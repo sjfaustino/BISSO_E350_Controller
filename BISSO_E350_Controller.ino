@@ -417,41 +417,124 @@ bool enqueueAxisMove(Axis a, float targetAbs, float feed){
   Move m{a, targetAbs, feed}; return qPush(m);
 }
 
-void parseGcodeLine(const String& line){
-  if (!X_AUTO()){ journalLog("WARN","GCODE_REJECT auto=LOW"); return; }
+/*─────────────────────────────────────────────────────────────
+  Updated parseGcodeLine()
+  - Default speed: MEDIUM (Y02) if no F specified
+  - Mode gating:
+      X_SEL_Y() → "C"  → allow Y, Z, F
+      X_SEL_X() → "T"  → allow X, Z, F
+      X_SEL_XY() → "C+T" → allow X, Y, Z, F
+  - Only one axis per G-code line accepted
+  - AUTO input (X04) must be HIGH to execute
+─────────────────────────────────────────────────────────────*/
+void parseGcodeLine(const String& line) {
 
-  char buf[128]; line.substring(0, sizeof(buf)-1).toCharArray(buf, sizeof(buf));
-  char *p=buf;
+  // AUTO mode gate
+  if (!X_AUTO()) {
+    journalLog("WARN", "GCODE_REJECT auto=LOW");
+    return;
+  }
 
-  char gc=' '; int gnum=0; bool isM=false; int mnum=0;
-  while (*p==' ') p++;
-  if (*p=='G'){ isM=false; gc='G'; p++; gnum=strtol(p,&p,10); }
-  else if (*p=='M'){ isM=true; gc='M'; p++; mnum=strtol(p,&p,10); }
+  // Copy to C string for token parsing
+  char buf[128];
+  line.substring(0, sizeof(buf) - 1).toCharArray(buf, sizeof(buf));
+  char *p = buf;
+
+  // Detect G/M command
+  char gc = ' ';
+  int gnum = 0, mnum = 0;
+  bool isM = false;
+
+  while (*p == ' ') p++;
+  if (*p == 'G') { isM = false; gc = 'G'; p++; gnum = strtol(p, &p, 10); }
+  else if (*p == 'M') { isM = true; gc = 'M'; p++; mnum = strtol(p, &p, 10); }
   else { return; }
 
-  if (!isM){
-    bool hasAxis=false; float fFeed=0;
-    float tgt[4] = {NAN,NAN,NAN,NAN};
-    while (*p){
-      while (*p==' ' || *p==',') p++;
-      char c=toupper(*p);
-      if (c=='X' || c=='Y' || c=='Z' || c=='A'){
-        p++; float v=strtof(p,&p);
-        int ai = (c=='X')?0:(c=='Y')?1:(c=='Z')?2:3;
-        tgt[ai]=v; hasAxis=true;
-      } else if (c=='F'){ p++; fFeed=strtof(p,&p); }
-      else { p++; }
+  // Axis / feed accumulators
+  float tgt[4] = {NAN, NAN, NAN, NAN};
+  float fFeed = 0.0f;
+
+  // Tokenize rest of line
+  while (*p) {
+    while (*p == ' ' || *p == ',') p++;
+    char c = toupper(*p);
+    if (c == 'X' || c == 'Y' || c == 'Z' || c == 'A') {
+      p++;
+      float v = strtof(p, &p);
+      int ai = (c == 'X') ? 0 : (c == 'Y') ? 1 : (c == 'Z') ? 2 : 3;
+      tgt[ai] = v;
+    } else if (c == 'F') {
+      p++;
+      fFeed = strtof(p, &p);
+    } else {
+      p++;
     }
-    if ((gnum==0 || gnum==1) && hasAxis){
-      for (int a=0;a<4;a++) if (!isnan(tgt[a])) enqueueAxisMove((Axis)a, tgt[a], fFeed);
-      journalLog("INFO","GCODE_ENQ G0/1");
+  }
+
+  // ------------------------------------------------------------
+  // Determine allowed axes based on mode selector inputs
+  bool modeC  = X_SEL_Y();   // "C" cut
+  bool modeT  = X_SEL_X();   // "T" traverse
+  bool modeCT = X_SEL_XY();  // "C+T"
+
+  bool allowX = false, allowY = false, allowZ = true;  // Z always allowed
+  if (modeC)  { allowY = true; }
+  if (modeT)  { allowX = true; }
+  if (modeCT) { allowX = true; allowY = true; }
+
+  if (!modeC && !modeT && !modeCT) {
+    journalLog("WARN", "NO_MODE_SELECTED");
+    alarmPush(AlarmCode::TASK_TIMEOUT, 0);  // repurpose as mode fault
+    return;
+  }
+
+  // ------------------------------------------------------------
+  // Count and validate axes in command
+  int axisCount = 0;
+  for (int a = 0; a < 4; a++) if (!isnan(tgt[a])) axisCount++;
+
+  if (axisCount == 0) {
+    journalLog("WARN", "NO_AXIS_SPECIFIED");
+    return;
+  }
+  if (axisCount > 1) {
+    journalLog("WARN", "MULTI_AXIS_REJECTED");
+    alarmPush(AlarmCode::TASK_TIMEOUT, axisCount);
+    return;
+  }
+
+  // ------------------------------------------------------------
+  // Resolve target axis and permission
+  Axis ax = AX_X;
+  float target = 0.0f;
+  if (!isnan(tgt[0])) { ax = AX_X; target = tgt[0]; if (!allowX) { journalLog("WARN", "X_AXIS_NOT_ALLOWED"); return; } }
+  if (!isnan(tgt[1])) { ax = AX_Y; target = tgt[1]; if (!allowY) { journalLog("WARN", "Y_AXIS_NOT_ALLOWED"); return; } }
+  if (!isnan(tgt[2])) { ax = AX_Z; target = tgt[2]; if (!allowZ) { journalLog("WARN", "Z_AXIS_NOT_ALLOWED"); return; } }
+
+  // ------------------------------------------------------------
+  // Default feed rate handling
+  if (fFeed <= 0.0f) {
+    fFeed = 300.0f;  // default to medium feed
+    journalLog("INFO", "FEED_DEFAULT_MEDIUM");
+  }
+
+  // ------------------------------------------------------------
+  // Execute command type
+  if (!isM) {
+    if (gnum == 0 || gnum == 1) {
+      enqueueAxisMove(ax, target, fFeed);
+      journalLog("INFO", "GCODE_SINGLE_AXIS_OK");
     }
   } else {
-    if (mnum==3){ Y_VS(true);  journalLog("INFO","M3 VS ON"); }
-    else if (mnum==5){ Y_VS(false); journalLog("INFO","M5 VS OFF"); }
-    else if (mnum==30){ outputsIdle(); journalLog("INFO","M30 IDLE"); }
+    switch (mnum) {
+      case 3:  Y_VS(true);  journalLog("INFO", "M3 SPINDLE ON");  break;
+      case 5:  Y_VS(false); journalLog("INFO", "M5 SPINDLE OFF"); break;
+      case 30: outputsIdle(); journalLog("INFO", "M30 PROGRAM END"); break;
+      default: break;
+    }
   }
 }
+
 
 /*─────────────────────────────────────────────────────────────
   16) Display Helpers: Delta Graphs, Diagnostics, CALIB UI
