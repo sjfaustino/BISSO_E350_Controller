@@ -372,11 +372,41 @@ uint8_t wj66GoodPct(){
 /*─────────────────────────────────────────────────────────────
   14) Axis / Motion Primitives
 ─────────────────────────────────────────────────────────────*/
-inline void setSpeedBits(float feed){
-  const float F_FAST = 600.0f; // threshold
-  Y_FAST(false); Y_MED(false);
-  if (feed >= F_FAST) Y_FAST(true); else if (feed>0) Y_MED(true);
+/*─────────────────────────────────────────────────────────────
+  Updated setSpeedBits()
+  - Feed ≤ 300 → MEDIUM speed (Y_MED)
+  - Feed ≥ 600 → FAST speed (Y_FAST)
+  - Feed between → retain previous state (no relay flicker)
+  - Feed ≤ 0 → defaults to MEDIUM (safety fallback)
+─────────────────────────────────────────────────────────────*/
+void setSpeedBits(float feed) {
+  static uint8_t lastMode = 0; // 0=idle, 1=medium, 2=fast
+
+  // Turn everything off initially
+  Y_FAST(false);
+  Y_MED(false);
+
+  // Determine speed category
+  uint8_t mode = 0;
+  if (feed <= 0.0f) { mode = 1; }          // Default to MEDIUM if undefined
+  else if (feed <= 300.0f) { mode = 1; }   // Medium speed threshold
+  else if (feed >= 600.0f) { mode = 2; }   // Fast speed threshold
+  else { mode = lastMode; }                // Between → keep previous speed
+
+  // Apply relay state based on mode
+  if (mode == 1) {
+    Y_MED(true);
+    lastMode = 1;
+    journalLog("INFO", "SPEED_SET_MEDIUM");
+  } else if (mode == 2) {
+    Y_FAST(true);
+    lastMode = 2;
+    journalLog("INFO", "SPEED_SET_FAST");
+  } else {
+    lastMode = 0;
+  }
 }
+
 void setAxisSelect(Axis a){
   Y_AX_X(false); Y_AX_Y(false); Y_AX_Z(false); Y_AX_A(false);
   switch(a){
