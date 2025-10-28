@@ -89,6 +89,10 @@ void loop(){
     case State::CALIB: task_calibration(); break;
     case State::SELF_TEST: selftestTask(); break;
     case State::DIAGNOSTICS: /* placeholder */ break;
+    case State::MANUAL_TILT:
+      manualTiltTask();
+      showManualTilt(getManualTiltTarget(), readTiltAngleDegrees(), cfg.a_axis_tilt_tolerance);
+      break;
     default: break;
   }
 

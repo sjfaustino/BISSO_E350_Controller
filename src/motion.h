@@ -6,3 +6,5 @@ bool enqueueAxisMove(Axis a, float targetAbs, float feed);
 void motionTask();
 int  motionQueueCount();
 bool setDirBits(bool dirPositive);
+void manualTiltTask();
+float getManualTiltTarget();

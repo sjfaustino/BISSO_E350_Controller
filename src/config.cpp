@@ -10,6 +10,9 @@ void cfgDefaults(){
   for(int i=0;i<4;i++){ cfg.softMin[i]=-1000.0f; cfg.softMax[i]=1000.0f; cfg.cal[i]={1.0f,0.0f}; }
   cfg.journal_flush_ms=5000; cfg.journal_flush_batch=10; cfg.journal_max_bytes=131072;
   cfg.run_ms_total=0;
+  cfg.a_axis_sensor_ch=1;
+  cfg.a_axis_degrees_per_unit=0.1f;
+  cfg.a_axis_tilt_tolerance=2.0f;
 }
 void cfgValidate(){
   if(cfg.debounce_ms<10||cfg.debounce_ms>1000) cfg.debounce_ms=50;
@@ -22,6 +25,9 @@ void cfgValidate(){
   if(cfg.journal_flush_ms<500||cfg.journal_flush_ms>60000) cfg.journal_flush_ms=5000;
   if(cfg.journal_flush_batch<1||cfg.journal_flush_batch>100) cfg.journal_flush_batch=10;
   if(cfg.journal_max_bytes<16384||cfg.journal_max_bytes>524288) cfg.journal_max_bytes=131072;
+  if(cfg.a_axis_sensor_ch>3) cfg.a_axis_sensor_ch=1;
+  if(cfg.a_axis_degrees_per_unit<0.01f||cfg.a_axis_degrees_per_unit>10.0f) cfg.a_axis_degrees_per_unit=0.1f;
+  if(cfg.a_axis_tilt_tolerance<0.1f||cfg.a_axis_tilt_tolerance>90.0f) cfg.a_axis_tilt_tolerance=2.0f;
 }
 void saveConfig(const Config& c){ prefs.begin("bisso",false); prefs.putBytes("cfg",&c,sizeof(Config)); prefs.end(); }
 void loadConfig(){
@@ -44,7 +50,9 @@ void cfgExportJSON(){
   for(int i=0;i<4;i++) f.printf("{\"gain\":%.6f,\"offset\":%.6f}%s", cfg.cal[i].gain, cfg.cal[i].offset, (i<3)?",":"");
   f.printf("],\"journal_flush_ms\":%u,\"journal_flush_batch\":%u,\"journal_max_bytes\":%u,",
            (unsigned)cfg.journal_flush_ms,(unsigned)cfg.journal_flush_batch,(unsigned)cfg.journal_max_bytes);
-  f.printf("\"run_ms_total\":%llu}\n",(unsigned long long)cfg.run_ms_total);
+  f.printf("\"run_ms_total\":%llu,", (unsigned long long)cfg.run_ms_total);
+  f.printf("\"a_axis_sensor_ch\":%u,\"a_axis_degrees_per_unit\":%.6f,\"a_axis_tilt_tolerance\":%.3f}\n",
+           (unsigned)cfg.a_axis_sensor_ch, cfg.a_axis_degrees_per_unit, cfg.a_axis_tilt_tolerance);
   f.close(); Serial.println(F("OK /config.json written"));
 }
 
@@ -68,6 +76,9 @@ void cfgImportJSON(){
     if((k=s.indexOf("\"journal_flush_batch\""))>=0){ int c=s.indexOf(':',k); cfg.journal_flush_batch=(uint16_t)s.substring(c+1).toInt(); }
     if((k=s.indexOf("\"journal_max_bytes\""))>=0){ int c=s.indexOf(':',k); cfg.journal_max_bytes=(uint32_t)s.substring(c+1).toInt(); }
     if((k=s.indexOf("\"run_ms_total\""))>=0){ int c=s.indexOf(':',k); cfg.run_ms_total=(uint64_t)s.substring(c+1).toInt(); }
+    if((k=s.indexOf("\"a_axis_sensor_ch\""))>=0){ int c=s.indexOf(':',k); cfg.a_axis_sensor_ch=(uint8_t)s.substring(c+1).toInt(); }
+    if((k=s.indexOf("\"a_axis_degrees_per_unit\""))>=0){ int c=s.indexOf(':',k); cfg.a_axis_degrees_per_unit=s.substring(c+1).toFloat(); }
+    if((k=s.indexOf("\"a_axis_tilt_tolerance\""))>=0){ int c=s.indexOf(':',k); cfg.a_axis_tilt_tolerance=s.substring(c+1).toFloat(); }
     float tmp4[4];
     if(parseArray4(s,"\"softMin\"",tmp4)) for(int i=0;i<4;i++) cfg.softMin[i]=tmp4[i];
     if(parseArray4(s,"\"softMax\"",tmp4)) for(int i=0;i<4;i++) cfg.softMax[i]=tmp4[i];
@@ -96,3 +107,4 @@ float adcReadRaw(int ch){
 }
 float adcReadLinearized(int ch){ return adcReadRaw(ch)*cfg.cal[ch&3].gain + cfg.cal[ch&3].offset; }
 float mockTemperatureC(){ return adcReadLinearized(0)*0.1f; }
+float readTiltAngleDegrees(){ return adcReadLinearized(cfg.a_axis_sensor_ch)*cfg.a_axis_degrees_per_unit; }

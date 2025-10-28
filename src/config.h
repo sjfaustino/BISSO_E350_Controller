@@ -11,3 +11,4 @@ void cfgImportJSON();
 float adcReadRaw(int ch);
 float adcReadLinearized(int ch);
 float mockTemperatureC();
+float readTiltAngleDegrees();
