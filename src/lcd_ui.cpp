@@ -60,3 +60,15 @@ void showCalib(uint8_t axisSel){
   snprintf(l3,sizeof(l3),"Hold START>3s=SAVE");
   lcdPrintLine(0,l0); lcdPrintLine(1,l1); lcdPrintLine(2,l2); lcdPrintLine(3,l3);
 }
+
+void showManualTilt(float targetDeg, float currentDeg, float tolerance){
+  char l0[21],l1[21],l2[21],l3[21];
+  float error=fabsf(targetDeg-currentDeg);
+  bool withinTol=(error<=tolerance);
+  snprintf(l0,sizeof(l0),"TILT BLADE MANUALLY");
+  snprintf(l1,sizeof(l1),"Target: %+6.1f deg", targetDeg);
+  snprintf(l2,sizeof(l2),"Actual: %+6.1f deg", currentDeg);
+  if(withinTol) snprintf(l3,sizeof(l3),"OK! Err:%4.1f<%4.1f", error, tolerance);
+  else          snprintf(l3,sizeof(l3),"Err:%6.1f>%4.1f", error, tolerance);
+  lcdPrintLine(0,l0); lcdPrintLine(1,l1); lcdPrintLine(2,l2); lcdPrintLine(3,l3);
+}

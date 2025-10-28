@@ -25,7 +25,7 @@
 #define ADC_PIN3 35
 
 enum class Axis : uint8_t { AX_X=0, AX_Y, AX_Z, AX_A };
-enum class State : uint8_t { IDLE=0, RUN, CALIB, DIAGNOSTICS, SELF_TEST, ERROR };
+enum class State : uint8_t { IDLE=0, RUN, CALIB, DIAGNOSTICS, SELF_TEST, ERROR, MANUAL_TILT };
 enum class AlarmCode : int8_t {
   NONE=0, SOFTLIMIT, SENSOR_FAULT, TEMP_TRIP, ESTOP,
   OUTPUT_INTERLOCK, ENC_MISMATCH, STALL
@@ -42,6 +42,9 @@ struct Config {
   Cal cal[4];
   uint32_t journal_flush_ms, journal_flush_batch, journal_max_bytes;
   uint64_t run_ms_total;
+  uint8_t a_axis_sensor_ch;
+  float a_axis_degrees_per_unit;
+  float a_axis_tilt_tolerance;
 };
 
 struct WJ66Data {

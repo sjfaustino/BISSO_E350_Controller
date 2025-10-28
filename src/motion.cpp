@@ -9,6 +9,15 @@ static bool  busy=false; static Move cur;
 static long  startEnc=0, lastEnc=0;
 static uint32_t startT=0, lastEncT=0;
 
+// Manual tilt state
+static struct {
+  bool active;
+  float targetDeg;
+  uint32_t startMs;
+} g_manualTilt = {false, 0.0f, 0};
+
+extern State state;
+
 static inline void setSpeedBits(float feed){
   Y_FAST(false); Y_MED(false);
   if (feed>=1.0f) Y_FAST(true); else Y_MED(true);
@@ -62,12 +71,29 @@ bool enqueueAxisMove(Axis a, float targetAbs, float feed){
 void motionTask(){
   if(!busy){
     if(!qPop(cur)) return;
-    busy=true; startT=millis(); setAxisBits(cur.axis);
+    busy=true; startT=millis();
+
+    // Check if this is an A-axis move - trigger manual tilt mode
+    if(cur.axis == Axis::AX_A){
+      g_manualTilt.active = true;
+      g_manualTilt.targetDeg = cur.targetAbs;
+      g_manualTilt.startMs = millis();
+      state = State::MANUAL_TILT;
+      journalLog("INFO","A_AXIS_MANUAL_TILT_MODE");
+      outputsIdle();
+      return; // Don't execute automatically
+    }
+
+    setAxisBits(cur.axis);
     startEnc=wj66.pos[(int)cur.axis]; lastEnc=startEnc; lastEncT=millis();
     bool dirPos=(cur.targetAbs>(float)startEnc);
     if(!setDirBits(dirPos)){ outputsIdle(); return; }
     setSpeedBits(cur.feed); Y_VS(true);
   }
+
+  // If in manual tilt mode, don't process normal motion
+  if(g_manualTilt.active) return;
+
   int ai=(int)cur.axis; float lo=cfg.softMin[ai], hi=cfg.softMax[ai];
   float posNow=(float)wj66.pos[ai];
   if(posNow<lo||posNow>hi){
@@ -84,3 +110,20 @@ void motionTask(){
     alarmPush(AlarmCode::STALL, (int16_t)ai); Y_VS(false); outputsIdle(); onSystemError(AlarmCode::STALL,(int16_t)ai); busy=false; return;
   }
 }
+
+void manualTiltTask(){
+  if(!g_manualTilt.active) return;
+
+  float currentDeg = readTiltAngleDegrees();
+  float error = fabsf(g_manualTilt.targetDeg - currentDeg);
+
+  // Check if within tolerance
+  if(error <= cfg.a_axis_tilt_tolerance){
+    journalLog("INFO","MANUAL_TILT_COMPLETE");
+    g_manualTilt.active = false;
+    busy = false;
+    state = State::RUN;
+  }
+}
+
+float getManualTiltTarget(){ return g_manualTilt.targetDeg; }
