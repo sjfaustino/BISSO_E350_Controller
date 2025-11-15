@@ -1,4 +1,5 @@
 #include "web_server.h"
+#include "motion.h"
 #include <ArduinoJson.h>
 
 // Global instance
@@ -100,14 +101,99 @@ void WebServerManager::handleJog() {
     
     String body = server->arg("plain");
     JsonDocument doc;
-    deserializeJson(doc, body);
     
+    // Deserialize JSON
+    DeserializationError error = deserializeJson(doc, body);
+    if (error) {
+        Serial.print("[WEB-JOG] JSON parse error: ");
+        Serial.println(error.c_str());
+        server->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        return;
+    }
+    
+    // Extract and validate parameters
     const char* direction = doc["direction"];
-    Serial.printf("[WEB-JOG] Direction: %s\n", direction);
+    float distance = doc["distance"] | 10.0f;      // Default 10mm
+    float speed = doc["speed"] | 50.0f;            // Default 50mm/s
     
-    // TODO: Integrate with motion control
+    // Input validation
+    if (!direction || distance <= 0 || distance > 500 || speed <= 0 || speed > 200) {
+        Serial.println("[WEB-JOG] ERROR: Invalid parameters");
+        server->send(400, "application/json", 
+            "{\"error\":\"Invalid: distance must be 0-500, speed 0-200\"}");
+        return;
+    }
     
-    server->send(200, "application/json", "{\"status\":\"ok\"}");
+    Serial.printf("[WEB-JOG] Direction: %s, Distance: %.1f mm, Speed: %.1f mm/s\n", 
+                  direction, distance, speed);
+    
+    // Integrate with motion control - execute jog command
+    bool success = false;
+    
+    if (strcmp(direction, "X+") == 0) {
+        motionMoveRelative(distance, 0, 0, 0, speed);
+        success = true;
+    } 
+    else if (strcmp(direction, "X-") == 0) {
+        motionMoveRelative(-distance, 0, 0, 0, speed);
+        success = true;
+    } 
+    else if (strcmp(direction, "Y+") == 0) {
+        motionMoveRelative(0, distance, 0, 0, speed);
+        success = true;
+    } 
+    else if (strcmp(direction, "Y-") == 0) {
+        motionMoveRelative(0, -distance, 0, 0, speed);
+        success = true;
+    } 
+    else if (strcmp(direction, "Z+") == 0) {
+        motionMoveRelative(0, 0, distance, 0, speed);
+        success = true;
+    } 
+    else if (strcmp(direction, "Z-") == 0) {
+        motionMoveRelative(0, 0, -distance, 0, speed);
+        success = true;
+    } 
+    else if (strcmp(direction, "A+") == 0) {
+        motionMoveRelative(0, 0, 0, distance, speed);
+        success = true;
+    } 
+    else if (strcmp(direction, "A-") == 0) {
+        motionMoveRelative(0, 0, 0, -distance, speed);
+        success = true;
+    } 
+    else if (strcmp(direction, "STOP") == 0) {
+        motionStop();
+        success = true;
+    }
+    else {
+        Serial.printf("[WEB-JOG] ERROR: Unknown direction '%s'\n", direction);
+        server->send(400, "application/json", "{\"error\":\"Unknown direction\"}");
+        return;
+    }
+    
+    if (success) {
+        // Build response with current status
+        JsonDocument response;
+        response["status"] = "ok";
+        response["direction"] = direction;
+        response["distance"] = distance;
+        response["speed"] = speed;
+        response["x_pos"] = motionGetPosition(0) / 1000.0f;
+        response["y_pos"] = motionGetPosition(1) / 1000.0f;
+        response["z_pos"] = motionGetPosition(2) / 1000.0f;
+        response["a_pos"] = motionGetPosition(3) / 1000.0f;
+        
+        String json;
+        serializeJson(response, json);
+        server->send(200, "application/json", json);
+        
+        Serial.println("[WEB-JOG] ✅ Motion command executed successfully");
+    } 
+    else {
+        server->send(500, "application/json", "{\"error\":\"Motion command failed\"}");
+        Serial.println("[WEB-JOG] ❌ Motion command failed");
+    }
 }
 
 void WebServerManager::handleNotFound() {

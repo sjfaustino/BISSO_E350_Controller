@@ -237,10 +237,25 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t* data, uint8_t len
   // All retries exhausted
   stats.transactions_failed++;
   
-  // Log fault
-  char msg[64];
-  snprintf(msg, sizeof(msg), "I²C transaction failed (0x%02X) - %s", address, i2cResultToString(result));
+  // Log detailed fault
+  char msg[96];
+  const char* error_name = i2cResultToString(result);
+  snprintf(msg, sizeof(msg), "I²C transaction failed (addr=0x%02X, retries=%d) - %s", 
+           address, retry_config.max_retries, error_name);
   faultLogError(FAULT_PLC_COMM_LOSS, msg);
+  
+  // Check bus status on failure
+  i2c_bus_status_t bus_status = i2cCheckBusStatus();
+  if (bus_status != I2C_BUS_OK) {
+    Serial.print("[I2C] WARNING: Bus status degraded - ");
+    Serial.println(i2cBusStatusToString(bus_status));
+    
+    // Trigger recovery for bus errors
+    if (bus_status == I2C_BUS_STUCK_SDA || bus_status == I2C_BUS_STUCK_SCL) {
+      Serial.println("[I2C] Initiating bus recovery...");
+      i2cRecoverBus();
+    }
+  }
   
   return result;
 }

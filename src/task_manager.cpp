@@ -1,4 +1,8 @@
 #include "task_manager.h"
+#include "fault_logging.h"
+#include "serial_logger.h"
+#include "watchdog_manager.h"
+#include "system_constants.h"
 #include "safety.h"
 #include "motion.h"
 #include "encoder_wj66.h"
@@ -85,6 +89,16 @@ void taskManagerInit() {
   if (!queue_motion || !queue_safety || !queue_encoder || 
       !queue_plc || !queue_fault || !queue_display) {
     Serial.println("[TASKS] ERROR: Failed to create queues!");
+    if (!queue_motion) Serial.println("  - Motion queue creation FAILED");
+    if (!queue_safety) Serial.println("  - Safety queue creation FAILED");
+    if (!queue_encoder) Serial.println("  - Encoder queue creation FAILED");
+    if (!queue_plc) Serial.println("  - PLC queue creation FAILED");
+    if (!queue_fault) Serial.println("  - Fault queue creation FAILED");
+    if (!queue_display) Serial.println("  - Display queue creation FAILED");
+    
+    faultLogError(FAULT_BOOT_FAILED, "Task queue creation failed");
+    Serial.println("[TASKS] CRITICAL: System cannot proceed without queues");
+    // Note: Consider esp_restart() here if absolutely critical
     return;
   }
   Serial.println("[TASKS] ✅ Message queues created");
@@ -97,6 +111,12 @@ void taskManagerInit() {
   
   if (!mutex_config || !mutex_i2c || !mutex_motion) {
     Serial.println("[TASKS] ERROR: Failed to create mutexes!");
+    if (!mutex_config) Serial.println("  - Config mutex creation FAILED");
+    if (!mutex_i2c) Serial.println("  - I2C mutex creation FAILED");
+    if (!mutex_motion) Serial.println("  - Motion mutex creation FAILED");
+    
+    faultLogError(FAULT_BOOT_FAILED, "Mutex creation failed");
+    Serial.println("[TASKS] CRITICAL: System cannot proceed without mutexes");
     return;
   }
   Serial.println("[TASKS] ✅ Mutexes created");
@@ -621,6 +641,7 @@ void taskMonitorCreate() {
 
 void taskMonitorFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
+  uint32_t last_watchdog_feed = millis();
   
   Serial.println("[MONITOR_TASK] Started on core 1");
   
@@ -628,6 +649,13 @@ void taskMonitorFunction(void* parameter) {
   memoryMonitorInit();
   
   while (1) {
+    // WATCHDOG FEED AT START - Critical protection
+    uint32_t now = millis();
+    if (now - last_watchdog_feed > WATCHDOG_FEED_INTERVAL_MS) {
+      watchdogFeed("monitor");
+      last_watchdog_feed = now;
+    }
+    
     uint32_t task_start = millis();
     
     // Update memory statistics
@@ -638,6 +666,20 @@ void taskMonitorFunction(void* parameter) {
       faultLogWarning(FAULT_WATCHDOG_TIMEOUT, "Memory critically low!");
     }
     
+    // Monitor other task execution times and detect hangs
+    for (int i = 0; i < stats_count; i++) {
+      if (task_stats[i].last_run_time_ms > TASK_MONITOR_INTERVAL_MS) {
+        Serial.print("[MONITOR] WARNING: Task '");
+        Serial.print(task_stats[i].name);
+        Serial.print("' took ");
+        Serial.print(task_stats[i].last_run_time_ms);
+        Serial.println("ms (may cause watchdog timeout)");
+        
+        faultLogWarning(FAULT_WATCHDOG_TIMEOUT, 
+                       "Task execution time exceeded threshold");
+      }
+    }
+    
     // Update stats
     uint32_t task_time = millis() - task_start;
     task_stats[7].run_count++;
@@ -646,6 +688,9 @@ void taskMonitorFunction(void* parameter) {
     if (task_time > task_stats[7].max_run_time_ms) {
       task_stats[7].max_run_time_ms = task_time;
     }
+    
+    // WATCHDOG FEED AT END - Additional protection
+    watchdogFeed("monitor");
     
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_MONITOR));
   }

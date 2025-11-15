@@ -17,6 +17,7 @@ typedef struct {
 } cli_command_t;
 
 void cliInit();
+void cliCleanup();
 void cliUpdate();
 void cliProcessCommand(const char* cmd);
 void cliPrintHelp();

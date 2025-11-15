@@ -2,6 +2,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include "system_constants.h"
+#include "string_safety.h"
 #include "config_unified.h"
 #include "motion.h"
 #include "encoder_wj66.h"
