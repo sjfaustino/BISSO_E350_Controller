@@ -1,4 +1,7 @@
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include "config_unified.h"
 #include "motion.h"
 #include "encoder_wj66.h"
@@ -7,11 +10,18 @@
 #include "safety.h"
 #include "cli.h"
 #include "lcd_interface.h"
+#include "fault_logging.h"
+#include "timeout_manager.h"
+#include "task_manager.h"
+#include "config_schema_versioning.h"
+#include "watchdog_manager.h"
 
 static bool system_ready = false;
 static uint32_t boot_time_ms = 0;
-static uint32_t uptime_seconds = 0;
-static uint32_t last_uptime_update = 0;
+
+// ============================================================================
+// BOOT SEQUENCE - Runs on core 0 before tasks start
+// ============================================================================
 
 void setup() {
   // Serial initialization
@@ -22,97 +32,125 @@ void setup() {
   
   Serial.println("\n╔════════════════════════════════════════╗");
   Serial.println("║     BISSO v4.2 Production Firmware     ║");
-  Serial.println("║          ESP32-S3 Bridge Saw            ║");
+  Serial.println("║   ESP32-S3 Bridge Saw Controller        ║");
+  Serial.println("║   FreeRTOS Multi-Task Architecture      ║");
   Serial.println("╚════════════════════════════════════════╝\n");
   
-  Serial.print("Boot started at: ");
+  Serial.print("[BOOT] Started at: ");
   Serial.print(boot_time_ms);
-  Serial.println(" ms");
+  Serial.println(" ms\n");
 
-  // Initialize systems in order
-  Serial.println("\n[BOOT] Initializing systems...\n");
+  // Initialize core systems in order (sequential initialization)
+  Serial.println("[BOOT] Initializing core systems (pre-task)...\n");
   
-  Serial.println("[BOOT] 1/8 - Configuration system");
+  // Fault logging FIRST (needed for error reporting)
+  Serial.println("[BOOT] 1/10 - Fault logging system");
+  faultLoggingInit();
+  delay(50);
+  
+  // Watchdog SECOND (protects everything)
+  Serial.println("[BOOT] 2/10 - Watchdog timer system");
+  watchdogInit();
+  delay(50);
+  
+  // Timeout manager
+  Serial.println("[BOOT] 3/10 - Timeout manager");
+  timeoutManagerInit();
+  delay(50);
+  
+  // Configuration system with schema versioning
+  Serial.println("[BOOT] 4/10 - Configuration system");
   configUnifiedInit();
-  delay(100);
+  delay(50);
   
-  Serial.println("[BOOT] 2/8 - Safety system");
+  Serial.println("[BOOT] 5/10 - Schema versioning");
+  configSchemaVersioningInit();
+  delay(50);
+  
+  // Safety system
+  Serial.println("[BOOT] 6/10 - Safety system");
   safetyInit();
-  delay(100);
+  delay(50);
   
-  Serial.println("[BOOT] 3/8 - Motion system");
+  // Motion system
+  Serial.println("[BOOT] 7/10 - Motion system");
   motionInit();
-  delay(100);
+  delay(50);
   
-  Serial.println("[BOOT] 4/8 - Encoder system");
+  // Encoder system
+  Serial.println("[BOOT] 8/10 - Encoder system");
   wj66Init();
-  delay(100);
+  delay(50);
   
-  Serial.println("[BOOT] 5/8 - Encoder calibration");
+  Serial.println("[BOOT] 9/10 - Encoder calibration");
   encoderCalibrationInit();
-  delay(100);
-  
-  Serial.println("[BOOT] 6/8 - PLC interface");
-  plcIfaceInit();
-  delay(100);
-  
-  Serial.println("[BOOT] 7/8 - LCD interface");
-  lcdInterfaceInit();
-  delay(100);
-  
-  Serial.println("[BOOT] 8/8 - Command Line Interface");
-  cliInit();
-  delay(100);
-  
-  system_ready = true;
-  uint32_t boot_duration = millis() - boot_time_ms;
-  
-  Serial.println("\n╔════════════════════════════════════════╗");
-  Serial.print("║ System ready in ");
-  Serial.print(boot_duration);
-  Serial.println(" ms");
-  Serial.println("╚════════════════════════════════════════╝\n");
-  
-  // Set initial LCD display
-  lcdInterfacePrintLine(0, "BISSO v4.2");
-  lcdInterfacePrintLine(1, "System Ready");
-  lcdInterfacePrintLine(2, "Waiting for commands");
-  lcdInterfacePrintLine(3, "Type: help");
-  
-  last_uptime_update = millis();
-}
-
-void loop() {
-  if (!system_ready) {
-    delay(10);
-    return;
-  }
-  
-  // Update uptime counter
-  if (millis() - last_uptime_update >= 1000) {
-    uptime_seconds++;
-    last_uptime_update = millis();
-  }
-  
-  // Safety checks FIRST (highest priority)
-  safetyUpdate();
-  
-  // Motion control
-  motionUpdate();
-  
-  // Encoder updates
-  wj66Update();
-  encoderCalibrationUpdate();
+  delay(50);
   
   // PLC interface
-  plcIfaceUpdate();
+  Serial.println("[BOOT] 10/10 - PLC interface");
+  plcIfaceInit();
+  delay(50);
   
-  // LCD updates
-  lcdInterfaceUpdate();
+  // Boot validation
+  Serial.println("\n[BOOT] Running pre-task boot validation...");
+  bootValidationInit();
   
-  // CLI processing (user input)
-  cliUpdate();
+  if (bootValidateAllSystems()) {
+    Serial.println("✅ Pre-task validation PASSED\n");
+  } else {
+    Serial.println("❌ Pre-task validation FAILED\n");
+    faultLogError(FAULT_BOOT_FAILED, "Pre-task validation failed");
+  }
   
-  // Minimal delay to prevent watchdog timeout
-  delayMicroseconds(100);
+  uint32_t pre_task_boot_ms = millis() - boot_time_ms;
+  Serial.print("[BOOT] Pre-task initialization: ");
+  Serial.print(pre_task_boot_ms);
+  Serial.println(" ms\n");
+  
+  // Initialize FreeRTOS task manager
+  Serial.println("[BOOT] Initializing FreeRTOS task manager...");
+  taskManagerInit();
+  
+  delay(100);
+  
+  // Start all FreeRTOS tasks
+  Serial.println("[BOOT] Starting FreeRTOS tasks...");
+  taskManagerStart();
+  
+  // All systems initialized, tasks will take over
+  system_ready = true;
+  
+  uint32_t total_boot_ms = millis() - boot_time_ms;
+  Serial.print("[BOOT] Total boot time: ");
+  Serial.print(total_boot_ms);
+  Serial.println(" ms\n");
+  
+  Serial.println("╔════════════════════════════════════════╗");
+  Serial.println("║      ✅ SYSTEM BOOT COMPLETE          ║");
+  Serial.println("║   All FreeRTOS tasks running...        ║");
+  Serial.println("╚════════════════════════════════════════╝\n");
+  
+  bootShowStatus();
+  cliPrintPrompt();
+  
+  // Delete setup task (no longer needed)
+  // The FreeRTOS tasks will handle everything
+  vTaskDelete(NULL);
+}
+
+// ============================================================================
+// LOOP - Runs on core 0 (idle loop)
+// ============================================================================
+
+void loop() {
+  // In FreeRTOS architecture, loop() is not the main control flow
+  // All real-time work is done in FreeRTOS tasks
+  
+  // Keep core 0 available for WiFi/BLE (if needed in future)
+  // Monitor system health periodically
+  
+  delay(1000);  // Minimal idle loop on core 0
+  
+  // Optional: System health monitoring every few seconds
+  // This runs on core 0 and doesn't interfere with core 1 tasks
 }

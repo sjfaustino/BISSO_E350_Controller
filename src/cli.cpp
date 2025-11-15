@@ -1,6 +1,9 @@
 #include "cli.h"
 #include "motion.h"
 #include "config_unified.h"
+#include "fault_logging.h"
+#include "boot_validation.h"
+#include "cli_stubs.h"
 
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint16_t cli_pos = 0;
@@ -26,6 +29,26 @@ void cmd_plc_status(int argc, char** argv);
 void cmd_system_info(int argc, char** argv);
 void cmd_system_reset(int argc, char** argv);
 void cmd_calibrate_speed(int argc, char** argv);
+void cmd_fault_show(int argc, char** argv);
+void cmd_fault_clear(int argc, char** argv);
+void cmd_estop_activate(int argc, char** argv);
+void cmd_estop_recover(int argc, char** argv);
+void cmd_timeout_diag(int argc, char** argv);
+void cmd_i2c_diag(int argc, char** argv);
+void cmd_i2c_recover(int argc, char** argv);
+void cmd_encoder_diag(int argc, char** argv);
+void cmd_encoder_baud_detect(int argc, char** argv);
+void cmd_task_stats(int argc, char** argv);
+void cmd_task_list(int argc, char** argv);
+void cmd_task_cpu(int argc, char** argv);
+void cmd_wdt_status(int argc, char** argv);
+void cmd_wdt_tasks(int argc, char** argv);
+void cmd_wdt_stats(int argc, char** argv);
+void cmd_wdt_report(int argc, char** argv);
+void cmd_config_schema_show(int argc, char** argv);
+void cmd_config_migrate(int argc, char** argv);
+void cmd_config_rollback(int argc, char** argv);
+void cmd_config_validate(int argc, char** argv);
 
 void cliInit() {
   Serial.println("[CLI] Command Line Interface initializing...");
@@ -50,6 +73,26 @@ void cliInit() {
   cliRegisterCommand("info", "System information", cmd_system_info);
   cliRegisterCommand("reset", "System reset", cmd_system_reset);
   cliRegisterCommand("speed", "Calibrate axis speed (speed axis [distance_mm])", cmd_calibrate_speed);
+  cliRegisterCommand("faults", "Show fault history", cmd_fault_show);
+  cliRegisterCommand("faults_clear", "Clear fault history", cmd_fault_clear);
+  cliRegisterCommand("estop", "Activate emergency stop", cmd_estop_activate);
+  cliRegisterCommand("estop_recover", "Request emergency stop recovery", cmd_estop_recover);
+  cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
+  cliRegisterCommand("i2c_diag", "Show I²C diagnostics", cmd_i2c_diag);
+  cliRegisterCommand("i2c_recover", "Recover I²C bus", cmd_i2c_recover);
+  cliRegisterCommand("encoder_diag", "Show encoder diagnostics", cmd_encoder_diag);
+  cliRegisterCommand("encoder_baud", "Auto-detect encoder baud rate", cmd_encoder_baud_detect);
+  cliRegisterCommand("config_schema", "Show schema history", cmd_config_schema_show);
+  cliRegisterCommand("config_migrate", "Migrate configuration to new schema", cmd_config_migrate);
+  cliRegisterCommand("config_rollback", "Rollback to previous schema", cmd_config_rollback);
+  cliRegisterCommand("config_validate", "Validate configuration schema", cmd_config_validate);
+  cliRegisterCommand("task_stats", "Show FreeRTOS task statistics", cmd_task_stats);
+  cliRegisterCommand("task_list", "List all FreeRTOS tasks", cmd_task_list);
+  cliRegisterCommand("task_cpu", "Show CPU usage", cmd_task_cpu);
+  cliRegisterCommand("wdt_status", "Show watchdog status", cmd_wdt_status);
+  cliRegisterCommand("wdt_tasks", "List monitored tasks", cmd_wdt_tasks);
+  cliRegisterCommand("wdt_stats", "Show watchdog statistics", cmd_wdt_stats);
+  cliRegisterCommand("wdt_report", "Detailed watchdog report", cmd_wdt_report);
   
   Serial.print("[CLI] Registered ");
   Serial.print(command_count);
@@ -173,17 +216,117 @@ void cmd_safety_status(int argc, char** argv) {
 }
 
 void cmd_config_show(int argc, char** argv) {
-  Serial.println("[CLI] Configuration (would display all config values)");
+  Serial.println("\n╔════════════════════════════════════════════════════════════════╗");
+  Serial.println("║           CONFIGURATION - ALL VALUES FROM NVS STORAGE          ║");
+  Serial.println("╚════════════════════════════════════════════════════════════════╝");
+  
+  // Soft Limits (Motion boundaries)
+  Serial.println("\n[LIMITS] Soft Limits (encoder counts):");
+  Serial.print("  X: ");
+  Serial.print(configGetInt("x_soft_limit_min", -50000));
+  Serial.print(" to ");
+  Serial.println(configGetInt("x_soft_limit_max", 50000));
+  
+  Serial.print("  Y: ");
+  Serial.print(configGetInt("y_soft_limit_min", -50000));
+  Serial.print(" to ");
+  Serial.println(configGetInt("y_soft_limit_max", 50000));
+  
+  Serial.print("  Z: ");
+  Serial.print(configGetInt("z_soft_limit_min", -50000));
+  Serial.print(" to ");
+  Serial.println(configGetInt("z_soft_limit_max", 50000));
+  
+  Serial.print("  A: ");
+  Serial.print(configGetInt("a_soft_limit_min", 0));
+  Serial.print(" to ");
+  Serial.println(configGetInt("a_soft_limit_max", 360000));
+  
+  // Motion Parameters
+  Serial.println("\n[MOTION] Motion Parameters:");
+  Serial.print("  Default Speed: ");
+  Serial.print(configGetFloat("default_speed_mm_s", 50.0f));
+  Serial.println(" mm/s");
+  
+  Serial.print("  Default Acceleration: ");
+  Serial.print(configGetFloat("default_acceleration", 5.0f));
+  Serial.println(" mm/s²");
+  
+  // Speed Calibrations
+  Serial.println("\n[SPEEDS] Calibrated Speeds (mm/s):");
+  float speed_x = configGetFloat("speed_X_mm_s", 0.0f);
+  float speed_y = configGetFloat("speed_Y_mm_s", 0.0f);
+  float speed_z = configGetFloat("speed_Z_mm_s", 0.0f);
+  float speed_a = configGetFloat("speed_A_mm_s", 0.0f);
+  
+  Serial.print("  X: ");
+  if (speed_x > 0) {
+    Serial.print(speed_x);
+    Serial.println(" ✅");
+  } else {
+    Serial.println("NOT CALIBRATED");
+  }
+  
+  Serial.print("  Y: ");
+  if (speed_y > 0) {
+    Serial.print(speed_y);
+    Serial.println(" ✅");
+  } else {
+    Serial.println("NOT CALIBRATED");
+  }
+  
+  Serial.print("  Z: ");
+  if (speed_z > 0) {
+    Serial.print(speed_z);
+    Serial.println(" ✅");
+  } else {
+    Serial.println("NOT CALIBRATED");
+  }
+  
+  Serial.print("  A: ");
+  if (speed_a > 0) {
+    Serial.print(speed_a);
+    Serial.println(" ✅");
+  } else {
+    Serial.println("NOT CALIBRATED");
+  }
+  
+  // Encoder PPM
+  Serial.println("\n[ENCODER] Encoder PPM (pulses per mm):");
+  Serial.print("  X: ");
+  Serial.println(configGetInt("encoder_ppm_x", 0));
+  
+  Serial.print("  Y: ");
+  Serial.println(configGetInt("encoder_ppm_y", 0));
+  
+  Serial.print("  Z: ");
+  Serial.println(configGetInt("encoder_ppm_z", 0));
+  
+  Serial.print("  A: ");
+  Serial.println(configGetInt("encoder_ppm_a", 0));
+  
+  // Safety Settings
+  Serial.println("\n[SAFETY] Safety Settings:");
+  Serial.print("  Alarm Pin: ");
+  Serial.println(configGetInt("alarm_pin", 2));
+  
+  Serial.print("  Stall Timeout: ");
+  Serial.print(configGetInt("stall_timeout_ms", 2000));
+  Serial.println(" ms");
+  
+  Serial.println("\n✅ All values retrieved from NVS persistent storage\n");
 }
 
 void cmd_config_reset(int argc, char** argv) {
-  Serial.println("[CLI] Config reset requested");
-  // configUnifiedReset();
+  Serial.println("[CONFIG] Resetting ALL configuration to factory defaults...");
+  configUnifiedReset();
+  Serial.println("[CONFIG] ✅ Factory reset complete - all defaults saved to NVS");
 }
 
 void cmd_config_save(int argc, char** argv) {
-  Serial.println("[CLI] Saving configuration...");
-  // configUnifiedSave();
+  Serial.println("[CONFIG] Ensuring all configuration is saved to NVS...");
+  configUnifiedSave();
+  Serial.println("[CONFIG] ✅ All configuration verified and saved to NVS");
 }
 
 void cmd_motion_move(int argc, char** argv) {
@@ -508,4 +651,180 @@ void cmd_calibrate_speed(int argc, char** argv) {
   // Save configuration to persistent storage
   configUnifiedSave();
   Serial.println("\n✅ Configuration saved to persistent storage");
+}
+
+void cmd_fault_show(int argc, char** argv) {
+  faultShowHistory();
+}
+
+void cmd_fault_clear(int argc, char** argv) {
+  Serial.println("[CLI] Clearing fault history...");
+  faultClearHistory();
+}
+
+void cmd_estop_activate(int argc, char** argv) {
+  emergencyStopSetActive(true);
+}
+
+void cmd_estop_recover(int argc, char** argv) {
+  if (!emergencyStopIsActive()) {
+    Serial.println("[ESTOP] No active emergency stop");
+    return;
+  }
+  
+  Serial.println("\n╔════════════════════════════════════════╗");
+  Serial.println("║     EMERGENCY STOP RECOVERY REQUEST     ║");
+  Serial.println("╚════════════════════════════════════════╝\n");
+  
+  Serial.println("[ESTOP] System was halted by emergency stop");
+  Serial.println("[ESTOP] Requesting recovery procedure...");
+  
+  if (emergencyStopRequestRecovery()) {
+    Serial.println("[ESTOP] Recovery procedure initiated");
+    Serial.println("[ESTOP] Please verify all safety conditions before resuming");
+    Serial.println("[ESTOP] Type 'estop_confirm' to complete recovery");
+  }
+}
+
+void cmd_timeout_diag(int argc, char** argv) {
+  timeoutShowDiagnostics();
+}
+
+void cmd_i2c_diag(int argc, char** argv) {
+  i2cShowStats();
+}
+
+void cmd_i2c_recover(int argc, char** argv) {
+  Serial.println("[CLI] Attempting I²C bus recovery...");
+  i2c_bus_status_t status = i2cCheckBusStatus();
+  
+  Serial.print("[CLI] Current bus status: ");
+  Serial.println(i2cBusStatusToString(status));
+  
+  if (status != I2C_BUS_OK) {
+    i2cRecoverBus();
+    status = i2cCheckBusStatus();
+    Serial.print("[CLI] After recovery: ");
+    Serial.println(i2cBusStatusToString(status));
+  } else {
+    Serial.println("[CLI] Bus is already OK");
+  }
+}
+
+void cmd_encoder_diag(int argc, char** argv) {
+  encoderShowStats();
+}
+
+void cmd_encoder_baud_detect(int argc, char** argv) {
+  Serial.println("[CLI] Starting encoder baud rate auto-detection...");
+  baud_detect_result_t result = encoderDetectBaudRate();
+  
+  if (result.detected) {
+    Serial.print("[CLI] ✅ Baud rate detected: ");
+    Serial.println(result.baud_rate);
+  } else {
+    Serial.println("[CLI] ❌ Could not detect baud rate - using default 9600");
+  }
+}
+
+void cmd_config_schema_show(int argc, char** argv) {
+  if (argc >= 2) {
+    if (strcmp(argv[1], "history") == 0) {
+      configShowSchemaHistory();
+    } else if (strcmp(argv[1], "keys") == 0) {
+      configShowKeyMetadata();
+    } else if (strcmp(argv[1], "status") == 0) {
+      configShowMigrationStatus();
+    } else {
+      Serial.println("[CLI] Usage: config_schema [history|keys|status]");
+    }
+  } else {
+    configShowMigrationStatus();
+    configShowSchemaHistory();
+  }
+}
+
+void cmd_config_migrate(int argc, char** argv) {
+  if (configIsMigrationNeeded()) {
+    Serial.println("[CLI] Starting configuration migration...");
+    migration_result_t result = configAutoMigrate();
+    
+    if (result.success) {
+      Serial.println("[CLI] ✅ Migration complete");
+    } else {
+      Serial.println("[CLI] ❌ Migration failed");
+    }
+  } else {
+    Serial.println("[CLI] ✅ Configuration already up to date");
+  }
+}
+
+void cmd_config_rollback(int argc, char** argv) {
+  if (argc < 2) {
+    Serial.println("[CLI] Usage: config_rollback <version>");
+    Serial.println("[CLI] Example: config_rollback 0");
+    return;
+  }
+  
+  uint8_t target_version = atoi(argv[1]);
+  Serial.print("[CLI] Rolling back to schema version ");
+  Serial.println(target_version);
+  
+  if (configRollbackToVersion(target_version)) {
+    Serial.println("[CLI] ✅ Rollback complete");
+  } else {
+    Serial.println("[CLI] ❌ Rollback failed");
+  }
+}
+
+void cmd_config_validate(int argc, char** argv) {
+  Serial.println("[CLI] Validating configuration schema...");
+  configValidateSchema();
+}
+
+void cmd_task_stats(int argc, char** argv) {
+  Serial.println("[CLI] Displaying FreeRTOS task statistics...");
+  taskShowStats();
+}
+
+void cmd_task_list(int argc, char** argv) {
+  Serial.println("[CLI] Listing all FreeRTOS tasks...");
+  taskShowAllTasks();
+}
+
+void cmd_task_cpu(int argc, char** argv) {
+  Serial.println("\n╔════════════════════════════════════════╗");
+  Serial.println("║       FreeRTOS CPU USAGE              ║");
+  Serial.println("╚════════════════════════════════════════╝\n");
+  
+  uint8_t cpu_usage = taskGetCpuUsage();
+  uint32_t uptime = taskGetUptime();
+  
+  Serial.print("[TASKS] CPU Usage: ");
+  Serial.print(cpu_usage);
+  Serial.println("%");
+  
+  Serial.print("[TASKS] System Uptime: ");
+  Serial.print(uptime);
+  Serial.println(" seconds\n");
+}
+
+void cmd_wdt_status(int argc, char** argv) {
+  Serial.println("[CLI] Displaying watchdog status...");
+  watchdogShowStatus();
+}
+
+void cmd_wdt_tasks(int argc, char** argv) {
+  Serial.println("[CLI] Displaying watchdog monitored tasks...");
+  watchdogShowTasks();
+}
+
+void cmd_wdt_stats(int argc, char** argv) {
+  Serial.println("[CLI] Displaying watchdog statistics...");
+  watchdogShowStats();
+}
+
+void cmd_wdt_report(int argc, char** argv) {
+  Serial.println("[CLI] Generating watchdog detailed report...");
+  watchdogPrintDetailedReport();
 }

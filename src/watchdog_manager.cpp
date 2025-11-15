@@ -1,0 +1,516 @@
+#include "watchdog_manager.h"
+#include "fault_logging.h"
+#include <Preferences.h>
+#include <esp_task_wdt.h>
+
+// ============================================================================
+// WATCHDOG STATE
+// ============================================================================
+
+static bool wdt_initialized = false;
+static bool wdt_enabled = false;
+static wdt_status_t wdt_status = WDT_STATUS_OK;
+static reset_reason_t last_reset_reason = RESET_REASON_UNKNOWN;
+
+static Preferences wdt_prefs;
+static watchdog_stats_t wdt_stats = {0};
+static watchdog_tick_t wdt_tasks[10] = {0};
+static int wdt_task_count = 0;
+
+static watchdog_callback_t wdt_callback = NULL;
+static uint32_t wdt_pause_count = 0;
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+static reset_reason_t getResetReason() {
+  esp_reset_reason_t reset_reason = esp_reset_reason();
+  
+  switch (reset_reason) {
+    case ESP_RST_POWERON:
+      return RESET_REASON_POWER_ON;
+    case ESP_RST_EXT:
+      return RESET_REASON_EXTERNAL;
+    case ESP_RST_SW:
+      return RESET_REASON_SOFTWARE;
+    case ESP_RST_TASK_WDT:
+      return RESET_REASON_WATCHDOG_TASK;
+    case ESP_RST_INT_WDT:
+      return RESET_REASON_WATCHDOG_INTERRUPT;
+    case ESP_RST_BROWNOUT:
+      return RESET_REASON_BROWN_OUT;
+    default:
+      return RESET_REASON_UNKNOWN;
+  }
+}
+
+static const char* resetReasonString(reset_reason_t reason) {
+  switch (reason) {
+    case RESET_REASON_POWER_ON:
+      return "Power-On Reset";
+    case RESET_REASON_EXTERNAL:
+      return "External Reset";
+    case RESET_REASON_SOFTWARE:
+      return "Software Reset";
+    case RESET_REASON_WATCHDOG_TASK:
+      return "Task Watchdog Timeout";
+    case RESET_REASON_WATCHDOG_INTERRUPT:
+      return "Interrupt Watchdog Timeout";
+    case RESET_REASON_BROWN_OUT:
+      return "Brown-Out Reset";
+    default:
+      return "Unknown Reset";
+  }
+}
+
+// ============================================================================
+// WATCHDOG INITIALIZATION
+// ============================================================================
+
+void watchdogInit() {
+  if (wdt_initialized) {
+    return;
+  }
+  
+  Serial.println("\n[WDT] Initializing watchdog timer system...");
+  
+  // Check reset reason
+  last_reset_reason = getResetReason();
+  Serial.print("[WDT] Last reset reason: ");
+  Serial.println(resetReasonString(last_reset_reason));
+  
+  // Load statistics from NVS
+  if (!wdt_prefs.begin("bisso_wdt", false)) {
+    Serial.println("[WDT] Warning: Could not open WDT NVS namespace");
+  } else {
+    wdt_stats.reset_count = wdt_prefs.getUInt("reset_count", 0);
+    wdt_stats.timeouts_detected = wdt_prefs.getUInt("timeouts", 0);
+    
+    if (last_reset_reason == RESET_REASON_WATCHDOG_TASK ||
+        last_reset_reason == RESET_REASON_WATCHDOG_INTERRUPT) {
+      wdt_stats.reset_count++;
+      wdt_stats.timeouts_detected++;
+      wdt_prefs.putUInt("reset_count", wdt_stats.reset_count);
+      wdt_prefs.putUInt("timeouts", wdt_stats.timeouts_detected);
+      
+      Serial.print("[WDT] ⚠️  WATCHDOG TIMEOUT DETECTED! Reset count: ");
+      Serial.println(wdt_stats.reset_count);
+      
+      faultLogError(FAULT_WATCHDOG_TIMEOUT, 
+        "Watchdog timeout reset - check for infinite loops");
+    }
+  }
+  
+  // Initialize ESP32 Task Watchdog Timer
+  if (ENABLE_TASK_WDT) {
+    Serial.print("[WDT] Configuring Task WDT (timeout: ");
+    Serial.print(WATCHDOG_TIMEOUT_SEC);
+    Serial.println("s)...");
+    
+    // Initialize with timeout value
+    esp_err_t ret = esp_task_wdt_init(WATCHDOG_TIMEOUT_SEC, true);
+    if (ret == ESP_OK) {
+      Serial.println("[WDT] ✅ Task WDT initialized");
+    } else if (ret == ESP_ERR_INVALID_STATE) {
+      Serial.println("[WDT] Task WDT already initialized");
+    } else {
+      Serial.print("[WDT] ❌ Failed to initialize Task WDT: ");
+      Serial.println(ret);
+    }
+  }
+  
+  // Initialize Interrupt Watchdog Timer
+  if (ENABLE_INTERRUPT_WDT) {
+    Serial.println("[WDT] Interrupt WDT: built-in (hardware level)");
+  }
+  
+  wdt_enabled = true;
+  wdt_initialized = true;
+  
+  Serial.println("[WDT] ✅ Watchdog system initialized\n");
+}
+
+// ============================================================================
+// TASK REGISTRATION
+// ============================================================================
+
+void watchdogTaskAdd(const char* task_name) {
+  if (!wdt_initialized) {
+    Serial.println("[WDT] Error: Watchdog not initialized!");
+    return;
+  }
+  
+  if (wdt_task_count >= 10) {
+    Serial.println("[WDT] Error: Too many tasks registered!");
+    return;
+  }
+  
+  // Find existing task
+  for (int i = 0; i < wdt_task_count; i++) {
+    if (strcmp(wdt_tasks[i].task_name, task_name) == 0) {
+      return;  // Already registered
+    }
+  }
+  
+  // Register new task
+  wdt_tasks[wdt_task_count].task_name = task_name;
+  wdt_tasks[wdt_task_count].last_tick = millis();
+  wdt_tasks[wdt_task_count].tick_count = 0;
+  wdt_tasks[wdt_task_count].missed_ticks = 0;
+  wdt_tasks[wdt_task_count].fed_this_cycle = false;
+  wdt_tasks[wdt_task_count].consecutive_misses = 0;
+  
+  wdt_task_count++;
+  
+  Serial.print("[WDT] Task registered: ");
+  Serial.println(task_name);
+}
+
+void watchdogSubscribeTask(TaskHandle_t task_handle, const char* task_name) {
+  if (!wdt_initialized || !wdt_enabled) {
+    return;
+  }
+  
+  // Add task to watchdog monitoring
+  esp_err_t ret = esp_task_wdt_add(task_handle);
+  if (ret == ESP_OK) {
+    Serial.print("[WDT] Subscribed task to WDT: ");
+    Serial.println(task_name);
+  } else {
+    Serial.print("[WDT] Failed to subscribe task: ");
+    Serial.println(ret);
+  }
+}
+
+// ============================================================================
+// WATCHDOG FEEDING
+// ============================================================================
+
+void watchdogFeed(const char* task_name) {
+  if (!wdt_initialized || !wdt_enabled || wdt_pause_count > 0) {
+    return;
+  }
+  
+  // Find and update task
+  for (int i = 0; i < wdt_task_count; i++) {
+    if (strcmp(wdt_tasks[i].task_name, task_name) == 0) {
+      wdt_tasks[i].last_tick = millis();
+      wdt_tasks[i].tick_count++;
+      wdt_tasks[i].fed_this_cycle = true;
+      
+      if (wdt_tasks[i].consecutive_misses > 0) {
+        wdt_stats.automatic_recoveries++;
+      }
+      wdt_tasks[i].consecutive_misses = 0;
+      
+      // Feed the actual watchdog timer
+      esp_task_wdt_reset();
+      return;
+    }
+  }
+}
+
+// ============================================================================
+// WATCHDOG STATUS & MONITORING
+// ============================================================================
+
+wdt_status_t watchdogGetStatus() {
+  if (!wdt_initialized) {
+    return WDT_STATUS_DISABLED;
+  }
+  
+  if (!wdt_enabled) {
+    return WDT_STATUS_DISABLED;
+  }
+  
+  // Check for starved tasks
+  uint32_t now = millis();
+  for (int i = 0; i < wdt_task_count; i++) {
+    uint32_t time_since_feed = now - wdt_tasks[i].last_tick;
+    
+    // If task hasn't fed in a while, it might be hung
+    if (time_since_feed > (WATCHDOG_TIMEOUT_SEC * 1000 / 2)) {
+      if (!wdt_tasks[i].fed_this_cycle) {
+        wdt_tasks[i].consecutive_misses++;
+        wdt_tasks[i].missed_ticks++;
+        
+        if (wdt_tasks[i].consecutive_misses > 3) {
+          wdt_status = WDT_STATUS_TIMEOUT;
+          return wdt_status;
+        }
+      }
+    }
+    
+    wdt_tasks[i].fed_this_cycle = false;
+  }
+  
+  return WDT_STATUS_OK;
+}
+
+bool watchdogRecoveredFromTimeout() {
+  return (last_reset_reason == RESET_REASON_WATCHDOG_TASK ||
+          last_reset_reason == RESET_REASON_WATCHDOG_INTERRUPT);
+}
+
+// ============================================================================
+// DIAGNOSTICS
+// ============================================================================
+
+void watchdogShowStatus() {
+  Serial.println("\n╔════════════════════════════════════════════════════════════╗");
+  Serial.println("║              WATCHDOG TIMER STATUS                        ║");
+  Serial.println("╚════════════════════════════════════════════════════════════╝\n");
+  
+  Serial.print("[WDT] Watchdog Status: ");
+  if (wdt_enabled) {
+    Serial.println("🟢 ENABLED");
+  } else {
+    Serial.println("🔴 DISABLED");
+  }
+  
+  Serial.print("[WDT] Task WDT Timeout: ");
+  Serial.print(WATCHDOG_TIMEOUT_SEC);
+  Serial.println(" seconds");
+  
+  Serial.print("[WDT] Current Status: ");
+  switch (watchdogGetStatus()) {
+    case WDT_STATUS_OK:
+      Serial.println("✅ OK");
+      break;
+    case WDT_STATUS_TIMEOUT:
+      Serial.println("❌ TIMEOUT DETECTED");
+      break;
+    case WDT_STATUS_PANIC:
+      Serial.println("🚨 PANIC MODE");
+      break;
+    case WDT_STATUS_RECOVERY_ATTEMPTED:
+      Serial.println("⚠️  RECOVERY ATTEMPTED");
+      break;
+    case WDT_STATUS_DISABLED:
+      Serial.println("⊘ DISABLED");
+      break;
+  }
+  
+  Serial.print("[WDT] Last Reset Reason: ");
+  Serial.println(resetReasonString(last_reset_reason));
+  
+  Serial.print("[WDT] Total Resets: ");
+  Serial.println(wdt_stats.reset_count);
+  
+  Serial.print("[WDT] Timeouts Detected: ");
+  Serial.println(wdt_stats.timeouts_detected);
+  
+  Serial.println();
+}
+
+void watchdogShowTasks() {
+  Serial.println("\n╔════════════════════════════════════════════════════════════╗");
+  Serial.println("║            WATCHDOG MONITORED TASKS                       ║");
+  Serial.println("╚════════════════════════════════════════════════════════════╝\n");
+  
+  Serial.println("[WDT] Task                  Ticks     Missed   Age(ms)  Status");
+  Serial.println("[WDT] ──────────────────────────────────────────────────────");
+  
+  uint32_t now = millis();
+  for (int i = 0; i < wdt_task_count; i++) {
+    uint32_t age = now - wdt_tasks[i].last_tick;
+    
+    Serial.print("[WDT] ");
+    Serial.print(wdt_tasks[i].task_name);
+    Serial.print("                  ");
+    Serial.print(wdt_tasks[i].tick_count);
+    Serial.print("     ");
+    Serial.print(wdt_tasks[i].missed_ticks);
+    Serial.print("      ");
+    Serial.print(age);
+    Serial.print("      ");
+    
+    if (age < (WATCHDOG_TIMEOUT_SEC * 1000 / 2)) {
+      Serial.println("✅ OK");
+    } else if (age < WATCHDOG_TIMEOUT_SEC * 1000) {
+      Serial.println("⚠️  SLOW");
+    } else {
+      Serial.println("❌ HUNG");
+    }
+  }
+  
+  Serial.println();
+}
+
+void watchdogShowStats() {
+  Serial.println("\n╔════════════════════════════════════════════════════════════╗");
+  Serial.println("║            WATCHDOG STATISTICS                            ║");
+  Serial.println("╚════════════════════════════════════════════════════════════╝\n");
+  
+  Serial.print("[WDT] Timeouts Detected: ");
+  Serial.println(wdt_stats.timeouts_detected);
+  
+  Serial.print("[WDT] Automatic Recoveries: ");
+  Serial.println(wdt_stats.automatic_recoveries);
+  
+  Serial.print("[WDT] Task Resets: ");
+  Serial.println(wdt_stats.task_resets);
+  
+  Serial.print("[WDT] System Resets: ");
+  Serial.println(wdt_stats.system_resets);
+  
+  Serial.print("[WDT] Total Watchdog Feeds: ");
+  Serial.println(wdt_stats.total_ticks);
+  
+  Serial.print("[WDT] Total Missed Ticks: ");
+  Serial.println(wdt_stats.missed_ticks);
+  
+  Serial.println();
+}
+
+reset_reason_t watchdogGetLastResetReason() {
+  return last_reset_reason;
+}
+
+uint32_t watchdogGetResetCount() {
+  return wdt_stats.reset_count;
+}
+
+bool watchdogIsTaskAlive(const char* task_name) {
+  uint32_t now = millis();
+  for (int i = 0; i < wdt_task_count; i++) {
+    if (strcmp(wdt_tasks[i].task_name, task_name) == 0) {
+      uint32_t age = now - wdt_tasks[i].last_tick;
+      return (age < (WATCHDOG_TIMEOUT_SEC * 1000));
+    }
+  }
+  return false;
+}
+
+uint32_t watchdogGetMissedTicks(const char* task_name) {
+  for (int i = 0; i < wdt_task_count; i++) {
+    if (strcmp(wdt_tasks[i].task_name, task_name) == 0) {
+      return wdt_tasks[i].missed_ticks;
+    }
+  }
+  return 0;
+}
+
+// ============================================================================
+// WATCHDOG CONTROL
+// ============================================================================
+
+void watchdogRecovery() {
+  Serial.println("[WDT] Attempting watchdog recovery...");
+  
+  // Reset all task counters
+  for (int i = 0; i < wdt_task_count; i++) {
+    wdt_tasks[i].consecutive_misses = 0;
+    wdt_tasks[i].last_tick = millis();
+  }
+  
+  // Feed watchdog
+  esp_task_wdt_reset();
+  
+  wdt_stats.automatic_recoveries++;
+  wdt_status = WDT_STATUS_RECOVERY_ATTEMPTED;
+  
+  Serial.println("[WDT] ✅ Recovery complete");
+}
+
+void watchdogResetStats() {
+  Serial.println("[WDT] Resetting watchdog statistics...");
+  
+  memset(&wdt_stats, 0, sizeof(wdt_stats));
+  
+  for (int i = 0; i < wdt_task_count; i++) {
+    wdt_tasks[i].tick_count = 0;
+    wdt_tasks[i].missed_ticks = 0;
+    wdt_tasks[i].consecutive_misses = 0;
+  }
+  
+  if (wdt_prefs.isKey("timeouts")) {
+    wdt_prefs.remove("timeouts");
+  }
+  
+  Serial.println("[WDT] ✅ Statistics reset");
+}
+
+void watchdogEnable() {
+  if (wdt_initialized && !wdt_enabled) {
+    Serial.println("[WDT] Enabling watchdog...");
+    wdt_enabled = true;
+    esp_task_wdt_reset();
+    Serial.println("[WDT] ✅ Watchdog enabled");
+  }
+}
+
+void watchdogDisable() {
+  if (wdt_initialized && wdt_enabled) {
+    Serial.println("[WDT] Disabling watchdog (DEBUG ONLY!)");
+    wdt_enabled = false;
+    Serial.println("[WDT] ⚠️  Watchdog disabled");
+  }
+}
+
+// ============================================================================
+// SAFE OPERATIONS
+// ============================================================================
+
+void watchdogPause() {
+  wdt_pause_count++;
+}
+
+void watchdogResume() {
+  if (wdt_pause_count > 0) {
+    wdt_pause_count--;
+  }
+  
+  if (wdt_pause_count == 0 && wdt_enabled) {
+    esp_task_wdt_reset();
+  }
+}
+
+void watchdogDelay(uint32_t ms) {
+  uint32_t start = millis();
+  while (millis() - start < ms) {
+    if (wdt_enabled && wdt_pause_count == 0) {
+      esp_task_wdt_reset();
+    }
+    delay(10);
+  }
+}
+
+// ============================================================================
+// CALLBACKS & UTILITIES
+// ============================================================================
+
+void watchdogSetCallback(watchdog_callback_t callback) {
+  wdt_callback = callback;
+}
+
+void watchdogLogStats() {
+  // Log statistics to NVS
+  wdt_prefs.putUInt("reset_count", wdt_stats.reset_count);
+  wdt_prefs.putUInt("timeouts", wdt_stats.timeouts_detected);
+  wdt_prefs.putUInt("recoveries", wdt_stats.automatic_recoveries);
+}
+
+watchdog_stats_t* watchdogGetStats() {
+  return &wdt_stats;
+}
+
+void watchdogPrintDetailedReport() {
+  Serial.println("\n╔════════════════════════════════════════════════════════════╗");
+  Serial.println("║         WATCHDOG DETAILED DIAGNOSTIC REPORT              ║");
+  Serial.println("╚════════════════════════════════════════════════════════════╝\n");
+  
+  watchdogShowStatus();
+  watchdogShowTasks();
+  watchdogShowStats();
+  
+  Serial.println("[WDT] Configuration:");
+  Serial.print("[WDT]  Task WDT: ");
+  Serial.println(ENABLE_TASK_WDT ? "Enabled" : "Disabled");
+  Serial.print("[WDT]  Interrupt WDT: ");
+  Serial.println(ENABLE_INTERRUPT_WDT ? "Enabled" : "Disabled");
+  Serial.print("[WDT]  Panic on Timeout: ");
+  Serial.println(PANIC_ON_TIMEOUT ? "Enabled" : "Disabled");
+  Serial.println();
+}
