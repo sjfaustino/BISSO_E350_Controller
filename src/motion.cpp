@@ -1,129 +1,254 @@
 #include "motion.h"
-#include "io.h"
-#include "journal.h"
-#include "wj66.h"
-#include "config.h"
 
-static Move q[QMAX]; static int qHead=0,qTail=0,qCnt=0;
-static bool  busy=false; static Move cur;
-static long  startEnc=0, lastEnc=0;
-static uint32_t startT=0, lastEncT=0;
+// Motion axis array
+static motion_axis_t axes[MOTION_AXES] = {
+  {0, 0, 0.0f, 0.0f, MOTION_ACCELERATION, MOTION_IDLE, 0, false, true},
+  {0, 0, 0.0f, 0.0f, MOTION_ACCELERATION, MOTION_IDLE, 0, false, true},
+  {0, 0, 0.0f, 0.0f, MOTION_ACCELERATION, MOTION_IDLE, 0, false, true},
+  {0, 0, 0.0f, 0.0f, MOTION_ACCELERATION, MOTION_IDLE, 0, false, true}
+};
 
-// Manual tilt state
-static struct {
-  bool active;
-  float targetDeg;
-  uint32_t startMs;
-} g_manualTilt = {false, 0.0f, 0};
+static uint32_t last_update_ms = 0;
+static bool global_enabled = true;
 
-extern State state;
-
-static inline void setSpeedBits(float feed){
-  Y_FAST(false); Y_MED(false);
-  if (feed>=1.0f) Y_FAST(true); else Y_MED(true);
-}
-static inline void setAxisBits(Axis a){
-  Y_AX_X(false); Y_AX_Y(false); Y_AX_Z(false); Y_AX_A(false);
-  switch(a){ case Axis::AX_X:Y_AX_X(true);break; case Axis::AX_Y:Y_AX_Y(true);break;
-             case Axis::AX_Z:Y_AX_Z(true);break; case Axis::AX_A:Y_AX_A(true);break; }
-}
-
-static struct{ bool pending; bool wantPos; uint32_t tStartMs; bool warned; } g_dir={false,true,0,false};
-static inline void dirAllOff(){ Y_DIR_POS(false); Y_DIR_NEG(false); }
-bool setDirBits(bool dirPositive){
-  uint32_t now=millis();
-  if(!g_dir.pending){
-    bool pos=(bool)Y_DIR_POS_STATE(), neg=(bool)Y_DIR_NEG_STATE();
-    if((pos^neg) && ((dirPositive&&pos)||(!dirPositive&&neg))) return true;
-    dirAllOff(); g_dir.pending=true; g_dir.wantPos=dirPositive; g_dir.tStartMs=now; g_dir.warned=false; return false;
+void motionInit() {
+  Serial.println("[MOTION] Motion system initializing...");
+  for (int i = 0; i < MOTION_AXES; i++) {
+    axes[i].position = 0;
+    axes[i].target_position = 0;
+    axes[i].current_speed = 0.0f;
+    axes[i].target_speed = 0.0f;
+    axes[i].state = MOTION_IDLE;
+    axes[i].enabled = true;
+    axes[i].homed = false;
+    Serial.print("  [MOTION] Axis ");
+    Serial.print(i);
+    Serial.println(" initialized");
   }
-  if(now-g_dir.tStartMs<DIR_DEAD_MS){
-    if(!g_dir.warned){ journalLog("WARN","DIR_INTERLOCK_WAIT"); g_dir.warned=true; }
-    dirAllOff(); return false;
-  }
-  if(g_dir.wantPos){ Y_DIR_POS(true); Y_DIR_NEG(false); journalLog("INFO","DIR_POSITIVE_SET"); }
-  else              { Y_DIR_POS(false); Y_DIR_NEG(true); journalLog("INFO","DIR_NEGATIVE_SET"); }
-  bool pos=(bool)Y_DIR_POS_STATE(), neg=(bool)Y_DIR_NEG_STATE();
-  if(pos&&neg){ journalLog("ERROR","OUTPUT_INTERLOCK BOTH_DIR_ON"); alarmPush(AlarmCode::OUTPUT_INTERLOCK,0);
-                outputsIdle(); onSystemError(AlarmCode::OUTPUT_INTERLOCK,0); g_dir.pending=false; return false; }
-  g_dir.pending=false; return true;
+  last_update_ms = millis();
+  Serial.println("[MOTION] Motion system ready");
 }
 
-void motionInit(){ busy=false; qHead=qTail=qCnt=0; }
-
-int motionQueueCount(){ return qCnt; }
-static bool qPush(const Move&m){ if(qCnt>=QMAX) return false; q[qTail]=m; qTail=(qTail+1)%QMAX; qCnt++; return true; }
-static bool qPop(Move& m){ if(qCnt==0) return false; m=q[qHead]; qHead=(qHead+1)%QMAX; qCnt--; return true; }
-
-bool enqueueAxisMove(Axis a, float targetAbs, float feed){
-  if(qCnt>=QMAX){ journalLog("ERROR","Q_FULL"); return false; }
-  int ai=(int)a; float lo=cfg.softMin[ai], hi=cfg.softMax[ai];
-  if(targetAbs<lo||targetAbs>hi){
-    char msg[96]; snprintf(msg,sizeof(msg),"SOFTLIMIT_REJECT axis=%d target=%.3f [%.3f..%.3f]",ai,targetAbs,lo,hi);
-    journalLog("ERROR",msg); alarmPush(AlarmCode::SOFTLIMIT,(int16_t)ai); outputsIdle(); onSystemError(AlarmCode::SOFTLIMIT,(int16_t)ai); return false;
+void motionUpdate() {
+  if (!global_enabled) return;
+  
+  uint32_t now = millis();
+  uint32_t delta_ms = now - last_update_ms;
+  
+  if (delta_ms < MOTION_UPDATE_INTERVAL_MS) {
+    return;
   }
-  Move m{a,targetAbs,feed,(float)wj66.pos[ai],millis()};
-  if(!qPush(m)) return false;
-  journalLog("INFO","MOVE_ENQUEUED");
-  return true;
-}
-
-void motionTask(){
-  if(!busy){
-    if(!qPop(cur)) return;
-    busy=true; startT=millis();
-
-    // Check if this is an A-axis move - trigger manual tilt mode
-    if(cur.axis == Axis::AX_A){
-      g_manualTilt.active = true;
-      g_manualTilt.targetDeg = cur.targetAbs;
-      g_manualTilt.startMs = millis();
-      state = State::MANUAL_TILT;
-      journalLog("INFO","A_AXIS_MANUAL_TILT_MODE");
-      outputsIdle();
-      return; // Don't execute automatically
+  
+  last_update_ms = now;
+  float delta_s = delta_ms / 1000.0f;
+  
+  for (int i = 0; i < MOTION_AXES; i++) {
+    motion_axis_t* axis = &axes[i];
+    
+    if (!axis->enabled || axis->state == MOTION_ERROR) {
+      continue;
     }
-
-    setAxisBits(cur.axis);
-    startEnc=wj66.pos[(int)cur.axis]; lastEnc=startEnc; lastEncT=millis();
-    bool dirPos=(cur.targetAbs>(float)startEnc);
-    if(!setDirBits(dirPos)){ outputsIdle(); return; }
-    setSpeedBits(cur.feed); Y_VS(true);
-  }
-
-  // If in manual tilt mode, don't process normal motion
-  if(g_manualTilt.active) return;
-
-  int ai=(int)cur.axis; float lo=cfg.softMin[ai], hi=cfg.softMax[ai];
-  float posNow=(float)wj66.pos[ai];
-  if(posNow<lo||posNow>hi){
-    char msg[96]; snprintf(msg,sizeof(msg),"SOFTLIMIT_BREACH axis=%d pos=%.3f [%.3f..%.3f]",ai,posNow,lo,hi);
-    journalLog("ERROR",msg); outputsIdle(); alarmPush(AlarmCode::SOFTLIMIT,(int16_t)ai); onSystemError(AlarmCode::SOFTLIMIT,(int16_t)ai); busy=false; return;
-  }
-  float err=fabsf(cur.targetAbs-posNow);
-  if(err<=POS_TOL){ busy=false; journalLog("INFO","MOVE_COMPLETED"); Y_VS(false); outputsIdle(); return; }
-
-  // Stall detection while VS active
-  long encNow = wj66.pos[ai];
-  if (encNow != lastEnc){ lastEnc=encNow; lastEncT=millis(); }
-  if (millis()-lastEncT > 300){
-    alarmPush(AlarmCode::STALL, (int16_t)ai); Y_VS(false); outputsIdle(); onSystemError(AlarmCode::STALL,(int16_t)ai); busy=false; return;
+    
+    int32_t distance_remaining = axis->target_position - axis->position;
+    
+    if (distance_remaining == 0 && axis->current_speed == 0) {
+      axis->state = MOTION_IDLE;
+      axis->target_speed = 0.0f;
+      continue;
+    }
+    
+    // Acceleration/deceleration logic
+    if (axis->target_speed > axis->current_speed) {
+      axis->current_speed += axis->acceleration * delta_s;
+      if (axis->current_speed > axis->target_speed) {
+        axis->current_speed = axis->target_speed;
+        axis->state = MOTION_CONSTANT_SPEED;
+      } else {
+        axis->state = MOTION_ACCELERATING;
+      }
+    } else if (axis->target_speed < axis->current_speed) {
+      axis->current_speed -= axis->acceleration * delta_s;
+      if (axis->current_speed < axis->target_speed) {
+        axis->current_speed = axis->target_speed;
+      }
+      axis->state = MOTION_DECELERATING;
+    }
+    
+    // Update position
+    int32_t move_distance = (int32_t)(axis->current_speed * delta_s);
+    if (move_distance != 0) {
+      axis->position += move_distance;
+      
+      // Check if target reached
+      if ((distance_remaining > 0 && axis->position >= axis->target_position) ||
+          (distance_remaining < 0 && axis->position <= axis->target_position)) {
+        axis->position = axis->target_position;
+        axis->current_speed = 0.0f;
+        axis->target_speed = 0.0f;
+        axis->state = MOTION_IDLE;
+      }
+    }
+    
+    axis->last_update_ms = now;
   }
 }
 
-void manualTiltTask(){
-  if(!g_manualTilt.active) return;
+void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
+  if (!global_enabled) {
+    Serial.println("[MOTION] ERROR: Motion system disabled");
+    return;
+  }
+  
+  axes[0].target_position = (int32_t)(x * 1000);
+  axes[1].target_position = (int32_t)(y * 1000);
+  axes[2].target_position = (int32_t)(z * 1000);
+  axes[3].target_position = (int32_t)(a * 1000);
+  
+  float clamped_speed = constrain(speed_mm_s, 0.1f, MOTION_MAX_SPEED);
+  for (int i = 0; i < MOTION_AXES; i++) {
+    axes[i].target_speed = clamped_speed;
+    axes[i].state = MOTION_ACCELERATING;
+  }
+  
+  Serial.print("[MOTION] Moving to (");
+  Serial.print(x); Serial.print(", ");
+  Serial.print(y); Serial.print(", ");
+  Serial.print(z); Serial.print(", ");
+  Serial.print(a);
+  Serial.print(") at ");
+  Serial.print(clamped_speed);
+  Serial.println(" mm/s");
+}
 
-  float currentDeg = readTiltAngleDegrees();
-  float error = fabsf(g_manualTilt.targetDeg - currentDeg);
+void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s) {
+  motionMoveAbsolute(
+    axes[0].position / 1000.0f + dx,
+    axes[1].position / 1000.0f + dy,
+    axes[2].position / 1000.0f + dz,
+    axes[3].position / 1000.0f + da,
+    speed_mm_s
+  );
+}
 
-  // Check if within tolerance
-  if(error <= cfg.a_axis_tilt_tolerance){
-    journalLog("INFO","MANUAL_TILT_COMPLETE");
-    g_manualTilt.active = false;
-    busy = false;
-    state = State::RUN;
+void motionSetAxisTarget(uint8_t axis, int32_t target_pos) {
+  if (axis < MOTION_AXES) {
+    axes[axis].target_position = target_pos;
+    axes[axis].target_speed = MOTION_MAX_SPEED;
+    axes[axis].state = MOTION_ACCELERATING;
   }
 }
 
-float getManualTiltTarget(){ return g_manualTilt.targetDeg; }
+void motionStop() {
+  for (int i = 0; i < MOTION_AXES; i++) {
+    axes[i].target_speed = 0.0f;
+    axes[i].state = MOTION_IDLE;
+  }
+  Serial.println("[MOTION] Stop commanded");
+}
+
+void motionPause() {
+  for (int i = 0; i < MOTION_AXES; i++) {
+    if (axes[i].state != MOTION_IDLE) {
+      axes[i].state = MOTION_PAUSED;
+    }
+  }
+  Serial.println("[MOTION] Paused");
+}
+
+void motionResume() {
+  for (int i = 0; i < MOTION_AXES; i++) {
+    if (axes[i].state == MOTION_PAUSED) {
+      axes[i].state = MOTION_ACCELERATING;
+    }
+  }
+  Serial.println("[MOTION] Resumed");
+}
+
+void motionEmergencyStop() {
+  global_enabled = false;
+  for (int i = 0; i < MOTION_AXES; i++) {
+    axes[i].target_speed = 0.0f;
+    axes[i].current_speed = 0.0f;
+    axes[i].state = MOTION_ERROR;
+  }
+  Serial.println("[MOTION] EMERGENCY STOP ACTIVATED");
+}
+
+int32_t motionGetPosition(uint8_t axis) {
+  if (axis < MOTION_AXES) return axes[axis].position;
+  return 0;
+}
+
+int32_t motionGetTarget(uint8_t axis) {
+  if (axis < MOTION_AXES) return axes[axis].target_position;
+  return 0;
+}
+
+float motionGetSpeed(uint8_t axis) {
+  if (axis < MOTION_AXES) return axes[axis].current_speed;
+  return 0.0f;
+}
+
+motion_state_t motionGetState(uint8_t axis) {
+  if (axis < MOTION_AXES) return axes[axis].state;
+  return MOTION_ERROR;
+}
+
+bool motionIsMoving() {
+  for (int i = 0; i < MOTION_AXES; i++) {
+    if (axes[i].state != MOTION_IDLE && axes[i].state != MOTION_ERROR) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool motionIsStalled(uint8_t axis) {
+  if (axis < MOTION_AXES) {
+    uint32_t time_since_update = millis() - axes[axis].last_update_ms;
+    return time_since_update > MOTION_STALL_TIMEOUT_MS;
+  }
+  return false;
+}
+
+void motionDiagnostics() {
+  Serial.println("\n[MOTION] === Motion System Diagnostics ===");
+  Serial.print("Global Enabled: ");
+  Serial.println(global_enabled ? "YES" : "NO");
+  Serial.print("System Moving: ");
+  Serial.println(motionIsMoving() ? "YES" : "NO");
+  
+  for (int i = 0; i < MOTION_AXES; i++) {
+    Serial.print("\nAxis ");
+    Serial.print(i);
+    Serial.print(": ");
+    switch(axes[i].state) {
+      case MOTION_IDLE: Serial.print("IDLE"); break;
+      case MOTION_ACCELERATING: Serial.print("ACCEL"); break;
+      case MOTION_CONSTANT_SPEED: Serial.print("CONST"); break;
+      case MOTION_DECELERATING: Serial.print("DECEL"); break;
+      case MOTION_PAUSED: Serial.print("PAUSED"); break;
+      case MOTION_ERROR: Serial.print("ERROR"); break;
+      default: Serial.print("UNKNOWN");
+    }
+    Serial.print(" | Pos: ");
+    Serial.print(axes[i].position / 1000.0f);
+    Serial.print(" mm | Speed: ");
+    Serial.print(axes[i].current_speed);
+    Serial.print(" mm/s | Stalled: ");
+    Serial.println(motionIsStalled(i) ? "YES" : "NO");
+  }
+}
+
+void motionPrintStatus() {
+  Serial.print("[MOTION] X=");
+  Serial.print(axes[0].position / 1000.0f);
+  Serial.print(" Y=");
+  Serial.print(axes[1].position / 1000.0f);
+  Serial.print(" Z=");
+  Serial.print(axes[2].position / 1000.0f);
+  Serial.print(" A=");
+  Serial.print(axes[3].position / 1000.0f);
+  Serial.print(" Moving=");
+  Serial.println(motionIsMoving() ? "YES" : "NO");
+}
