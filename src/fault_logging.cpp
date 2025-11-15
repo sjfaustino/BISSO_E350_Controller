@@ -65,6 +65,7 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, i
   entry.axis = axis;
   entry.value = value;
   strncpy(entry.message, message, sizeof(entry.message) - 1);
+  entry.message[sizeof(entry.message) - 1] = '\0';  // Ensure null termination
   
   // Log to serial first
   char timestamp_str[16];

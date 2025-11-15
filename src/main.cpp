@@ -15,6 +15,7 @@
 #include "task_manager.h"
 #include "config_schema_versioning.h"
 #include "watchdog_manager.h"
+#include "web_server.h"
 
 static bool system_ready = false;
 static uint32_t boot_time_ms = 0;
@@ -107,6 +108,12 @@ void setup() {
   Serial.print(pre_task_boot_ms);
   Serial.println(" ms\n");
   
+  // Initialize Web Server
+  Serial.println("[BOOT] Initializing Web Server...");
+  webServer.init();
+  webServer.begin();
+  delay(50);
+  
   // Initialize FreeRTOS task manager
   Serial.println("[BOOT] Initializing FreeRTOS task manager...");
   taskManagerInit();
@@ -146,10 +153,13 @@ void loop() {
   // In FreeRTOS architecture, loop() is not the main control flow
   // All real-time work is done in FreeRTOS tasks
   
+  // Handle web server requests
+  webServer.handleClient();
+  
   // Keep core 0 available for WiFi/BLE (if needed in future)
   // Monitor system health periodically
   
-  delay(1000);  // Minimal idle loop on core 0
+  delay(10);  // Minimal idle loop on core 0 with web server handling
   
   // Optional: System health monitoring every few seconds
   // This runs on core 0 and doesn't interfere with core 1 tasks

@@ -93,8 +93,8 @@ void lcdInterfacePrintLine(uint8_t line, const char* text) {
   
   // Pad or truncate to LCD_COLS
   memset(lcd_state.display[line], ' ', LCD_COLS);
-  strncpy(lcd_state.display[line], text, LCD_COLS);
-  lcd_state.display[line][LCD_COLS] = '\0';
+  strncpy(lcd_state.display[line], text, LCD_COLS - 1);
+  lcd_state.display[line][LCD_COLS - 1] = '\0';  // Ensure null termination
   lcd_state.display_dirty[line] = true;
 }
 

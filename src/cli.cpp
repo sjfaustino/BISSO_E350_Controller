@@ -136,6 +136,7 @@ void cliProcessCommand(const char* cmd) {
   // Parse command and arguments
   char cmd_copy[CLI_BUFFER_SIZE];
   strncpy(cmd_copy, cmd, CLI_BUFFER_SIZE - 1);
+  cmd_copy[CLI_BUFFER_SIZE - 1] = '\0';  // Ensure null termination
   
   char* argv[CLI_MAX_ARGS];
   int argc = 0;

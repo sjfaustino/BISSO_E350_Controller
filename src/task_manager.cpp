@@ -9,6 +9,8 @@
 #include "lcd_interface.h"
 #include "config_unified.h"
 #include "watchdog_manager.h"
+#include "memory_monitor.h"
+#include "input_validation.h"
 
 // ============================================================================
 // TASK HANDLES - Global references to all tasks
@@ -351,11 +353,17 @@ void taskEncoderFunction(void* parameter) {
   
   Serial.println("[ENCODER_TASK] Started on core 1");
   
+  // Register with watchdog
+  watchdogTaskAdd("Encoder");
+  
   while (1) {
     uint32_t task_start = millis();
     
     // Encoder operations (every 20ms = 50 Hz)
     wj66Update();  // Read encoder, process feedback
+    
+    // Feed watchdog
+    watchdogFeed("Encoder");
     
     // Update stats
     uint32_t task_time = millis() - task_start;
@@ -398,6 +406,9 @@ void taskPlcCommFunction(void* parameter) {
   
   Serial.println("[PLC_TASK] Started on core 1");
   
+  // Register with watchdog
+  watchdogTaskAdd("PLC_Comm");
+  
   while (1) {
     uint32_t task_start = millis();
     
@@ -406,6 +417,9 @@ void taskPlcCommFunction(void* parameter) {
       plcIfaceUpdate();  // I2C communication with Siemens S5
       taskUnlockMutex(mutex_i2c);
     }
+    
+    // Feed watchdog
+    watchdogFeed("PLC_Comm");
     
     // Update stats
     uint32_t task_time = millis() - task_start;
@@ -448,12 +462,18 @@ void taskI2cManagerFunction(void* parameter) {
   
   Serial.println("[I2C_TASK] Started on core 1");
   
+  // Register with watchdog
+  watchdogTaskAdd("I2C_Manager");
+  
   while (1) {
     uint32_t task_start = millis();
     
     // I2C management (every 50ms = 20 Hz)
     // Monitor bus health, statistics
     i2cGetStats();  // Collect diagnostics
+    
+    // Feed watchdog
+    watchdogFeed("I2C_Manager");
     
     // Update stats
     uint32_t task_time = millis() - task_start;
@@ -604,11 +624,19 @@ void taskMonitorFunction(void* parameter) {
   
   Serial.println("[MONITOR_TASK] Started on core 1");
   
+  // Initialize memory monitor
+  memoryMonitorInit();
+  
   while (1) {
     uint32_t task_start = millis();
     
-    // Diagnostics (every 1000ms = 1 Hz)
-    // Collect and display system statistics
+    // Update memory statistics
+    memoryMonitorUpdate();
+    
+    // Check for memory pressure
+    if (memoryMonitorIsCriticallyLow(32768)) {  // 32 KB threshold
+      faultLogWarning(FAULT_WATCHDOG_TIMEOUT, "Memory critically low!");
+    }
     
     // Update stats
     uint32_t task_time = millis() - task_start;

@@ -61,6 +61,7 @@ void configSetInt(const char* key, int32_t value) {
     }
     idx = config_count++;
     strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
+    config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';  // Ensure null termination
     config_table[idx].type = CONFIG_INT32;
   }
   
@@ -102,6 +103,7 @@ void configSetFloat(const char* key, float value) {
     }
     idx = config_count++;
     strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
+    config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';  // Ensure null termination
     config_table[idx].type = CONFIG_FLOAT;
   }
   
@@ -145,10 +147,12 @@ void configSetString(const char* key, const char* value) {
     }
     idx = config_count++;
     strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
+    config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';  // Ensure null termination
     config_table[idx].type = CONFIG_STRING;
   }
   
   strncpy(config_table[idx].value.str_val, value, CONFIG_VALUE_LEN - 1);
+  config_table[idx].value.str_val[CONFIG_VALUE_LEN - 1] = '\0';  // Ensure null termination
   config_table[idx].is_set = true;
   
   // Also save to NVS immediately for persistence
