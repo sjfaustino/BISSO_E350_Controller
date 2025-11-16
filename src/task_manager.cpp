@@ -226,14 +226,12 @@ void taskSafetyCreate() {
 
 void taskSafetyFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
-  uint32_t loop_count = 0;
   
-  Serial.println("[SAFETY_TASK] Started on core 1");
+  logInfo("[SAFETY_TASK] Started on core 1");
   watchdogTaskAdd("Safety");
   
   while (1) {
     uint32_t task_start = millis();
-    loop_count++;
     
     // Critical safety operations
     safetyUpdate();  // Check e-stop, interlocks, alarms
@@ -243,10 +241,10 @@ void taskSafetyFunction(void* parameter) {
     while (taskReceiveMessage(queue_safety, &msg, 0)) {
       switch (msg.type) {
         case MSG_SAFETY_ESTOP_REQUESTED:
-          Serial.println("[SAFETY_TASK] E-STOP requested!");
+          logError("[SAFETY_TASK] E-STOP requested!");
           break;
         case MSG_SAFETY_ALARM_TRIGGERED:
-          Serial.println("[SAFETY_TASK] Alarm triggered!");
+          logError("[SAFETY_TASK] Alarm triggered!");
           break;
         default:
           break;
@@ -295,14 +293,12 @@ void taskMotionCreate() {
 
 void taskMotionFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
-  uint32_t loop_count = 0;
   
-  Serial.println("[MOTION_TASK] Started on core 1");
+  logInfo("[MOTION_TASK] Started on core 1");
   watchdogTaskAdd("Motion");
   
   while (1) {
     uint32_t task_start = millis();
-    loop_count++;
     
     // Motion control operations (every 10ms = 100 Hz)
     if (taskLockMutex(mutex_motion, 5)) {
@@ -315,13 +311,13 @@ void taskMotionFunction(void* parameter) {
     while (taskReceiveMessage(queue_motion, &msg, 0)) {
       switch (msg.type) {
         case MSG_MOTION_START:
-          Serial.println("[MOTION_TASK] Start command received");
+          logInfo("[MOTION_TASK] Start command received");
           break;
         case MSG_MOTION_STOP:
-          Serial.println("[MOTION_TASK] Stop command received");
+          logInfo("[MOTION_TASK] Stop command received");
           break;
         case MSG_MOTION_EMERGENCY_HALT:
-          Serial.println("[MOTION_TASK] Emergency halt!");
+          logError("[MOTION_TASK] Emergency halt!");
           break;
         default:
           break;
@@ -520,27 +516,36 @@ void taskCliCreate() {
     NULL,
     TASK_PRIORITY_CLI,
     &task_cli,
-    CORE_1
+    CORE_0              // ← Load balancing: non-critical, use Core 0
   );
   
   if (result != pdPASS) {
     Serial.println("[TASKS] ERROR: Failed to create CLI task!");
   } else {
-    Serial.println("[TASKS] ✓ CLI task created (priority 15, core 1)");
+    Serial.println("[TASKS] ✓ CLI task created (priority 15, core 0)");
     task_stats[5].handle = task_cli;
   }
 }
 
 void taskCliFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
+  static uint32_t last_watchdog_feed = 0;
   
   Serial.println("[CLI_TASK] Started on core 1");
+  
+  // Register CLI task (no watchdog registration in this version)
   
   while (1) {
     uint32_t task_start = millis();
     
     // CLI processing (every 100ms = 10 Hz)
     cliUpdate();  // Non-blocking user input processing
+    
+    // *** CRITICAL: Feed watchdog periodically ***
+    if (millis() - last_watchdog_feed > WATCHDOG_FEED_INTERVAL_MS) {
+      watchdogFeed("CLI");
+      last_watchdog_feed = millis();
+    }
     
     // Update stats
     uint32_t task_time = millis() - task_start;
@@ -567,13 +572,13 @@ void taskFaultLogCreate() {
     NULL,
     TASK_PRIORITY_FAULT_LOG,
     &task_fault_log,
-    CORE_1
+    CORE_0              // ← Load balancing: logging is non-critical, use Core 0
   );
   
   if (result != pdPASS) {
     Serial.println("[TASKS] ERROR: Failed to create Fault_Log task!");
   } else {
-    Serial.println("[TASKS] ✓ Fault_Log task created (priority 14, core 1)");
+    Serial.println("[TASKS] ✓ Fault_Log task created (priority 5, core 0)");
     task_stats[6].handle = task_fault_log;
   }
 }

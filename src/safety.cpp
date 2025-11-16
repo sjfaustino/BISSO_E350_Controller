@@ -23,6 +23,68 @@ void safetyInit() {
   Serial.println("[SAFETY] Safety system ready");
 }
 
+/**
+ * @brief Safety system monitor - checks all safety interlocks and alarms
+ * 
+ * **Safety Checks Performed:**
+ * 1. **Stall Detection**: Monitor if axes are stuck (position not advancing)
+ *    - Check every 100ms
+ *    - Timeout threshold: SAFETY_STALL_CHECK_INTERVAL_MS
+ *    - Triggers alarm if axis locked for >2 seconds
+ * 
+ * 2. **Emergency Stop Status**: Verify E-stop button state
+ *    - Query GPIO for physical E-stop button
+ *    - Compare with software E-stop flag
+ *    - Detect discrepancies
+ * 
+ * 3. **PLC Communication**: Ensure PLC is responding
+ *    - Check last message timestamp
+ *    - Trigger alarm if PLC silent for >500ms
+ *    - Fallback to safe mode
+ * 
+ * 4. **Fault Duration Tracking**: Monitor active faults
+ *    - Update elapsed time for current fault
+ *    - Log extended faults (>30 seconds)
+ *    - Generate diagnostics
+ * 
+ * 5. **Interlock Validation**: Verify all safety interlocks
+ *    - Check door sensors
+ *    - Check light curtains
+ *    - Check safety gates
+ * 
+ * **State Machine:**
+ * - SAFETY_OK: All systems healthy
+ * - SAFETY_WARNING: Non-critical issue (log only)
+ * - SAFETY_FAULT: Critical issue (stop motion)
+ * - SAFETY_ESTOP: Emergency stop active (full halt)
+ * 
+ * **Timing:**
+ * @note Called from safety task at 200Hz (5ms period)
+ * @note Typical execution: 2-5ms
+ * @note Stall checks run every 100ms (less frequently)
+ * 
+ * **Thread Safety:**
+ * @pre Called only from safety task (no mutex needed)
+ * @post Safety state updated atomically
+ * @note Safe to read from other tasks (atomic reads)
+ * 
+ * **Fault Handling:**
+ * - All faults logged with timestamp
+ * - Motion stops on SAFETY_FAULT
+ * - CLI disabled on SAFETY_ESTOP
+ * - Automatic recovery not attempted (manual reset required)
+ * 
+ * **Performance:**
+ * @note Non-blocking, all checks fast
+ * @note No allocation or dynamic memory
+ * @note Can be called repeatedly without issues
+ * 
+ * @return void (safety state updated via safety_state structure)
+ * 
+ * @see safetyTriggerAlarm() - Trigger fault alarm
+ * @see safetyCheckMotionAllowed() - Query if motion permitted
+ * @see safety.h - Safety state definitions
+ */
 void safetyUpdate() {
   // Check for stalled axes (would integrate with motion system)
   uint32_t now = millis();

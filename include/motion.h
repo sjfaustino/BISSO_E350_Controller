@@ -3,13 +3,22 @@
 
 #include <Arduino.h>
 #include <stdint.h>
+#include "system_constants.h"
 
 // Motion constants
 #define MOTION_AXES 4
-#define MOTION_MAX_SPEED 100.0f
 #define MOTION_ACCELERATION 5.0f
 #define MOTION_STALL_TIMEOUT_MS 2000
 #define MOTION_UPDATE_INTERVAL_MS 10
+// Note: MOTION_MAX_SPEED defined in system_constants.h
+
+// Speed Profile Mapping (Controller -> PLC notification via PCF8574 I2C expander)
+// KC868-A16 uses PCF8574 I2C expander for digital outputs
+typedef enum {
+  SPEED_PROFILE_1 = 0,  // P0:0, P1:0 (Slow:   0-30 mm/s)
+  SPEED_PROFILE_2 = 1,  // P0:1, P1:0 (Medium: 31-80 mm/s)
+  SPEED_PROFILE_3 = 2   // P0:0, P1:1 (Fast:   81-200 mm/s)
+} speed_profile_t;
 
 // Motion states
 typedef enum {
@@ -78,6 +87,10 @@ uint32_t motionGetLimitViolations(uint8_t axis);
 // State machine validation
 bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state);
 bool motionSetState(uint8_t axis, motion_state_t new_state);
+
+// Speed Profile Control (Controller notifies PLC via GPIO)
+speed_profile_t motionMapSpeedToProfile(float speed_mm_s);
+void motionSetPLCSpeedProfile(speed_profile_t profile);
 const char* motionStateToString(motion_state_t state);
 
 // Encoder feedback integration

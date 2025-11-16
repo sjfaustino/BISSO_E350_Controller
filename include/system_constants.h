@@ -5,13 +5,22 @@
 // MOTION CONTROL CONSTANTS
 // ============================================================================
 
+// Speed Profile Output via PCF8574 I2C Expander (KC868-A16)
+// GPIO14/15 not available - using I2C expansion instead
+#define SPEED_PROFILE_BIT_0_PCF_PIN 0   // P0 on PCF8574 (Speed bit 0)
+#define SPEED_PROFILE_BIT_1_PCF_PIN 1   // P1 on PCF8574 (Speed bit 1)
+// PCF8574 Profile Encoding:
+// 00 = Profile 1 (Slow:   0-30 mm/s)
+// 01 = Profile 2 (Medium: 31-80 mm/s)
+// 10 = Profile 3 (Fast:   81-200 mm/s)
+
 // Position scaling: internal units to physical units
 #define MOTION_POSITION_SCALE_FACTOR 1000        // 1000 internal units = 1mm
 
 // Motion timing
 #define MOTION_UPDATE_INTERVAL_MS 10              // Update frequency: 100Hz
 #define MOTION_STALL_TIMEOUT_MS 2000              // Detect stalled motion after 2 seconds
-#define MOTION_MAX_SPEED 100.0f                   // Maximum speed: 100 mm/s
+#define MOTION_MAX_SPEED 200.0f                   // Maximum speed: 200 mm/s (for 3 profiles)
 #define MOTION_ACCELERATION 5.0f                  // Acceleration rate: 5 mm/s²
 
 // ============================================================================
@@ -96,12 +105,26 @@
 #define CONFIG_MAX_SIZE 4096                      // Maximum config size
 
 // ============================================================================
+// MOTION SPEED CONSTRAINTS
+// ============================================================================
+
+#define MOTION_MIN_SPEED_MM_S 0.1f                    // Minimum valid speed
+#define MOTION_MAX_SPEED_MM_S 200.0f                  // Maximum speed: 200 mm/s
+
+// ============================================================================
+// WEB SERVER JOG CONSTRAINTS
+// ============================================================================
+
+#define WEB_MAX_JOG_DISTANCE_MM 500                   // Max jog distance per command
+#define WEB_MAX_JOG_SPEED_MM_S 100                    // Max jog speed via web
+
+// ============================================================================
 // MEMORY MANAGEMENT CONSTANTS
 // ============================================================================
 
-#define MEMORY_WARNING_THRESHOLD_KB 64            // Warn if free < 64KB
-#define MEMORY_CRITICAL_THRESHOLD_KB 32           // Critical if free < 32KB
-#define MEMORY_CHECK_INTERVAL_MS 1000             // Check memory every second
+#define MEMORY_WARNING_THRESHOLD_BYTES 65536          // Warn if free < 64KB (was hardcoded as 32768)
+#define MEMORY_CRITICAL_THRESHOLD_BYTES 32768         // Critical if free < 32KB
+#define MEMORY_CHECK_INTERVAL_MS 1000                 // Check memory every second
 
 // ============================================================================
 // WEB SERVER CONSTANTS

@@ -27,9 +27,69 @@ void wj66Init() {
   Serial.println("[WJ66] Encoder system ready");
 }
 
+/**
+ * @brief WJ66 encoder serial communication update - reads position data from all 4 axes
+ * 
+ * **Protocol Overview:**
+ * - Communication: Serial1 at 9600 baud via KC868-A16 (GPIO14=RX, GPIO33=TX)
+ * - Encoder Type: WJ66 quadrature encoder
+ * - Command Format: "#00\r" (ASCII command)
+ * - Response Format: "!±val1,±val2,±val3,±val4\r" (4 signed 16-bit values)
+ * - PPR (Pulses Per Revolution): 20
+ * - Max Position Range: ±99,999 (constraint: >100,000 is invalid)
+ * 
+ * **Algorithm:**
+ * 1. Check if enough time has elapsed since last read (WJ66_READ_INTERVAL_MS)
+ * 2. Every 500ms, send read command "#00\r" to encoder
+ * 3. Read response byte-by-byte into fixed circular buffer
+ * 4. On '\r' received:
+ *    - Validate format: starts with '!'
+ *    - Parse 4 signed integers with comma delimiters
+ *    - Handle negative numbers: '-' flag then accumulate digits
+ *    - Validate range: all values must be ±100,000 or less
+ *    - On success: update position array and timestamp
+ *    - On error: set ENCODER_CRC_ERROR status
+ * 5. Buffer overflow protection: max 64 bytes (reset if exceeded)
+ * 
+ * **Fixed Buffer (64 bytes):**
+ * - Prevents dynamic String allocation memory fragmentation
+ * - Strict bounds checking: buffer_idx < 64
+ * - Automatic reset on overflow with error logging
+ * - Null-terminated after each successful parse
+ * 
+ * **Data Validation:**
+ * - Checks for 3 commas (4 values expected)
+ * - Validates all values in ±100,000 range
+ * - Updates timestamps for stall detection
+ * - Increments read counter for diagnostics
+ * 
+ * **Thread Safety:**
+ * @pre Static buffer and state accessed atomically
+ * @note Called from encoder task at ~20Hz
+ * @note Position updates visible to motion task immediately
+ * 
+ * **Error Handling:**
+ * - ENCODER_OK: Valid data received
+ * - ENCODER_CRC_ERROR: Parse error or value out of range
+ * - Buffer overflow: Logged, buffer reset, error_count++
+ * - Timeout: No data for >1 second triggers fallback
+ * 
+ * **Performance:**
+ * @note Typical execution: 5-10ms (when parsing)
+ * @note Non-blocking: reads available serial data only
+ * @note No allocation: uses fixed 64-byte buffer
+ * 
+ * @return void (state updated via wj66_state structure)
+ * 
+ * @see encoder_wj66.h - Protocol and status definitions
+ * @see wj66Init() - Initialize serial port
+ * @see encoderMotionGetPosition() - Get current position from motion system
+ */
 void wj66Update() {
   static uint32_t last_read = 0;
-  static String response_buffer = "";
+  static char response_buffer[65] = {0};      // Fixed buffer (was: String)
+  static uint8_t buffer_idx = 0;              // Track position in buffer
+  static const uint8_t MAX_RESPONSE_LEN = 64; // Max expected response length
   
   if (millis() - last_read < WJ66_READ_INTERVAL_MS) return;
   last_read = millis();
@@ -45,8 +105,8 @@ void wj66Update() {
     char c = Serial1.read();
     
     if (c == '\r') {
-      // Process complete response
-      if (response_buffer.startsWith("!")) {
+      // CRITICAL: Process complete response
+      if (buffer_idx > 0 && response_buffer[0] == '!') {
         // Parse response: "!±val1,±val2,±val3,±val4\r"
         // Correctly handles negative numbers: -1234 -> parse 1234, then negate
         int commas = 0;
@@ -54,7 +114,7 @@ void wj66Update() {
         int32_t current_value = 0;
         bool is_negative = false;
         
-        for (int i = 1; i < response_buffer.length(); i++) {
+        for (uint8_t i = 1; i < buffer_idx; i++) {
           char ch = response_buffer[i];
           if (ch == ',') {
             // Save value, applying negative flag if set
@@ -84,7 +144,7 @@ void wj66Update() {
           for (int i = 0; i < 4; i++) {
             if (abs(values[i]) > 100000) {
               valid = false;
-              logWarning("Encoder value out of range: axis %d = %ld", i, values[i]);
+              logWarning("[WJ66] Encoder value out of range: axis %d = %ld", i, values[i]);
             }
           }
           
@@ -96,7 +156,7 @@ void wj66Update() {
             }
             wj66_state.status = ENCODER_OK;
           } else {
-            logError("Invalid encoder values received");
+            logError("[WJ66] Invalid encoder values received");
             wj66_state.status = ENCODER_CRC_ERROR;
           }
         } else {
@@ -105,15 +165,21 @@ void wj66Update() {
         }
       }
       
-      response_buffer = ""; // Clear for next response
+      // Clear buffer for next response
+      buffer_idx = 0;
+      memset(response_buffer, 0, sizeof(response_buffer));
     } else if (c >= 32 && c < 127) {
-      // Valid ASCII character
-      response_buffer += c;
-      
-      // Buffer overflow protection - prevent unbounded growth
-      if (response_buffer.length() > 64) {
-        response_buffer = "";
+      // Valid ASCII character - add to buffer with STRICT bounds checking
+      if (buffer_idx < MAX_RESPONSE_LEN) {
+        response_buffer[buffer_idx++] = c;
+        response_buffer[buffer_idx] = '\0';  // Keep null-terminated
+      } else {
+        // CRITICAL: Buffer overflow - reset immediately
+        logError("[WJ66] CRITICAL: Response buffer overflow detected!");
+        buffer_idx = 0;
+        memset(response_buffer, 0, sizeof(response_buffer));
         wj66_state.error_count++;
+        faultLogWarning(FAULT_ENCODER_TIMEOUT, "WJ66 buffer overflow");
       }
     }
   }

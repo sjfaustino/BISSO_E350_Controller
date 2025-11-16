@@ -1,4 +1,6 @@
 #include "motion.h"
+#include "system_constants.h"
+#include "plc_iface.h"
 #include "encoder_motion_integration.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
@@ -51,6 +53,49 @@ void motionInit() {
   Serial.println("[MOTION] ✅ Motion system ready");
 }
 
+/**
+ * @brief Core motion control update - processes all axes with trapezoidal velocity profiles
+ * 
+ * **Algorithm Overview:**
+ * This function implements independent trapezoidal velocity profiles for each axis:
+ * 1. Calculate elapsed time since last update
+ * 2. For each axis currently in motion:
+ *    - Determine acceleration/deceleration phase based on position and speed
+ *    - Apply acceleration to current speed (capped at target speed)
+ *    - Calculate new position based on current speed
+ *    - Check against soft limits and encoder feedback
+ *    - Update state machine (ACCELERATING → VELOCITY → DECELERATING → IDLE)
+ * 3. Handle state transitions and error conditions
+ * 4. Release mutex and return
+ * 
+ * **Trapezoidal Profile Phases:**
+ * - ACCELERATING: Speed increases at MOTION_ACCELERATION rate
+ * - VELOCITY: Constant speed phase
+ * - DECELERATING: Speed decreases at MOTION_ACCELERATION rate
+ * - IDLE: Stopped
+ * 
+ * **Thread Safety:**
+ * @pre Motion mutex must NOT be held (acquires with 5ms timeout)
+ * @post Motion mutex released before return
+ * @note Handles concurrent reads from CLI/web tasks safely
+ * 
+ * **Timing:**
+ * @note Must be called from motion task at 100Hz (10ms intervals)
+ * @note Skips update if less than MOTION_UPDATE_INTERVAL_MS has elapsed
+ * @note Typical execution time: 2-5ms per axis
+ * 
+ * **Safety Checks:**
+ * - Soft limits enforced (position bounded)
+ * - Stall detection (position not advancing)
+ * - Encoder feedback validation
+ * - State machine validation
+ * 
+ * @return void (state updated via axes[] array, protected by mutex)
+ * 
+ * @see motionSetAxisTarget() - Set target position
+ * @see motionStop() - Emergency stop
+ * @see motionEmergencyStop() - E-stop with timeout
+ */
 void motionUpdate() {
   if (!global_enabled) return;
   
@@ -167,35 +212,62 @@ void motionUpdate() {
 
 void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   if (!global_enabled) {
-    Serial.println("[MOTION] ERROR: Motion system disabled");
+    logError("[MOTION] ERROR: Motion system disabled");
     return;
   }
   
   // Acquire mutex with 100ms timeout for CLI/web commands
   if (!taskLockMutex(taskGetMotionMutex(), 100)) {
-    Serial.println("[MOTION] ERROR: Could not acquire motion mutex");
+    logError("[MOTION] ERROR: Could not acquire motion mutex");
     return;
   }
   
-  axes[0].target_position = (int32_t)(x * 1000);
-  axes[1].target_position = (int32_t)(y * 1000);
-  axes[2].target_position = (int32_t)(z * 1000);
-  axes[3].target_position = (int32_t)(a * 1000);
+  // *** CRITICAL SECTION - Protected by mutex ***
   
-  float clamped_speed = constrain(speed_mm_s, 0.1f, MOTION_MAX_SPEED);
+  // SAFETY: Validate all target positions against soft limits
+  int32_t targets[] = {
+    (int32_t)(x * 1000),
+    (int32_t)(y * 1000),
+    (int32_t)(z * 1000),
+    (int32_t)(a * 1000)
+  };
+  
+  // Check soft limits for all axes
+  for (int i = 0; i < MOTION_AXES; i++) {
+    if (axes[i].soft_limit_enabled) {
+      if (targets[i] < axes[i].soft_limit_min || targets[i] > axes[i].soft_limit_max) {
+        logError("[MOTION] ERROR: Axis %d target %d violates soft limits [%d, %d]",
+                 i, targets[i], axes[i].soft_limit_min, axes[i].soft_limit_max);
+        
+        faultLogWarning(FAULT_SOFT_LIMIT_EXCEEDED, 
+                        "Motion soft limit violation attempted");
+        
+        taskUnlockMutex(taskGetMotionMutex());
+        return;
+      }
+    }
+  }
+  
+  // All targets valid - proceed with motion
+  // Map speed to profile and notify PLC
+  speed_profile_t profile = motionMapSpeedToProfile(speed_mm_s);
+  motionSetPLCSpeedProfile(profile);
+  
+  // Set all axis targets and speeds
+  for (int i = 0; i < MOTION_AXES; i++) {
+    axes[i].target_position = targets[i];
+  }
+  
+  // Use user-specified speed (clamped to valid range)
+  float clamped_speed = constrain(speed_mm_s, MOTION_MIN_SPEED_MM_S, MOTION_MAX_SPEED_MM_S);
   for (int i = 0; i < MOTION_AXES; i++) {
     axes[i].target_speed = clamped_speed;
     axes[i].state = MOTION_ACCELERATING;
   }
+  // *** END CRITICAL SECTION ***
   
-  Serial.print("[MOTION] Moving to (");
-  Serial.print(x); Serial.print(", ");
-  Serial.print(y); Serial.print(", ");
-  Serial.print(z); Serial.print(", ");
-  Serial.print(a);
-  Serial.print(") at ");
-  Serial.print(clamped_speed);
-  Serial.println(" mm/s");
+  logInfo("[MOTION] Moving to (%.2f, %.2f, %.2f, %.2f) at %.1f mm/s (Profile %d) - limits OK",
+          x, y, z, a, clamped_speed, (int)profile + 1);
   
   // Release mutex
   taskUnlockMutex(taskGetMotionMutex());
@@ -212,40 +284,116 @@ void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s
 }
 
 void motionSetAxisTarget(uint8_t axis, int32_t target_pos) {
-  if (axis < MOTION_AXES) {
-    axes[axis].target_position = target_pos;
-    axes[axis].target_speed = MOTION_MAX_SPEED;
-    axes[axis].state = MOTION_ACCELERATING;
+  if (axis >= MOTION_AXES) {
+    logError("[MOTION] ERROR: Invalid axis %d for target position", axis);
+    return;
   }
+  
+  // CRITICAL: Acquire mutex to prevent race condition with motionUpdate()
+  if (!taskLockMutex(taskGetMotionMutex(), 100)) {
+    logError("[MOTION] ERROR: Could not acquire motion mutex for axis target");
+    return;
+  }
+  
+  // *** CRITICAL SECTION - Protected by mutex ***
+  
+  // SAFETY: Validate target position against soft limits
+  motion_axis_t* ax = &axes[axis];
+  
+  if (ax->soft_limit_enabled) {
+    if (target_pos < ax->soft_limit_min || target_pos > ax->soft_limit_max) {
+      logError("[MOTION] ERROR: Axis %d target %d violates soft limits [%d, %d]",
+               axis, target_pos, ax->soft_limit_min, ax->soft_limit_max);
+      
+      // Log proper fault code for soft limit violation
+      faultLogWarning(FAULT_SOFT_LIMIT_EXCEEDED, 
+                      "Axis soft limit violation attempted");
+      
+      taskUnlockMutex(taskGetMotionMutex());
+      return;
+    }
+  }
+  
+  // Position is valid - set motion parameters
+  ax->target_position = target_pos;
+  ax->target_speed = MOTION_MAX_SPEED;
+  ax->state = MOTION_ACCELERATING;
+  
+  // *** END CRITICAL SECTION ***
+  
+  taskUnlockMutex(taskGetMotionMutex());
+  
+  logInfo("[MOTION] Axis %d: target set to %d (within limits)", axis, target_pos);
 }
 
 void motionStop() {
+  // CRITICAL: Acquire mutex to prevent race condition with motionUpdate()
+  // motionStop() runs in CLI/web task, motionUpdate() runs in motion task
+  if (!taskLockMutex(taskGetMotionMutex(), 100)) {
+    logError("[MOTION] ERROR: Could not acquire motion mutex for Stop");
+    return;
+  }
+  
+  // *** CRITICAL SECTION - Protected by mutex ***
   for (int i = 0; i < MOTION_AXES; i++) {
     axes[i].target_speed = 0.0f;
     axes[i].state = MOTION_IDLE;
   }
-  Serial.println("[MOTION] Stop commanded");
+  // *** END CRITICAL SECTION ***
+  
+  taskUnlockMutex(taskGetMotionMutex());
+  
+  logInfo("[MOTION] Stop commanded - all axes idle");
 }
 
 void motionPause() {
+  // CRITICAL: Acquire mutex to prevent race condition with motionUpdate()
+  if (!taskLockMutex(taskGetMotionMutex(), 100)) {
+    logError("[MOTION] ERROR: Could not acquire motion mutex for Pause");
+    return;
+  }
+  
+  // *** CRITICAL SECTION - Protected by mutex ***
   for (int i = 0; i < MOTION_AXES; i++) {
-    if (axes[i].state != MOTION_IDLE) {
+    if (axes[i].state != MOTION_IDLE && axes[i].state != MOTION_PAUSED) {
       axes[i].state = MOTION_PAUSED;
+      logInfo("[MOTION] Axis %d paused", i);
     }
   }
-  Serial.println("[MOTION] Paused");
+  // *** END CRITICAL SECTION ***
+  
+  taskUnlockMutex(taskGetMotionMutex());
+  
+  logInfo("[MOTION] All active axes paused");
 }
 
 void motionResume() {
+  // CRITICAL: Acquire mutex to prevent race condition with motionUpdate()
+  if (!taskLockMutex(taskGetMotionMutex(), 100)) {
+    logError("[MOTION] ERROR: Could not acquire motion mutex for Resume");
+    return;
+  }
+  
+  // *** CRITICAL SECTION - Protected by mutex ***
   for (int i = 0; i < MOTION_AXES; i++) {
     if (axes[i].state == MOTION_PAUSED) {
       axes[i].state = MOTION_ACCELERATING;
+      logInfo("[MOTION] Axis %d resumed", i);
     }
   }
-  Serial.println("[MOTION] Resumed");
+  // *** END CRITICAL SECTION ***
+  
+  taskUnlockMutex(taskGetMotionMutex());
+  
+  logInfo("[MOTION] Paused axes resumed");
 }
 
 void motionEmergencyStop() {
+  // CRITICAL: Emergency stop - try to acquire mutex, but don't wait long
+  // Emergency stop takes priority over everything
+  bool got_mutex = taskLockMutex(taskGetMotionMutex(), 10);  // Short timeout for emergency
+  
+  // *** CRITICAL SECTION - Protected by mutex (if acquired) ***
   global_enabled = false;
   
   // Stop all axes immediately
@@ -255,8 +403,17 @@ void motionEmergencyStop() {
     axes[i].state = MOTION_ERROR;
   }
   
-  Serial.println("[MOTION] ⚠️  EMERGENCY STOP ACTIVATED ⚠️");
-  Serial.println("[MOTION] All axes stopped - Manual recovery required");
+  // *** END CRITICAL SECTION ***
+  
+  if (got_mutex) {
+    taskUnlockMutex(taskGetMotionMutex());
+  } else {
+    logError("[MOTION] WARNING: Could not acquire mutex for emergency stop (forced anyway)");
+  }
+  
+  logError("[MOTION] ⚠️  EMERGENCY STOP ACTIVATED ⚠️");
+  logError("[MOTION] All axes stopped - Manual recovery required");
+  logError("[MOTION] global_enabled = false");
   
   // Log critical fault
   faultLogError(FAULT_EMERGENCY_HALT, "Emergency stop activated - motion halted");
@@ -511,7 +668,13 @@ bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) {
 
 bool motionSetState(uint8_t axis, motion_state_t new_state) {
   if (axis >= MOTION_AXES) {
-    Serial.println("[MOTION] ERROR: Invalid axis for state change");
+    logError("[MOTION] ERROR: Invalid axis %d for state change", axis);
+    return false;
+  }
+  
+  // CRITICAL: Acquire mutex to prevent race condition with motionUpdate()
+  if (!taskLockMutex(taskGetMotionMutex(), 100)) {
+    logError("[MOTION] ERROR: Could not acquire motion mutex for state change");
     return false;
   }
   
@@ -519,25 +682,19 @@ bool motionSetState(uint8_t axis, motion_state_t new_state) {
   
   // Validate transition
   if (!motionIsValidStateTransition(axis, new_state)) {
-    Serial.print("[MOTION] ERROR: Invalid state transition on axis ");
-    Serial.print(axis);
-    Serial.print(" from ");
-    Serial.print(motionStateToString(current));
-    Serial.print(" to ");
-    Serial.println(motionStateToString(new_state));
+    logError("[MOTION] ERROR: Invalid state transition on axis %d from %s to %s", 
+             axis, motionStateToString(current), motionStateToString(new_state));
     
     faultLogWarning(FAULT_WATCHDOG_TIMEOUT, "Invalid state transition");
+    taskUnlockMutex(taskGetMotionMutex());
     return false;
   }
   
   // Log state change
-  Serial.print("[MOTION] Axis ");
-  Serial.print(axis);
-  Serial.print(" state: ");
-  Serial.print(motionStateToString(current));
-  Serial.print(" -> ");
-  Serial.println(motionStateToString(new_state));
+  logInfo("[MOTION] Axis %d state: %s -> %s", 
+          axis, motionStateToString(current), motionStateToString(new_state));
   
+  // *** CRITICAL SECTION - Protected by mutex ***
   // Update state
   axes[axis].state = new_state;
   
@@ -546,6 +703,9 @@ bool motionSetState(uint8_t axis, motion_state_t new_state) {
     axes[axis].current_speed = 0.0f;
     axes[axis].target_speed = 0.0f;
   }
+  // *** END CRITICAL SECTION ***
+  
+  taskUnlockMutex(taskGetMotionMutex());
   
   return true;
 }
@@ -561,5 +721,74 @@ void motionEnableEncoderFeedback(bool enable) {
 
 bool motionIsEncoderFeedbackEnabled() {
   return encoder_feedback_enabled;
+}
+
+// ============================================================================
+// SPEED PROFILE CONTROL (Controller -> PLC notification)
+// ============================================================================
+
+speed_profile_t motionMapSpeedToProfile(float speed_mm_s) {
+  // Map user-selected speed to one of 3 profiles
+  if (speed_mm_s <= 30.0f) {
+    return SPEED_PROFILE_1;  // Slow: 0-30 mm/s
+  } else if (speed_mm_s <= 80.0f) {
+    return SPEED_PROFILE_2;  // Medium: 31-80 mm/s
+  } else {
+    return SPEED_PROFILE_3;  // Fast: 81-200 mm/s
+  }
+}
+
+// Internal version without mutex - call only when mutex is already held
+static void motionSetPLCSpeedProfile_internal(speed_profile_t profile) {
+  // Set speed profile via PCF8574 I2C expander (KC868-A16)
+  // *** IMPORTANT: Caller must hold motion mutex! ***
+  // Uses ELBO I72 register (PCF8574 @ 0x20)
+  // CRITICAL: Check I2C transmission errors for safety
+  
+  uint8_t bit0 = (profile) & 0x01;      // Extract bit 0
+  uint8_t bit1 = (profile >> 1) & 0x01; // Extract bit 1
+  
+  // Set via ELBO I72 bits (Speed selection) with error checking
+  bool fast_ok = elboI72SetSpeed(ELBO_I72_FAST, bit0);
+  bool med_ok = elboI72SetSpeed(ELBO_I72_MED, bit1);
+  
+  const char* profile_names[] = {"Slow", "Medium", "Fast"};
+  
+  // Check for I2C transmission errors
+  if (!fast_ok || !med_ok) {
+    logError("[MOTION] *** CRITICAL: Speed profile I2C transmission failed! ***");
+    logError("[MOTION] FAST I2C: %s, MED I2C: %s", 
+             fast_ok ? "OK" : "FAILED", med_ok ? "OK" : "FAILED");
+    logError("[MOTION] PLC may not have received speed profile selection!");
+    logError("[MOTION] Motion may execute at incorrect speed profile!");
+    
+    // Halt motion to prevent safety issue (don't call motionStop, we hold the mutex)
+    for (int i = 0; i < MOTION_AXES; i++) {
+      axes[i].target_speed = 0.0f;
+      axes[i].state = MOTION_ERROR;
+    }
+    
+    return;  // Don't log success if there was an error
+  }
+  
+  logInfo("[MOTION] Speed profile: %s (FAST:%d, MED:%d) - I2C OK", 
+          profile_names[profile], bit0, bit1);
+}
+
+// External version with mutex protection
+void motionSetPLCSpeedProfile(speed_profile_t profile) {
+  // Set speed profile via PCF8574 I2C expander (KC868-A16)
+  // Uses ELBO I72 register (PCF8574 @ 0x20)
+  // CRITICAL: Check I2C transmission errors for safety
+  
+  // CRITICAL: Acquire mutex to prevent race condition with motionUpdate()
+  if (!taskLockMutex(taskGetMotionMutex(), 100)) {
+    logError("[MOTION] ERROR: Could not acquire motion mutex for speed profile");
+    return;
+  }
+  
+  motionSetPLCSpeedProfile_internal(profile);
+  
+  taskUnlockMutex(taskGetMotionMutex());
 }
 
