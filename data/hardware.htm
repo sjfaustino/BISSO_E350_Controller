@@ -1,0 +1,807 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ELBO v4.2 Hardware Config - Mockup</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 20px; 
+      background: #f0f0f0; 
+    }
+    
+    .container { 
+      max-width: 1200px; 
+      margin: auto; 
+      background: white; 
+      padding: 20px; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+    }
+    
+    h1 { 
+      color: #333; 
+      border-bottom: 3px solid #007bff; 
+      padding-bottom: 10px; 
+      margin-bottom: 20px;
+    }
+    
+    h2 { 
+      color: #555; 
+      margin-top: 30px; 
+      border-left: 4px solid #007bff; 
+      padding-left: 10px; 
+    }
+    
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #007bff;
+      margin-bottom: 20px;
+      gap: 5px;
+    }
+    
+    .tab {
+      padding: 12px 24px;
+      cursor: pointer;
+      border: none;
+      background: #e9ecef;
+      border-radius: 8px 8px 0 0;
+      font-weight: bold;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+    
+    .tab:hover {
+      background: #dee2e6;
+    }
+    
+    .tab.active {
+      background: #007bff;
+      color: white;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    /* Hardware Config Panel */
+    .hw-panel {
+      background: #f8f9fa;
+      border: 2px solid #007bff;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    
+    .hw-section {
+      margin-bottom: 30px;
+    }
+    
+    .hw-section-title {
+      background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      font-size: 15px;
+      box-shadow: 0 2px 4px rgba(0,123,255,0.2);
+    }
+    
+    .hw-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    
+    .hw-item {
+      background: white;
+      border: 2px solid #dee2e6;
+      border-radius: 6px;
+      padding: 15px;
+      transition: all 0.3s;
+      position: relative;
+    }
+    
+    .hw-item:hover {
+      border-color: #007bff;
+      box-shadow: 0 4px 8px rgba(0,123,255,0.15);
+      transform: translateY(-2px);
+    }
+    
+    .hw-item label {
+      display: block;
+      font-weight: bold;
+      color: #495057;
+      margin-bottom: 8px;
+      font-size: 14px;
+      letter-spacing: 0.3px;
+    }
+    
+    .hw-item select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #ced4da;
+      border-radius: 5px;
+      font-size: 14px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+    }
+    
+    .hw-item select:hover {
+      border-color: #80bdff;
+    }
+    
+    .hw-item select:focus {
+      outline: none;
+      border-color: #007bff;
+      box-shadow: 0 0 0 4px rgba(0,123,255,0.15);
+    }
+    
+    .hw-item .desc {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 6px;
+      line-height: 1.4;
+      font-style: italic;
+    }
+    
+    .hw-item.assigned {
+      border-color: #28a745;
+      background: #f0fff4;
+    }
+    
+    .hw-item.unassigned {
+      border-color: #ffc107;
+      background: #fffbf0;
+    }
+    
+    /* Buttons */
+    .btn { 
+      background: #007bff; 
+      color: white; 
+      border: none; 
+      padding: 12px 24px; 
+      cursor: pointer; 
+      border-radius: 6px; 
+      font-size: 15px;
+      font-weight: bold;
+      margin: 5px;
+      transition: all 0.3s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .btn:hover { 
+      background: #0056b3; 
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn:active { 
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .btn.success { 
+      background: linear-gradient(135deg, #28a745 0%, #218838 100%); 
+    }
+    
+    .btn.success:hover { 
+      background: linear-gradient(135deg, #218838 0%, #1e7e34 100%); 
+    }
+    
+    .btn.danger { 
+      background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); 
+    }
+    
+    .btn.danger:hover { 
+      background: linear-gradient(135deg, #c82333 0%, #bd2130 100%); 
+    }
+    
+    .btn.secondary { 
+      background: #6c757d; 
+    }
+    
+    .btn.secondary:hover { 
+      background: #5a6268; 
+    }
+    
+    .hw-actions {
+      margin-top: 25px;
+      padding-top: 25px;
+      border-top: 2px solid #dee2e6;
+      text-align: center;
+    }
+    
+    .alert {
+      padding: 15px 20px;
+      border-radius: 6px;
+      margin: 15px 0;
+      display: none;
+      font-weight: 500;
+      animation: slideDown 0.3s;
+    }
+    
+    @keyframes slideDown {
+      from { 
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to { 
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .alert.success { 
+      background: #d4edda; 
+      color: #155724; 
+      border: 2px solid #c3e6cb; 
+    }
+    
+    .alert.error { 
+      background: #f8d7da; 
+      color: #721c24; 
+      border: 2px solid #f5c6cb; 
+    }
+    
+    .alert.warning { 
+      background: #fff3cd; 
+      color: #856404; 
+      border: 2px solid #ffeaa7; 
+    }
+    
+    /* Pin availability badge */
+    .pin-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 5px;
+    }
+    
+    .pin-badge.available {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .pin-badge.used {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    /* Connection visualization */
+    .connection-viz {
+      background: white;
+      border: 2px solid #007bff;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    
+    .connection-row {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      margin: 5px 0;
+      background: #f8f9fa;
+      border-radius: 4px;
+      border-left: 4px solid #007bff;
+    }
+    
+    .connection-row .signal-name {
+      flex: 1;
+      font-weight: bold;
+      color: #495057;
+    }
+    
+    .connection-row .arrow {
+      padding: 0 15px;
+      color: #007bff;
+      font-size: 20px;
+    }
+    
+    .connection-row .gpio-name {
+      flex: 1;
+      text-align: right;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      color: #28a745;
+    }
+    
+    /* Info box */
+    .info-box {
+      background: #e7f3ff;
+      border-left: 4px solid #007bff;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    
+    .info-box strong {
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 ELBO v4.2 Bridge Saw Controller</h1>
+    
+    <!-- Tab Navigation -->
+    <div class="tabs">
+      <button class="tab" onclick="switchTab('status')">📊 Status</button>
+      <button class="tab active" onclick="switchTab('hardware')">⚙️ Hardware Config</button>
+      <button class="tab" onclick="switchTab('jog')">🎮 Jog Control</button>
+    </div>
+    
+    <!-- STATUS TAB -->
+    <div id="status-tab" class="tab-content">
+      <h2>System Status</h2>
+      <p style="color: #6c757d;">Status dashboard would appear here...</p>
+    </div>
+    
+    <!-- HARDWARE CONFIG TAB -->
+    <div id="hardware-tab" class="tab-content active">
+      <h2>⚙️ Hardware Pin Configuration</h2>
+      
+      <div class="info-box">
+        <strong>💡 How it works:</strong> Select GPIO pins for each PLC signal. 
+        When you assign a pin, it automatically becomes unavailable in other dropdowns. 
+        Click "Save Configuration" to store settings to flash memory.
+      </div>
+      
+      <div id="config-alert" class="alert"></div>
+      
+      <div class="hw-panel">
+        <!-- PLC INPUTS Section -->
+        <div class="hw-section">
+          <div class="hw-section-title">📥 PLC INPUTS (from PLC to ESP32)</div>
+          <div class="hw-grid">
+            
+            <!-- C Selector -->
+            <div class="hw-item assigned" id="item-c-sel">
+              <label>C_SELECTOR</label>
+              <select id="gpio-c-sel" onchange="updateSelection('c-sel', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="36">CH1 (GPIO36)</option>
+                <option value="34">CH2 (GPIO34)</option>
+                <option value="35">CH3 (GPIO35)</option>
+                <option value="39" selected>CH4 (GPIO39)</option>
+                <option value="32">IO32 (GPIO32)</option>
+              </select>
+              <div class="desc">C mode selector input from PLC</div>
+            </div>
+            
+            <!-- T Selector -->
+            <div class="hw-item assigned" id="item-t-sel">
+              <label>T_SELECTOR</label>
+              <select id="gpio-t-sel" onchange="updateSelection('t-sel', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="36">CH1 (GPIO36)</option>
+                <option value="34" selected>CH2 (GPIO34)</option>
+                <option value="35">CH3 (GPIO35)</option>
+                <option value="39">CH4 (GPIO39)</option>
+                <option value="32">IO32 (GPIO32)</option>
+              </select>
+              <div class="desc">T mode selector input from PLC</div>
+            </div>
+            
+            <!-- CT Selector -->
+            <div class="hw-item assigned" id="item-ct-sel">
+              <label>CT_SELECTOR</label>
+              <select id="gpio-ct-sel" onchange="updateSelection('ct-sel', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="36" selected>CH1 (GPIO36)</option>
+                <option value="34">CH2 (GPIO34)</option>
+                <option value="35">CH3 (GPIO35)</option>
+                <option value="39">CH4 (GPIO39)</option>
+                <option value="32">IO32 (GPIO32)</option>
+              </select>
+              <div class="desc">C+T combined mode selector from PLC</div>
+            </div>
+            
+            <!-- Manual Selector -->
+            <div class="hw-item assigned" id="item-manual-sel">
+              <label>MANUAL_SELECTOR</label>
+              <select id="gpio-manual-sel" onchange="updateSelection('manual-sel', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="36">CH1 (GPIO36)</option>
+                <option value="34">CH2 (GPIO34)</option>
+                <option value="35" selected>CH3 (GPIO35)</option>
+                <option value="39">CH4 (GPIO39)</option>
+                <option value="32">IO32 (GPIO32)</option>
+              </select>
+              <div class="desc">Manual mode selector input from PLC</div>
+            </div>
+            
+            <!-- E-Stop Button -->
+            <div class="hw-item assigned" id="item-estop-button">
+              <label>E-STOP_BUTTON</label>
+              <select id="gpio-estop-button" onchange="updateSelection('estop-button', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="36">CH1 (GPIO36)</option>
+                <option value="34">CH2 (GPIO34)</option>
+                <option value="35">CH3 (GPIO35)</option>
+                <option value="39">CH4 (GPIO39)</option>
+                <option value="32" selected>IO32 (GPIO32)</option>
+              </select>
+              <div class="desc">Button to immediately stop ALL operation</div>
+            </div>
+
+            <!-- Pause Button -->
+            <div class="hw-item assigned" id="item-pause-button">
+              <label>PAUSE_BUTTON</label>
+              <select id="gpio-pause-button" onchange="updateSelection('pause-button', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="36">CH1 (GPIO36)</option>
+                <option value="34">CH2 (GPIO34)</option>
+                <option value="35">CH3 (GPIO35)</option>
+                <option value="39">CH4 (GPIO39)</option>
+                <option value="32" selected>IO32 (GPIO32)</option>
+              </select>
+              <div class="desc">Button to pause current operation</div>
+            </div>
+
+            <!-- Resume Button-->
+            <div class="hw-item assigned" id="item-resume-button">
+              <label>RESUME_BUTTON</label>
+              <select id="gpio-resume-button" onchange="updateSelection('resume-button', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="36">CH1 (GPIO36)</option>
+                <option value="34">CH2 (GPIO34)</option>
+                <option value="35">CH3 (GPIO35)</option>
+                <option value="39">CH4 (GPIO39)</option>
+                <option value="32" selected>IO32 (GPIO32)</option>
+              </select>
+              <div class="desc">Button that resumes the current operation</div>
+            </div>
+            
+          </div>
+        </div>
+        
+        <!-- PLC OUTPUTS Section -->
+        <div class="hw-section">
+          <div class="hw-section-title">📤 PLC OUTPUTS (from ESP32 to PLC)</div>
+          <div class="hw-grid">
+            
+            <!-- Axis Select -->
+            <div class="hw-item assigned" id="item-axis-sel">
+              <label>AXIS_SELECT</label>
+              <select id="gpio-axis-sel" onchange="updateSelection('axis-sel', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="4" selected>IIC_SDA (GPIO4)</option>
+                <option value="5">IIC_SCL (GPIO5)</option>
+                <option value="18">IO18 (GPIO18)</option>
+                <option value="19">IO19 (GPIO19)</option>
+                <option value="21">IO21 (GPIO21)</option>
+              </select>
+              <div class="desc">Axis selection output to PLC</div>
+            </div>
+            
+            <!-- Direction -->
+            <div class="hw-item assigned" id="item-direction">
+              <label>DIRECTION</label>
+              <select id="gpio-direction" onchange="updateSelection('direction', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="4">IIC_SDA (GPIO4)</option>
+                <option value="5" selected>IIC_SCL (GPIO5)</option>
+                <option value="18">IO18 (GPIO18)</option>
+                <option value="19">IO19 (GPIO19)</option>
+                <option value="21">IO21 (GPIO21)</option>
+              </select>
+              <div class="desc">Direction output to PLC (+/-)</div>
+            </div>
+            
+            <!-- Speed Medium -->
+            <div class="hw-item assigned" id="item-speed-med">
+              <label>SPEED_MEDIUM</label>
+              <select id="gpio-speed-med" onchange="updateSelection('speed-med', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="4">IIC_SDA (GPIO4)</option>
+                <option value="5">IIC_SCL (GPIO5)</option>
+                <option value="18" selected>IO18 (GPIO18)</option>
+                <option value="19">IO19 (GPIO19)</option>
+                <option value="21">IO21 (GPIO21)</option>
+              </select>
+              <div class="desc">Medium speed indicator to PLC</div>
+            </div>
+            
+            <!-- Speed Fast -->
+            <div class="hw-item assigned" id="item-speed-fast">
+              <label>SPEED_FAST</label>
+              <select id="gpio-speed-fast" onchange="updateSelection('speed-fast', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="4">IIC_SDA (GPIO4)</option>
+                <option value="5">IIC_SCL (GPIO5)</option>
+                <option value="18">IO18 (GPIO18)</option>
+                <option value="19" selected>IO19 (GPIO19)</option>
+                <option value="21">IO21 (GPIO21)</option>
+              </select>
+              <div class="desc">Fast speed indicator to PLC</div>
+            </div>
+            
+            <!-- Speed V/S -->
+            <div class="hw-item assigned" id="item-speed-vs">
+              <label>SPEED_V/S</label>
+              <select id="gpio-speed-vs" onchange="updateSelection('speed-vs', this.value)">
+                <option value="-1">-- Not Assigned --</option>
+                <option value="4">IIC_SDA (GPIO4)</option>
+                <option value="5">IIC_SCL (GPIO5)</option>
+                <option value="18">IO18 (GPIO18)</option>
+                <option value="19">IO19 (GPIO19)</option>
+                <option value="21" selected>IO21 (GPIO21)</option>
+              </select>
+              <div class="desc">Variable speed (V/S) indicator to PLC</div>
+            </div>
+            
+          </div>
+        </div>
+        
+        <!-- Current Configuration Visualization -->
+        <div class="hw-section">
+          <h3 style="color: #495057; margin-bottom: 15px;">📋 Current Pin Assignments</h3>
+          <div class="connection-viz">
+            <div class="connection-row">
+              <span class="signal-name">C_SELECTOR</span>
+              <span class="arrow">→</span>
+              <span class="gpio-name" id="viz-c-sel">CH4 (GPIO39)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">T_SELECTOR</span>
+              <span class="arrow">→</span>
+              <span class="gpio-name" id="viz-t-sel">CH2 (GPIO34)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">CT_SELECTOR</span>
+              <span class="arrow">→</span>
+              <span class="gpio-name" id="viz-ct-sel">CH1 (GPIO36)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">MANUAL_SELECTOR</span>
+              <span class="arrow">→</span>
+              <span class="gpio-name" id="viz-manual-sel">CH3 (GPIO35)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">E-STOP_BUTTON</span>
+              <span class="arrow">→</span>
+              <span class="gpio-name" id="viz-manual-a">IO32 (GPIO32)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">PAUSE_BUTTON</span>
+              <span class="arrow">→</span>
+              <span class="gpio-name" id="viz-manual-a">IO32 (GPIO32)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">RESUME_RESUME</span>
+              <span class="arrow">→</span>
+              <span class="gpio-name" id="viz-manual-a">IO32 (GPIO32)</span>
+            </div>
+            <hr style="margin: 15px 0; border: 1px solid #dee2e6;">
+            <div class="connection-row">
+              <span class="signal-name">AXIS_SELECT</span>
+              <span class="arrow">←</span>
+              <span class="gpio-name" id="viz-axis-sel">IIC_SDA (GPIO4)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">DIRECTION</span>
+              <span class="arrow">←</span>
+              <span class="gpio-name" id="viz-direction">IIC_SCL (GPIO5)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">SPEED_MEDIUM</span>
+              <span class="arrow">←</span>
+              <span class="gpio-name" id="viz-speed-med">IO18 (GPIO18)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">SPEED_FAST</span>
+              <span class="arrow">←</span>
+              <span class="gpio-name" id="viz-speed-fast">IO19 (GPIO19)</span>
+            </div>
+            <div class="connection-row">
+              <span class="signal-name">SPEED_V/S</span>
+              <span class="arrow">←</span>
+              <span class="gpio-name" id="viz-speed-vs">IO21 (GPIO21)</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="hw-actions">
+          <button class="btn success" onclick="saveConfig()">💾 Save Configuration</button>
+          <button class="btn secondary" onclick="reloadConfig()">🔄 Reload</button>
+          <button class="btn danger" onclick="resetConfig()">⚠️ Reset to Defaults</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- JOG CONTROL TAB -->
+    <div id="jog-tab" class="tab-content">
+      <h2>🎮 Manual Jog Control</h2>
+      <p style="color: #6c757d;">Jog control panel would appear here...</p>
+    </div>
+  </div>
+  
+  <script>
+    // Configuration state
+    let config = {
+      'c-sel': 39,
+      't-sel': 34,
+      'ct-sel': 36,
+      'manual-sel': 35,
+	  'estop-button': 32,
+	  'pause-button': 32,
+	  'resume-button': 32,
+      'axis-sel': 4,
+      'direction': 5,
+      'speed-med': 18,
+      'speed-fast': 19,
+      'speed-vs': 21
+    };
+    
+    // Silkscreen mapping
+    const silkscreenMap = {
+      36: 'CH1', 39: 'CH4', 34: 'CH2', 35: 'CH3',
+      32: 'IO32', 4: 'IIC_SDA', 5: 'IIC_SCL',
+      18: 'IO18', 19: 'IO19', 21: 'IO21',
+      22: 'IO22', 23: 'IO23', 25: 'IO25',
+      26: 'IO26', 27: 'IO27', 14: 'HT1',
+      33: 'HT2', 16: 'RS485_RXD', 13: 'RS485_TXD'
+    };
+    
+    function getDisplayName(gpio) {
+      if (gpio === -1) return 'Not Assigned';
+      const silkscreen = silkscreenMap[gpio] || 'GPIO' + gpio;
+      return `${silkscreen} (GPIO${gpio})`;
+    }
+    
+    // Available pins
+    const inputPins = [36, 39, 34, 35, 32, 33, 25, 26, 27, 14, 12, 13, 15, 2];
+    const outputPins = [4, 5, 18, 19, 21, 22, 23, 16, 17];
+    
+    // Tab switching
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tab + '-tab').classList.add('active');
+    }
+    
+    // Update selection and mutual exclusion
+    function updateSelection(signalId, newGPIO) {
+      const oldGPIO = config[signalId];
+      config[signalId] = parseInt(newGPIO);
+      
+      // Update visualization
+      const vizElement = document.getElementById('viz-' + signalId);
+      if (vizElement) {
+        vizElement.textContent = getDisplayName(parseInt(newGPIO));
+        vizElement.style.color = newGPIO === '-1' ? '#dc3545' : '#28a745';
+      }
+      
+      // Update item styling
+      const item = document.getElementById('item-' + signalId);
+      if (newGPIO === '-1') {
+        item.classList.remove('assigned');
+        item.classList.add('unassigned');
+      } else {
+        item.classList.remove('unassigned');
+        item.classList.add('assigned');
+      }
+      
+      // Rebuild all dropdowns to reflect availability
+      rebuildDropdowns();
+      
+      showAlert('Configuration updated - click Save to persist', 'warning');
+    }
+    
+    // Rebuild dropdowns with current availability
+    function rebuildDropdowns() {
+      // Get used pins
+      const usedInputs = Object.keys(config)
+        .filter(k => ['c-sel', 't-sel', 'ct-sel', 'manual-sel', 'manual-a'].includes(k))
+        .map(k => config[k])
+        .filter(v => v !== -1);
+      
+      const usedOutputs = Object.keys(config)
+        .filter(k => ['axis-sel', 'direction', 'speed-med', 'speed-fast', 'speed-vs'].includes(k))
+        .map(k => config[k])
+        .filter(v => v !== -1);
+      
+      // Rebuild input dropdowns
+      ['c-sel', 't-sel', 'ct-sel', 'manual-sel', 'manual-a'].forEach(signalId => {
+        const select = document.getElementById('gpio-' + signalId);
+        const currentValue = config[signalId];
+        const availablePins = inputPins.filter(p => !usedInputs.includes(p) || p === currentValue);
+        
+        select.innerHTML = '<option value="-1">-- Not Assigned --</option>';
+        
+        // Sort: CH pins first, then others
+        availablePins.sort((a, b) => {
+          const aName = silkscreenMap[a] || '';
+          const bName = silkscreenMap[b] || '';
+          if (aName.startsWith('CH') && !bName.startsWith('CH')) return -1;
+          if (!aName.startsWith('CH') && bName.startsWith('CH')) return 1;
+          return a - b;
+        });
+        
+        availablePins.forEach(pin => {
+          const opt = document.createElement('option');
+          opt.value = pin;
+          opt.textContent = getDisplayName(pin);
+          if (pin === currentValue) opt.selected = true;
+          select.appendChild(opt);
+        });
+      });
+      
+      // Rebuild output dropdowns
+      ['axis-sel', 'direction', 'speed-med', 'speed-fast', 'speed-vs'].forEach(signalId => {
+        const select = document.getElementById('gpio-' + signalId);
+        const currentValue = config[signalId];
+        const availablePins = outputPins.filter(p => !usedOutputs.includes(p) || p === currentValue);
+        
+        select.innerHTML = '<option value="-1">-- Not Assigned --</option>';
+        
+        // Sort: IIC first, then IO pins
+        availablePins.sort((a, b) => {
+          const aName = silkscreenMap[a] || '';
+          const bName = silkscreenMap[b] || '';
+          if (aName.startsWith('IIC') && !bName.startsWith('IIC')) return -1;
+          if (!aName.startsWith('IIC') && bName.startsWith('IIC')) return 1;
+          return a - b;
+        });
+        
+        availablePins.forEach(pin => {
+          const opt = document.createElement('option');
+          opt.value = pin;
+          opt.textContent = getDisplayName(pin);
+          if (pin === currentValue) opt.selected = true;
+          select.appendChild(opt);
+        });
+      });
+    }
+    
+    function saveConfig() {
+      showAlert('✅ Configuration saved successfully! Settings stored to NVS flash memory.', 'success');
+    }
+    
+    function reloadConfig() {
+      showAlert('🔄 Configuration reloaded from flash memory', 'success');
+    }
+    
+    function resetConfig() {
+      if (confirm('Reset to factory defaults? This will overwrite your current configuration.')) {
+        showAlert('✅ Configuration reset to defaults', 'success');
+      }
+    }
+    
+    function showAlert(message, type) {
+      const alert = document.getElementById('config-alert');
+      alert.textContent = message;
+      alert.className = 'alert ' + type;
+      alert.style.display = 'block';
+      setTimeout(() => { alert.style.display = 'none'; }, 5000);
+    }
+    
+    // Initialize
+    rebuildDropdowns();
+  </script>
+</body>
+</html>

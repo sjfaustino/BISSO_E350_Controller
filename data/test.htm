@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BISSO v4.2 – Hardware Pin Assignment</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:system-ui,-apple-system,sans-serif;background:#f5f5f5;color:#111;min-height:100vh;padding:20px;transition:all .3s}
+        body.dark-mode{background:#111;color:#eee}
+        .container{max-width:1100px;margin:auto;background:#fff;border:2px solid #ccc;border-radius:8px;padding:30px;box-shadow:0 8px 32px rgba(0,0,0,.1)}
+        body.dark-mode .container{background:#222;border-color:#444;box-shadow:0 8px 32px rgba(0,0,0,.8)}
+        .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;padding-bottom:15px;border-bottom:2px solid #ccc}
+        body.dark-mode .header{border-color:#444}
+        h1{font-size:28px;color:#2563eb}
+        body.dark-mode h1{color:#60a5fa}
+        .theme-toggle{width:50px;height:50px;border-radius:50%;border:2px solid #2563eb;background:#dbeafe;color:#1e40af;font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+        body.dark-mode .theme-toggle{border-color:#60a5fa;background:#1e40af;color:#dbeafe}
+        h2{font-size:22px;margin:30px 0 15px;color:#2563eb}
+        body.dark-mode h2{color:#93c5fd}
+        table{width:100%;border-collapse:collapse;margin:20px 0;background:rgba(0,0,0,.02);border-radius:8px;overflow:hidden}
+        body.dark-mode table{background:rgba(255,255,255,.03)}
+        th,td{padding:14px 16px;border-bottom:1px solid #ddd;text-align:left}
+        body.dark-mode th,body.dark-mode td{border-color:#444}
+        th{background:#2563eb;color:#fff}
+        body.dark-mode th{background:#1e40af}
+        select{padding:10px 14px;border:1px solid #aaa;border-radius:6px;background:#fff;font-family:'JetBrains Mono',monospace;min-width:380px;font-size:15px}
+        body.dark-mode select{background:#1e293b;color:#e2e8f0;border-color:#475569}
+        .pin-used{color:#dc2626;font-weight:bold}
+        body.dark-mode .pin-used{color:#fca5a5}
+        .warning-banner{
+            padding:16px 20px;margin:20px 0;border-radius:8px;font-weight:600;
+            border-left:6px solid #dc2626;display:none;animation:fade 0.5s;
+        }
+        .warning-banner.danger{background:#fee2e2;color:#7f1d1d;border-color:#f87171}
+        .warning-banner.warn{background:#fffbeb;color:#92400e;border-color:#f59e0b}
+        .warning-banner.info{background:#dbeafe;color:#1e40af;border-color:#60a5fa}
+        body.dark-mode .warning-banner.danger{background:#450a0a;color:#fca5a5}
+        body.dark-mode .warning-banner.warn{background:#451a03;color:#fbbf24}
+        body.dark-mode .warning-banner.info{background:#1e3a8a;color:#93c5fd}
+        @keyframes fade{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+        .buttons{text-align:center;margin-top:40px}
+        button{padding:14px 32px;margin:0 12px;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer}
+        .btn-save{background:#16a34a;color:#fff}
+        .btn-reload{background:#0ea5e9;color:#fff}
+        .btn-reset{background:#dc2626;color:#fff}
+        .footer{margin-top:60px;text-align:center;color:#666;font-size:14px}
+        body.dark-mode .footer{color:#94a3b8}
+        .footer a{color:#2563eb;margin:0 15px;text-decoration:none}
+        body.dark-mode .footer a{color:#93c5fd}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>BISSO v4.2 — Hardware Pin Assignment</h1>
+        <div class="theme-toggle" id="themeToggle">Moon</div>
+    </div>
+
+    <div class="warning-banner danger" id="warning"></div>
+
+    <h2>Input Signals</h2>
+    <table>
+        <thead><tr><th>Signal</th><th>Description</th><th>Pin Assignment</th></tr></thead>
+        <tbody>
+            <tr><td>Emergency Stop</td><td>Red mushroom button (NC)</td><td><select id="estop_in" data-type="input"></select></td></tr>
+            <tr><td>X Home Switch</td><td>Negative limit</td><td><select id="home_x" data-type="input"></select></td></tr>
+            <tr><td>Y Home Switch</td><td>Back limit</td><td><select id="home_y" data-type="input"></select></td></tr>
+            <tr><td>Z Home Switch</td><td>Upper limit</td><td><select id="home_z" data-type="input"></select></td></tr>
+            <tr><td>Probe Input</td><td>Z touch plate</td><td><select id="probe" data-type="input"></select></td></tr>
+            <tr><td>External Start</td><td>Green remote button</td><td><select id="start_btn" data-type="input"></select></td></tr>
+        </tbody>
+    </table>
+
+    <h2>Output Signals</h2>
+    <table>
+        <thead><tr><th>Signal</th><th>Description</th><th>Pin Assignment</th></tr></thead>
+        <tbody>
+            <tr><td>Spindle Enable</td><td>Main spindle relay/SSR</td><td><select id="spindle_en" data-type="output"></select></td></tr>
+            <tr><td>Coolant Pump</td><td>Water pump</td><td><select id="coolant" data-type="output"></select></td></tr>
+            <tr><td>Tool Change</td><td>Pneumatic changer</td><td><select id="tool_change" data-type="output"></select></td></tr>
+            <tr><td>Alarm Beacon</td><td>Red light / buzzer</td><td><select id="alarm_out" data-type="output"></select></td></tr>
+        </tbody>
+    </table>
+
+    <div class="buttons">
+        <button class="btn-save" id="save">Save to Flash</button>
+        <button class="btn-reload" id="reload">Reload</button>
+        <button class="btn-reset" id="reset">Factory Reset Pins</button>
+    </div>
+
+    <div class="footer">
+        <a href="/">Dashboard</a> • <a href="/jog.html">Jog</a> • <a href="/settings.html">Settings</a> • Hardware
+    </div>
+</div>
+
+<script>
+// ==================== THEME ====================
+const DARK='dark-mode', LIGHT='light-mode';
+function getTheme(){const p=new URLSearchParams(location.search);if(p.get('theme')==='dark')return DARK;if(p.get('theme')==='light')return LIGHT;const s=localStorage.getItem('bisso-theme');if(s)return s;return window.matchMedia('(prefers-color-scheme: dark)').matches?DARK:LIGHT;}
+function applyTheme(t){document.body.classList.remove(DARK,LIGHT);document.body.classList.add(t);localStorage.setItem('bisso-theme',t);document.getElementById('themeToggle').textContent=t===DARK?'Sun':'Moon';}
+applyTheme(getTheme());
+document.getElementById('themeToggle').addEventListener('click',()=>applyTheme(document.body.classList.contains(DARK)?LIGHT:DARK));
+
+// ==================== FULL KC868-A16 PINOUT WITH CURRENT & VOLTAGE SPECS ====================
+const pins = [
+    // X1-X16 — Opto-isolated inputs (5-24V, 10 mA typical)
+    ...Array.from({length:16},(_,i)=>({gpio:i,silk:`X${i+1}`,type:"input",voltage:"5-24V",current:"10mA",note:"Input only"})),
+    // Y1-Y16 — MOSFET outputs (12-30V, 10A max per channel)
+    ...Array.from({length:16},(_,i)=>({gpio:16+i,silk:`Y${i+1}`,type:"output",voltage:"12-30V",current:"10A max",note:"Output only"})),
+    // Direct ESP32 pins
+    {gpio:32,silk:"HT1",type:"both",voltage:"3.3V",current:"5mA",note:"GPIO14 – Direct to ESP32"},
+    {gpio:33,silk:"HT2",type:"both",voltage:"3.3V",current:"5mA",note:"GPIO15 – Direct to ESP32"},
+    {gpio:34,silk:"HT3",type:"both",voltage:"3.3V",current:"5mA",note:"GPIO16 – Direct to ESP32"},
+    {gpio:35,silk:"RXD2",type:"both",voltage:"3.3V",current:"5mA",note:"GPIO17 – RS485 A"},
+    {gpio:36,silk:"TXD2",type:"both",voltage:"3.3V",current:"5mA",note:"GPIO18 – RS485 B"},
+    {gpio:37,silk:"IN1",type:"input",voltage:"0-20mA",current:"20mA",note:"Current loop input"},
+    {gpio:38,silk:"IN2",type:"input",voltage:"0-20mA",current:"20mA",note:"Current loop input"},
+    {gpio:39,silk:"IN3",type:"input",voltage:"0-5V",current:"1mA",note:"Analog 0-5V"},
+    {gpio:40,silk:"IN4",type:"input",voltage:"0-5V",current:"1mA",note:"Analog 0-5V"}
+];
+
+let assignments = {
+    estop_in:0,home_x:1,home_y:2,home_z:3,probe:37,start_btn:-1,
+    spindle_en:16,coolant:17,tool_change:18,alarm_out:32
+};
+
+function getDisplay(p){
+    if(!p)return"-- Not Assigned --";
+    let t=p.silk;
+    if(p.note)t+=` – ${p.note}`;
+    return`${t} (GPIO${p.gpio}) – ${p.voltage} – ${p.current}`;
+}
+
+function showWarning(msg,type='danger'){
+    const w=document.getElementById('warning');
+    w.textContent=`Warning: ${msg}`;
+    w.className=`warning-banner ${type}`;
+    w.style.display='block';
+    setTimeout(()=>w.style.display='none',8000);
+}
+
+function hideWarning(){document.getElementById('warning').style.display='none';}
+
+function rebuildDropdowns(){
+    const used=new Set(Object.values(assignments).filter(v=>v!==-1));
+    document.querySelectorAll('select').forEach(sel=>{
+        const sig=sel.id;
+        const curr=assignments[sig];
+        const wantInput=sel.dataset.type==='input';
+        sel.innerHTML='';
+        const none=document.createElement('option');
+        none.value=-1;none.textContent='-- Not Assigned --';
+        if(curr===-1)none.selected=true;
+        sel.appendChild(none);
+        pins.forEach(p=>{
+            const ok=wantInput?(p.type==='input'||p.type==='both'):(p.type==='output'||p.type==='both');
+            if(!ok)return;
+            const opt=document.createElement('option');
+            opt.value=p.gpio;
+            opt.textContent=getDisplay(p);
+            if(used.has(p.gpio)&&p.gpio!==curr){
+                opt.disabled=true;
+                opt.textContent+=' [USED]';
+                opt.className='pin-used';
+            }
+            if(p.gpio===curr)opt.selected=true;
+            sel.appendChild(opt);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+    rebuildDropdowns();
+
+    document.querySelectorAll('select').forEach(sel=>{
+        sel.addEventListener('change',function(){
+            const sig=this.id;
+            const newPin=Number(this.value);
+            const oldPin=assignments[sig];
+            hideWarning();
+
+            // Safety checks
+            if(newPin!==-1){
+                const p=pins.find(x=>x.gpio===newPin);
+                if(sig.includes('home')||sig==='estop_in'||sig==='probe'||sig==='start_btn'){
+                    if(p.voltage.includes('3.3V')&&p.current==='5mA'){
+                        showWarning('Dry contact on 3.3V/5mA pin will NOT work — use X1–X16 instead!','danger');
+                    }else if(p.voltage==='0-20mA'){
+                        showWarning('You selected a current-loop input — add 250Ω shunt resistor for dry contact','warn');
+                    }else if(p.voltage==='0-5V'){
+                        showWarning('Analog 0-5V input — dry contact may be unreliable','warn');
+                    }
+                }
+                if(sig.includes('spindle')||sig.includes('coolant')||sig.includes('tool')||sig.includes('alarm')){
+                    if(p.type==='input'){
+                        showWarning('You selected an INPUT pin for an OUTPUT signal — nothing will happen!','danger');
+                    }else if(p.voltage.includes('3.3V')){
+                        showWarning('3.3V pin selected — too weak for relays! Use Y1–Y16 (10A)','danger');
+                    }
+                }
+                // Conflict check
+                for(const[k,v]of Object.entries(assignments)){
+                    if(k!==sig&&v===newPin){
+                        alert(`Pin already used by ${k.replace(/_/g,' ')}!`);
+                        this.value=oldPin;
+                        return;
+                    }
+                }
+            }
+            assignments[sig]=newPin;
+            rebuildDropdowns();
+        });
+    });
+
+    document.getElementById('save').onclick=()=>showWarning('Configuration saved to flash!','info');
+    document.getElementById('reload').onclick=()=>location.reload();
+    document.getElementById('reset').onclick=()=>{
+        if(confirm('Reset ALL pins to factory defaults?')){
+            Object.keys(assignments).forEach(k=>assignments[k]=-1);
+            rebuildDropdowns();
+            showWarning('Factory reset complete','info');
+        }
+    };
+});
+</script>
+</body>
+</html>
