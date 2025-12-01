@@ -4,6 +4,9 @@
 #include "fault_logging.h" 
 #include <Wire.h>
 
+// Debounce Configuration
+#define PLC_DEBOUNCE_REQUIRED_READS 2
+
 // PLC Interface State - manages three PCF8574 expanders
 struct {
   uint8_t I72_byte;    // Speed profile output (PCF8574 @ 0x20)
@@ -23,6 +26,10 @@ struct {
   0
 };
 
+// State for Debounce Logic
+static uint8_t input_debounce_count = 0;
+static uint8_t input_last_stable_byte = 0x00;
+
 void plcIfaceInit() {
   Serial.println("[PLC] PLC interface initializing...");
   
@@ -32,6 +39,12 @@ void plcIfaceInit() {
   plc_state.last_read_ms = millis();
   plc_state.error_count = 0;
   plc_state.read_count = 0;
+  
+  // Set initial stable byte to current state
+  uint8_t initial_read;
+  if (i2cReadWithRetry(PCF8574_Q73_ADDR, &initial_read, 1) == I2C_RESULT_OK) {
+      input_last_stable_byte = initial_read;
+  }
   
   Serial.print("[PLC] I2C initialized: SDA=GPIO");
   Serial.print(PLC_SDA_PIN);
@@ -55,21 +68,46 @@ void plcIfaceUpdate() {
   }
   last_read = millis();
   
-  uint8_t read_buffer;
+  uint8_t current_read_byte;
   
-  i2c_result_t result = i2cReadWithRetry(PCF8574_Q73_ADDR, &read_buffer, 1);
+  i2c_result_t result = i2cReadWithRetry(PCF8574_Q73_ADDR, &current_read_byte, 1);
   
   if (result == I2C_RESULT_OK) {
-    plc_state.Q73_byte = read_buffer;
-    plc_state.status = PLC_OK;
-    plc_state.last_read_ms = millis();
     plc_state.read_count++;
+    
+    // --- DEBOUNCE LOGIC ---
+    if (current_read_byte == input_last_stable_byte) {
+        // State is the same as the last stable state
+        input_debounce_count++;
+        
+        if (input_debounce_count >= PLC_DEBOUNCE_REQUIRED_READS) {
+            // Stability achieved: Update the official state only now
+            plc_state.Q73_byte = current_read_byte;
+            plc_state.status = PLC_OK;
+            plc_state.last_read_ms = millis();
+            
+            // Lock debounce counter to prevent wrap-around
+            input_debounce_count = PLC_DEBOUNCE_REQUIRED_READS; 
+        }
+    } else {
+        // State changed or is bouncing: Reset counter and update the reference byte.
+        // The official plc_state.Q73_byte remains UNCHANGED until debounce count is met.
+        input_last_stable_byte = current_read_byte;
+        input_debounce_count = 1;
+        plc_state.status = PLC_TIMEOUT; // Temporarily mark as unstable/timeout while debounce is running
+    }
+    // --- END DEBOUNCE LOGIC ---
+
   } else {
+    // I2C read failed or timed out: Mark error and reset debounce
+    plc_state.error_count++;
+    input_debounce_count = 0;
+    
     plc_state.status = PLC_TIMEOUT; 
     if (result == I2C_RESULT_NACK) {
         plc_state.status = PLC_NOT_FOUND; 
     }
-    plc_state.error_count++;
+    
     logWarning("[PLC] Q73 read failed, I2C result: %s", i2cResultToString(result));
     faultLogWarning(FAULT_PLC_COMM_LOSS, "Q73 Consensus Read Failed");
   }
@@ -135,7 +173,7 @@ bool elboI72SetSpeed(uint8_t speed_bit, bool value) {
   } else {
     logError("[ELBO] I2C Error writing I72 speed: %s", i2cResultToString(result));
     plc_state.error_count++;
-    // --- NEW FAULT LOGGING ---
+    // --- FAULT LOGGING ---
     faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I72_ADDR,
                   "I72 Speed Write Failed (Bit %d, Result %d)", speed_bit, result);
     // -------------------------
@@ -168,7 +206,7 @@ bool elboI73SetAxis(uint8_t axis_bit, bool value) {
   } else {
     logError("[ELBO] I2C Error writing I73 axis: %s", i2cResultToString(result));
     plc_state.error_count++;
-    // --- NEW FAULT LOGGING ---
+    // --- FAULT LOGGING ---
     faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR,
                   "I73 Axis Write Failed (Bit %d)", axis_bit);
     // -------------------------
@@ -197,7 +235,7 @@ bool elboI73SetDirection(uint8_t dir_bit, bool value) {
   } else {
     logError("[ELBO] I2C Error writing I73 direction: %s", i2cResultToString(result));
     plc_state.error_count++;
-    // --- NEW FAULT LOGGING ---
+    // --- FAULT LOGGING ---
     faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR,
                   "I73 Dir Write Failed (Bit %d)", dir_bit);
     // -------------------------
@@ -260,6 +298,7 @@ uint32_t plcGetErrorCount() {
 void plcDiagnostics() {
   Serial.println("\n=== PLC Interface Diagnostics ===");
   Serial.printf("Status: %d (0=OK, 1=TIMEOUT, 2=NOT_FOUND)\n", plc_state.status);
+  Serial.printf("Debounce Count: %d (Req: %d)\n", input_debounce_count, PLC_DEBOUNCE_REQUIRED_READS);
   Serial.printf("Errors: %d\n", plc_state.error_count);
   Serial.printf("Reads: %d\n", plc_state.read_count);
   Serial.printf("Last read: %d ms ago\n", millis() - plc_state.last_read_ms);
