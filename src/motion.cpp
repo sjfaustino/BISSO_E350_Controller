@@ -232,6 +232,19 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
     logError("[MOTION] ERROR: Could not acquire motion mutex");
     return;
   }
+
+  // --- CRITICAL SAFETY CHECK: ENCODER FRESHNESS ---
+  // Before calculating targets or setting outputs, ensure we have valid feedback.
+  for (int i = 0; i < MOTION_AXES; i++) {
+      if (wj66IsStale(i)) {
+          logError("[MOTION] ERROR: Move rejected. Encoder axis %d is stale.", i);
+          faultLogEntry(FAULT_ERROR, FAULT_ENCODER_TIMEOUT, i, wj66GetAxisAge(i), 
+                        "Move rejected: Encoder data stale (Age: %lu ms)", wj66GetAxisAge(i));
+          taskUnlockMutex(taskGetMotionMutex());
+          return;
+      }
+  }
+  // ------------------------------------------------
   
   // *** CRITICAL SECTION ***
   uint8_t target_axis = 255;
