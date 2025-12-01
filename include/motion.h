@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <stdint.h>
 #include "system_constants.h"
+#include "plc_iface.h" // Necessary for ELBO_I73 constants used in the arrays below
 
 #define MOTION_AXES 4
 #define MOTION_UPDATE_INTERVAL_MS 10
@@ -91,5 +92,9 @@ void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction
 // Encoder feedback integration
 void motionEnableEncoderFeedback(bool enable);
 bool motionIsEncoderFeedbackEnabled();
+
+// --- PLC I/O Mapping (Extern Declarations, defined in motion_core.cpp) ---
+extern const uint8_t AXIS_TO_I73_BIT[]; 
+extern const uint8_t AXIS_TO_CONSENSO_BIT[];
 
 #endif
