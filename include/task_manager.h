@@ -1,0 +1,199 @@
+#ifndef TASK_MANAGER_H
+#define TASK_MANAGER_H
+
+#include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
+#include <freertos/semphr.h>
+
+// ============================================================================
+// TASK PRIORITY LEVELS
+// ============================================================================
+
+#define TASK_PRIORITY_SAFETY      24
+#define TASK_PRIORITY_MOTION      22
+#define TASK_PRIORITY_ENCODER     20
+#define TASK_PRIORITY_PLC_COMM    18
+#define TASK_PRIORITY_I2C_MANAGER 17
+#define TASK_PRIORITY_CLI         15
+#define TASK_PRIORITY_FAULT_LOG   14
+#define TASK_PRIORITY_MONITOR     12
+#define TASK_PRIORITY_LCD         10
+#define TASK_PRIORITY_IDLE        1
+
+// ============================================================================
+// TASK STACK SIZES (in words, ESP32 = 4 bytes/word)
+// ============================================================================
+
+#define TASK_STACK_SAFETY        2048
+#define TASK_STACK_MOTION        2048
+#define TASK_STACK_ENCODER       1024
+#define TASK_STACK_PLC_COMM      1024
+#define TASK_STACK_I2C_MANAGER   1024
+#define TASK_STACK_CLI           2048
+#define TASK_STACK_FAULT_LOG     1024
+#define TASK_STACK_MONITOR       1024
+#define TASK_STACK_LCD           1024
+#define TASK_STACK_BOOT          2048
+
+// ============================================================================
+// TASK CORE AFFINITY
+// ============================================================================
+
+#define CORE_0                   0
+#define CORE_1                   1
+#define CORE_BOTH               -1
+
+// ============================================================================
+// TASK PERIOD/FREQUENCY (in milliseconds)
+// ============================================================================
+
+#define TASK_PERIOD_SAFETY       5
+#define TASK_PERIOD_MOTION       10
+#define TASK_PERIOD_ENCODER      20
+#define TASK_PERIOD_PLC_COMM     50
+#define TASK_PERIOD_I2C_MANAGER  50
+#define TASK_PERIOD_CLI          100
+#define TASK_PERIOD_FAULT_LOG    500
+#define TASK_PERIOD_MONITOR      1000
+#define TASK_PERIOD_LCD          100
+
+// ============================================================================
+// MESSAGE QUEUE DEFINITIONS
+// ============================================================================
+
+#define QUEUE_ITEM_SIZE          64
+#define QUEUE_LEN_MOTION         10
+#define QUEUE_LEN_SAFETY         20
+#define QUEUE_LEN_ENCODER        10
+#define QUEUE_LEN_PLC            10
+#define QUEUE_LEN_FAULT          50
+#define QUEUE_LEN_DISPLAY        10
+
+// ============================================================================
+// INTER-TASK COMMUNICATION TYPES
+// ============================================================================
+
+typedef enum {
+  // Safety events
+  MSG_SAFETY_ESTOP_REQUESTED,
+  MSG_SAFETY_ESTOP_CLEAR,
+  MSG_SAFETY_ALARM_TRIGGERED,
+  MSG_SAFETY_ALARM_CLEARED,
+  
+  // Motion events
+  MSG_MOTION_START,
+  MSG_MOTION_STOP,
+  MSG_MOTION_EMERGENCY_HALT,
+  
+  // Encoder events
+  MSG_ENCODER_DATA_READY,
+  MSG_ENCODER_ERROR,
+  MSG_ENCODER_CALIBRATION_DONE,
+  
+  // PLC events
+  MSG_PLC_COMMAND_RECEIVED,
+  MSG_PLC_STATUS_UPDATE,
+  MSG_PLC_ERROR,
+  
+  // Fault events
+  MSG_FAULT_LOGGED,
+  MSG_FAULT_CRITICAL,
+  
+  // Display events
+  MSG_DISPLAY_UPDATE,
+} message_type_t;
+
+typedef struct {
+  message_type_t type;
+  uint32_t param1;
+  uint32_t param2;
+  uint8_t data[QUEUE_ITEM_SIZE];
+  uint32_t timestamp;
+} queue_message_t;
+
+// ============================================================================
+// TASK STATISTICS
+// ============================================================================
+
+typedef struct {
+  TaskHandle_t handle;
+  const char* name;
+  UBaseType_t priority;
+  uint32_t run_count;
+  uint32_t total_time_ms;
+  uint32_t last_run_time_ms;
+  uint32_t max_run_time_ms;
+  uint16_t stack_high_water;
+} task_stats_t;
+
+// Accessors for task statistics array
+int taskGetStatsCount();
+task_stats_t* taskGetStatsArray();
+
+// ============================================================================
+// TASK MANAGER INITIALIZATION
+// ============================================================================
+
+void taskManagerInit();
+void taskManagerStart();
+
+// ============================================================================
+// INDIVIDUAL TASK FUNCTION PROTOTYPES (Defined externally in tasks_*.cpp)
+// ============================================================================
+
+void taskSafetyFunction(void* parameter);
+void taskMotionFunction(void* parameter);
+void taskEncoderFunction(void* parameter);
+void taskPlcCommFunction(void* parameter);
+void taskI2cManagerFunction(void* parameter);
+void taskCliFunction(void* parameter);
+void taskFaultLogFunction(void* parameter);
+void taskMonitorFunction(void* parameter);
+void taskLcdFunction(void* parameter);
+
+// Dispatchers
+void taskSafetyCreate();
+void taskMotionCreate();
+void taskEncoderCreate();
+void taskPlcCommCreate();
+void taskI2cManagerCreate();
+void taskCliCreate();
+void taskFaultLogCreate();
+void taskMonitorCreate();
+void taskLcdCreate();
+
+// ============================================================================
+// INTER-TASK COMMUNICATION FUNCTIONS
+// ============================================================================
+
+// Queue management
+QueueHandle_t taskGetMotionQueue();
+QueueHandle_t taskGetSafetyQueue();
+QueueHandle_t taskGetEncoderQueue();
+QueueHandle_t taskGetPlcQueue();
+QueueHandle_t taskGetFaultQueue();
+QueueHandle_t taskGetDisplayQueue();
+
+// Send/Receive messages (Defined in task_manager.cpp)
+bool taskSendMessage(QueueHandle_t queue, const queue_message_t* msg);
+bool taskReceiveMessage(QueueHandle_t queue, queue_message_t* msg, uint32_t timeout_ms);
+
+// SYNCHRONIZATION PRIMITIVES
+SemaphoreHandle_t taskGetConfigMutex();
+SemaphoreHandle_t taskGetI2cMutex();
+SemaphoreHandle_t taskGetMotionMutex();
+bool taskLockMutex(SemaphoreHandle_t mutex, uint32_t timeout_ms);
+void taskUnlockMutex(SemaphoreHandle_t mutex);
+
+// ============================================================================
+// DIAGNOSTICS
+// ============================================================================
+
+void taskShowStats();
+void taskShowAllTasks();
+uint8_t taskGetCpuUsage();
+uint32_t taskGetUptime();
+
+#endif
