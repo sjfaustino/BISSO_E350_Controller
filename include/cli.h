@@ -34,4 +34,9 @@ void cliRegisterMotionCommands();
 void cliRegisterDiagCommands();
 void cliRegisterCalibCommands();
 
+// E-Stop Command Prototypes (Implemented in cli_motion.cpp)
+void cmd_estop_status(int argc, char** argv);
+void cmd_estop_on(int argc, char** argv);
+void cmd_estop_off(int argc, char** argv);
+
 #endif
