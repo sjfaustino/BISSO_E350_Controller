@@ -43,8 +43,7 @@ void cmd_fault_clear(int argc, char** argv) { faultClearHistory(); }
 void cmd_timeout_diag(int argc, char** argv) { timeoutShowDiagnostics(); }
 void cmd_i2c_diag(int argc, char** argv) { i2cShowStats(); }
 void cmd_i2c_recover(int argc, char** argv) { i2cRecoverBus(); }
-extern void encoderMotionDiagnostics(); // Explicit declaration for linker
-void cmd_encoder_diag(int argc, char** argv) { encoderMotionDiagnostics(); } 
+void cmd_encoder_diag(int argc, char** argv) { encoderMotionDiagnostics(); }
 void cmd_encoder_baud_detect(int argc, char** argv) { encoderDetectBaudRate(); }
 
 void cmd_task_stats(int argc, char** argv) { taskShowStats(); }
@@ -69,11 +68,10 @@ extern void cmd_config_save(int argc, char** argv);
 
 
 // ============================================================================
-// NEW: FAULT STATS COMMAND IMPLEMENTATION
+// FAULT STATS COMMAND IMPLEMENTATION
 // ============================================================================
 
 // Helper to format milliseconds to readable time string (HH:MM:SS format)
-// NOTE: This uses local time conversion which relies on a running system RTC/time source.
 static const char* formatTimestamp(uint32_t timestamp_ms) {
     static char time_buffer[32];
     time_t t = timestamp_ms / 1000;
@@ -117,7 +115,7 @@ void cmd_faults_stats(int argc, char** argv) {
 
 
 // ============================================================================
-// DEBUG COMMAND DISPATCHER AND HANDLERS (Omitted for brevity)
+// DEBUG COMMAND DISPATCHER AND HANDLERS (Implementation bodies omitted for brevity)
 // ============================================================================
 
 void cmd_debug_main(int argc, char** argv) {
@@ -298,8 +296,8 @@ void cliRegisterDiagCommands() {
     // --- New Debug Dispatcher ---
     cliRegisterCommand("debug", "Show detailed system diagnostics (debug [all|encoders|config])", cmd_debug_main); 
     
-    // --- Individual Diagnostics (Aliased to be called directly) ---
-    cliRegisterCommand("faults", "Show fault history", cmd_fault_show);
+    // --- Individual Diagnostics (Registered Commands) ---
+    cliRegisterCommand("faults_show", "Show fault history", cmd_fault_show);
     cliRegisterCommand("faults_stats", "Show categorized fault statistics and timeline.", cmd_faults_stats); 
     cliRegisterCommand("faults_clear", "Clear fault history", cmd_fault_clear);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
@@ -307,7 +305,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("i2c_recover", "Recover I²C bus", cmd_i2c_recover);
     cliRegisterCommand("encoder_diag", "Show encoder diagnostics", cmd_encoder_diag);
     cliRegisterCommand("encoder_baud", "Auto-detect encoder baud rate", cmd_encoder_baud_detect);
-    // Aliases for config commands (implemented in cli_config.cpp)
+    // Aliases for config commands (extern declarations and registrations)
     extern void cmd_config_schema_show(int argc, char** argv);
     extern void cmd_config_migrate(int argc, char** argv);
     extern void cmd_config_rollback(int argc, char** argv);
@@ -320,7 +318,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("config_migrate", "Migrate configuration to new schema", cmd_config_migrate);
     cliRegisterCommand("config_rollback", "Rollback to previous schema", cmd_config_rollback);
     cliRegisterCommand("config_validate", "Validate configuration schema", cmd_config_validate);
-    // Aliases for task/WDT commands (implemented in cli_diag.cpp)
+    // Aliases for task/WDT commands (defined/implemented in this file)
     cliRegisterCommand("task_stats", "Show FreeRTOS task statistics", cmd_task_stats);
     cliRegisterCommand("task_list", "List all FreeRTOS tasks", cmd_task_list);
     cliRegisterCommand("task_cpu", "Show CPU usage", cmd_task_cpu);

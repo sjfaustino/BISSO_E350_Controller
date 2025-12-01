@@ -54,12 +54,13 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   int32_t target_pos = 0;
   float targets_mm[] = {x, y, z, a};
 
-  // Retrieve scale factors from global machineCal (using standard factor if not calibrated).
+  // --- FIX: Use Calibrated Scale Factors per Axis ---
   float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_y = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_z = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR;
   float scales[] = {scale_x, scale_y, scale_z, scale_a};
+  // ----------------------------------------------------
 
   int active_axes_count = 0;
   
@@ -95,7 +96,7 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   
   float effective_speed = (speed_mm_s == 0.0f) ? MOTION_MED_SPEED_DEFAULT : speed_mm_s;
   
-  // SAFETY: Validate target position against soft limits
+  // SAFETY: Validate target position against soft limits (using internal counts)
   if (axes[target_axis].soft_limit_enabled) {
     if (target_pos < axes[target_axis].soft_limit_min || target_pos > axes[target_axis].soft_limit_max) {
       logError("[MOTION] ERROR: Axis %d target %d violates soft limits [%d, %d]",
@@ -136,10 +137,12 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
 }
 
 void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s) {
+  // --- FIX: Use Calibrated Scale Factors per Axis for Relative Moves ---
   float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_y = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_z = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR;
+  // --------------------------------------------------------------------
 
   float current_x = motionGetPosition(0) / scale_x;
   float current_y = motionGetPosition(1) / scale_y;
