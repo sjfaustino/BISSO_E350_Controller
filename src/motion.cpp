@@ -18,10 +18,10 @@
 
 // Motion axis array
 static motion_axis_t axes[MOTION_AXES] = {
-  {0, 0, MOTION_IDLE, 0, true, -500000, 500000, true, 0, 0}, 
-  {0, 0, MOTION_IDLE, 0, true, -300000, 300000, true, 0, 0}, 
-  {0, 0, MOTION_IDLE, 0, true, 0, 150000, true, 0, 0},       
-  {0, 0, MOTION_IDLE, 0, true, -45000, 45000, true, 0, 0}   
+  {0, 0, MOTION_IDLE, 0, 0, true, -500000, 500000, true, 0, 0}, 
+  {0, 0, MOTION_IDLE, 0, 0, true, -300000, 300000, true, 0, 0}, 
+  {0, 0, MOTION_IDLE, 0, 0, true, 0, 150000, true, 0, 0},       
+  {0, 0, MOTION_IDLE, 0, 0, true, -45000, 45000, true, 0, 0}   
 };
 
 // Internal motion parameters 
@@ -33,6 +33,10 @@ static bool encoder_feedback_enabled = false;
 
 // PLC I/O bit map 
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y, ELBO_I73_AXIS_Z, 255}; 
+
+// PLC Input (Consensus) bit map
+// Mapping: Axis 0(X) -> Q73.1, Axis 1(Y) -> Q73.0, Axis 2(Z) -> Q73.2
+const uint8_t AXIS_TO_CONSENSO_BIT[] = {ELBO_Q73_CONSENSO_X, ELBO_Q73_CONSENSO_Y, ELBO_Q73_CONSENSO_Z, 255};
 
 void motionInit() {
   Serial.println("[MOTION] Motion system initializing...");
@@ -47,6 +51,7 @@ void motionInit() {
     axes[i].target_position = 0;
     axes[i].state = MOTION_IDLE;
     axes[i].enabled = true;
+    axes[i].state_entry_ms = 0;
     Serial.print("  [MOTION] Axis ");
     Serial.print(i);
     Serial.println(" initialized");
@@ -88,11 +93,9 @@ void motionUpdate() {
     // --- Soft Limit Check ---
     if (axis->soft_limit_enabled) {
       if (current_pos < axis->soft_limit_min || current_pos > axis->soft_limit_max) {
-        // --- NEW FAULT LOGGING ---
         faultLogEntry(FAULT_WARNING, FAULT_SOFT_LIMIT_EXCEEDED, active_axis, current_pos, 
                       "Axis %d violation: Pos %d out of [%d, %d]", 
                       active_axis, current_pos, axis->soft_limit_min, axis->soft_limit_max);
-        // -------------------------
         motionEmergencyStop(); 
         Serial.print("[MOTION] Axis ");
         Serial.print(active_axis);
@@ -107,6 +110,40 @@ void motionUpdate() {
       case MOTION_IDLE:
         break;
 
+      case MOTION_WAIT_CONSENSO:
+        {
+            // 1. Check for Timeout
+            if (now - axis->state_entry_ms > MOTION_CONSENSO_TIMEOUT_MS) {
+                faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, active_axis, 0, 
+                              "PLC Consensus Timeout on Axis %d (Wait > 5s)", active_axis);
+                logError("[MOTION] Consensus timeout! Aborting move.");
+                motionSetPLCAxisDirection(255, false, false); // Kill outputs
+                axis->state = MOTION_ERROR;
+            } 
+            // 2. Check for Consensus Signal
+            else {
+                uint8_t consenso_bit = AXIS_TO_CONSENSO_BIT[active_axis];
+                bool permission_granted = false;
+
+                if (consenso_bit == 255) {
+                    // Axis A or undefined typically has no PLC feedback, proceed immediately
+                    permission_granted = true;
+                } else {
+                    // Read Q73 via PLC interface cache
+                    if (elboQ73GetConsenso(consenso_bit)) {
+                        permission_granted = true;
+                    }
+                }
+
+                if (permission_granted) {
+                    logInfo("[MOTION] Consensus received for Axis %d. Starting move.", active_axis);
+                    axis->state = MOTION_EXECUTING;
+                    axis->state_entry_ms = now;
+                }
+            }
+        }
+        break;
+
       case MOTION_EXECUTING:
         // Check if target is reached
         if ((active_start_position < axis->target_position && current_pos >= axis->target_position) ||
@@ -114,6 +151,7 @@ void motionUpdate() {
           
           axis->position = axis->target_position;
           axis->state = MOTION_STOPPING;         
+          axis->state_entry_ms = now;
           
           motionSetPLCAxisDirection(255, false, false); 
           
@@ -124,6 +162,7 @@ void motionUpdate() {
         break;
         
       case MOTION_STOPPING:
+        // Simple settle time or wait for encoder to stabilize
         if (abs(current_pos - axis->position_at_stop) < 10) { 
             axis->state = MOTION_IDLE;
             active_axis = 255;
@@ -145,7 +184,7 @@ void motionUpdate() {
 }
 
 // ============================================================================
-// PLC I/O CONTROL IMPLEMENTATION (Only ONE definition)
+// PLC I/O CONTROL IMPLEMENTATION
 // ============================================================================
 
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction) {
@@ -226,10 +265,8 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
 
   if (active_axes_count > 1) {
     logError("[MOTION] ERROR: Multi-axis move rejected (active axes: %d)", active_axes_count);
-    // --- NEW FAULT LOGGING ---
     faultLogEntry(FAULT_WARNING, FAULT_SOFT_LIMIT_EXCEEDED, -1, active_axes_count, 
                   "Multi-axis move rejected (%d requested)", active_axes_count);
-    // -------------------------
     taskUnlockMutex(taskGetMotionMutex());
     return;
   }
@@ -248,15 +285,14 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
       logError("[MOTION] ERROR: Axis %d target %d violates soft limits [%d, %d]",
                target_axis, target_pos, axes[target_axis].soft_limit_min, axes[target_axis].soft_limit_max);
       
-      // --- NEW FAULT LOGGING ---
       faultLogEntry(FAULT_WARNING, FAULT_SOFT_LIMIT_EXCEEDED, target_axis, target_pos, 
                     "Target position %d violates axis %d limits", target_pos, target_axis);
-      // -------------------------
       taskUnlockMutex(taskGetMotionMutex());
       return;
     }
   }
   
+  // Setup the Move
   axes[target_axis].target_position = target_pos;
   axes[target_axis].position_at_stop = motionGetPosition(target_axis);
 
@@ -265,15 +301,18 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
 
   bool is_forward = (target_pos > motionGetPosition(target_axis));
   
+  // Assert PLC Signals
   motionSetPLCAxisDirection(255, false, false); 
   motionSetPLCAxisDirection(target_axis, true, is_forward); 
 
+  // Update State - WAIT FOR HANDSHAKE
   active_axis = target_axis;
   active_start_position = motionGetPosition(target_axis);
-  axes[target_axis].state = MOTION_EXECUTING; 
   
-  logInfo("[MOTION] Moving Axis %d to target %d (Scale: %.2f, Profile %d)",
-          target_axis, target_pos, scales[target_axis], (int)profile);
+  axes[target_axis].state = MOTION_WAIT_CONSENSO; // <-- HANDSHAKE STATE
+  axes[target_axis].state_entry_ms = millis();
+  
+  logInfo("[MOTION] Moving Axis %d to target %d. Waiting for Consensus...", target_axis, target_pos);
   
   taskUnlockMutex(taskGetMotionMutex());
 }
@@ -302,6 +341,7 @@ void motionStop() {
     motionSetPLCAxisDirection(255, false, false); 
     axes[active_axis].position_at_stop = motionGetPosition(active_axis); 
     axes[active_axis].state = MOTION_STOPPING;
+    axes[active_axis].state_entry_ms = millis();
     logInfo("[MOTION] Stop commanded on axis %d. Transition to MOTION_STOPPING.", active_axis);
   } else {
     logInfo("[MOTION] Stop commanded but no axis was active. Idle.");
@@ -385,7 +425,8 @@ motion_state_t motionGetState(uint8_t axis) {
 }
 
 bool motionIsMoving() {
-  return active_axis != 255 && axes[active_axis].state == MOTION_EXECUTING;
+  // Moving is defined as Executing OR Waiting for Consensus
+  return active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO);
 }
 
 bool motionIsStalled(uint8_t axis) {
@@ -457,6 +498,7 @@ uint32_t motionGetLimitViolations(uint8_t axis) {
 const char* motionStateToString(motion_state_t state) {
   switch (state) {
     case MOTION_IDLE:           return "IDLE";
+    case MOTION_WAIT_CONSENSO:  return "WAIT_CONSENSO";
     case MOTION_EXECUTING:      return "EXECUTING";
     case MOTION_STOPPING:       return "STOPPING";
     case MOTION_PAUSED:         return "PAUSED";
@@ -470,7 +512,8 @@ bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) {
   motion_state_t current = axes[axis].state;
   
   switch (current) {
-    case MOTION_IDLE: return (new_state == MOTION_EXECUTING || new_state == MOTION_ERROR);
+    case MOTION_IDLE: return (new_state == MOTION_WAIT_CONSENSO || new_state == MOTION_ERROR);
+    case MOTION_WAIT_CONSENSO: return (new_state == MOTION_EXECUTING || new_state == MOTION_IDLE || new_state == MOTION_ERROR);
     case MOTION_EXECUTING: return (new_state == MOTION_STOPPING || new_state == MOTION_PAUSED || new_state == MOTION_ERROR);
     case MOTION_STOPPING: return (new_state == MOTION_IDLE || new_state == MOTION_ERROR);
     case MOTION_PAUSED: return (new_state == MOTION_EXECUTING || new_state == MOTION_IDLE || new_state == MOTION_ERROR);
@@ -483,13 +526,17 @@ bool motionSetState(uint8_t axis, motion_state_t new_state) {
   if (axis >= MOTION_AXES) return false;
   if (!taskLockMutex(taskGetMotionMutex(), 100)) return false;
   
-  motion_state_t current = axes[axis].state;
   if (!motionIsValidStateTransition(axis, new_state)) {
     taskUnlockMutex(taskGetMotionMutex());
     return false;
   }
   
   axes[axis].state = new_state;
+  // If entering a state that starts with waiting, record timestamp
+  if (new_state == MOTION_WAIT_CONSENSO || new_state == MOTION_STOPPING) {
+      axes[axis].state_entry_ms = millis();
+  }
+  
   if (new_state == MOTION_IDLE || new_state == MOTION_ERROR) {
       motionSetPLCAxisDirection(255, false, false);
       active_axis = 255;

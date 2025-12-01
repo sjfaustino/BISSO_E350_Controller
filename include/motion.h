@@ -7,6 +7,7 @@
 
 #define MOTION_AXES 4
 #define MOTION_UPDATE_INTERVAL_MS 10
+#define MOTION_CONSENSO_TIMEOUT_MS 5000 // 5 Seconds timeout for PLC handshake
 
 typedef enum {
   SPEED_PROFILE_1 = 0,
@@ -16,18 +17,20 @@ typedef enum {
 
 typedef enum {
   MOTION_IDLE = 0,
-  MOTION_EXECUTING = 1,
-  MOTION_STOPPING = 2,
-  MOTION_PAUSED = 3,
-  MOTION_ERROR = 4
+  MOTION_WAIT_CONSENSO = 1, // NEW: Waiting for PLC Q73 confirmation
+  MOTION_EXECUTING = 2,
+  MOTION_STOPPING = 3,
+  MOTION_PAUSED = 4,
+  MOTION_ERROR = 5
 } motion_state_t;
 
-// Streamlined structure for PLC/Encoder driven control (Removed 'homed' flag)
+// Streamlined structure for PLC/Encoder driven control
 typedef struct {
   int32_t position;                   // Current position (synchronized to encoder counts)
   int32_t target_position;            // Target position in encoder counts
   motion_state_t state;               // Current state of the motion controller
   uint32_t last_update_ms;            // Timestamp of last motion update
+  uint32_t state_entry_ms;            // NEW: Timestamp when current state was entered (for timeouts)
   bool enabled;                       
   
   // Soft limit protection
@@ -49,7 +52,6 @@ void motionUpdate();
 // Motion commands
 void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
 void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s);
-// REMOVED: motionSetAxisTarget(uint8_t axis, int32_t target_pos);
 void motionStop();
 void motionPause();
 void motionResume();
@@ -60,7 +62,6 @@ bool motionIsEmergencyStopped();
 // Motion queries
 int32_t motionGetPosition(uint8_t axis);
 int32_t motionGetTarget(uint8_t axis);
-// REMOVED: motionGetSpeed(uint8_t axis);
 motion_state_t motionGetState(uint8_t axis);
 bool motionIsMoving();
 bool motionIsStalled(uint8_t axis);
