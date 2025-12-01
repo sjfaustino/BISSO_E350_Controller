@@ -297,7 +297,7 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   axes[target_axis].position_at_stop = motionGetPosition(target_axis);
 
   speed_profile_t profile = motionMapSpeedToProfile(target_axis, effective_speed);
-  motionSetPLCSpeedProfile(profile);
+  motionSetPLCSpeedProfile(profile); // This now guarantees VS is OFF
 
   bool is_forward = (target_pos > motionGetPosition(target_axis));
   
@@ -576,6 +576,9 @@ speed_profile_t motionMapSpeedToProfile(uint8_t axis, float requested_speed_mm_s
 }
 
 void motionSetPLCSpeedProfile(speed_profile_t profile) {
+  // CRITICAL SAFETY: Ensure VS Mode is OFF before enabling normal speed profiles.
+  elboI73SetVSMode(false);
+
   uint8_t bit0 = (profile == SPEED_PROFILE_2);
   uint8_t bit1 = (profile == SPEED_PROFILE_3); 
   
@@ -589,4 +592,26 @@ void motionSetPLCSpeedProfile(speed_profile_t profile) {
     return;
   }
   logInfo("[MOTION] Speed profile: %d - I2C OK", profile);
+}
+
+void motionSetVSMode(bool active) {
+    if (active) {
+        // Enforce exclusivity: Clear speed bits FIRST
+        elboI72SetSpeed(ELBO_I72_FAST, false);
+        elboI72SetSpeed(ELBO_I72_MED, false);
+        
+        // Then enable VS
+        if (!elboI73SetVSMode(true)) {
+             faultLogEntry(FAULT_ERROR, FAULT_I2C_ERROR, -1, 0, "Failed to enable VS Mode");
+        } else {
+             logInfo("[MOTION] VS Mode ENABLED (Speed bits cleared)");
+        }
+    } else {
+        // Just disable VS
+        if (!elboI73SetVSMode(false)) {
+             faultLogEntry(FAULT_ERROR, FAULT_I2C_ERROR, -1, 0, "Failed to disable VS Mode");
+        } else {
+             logInfo("[MOTION] VS Mode DISABLED");
+        }
+    }
 }

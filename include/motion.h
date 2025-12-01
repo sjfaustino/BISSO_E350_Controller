@@ -17,7 +17,7 @@ typedef enum {
 
 typedef enum {
   MOTION_IDLE = 0,
-  MOTION_WAIT_CONSENSO = 1, // NEW: Waiting for PLC Q73 confirmation
+  MOTION_WAIT_CONSENSO = 1, // Waiting for PLC Q73 confirmation
   MOTION_EXECUTING = 2,
   MOTION_STOPPING = 3,
   MOTION_PAUSED = 4,
@@ -30,7 +30,7 @@ typedef struct {
   int32_t target_position;            // Target position in encoder counts
   motion_state_t state;               // Current state of the motion controller
   uint32_t last_update_ms;            // Timestamp of last motion update
-  uint32_t state_entry_ms;            // NEW: Timestamp when current state was entered (for timeouts)
+  uint32_t state_entry_ms;            // Timestamp when current state was entered
   bool enabled;                       
   
   // Soft limit protection
@@ -84,6 +84,7 @@ const char* motionStateToString(motion_state_t state);
 // Speed Profile Control
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float requested_speed_mm_s);
 void motionSetPLCSpeedProfile(speed_profile_t profile);
+void motionSetVSMode(bool active); // <-- NEW: Explicit VS Mode control
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction); 
 
 // Encoder feedback integration
