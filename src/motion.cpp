@@ -17,11 +17,12 @@
 #define MOTION_MED_SPEED_DEFAULT 90.0f 
 
 // Motion axis array
+// FIX: Corrected initializer list to match struct (12 fields)
 static motion_axis_t axes[MOTION_AXES] = {
-  {0, 0, MOTION_IDLE, 0, 0, true, -500000, 500000, true, 0, 0}, 
-  {0, 0, MOTION_IDLE, 0, 0, true, -300000, 300000, true, 0, 0}, 
-  {0, 0, MOTION_IDLE, 0, 0, true, 0, 150000, true, 0, 0},       
-  {0, 0, MOTION_IDLE, 0, 0, true, -45000, 45000, true, 0, 0}   
+  {0, 0, MOTION_IDLE, 0, 0, true, -500000, 500000, true, 0, 0, SPEED_PROFILE_1}, 
+  {0, 0, MOTION_IDLE, 0, 0, true, -300000, 300000, true, 0, 0, SPEED_PROFILE_1}, 
+  {0, 0, MOTION_IDLE, 0, 0, true, 0, 150000, true, 0, 0, SPEED_PROFILE_1},       
+  {0, 0, MOTION_IDLE, 0, 0, true, -45000, 45000, true, 0, 0, SPEED_PROFILE_1}   
 };
 
 // Internal motion parameters 
@@ -52,6 +53,7 @@ void motionInit() {
     axes[i].state = MOTION_IDLE;
     axes[i].enabled = true;
     axes[i].state_entry_ms = 0;
+    axes[i].saved_speed_profile = SPEED_PROFILE_1;
     Serial.print("  [MOTION] Axis ");
     Serial.print(i);
     Serial.println(" initialized");
@@ -170,6 +172,10 @@ void motionUpdate() {
         }
         break;
 
+      case MOTION_PAUSED:
+        // Do nothing, wait for resume command
+        break;
+
       case MOTION_ERROR:
         break;
         
@@ -244,7 +250,6 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
           return;
       }
   }
-  // ------------------------------------------------
   
   // *** CRITICAL SECTION ***
   uint8_t target_axis = 255;
@@ -310,7 +315,9 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   axes[target_axis].position_at_stop = motionGetPosition(target_axis);
 
   speed_profile_t profile = motionMapSpeedToProfile(target_axis, effective_speed);
-  motionSetPLCSpeedProfile(profile); // This now guarantees VS is OFF
+  axes[target_axis].saved_speed_profile = profile; // Save for Resume functionality
+
+  motionSetPLCSpeedProfile(profile); // Note: This function ensures VS is OFF
 
   bool is_forward = (target_pos > motionGetPosition(target_axis));
   
@@ -364,11 +371,48 @@ void motionStop() {
 }
 
 void motionPause() {
-  motionStop();
+  if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
+
+  if (active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO)) {
+      // 1. Stop physical motion immediately
+      motionSetPLCAxisDirection(255, false, false);
+      
+      // 2. Transition state
+      axes[active_axis].state = MOTION_PAUSED;
+      logInfo("[MOTION] PAUSED Axis %d. (Profile %d saved)", active_axis, axes[active_axis].saved_speed_profile);
+  } else {
+      logWarning("[MOTION] Pause ignored: No active motion to pause.");
+  }
+
+  taskUnlockMutex(taskGetMotionMutex());
 }
 
 void motionResume() {
-  logWarning("[MOTION] Resume is not implemented in single-axis PLC model. Use a new MOVE command.");
+  if (!global_enabled) return;
+  if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
+
+  if (active_axis != 255 && axes[active_axis].state == MOTION_PAUSED) {
+      logInfo("[MOTION] Resuming Axis %d...", active_axis);
+
+      // 1. Restore Speed Profile
+      motionSetPLCSpeedProfile(axes[active_axis].saved_speed_profile);
+
+      // 2. Restore Direction/Axis Bits
+      int32_t current_pos = wj66GetPosition(active_axis);
+      int32_t target_pos = axes[active_axis].target_position;
+      bool is_forward = (target_pos > current_pos); // Re-evaluate direction based on current pos
+
+      motionSetPLCAxisDirection(255, false, false); // Clear first
+      motionSetPLCAxisDirection(active_axis, true, is_forward);
+
+      // 3. Re-enter Handshake State (Safety First)
+      axes[active_axis].state = MOTION_WAIT_CONSENSO;
+      axes[active_axis].state_entry_ms = millis();
+  } else {
+      logWarning("[MOTION] Resume ignored: Not in PAUSED state.");
+  }
+
+  taskUnlockMutex(taskGetMotionMutex());
 }
 
 void motionEmergencyStop() {
@@ -526,10 +570,10 @@ bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) {
   
   switch (current) {
     case MOTION_IDLE: return (new_state == MOTION_WAIT_CONSENSO || new_state == MOTION_ERROR);
-    case MOTION_WAIT_CONSENSO: return (new_state == MOTION_EXECUTING || new_state == MOTION_IDLE || new_state == MOTION_ERROR);
+    case MOTION_WAIT_CONSENSO: return (new_state == MOTION_EXECUTING || new_state == MOTION_IDLE || new_state == MOTION_ERROR || new_state == MOTION_PAUSED);
     case MOTION_EXECUTING: return (new_state == MOTION_STOPPING || new_state == MOTION_PAUSED || new_state == MOTION_ERROR);
     case MOTION_STOPPING: return (new_state == MOTION_IDLE || new_state == MOTION_ERROR);
-    case MOTION_PAUSED: return (new_state == MOTION_EXECUTING || new_state == MOTION_IDLE || new_state == MOTION_ERROR);
+    case MOTION_PAUSED: return (new_state == MOTION_WAIT_CONSENSO || new_state == MOTION_IDLE || new_state == MOTION_ERROR);
     case MOTION_ERROR: return (new_state == MOTION_IDLE);
     default: return false;
   }

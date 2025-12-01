@@ -20,7 +20,7 @@ typedef enum {
   MOTION_WAIT_CONSENSO = 1, // Waiting for PLC Q73 confirmation
   MOTION_EXECUTING = 2,
   MOTION_STOPPING = 3,
-  MOTION_PAUSED = 4,
+  MOTION_PAUSED = 4,        // Motion paused by operator
   MOTION_ERROR = 5
 } motion_state_t;
 
@@ -30,7 +30,7 @@ typedef struct {
   int32_t target_position;            // Target position in encoder counts
   motion_state_t state;               // Current state of the motion controller
   uint32_t last_update_ms;            // Timestamp of last motion update
-  uint32_t state_entry_ms;            // Timestamp when current state was entered
+  uint32_t state_entry_ms;            // Timestamp when current state was entered (for timeouts)
   bool enabled;                       
   
   // Soft limit protection
@@ -41,6 +41,7 @@ typedef struct {
 
   // State management
   int32_t position_at_stop;           // Encoder position when PLC stop command was issued
+  speed_profile_t saved_speed_profile; // Saved profile for Resume operations
 } motion_axis_t;
 
 // Motion system initialization
@@ -84,7 +85,7 @@ const char* motionStateToString(motion_state_t state);
 // Speed Profile Control
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float requested_speed_mm_s);
 void motionSetPLCSpeedProfile(speed_profile_t profile);
-void motionSetVSMode(bool active); // <-- NEW: Explicit VS Mode control
+void motionSetVSMode(bool active);
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction); 
 
 // Encoder feedback integration
