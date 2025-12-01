@@ -17,14 +17,15 @@
 #include "safety.h"           
 #include "firmware_version.h" 
 #include "encoder_motion_integration.h"
-#include "encoder_calibration.h" // For access to machineCal
+#include "encoder_calibration.h" 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <math.h> // For fabsf
+#include <time.h> // For localtime
+#include <math.h>
 
-// Forward declarations for external functions
+// Forward declarations for external diagnostic functions
 extern uint32_t taskGetUptime();
 
 // Forward declarations for specialized handlers
@@ -33,15 +34,17 @@ void debugAllHandler();
 void debugConfigHandler();
 
 // ============================================================================
-// EXTERNAL REFERENCES / MISSING HANDLERS IMPLEMENTATION
+// MISSING DIAGNOSTIC HANDLERS IMPLEMENTATION
 // ============================================================================
 
 void cmd_fault_show(int argc, char** argv) { faultShowHistory(); }
+void cmd_faults_stats(int argc, char** argv); // NEW PROTOTYPE
 void cmd_fault_clear(int argc, char** argv) { faultClearHistory(); }
 void cmd_timeout_diag(int argc, char** argv) { timeoutShowDiagnostics(); }
 void cmd_i2c_diag(int argc, char** argv) { i2cShowStats(); }
 void cmd_i2c_recover(int argc, char** argv) { i2cRecoverBus(); }
-void cmd_encoder_diag(int argc, char** argv) { encoderMotionDiagnostics(); }
+extern void encoderMotionDiagnostics(); // Explicit declaration for linker
+void cmd_encoder_diag(int argc, char** argv) { encoderMotionDiagnostics(); } 
 void cmd_encoder_baud_detect(int argc, char** argv) { encoderDetectBaudRate(); }
 
 void cmd_task_stats(int argc, char** argv) { taskShowStats(); }
@@ -66,7 +69,55 @@ extern void cmd_config_save(int argc, char** argv);
 
 
 // ============================================================================
-// DEBUG COMMAND DISPATCHER AND HANDLERS
+// NEW: FAULT STATS COMMAND IMPLEMENTATION
+// ============================================================================
+
+// Helper to format milliseconds to readable time string (HH:MM:SS format)
+// NOTE: This uses local time conversion which relies on a running system RTC/time source.
+static const char* formatTimestamp(uint32_t timestamp_ms) {
+    static char time_buffer[32];
+    time_t t = timestamp_ms / 1000;
+    struct tm *tm = localtime(&t);
+    strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", tm);
+    return time_buffer;
+}
+
+void cmd_faults_stats(int argc, char** argv) {
+    fault_stats_t stats = faultGetStats();
+    uint32_t current_uptime_ms = millis(); 
+
+    Serial.println("[FAULT] ╔════════════════════════════════════════╗");
+    Serial.println("[FAULT] ║        Faults Statistics               ║");
+    Serial.println("[FAULT] ╚════════════════════════════════════════╝");
+    
+    Serial.printf("[FAULT] Total Faults: %lu\n", stats.total_faults);
+    Serial.println("[FAULT] ----------------------------------------");
+    Serial.printf("[FAULT] Encoder Faults: %lu\n", stats.encoder_faults);
+    Serial.printf("[FAULT] Motion Faults: %lu\n", stats.motion_faults);
+    Serial.printf("[FAULT] Safety Faults: %lu\n", stats.safety_faults);
+    Serial.printf("[FAULT] PLC/I2C Faults: %lu\n", stats.plc_faults);
+    Serial.printf("[FAULT] Config/Calibration Faults: %lu\n", stats.config_faults);
+    Serial.printf("[FAULT] System/WDT Faults: %lu\n", stats.system_faults);
+    Serial.println("[FAULT]");
+    
+    if (stats.total_faults > 0) {
+        Serial.printf("[FAULT] Most Recent: %s\n", formatTimestamp(stats.last_fault_time_ms));
+        Serial.printf("[FAULT] First Recorded: %s\n", formatTimestamp(stats.first_fault_time_ms));
+        
+        uint32_t uptime_since_last_ms = current_uptime_ms - stats.last_fault_time_ms;
+        uint32_t hours = uptime_since_last_ms / 3600000;
+        uint32_t minutes = (uptime_since_last_ms % 3600000) / 60000;
+        uint32_t seconds = (uptime_since_last_ms % 60000) / 1000;
+
+        Serial.printf("[FAULT] Uptime Since Last Fault: %lu hrs, %lu min, %lu sec\n", hours, minutes, seconds);
+    } else {
+        Serial.println("[FAULT] No permanent faults recorded in NVS.");
+    }
+}
+
+
+// ============================================================================
+// DEBUG COMMAND DISPATCHER AND HANDLERS (Omitted for brevity)
 // ============================================================================
 
 void cmd_debug_main(int argc, char** argv) {
@@ -86,10 +137,6 @@ void cmd_debug_main(int argc, char** argv) {
         Serial.println("[CLI] Try: debug all | debug encoders | debug config");
     }
 }
-
-// ----------------------------------------------------------------------------
-// HANDLER 1: debug encoders (Live stream)
-// ----------------------------------------------------------------------------
 
 void debugEncodersHandler() {
     extern int32_t motionGetPosition(uint8_t axis);
@@ -125,10 +172,6 @@ void debugEncodersHandler() {
     
     Serial.println("[CLI] ═════════════════════════════════════════════════");
 }
-
-// ----------------------------------------------------------------------------
-// HANDLER 2: debug config (Detailed configuration)
-// ----------------------------------------------------------------------------
 
 void debugConfigHandler() {
     Serial.println("\n[CLI] ╔════════════════════════════════════════════════════╗");
@@ -191,10 +234,6 @@ void debugConfigHandler() {
     Serial.println("[CLI] ═══════════════════════════════════════════════════");
 }
 
-// ----------------------------------------------------------------------------
-// HANDLER 3: debug all (Full System Dump)
-// ----------------------------------------------------------------------------
-
 void debugAllHandler() {
     extern const char* motionStateToString(motion_state_t state);
     
@@ -252,7 +291,7 @@ void debugAllHandler() {
 
 
 // ============================================================================
-// REGISTRATION (Defined in cli_diag.cpp)
+// REGISTRATION
 // ============================================================================
 
 void cliRegisterDiagCommands() {
@@ -261,6 +300,7 @@ void cliRegisterDiagCommands() {
     
     // --- Individual Diagnostics (Aliased to be called directly) ---
     cliRegisterCommand("faults", "Show fault history", cmd_fault_show);
+    cliRegisterCommand("faults_stats", "Show categorized fault statistics and timeline.", cmd_faults_stats); 
     cliRegisterCommand("faults_clear", "Clear fault history", cmd_fault_clear);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
     cliRegisterCommand("i2c_diag", "Show I²C diagnostics", cmd_i2c_diag);
