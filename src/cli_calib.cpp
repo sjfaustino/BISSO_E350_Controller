@@ -9,7 +9,7 @@
 #include "fault_logging.h" 
 #include "encoder_comm_stats.h"
 #include "encoder_motion_integration.h"
-#include "system_utilities.h" // <-- NEW: Include for canonical mapping
+#include "system_utilities.h" 
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
@@ -27,7 +27,16 @@ typedef struct {
 // FORWARD DECLARATIONS 
 // ============================================================================
 
-// NOTE: parse_axis_arg REMOVED. Use axisCharToIndex from system_utilities.h
+// --- NEW/FIX: Local helper to get the correct axis pointer ---
+AxisCalibration* getAxisCalPtrForCli(uint8_t axis) {
+    if (axis == 0) return &machineCal.X;
+    if (axis == 1) return &machineCal.Y;
+    if (axis == 2) return &machineCal.Z;
+    if (axis == 3) return &machineCal.A;
+    return NULL;
+}
+// -----------------------------------------------------------
+
 void saveAllCalibration(); 
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction); 
 void motionSetPLCSpeedProfile(speed_profile_t profile); 
@@ -39,7 +48,7 @@ void encoderMotionDiagnostics();
 
 
 // ============================================================================
-// MODULAR COMMAND PROTOTYPES (omitted for brevity)
+// MODULAR COMMAND PROTOTYPES
 // ============================================================================
 
 void cmd_encoder_calib(int argc, char** argv);
@@ -52,7 +61,7 @@ calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profi
 
 
 // ============================================================================
-// REGISTRATION (omitted for brevity)
+// REGISTRATION
 // ============================================================================
 
 void cliRegisterCalibCommands() {
@@ -65,7 +74,7 @@ void cliRegisterCalibCommands() {
 }
 
 // ============================================================================
-// CORE IMPLEMENTATION: SPEED MEASUREMENT HELPER (omitted for brevity)
+// CORE IMPLEMENTATION: SPEED MEASUREMENT HELPER
 // ============================================================================
 
 calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profile, float distance_mm, bool is_forward) {
@@ -113,7 +122,7 @@ calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profi
 
 
 // ============================================================================
-// COMMAND IMPLEMENTATIONS (Refactored)
+// COMMAND IMPLEMENTATIONS (FIXED AXIS LOGIC)
 // ============================================================================
 
 void cmd_encoder_calib(int argc, char** argv) {
@@ -122,7 +131,7 @@ void cmd_encoder_calib(int argc, char** argv) {
     return;
   }
   
-  uint8_t axis = axisCharToIndex(argv[1]); // <-- USES NEW CANONICAL UTILITY
+  uint8_t axis = axisCharToIndex(argv[1]);
   float distance_mm = 0.0f;
 
   if (axis >= 4) {
@@ -145,23 +154,27 @@ void cmd_encoder_reset(int argc, char** argv) {
         return;
     }
     
-    uint8_t axis = axisCharToIndex(argv[2]); // <-- USES NEW CANONICAL UTILITY
+    uint8_t axis = axisCharToIndex(argv[2]);
     
     if (axis >= 4) {
         Serial.println("[CLI] ERROR: Invalid axis. Use X, Y, Z, or A.");
         return;
     }
-
-    Serial.printf("[CLI] Resetting all speed profiles for Axis %c to factory defaults...\n", axisIndexToChar(axis)); // <-- USES NEW CANONICAL UTILITY
     
-    if (axis == 0) {
-        machineCal.X.speed_slow_mm_min = 300.0f; 
-        machineCal.X.speed_med_mm_min = 900.0f;
-        machineCal.X.speed_fast_mm_min = 2400.0f;
+    // --- FIX: Use helper to get the correct axis pointer ---
+    AxisCalibration* cal = getAxisCalPtrForCli(axis);
+    
+    if (cal) {
+        Serial.printf("[CLI] Resetting all speed profiles for Axis %c to factory defaults...\n", axisIndexToChar(axis));
+        cal->speed_slow_mm_min = 300.0f; 
+        cal->speed_med_mm_min = 900.0f;
+        cal->speed_fast_mm_min = 2400.0f;
         saveAllCalibration();
+        Serial.printf("[CLI] ✅ Speed profiles for Axis %c reset and saved to NVS.\n", axisIndexToChar(axis));
+    } else {
+         Serial.printf("[CLI] ERROR: Failed to find calibration data for Axis %c.\n", axisIndexToChar(axis));
     }
-    
-    Serial.printf("[CLI] ✅ Speed profiles for Axis %c reset and saved to NVS.\n", axisIndexToChar(axis)); // <-- USES NEW CANONICAL UTILITY
+    // -----------------------------------------------------
 }
 
 
@@ -171,8 +184,8 @@ void cmd_calib_ppmm_start(int argc, char** argv) {
         return;
     }
     
-    uint8_t axis = axisCharToIndex(argv[1]); // <-- USES NEW CANONICAL UTILITY
-    char axis_char = axisIndexToChar(axis); // <-- USES NEW CANONICAL UTILITY
+    uint8_t axis = axisCharToIndex(argv[1]);
+    char axis_char = axisIndexToChar(axis);
     float distance_mm = 0.0f;
 
     if (axis >= 4) {
@@ -255,7 +268,7 @@ void cmd_calib_ppmm_reset(int argc, char** argv) {
         return;
     }
     
-    uint8_t axis = axisCharToIndex(argv[2]); // <-- USES NEW CANONICAL UTILITY
+    uint8_t axis = axisCharToIndex(argv[2]);
 
     if (axis >= 4) {
         Serial.println("[CLI] ERROR: Invalid axis. Use X, Y, Z, or A.");
@@ -266,7 +279,7 @@ void cmd_calib_ppmm_reset(int argc, char** argv) {
 
     wj66Reset(); 
     
-    Serial.printf("[CLI] ✅ PPM calibration for Axis %c reset to %lu pulses/mm and encoder position reset to 0.\n", axisIndexToChar(axis), MOTION_POSITION_SCALE_FACTOR); // <-- USES NEW CANONICAL UTILITY
+    Serial.printf("[CLI] ✅ PPM calibration for Axis %c reset to %lu pulses/mm and encoder position reset to 0.\n", axisIndexToChar(axis), MOTION_POSITION_SCALE_FACTOR);
 }
 
 
@@ -277,8 +290,8 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
         return;
     }
 
-    uint8_t axis = axisCharToIndex(argv[1]); // <-- USES NEW CANONICAL UTILITY
-    char axis_char = axisIndexToChar(axis); // <-- USES NEW CANONICAL UTILITY
+    uint8_t axis = axisCharToIndex(argv[1]);
+    char axis_char = axisIndexToChar(axis);
     if (axis >= 4) {
         Serial.println("[CLI] ERROR: Invalid axis. Use X, Y, Z, or A.");
         return;
@@ -330,11 +343,20 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     Serial.printf("  Reverse: %.1f mm in %.2f s\n", (float)run_rev.counts / MOTION_POSITION_SCALE_FACTOR, (float)run_rev.time_ms / 1000.0f);
     Serial.printf("  Average Speed: %.2f mm/s (%.1f mm/min)\n", speed_mm_s, speed_mm_min);
 
-    switch(profile) {
-        case SPEED_PROFILE_1: machineCal.X.speed_slow_mm_min = speed_mm_min; break;
-        case SPEED_PROFILE_2: machineCal.X.speed_med_mm_min = speed_mm_min; break;
-        case SPEED_PROFILE_3: machineCal.X.speed_fast_mm_min = speed_mm_min; break;
+    // --- FIX: Use helper to get the correct axis pointer and assign speed profile ---
+    AxisCalibration* cal = getAxisCalPtrForCli(axis);
+    
+    if (cal == NULL) {
+        Serial.println("[CALIB] ERROR: Internal axis pointer lookup failed for saving.");
+        return;
     }
+
+    switch(profile) {
+        case SPEED_PROFILE_1: cal->speed_slow_mm_min = speed_mm_min; break;
+        case SPEED_PROFILE_2: cal->speed_med_mm_min = speed_mm_min; break;
+        case SPEED_PROFILE_3: cal->speed_fast_mm_min = speed_mm_min; break;
+    }
+    // -------------------------------------------------------------------------------
     
     saveAllCalibration(); 
     Serial.println("✅ Calibration successful and values saved to NVS.");

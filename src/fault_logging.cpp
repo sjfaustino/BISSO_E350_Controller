@@ -1,17 +1,24 @@
 #include "fault_logging.h"
 #include "config_unified.h"
+#include "motion.h"          // Added for motionEmergencyStop()
+#include "safety_state_machine.h" // Added for safetySetState()
+#include "serial_logger.h"   // Added for logError(), logInfo(), etc.
 #include <Preferences.h>
 #include <stdio.h>    // Required for vsnprintf
 #include <string.h>   // Required for strncpy
 #include <time.h>     // For time_t and localtime (for time string format)
 
 static Preferences fault_prefs;
-static bool estop_active = false;
+static bool estop_active = false; // Internal flag for E-Stop state
 static bool estop_recovery_requested = false;
 static uint32_t last_fault_id = 0;
 
 #define FAULT_LOG_MAX_ENTRIES 32 // Not strictly enforced in this code but defined
 #define FAULT_LOG_NAMESPACE "bisso_faults"
+
+// ============================================================================
+// INITIALIZATION AND UTILITIES
+// ============================================================================
 
 void faultLoggingInit() {
   Serial.println("[FAULT] Fault logging system initializing...");
@@ -68,6 +75,10 @@ const char* faultSeverityToString(fault_severity_t severity) {
   }
 }
 
+// ============================================================================
+// CORE LOGGING IMPLEMENTATION
+// ============================================================================
+
 void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, int32_t value, const char* format, ...) {
   
   // Create fault entry
@@ -98,7 +109,7 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, i
   Serial.print(" - ");
   Serial.println(entry.message); 
   
-  // 3. Save to NVS (Persistence logic remains the same)
+  // 3. Save to NVS (Persistence logic)
   last_fault_id++;
   char key[32];
   snprintf(key, sizeof(key), "fault_%lu_sev", last_fault_id);
@@ -122,16 +133,38 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, i
   // Update last ID
   fault_prefs.putUInt("last_id", last_fault_id);
   
-  // Log count by severity
+  // Log count by severity (optional stat tracking)
   char count_key[32];
   snprintf(count_key, sizeof(count_key), "count_%s", faultSeverityToString(severity));
   uint32_t count = fault_prefs.getUInt(count_key, 0);
   fault_prefs.putUInt(count_key, count + 1);
+
+  // 4. CRITICAL: If severity is critical, trigger the E-Stop mechanism
+  if (severity == FAULT_CRITICAL) {
+      emergencyStopSetActive(true);
+  }
 }
 
-// ----------------------------------------------------------------------
-// NEW: FAULT STATISTICS GATHERING
-// ----------------------------------------------------------------------
+// ============================================================================
+// WRAPPER FUNCTIONS
+// ============================================================================
+
+void faultLogWarning(fault_code_t code, const char* message) {
+  faultLogEntry(FAULT_WARNING, code, -1, 0, "%s", message); 
+}
+
+void faultLogError(fault_code_t code, const char* message) {
+  faultLogEntry(FAULT_ERROR, code, -1, 0, "%s", message);
+}
+
+void faultLogCritical(fault_code_t code, const char* message) {
+  // faultLogEntry will internally call emergencyStopSetActive(true)
+  faultLogEntry(FAULT_CRITICAL, code, -1, 0, "%s", message);
+}
+
+// ============================================================================
+// FAULT STATISTICS GATHERING
+// ============================================================================
 fault_stats_t faultGetStats() {
     fault_stats_t stats = {0};
     uint32_t first_time = 0xFFFFFFFF;
@@ -201,24 +234,6 @@ fault_stats_t faultGetStats() {
     return stats;
 }
 
-
-// ----------------------------------------------------------------------
-// WRAPPER FUNCTIONS (Unchanged)
-// ----------------------------------------------------------------------
-
-void faultLogWarning(fault_code_t code, const char* message) {
-  faultLogEntry(FAULT_WARNING, code, -1, 0, "%s", message); 
-}
-
-void faultLogError(fault_code_t code, const char* message) {
-  faultLogEntry(FAULT_ERROR, code, -1, 0, "%s", message);
-}
-
-void faultLogCritical(fault_code_t code, const char* message) {
-  faultLogEntry(FAULT_CRITICAL, code, -1, 0, "%s", message);
-  emergencyStopSetActive(true);
-}
-
 void faultShowHistory() {
     Serial.println("[FAULT] Full fault history display omitted for brevity.");
 }
@@ -252,8 +267,50 @@ void faultClearHistory() {
     Serial.println("[FAULT] ✅ Fault history cleared");
 }
 
-// Emergency stop management (Implementation bodies omitted for brevity)
-void emergencyStopSetActive(bool active) { /* ... */ }
-bool emergencyStopIsActive() { return estop_active; }
-bool emergencyStopRequestRecovery() { /* ... */ return false; }
-void emergencyStopClearRecovery() { /* ... */ }
+// ============================================================================
+// E-STOP MANAGEMENT IMPLEMENTATION (FIXED)
+// ============================================================================
+
+void emergencyStopSetActive(bool active) {
+    if (active && !estop_active) {
+        // ACTIVATE E-STOP
+        estop_active = true;
+        
+        // 1. Halt all motion via the high-level motion API
+        motionEmergencyStop();
+        
+        // 2. Update Safety FSM
+        safetySetState(FSM_EMERGENCY);
+        
+        logError("[E-STOP] System Activated via Fault Handler.");
+    } 
+    else if (!active && estop_active) {
+        // CLEAR E-STOP
+        // NOTE: This must only be called internally by motionClearEmergencyStop()
+        // after safety checks pass.
+        estop_active = false;
+        
+        // The motionClearEmergencyStop() function handles the rest of the recovery (motion enable).
+        // Set FSM back to OK (assuming safety checks passed in the caller function).
+        safetySetState(FSM_OK); 
+        logInfo("[E-STOP] System flag cleared by motion recovery.");
+    }
+}
+
+bool emergencyStopIsActive() { 
+    return estop_active; 
+}
+
+bool emergencyStopRequestRecovery() {
+    if (emergencyStopIsActive()) {
+        estop_recovery_requested = true;
+        logWarning("[E-STOP] Recovery request logged. Operator must run CLI command.");
+        return true;
+    }
+    return false;
+}
+
+void emergencyStopClearRecovery() {
+    estop_recovery_requested = false;
+    logInfo("[E-STOP] Recovery request flag cleared.");
+}

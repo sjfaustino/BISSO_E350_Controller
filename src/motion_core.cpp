@@ -222,6 +222,12 @@ bool motionIsEmergencyStopped() {
   return !global_enabled;
 }
 
+// --- NEW: Active Axis Getter ---
+uint8_t motionGetActiveAxis() {
+  return active_axis;
+}
+// ------------------------------
+
 // --- DIAGNOSTICS & STATUS ---
 
 void motionDiagnostics() {
@@ -240,11 +246,15 @@ void motionDiagnostics() {
     Serial.print(motionStateToString(axes[i].state));
     Serial.print(" | Pos: ");
     
+    // Scale factor fix for diagnostics (using the new constant for A-axis)
     float scale = MOTION_POSITION_SCALE_FACTOR;
     if (i==0 && machineCal.X.pulses_per_mm > 0) scale = machineCal.X.pulses_per_mm;
     else if (i==1 && machineCal.Y.pulses_per_mm > 0) scale = machineCal.Y.pulses_per_mm;
     else if (i==2 && machineCal.Z.pulses_per_mm > 0) scale = machineCal.Z.pulses_per_mm;
-    else if (i==3 && machineCal.A.pulses_per_degree > 0) scale = machineCal.A.pulses_per_degree;
+    else if (i==3) {
+      if (machineCal.A.pulses_per_degree > 0) scale = machineCal.A.pulses_per_degree;
+      else scale = MOTION_POSITION_SCALE_FACTOR_DEG;
+    }
     
     Serial.print(motionGetPosition(i) / scale);
     Serial.print(i==3 ? " deg" : " mm");

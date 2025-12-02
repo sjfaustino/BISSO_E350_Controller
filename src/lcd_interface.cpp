@@ -3,7 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 #include "system_constants.h" 
-#include "encoder_calibration.h" // Needed to access machineCal struct for PPM/PPD
+#include "encoder_calibration.h" 
+#include "plc_iface.h" // <-- FIX: Added to provide PLC_SDA_PIN, PLC_SCL_PIN, PLC_I2C_SPEED
 
 struct {
   lcd_mode_t mode;
@@ -35,7 +36,8 @@ void lcdInterfaceInit() {
   lcd_state.update_count = 0;
   
   // Try I2C mode first
-  Wire.begin(4, 5, 100000);
+  // FIX: These constants are now correctly declared due to the new include.
+  Wire.begin(PLC_SDA_PIN, PLC_SCL_PIN, PLC_I2C_SPEED);
   Wire.beginTransmission(LCD_I2C_ADDR);
   if (Wire.endTransmission() == 0) {
     lcd_state.mode = LCD_MODE_I2C;
@@ -52,7 +54,7 @@ void lcdInterfaceInit() {
 
 void lcdInterfaceUpdate() {
   uint32_t now = millis();
-  // FIX: Use system_constants.h value for interval check
+  // Check against system constant for refresh rate
   if (now - lcd_state.last_update < LCD_REFRESH_INTERVAL_MS) { 
     return;
   }
@@ -62,15 +64,18 @@ void lcdInterfaceUpdate() {
   
   switch(lcd_state.mode) {
     case LCD_MODE_I2C:
-      // Actual I2C write logic would go here.
+      // In a full implementation, the I2C writes to the LCD module happen here,
+      // typically refreshing only the dirty lines.
       for (int i = 0; i < LCD_ROWS; i++) {
         if (lcd_state.display_dirty[i]) {
+          // I2C Write Logic (omitted for brevity)
           lcd_state.display_dirty[i] = false;
         }
       }
       break;
       
     case LCD_MODE_SERIAL:
+      // Output to serial terminal for debugging/simulated display
       for (int i = 0; i < LCD_ROWS; i++) {
         if (lcd_state.display_dirty[i]) {
           Serial.print("[LCD:");
@@ -97,19 +102,22 @@ void lcdInterfacePrintLine(uint8_t line, const char* text) {
   lcd_state.display_dirty[line] = true;
 }
 
-// FIX: Implements the 10Hz axis position display logic using individual PPM/PPD factors
+// Implements the 10Hz axis position display logic using individual PPM/PPD factors
 void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts, int32_t a_counts) {
     char line1_buffer[LCD_COLS + 1];
     char line2_buffer[LCD_COLS + 1];
 
-    // Get Calibration Factors (Use default scale factor if Cal is 0)
-    // NOTE: machineCal is defined in hardware_config.h and is global
+    // --- Get Calibration Factors (Use correct default scale factor if Cal is 0) ---
     const float default_scale = (float)MOTION_POSITION_SCALE_FACTOR;
+    const float default_scale_deg = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
     
+    // Linear Axes (X, Y, Z) use pulses_per_mm
     float x_scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : default_scale;
     float y_scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : default_scale;
     float z_scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : default_scale;
-    float a_scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : default_scale;
+    
+    // Rotational Axis (A) uses pulses_per_degree
+    float a_scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : default_scale_deg;
 
 
     // --- Line 1: X and Y Axes (mm) ---

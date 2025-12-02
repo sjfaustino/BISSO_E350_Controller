@@ -18,11 +18,13 @@
 #include "firmware_version.h" 
 #include "encoder_motion_integration.h"
 #include "encoder_calibration.h" 
+#include "system_utilities.h" // For axisCharToIndex
+#include "input_validation.h" // For parseAndValidateInt
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <time.h> // For localtime
+#include <time.h>
 #include <math.h>
 
 // Forward declarations for external diagnostic functions
@@ -32,32 +34,91 @@ extern uint32_t taskGetUptime();
 void debugEncodersHandler();
 void debugAllHandler();
 void debugConfigHandler();
+void cmd_diag_scheduler_main(int argc, char** argv); // Dispatcher
 
 // ============================================================================
-// MISSING DIAGNOSTIC HANDLERS IMPLEMENTATION
+// WDT / TASK CONSOLIDATED COMMAND HANDLERS (DEFINED HERE to resolve linker errors)
 // ============================================================================
 
-void cmd_fault_show(int argc, char** argv) { faultShowHistory(); }
-void cmd_faults_stats(int argc, char** argv); // NEW PROTOTYPE
-void cmd_fault_clear(int argc, char** argv) { faultClearHistory(); }
+// Externs for WDT/Task utilities (actual definitions are in watchdog_manager.cpp and task_manager.cpp)
+extern void watchdogShowStatus();
+extern void watchdogShowTasks();
+extern void watchdogShowStats();
+extern void watchdogPrintDetailedReport();
+extern void taskShowStats();
+extern void taskShowAllTasks();
+extern uint8_t taskGetCpuUsage();
+
+void cmd_wdt_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("\n[WDT] Usage: wdt [status | tasks | stats | report]");
+        return;
+    }
+
+    if (strcmp(argv[1], "status") == 0) {
+        watchdogShowStatus();
+    } else if (strcmp(argv[1], "tasks") == 0) {
+        watchdogShowTasks();
+    } else if (strcmp(argv[1], "stats") == 0) {
+        watchdogShowStats();
+    } else if (strcmp(argv[1], "report") == 0) {
+        watchdogPrintDetailedReport();
+    } else {
+        Serial.printf("[WDT] Error: Unknown parameter '%s'\n", argv[1]);
+    }
+}
+
+void cmd_task_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("\n[TASK] Usage: task [stats | list | cpu]");
+        return;
+    }
+
+    if (strcmp(argv[1], "stats") == 0) {
+        taskShowStats();
+    } else if (strcmp(argv[1], "list") == 0) {
+        taskShowAllTasks();
+    } else if (strcmp(argv[1], "cpu") == 0) {
+        Serial.printf("[TASK] Total CPU Usage: %u%%\n", taskGetCpuUsage());
+    } else {
+        Serial.printf("[TASK] Error: Unknown parameter '%s'\n", argv[1]);
+    }
+}
+
+// ============================================================================
+// WRAPPER / DISPATCHER IMPLEMENTATION
+// ============================================================================
+
+void cmd_faults_show(int argc, char** argv) { faultShowHistory(); }
+void cmd_faults_stats(int argc, char** argv); 
+void cmd_faults_clear(int argc, char** argv) { faultClearHistory(); }
 void cmd_timeout_diag(int argc, char** argv) { timeoutShowDiagnostics(); }
 void cmd_i2c_diag(int argc, char** argv) { i2cShowStats(); }
 void cmd_i2c_recover(int argc, char** argv) { i2cRecoverBus(); }
 void cmd_encoder_diag(int argc, char** argv) { encoderMotionDiagnostics(); }
 void cmd_encoder_baud_detect(int argc, char** argv) { encoderDetectBaudRate(); }
 
-void cmd_task_stats(int argc, char** argv) { taskShowStats(); }
-void cmd_task_list(int argc, char** argv) { taskShowAllTasks(); }
-void cmd_task_cpu(int argc, char** argv) { 
-    Serial.printf("[CLI] CPU Usage: %u%%\n", taskGetCpuUsage()); 
+// Dispatcher that routes calls based on the command name (argv[0])
+void cmd_diag_scheduler_main(int argc, char** argv) {
+    if (strcmp(argv[0], "wdt") == 0) {
+        cmd_wdt_main(argc, argv);
+    } else if (strcmp(argv[0], "task") == 0) {
+        cmd_task_main(argc, argv);
+    }
 }
 
-void cmd_wdt_status(int argc, char** argv) { watchdogShowStatus(); }
-void cmd_wdt_tasks(int argc, char** argv) { watchdogShowTasks(); }
-void cmd_wdt_stats(int argc, char** argv) { watchdogShowStats(); }
-void cmd_wdt_report(int argc, char** argv) { watchdogPrintDetailedReport(); }
+// --- WDT/TASK CONSOLIDATION WRAPPERS (Now calls the main handlers directly) ---
+// FIX: Cast string literals to char* to resolve ISO C++ warnings
+void cmd_task_stats(int argc, char** argv) { char* args[] = {(char*)"task", (char*)"stats"}; cmd_task_main(2, args); }
+void cmd_task_list(int argc, char** argv) { char* args[] = {(char*)"task", (char*)"list"}; cmd_task_main(2, args); }
+void cmd_task_cpu(int argc, char** argv) { char* args[] = {(char*)"task", (char*)"cpu"}; cmd_task_main(2, args); }
+void cmd_wdt_status(int argc, char** argv) { char* args[] = {(char*)"wdt", (char*)"status"}; cmd_wdt_main(2, args); }
+void cmd_wdt_tasks(int argc, char** argv) { char* args[] = {(char*)"wdt", (char*)"tasks"}; cmd_wdt_main(2, args); }
+void cmd_wdt_stats(int argc, char** argv) { char* args[] = {(char*)"wdt", (char*)"stats"}; cmd_wdt_main(2, args); }
+void cmd_wdt_report(int argc, char** argv) { char* args[] = {(char*)"wdt", (char*)"report"}; cmd_wdt_main(2, args); }
 
-// Aliases for config commands (extern definitions)
+
+// Aliases for config commands (extern definitions - implemented in cli_config.cpp)
 extern void cmd_config_schema_show(int argc, char** argv);
 extern void cmd_config_migrate(int argc, char** argv);
 extern void cmd_config_rollback(int argc, char** argv);
@@ -65,13 +126,57 @@ extern void cmd_config_validate(int argc, char** argv);
 extern void cmd_config_show(int argc, char** argv);
 extern void cmd_config_reset(int argc, char** argv);
 extern void cmd_config_save(int argc, char** argv);
+extern void cmd_config_main(int argc, char** argv);
+
+
+// ============================================================================
+// CONFIGURATION DISPATCHER (Consolidated)
+// ============================================================================
+
+void cmd_config_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("\n[CONFIG] === Configuration Management Command ===");
+        Serial.println("[CONFIG] Usage: config [show | schema | migrate | rollback | validate | reset | save]");
+        Serial.println("[CONFIG]   show: Show current run-time settings (aliased to 'config').");
+        Serial.println("[CONFIG]   schema: Show schema history and key metadata.");
+        Serial.println("[CONFIG]   migrate: Automatically migrate configuration schema.");
+        Serial.println("[CONFIG]   rollback <v>: Rollback schema to specific version (e.g., rollback 0).");
+        Serial.println("[CONFIG]   validate: Run full consistency validation report.");
+        Serial.println("[CONFIG]   reset: Reset ALL configuration to factory defaults.");
+        Serial.println("[CONFIG]   save: Force save current configuration to NVS.");
+        return;
+    }
+
+    if (strcmp(argv[1], "show") == 0) {
+        cmd_config_show(argc, argv);
+    } else if (strcmp(argv[1], "schema") == 0) {
+        cmd_config_schema_show(argc, argv);
+    } else if (strcmp(argv[1], "migrate") == 0) {
+        cmd_config_migrate(argc, argv);
+    } else if (strcmp(argv[1], "rollback") == 0) {
+        // Need at least 3 arguments: "config rollback V"
+        if (argc < 3) {
+             Serial.println("[CONFIG] ERROR: Rollback requires a target version number.");
+             return;
+        }
+        cmd_config_rollback(argc, argv); // Handles version argument in argv[2]
+    } else if (strcmp(argv[1], "validate") == 0) {
+        cmd_config_validate(argc, argv);
+    } else if (strcmp(argv[1], "reset") == 0) {
+        cmd_config_reset(argc, argv);
+    } else if (strcmp(argv[1], "save") == 0) {
+        cmd_config_save(argc, argv);
+    } else {
+        Serial.printf("[CONFIG] Error: Unknown parameter '%s'\n", argv[1]);
+        Serial.println("[CONFIG] Use 'config' without parameters for help.");
+    }
+}
 
 
 // ============================================================================
 // FAULT STATS COMMAND IMPLEMENTATION
 // ============================================================================
 
-// Helper to format milliseconds to readable time string (HH:MM:SS format)
 static const char* formatTimestamp(uint32_t timestamp_ms) {
     static char time_buffer[32];
     time_t t = timestamp_ms / 1000;
@@ -115,7 +220,7 @@ void cmd_faults_stats(int argc, char** argv) {
 
 
 // ============================================================================
-// DEBUG COMMAND DISPATCHER AND HANDLERS (Implementation bodies omitted for brevity)
+// DEBUG COMMAND DISPATCHER AND HANDLERS (Omitted for brevity)
 // ============================================================================
 
 void cmd_debug_main(int argc, char** argv) {
@@ -181,12 +286,13 @@ void debugConfigHandler() {
     
     // --- Calibration Setup ---
     const float DEFAULT_SCALE = (float)MOTION_POSITION_SCALE_FACTOR; 
+    const float DEFAULT_SCALE_DEG = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
     
     // Get actual calibrated scales, using fallback if 0.0f
     float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : DEFAULT_SCALE;
     float scale_y = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : DEFAULT_SCALE;
     float scale_z = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : DEFAULT_SCALE;
-    float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : DEFAULT_SCALE;
+    float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : DEFAULT_SCALE_DEG;
     
     // --- Soft Limits (Conversion to mm/degrees) ---
     Serial.println("[CLI] Soft Limits (Units: mm / degrees):");
@@ -287,9 +393,44 @@ void debugAllHandler() {
     Serial.println("[CLI] ╚════════════════════════════════════════════════════╝");
 }
 
+// ============================================================================
+// NEW ENCODER BAUD RATE SETTER
+// ============================================================================
+extern bool parseAndValidateInt(const char* str, int32_t* value, int32_t min, int32_t max);
+extern bool encoderSetBaudRate(uint32_t baud_rate);
+
+void cmd_encoder_set_baud(int argc, char** argv) {
+  if (argc < 2) {
+    Serial.println("[CLI] Usage: encoder_baud_set <baud_rate>");
+    Serial.println("[CLI] Example: encoder_baud_set 38400");
+    return;
+  }
+  
+  int32_t new_baud_rate_i32 = 0;
+  
+  // Standard valid baud rate range
+  const int32_t MIN_BAUD = 1200;
+  const int32_t MAX_BAUD = 115200;
+
+  // 1. Validate input 
+  if (!parseAndValidateInt(argv[1], &new_baud_rate_i32, MIN_BAUD, MAX_BAUD)) {
+    Serial.printf("[CLI] ERROR: Invalid baud rate. Must be integer between %ld and %ld.\n", MIN_BAUD, MAX_BAUD);
+    return;
+  }
+
+  uint32_t new_baud_rate = (uint32_t)new_baud_rate_i32;
+
+  // 2. Perform the set operation
+  if (encoderSetBaudRate(new_baud_rate)) {
+    Serial.printf("[CLI] ✅ Encoder baud rate set to %lu. Encoder communication re-initialized.\n", new_baud_rate);
+  } else {
+    Serial.printf("[CLI] ❌ Failed to set encoder baud rate to %lu.\n", new_baud_rate);
+  }
+}
+
 
 // ============================================================================
-// REGISTRATION
+// REGISTRATION (FIXED & CONSOLIDATED)
 // ============================================================================
 
 void cliRegisterDiagCommands() {
@@ -297,33 +438,23 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("debug", "Show detailed system diagnostics (debug [all|encoders|config])", cmd_debug_main); 
     
     // --- Individual Diagnostics (Registered Commands) ---
-    cliRegisterCommand("faults_show", "Show fault history", cmd_fault_show);
+    cliRegisterCommand("faults_show", "Show fault history", cmd_faults_show); 
     cliRegisterCommand("faults_stats", "Show categorized fault statistics and timeline.", cmd_faults_stats); 
-    cliRegisterCommand("faults_clear", "Clear fault history", cmd_fault_clear);
+    cliRegisterCommand("faults_clear", "Clear fault history", cmd_faults_clear); 
+    
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
     cliRegisterCommand("i2c_diag", "Show I²C diagnostics", cmd_i2c_diag);
     cliRegisterCommand("i2c_recover", "Recover I²C bus", cmd_i2c_recover);
     cliRegisterCommand("encoder_diag", "Show encoder diagnostics", cmd_encoder_diag);
     cliRegisterCommand("encoder_baud", "Auto-detect encoder baud rate", cmd_encoder_baud_detect);
-    // Aliases for config commands (extern declarations and registrations)
-    extern void cmd_config_schema_show(int argc, char** argv);
-    extern void cmd_config_migrate(int argc, char** argv);
-    extern void cmd_config_rollback(int argc, char** argv);
-    extern void cmd_config_validate(int argc, char** argv);
-    extern void cmd_config_show(int argc, char** argv);
-    extern void cmd_config_reset(int argc, char** argv);
-    extern void cmd_config_save(int argc, char** argv);
-
-    cliRegisterCommand("config_schema", "Show schema history", cmd_config_schema_show);
-    cliRegisterCommand("config_migrate", "Migrate configuration to new schema", cmd_config_migrate);
-    cliRegisterCommand("config_rollback", "Rollback to previous schema", cmd_config_rollback);
-    cliRegisterCommand("config_validate", "Validate configuration schema", cmd_config_validate);
-    // Aliases for task/WDT commands (defined/implemented in this file)
-    cliRegisterCommand("task_stats", "Show FreeRTOS task statistics", cmd_task_stats);
-    cliRegisterCommand("task_list", "List all FreeRTOS tasks", cmd_task_list);
-    cliRegisterCommand("task_cpu", "Show CPU usage", cmd_task_cpu);
-    cliRegisterCommand("wdt_status", "Show watchdog status", cmd_wdt_status);
-    cliRegisterCommand("wdt_tasks", "List monitored tasks", cmd_wdt_tasks);
-    cliRegisterCommand("wdt_stats", "Show watchdog statistics", cmd_wdt_stats);
-    cliRegisterCommand("wdt_report", "Detailed watchdog report", cmd_wdt_report);
+    cliRegisterCommand("encoder_baud_set", "Manually set encoder baud rate (e.g., encoder_baud_set 9600)", cmd_encoder_set_baud);
+    
+    // --- CONFIGURATION CONSOLIDATION ---
+    extern void cmd_config_main(int argc, char** argv);
+    cliRegisterCommand("config", "Configuration schema management and validation.", cmd_config_main); 
+    
+    // --- WDT CONSOLIDATION ---
+    // The main handlers are defined in this file (cmd_wdt_main, cmd_task_main)
+    cliRegisterCommand("wdt", "Watchdog Timer management and diagnostics.", cmd_diag_scheduler_main);
+    cliRegisterCommand("task", "FreeRTOS task monitoring and statistics.", cmd_diag_scheduler_main);
 }

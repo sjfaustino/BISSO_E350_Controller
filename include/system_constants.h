@@ -11,6 +11,7 @@
 
 // Position scaling: internal units to physical units
 #define MOTION_POSITION_SCALE_FACTOR 1000        // 1000 internal units = 1mm
+#define MOTION_POSITION_SCALE_FACTOR_DEG 1000    // 1000 internal units = 1 degree
 
 // Motion timing
 #define MOTION_UPDATE_INTERVAL_MS 10              // Update frequency: 100Hz
@@ -27,7 +28,7 @@
 #define ENCODER_COMMAND_INTERVAL_MS 500           // Command retry interval
 #define ENCODER_TIMEOUT_MS 1000                   // Data timeout: 1 second
 #define ENCODER_BUFFER_SIZE 64                    // Serial buffer max size
-#define ENCODER_PPR 20                            // Pulses per revolution
+#define ENCODER_PPR 20                            // Pulses per revolution <-- UPDATED TO 20 PPR
 
 // ============================================================================
 // PLC COMMUNICATION CONSTANTS
@@ -122,7 +123,7 @@
 // LCD DISPLAY CONSTANTS
 // ============================================================================
 
-#define LCD_REFRESH_INTERVAL_MS 100               // FIX: 100ms for 10Hz positional updates
+#define LCD_REFRESH_INTERVAL_MS 100               // 100ms for 10Hz positional updates
 #define LCD_BACKLIGHT_TIMEOUT_MS 300000           // Backlight off after 5 min
 
 // ============================================================================

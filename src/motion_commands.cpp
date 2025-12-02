@@ -54,19 +54,21 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   int32_t target_pos = 0;
   float targets_mm[] = {x, y, z, a};
 
-  // --- FIX: Use Calibrated Scale Factors per Axis ---
+  // --- FIX: Use Calibrated Scale Factors per Axis (Linear/Angular Fallback) ---
   float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_y = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_z = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
-  float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR;
+  // Use specific degree scale factor for A-axis fallback
+  float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR_DEG; 
   float scales[] = {scale_x, scale_y, scale_z, scale_a};
-  // ----------------------------------------------------
+  // -----------------------------------------------------------------------------
 
   int active_axes_count = 0;
   
   for (int i = 0; i < MOTION_AXES; i++) {
     int32_t target_counts = (int32_t)(targets_mm[i] * scales[i]);
     
+    // Check if the target is significantly different from current position
     if (abs(target_counts - motionGetPosition(i)) > 1) { 
       active_axes_count++;
       target_axis = i;
@@ -141,7 +143,7 @@ void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s
   float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_y = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
   float scale_z = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
-  float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR;
+  float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR_DEG;
   // --------------------------------------------------------------------
 
   float current_x = motionGetPosition(0) / scale_x;
@@ -172,6 +174,7 @@ void motionStop() {
 }
 
 void motionPause() {
+  if (!global_enabled) return;
   if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
 
   if (active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO)) {
@@ -257,6 +260,9 @@ bool motionClearEmergencyStop() {
   }
   active_axis = 255;
   
+  // Notify fault logging system that the halt flag can be cleared
+  emergencyStopSetActive(false); 
+
   Serial.println("[MOTION] ✅ Emergency stop cleared - System ready");
   faultLogWarning(FAULT_EMERGENCY_HALT, "Emergency stop cleared - system recovered");
   

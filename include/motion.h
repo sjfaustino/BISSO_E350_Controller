@@ -67,6 +67,7 @@ int32_t motionGetTarget(uint8_t axis);
 motion_state_t motionGetState(uint8_t axis);
 bool motionIsMoving();
 bool motionIsStalled(uint8_t axis);
+uint8_t motionGetActiveAxis(); // <-- NEW: Safely returns the index of the currently active axis
 
 // Motion diagnostics
 void motionDiagnostics();
