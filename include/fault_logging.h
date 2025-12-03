@@ -36,20 +36,21 @@ typedef enum {
   FAULT_TASK_HUNG = 0x13
 } fault_code_t;
 
-// NEW: Fault Statistics Structure
+// Fault Statistics Structure
 typedef struct {
     uint32_t total_faults;
-    uint32_t encoder_faults; // F_ENCODER_TIMEOUT, F_ENCODER_SPIKE
-    uint32_t motion_faults;  // F_MOTION_STALL, F_SOFT_LIMIT_EXCEEDED
-    uint32_t safety_faults;  // F_ESTOP_ACTIVATED, F_SAFETY_INTERLOCK, F_EMERGENCY_HALT
-    uint32_t config_faults;  // F_CONFIGURATION_INVALID, F_CALIBRATION_MISSING, F_BOOT_FAILED, etc.
-    uint32_t plc_faults;     // F_PLC_COMM_LOSS, F_I2C_ERROR
-    uint32_t system_faults;  // F_WATCHDOG_TIMEOUT, F_TASK_HUNG, F_CRITICAL_SYSTEM_ERROR, etc.
-    uint32_t other_faults;   // Should ideally be 0 if categories are comprehensive
+    uint32_t encoder_faults; 
+    uint32_t motion_faults;  
+    uint32_t safety_faults;  
+    uint32_t config_faults;  
+    uint32_t plc_faults;     
+    uint32_t system_faults;  
+    uint32_t other_faults;   
     uint32_t last_fault_time_ms;
     uint32_t first_fault_time_ms;
 } fault_stats_t;
 
+// Full Fault Entry Structure
 typedef struct {
   uint32_t timestamp;           // Boot timestamp (ms since system start)
   fault_severity_t severity;    // Severity level
@@ -59,10 +60,13 @@ typedef struct {
   char message[64];             // Human-readable message
 } fault_entry_t;
 
-// --- REFACTORED SIGNATURE ---
+// Public Logging API (Non-Blocking)
 void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, int32_t value, const char* format, ...);
 
-// NOTE: The simple wrappers (faultLogWarning, faultLogError, etc.) are now less useful.
+// Worker API (Blocking - Call ONLY from Fault_Log Task)
+void faultLogToNVS(const fault_entry_t* entry);
+
+// Wrapper Functions
 void faultLogWarning(fault_code_t code, const char* message);
 void faultLogError(fault_code_t code, const char* message);
 void faultLogCritical(fault_code_t code, const char* message);
@@ -74,15 +78,10 @@ void faultClearHistory();
 const char* faultCodeToString(fault_code_t code);
 const char* faultSeverityToString(fault_severity_t severity);
 
-// NEW: Fault Statistics Access
+// Fault Statistics Access
 fault_stats_t faultGetStats();
 
-// Boot validation
-void bootValidationInit();
-bool bootValidateAllSystems();
-void bootShowStatus();
-
-// Emergency stop recovery
+// Emergency stop management
 void emergencyStopSetActive(bool active);
 bool emergencyStopIsActive();
 bool emergencyStopRequestRecovery();

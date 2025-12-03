@@ -63,7 +63,8 @@
 // MESSAGE QUEUE DEFINITIONS
 // ============================================================================
 
-#define QUEUE_ITEM_SIZE          64
+// FIX: Increased to 96 bytes to hold the full fault_entry_t (~80 bytes)
+#define QUEUE_ITEM_SIZE          96 
 #define QUEUE_LEN_MOTION         10
 #define QUEUE_LEN_SAFETY         20
 #define QUEUE_LEN_ENCODER        10
@@ -176,7 +177,7 @@ QueueHandle_t taskGetPlcQueue();
 QueueHandle_t taskGetFaultQueue();
 QueueHandle_t taskGetDisplayQueue();
 
-// Send/Receive messages (Defined in task_manager.cpp)
+// Send/Receive messages
 bool taskSendMessage(QueueHandle_t queue, const queue_message_t* msg);
 bool taskReceiveMessage(QueueHandle_t queue, queue_message_t* msg, uint32_t timeout_ms);
 
