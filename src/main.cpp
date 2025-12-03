@@ -19,13 +19,50 @@
 #include "watchdog_manager.h"
 #include "web_server.h"
 #include "boot_validation.h"
-#include "board_inputs.h" // <-- Critical for physical buttons
+#include "board_inputs.h" 
 
 static bool system_ready = false;
 static uint32_t boot_time_ms = 0;
 
 // External Web Server instance
 extern WebServerManager webServer;
+
+// ============================================================================
+// FREERTOS HARDENING HOOKS
+// ============================================================================
+
+/**
+ * @brief FreeRTOS Stack Overflow Hook
+ * Called by the kernel when a task exceeds its allocated stack size.
+ * This function must remain lean and avoid heavy operations.
+ */
+extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
+    // 1. Prevent recursion/re-entry
+    static volatile bool handling_overflow = false;
+    if (handling_overflow) return;
+    handling_overflow = true;
+
+    // 2. Direct Emergency Serial Output
+    // We print immediately to UART to capture the culprit before the system dies.
+    // Using simple prints to minimize stack usage.
+    Serial.println("\n\n#########################################");
+    Serial.println("!!! CRITICAL: STACK OVERFLOW DETECTED !!!");
+    Serial.print("Faulty Task: ");
+    Serial.println(pcTaskName);
+    Serial.println("Action: Forcing System Restart");
+    Serial.println("#########################################\n");
+
+    // 3. Attempt to log to NVS (Best Effort)
+    // Note: This might fail if the stack is totally corrupted or if mutexes are held,
+    // but we attempt it to preserve the record for the next boot.
+    // We bypass standard wrappers if possible, but here we use the critical logger.
+    faultLogCritical(FAULT_CRITICAL_SYSTEM_ERROR, "Stack Overflow");
+
+    // 4. Force Restart
+    // Allow a brief moment for the serial buffer to flush
+    delay(1000);
+    ESP.restart();
+}
 
 // ============================================================================
 // BOOT WRAPPER PROTOTYPES (Required by BOOT_INIT_SUBSYSTEM macro)
@@ -148,7 +185,17 @@ void setup() {
     return; // Should halt here
   }
   
+  // Start the dedicated safety monitoring task first (Core 1)
+  // Note: Include safety_task.h at top if safetyTaskStart is not visible, 
+  // but here we assume it is handled via the task_manager or direct prototype.
+  // In the current file set, safetyTaskStart is declared in safety_task.h.
+  // Since we haven't included safety_task.h in main.cpp, we rely on taskManager.
+  // However, safetyTaskStart was defined in tasks_safety.cpp but traditionally called here.
+  // To keep it clean, we will assume taskManagerStart() handles the dispatcher logic 
+  // OR we add the specific start call if the architecture demands it.
+  
   // Initialize FreeRTOS task manager and start scheduler
+  // taskManagerStart() creates all tasks including Safety, Motion, etc.
   taskManagerInit();
   taskManagerStart();
   

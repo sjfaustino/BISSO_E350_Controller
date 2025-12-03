@@ -28,7 +28,7 @@
 #define ENCODER_COMMAND_INTERVAL_MS 500           // Command retry interval
 #define ENCODER_TIMEOUT_MS 1000                   // Data timeout: 1 second
 #define ENCODER_BUFFER_SIZE 64                    // Serial buffer max size
-#define ENCODER_PPR 20                            // Pulses per revolution <-- UPDATED TO 20 PPR
+#define ENCODER_PPR 20                            // Pulses per revolution
 
 // ============================================================================
 // PLC COMMUNICATION CONSTANTS
@@ -72,6 +72,12 @@
 #define FAULT_LOG_SIZE 100                        // Max fault history entries
 #define FAULT_LOG_CLEANUP_INTERVAL_MS 10000       // Cleanup old faults every 10s
 #define FAULT_LOG_TIMEOUT_MS 100                  // Timeout for fault logging
+
+// ============================================================================
+// BOOT VALIDATION CONSTANTS
+// ============================================================================
+
+#define MAX_BOOT_SUBSYSTEMS 15                    // Max number of subsystems to track
 
 // ============================================================================
 // SERIAL COMMUNICATION CONSTANTS

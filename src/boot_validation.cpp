@@ -1,16 +1,20 @@
 #include "boot_validation.h"
 #include "fault_logging.h"
+#include "serial_logger.h"
+#include "system_constants.h" // <-- NEW: Required for MAX_BOOT_SUBSYSTEMS
 #include <Preferences.h>
 #include <string.h>
-#include "serial_logger.h"
 #include <Arduino.h>
 
 // ============================================================================
 // BOOT STATE
 // ============================================================================
 
+// Defined constant for NVS namespace to facilitate future re-partitioning
+#define BOOT_NVS_NAMESPACE "bisso_boot"
+
 static boot_sequence_t boot_seq = {0};
-static subsystem_health_t subsystems[15] = {0};
+static subsystem_health_t subsystems[MAX_BOOT_SUBSYSTEMS] = {0}; // FIX: Use defined constant
 static int subsystem_count = 0;
 static bool degraded_mode = false;
 static bool shutting_down = false;
@@ -31,7 +35,7 @@ void bootValidationInit() {
   boot_seq.boot_validation_passed = false;
   
   // Initialize NVS for boot statistics
-  if (!boot_prefs.begin("bisso_boot", true)) { // Read-only check first
+  if (!boot_prefs.begin(BOOT_NVS_NAMESPACE, true)) { // FIX: Use constant
     Serial.println("[BOOT_VALIDATION] Warning: Could not open boot NVS namespace");
   } else {
     uint32_t consecutive = boot_prefs.getUInt("consecutive_ok", 0);
@@ -48,7 +52,7 @@ void bootValidationInit() {
 // ============================================================================
 
 void bootRegisterSubsystem(const char* name) {
-  if (subsystem_count >= 15) {
+  if (subsystem_count >= MAX_BOOT_SUBSYSTEMS) { // FIX: Use constant for check
     Serial.println("[BOOT_VALIDATION] ERROR: Too many subsystems!");
     return;
   }
@@ -89,7 +93,7 @@ void bootMarkFailed(const char* name, const char* error_msg, boot_status_code_t 
       boot_seq.overall_status = status;
       
       // Log to NVS
-      if (boot_prefs.begin("bisso_boot", false)) { // Read-write
+      if (boot_prefs.begin(BOOT_NVS_NAMESPACE, false)) { // FIX: Use constant
         boot_prefs.putUInt("errors", boot_prefs.getUInt("errors", 0) + 1);
         boot_prefs.end();
       }
@@ -188,7 +192,7 @@ bool bootValidateAllSystems() {
     boot_seq.overall_status = BOOT_OK;
     
     // Increment consecutive successes
-    if (boot_prefs.begin("bisso_boot", false)) { 
+    if (boot_prefs.begin(BOOT_NVS_NAMESPACE, false)) { 
       uint32_t consecutive = boot_prefs.getUInt("consecutive_ok", 0) + 1;
       boot_prefs.putUInt("consecutive_ok", consecutive);
       boot_prefs.end();
@@ -211,7 +215,7 @@ bool bootValidateAllSystems() {
     boot_seq.overall_status = BOOT_CRITICAL_ERROR;
     
     // Reset consecutive successes
-    if (boot_prefs.begin("bisso_boot", false)) { 
+    if (boot_prefs.begin(BOOT_NVS_NAMESPACE, false)) { 
       boot_prefs.putUInt("consecutive_ok", 0);
       boot_prefs.end();
     }
@@ -462,7 +466,7 @@ void bootShowDegradedModeStatus() {
 // ============================================================================
 
 void bootLogErrors() {
-  if (!boot_prefs.begin("bisso_boot", true)) {
+  if (!boot_prefs.begin(BOOT_NVS_NAMESPACE, true)) { // FIX: Use constant
     logError("[BOOT] Cannot read errors: NVS not started.");
     return;
   }
@@ -485,7 +489,7 @@ const char* bootGetLastError() {
 }
 
 uint32_t bootGetErrorCount() {
-  if (boot_prefs.begin("bisso_boot", true)) {
+  if (boot_prefs.begin(BOOT_NVS_NAMESPACE, true)) { // FIX: Use constant
     uint32_t count = boot_prefs.getUInt("errors", 0);
     boot_prefs.end();
     return count;
@@ -494,7 +498,7 @@ uint32_t bootGetErrorCount() {
 }
 
 uint32_t bootGetConsecutiveSuccesses() {
-  if (boot_prefs.begin("bisso_boot", true)) {
+  if (boot_prefs.begin(BOOT_NVS_NAMESPACE, true)) { // FIX: Use constant
     uint32_t count = boot_prefs.getUInt("consecutive_ok", 0);
     boot_prefs.end();
     return count;
