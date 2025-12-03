@@ -8,7 +8,7 @@
 #include "safety.h"
 #include "encoder_calibration.h" 
 #include "encoder_wj66.h"
-#include "config_unified.h" // <-- NEW: Required for configGetInt
+#include "config_unified.h" // Required for configGetInt
 #include <math.h> 
 #include <string.h>
 #include <stdlib.h> 
@@ -154,7 +154,7 @@ void motionUpdate() {
 
       case MOTION_EXECUTING:
         {
-            // --- NEW: X-AXIS FINAL APPROACH LOGIC ---
+            // --- X-AXIS FINAL APPROACH LOGIC ---
             if (active_axis == 0) { // Axis 0 = X
                 int32_t dist_to_target = abs(axis->target_position - current_pos);
                 
@@ -201,11 +201,17 @@ void motionUpdate() {
         break;
         
       case MOTION_STOPPING:
-        // Wait for encoder to settle
-        if (abs(current_pos - axis->position_at_stop) < 10) { 
-            axis->state = MOTION_IDLE;
-            active_axis = 255;
-            logInfo("[MOTION] Axis %d motion finalized and idle.", active_axis);
+        {
+            // FIX: Use Configurable Deadband for Settling
+            // Retrieve from NVS, default to 10 counts if not set.
+            int32_t settle_deadband = configGetInt("motion_settle_deadband", 10);
+
+            // Wait for encoder to settle within deadband
+            if (abs(current_pos - axis->position_at_stop) < settle_deadband) { 
+                axis->state = MOTION_IDLE;
+                active_axis = 255;
+                logInfo("[MOTION] Axis %d motion finalized (Settled within %d counts).", active_axis, settle_deadband);
+            }
         }
         break;
 
