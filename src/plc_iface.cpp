@@ -40,16 +40,18 @@ void plcIfaceInit() {
   // before any other logic runs. This prevents startup chatter or unsafe motion.
   uint8_t safe_output = 0xFF; 
   
-  // 1. Safe State for Speed Profile (I72)
+  // 1. Safe State for Speed Profile (I72) - Use Retry logic for robust init
   i2c_result_t res1 = i2cWriteWithRetry(PCF8574_I72_ADDR, &safe_output, 1);
   if (res1 != I2C_RESULT_OK) {
       Serial.println("[PLC] ⚠️ Warning: Failed to set safe state on I72 (Speed)");
+      faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I72_ADDR, "Init Safe State I72 Failed");
   }
 
-  // 2. Safe State for Axis/Direction (I73)
+  // 2. Safe State for Axis/Direction (I73) - Use Retry logic
   i2c_result_t res2 = i2cWriteWithRetry(PCF8574_I73_ADDR, &safe_output, 1);
   if (res2 != I2C_RESULT_OK) {
       Serial.println("[PLC] ⚠️ Warning: Failed to set safe state on I73 (Axis/Dir)");
+      faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR, "Init Safe State I73 Failed");
   }
   
   // Update internal state to match hardware
@@ -92,6 +94,7 @@ void plcIfaceUpdate() {
   
   uint8_t current_read_byte;
   
+  // Input reading runs in the PLC task, so we can use standard retry logic
   i2c_result_t result = i2cReadWithRetry(PCF8574_Q73_ADDR, &current_read_byte, 1);
   
   if (result == I2C_RESULT_OK) {
@@ -125,10 +128,7 @@ void plcIfaceUpdate() {
     plc_state.error_count++;
     input_debounce_count = 0;
     
-    plc_state.status = PLC_TIMEOUT; 
-    if (result == I2C_RESULT_NACK) {
-        plc_state.status = PLC_NOT_FOUND; 
-    }
+    plc_state.status = (result == I2C_RESULT_NACK) ? PLC_NOT_FOUND : PLC_TIMEOUT; 
     
     logWarning("[PLC] Q73 read failed, I2C result: %s", i2cResultToString(result));
     faultLogWarning(FAULT_PLC_COMM_LOSS, "Q73 Consensus Read Failed");
@@ -188,17 +188,16 @@ bool elboI72SetSpeed(uint8_t speed_bit, bool value) {
     plc_state.I72_byte |= (1 << speed_bit);  // Set bit high (OFF)
   }
   
-  i2c_result_t result = i2cWriteWithRetry(PCF8574_I72_ADDR, &plc_state.I72_byte, 1);
+  // FIX: Use Fast Write for runtime motion updates (2ms timeout)
+  i2c_result_t result = i2cWriteFast(PCF8574_I72_ADDR, &plc_state.I72_byte, 1);
   
   if (result == I2C_RESULT_OK) {
     return true;
   } else {
-    logError("[ELBO] I2C Error writing I72 speed: %s", i2cResultToString(result));
+    logError("[ELBO] I72 speed write failed: %s", i2cResultToString(result));
     plc_state.error_count++;
-    // --- FAULT LOGGING ---
     faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I72_ADDR,
-                  "I72 Speed Write Failed (Bit %d, Result %d)", speed_bit, result);
-    // -------------------------
+                  "I72 Speed Write Failed (Bit %d, Res %d)", speed_bit, result);
     return false;
   }
 }
@@ -221,17 +220,16 @@ bool elboI73SetAxis(uint8_t axis_bit, bool value) {
     plc_state.I73_byte |= (1 << axis_bit);
   }
   
-  i2c_result_t result = i2cWriteWithRetry(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
+  // FIX: Use Fast Write
+  i2c_result_t result = i2cWriteFast(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
   
   if (result == I2C_RESULT_OK) {
     return true;
   } else {
-    logError("[ELBO] I2C Error writing I73 axis: %s", i2cResultToString(result));
+    logError("[ELBO] I73 axis write failed: %s", i2cResultToString(result));
     plc_state.error_count++;
-    // --- FAULT LOGGING ---
     faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR,
-                  "I73 Axis Write Failed (Bit %d)", axis_bit);
-    // -------------------------
+                  "I73 Axis Write Failed (Bit %d, Res %d)", axis_bit, result);
     return false;
   }
 }
@@ -250,17 +248,16 @@ bool elboI73SetDirection(uint8_t dir_bit, bool value) {
     plc_state.I73_byte |= (1 << dir_bit);
   }
   
-  i2c_result_t result = i2cWriteWithRetry(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
+  // FIX: Use Fast Write
+  i2c_result_t result = i2cWriteFast(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
   
   if (result == I2C_RESULT_OK) {
     return true;
   } else {
-    logError("[ELBO] I2C Error writing I73 direction: %s", i2cResultToString(result));
+    logError("[ELBO] I73 direction write failed: %s", i2cResultToString(result));
     plc_state.error_count++;
-    // --- FAULT LOGGING ---
     faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR,
-                  "I73 Dir Write Failed (Bit %d)", dir_bit);
-    // -------------------------
+                  "I73 Dir Write Failed (Bit %d, Res %d)", dir_bit, result);
     return false;
   }
 }
@@ -276,7 +273,8 @@ bool elboI73SetVSMode(bool value) {
     plc_state.I73_byte |= (1 << ELBO_I73_V_S_MODE);
   }
   
-  i2c_result_t result = i2cWriteWithRetry(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
+  // FIX: Use Fast Write
+  i2c_result_t result = i2cWriteFast(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
   
   if (result == I2C_RESULT_OK) {
     return true;

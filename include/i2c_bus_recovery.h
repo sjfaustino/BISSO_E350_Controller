@@ -60,6 +60,9 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t* data, uint8_t len
 i2c_result_t i2cWriteWithRetry(uint8_t address, const uint8_t* data, uint8_t len);
 i2c_result_t i2cReadWithRetry(uint8_t address, uint8_t* data, uint8_t len);
 
+// --- NEW: Fast Write for Real-Time Tasks (No Retry, Short Timeout) ---
+i2c_result_t i2cWriteFast(uint8_t address, const uint8_t* data, uint8_t len);
+
 // Configuration
 void i2cSetRetryConfig(i2c_retry_config_t config);
 i2c_retry_config_t i2cGetRetryConfig();

@@ -1,5 +1,6 @@
 #include "i2c_bus_recovery.h"
 #include "fault_logging.h"
+#include "system_constants.h" // Required for I2C_TRANSACTION_TIMEOUT_MS
 #include <Wire.h>
 
 // ESP32-S3 I²C pins
@@ -136,35 +137,19 @@ void i2cRecoverBus() {
 
 void i2cSoftReset() {
   Serial.println("[I2C] Performing soft reset...");
-  
-  // End current Wire session
   Wire.end();
-  
-  // Small delay
   delay(10);
-  
-  // Reinitialize with standard configuration
-  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 100000);  // 100kHz
-  
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 100000); 
   Serial.println("[I2C] ✅ Soft reset complete");
 }
 
 void i2cHardReset() {
   Serial.println("[I2C] Performing hard reset...");
-  
-  // End Wire
   Wire.end();
-  
-  // Reset pins
   pinMode(I2C_SDA_PIN, INPUT);
   pinMode(I2C_SCL_PIN, INPUT);
-  
-  // Wait
   delay(100);
-  
-  // Reinitialize
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 100000);
-  
   Serial.println("[I2C] ✅ Hard reset complete");
 }
 
@@ -177,17 +162,10 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t* data, uint8_t len
     
     if (attempt > 0) {
       stats.retries_performed++;
-      
-      // Check bus status before retry
       i2c_bus_status_t bus_status = i2cCheckBusStatus();
       if (bus_status != I2C_BUS_OK) {
-        Serial.print("[I2C] Bus error detected (");
-        Serial.print(i2cBusStatusToString(bus_status));
-        Serial.println(") - attempting recovery");
         i2cRecoverBus();
       }
-      
-      // Exponential backoff
       delay(backoff_ms);
       backoff_ms = (uint16_t)((float)backoff_ms * retry_config.backoff_multiplier);
       if (backoff_ms > retry_config.max_backoff_ms) {
@@ -195,7 +173,6 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t* data, uint8_t len
       }
     }
     
-    // Attempt transaction
     Wire.beginTransmission(address);
     
     if (read) {
@@ -234,25 +211,15 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t* data, uint8_t len
     }
   }
   
-  // All retries exhausted
   stats.transactions_failed++;
   
-  // Log detailed fault using the new API
   faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, -1, result, 
-                "I²C transaction failed (addr=0x%02X, retries=%d) - Result: %s", 
-                address, retry_config.max_retries, i2cResultToString(result));
+                "I²C transaction failed (addr=0x%02X) - %s", 
+                address, i2cResultToString(result));
   
-  // Check bus status on failure
   i2c_bus_status_t bus_status = i2cCheckBusStatus();
   if (bus_status != I2C_BUS_OK) {
-    Serial.print("[I2C] WARNING: Bus status degraded - ");
-    Serial.println(i2cBusStatusToString(bus_status));
-    
-    // Trigger recovery for bus errors
-    if (bus_status == I2C_BUS_STUCK_SDA || bus_status == I2C_BUS_STUCK_SCL) {
-      Serial.println("[I2C] Initiating bus recovery...");
       i2cRecoverBus();
-    }
   }
   
   return result;
@@ -266,6 +233,41 @@ i2c_result_t i2cWriteWithRetry(uint8_t address, const uint8_t* data, uint8_t len
 
 i2c_result_t i2cReadWithRetry(uint8_t address, uint8_t* data, uint8_t len) {
   return i2cTransactionWithRetry(address, data, len, true);
+}
+
+// --- NEW: Fast Write for Real-Time Tasks (No Retry) ---
+i2c_result_t i2cWriteFast(uint8_t address, const uint8_t* data, uint8_t len) {
+    stats.transactions_total++;
+    
+    // Set extremely short timeout (2ms) for real-time safety
+    Wire.setTimeOut(2); 
+    
+    Wire.beginTransmission(address);
+    Wire.write(data, len);
+    uint8_t error = Wire.endTransmission(true);
+    
+    // Restore standard timeout for other tasks
+    Wire.setTimeOut(I2C_TRANSACTION_TIMEOUT_MS); 
+    
+    if (error == 0) {
+        stats.transactions_success++;
+        return I2C_RESULT_OK;
+    }
+    
+    stats.transactions_failed++;
+    
+    // Map Wire errors to our enum
+    i2c_result_t res = I2C_RESULT_UNKNOWN_ERROR;
+    if (error == 1) res = I2C_RESULT_BUS_ERROR;
+    else if (error == 2) res = I2C_RESULT_NACK;
+    else if (error == 3) res = I2C_RESULT_ARBITRATION_LOST;
+    else if (error == 4) res = I2C_RESULT_TIMEOUT;
+    
+    // Log failures, but don't retry/block
+    if (error == 4) stats.error_timeout++;
+    else if (error == 2) stats.error_nack++;
+    
+    return res;
 }
 
 void i2cSetRetryConfig(i2c_retry_config_t config) {
@@ -331,44 +333,11 @@ void i2cShowStats() {
   Serial.print("  Arbitration Loss: ");
   Serial.println(current.error_arbitration);
   
-  Serial.println("\n[I2C_STATS] Retry Configuration:");
-  Serial.print("  Max Retries: ");
-  Serial.println(retry_config.max_retries);
-  
-  Serial.print("  Initial Backoff: ");
-  Serial.print(retry_config.initial_backoff_ms);
-  Serial.println(" ms");
-  
-  Serial.print("  Max Backoff: ");
-  Serial.print(retry_config.max_backoff_ms);
-  Serial.println(" ms");
-  
-  Serial.print("  Backoff Multiplier: ");
-  Serial.println(retry_config.backoff_multiplier);
-  
-  // Health assessment
-  Serial.println("\n[I2C_STATS] Bus Health Assessment:");
-  i2c_bus_status_t status = i2cCheckBusStatus();
-  Serial.print("  Current Status: ");
-  Serial.println(i2cBusStatusToString(status));
-  
-  if (current.success_rate > 99.0f) {
-    Serial.println("  Overall Health: ✅ EXCELLENT");
-  } else if (current.success_rate > 95.0f) {
-    Serial.println("  Overall Health: ✅ GOOD");
-  } else if (current.success_rate > 90.0f) {
-    Serial.println("  Overall Health: ⚠️  WARNING");
-  } else {
-    Serial.println("  Overall Health: ❌ CRITICAL");
-  }
-  
   Serial.println();
 }
 
 void i2cMonitorBusHealth() {
-  // Periodic health check
   i2c_bus_status_t status = i2cCheckBusStatus();
-  
   if (status != I2C_BUS_OK) {
     faultLogEntry(FAULT_WARNING, FAULT_PLC_COMM_LOSS, -1, status, 
                   "I²C bus degraded: %s", 
