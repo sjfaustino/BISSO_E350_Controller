@@ -35,6 +35,28 @@ void plcIfaceInit() {
   
   i2cRecoveryInit();
 
+  // --- SAFETY: FORCE SAFE STATE (Active LOW Logic: 1 = OFF) ---
+  // We explicitly write 0xFF to both output expanders to ensure all relays are OFF
+  // before any other logic runs. This prevents startup chatter or unsafe motion.
+  uint8_t safe_output = 0xFF; 
+  
+  // 1. Safe State for Speed Profile (I72)
+  i2c_result_t res1 = i2cWriteWithRetry(PCF8574_I72_ADDR, &safe_output, 1);
+  if (res1 != I2C_RESULT_OK) {
+      Serial.println("[PLC] ⚠️ Warning: Failed to set safe state on I72 (Speed)");
+  }
+
+  // 2. Safe State for Axis/Direction (I73)
+  i2c_result_t res2 = i2cWriteWithRetry(PCF8574_I73_ADDR, &safe_output, 1);
+  if (res2 != I2C_RESULT_OK) {
+      Serial.println("[PLC] ⚠️ Warning: Failed to set safe state on I73 (Axis/Dir)");
+  }
+  
+  // Update internal state to match hardware
+  plc_state.I72_byte = 0xFF;
+  plc_state.I73_byte = 0xFF;
+  // -----------------------------------------------------------
+
   plc_state.status = PLC_OK;
   plc_state.last_read_ms = millis();
   plc_state.error_count = 0;
