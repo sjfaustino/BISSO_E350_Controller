@@ -3,8 +3,8 @@
 #include "boot_validation.h"
 #include "memory_monitor.h"
 #include "task_manager.h"
-#include "system_utilities.h" // Canonical Axis Utilities (axisCharToIndex)
-#include "firmware_version.h" // Firmware version string
+#include "system_utilities.h" 
+#include "firmware_version.h" 
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -14,11 +14,15 @@
 // CLI STATE DEFINITIONS
 // ============================================================================
 
+// Local state variables use the canonical definitions from cli.h
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint16_t cli_pos = 0;
 static cli_command_t commands[CLI_MAX_COMMANDS];
 static int command_count = 0;
-static char* cli_history[CLI_HISTORY_SIZE];
+
+// FIX: Changed from char*[] (pointers to heap) to static 2D array (BSS/Data segment)
+// This eliminates malloc() entirely from the CLI history logic.
+static char cli_history[CLI_HISTORY_SIZE][CLI_BUFFER_SIZE]; 
 static int history_index = 0;
 
 // ============================================================================
@@ -41,6 +45,10 @@ extern uint32_t taskGetUptime();
 void cliInit() {
   Serial.println("[CLI] Command Line Interface initializing...");
   memset(cli_buffer, 0, sizeof(cli_buffer));
+  
+  // FIX: Clear static history buffer
+  memset(cli_history, 0, sizeof(cli_history));
+  
   cli_pos = 0;
   command_count = 0;
   
@@ -54,7 +62,7 @@ void cliInit() {
   cliRegisterMotionCommands();
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
-  cliRegisterWifiCommands(); // <-- NEW: Register WiFi module
+  cliRegisterWifiCommands(); 
   
   Serial.print("[CLI] Registered ");
   Serial.print(command_count);
@@ -63,14 +71,11 @@ void cliInit() {
 }
 
 void cliCleanup() {
-  for (int i = 0; i < history_index; i++) {
-    if (cli_history[i]) {
-      free(cli_history[i]);
-      cli_history[i] = NULL;
-    }
-  }
+  // FIX: No free() required for static arrays.
+  // Just reset the index and clear memory to be safe.
   history_index = 0;
-  logInfo("CLI: History cleaned up (%d entries freed)", history_index);
+  memset(cli_history, 0, sizeof(cli_history));
+  logInfo("CLI: History cleared (Static buffer reset)");
 }
 
 void cliUpdate() {
@@ -119,17 +124,19 @@ void cliProcessCommand(const char* cmd) {
   
   if (argc == 0) return;
   
-  // History management
+  // History management (FIX: Static Allocation)
   if (history_index < CLI_HISTORY_SIZE) {
-    char* history_entry = (char*)malloc(strlen(cmd) + 1);
-    if (history_entry) {
-      strcpy(history_entry, cmd);
-      cli_history[history_index++] = history_entry;
-    }
+    // Store command in static array instead of malloc
+    // Using strncpy to prevent buffer overflows
+    strncpy(cli_history[history_index], cmd, CLI_BUFFER_SIZE - 1);
+    cli_history[history_index][CLI_BUFFER_SIZE - 1] = '\0'; // Ensure null-termination
+    history_index++;
+  } else {
+    // Optional: Implement ring buffer logic here if desired later
+    // For now, we just stop recording when full, as per original logic logic
   }
   
   // Custom multi-word command parsing logic to handle "calibrate speed X ..."
-  // This checks for the longest possible match first.
   
   // 1. Check for "calibrate ppmm end"
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && strcmp(argv[1], "ppmm") == 0 && strcmp(argv[2], "end") == 0) {
