@@ -3,13 +3,10 @@
 #include "config_unified.h"
 #include "config_schema_versioning.h"
 #include "config_validator.h"
-#include <stdlib.h> // For atoi
-#include <string.h> // For strcmp
+#include <stdlib.h> 
+#include <string.h> 
 
-// ============================================================================
-// FORWARD DECLARATIONS (from other files/self)
-// ============================================================================
-
+// Forward declarations
 void cmd_config_show(int argc, char** argv);
 void cmd_config_reset(int argc, char** argv);
 void cmd_config_save(int argc, char** argv);
@@ -18,13 +15,8 @@ void cmd_config_migrate(int argc, char** argv);
 void cmd_config_rollback(int argc, char** argv);
 void cmd_config_validate(int argc, char** argv);
 
-// ============================================================================
-// REGISTRATION (Standard)
-// ============================================================================
-
 void cliRegisterConfigCommands() {
-  // NOTE: In the consolidated model (using cmd_config_main as dispatcher),
-  // these individual registrations are deprecated but often left for tool compatibility.
+  // Deprecated direct commands kept for compatibility
   cliRegisterCommand("config", "Show configuration", cmd_config_show);
   cliRegisterCommand("config_reset", "Reset config to defaults", cmd_config_reset);
   cliRegisterCommand("config_save", "Save configuration", cmd_config_save);
@@ -34,12 +26,8 @@ void cliRegisterConfigCommands() {
   cliRegisterCommand("config_validate", "Validate configuration schema", cmd_config_validate);
 }
 
-// ============================================================================
-// CONFIGURATION MAIN DISPATCHER (FIX: Defined here)
-// ============================================================================
-
 void cmd_config_main(int argc, char** argv) {
-    if (argc < 2) { // Check if only the command name is present
+    if (argc < 2) { 
         Serial.println("\n[CONFIG] === Configuration Management ===");
         Serial.println("[CONFIG] Usage: config [command] <parameter>");
         Serial.println("[CONFIG] Commands:");
@@ -49,37 +37,26 @@ void cmd_config_main(int argc, char** argv) {
         Serial.println("  validate  - Run full consistency validation report on the config.");
         Serial.println("  schema    - Show schema version history and key metadata.");
         Serial.println("  migrate   - Automatically migrate configuration schema to current version.");
-        Serial.println("  rollback <v>- Rollback schema to a specific version (e.g., rollback 0).");
+        Serial.println("  rollback <v>- Rollback schema to a specific version.");
         return;
     }
 
-    if (strcmp(argv[1], "show") == 0) {
-        cmd_config_show(argc, argv);
-    } else if (strcmp(argv[1], "save") == 0) {
-        cmd_config_save(argc, argv);
-    } else if (strcmp(argv[1], "reset") == 0) {
-        cmd_config_reset(argc, argv);
-    } else if (strcmp(argv[1], "validate") == 0) {
-        cmd_config_validate(argc, argv);
-    } else if (strcmp(argv[1], "schema") == 0) {
-        cmd_config_schema_show(argc, argv);
-    } else if (strcmp(argv[1], "migrate") == 0) {
-        cmd_config_migrate(argc, argv);
-    } else if (strcmp(argv[1], "rollback") == 0) {
+    if (strcmp(argv[1], "show") == 0) cmd_config_show(argc, argv);
+    else if (strcmp(argv[1], "save") == 0) cmd_config_save(argc, argv);
+    else if (strcmp(argv[1], "reset") == 0) cmd_config_reset(argc, argv);
+    else if (strcmp(argv[1], "validate") == 0) cmd_config_validate(argc, argv);
+    else if (strcmp(argv[1], "schema") == 0) cmd_config_schema_show(argc, argv);
+    else if (strcmp(argv[1], "migrate") == 0) cmd_config_migrate(argc, argv);
+    else if (strcmp(argv[1], "rollback") == 0) {
         if (argc < 3) {
-             Serial.println("[CONFIG] ERROR: Rollback requires a target version number (e.g., config rollback 0).");
+             Serial.println("[CONFIG] [ERR] Rollback requires a target version number.");
              return;
         }
         cmd_config_rollback(argc, argv); 
     } else {
-        Serial.printf("[CONFIG] Error: Unknown parameter '%s'. Use 'config' for help.\n", argv[1]);
+        Serial.printf("[CONFIG] Error: Unknown parameter '%s'.\n", argv[1]);
     }
 }
-
-
-// ============================================================================
-// COMMAND IMPLEMENTATIONS
-// ============================================================================
 
 void cmd_config_show(int argc, char** argv) {
   configUnifiedDiagnostics();
@@ -88,13 +65,13 @@ void cmd_config_show(int argc, char** argv) {
 void cmd_config_reset(int argc, char** argv) {
   Serial.println("[CONFIG] Resetting ALL configuration to factory defaults...");
   configUnifiedReset();
-  Serial.println("[CONFIG] ✅ Factory reset complete - all defaults saved to NVS");
+  Serial.println("[CONFIG] [OK] Factory reset complete.");
 }
 
 void cmd_config_save(int argc, char** argv) {
-  Serial.println("[CONFIG] Ensuring all configuration is saved to NVS...");
+  Serial.println("[CONFIG] Saving configuration to NVS...");
   configUnifiedSave();
-  Serial.println("[CONFIG] ✅ All configuration verified and saved to NVS");
+  Serial.println("[CONFIG] [OK] Saved.");
 }
 
 void cmd_config_schema_show(int argc, char** argv) {
@@ -110,9 +87,6 @@ void cmd_config_rollback(int argc, char** argv) {
     Serial.println("[CLI] Usage: config_rollback <version>");
     return;
   }
-  
-  // NOTE: Using argv[1] directly here because cmd_config_main ensures 
-  // argv[1] is the parameter (if called via that dispatcher).
   uint8_t target_version = atoi(argv[1]);
   configRollbackToVersion(target_version);
 }

@@ -7,6 +7,7 @@
 #include "system_constants.h"
 #include "safety_state_machine.h"
 #include "fault_logging.h"
+#include "firmware_version.h" // <-- NEW
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <string.h>
@@ -18,25 +19,29 @@ void taskLcdFunction(void* parameter) {
   logInfo("[LCD_TASK] Started on core 1");
   watchdogTaskAdd("LCD");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "LCD");
+  
+  // FIX: Dynamic Version for Splash Screen
+  char ver_str[FIRMWARE_VERSION_STRING_LEN];
+  firmwareGetVersionString(ver_str, sizeof(ver_str));
+  
+  lcdInterfacePrintLine(2, ver_str);
+  lcdInterfacePrintLine(3, "System Initializing");
+  lcdInterfaceUpdate();
 
   while (1) {
     uint32_t task_start = millis();
     
-    // 1. Read Current Encoder Positions 
     int32_t x_pos = motionGetPosition(0); 
     int32_t y_pos = motionGetPosition(1);
     int32_t z_pos = motionGetPosition(2);
     int32_t a_pos = motionGetPosition(3);
     
-    // 2. Update Axes Display (Line 1 & 2 - 10 Hz positional data)
     lcdInterfacePrintAxes(x_pos, y_pos, z_pos, a_pos);
     
-    // 3. Display Status Messages (Line 3 & 4 - System state/Faults)
     safety_fsm_state_t fsm_state = safetyGetState();
     safety_fault_t current_fault_code = safetyGetCurrentFault();
 
     if (fsm_state == FSM_EMERGENCY || fsm_state == FSM_ALARM) {
-        // FIX: Explicitly cast safety_fault_t to fault_code_t
         lcdInterfacePrintLine(2, "ALARM: MOTION HALTED");
         lcdInterfacePrintLine(3, faultCodeToString((fault_code_t)current_fault_code)); 
     } else if (motionIsMoving()) {
@@ -47,13 +52,9 @@ void taskLcdFunction(void* parameter) {
         lcdInterfacePrintLine(3, "INFO: System Ready");
     }
 
-    // 4. Push Updated Display Content to I2C Hardware
     lcdInterfaceUpdate(); 
     
-    // Update stats
-    
     watchdogFeed("LCD");
-    
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_LCD));
   }
 }

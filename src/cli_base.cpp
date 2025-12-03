@@ -4,41 +4,27 @@
 #include "memory_monitor.h"
 #include "task_manager.h"
 #include "system_utilities.h" 
-#include "firmware_version.h" 
+#include "firmware_version.h" // <-- Required
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
-
-// ============================================================================
-// CLI STATE DEFINITIONS
-// ============================================================================
 
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint16_t cli_pos = 0;
 static cli_command_t commands[CLI_MAX_COMMANDS];
 static int command_count = 0;
 
-// FIX: Static 2D array avoids heap fragmentation (No malloc)
 static char cli_history[CLI_HISTORY_SIZE][CLI_BUFFER_SIZE];
 static int history_index = 0;
-
-// ============================================================================
-// FORWARD DECLARATIONS
-// ============================================================================
 
 void cmd_help(int argc, char** argv);
 void cmd_system_info(int argc, char** argv);
 void cmd_system_reset(int argc, char** argv);
 
-// External functions
 extern void bootShowStatus();      
 extern void bootRebootSystem();    
 extern uint32_t taskGetUptime();   
-
-// ============================================================================
-// CORE CLI FUNCTIONS
-// ============================================================================
 
 void cliInit() {
   Serial.println("[CLI] Initializing...");
@@ -47,12 +33,10 @@ void cliInit() {
   cli_pos = 0;
   command_count = 0;
   
-  // Register core commands
   cliRegisterCommand("help", "Show help", cmd_help);
   cliRegisterCommand("info", "System information", cmd_system_info);
   cliRegisterCommand("reset", "System reset", cmd_system_reset);
   
-  // Register module commands
   cliRegisterConfigCommands();
   cliRegisterMotionCommands();
   cliRegisterDiagCommands();
@@ -72,7 +56,6 @@ void cliCleanup() {
 void cliUpdate() {
   while (Serial.available() > 0) {
     char c = Serial.read();
-    
     if (c == '\n' || c == '\r') {
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
@@ -86,9 +69,7 @@ void cliUpdate() {
     } else if (c == '\b' || c == 0x7F) {
       if (cli_pos > 0) {
         cli_pos--;
-        Serial.write('\b');
-        Serial.write(' ');
-        Serial.write('\b');
+        Serial.write('\b'); Serial.write(' '); Serial.write('\b');
       }
     } else if (c >= 32 && c < 127 && cli_pos < CLI_BUFFER_SIZE - 1) {
       cli_buffer[cli_pos++] = c;
@@ -115,14 +96,11 @@ void cliProcessCommand(const char* cmd) {
   
   if (argc == 0) return;
   
-  // Save to History
   if (history_index < CLI_HISTORY_SIZE) {
     strncpy(cli_history[history_index], cmd, CLI_BUFFER_SIZE - 1);
     cli_history[history_index][CLI_BUFFER_SIZE - 1] = '\0'; 
     history_index++;
   }
-  
-  // --- Custom Parsing for Multi-Word Commands ---
   
   // 1. "calibrate ppmm end"
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && strcmp(argv[1], "ppmm") == 0 && strcmp(argv[2], "end") == 0) {
@@ -134,7 +112,7 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 2. "calibrate speed X reset" / "calibrate ppmm X reset"
+  // 2. "calibrate speed X reset"
   if (argc >= 4 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0) && strcmp(argv[3], "reset") == 0) {
       if (axisCharToIndex(argv[2]) == 255) { 
           Serial.printf("[CLI] [ERR] Invalid axis: %s\n", argv[2]);
@@ -150,7 +128,7 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 3. "calibrate speed" / "calibrate ppmm"
+  // 3. "calibrate speed"
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0)) {
       if (axisCharToIndex(argv[2]) == 255) { 
           Serial.printf("[CLI] [ERR] Invalid axis: %s\n", argv[2]);
@@ -163,7 +141,7 @@ void cliProcessCommand(const char* cmd) {
               return;
             }
           }
-      } else { // ppmm
+      } else { 
           for (int i = 0; i < command_count; i++) {
             if (strcmp(commands[i].command, "calibrate ppmm") == 0) {
               commands[i].handler(argc, argv);
@@ -173,14 +151,13 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 4. Default Parsing
+  // 4. Default
   for (int i = 0; i < command_count; i++) {
     if (strcmp(commands[i].command, argv[0]) == 0) {
       commands[i].handler(argc, argv);
       return;
     }
   }
-  
   Serial.printf("[CLI] Unknown command: '%s'. Type 'help'.\n", argv[0]);
 }
 
@@ -194,7 +171,12 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
 }
 
 void cliPrintHelp() {
-  Serial.println("\n=== BISSO v4.2 Commands ===");
+  // FIX: Dynamic Banner
+  char ver_str[FIRMWARE_VERSION_STRING_LEN];
+  firmwareGetVersionString(ver_str, sizeof(ver_str));
+  
+  Serial.printf("\n=== %s Commands ===\n", ver_str);
+  
   for (int i = 0; i < command_count; i++) {
     Serial.print("  ");
     Serial.print(commands[i].command);
@@ -207,18 +189,11 @@ void cliPrintHelp() {
   Serial.println();
 }
 
-void cliPrintPrompt() {
-  Serial.print("> ");
-}
-
-// ============================================================================
-// LOCAL COMMAND IMPLEMENTATIONS
-// ============================================================================
+void cliPrintPrompt() { Serial.print("> "); }
 
 void cmd_system_info(int argc, char** argv) {
   char version_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(version_str, sizeof(version_str));
-  
   Serial.println("\n=== SYSTEM INFORMATION ===");
   Serial.printf("Firmware:  %s\n", version_str);
   Serial.printf("Platform:  ESP32-S3 (KC868-A16)\n");
@@ -231,6 +206,4 @@ void cmd_system_reset(int argc, char** argv) {
   bootRebootSystem(); 
 }
 
-void cmd_help(int argc, char** argv) {
-  cliPrintHelp();
-}
+void cmd_help(int argc, char** argv) { cliPrintHelp(); }

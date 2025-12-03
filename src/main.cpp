@@ -18,6 +18,7 @@
 #include "web_server.h"
 #include "boot_validation.h"
 #include "board_inputs.h" 
+#include "firmware_version.h" // <-- Ensure this is included
 
 static uint32_t boot_time_ms = 0;
 extern WebServerManager webServer;
@@ -66,8 +67,12 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   boot_time_ms = millis();
+
+  // FIX: Dynamic Version String
+  char ver_str[FIRMWARE_VERSION_STRING_LEN];
+  firmwareGetVersionString(ver_str, sizeof(ver_str));
   
-  Serial.println("\n=== BISSO v4.2 PRO FIRMWARE ===");
+  Serial.printf("\n=== %s PRO FIRMWARE ===\n", ver_str);
   
   bootValidationInit();
   
