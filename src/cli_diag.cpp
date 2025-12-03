@@ -27,43 +27,38 @@
 #include <time.h>
 #include <math.h>
 
-// Forward declarations for external functions
+// Forward declarations
 extern uint32_t taskGetUptime();
 extern void cmd_config_main(int argc, char** argv); // Defined in cli_config.cpp
 
-// Forward declarations for local handlers
+// Local handlers
 void debugEncodersHandler();
 void debugAllHandler();
 void debugConfigHandler();
 void cmd_diag_scheduler_main(int argc, char** argv);
 
 // ============================================================================
-// DEBUG MAIN DISPATCHER (THIS WAS MISSING IN PREVIOUS VERSION)
+// DEBUG MAIN DISPATCHER
 // ============================================================================
 void cmd_debug_main(int argc, char** argv) {
     if (argc < 2) {
         Serial.println("\n[DEBUG] === System Diagnostics Utility ===");
         Serial.println("[DEBUG] Usage: debug [target]");
         Serial.println("[DEBUG] Targets:");
-        Serial.println("  all      - Dump all core subsystems (WDT, Memory, Motion, PLC).");
-        Serial.println("  encoders - Display real-time encoder positions/age.");
-        Serial.println("  config   - Display current runtime configuration.");
+        Serial.println("  all      - Dump all core subsystems.");
+        Serial.println("  encoders - Display real-time encoder positions.");
+        Serial.println("  config   - Display current configuration.");
         return;
     }
 
-    if (strcmp(argv[1], "all") == 0) {
-        debugAllHandler();
-    } else if (strcmp(argv[1], "encoders") == 0) {
-        debugEncodersHandler();
-    } else if (strcmp(argv[1], "config") == 0) {
-        debugConfigHandler();
-    } else {
-        Serial.printf("[CLI] Error: Unknown debug target '%s'. Use 'debug' for help.\n", argv[1]);
-    }
+    if (strcmp(argv[1], "all") == 0) debugAllHandler();
+    else if (strcmp(argv[1], "encoders") == 0) debugEncodersHandler();
+    else if (strcmp(argv[1], "config") == 0) debugConfigHandler();
+    else Serial.printf("[CLI] Error: Unknown debug target '%s'.\n", argv[1]);
 }
 
 // ============================================================================
-// WDT / TASK CONSOLIDATED COMMAND HANDLERS
+// WDT / TASK CONSOLIDATED HANDLERS (Defined here to fix linker)
 // ============================================================================
 extern void watchdogShowStatus();
 extern void watchdogShowTasks();
@@ -77,61 +72,81 @@ void cmd_wdt_main(int argc, char** argv) {
     if (argc < 2) { 
         Serial.println("\n[WDT] === Watchdog Timer Diagnostics ===");
         Serial.println("[WDT] Usage: wdt [parameter]");
-        Serial.println("[WDT] Parameters:");
         Serial.println("  status  - Show current WDT status.");
         Serial.println("  tasks   - List monitored tasks.");
         Serial.println("  stats   - Display WDT statistics.");
         Serial.println("  report  - Display detailed report.");
         return;
     }
-
-    if (strcmp(argv[1], "status") == 0) {
-        watchdogShowStatus();
-    } else if (strcmp(argv[1], "tasks") == 0) {
-        watchdogShowTasks();
-    } else if (strcmp(argv[1], "stats") == 0) {
-        watchdogShowStats();
-    } else if (strcmp(argv[1], "report") == 0) {
-        watchdogPrintDetailedReport();
-    } else {
-        Serial.printf("[WDT] Error: Unknown parameter '%s'.\n", argv[1]);
-    }
+    if (strcmp(argv[1], "status") == 0) watchdogShowStatus();
+    else if (strcmp(argv[1], "tasks") == 0) watchdogShowTasks();
+    else if (strcmp(argv[1], "stats") == 0) watchdogShowStats();
+    else if (strcmp(argv[1], "report") == 0) watchdogPrintDetailedReport();
+    else Serial.printf("[WDT] Error: Unknown parameter '%s'.\n", argv[1]);
 }
 
 void cmd_task_main(int argc, char** argv) {
     if (argc < 2) { 
         Serial.println("\n[TASK] === FreeRTOS Task Monitoring ===");
         Serial.println("[TASK] Usage: task [parameter]");
-        Serial.println("[TASK] Parameters:");
         Serial.println("  stats   - Display run time stats.");
         Serial.println("  list    - List running tasks & stack.");
         Serial.println("  cpu     - Display CPU usage %.");
         return;
     }
-
-    if (strcmp(argv[1], "stats") == 0) {
-        taskShowStats();
-    } else if (strcmp(argv[1], "list") == 0) {
-        taskShowAllTasks();
-    } else if (strcmp(argv[1], "cpu") == 0) {
-        Serial.printf("[TASK] Total CPU Usage: %u%%\n", taskGetCpuUsage());
-    } else {
-        Serial.printf("[TASK] Error: Unknown parameter '%s'.\n", argv[1]);
-    }
+    if (strcmp(argv[1], "stats") == 0) taskShowStats();
+    else if (strcmp(argv[1], "list") == 0) taskShowAllTasks();
+    else if (strcmp(argv[1], "cpu") == 0) Serial.printf("[TASK] Total CPU Usage: %u%%\n", taskGetCpuUsage());
+    else Serial.printf("[TASK] Error: Unknown parameter '%s'.\n", argv[1]);
 }
 
 // ============================================================================
 // FAULT HANDLERS
 // ============================================================================
+static const char* formatTimestamp(uint32_t timestamp_ms) {
+    static char time_buffer[32];
+    time_t t = timestamp_ms / 1000;
+    struct tm *tm = localtime(&t);
+    strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", tm);
+    return time_buffer;
+}
+
 void cmd_faults_show(int argc, char** argv) { faultShowHistory(); }
-void cmd_faults_stats(int argc, char** argv); // Defined below
 void cmd_faults_clear(int argc, char** argv) { faultClearHistory(); }
+
+void cmd_faults_stats(int argc, char** argv) {
+    fault_stats_t stats = faultGetStats();
+    Serial.println("\n[FAULT] === Fault Statistics ===");
+    Serial.printf("Total: %lu | Encoder: %lu | Motion: %lu | Safety: %lu\n", 
+                  stats.total_faults, stats.encoder_faults, stats.motion_faults, stats.safety_faults);
+    if (stats.total_faults > 0) {
+        Serial.printf("Last Fault: %s\n", formatTimestamp(stats.last_fault_time_ms));
+    } else {
+        Serial.println("No faults recorded.");
+    }
+}
+
+void cmd_faults_main(int argc, char** argv) {
+    if (argc < 2) { 
+        Serial.println("\n[FAULTS] === Fault Log Management ===");
+        Serial.println("[FAULTS] Usage: faults [show | stats | clear]");
+        return;
+    }
+    if (strcmp(argv[1], "show") == 0) cmd_faults_show(argc, argv);
+    else if (strcmp(argv[1], "stats") == 0) cmd_faults_stats(argc, argv);
+    else if (strcmp(argv[1], "clear") == 0) cmd_faults_clear(argc, argv);
+    else Serial.printf("[FAULTS] Error: Unknown parameter '%s'.\n", argv[1]);
+}
+
+// ============================================================================
+// INDIVIDUAL DIAGNOSTICS
+// ============================================================================
 void cmd_timeout_diag(int argc, char** argv) { timeoutShowDiagnostics(); }
 void cmd_encoder_diag(int argc, char** argv) { encoderMotionDiagnostics(); }
 void cmd_encoder_baud_detect(int argc, char** argv) { encoderDetectBaudRate(); }
 
 // ============================================================================
-// ENCODER MAIN DISPATCHER
+// ENCODER MAIN
 // ============================================================================
 extern bool encoderSetBaudRate(uint32_t baud_rate);
 extern bool parseAndValidateInt(const char* str, int32_t* value, int32_t min, int32_t max);
@@ -143,22 +158,20 @@ void cmd_encoder_set_baud(int argc, char** argv) {
   }
   int32_t new_baud_rate_i32 = 0;
   if (!parseAndValidateInt(argv[1], &new_baud_rate_i32, 1200, 115200)) {
-    Serial.println("[CLI] ERROR: Invalid baud rate.");
+    Serial.println("[CLI] [ERR] Invalid baud rate.");
     return;
   }
   if (encoderSetBaudRate((uint32_t)new_baud_rate_i32)) {
-    Serial.printf("[CLI] ✅ Encoder baud rate set to %ld.\n", new_baud_rate_i32);
+    Serial.printf("[CLI] [OK] Encoder baud rate set to %ld.\n", new_baud_rate_i32);
   } else {
-    Serial.printf("[CLI] ❌ Failed to set encoder baud rate.\n");
+    Serial.printf("[CLI] [ERR] Failed to set encoder baud rate.\n");
   }
 }
 
 void cmd_encoder_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("\n[ENCODER] === WJ66 Encoder Management ===");
-        Serial.println("[ENCODER] Usage: encoder [command]");
-        Serial.println("  diag    - Display stats & position.");
-        Serial.println("  baud    - Auto-detect baud rate.");
+        Serial.println("\n[ENCODER] === WJ66 Management ===");
+        Serial.println("Usage: encoder [diag | baud]");
         return;
     }
     if (strcmp(argv[1], "diag") == 0) cmd_encoder_diag(argc, argv);
@@ -167,16 +180,14 @@ void cmd_encoder_main(int argc, char** argv) {
 }
 
 // ============================================================================
-// I2C MAIN DISPATCHER
+// I2C MAIN
 // ============================================================================
 void cmd_i2c_main(int argc, char** argv) {
     extern void i2cShowStats();
     extern void i2cRecoverBus();
     if (argc < 2) { 
-        Serial.println("\n[I2C] === I²C Bus Management ===");
-        Serial.println("[I2C] Usage: i2c [command]");
-        Serial.println("  diag    - Display transaction stats.");
-        Serial.println("  recover - Attempt soft bus recovery.");
+        Serial.println("\n[I2C] === I2C Bus Management ===");
+        Serial.println("Usage: i2c [diag | recover]");
         return;
     }
     if (strcmp(argv[1], "diag") == 0) i2cShowStats();
@@ -185,25 +196,7 @@ void cmd_i2c_main(int argc, char** argv) {
 }
 
 // ============================================================================
-// FAULTS MAIN DISPATCHER
-// ============================================================================
-void cmd_faults_main(int argc, char** argv) {
-    if (argc < 2) { 
-        Serial.println("\n[FAULTS] === Fault Log Management ===");
-        Serial.println("[FAULTS] Usage: faults [parameter]");
-        Serial.println("  show  - Display history.");
-        Serial.println("  stats - Display counts/timeline.");
-        Serial.println("  clear - Clear history.");
-        return;
-    }
-    if (strcmp(argv[1], "show") == 0) cmd_faults_show(argc, argv);
-    else if (strcmp(argv[1], "stats") == 0) cmd_faults_stats(argc, argv);
-    else if (strcmp(argv[1], "clear") == 0) cmd_faults_clear(argc, argv);
-    else Serial.printf("[FAULTS] Error: Unknown parameter '%s'.\n", argv[1]);
-}
-
-// ============================================================================
-// SCHEDULER DISPATCHER (WDT/TASK)
+// SCHEDULER DISPATCHER
 // ============================================================================
 void cmd_diag_scheduler_main(int argc, char** argv) {
     if (strcmp(argv[0], "wdt") == 0) cmd_wdt_main(argc, argv);
@@ -211,32 +204,10 @@ void cmd_diag_scheduler_main(int argc, char** argv) {
 }
 
 // ============================================================================
-// FAULT STATS IMPLEMENTATION
-// ============================================================================
-static const char* formatTimestamp(uint32_t timestamp_ms) {
-    static char time_buffer[32];
-    time_t t = timestamp_ms / 1000;
-    struct tm *tm = localtime(&t);
-    strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", tm);
-    return time_buffer;
-}
-
-void cmd_faults_stats(int argc, char** argv) {
-    fault_stats_t stats = faultGetStats();
-    Serial.println("[FAULT] === Statistics ===");
-    Serial.printf("Total: %lu | Encoder: %lu | Motion: %lu | Safety: %lu\n", 
-                  stats.total_faults, stats.encoder_faults, stats.motion_faults, stats.safety_faults);
-    if (stats.total_faults > 0) {
-        Serial.printf("Last Fault: %s\n", formatTimestamp(stats.last_fault_time_ms));
-    } else {
-        Serial.println("No faults recorded.");
-    }
-}
-
-// ============================================================================
-// DEBUG HANDLER IMPLEMENTATIONS
+// DEBUG IMPLEMENTATIONS
 // ============================================================================
 void debugEncodersHandler() {
+    extern int32_t motionGetPosition(uint8_t axis);
     Serial.println("[DEBUG] -- Encoder Status --");
     wj66Diagnostics();
 }
