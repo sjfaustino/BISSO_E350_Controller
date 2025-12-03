@@ -4,6 +4,7 @@
 #include "encoder_motion_integration.h"
 #include "system_constants.h"
 #include "serial_logger.h"
+#include "config_unified.h" // <-- NEW: Added to access configuration
 #include <Arduino.h>
 #include "safety_state_machine.h"
 #include <string.h>
@@ -37,18 +38,23 @@ void safetyUpdate() {
   if (now - last_stall_check > SAFETY_STALL_CHECK_INTERVAL_MS) {
     last_stall_check = now;
     
+    // FIX: Fetch configurable stall timeout from NVS (Default to 2000ms if not set)
+    // This resolves the inconsistency between CLI diagnostics and actual enforcement.
+    uint32_t stall_limit_ms = (uint32_t)configGetInt("stall_timeout_ms", SAFETY_MAX_STALL_TIME_MS);
+
     if (motionIsMoving()) {
         
         for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
             if (motionGetState(axis) == MOTION_EXECUTING) {
                 
+                // Use the retrieved stall_limit_ms instead of the hardcoded constant
                 if (encoderMotionHasError(axis) && 
-                    encoderMotionGetErrorDuration(axis) > SAFETY_MAX_STALL_TIME_MS) {
+                    encoderMotionGetErrorDuration(axis) > stall_limit_ms) {
                     
                     safetyReportStall(axis); 
                     
-                    logError("Stall detected on axis %d (Error duration: %lu ms)", 
-                             axis, SAFETY_MAX_STALL_TIME_MS);
+                    logError("Stall detected on axis %d (Error duration: %lu ms > Limit: %lu ms)", 
+                             axis, encoderMotionGetErrorDuration(axis), stall_limit_ms);
                 }
             }
         }
@@ -205,7 +211,6 @@ void safetyDiagnostics() {
       Serial.print("  [");
       Serial.print(i);
       Serial.print("] Fault: ");
-      // FIX: Use faultCodeToString for human-readable output
       Serial.println(faultCodeToString((fault_code_t)safety_state.fault_history[idx])); 
     }
   }
