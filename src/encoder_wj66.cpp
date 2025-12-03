@@ -1,7 +1,8 @@
 #include "encoder_wj66.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
-#include "encoder_comm_stats.h" // Needed for baud rate detection
+#include "encoder_comm_stats.h" 
+#include <Preferences.h> // <-- NEW: Required for NVS persistence
 
 struct {
   int32_t position[WJ66_AXES];
@@ -15,22 +16,80 @@ struct {
 void wj66Init() {
   Serial.println("[WJ66] Encoder system initializing...");
   
-  // *** FIX: Integrate Baud Rate Auto-Detection ***
-  Serial.println("[WJ66] Starting baud rate auto-detection...");
-  baud_detect_result_t result = encoderDetectBaudRate();
-  
-  uint32_t baud_rate = WJ66_BAUD; // Default to 9600
-  if (result.detected) {
-      baud_rate = result.baud_rate;
-      Serial.printf("[WJ66] Detected baud rate: %lu\n", baud_rate);
-  } else {
-      Serial.printf("[WJ66] WARNING: Auto-detection failed. Defaulting to %lu baud.\n", WJ66_BAUD);
-      faultLogWarning(FAULT_ENCODER_TIMEOUT, "WJ66 Baud rate auto-detection failed");
+  uint32_t final_baud_rate = WJ66_BAUD; // Default 9600
+  bool baud_confirmed = false;
+
+  // 1. Try to load saved baud rate from NVS
+  Preferences p;
+  p.begin("wj66_config", true); // Read-only mode
+  uint32_t saved_baud = p.getUInt("baud_rate", 0);
+  p.end();
+
+  if (saved_baud > 0) {
+      Serial.printf("[WJ66] Trying saved baud rate: %lu...\n", saved_baud);
+      
+      // Initialize Serial with saved rate
+      // Note: RX=14, TX=33 (Standard for this board/config)
+      Serial1.begin(saved_baud, SERIAL_8N1, 14, 33);
+      
+      // Verify communication by sending a standard query
+      // WJ66 usually responds to 0x01 0x00 (Read Axis 1) or similar depending on model.
+      // We use the generic stats command function which handles the framing.
+      uint8_t query_cmd[] = {0x01, 0x00}; 
+      
+      // Clear buffer first
+      while(Serial1.available()) Serial1.read();
+      
+      if (encoderSendCommandWithStats(query_cmd, 2)) {
+          // Attempt to read response with a short timeout
+          uint8_t dummy_buf[32];
+          if (encoderReadFrameWithStats(dummy_buf, 32, 200)) {
+              Serial.println("[WJ66] ✅ Saved baud rate verified successfully.");
+              final_baud_rate = saved_baud;
+              baud_confirmed = true;
+          } else {
+              Serial.println("[WJ66] ⚠️ Saved baud rate timed out.");
+          }
+      }
+      
+      if (!baud_confirmed) {
+          Serial.println("[WJ66] Saved rate failed. Closing port.");
+          Serial1.end();
+          delay(100);
+      }
   }
 
-  // Initialize Serial1 with the detected or default baud rate
-  Serial1.begin(baud_rate, SERIAL_8N1, 14, 33);
+  // 2. Fallback to Auto-Detection if saved rate failed or didn't exist
+  if (!baud_confirmed) {
+      Serial.println("[WJ66] Starting baud rate auto-detection...");
+      baud_detect_result_t result = encoderDetectBaudRate();
+      
+      if (result.detected) {
+          final_baud_rate = result.baud_rate;
+          Serial.printf("[WJ66] ✅ Auto-detected baud rate: %lu\n", final_baud_rate);
+          
+          // Save the new working rate to NVS
+          p.begin("wj66_config", false); // Read-write mode
+          p.putUInt("baud_rate", final_baud_rate);
+          p.end();
+          Serial.println("[WJ66] New baud rate saved to NVS.");
+      } else {
+          Serial.printf("[WJ66] ❌ Auto-detection failed. Defaulting to %lu baud.\n", WJ66_BAUD);
+          faultLogWarning(FAULT_ENCODER_TIMEOUT, "WJ66 Baud rate auto-detection failed");
+          // Initialize with default if detection failed (encoderDetectBaudRate might leave it closed)
+          Serial1.begin(WJ66_BAUD, SERIAL_8N1, 14, 33);
+      }
+  } else {
+      // Ensure stats module knows the current rate if we skipped detection
+      encoderSetBaudRate(final_baud_rate);
+  }
+
+  // Final confirmation of port state
+  if (!Serial1) {
+      Serial1.begin(final_baud_rate, SERIAL_8N1, 14, 33);
+  }
   
+  // Initialize state
   for (int i = 0; i < WJ66_AXES; i++) {
     wj66_state.position[i] = 0;
     wj66_state.last_read[i] = millis();
@@ -40,7 +99,8 @@ void wj66Init() {
   wj66_state.status = ENCODER_OK;
   wj66_state.error_count = 0;
   wj66_state.last_command_time = millis();
-  Serial.println("[WJ66] Encoder system ready");
+  
+  Serial.printf("[WJ66] Encoder system ready @ %lu baud\n", final_baud_rate);
 }
 
 /**
@@ -113,7 +173,7 @@ void wj66Update() {
           } else {
             logError("[WJ66] Invalid encoder values received (out of range)");
             wj66_state.status = ENCODER_CRC_ERROR;
-            // --- NEW FAULT LOGGING ---
+            // --- FAULT LOGGING ---
             faultLogEntry(FAULT_WARNING, FAULT_ENCODER_SPIKE, -1, values[0], 
                           "WJ66 value out of range (Example X=%ld)", values[0]);
             // -------------------------
@@ -121,7 +181,7 @@ void wj66Update() {
         } else {
           wj66_state.status = ENCODER_CRC_ERROR;
           wj66_state.error_count++;
-          // --- NEW FAULT LOGGING ---
+          // --- FAULT LOGGING ---
           faultLogEntry(FAULT_WARNING, FAULT_ENCODER_TIMEOUT, -1, commas, 
                         "WJ66 response missing values/commas (%d found)", commas);
           // -------------------------
@@ -142,7 +202,7 @@ void wj66Update() {
         buffer_idx = 0;
         memset(response_buffer, 0, sizeof(response_buffer));
         wj66_state.error_count++;
-        // --- NEW FAULT LOGGING ---
+        // --- FAULT LOGGING ---
         faultLogEntry(FAULT_WARNING, FAULT_ENCODER_TIMEOUT, -1, MAX_RESPONSE_LEN, 
                       "WJ66 buffer overflow (Max size %d)", MAX_RESPONSE_LEN);
         // -------------------------
@@ -155,7 +215,7 @@ void wj66Update() {
     if (wj66IsStale(i) && wj66_state.read_count[i] > 0) {
       wj66_state.status = ENCODER_TIMEOUT;
       wj66_state.error_count++;
-      // --- NEW FAULT LOGGING ---
+      // --- FAULT LOGGING ---
       faultLogEntry(FAULT_WARNING, FAULT_ENCODER_TIMEOUT, i, wj66GetAxisAge(i), 
                     "WJ66 Axis %d data stale/timeout (Age: %lu ms)", i, wj66GetAxisAge(i));
       // -------------------------
