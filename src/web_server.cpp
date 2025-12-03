@@ -5,6 +5,10 @@
 // Global instance
 WebServerManager webServer(80);
 
+// FIX: Static buffer for JSON responses to prevent Heap Fragmentation.
+// WEB_BUFFER_SIZE is defined in system_constants.h (typically 1024)
+static char json_response_buffer[WEB_BUFFER_SIZE];
+
 WebServerManager::WebServerManager(uint16_t port) : port(port), server(nullptr) {
     memset(&current_status, 0, sizeof(current_status));
     strcpy(current_status.status, "INITIALIZING");
@@ -72,11 +76,8 @@ void WebServerManager::serveFile(const char* filename, const char* contentType) 
 void WebServerManager::handleStatus() {
     if (!server) return;
     
-    String json = getStatusJSON();
-    server->send(200, "application/json", json);
-}
-
-String WebServerManager::getStatusJSON() {
+    // FIX: Using ArduinoJson v7 on the stack (it manages its own heap, but cleanly destructs).
+    // The critical fix is AVOIDING the "String" class for the output.
     JsonDocument doc;
     
     doc["status"] = current_status.status;
@@ -86,9 +87,10 @@ String WebServerManager::getStatusJSON() {
     doc["a_pos"] = current_status.a_pos;
     doc["uptime"] = current_status.uptime_sec;
     
-    String json;
-    serializeJson(doc, json);
-    return json;
+    // Serialize directly to the static buffer
+    serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
+    
+    server->send(200, "application/json", json_response_buffer);
 }
 
 void WebServerManager::handleJog() {
@@ -99,6 +101,8 @@ void WebServerManager::handleJog() {
         return;
     }
     
+    // Note: server->arg("plain") returns a String& reference from the library's internal buffer.
+    // We cannot easily avoid this allocation without changing the library, but it is less frequent than status polling.
     String body = server->arg("plain");
     JsonDocument doc;
     
@@ -184,9 +188,9 @@ void WebServerManager::handleJog() {
         response["z_pos"] = motionGetPosition(2) / 1000.0f;
         response["a_pos"] = motionGetPosition(3) / 1000.0f;
         
-        String json;
-        serializeJson(response, json);
-        server->send(200, "application/json", json);
+        // FIX: Serialize directly to static buffer
+        serializeJson(response, json_response_buffer, sizeof(json_response_buffer));
+        server->send(200, "application/json", json_response_buffer);
         
         Serial.println("[WEB-JOG] ✅ Motion command executed successfully");
     } 

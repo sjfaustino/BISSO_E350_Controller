@@ -5,6 +5,7 @@
 #include <WebServer.h>
 #include <SPIFFS.h>
 #include "config_unified.h"
+#include "system_constants.h" // Added for WEB_BUFFER_SIZE
 
 // Forward declarations
 class WebServer;
@@ -45,7 +46,7 @@ private:
     
     // Helper methods
     void serveFile(const char* filename, const char* contentType);
-    String getStatusJSON();
+    // Removed: String getStatusJSON(); (Replaced by direct buffer usage)
 };
 
 extern WebServerManager webServer;
