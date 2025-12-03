@@ -14,26 +14,24 @@
 // CLI STATE DEFINITIONS
 // ============================================================================
 
-// Local state variables use the canonical definitions from cli.h
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint16_t cli_pos = 0;
 static cli_command_t commands[CLI_MAX_COMMANDS];
 static int command_count = 0;
 
-// FIX: Changed from char*[] (pointers to heap) to static 2D array (BSS/Data segment)
-// This eliminates malloc() entirely from the CLI history logic.
-static char cli_history[CLI_HISTORY_SIZE][CLI_BUFFER_SIZE]; 
+// FIX: Static 2D array avoids heap fragmentation (No malloc)
+static char cli_history[CLI_HISTORY_SIZE][CLI_BUFFER_SIZE];
 static int history_index = 0;
 
 // ============================================================================
-// FORWARD DECLARATIONS (for local commands)
+// FORWARD DECLARATIONS
 // ============================================================================
 
 void cmd_help(int argc, char** argv);
 void cmd_system_info(int argc, char** argv);
 void cmd_system_reset(int argc, char** argv);
 
-// External functions needed
+// External functions
 extern void bootShowStatus();      
 extern void bootRebootSystem();    
 extern uint32_t taskGetUptime();   
@@ -43,12 +41,9 @@ extern uint32_t taskGetUptime();
 // ============================================================================
 
 void cliInit() {
-  Serial.println("[CLI] Command Line Interface initializing...");
+  Serial.println("[CLI] Initializing...");
   memset(cli_buffer, 0, sizeof(cli_buffer));
-  
-  // FIX: Clear static history buffer
   memset(cli_history, 0, sizeof(cli_history));
-  
   cli_pos = 0;
   command_count = 0;
   
@@ -57,25 +52,21 @@ void cliInit() {
   cliRegisterCommand("info", "System information", cmd_system_info);
   cliRegisterCommand("reset", "System reset", cmd_system_reset);
   
-  // Register commands from modular files 
+  // Register module commands
   cliRegisterConfigCommands();
   cliRegisterMotionCommands();
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
   cliRegisterWifiCommands(); 
   
-  Serial.print("[CLI] Registered ");
-  Serial.print(command_count);
-  Serial.println(" commands");
+  Serial.printf("[CLI] [OK] Ready (%d commands)\n", command_count);
   cliPrintPrompt();
 }
 
 void cliCleanup() {
-  // FIX: No free() required for static arrays.
-  // Just reset the index and clear memory to be safe.
   history_index = 0;
   memset(cli_history, 0, sizeof(cli_history));
-  logInfo("CLI: History cleared (Static buffer reset)");
+  logInfo("CLI: History cleared.");
 }
 
 void cliUpdate() {
@@ -85,7 +76,7 @@ void cliUpdate() {
     if (c == '\n' || c == '\r') {
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
-        Serial.println(); // Echo newline
+        Serial.println(); 
         cliProcessCommand(cli_buffer);
         cli_pos = 0;
       } else {
@@ -124,21 +115,16 @@ void cliProcessCommand(const char* cmd) {
   
   if (argc == 0) return;
   
-  // History management (FIX: Static Allocation)
+  // Save to History
   if (history_index < CLI_HISTORY_SIZE) {
-    // Store command in static array instead of malloc
-    // Using strncpy to prevent buffer overflows
     strncpy(cli_history[history_index], cmd, CLI_BUFFER_SIZE - 1);
-    cli_history[history_index][CLI_BUFFER_SIZE - 1] = '\0'; // Ensure null-termination
+    cli_history[history_index][CLI_BUFFER_SIZE - 1] = '\0'; 
     history_index++;
-  } else {
-    // Optional: Implement ring buffer logic here if desired later
-    // For now, we just stop recording when full, as per original logic logic
   }
   
-  // Custom multi-word command parsing logic to handle "calibrate speed X ..."
+  // --- Custom Parsing for Multi-Word Commands ---
   
-  // 1. Check for "calibrate ppmm end"
+  // 1. "calibrate ppmm end"
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && strcmp(argv[1], "ppmm") == 0 && strcmp(argv[2], "end") == 0) {
       for (int i = 0; i < command_count; i++) {
         if (strcmp(commands[i].command, "calibrate ppmm end") == 0) {
@@ -148,19 +134,14 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 2. Check for "calibrate speed X reset" and "calibrate ppmm X reset" (4 words total)
+  // 2. "calibrate speed X reset" / "calibrate ppmm X reset"
   if (argc >= 4 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0) && strcmp(argv[3], "reset") == 0) {
-      
-      // We must validate the axis argument before building the command string match
       if (axisCharToIndex(argv[2]) == 255) { 
-          Serial.print("[CLI] Error: Invalid axis argument: "); Serial.println(argv[2]);
+          Serial.printf("[CLI] [ERR] Invalid axis: %s\n", argv[2]);
           return;
       }
-      
       char full_cmd[32];
-      // Reconstruct the registered command string format
       snprintf(full_cmd, sizeof(full_cmd), "calibrate %s X reset", argv[1]);
-      
       for (int i = 0; i < command_count; i++) {
         if (strcmp(commands[i].command, full_cmd) == 0) {
           commands[i].handler(argc, argv);
@@ -169,14 +150,12 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 3. Check for 3-word commands like "calibrate speed" (followed by axis and distance/profile)
+  // 3. "calibrate speed" / "calibrate ppmm"
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0)) {
-      
       if (axisCharToIndex(argv[2]) == 255) { 
-          Serial.print("[CLI] Error: Invalid axis argument: "); Serial.println(argv[2]);
+          Serial.printf("[CLI] [ERR] Invalid axis: %s\n", argv[2]);
           return;
       }
-      
       if (strcmp(argv[1], "speed") == 0) {
           for (int i = 0; i < command_count; i++) {
             if (strcmp(commands[i].command, "calibrate speed") == 0) {
@@ -194,7 +173,7 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 4. Default parsing (for single-word commands like 'move', 'info', 'wifi', 'i2c')
+  // 4. Default Parsing
   for (int i = 0; i < command_count; i++) {
     if (strcmp(commands[i].command, argv[0]) == 0) {
       commands[i].handler(argc, argv);
@@ -202,43 +181,30 @@ void cliProcessCommand(const char* cmd) {
     }
   }
   
-  Serial.print("[CLI] Unknown command: ");
-  Serial.println(argv[0]);
-  Serial.println("[CLI] Type 'help' for available commands");
+  Serial.printf("[CLI] Unknown command: '%s'. Type 'help'.\n", argv[0]);
 }
 
 bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handler) {
-  if (command_count >= CLI_MAX_COMMANDS) {
-    return false;
-  }
-  
+  if (command_count >= CLI_MAX_COMMANDS) return false;
   commands[command_count].command = name;
   commands[command_count].help = help;
   commands[command_count].handler = handler;
   command_count++;
-  
   return true;
 }
 
 void cliPrintHelp() {
-  Serial.println("\n=== BISSO v4.2 Commands ===\n");
+  Serial.println("\n=== BISSO v4.2 Commands ===");
   for (int i = 0; i < command_count; i++) {
-    // Basic formatting for readability
     Serial.print("  ");
     Serial.print(commands[i].command);
-    
-    // Align help text
     int cmd_len = strlen(commands[i].command);
-    if (cmd_len < 20) {
-        for(int s=0; s < (20 - cmd_len); s++) Serial.print(" ");
-    } else {
-        Serial.print(" ");
-    }
-    
+    int padding = (cmd_len < 20) ? (20 - cmd_len) : 1;
+    for(int s=0; s < padding; s++) Serial.print(" ");
     Serial.print("- ");
     Serial.println(commands[i].help);
   }
-  Serial.println("");
+  Serial.println();
 }
 
 void cliPrintPrompt() {
@@ -253,21 +219,15 @@ void cmd_system_info(int argc, char** argv) {
   char version_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(version_str, sizeof(version_str));
   
-  Serial.println("\n=== System Information ===");
-  
-  Serial.print("Firmware: ");
-  Serial.println(version_str); 
-  
-  Serial.print("Platform: ESP32-S3 (KC868-A16)\n");
-  Serial.print("Uptime:   ");
-  Serial.print(taskGetUptime()); 
-  Serial.println(" seconds\n");
-  
+  Serial.println("\n=== SYSTEM INFORMATION ===");
+  Serial.printf("Firmware:  %s\n", version_str);
+  Serial.printf("Platform:  ESP32-S3 (KC868-A16)\n");
+  Serial.printf("Uptime:    %lu seconds\n", taskGetUptime());
   bootShowStatus();
 }
 
 void cmd_system_reset(int argc, char** argv) {
-  Serial.println("[CLI] System reset requested (software restart)...");
+  Serial.println("[CLI] System reset requested...");
   bootRebootSystem(); 
 }
 
