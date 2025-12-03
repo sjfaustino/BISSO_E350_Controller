@@ -7,7 +7,8 @@
 #include "task_manager.h"
 #include "safety.h"
 #include "encoder_calibration.h" 
-#include "encoder_wj66.h"        
+#include "encoder_wj66.h"
+#include "config_unified.h" // <-- NEW: Required for configGetInt
 #include <math.h> 
 #include <string.h>
 #include <stdlib.h> 
@@ -152,19 +153,50 @@ void motionUpdate() {
         break;
 
       case MOTION_EXECUTING:
-        // Check if target is reached
-        if ((active_start_position < axis->target_position && current_pos >= axis->target_position) ||
-            (active_start_position > axis->target_position && current_pos <= axis->target_position)) {
-          
-          axis->position = axis->target_position;
-          axis->state = MOTION_STOPPING;         
-          axis->state_entry_ms = now;
-          
-          motionSetPLCAxisDirection(255, false, false); // Stop movement
-          
-          axis->position_at_stop = current_pos;
+        {
+            // --- NEW: X-AXIS FINAL APPROACH LOGIC ---
+            if (active_axis == 0) { // Axis 0 = X
+                int32_t dist_to_target = abs(axis->target_position - current_pos);
+                
+                // 1. Get Configured Approach Distance (Default 50mm if not set)
+                int32_t approach_mm = configGetInt("x_approach_mm", 50);
+                
+                // 2. Get Calibrated Scale Factor for X
+                float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
+                
+                // 3. Convert mm to Encoder Counts
+                int32_t approach_counts = (int32_t)(approach_mm * scale_x);
+                
+                // 4. Check if we are in the zone, outside deadband, and not already slow
+                if (dist_to_target <= approach_counts && 
+                    dist_to_target > 100 && // Deadband (prevent jitter near target)
+                    axis->saved_speed_profile != SPEED_PROFILE_1) {
+                    
+                    logInfo("[MOTION] Axis X entering Final Approach (Dist: %ld counts). Downshifting to SLOW.", dist_to_target);
+                    
+                    // Apply Slow Profile immediately
+                    motionSetPLCSpeedProfile(SPEED_PROFILE_1);
+                    
+                    // Update state so we don't spam I2C writes
+                    axis->saved_speed_profile = SPEED_PROFILE_1;
+                }
+            }
+            // ----------------------------------------
 
-          logInfo("[MOTION] Axis %d reached target %d. Stopping.", active_axis, axis->target_position);
+            // Check if target is reached
+            if ((active_start_position < axis->target_position && current_pos >= axis->target_position) ||
+                (active_start_position > axis->target_position && current_pos <= axis->target_position)) {
+              
+              axis->position = axis->target_position;
+              axis->state = MOTION_STOPPING;         
+              axis->state_entry_ms = now;
+              
+              motionSetPLCAxisDirection(255, false, false); // Stop movement
+              
+              axis->position_at_stop = current_pos;
+
+              logInfo("[MOTION] Axis %d reached target %d. Stopping.", active_axis, axis->target_position);
+            }
         }
         break;
         
@@ -222,11 +254,10 @@ bool motionIsEmergencyStopped() {
   return !global_enabled;
 }
 
-// --- NEW: Active Axis Getter ---
+// --- Active Axis Getter ---
 uint8_t motionGetActiveAxis() {
   return active_axis;
 }
-// ------------------------------
 
 // --- DIAGNOSTICS & STATUS ---
 
@@ -246,7 +277,7 @@ void motionDiagnostics() {
     Serial.print(motionStateToString(axes[i].state));
     Serial.print(" | Pos: ");
     
-    // Scale factor fix for diagnostics (using the new constant for A-axis)
+    // Scale factor for diagnostics
     float scale = MOTION_POSITION_SCALE_FACTOR;
     if (i==0 && machineCal.X.pulses_per_mm > 0) scale = machineCal.X.pulses_per_mm;
     else if (i==1 && machineCal.Y.pulses_per_mm > 0) scale = machineCal.Y.pulses_per_mm;
