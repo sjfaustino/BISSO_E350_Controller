@@ -2,6 +2,7 @@
 #include "serial_logger.h"
 #include <Preferences.h>
 #include <string.h>
+#include <math.h> // Added for fabsf
 
 // NVS-backed persistent storage
 static Preferences prefs;
@@ -117,10 +118,20 @@ void configSetInt(const char* key, int32_t value) {
     config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
     config_table[idx].type = CONFIG_INT32;
   }
+
+  // --- FIX: Smart Write Protection (Flash Saver) ---
+  // If the key exists, is the correct type, and has the same value, do nothing.
+  if (config_table[idx].is_set && 
+      config_table[idx].type == CONFIG_INT32 && 
+      config_table[idx].value.int_val == value) {
+      return; // Value hasn't changed, ignore write
+  }
+  // -------------------------------------------------
   
   // Update in-memory cache
   config_table[idx].value.int_val = value;
   config_table[idx].is_set = true;
+  config_table[idx].type = CONFIG_INT32; // Ensure type is correct if reusing slot
   
   // Mark as dirty for batch write
   config_dirty = true;
@@ -171,9 +182,18 @@ void configSetFloat(const char* key, float value) {
     config_table[idx].type = CONFIG_FLOAT;
   }
   
+  // --- FIX: Smart Write Protection (Flash Saver) ---
+  if (config_table[idx].is_set && 
+      config_table[idx].type == CONFIG_FLOAT && 
+      fabsf(config_table[idx].value.float_val - value) < 0.0001f) {
+      return; // Value hasn't changed significantly, ignore write
+  }
+  // -------------------------------------------------
+
   // Update in-memory cache
   config_table[idx].value.float_val = value;
   config_table[idx].is_set = true;
+  config_table[idx].type = CONFIG_FLOAT;
   
   // Mark as dirty for batch write
   config_dirty = true;
@@ -256,10 +276,19 @@ void configSetString(const char* key, const char* value) {
     config_table[idx].type = CONFIG_STRING;
   }
   
+  // --- FIX: Smart Write Protection (Flash Saver) ---
+  if (config_table[idx].is_set && 
+      config_table[idx].type == CONFIG_STRING && 
+      strncmp(config_table[idx].value.str_val, value, CONFIG_VALUE_LEN) == 0) {
+      return; // Value hasn't changed
+  }
+  // -------------------------------------------------
+
   // Update in-memory cache
   strncpy(config_table[idx].value.str_val, value, CONFIG_VALUE_LEN - 1);
   config_table[idx].value.str_val[CONFIG_VALUE_LEN - 1] = '\0';
   config_table[idx].is_set = true;
+  config_table[idx].type = CONFIG_STRING;
   
   // Mark as dirty for batch write
   config_dirty = true;
@@ -312,7 +341,7 @@ void configUnifiedSave() {
     }
   }
   
-  // FIX: Explicitly end NVS session to ensure data is written to flash reliably
+  // Explicitly end NVS session to ensure data is written to flash reliably
   prefs.end(); 
   prefs.begin("bisso_config", false); // Restart session for continued use
 
