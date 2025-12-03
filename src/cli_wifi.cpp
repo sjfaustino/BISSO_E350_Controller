@@ -1,5 +1,6 @@
 #include "cli.h"
 #include "serial_logger.h"
+#include "watchdog_manager.h" // <-- NEW: Required for watchdogFeed
 #include <WiFi.h>
 #include <Arduino.h>
 
@@ -91,6 +92,10 @@ void cmd_wifi_connect(int argc, char** argv) {
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) { // 10 second timeout
         delay(500);
+        
+        // FIX: Feed watchdog to prevent reset during blocking delay
+        watchdogFeed("CLI"); 
+        
         Serial.print(".");
         attempts++;
     }
