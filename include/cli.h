@@ -18,7 +18,9 @@ typedef struct cli_command_t {
 } cli_command_t;
 
 
-// Main functions
+// ============================================================================
+// CORE CLI FUNCTIONS
+// ============================================================================
 void cliInit();
 void cliCleanup();
 void cliUpdate();
@@ -28,40 +30,46 @@ void cliPrintPrompt();
 bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handler);
 int cliGetCommandCount();
 
-// Registration functions for modular files
+// ============================================================================
+// MODULE REGISTRATION FUNCTIONS
+// ============================================================================
 void cliRegisterConfigCommands();
 void cliRegisterMotionCommands();
 void cliRegisterDiagCommands();
 void cliRegisterCalibCommands();
+void cliRegisterWifiCommands(); 
 
-// --- General Command Prototypes (Implemented in cli_base.cpp) ---
+// ============================================================================
+// COMMAND HANDLER PROTOTYPES
+// ============================================================================
+
+// --- General / System (cli_base.cpp) ---
 void cmd_system_info(int argc, char** argv);
 void cmd_system_reset(int argc, char** argv);
 void cmd_help(int argc, char** argv);
 
-// --- E-Stop Command Prototypes (Implemented in cli_motion.cpp) ---
+// --- Motion / Safety (cli_motion.cpp) ---
+// Note: Standard move commands are typically local to cli_motion.cpp
 void cmd_estop_status(int argc, char** argv);
 void cmd_estop_on(int argc, char** argv);
 void cmd_estop_off(int argc, char** argv);
 
-// --- Diagnostic Command Prototypes (Implemented in cli_diag.cpp) ---
-void cmd_debug_main(int argc, char** argv); 
-void cmd_faults_show(int argc, char** argv);
-void cmd_faults_stats(int argc, char** argv); 
-void cmd_faults_clear(int argc, char** argv); 
+// --- Diagnostics & Hardware (cli_diag.cpp) ---
+// Consolidated Dispatchers
+void cmd_faults_main(int argc, char** argv);        // 'faults' command
+void cmd_i2c_main(int argc, char** argv);           // 'i2c' command
+void cmd_encoder_main(int argc, char** argv);       // 'encoder' command
+void cmd_debug_main(int argc, char** argv);         // 'debug' command
+void cmd_diag_scheduler_main(int argc, char** argv);// 'wdt' and 'task' dispatcher
+
+// Standalone Diagnostic Commands
 void cmd_timeout_diag(int argc, char** argv);
-void cmd_i2c_diag(int argc, char** argv);
-void cmd_i2c_recover(int argc, char** argv);
-void cmd_encoder_diag(int argc, char** argv);
-void cmd_encoder_baud_detect(int argc, char** argv);
-void cmd_wdt_main(int argc, char** argv); 
-void cmd_task_main(int argc, char** argv); 
+void cmd_encoder_set_baud(int argc, char** argv);
 
-// --- Configuration Diagnostic Prototypes (Implemented in cli_config.cpp, referenced in cli_diag.cpp) ---
-void cmd_config_main(int argc, char** argv); // NEW: Consolidated Config Dispatcher
+// --- Configuration (cli_config.cpp) ---
+void cmd_config_main(int argc, char** argv);        // 'config' command
 
-void cmd_config_show(int argc, char** argv);
-void cmd_config_reset(int argc, char** argv);
-void cmd_config_save(int argc, char** argv);
+// --- Network (cli_wifi.cpp) ---
+void cmd_wifi_main(int argc, char** argv);          // 'wifi' command
 
-#endif
+#endif // CLI_H

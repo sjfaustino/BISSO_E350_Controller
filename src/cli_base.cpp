@@ -4,7 +4,7 @@
 #include "memory_monitor.h"
 #include "task_manager.h"
 #include "system_utilities.h" // Canonical Axis Utilities (axisCharToIndex)
-#include "firmware_version.h" // New: Firmware version string
+#include "firmware_version.h" // Firmware version string
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -12,10 +12,8 @@
 
 // ============================================================================
 // CLI STATE DEFINITIONS
-// NOTE: Macros for buffer/arg/history size are now defined only in cli.h
 // ============================================================================
 
-// Local state variables use the canonical definitions from cli.h
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint16_t cli_pos = 0;
 static cli_command_t commands[CLI_MAX_COMMANDS];
@@ -31,19 +29,10 @@ void cmd_help(int argc, char** argv);
 void cmd_system_info(int argc, char** argv);
 void cmd_system_reset(int argc, char** argv);
 
-// External functions needed (defined in other modules):
+// External functions needed
 extern void bootShowStatus();      
 extern void bootRebootSystem();    
 extern uint32_t taskGetUptime();   
-
-
-// ============================================================================
-// UTILITY FUNCTION (REMOVED: Now located in system_utilities.cpp)
-// ============================================================================
-
-// The logic for parse_axis_arg was moved to system_utilities.cpp 
-// and is now accessed via system_utilities.h as axisCharToIndex.
-
 
 // ============================================================================
 // CORE CLI FUNCTIONS
@@ -65,6 +54,7 @@ void cliInit() {
   cliRegisterMotionCommands();
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
+  cliRegisterWifiCommands(); // <-- NEW: Register WiFi module
   
   Serial.print("[CLI] Registered ");
   Serial.print(command_count);
@@ -90,8 +80,11 @@ void cliUpdate() {
     if (c == '\n' || c == '\r') {
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
+        Serial.println(); // Echo newline
         cliProcessCommand(cli_buffer);
         cli_pos = 0;
+      } else {
+        Serial.println();
       }
       cliPrintPrompt();
     } else if (c == '\b' || c == 0x7F) {
@@ -126,18 +119,17 @@ void cliProcessCommand(const char* cmd) {
   
   if (argc == 0) return;
   
+  // History management
   if (history_index < CLI_HISTORY_SIZE) {
     char* history_entry = (char*)malloc(strlen(cmd) + 1);
     if (history_entry) {
       strcpy(history_entry, cmd);
       cli_history[history_index++] = history_entry;
-    } else {
-      logWarning("CLI: Failed to allocate history entry");
-      // Continue execution
     }
   }
   
-  // Custom multi-word command parsing logic: Check for the longest possible match first
+  // Custom multi-word command parsing logic to handle "calibrate speed X ..."
+  // This checks for the longest possible match first.
   
   // 1. Check for "calibrate ppmm end"
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && strcmp(argv[1], "ppmm") == 0 && strcmp(argv[2], "end") == 0) {
@@ -152,15 +144,14 @@ void cliProcessCommand(const char* cmd) {
   // 2. Check for "calibrate speed X reset" and "calibrate ppmm X reset" (4 words total)
   if (argc >= 4 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0) && strcmp(argv[3], "reset") == 0) {
       
-      // We must validate the axis argument before building the command string
-      if (axisCharToIndex(argv[2]) == 255) { // <-- USES NEW CANONICAL UTILITY
+      // We must validate the axis argument before building the command string match
+      if (axisCharToIndex(argv[2]) == 255) { 
           Serial.print("[CLI] Error: Invalid axis argument: "); Serial.println(argv[2]);
           return;
       }
       
       char full_cmd[32];
-      // Note: The registered command string should ideally not contain 'X', but use a token placeholder.
-      // Assuming for now the registered command is "calibrate speed X reset" and we match on the structure.
+      // Reconstruct the registered command string format
       snprintf(full_cmd, sizeof(full_cmd), "calibrate %s X reset", argv[1]);
       
       for (int i = 0; i < command_count; i++) {
@@ -174,8 +165,7 @@ void cliProcessCommand(const char* cmd) {
   // 3. Check for 3-word commands like "calibrate speed" (followed by axis and distance/profile)
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0)) {
       
-      // We must validate the axis argument before calling the handler
-      if (axisCharToIndex(argv[2]) == 255) { // <-- USES NEW CANONICAL UTILITY
+      if (axisCharToIndex(argv[2]) == 255) { 
           Serial.print("[CLI] Error: Invalid axis argument: "); Serial.println(argv[2]);
           return;
       }
@@ -197,7 +187,7 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 4. Default parsing (for single-word commands like 'move', 'info')
+  // 4. Default parsing (for single-word commands like 'move', 'info', 'wifi', 'i2c')
   for (int i = 0; i < command_count; i++) {
     if (strcmp(commands[i].command, argv[0]) == 0) {
       commands[i].handler(argc, argv);
@@ -226,9 +216,19 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
 void cliPrintHelp() {
   Serial.println("\n=== BISSO v4.2 Commands ===\n");
   for (int i = 0; i < command_count; i++) {
+    // Basic formatting for readability
     Serial.print("  ");
     Serial.print(commands[i].command);
-    Serial.print(" - ");
+    
+    // Align help text
+    int cmd_len = strlen(commands[i].command);
+    if (cmd_len < 20) {
+        for(int s=0; s < (20 - cmd_len); s++) Serial.print(" ");
+    } else {
+        Serial.print(" ");
+    }
+    
+    Serial.print("- ");
     Serial.println(commands[i].help);
   }
   Serial.println("");
@@ -238,19 +238,21 @@ void cliPrintPrompt() {
   Serial.print("> ");
 }
 
-// Local command implementations
+// ============================================================================
+// LOCAL COMMAND IMPLEMENTATIONS
+// ============================================================================
+
 void cmd_system_info(int argc, char** argv) {
   char version_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(version_str, sizeof(version_str));
   
   Serial.println("\n=== System Information ===");
   
-  // Display the new versioning system
   Serial.print("Firmware: ");
-  Serial.println(version_str); // e.g., "Gemini v1.0.0"
+  Serial.println(version_str); 
   
-  Serial.print("Platform: ESP32-S3\n");
-  Serial.print("Uptime: ");
+  Serial.print("Platform: ESP32-S3 (KC868-A16)\n");
+  Serial.print("Uptime:   ");
   Serial.print(taskGetUptime()); 
   Serial.println(" seconds\n");
   
@@ -258,7 +260,7 @@ void cmd_system_info(int argc, char** argv) {
 }
 
 void cmd_system_reset(int argc, char** argv) {
-  Serial.println("[CLI] System reset requested (software restart)");
+  Serial.println("[CLI] System reset requested (software restart)...");
   bootRebootSystem(); 
 }
 
