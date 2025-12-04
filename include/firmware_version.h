@@ -2,18 +2,16 @@
 #define FIRMWARE_VERSION_H
 
 #include <stdint.h>
-#include <stddef.h> // FIX 1: Added for size_t definition
+#include <stddef.h> 
 
-// --- Project Codename ---
+// --- Project Identity ---
 #define FIRMWARE_CODENAME           "Gemini"
-
-// --- Version Components ---
 #define FIRMWARE_VERSION_MAJOR      1
-#define FIRMWARE_VERSION_MINOR      0 // FIX 2: Corrected typo from FIRTWARE_VERSION_MINOR
+#define FIRMWARE_VERSION_MINOR      0 
 #define FIRMWARE_VERSION_PATCH      0
 
 // --- String Representation ---
-#define FIRMWARE_VERSION_STRING_LEN 16
+#define FIRMWARE_VERSION_STRING_LEN 32 // Increased to allow for longer codenames/build info
 
 /**
  * @brief Get the full firmware version string (e.g., "Gemini v1.0.0").

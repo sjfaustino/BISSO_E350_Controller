@@ -4,7 +4,7 @@
 #include "encoder_motion_integration.h"
 #include "system_constants.h"
 #include "serial_logger.h"
-#include "config_unified.h" // <-- NEW: Added to access configuration
+#include "config_unified.h" 
 #include <Arduino.h>
 #include "safety_state_machine.h"
 #include <string.h>
@@ -15,7 +15,7 @@ static uint32_t alarm_trigger_time = 0;
 static uint32_t last_stall_check = 0;
 
 void safetyInit() {
-  Serial.println("[SAFETY] Safety system initializing...");
+  Serial.println("[SAFETY] Initializing...");
   pinMode(SAFETY_ALARM_PIN, OUTPUT);
   digitalWrite(SAFETY_ALARM_PIN, LOW);
   
@@ -27,9 +27,7 @@ void safetyInit() {
   memset(safety_state.fault_message, 0, sizeof(safety_state.fault_message));
   memset(safety_state.fault_history, 0, sizeof(safety_state.fault_history));
   
-  Serial.print("[SAFETY] Alarm pin set to GPIO ");
-  Serial.println(SAFETY_ALARM_PIN);
-  Serial.println("[SAFETY] Safety system ready");
+  Serial.printf("[SAFETY] [OK] Alarm Pin: GPIO %d\n", SAFETY_ALARM_PIN);
 }
 
 void safetyUpdate() {
@@ -38,22 +36,18 @@ void safetyUpdate() {
   if (now - last_stall_check > SAFETY_STALL_CHECK_INTERVAL_MS) {
     last_stall_check = now;
     
-    // FIX: Fetch configurable stall timeout from NVS (Default to 2000ms if not set)
-    // This resolves the inconsistency between CLI diagnostics and actual enforcement.
+    // Fetch configurable stall timeout (Default 2000ms)
     uint32_t stall_limit_ms = (uint32_t)configGetInt("stall_timeout_ms", SAFETY_MAX_STALL_TIME_MS);
 
     if (motionIsMoving()) {
-        
         for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
             if (motionGetState(axis) == MOTION_EXECUTING) {
-                
-                // Use the retrieved stall_limit_ms instead of the hardcoded constant
                 if (encoderMotionHasError(axis) && 
                     encoderMotionGetErrorDuration(axis) > stall_limit_ms) {
                     
                     safetyReportStall(axis); 
                     
-                    logError("Stall detected on axis %d (Error duration: %lu ms > Limit: %lu ms)", 
+                    logError("[SAFETY] [FAIL] Stall Axis %d (Dur: %lu ms > Limit: %lu ms)", 
                              axis, encoderMotionGetErrorDuration(axis), stall_limit_ms);
                 }
             }
@@ -72,9 +66,7 @@ bool safetyCheckMotionAllowed(uint8_t axis) {
 }
 
 void safetyTriggerAlarm(const char* reason) {
-  if (alarm_active) {
-    return;
-  }
+  if (alarm_active) return;
   
   alarm_active = true;
   alarm_trigger_time = millis();
@@ -88,37 +80,29 @@ void safetyTriggerAlarm(const char* reason) {
   
   digitalWrite(SAFETY_ALARM_PIN, HIGH);
   
-  Serial.print("[SAFETY] *** ALARM TRIGGERED: ");
-  Serial.println(reason);
-  Serial.print("[SAFETY] Fault count: ");
-  Serial.println(safety_state.fault_count);
+  Serial.printf("[SAFETY] [ALARM] Triggered: %s\n", reason);
+  Serial.printf("[SAFETY] Fault Count: %lu\n", safety_state.fault_count);
   
   motionEmergencyStop();
 }
 
 void safetyResetAlarm() {
-  if (!alarm_active) {
-    return;
-  }
+  if (!alarm_active) return;
   
   alarm_active = false;
   digitalWrite(SAFETY_ALARM_PIN, LOW);
   safety_state.current_fault = SAFETY_OK;
   safety_state.fault_duration_ms = millis() - alarm_trigger_time;
   
-  Serial.print("[SAFETY] Alarm reset (duration: ");
-  Serial.print(safety_state.fault_duration_ms);
-  Serial.println(" ms)");
+  Serial.printf("[SAFETY] [OK] Alarm reset (Duration: %lu ms)\n", safety_state.fault_duration_ms);
 }
 
 void safetyReportStall(uint8_t axis) {
   if (axis < MOTION_AXES) {
     safety_state.current_fault = SAFETY_STALLED;
     char msg[64];
-    snprintf(msg, sizeof(msg), "STALL on axis %d", axis);
-    // --- NEW FAULT LOGGING ---
-    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0, "Motion stall detected on Axis %d", axis);
-    // -------------------------
+    snprintf(msg, sizeof(msg), "STALL Axis %d", axis);
+    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0, "Motion stall detected");
     safetyTriggerAlarm(msg);
   }
 }
@@ -127,10 +111,8 @@ void safetyReportSoftLimit(uint8_t axis) {
   if (axis < MOTION_AXES) {
     safety_state.current_fault = SAFETY_SOFT_LIMIT;
     char msg[64];
-    snprintf(msg, sizeof(msg), "SOFT_LIMIT on axis %d", axis);
-    // --- NEW FAULT LOGGING ---
-    faultLogEntry(FAULT_ERROR, FAULT_SOFT_LIMIT_EXCEEDED, axis, 0, "Soft limit reached on Axis %d", axis);
-    // -------------------------
+    snprintf(msg, sizeof(msg), "LIMIT Axis %d", axis);
+    faultLogEntry(FAULT_ERROR, FAULT_SOFT_LIMIT_EXCEEDED, axis, 0, "Soft limit reached");
     safetyTriggerAlarm(msg);
   }
 }
@@ -139,10 +121,8 @@ void safetyReportEncoderError(uint8_t axis) {
   if (axis < MOTION_AXES) {
     safety_state.current_fault = SAFETY_ENCODER_ERROR;
     char msg[64];
-    snprintf(msg, sizeof(msg), "ENCODER_ERROR on axis %d", axis);
-    // --- NEW FAULT LOGGING ---
-    faultLogEntry(FAULT_ERROR, FAULT_ENCODER_TIMEOUT, axis, 0, "Encoder communication failure on Axis %d", axis);
-    // -------------------------
+    snprintf(msg, sizeof(msg), "ENC_ERR Axis %d", axis);
+    faultLogEntry(FAULT_ERROR, FAULT_ENCODER_TIMEOUT, axis, 0, "Encoder comm failure");
     safetyTriggerAlarm(msg);
   }
 }
@@ -150,68 +130,43 @@ void safetyReportEncoderError(uint8_t axis) {
 void safetyReportPLCFault() {
   safety_state.current_fault = SAFETY_PLC_FAULT;
   safetyTriggerAlarm("PLC_FAULT");
-  // --- NEW FAULT LOGGING ---
-  faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, -1, 0, "PLC Consensus/Comm failure detected");
-  // -------------------------
+  faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, -1, 0, "PLC Consensus Failure");
 }
 
-safety_fault_t safetyGetCurrentFault() {
-  return safety_state.current_fault;
-}
-
-bool safetyIsAlarmed() {
-  return alarm_active;
-}
-
+safety_fault_t safetyGetCurrentFault() { return safety_state.current_fault; }
+bool safetyIsAlarmed() { return alarm_active; }
 uint32_t safetyGetAlarmDuration() {
-  if (alarm_active) {
-    return millis() - alarm_trigger_time;
-  }
-  return safety_state.fault_duration_ms;
+  return alarm_active ? (millis() - alarm_trigger_time) : safety_state.fault_duration_ms;
 }
 
 void safetyDiagnostics() {
-  Serial.println("\n[SAFETY] === Safety System Diagnostics ===");
-  Serial.print("Alarm Status: ");
-  Serial.println(alarm_active ? "ACTIVE" : "INACTIVE");
+  Serial.println("\n[SAFETY] === Diagnostics ===");
+  Serial.printf("Status: %s\n", alarm_active ? "[ALARM]" : "[OK]");
   
-  Serial.print("Current Fault: ");
+  const char* faultStr = "UNKNOWN";
   switch(safety_state.current_fault) {
-    case SAFETY_OK: Serial.println("NONE"); break;
-    case SAFETY_STALLED: Serial.println("STALLED"); break;
-    case SAFETY_SOFT_LIMIT: Serial.println("SOFT_LIMIT"); break;
-    case SAFETY_PLC_FAULT: Serial.println("PLC_FAULT"); break;
-    case SAFETY_THERMAL: Serial.println("THERMAL"); break;
-    case SAFETY_ALARM: Serial.println("ALARM"); break;
-    case SAFETY_ENCODER_ERROR: Serial.println("ENCODER_ERROR"); break;
-    default: Serial.println("UNKNOWN");
+    case SAFETY_OK: faultStr = "NONE"; break;
+    case SAFETY_STALLED: faultStr = "STALLED"; break;
+    case SAFETY_SOFT_LIMIT: faultStr = "SOFT_LIMIT"; break;
+    case SAFETY_PLC_FAULT: faultStr = "PLC_FAULT"; break;
+    case SAFETY_THERMAL: faultStr = "THERMAL"; break;
+    case SAFETY_ALARM: faultStr = "ALARM"; break;
+    case SAFETY_ENCODER_ERROR: faultStr = "ENCODER_ERROR"; break;
   }
-  
-  Serial.print("Alarm Pin (GPIO ");
-  Serial.print(SAFETY_ALARM_PIN);
-  Serial.print("): ");
-  Serial.println(digitalRead(SAFETY_ALARM_PIN) ? "HIGH" : "LOW");
-  
-  Serial.print("Total Faults: ");
-  Serial.println(safety_state.fault_count);
-  
-  Serial.print("Last Fault Message: ");
-  Serial.println(safety_state.fault_message);
+  Serial.printf("Current Fault: %s\n", faultStr);
+  Serial.printf("GPIO State: %s\n", digitalRead(SAFETY_ALARM_PIN) ? "HIGH" : "LOW");
+  Serial.printf("Count: %lu\n", safety_state.fault_count);
+  Serial.printf("Last Msg: %s\n", safety_state.fault_message);
   
   if (alarm_active) {
-    Serial.print("Alarm Duration: ");
-    Serial.print(safetyGetAlarmDuration());
-    Serial.println(" ms");
+    Serial.printf("Duration: %lu ms\n", safetyGetAlarmDuration());
   }
   
-  Serial.println("\nRecent Fault History (Last 16 Events):");
+  Serial.println("\nHistory (Last 16):");
   for (int i = 0; i < SAFETY_FAULT_HISTORY_SIZE; i++) {
     int idx = (safety_state.history_index + i) % SAFETY_FAULT_HISTORY_SIZE;
     if (safety_state.fault_history[idx] != SAFETY_OK) {
-      Serial.print("  [");
-      Serial.print(i);
-      Serial.print("] Fault: ");
-      Serial.println(faultCodeToString((fault_code_t)safety_state.fault_history[idx])); 
+      Serial.printf("  [%d] %s\n", i, faultCodeToString((fault_code_t)safety_state.fault_history[idx])); 
     }
   }
 }
