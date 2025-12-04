@@ -1,6 +1,7 @@
 #include "system_utilities.h"
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
 
 char axisIndexToChar(uint8_t index) {
     switch(index) {
