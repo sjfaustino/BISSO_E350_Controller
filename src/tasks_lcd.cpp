@@ -7,20 +7,18 @@
 #include "system_constants.h"
 #include "safety_state_machine.h"
 #include "fault_logging.h"
-#include "firmware_version.h" // <-- NEW
+#include "firmware_version.h" 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <string.h>
 
-// The external task function body
 void taskLcdFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
   
-  logInfo("[LCD_TASK] Started on core 1");
+  logInfo("[LCD_TASK] [OK] Started on core 1");
   watchdogTaskAdd("LCD");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "LCD");
   
-  // FIX: Dynamic Version for Splash Screen
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(ver_str, sizeof(ver_str));
   
@@ -29,8 +27,6 @@ void taskLcdFunction(void* parameter) {
   lcdInterfaceUpdate();
 
   while (1) {
-    uint32_t task_start = millis();
-    
     int32_t x_pos = motionGetPosition(0); 
     int32_t y_pos = motionGetPosition(1);
     int32_t z_pos = motionGetPosition(2);
@@ -53,7 +49,6 @@ void taskLcdFunction(void* parameter) {
     }
 
     lcdInterfaceUpdate(); 
-    
     watchdogFeed("LCD");
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_LCD));
   }

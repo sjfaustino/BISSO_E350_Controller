@@ -7,14 +7,11 @@
 #include <freertos/task.h>
 #include <string.h>
 
-// The external task function body
 void taskMotionFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
   
-  logInfo("[MOTION_TASK] Started on core 1");
+  logInfo("[MOTION_TASK] [OK] Started on core 1");
   watchdogTaskAdd("Motion");
-  
-  // FIX: Use xTaskGetCurrentTaskHandle() to get and subscribe the handle
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Motion");
 
   while (1) {
@@ -41,10 +38,7 @@ void taskMotionFunction(void* parameter) {
       }
     }
     
-    // Update stats
-    
     watchdogFeed("Motion");
-    
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_MOTION));
   }
 }
