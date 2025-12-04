@@ -1,5 +1,6 @@
 #include "config_unified.h"
 #include "serial_logger.h"
+#include "config_keys.h" 
 #include <Preferences.h>
 #include <string.h>
 #include <math.h> 
@@ -14,13 +15,14 @@ static int config_count = 0;
 static uint32_t last_nvs_save = 0;
 static bool config_dirty = false;
 
+// Critical keys that should save immediately
 static const char* critical_keys[] = {
-  "calibration_x", "calibration_y", "calibration_z", "calibration_a",
-  "emergency_stop", "safety_enabled",
-  "x_soft_limit_min", "x_soft_limit_max",
-  "y_soft_limit_min", "y_soft_limit_max",
-  "z_soft_limit_min", "z_soft_limit_max",
-  "a_soft_limit_min", "a_soft_limit_max"
+  KEY_PPM_X, KEY_PPM_Y, KEY_PPM_Z, KEY_PPM_A,
+  KEY_X_LIMIT_MIN, KEY_X_LIMIT_MAX,
+  KEY_Y_LIMIT_MIN, KEY_Y_LIMIT_MAX,
+  KEY_Z_LIMIT_MIN, KEY_Z_LIMIT_MAX,
+  KEY_A_LIMIT_MIN, KEY_A_LIMIT_MAX,
+  KEY_STALL_TIMEOUT, KEY_ALARM_PIN
 };
 
 static bool isCriticalKey(const char* key) {
@@ -212,18 +214,27 @@ void configUnifiedLoad() {
 
 void configUnifiedReset() {
   Serial.print("[CONFIG] Resetting defaults... ");
-  configSetInt("x_soft_limit_min", -500000); configSetInt("x_soft_limit_max", 500000);
-  configSetInt("y_soft_limit_min", -300000); configSetInt("y_soft_limit_max", 300000);
-  configSetInt("z_soft_limit_min", -50000);  configSetInt("z_soft_limit_max", 150000);
-  configSetInt("a_soft_limit_min", -45000);  configSetInt("a_soft_limit_max", 45000);
-  configSetFloat("default_speed_mm_s", 15.0f); 
-  configSetFloat("default_acceleration", 5.0f);
-  configSetInt("encoder_ppm_x", 1000); configSetInt("encoder_ppm_y", 1000);
-  configSetInt("encoder_ppm_z", 1000); configSetInt("encoder_ppm_a", 1000); 
-  configSetInt("alarm_pin", 2);
-  configSetInt("stall_timeout_ms", 2000);
-  configSetFloat("speed_X_mm_s", 0.0f); configSetFloat("speed_Y_mm_s", 0.0f);
-  configSetFloat("speed_Z_mm_s", 0.0f); configSetFloat("speed_A_mm_s", 0.0f);
+  
+  configSetInt(KEY_X_LIMIT_MIN, -500000); configSetInt(KEY_X_LIMIT_MAX, 500000);
+  configSetInt(KEY_Y_LIMIT_MIN, -300000); configSetInt(KEY_Y_LIMIT_MAX, 300000);
+  configSetInt(KEY_Z_LIMIT_MIN, -50000);  configSetInt(KEY_Z_LIMIT_MAX, 150000);
+  configSetInt(KEY_A_LIMIT_MIN, -45000);  configSetInt(KEY_A_LIMIT_MAX, 45000);
+  
+  configSetFloat(KEY_DEFAULT_SPEED, 15.0f); 
+  configSetFloat(KEY_DEFAULT_ACCEL, 5.0f);
+  
+  configSetInt(KEY_PPM_X, 1000); configSetInt(KEY_PPM_Y, 1000);
+  configSetInt(KEY_PPM_Z, 1000); configSetInt(KEY_PPM_A, 1000); 
+  
+  configSetInt(KEY_ALARM_PIN, 2);
+  configSetInt(KEY_STALL_TIMEOUT, 2000);
+  configSetInt(KEY_X_APPROACH, 50);
+  configSetInt(KEY_MOTION_DEADBAND, 10);
+  
+  configSetFloat(KEY_SPEED_CAL_X, 0.0f);
+  configSetFloat(KEY_SPEED_CAL_Y, 0.0f);
+  configSetFloat(KEY_SPEED_CAL_Z, 0.0f);
+  configSetFloat(KEY_SPEED_CAL_A, 0.0f);
   
   configUnifiedSave();
   Serial.println("[OK]");

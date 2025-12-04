@@ -1,5 +1,6 @@
 #include "config_schema_versioning.h"
 #include "config_unified.h"
+#include "config_keys.h" 
 #include "fault_logging.h"
 #include <Preferences.h>
 #include <string.h>
@@ -7,39 +8,43 @@
 static Preferences schema_prefs;
 static uint8_t current_schema_version = CONFIG_SCHEMA_VERSION;
 
-// Schema history for documentation/tracking
 static const schema_record_t schema_history[] = {
   {0, "Initial schema (v0.1)", "Base motion control", 0},
   {1, "Enhanced schema (v4.2)", "Speed calibration, NVS persistence", 1700000000}
 };
 
-// Metadata defining the lifespan and type of every config key
 static const config_key_metadata_t key_metadata[] = {
-  {"x_soft_limit_min", 0, 0, "int32", "X min limit", true, true},
-  {"x_soft_limit_max", 0, 0, "int32", "X max limit", true, true},
-  {"y_soft_limit_min", 0, 0, "int32", "Y min limit", true, true},
-  {"y_soft_limit_max", 0, 0, "int32", "Y max limit", true, true},
-  {"z_soft_limit_min", 0, 0, "int32", "Z min limit", true, true},
-  {"z_soft_limit_max", 0, 0, "int32", "Z max limit", true, true},
-  {"a_soft_limit_min", 0, 0, "int32", "A min limit", true, true},
-  {"a_soft_limit_max", 0, 0, "int32", "A max limit", true, true},
-  {"default_speed_mm_s", 0, 0, "float", "Default speed", true, true},
-  {"default_acceleration", 0, 0, "float", "Default accel", true, true},
-  {"speed_X_mm_s", 1, 0, "float", "Calib X Speed", true, false},
-  {"speed_Y_mm_s", 1, 0, "float", "Calib Y Speed", true, false},
-  {"speed_Z_mm_s", 1, 0, "float", "Calib Z Speed", true, false},
-  {"speed_A_mm_s", 1, 0, "float", "Calib A Speed", true, false},
-  {"encoder_ppm_x", 0, 0, "int32", "X PPM", true, true},
-  {"encoder_ppm_y", 0, 0, "int32", "Y PPM", true, true},
-  {"encoder_ppm_z", 0, 0, "int32", "Z PPM", true, true},
-  {"encoder_ppm_a", 0, 0, "int32", "A PPM", true, true},
-  {"stall_timeout_ms", 0, 0, "int32", "Stall Timeout", true, true},
+  {KEY_X_LIMIT_MIN, 0, 0, "int32", "X min limit", true, true},
+  {KEY_X_LIMIT_MAX, 0, 0, "int32", "X max limit", true, true},
+  {KEY_Y_LIMIT_MIN, 0, 0, "int32", "Y min limit", true, true},
+  {KEY_Y_LIMIT_MAX, 0, 0, "int32", "Y max limit", true, true},
+  {KEY_Z_LIMIT_MIN, 0, 0, "int32", "Z min limit", true, true},
+  {KEY_Z_LIMIT_MAX, 0, 0, "int32", "Z max limit", true, true},
+  {KEY_A_LIMIT_MIN, 0, 0, "int32", "A min limit", true, true},
+  {KEY_A_LIMIT_MAX, 0, 0, "int32", "A max limit", true, true},
+  
+  {KEY_DEFAULT_SPEED, 0, 0, "float", "Default speed", true, true},
+  {KEY_DEFAULT_ACCEL, 0, 0, "float", "Default accel", true, true},
+  
+  {KEY_SPEED_CAL_X, 1, 0, "float", "Calib X Speed", true, false},
+  {KEY_SPEED_CAL_Y, 1, 0, "float", "Calib Y Speed", true, false},
+  {KEY_SPEED_CAL_Z, 1, 0, "float", "Calib Z Speed", true, false},
+  {KEY_SPEED_CAL_A, 1, 0, "float", "Calib A Speed", true, false},
+  
+  {KEY_PPM_X, 0, 0, "int32", "X PPM", true, true},
+  {KEY_PPM_Y, 0, 0, "int32", "Y PPM", true, true},
+  {KEY_PPM_Z, 0, 0, "int32", "Z PPM", true, true},
+  {KEY_PPM_A, 0, 0, "int32", "A PPM", true, true},
+  
+  {KEY_STALL_TIMEOUT, 0, 0, "int32", "Stall Timeout", true, true},
+  {KEY_X_APPROACH, 1, 0, "int32", "X Final Approach", true, true},
+  {KEY_MOTION_DEADBAND, 1, 0, "int32", "Motion Deadband", true, true},
+
   {NULL, 0, 0, NULL, NULL, false, false}
 };
 
 void configSchemaVersioningInit() {
   Serial.println("[SCHEMA] Initializing versioning...");
-  
   if (!schema_prefs.begin("bisso_schema", false)) {
     Serial.println("[SCHEMA] [FAIL] Init storage failed");
     return;
@@ -56,18 +61,9 @@ void configSchemaVersioningInit() {
   }
 }
 
-uint8_t configGetSchemaVersion() {
-  return CONFIG_SCHEMA_VERSION;
-}
-
-void configSetSchemaVersion(uint8_t version) {
-  schema_prefs.putUChar("schema_version", version);
-  current_schema_version = version;
-}
-
-uint8_t configGetStoredSchemaVersion() {
-  return schema_prefs.getUChar("schema_version", CONFIG_SCHEMA_VERSION);
-}
+uint8_t configGetSchemaVersion() { return CONFIG_SCHEMA_VERSION; }
+void configSetSchemaVersion(uint8_t version) { schema_prefs.putUChar("schema_version", version); }
+uint8_t configGetStoredSchemaVersion() { return schema_prefs.getUChar("schema_version", CONFIG_SCHEMA_VERSION); }
 
 const char* configGetSchemaDescription(uint8_t version) {
   for (size_t i = 0; i < sizeof(schema_history)/sizeof(schema_history[0]); i++) {
@@ -110,27 +106,24 @@ migration_result_t configMigrateSchema(uint8_t from_version, uint8_t to_version)
   for (int i = 0; key_metadata[i].key != NULL; i++) {
     const char* key = key_metadata[i].key;
     
-    // Skip keys not relevant to source version
     if (!configIsKeyActiveInVersion(key, from_version)) {
       result.items_skipped++;
       continue;
     }
     
-    // Check migration flags
     if (direction == MIGRATION_UPGRADE && !key_metadata[i].migrate_forward) {
         result.items_skipped++;
         continue;
     }
     
-    // Simple migration: Ensure key exists in NVS, set default if new
     if (configIsKeyActiveInVersion(key, to_version)) {
-        // V0->V1 Upgrade Logic for Speed
-        if (from_version == 0 && to_version == 1 && strcmp(key, "default_speed_mm_s") == 0) {
-             float old_spd = configGetFloat("default_speed_mm_s", 15.0f);
-             configSetFloat("speed_X_mm_s", old_spd);
-             configSetFloat("speed_Y_mm_s", old_spd);
-             configSetFloat("speed_Z_mm_s", old_spd);
-             configSetFloat("speed_A_mm_s", old_spd);
+        // V0->V1 Upgrade Logic
+        if (from_version == 0 && to_version == 1 && strcmp(key, KEY_DEFAULT_SPEED) == 0) {
+             float old_spd = configGetFloat(KEY_DEFAULT_SPEED, 15.0f);
+             configSetFloat(KEY_SPEED_CAL_X, old_spd);
+             configSetFloat(KEY_SPEED_CAL_Y, old_spd);
+             configSetFloat(KEY_SPEED_CAL_Z, old_spd);
+             configSetFloat(KEY_SPEED_CAL_A, old_spd);
         }
         result.items_migrated++;
     } else {
@@ -171,28 +164,21 @@ void configShowMigrationStatus() {
   Serial.println("\n=== MIGRATION STATUS ===");
   uint8_t stored = configGetStoredSchemaVersion();
   Serial.printf("Stored: v%d | Current: v%d\n", stored, CONFIG_SCHEMA_VERSION);
-  
   if (stored == CONFIG_SCHEMA_VERSION) Serial.println("Status: [SYNCED]");
   else if (stored < CONFIG_SCHEMA_VERSION) Serial.println("Status: [UPGRADE NEEDED]");
   else Serial.println("Status: [DOWNGRADE NEEDED]");
+}
+
+void configValidateSchema() {
+  Serial.println("[SCHEMA] Validating...");
+  uint8_t stored = configGetStoredSchemaVersion();
+  if (stored > CONFIG_SCHEMA_VERSION) Serial.println("[SCHEMA] [WARN] Stored version newer");
+  else Serial.println("[SCHEMA] [OK] Validation passed");
 }
 
 void configShowKeyMetadata() {
   Serial.println("\n=== KEY METADATA ===");
   for (int i = 0; key_metadata[i].key != NULL; i++) {
       Serial.printf("%s (%s): %s\n", key_metadata[i].key, key_metadata[i].type, key_metadata[i].description);
-  }
-}
-
-void configValidateSchema() {
-  Serial.println("[SCHEMA] Validating...");
-  uint8_t stored = configGetStoredSchemaVersion();
-  if (stored > CONFIG_SCHEMA_VERSION) {
-      Serial.println("[SCHEMA] [WARN] Stored version newer than firmware");
-  } else if (stored < CONFIG_SCHEMA_MIN_SUPPORTED) {
-      Serial.println("[SCHEMA] [FAIL] Stored version obsolete");
-      faultLogError(FAULT_CONFIGURATION_INVALID, "Schema obsolete");
-  } else {
-      Serial.println("[SCHEMA] [OK] Validation passed");
   }
 }

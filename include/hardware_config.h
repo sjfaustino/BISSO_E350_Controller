@@ -1,12 +1,12 @@
-// hardware_config.h — BISSO v4.2 FINAL PRODUCTION VERSION
+// hardware_config.h — Gemini v1.0.0 FINAL PRODUCTION VERSION
 
 #pragma once
 #include <Arduino.h>
 #include <cstdint>
 
-// Forward declaration for CLI types used inside the header
+// Forward declaration for CLI types
 typedef void (*cli_handler_t)(int argc, char** argv);
-typedef struct cli_command_t cli_command_t; // Declare only, definition remains in cli.h
+typedef struct cli_command_t cli_command_t; 
 
 enum class BoardType : uint8_t { UNKNOWN = 0, A16, A32 };
 BoardType detectBoard();
@@ -69,7 +69,6 @@ constexpr PinInfo pinDatabase[] = {
 
 constexpr size_t PIN_COUNT = sizeof(pinDatabase)/sizeof(pinDatabase[0]);
 
-// Real BISSO signals — factory order from X1
 struct SignalDef {
     const char* key;
     const char* name;

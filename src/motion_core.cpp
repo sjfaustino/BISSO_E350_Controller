@@ -9,6 +9,7 @@
 #include "encoder_calibration.h" 
 #include "encoder_wj66.h"        
 #include "config_unified.h" 
+#include "config_keys.h" // <-- NEW
 #include <math.h> 
 #include <string.h>
 #include <stdlib.h> 
@@ -94,7 +95,9 @@ void motionUpdate() {
         {
             if (active_axis == 0) { // X-Axis Final Approach
                 int32_t dist = abs(axis->target_position - current_pos);
-                int32_t approach_mm = configGetInt("x_approach_mm", 50);
+                // Use Constant Key
+                int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
+                
                 float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
                 int32_t approach_cnt = (int32_t)(approach_mm * scale_x);
                 
@@ -117,7 +120,8 @@ void motionUpdate() {
         
       case MOTION_STOPPING:
         {
-            int32_t deadband = configGetInt("motion_settle_deadband", 10);
+            // Use Constant Key
+            int32_t deadband = configGetInt(KEY_MOTION_DEADBAND, 10);
             if (abs(current_pos - axis->position_at_stop) < deadband) { 
                 axis->state = MOTION_IDLE;
                 active_axis = 255;
@@ -173,7 +177,6 @@ bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos) {
 
 bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) {
   if (axis >= MOTION_AXES) return false;
-  // (Simplified transition logic for brevity, assumed correct from previous)
   return true; 
 }
 

@@ -5,6 +5,7 @@
 #include "system_constants.h"
 #include "serial_logger.h"
 #include "config_unified.h" 
+#include "config_keys.h" // <-- NEW
 #include <Arduino.h>
 #include "safety_state_machine.h"
 #include <string.h>
@@ -36,8 +37,8 @@ void safetyUpdate() {
   if (now - last_stall_check > SAFETY_STALL_CHECK_INTERVAL_MS) {
     last_stall_check = now;
     
-    // Fetch configurable stall timeout (Default 2000ms)
-    uint32_t stall_limit_ms = (uint32_t)configGetInt("stall_timeout_ms", SAFETY_MAX_STALL_TIME_MS);
+    // FIX: Use Constant Key
+    uint32_t stall_limit_ms = (uint32_t)configGetInt(KEY_STALL_TIMEOUT, SAFETY_MAX_STALL_TIME_MS);
 
     if (motionIsMoving()) {
         for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
