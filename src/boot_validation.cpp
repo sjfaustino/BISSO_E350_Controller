@@ -15,39 +15,26 @@ static bool degraded_mode = false;
 static bool shutting_down = false;
 static Preferences boot_prefs;
 
-// ============================================================================
-// BOOT VALIDATION INITIALIZATION
-// ============================================================================
-
 void bootValidationInit() {
-  Serial.println("[BOOT_VAL] Initializing boot validation system...");
+  logInfo("[BOOT_VAL] Initializing...");
   
   boot_seq.boot_start_time = millis();
   boot_seq.overall_status = BOOT_OK;
-  boot_seq.systems_initialized = 0;
-  boot_seq.systems_healthy = 0;
-  boot_seq.systems_failed = 0;
-  boot_seq.boot_validation_passed = false;
   
   if (!boot_prefs.begin(BOOT_NVS_NAMESPACE, true)) { 
-    Serial.println("[BOOT_VAL] [WARN] Could not open boot NVS namespace");
+    logWarning("[BOOT_VAL] Could not open NVS");
   } else {
     uint32_t consecutive = boot_prefs.getUInt("consecutive_ok", 0);
     boot_prefs.end();
-    Serial.print("[BOOT_VAL] Consecutive successful boots: ");
-    Serial.println(consecutive);
+    logInfo("[BOOT_VAL] Consecutive boots: %lu", consecutive);
   }
   
-  Serial.println("[BOOT_VAL] Boot validation ready\n");
+  logInfo("[BOOT_VAL] Ready");
 }
-
-// ============================================================================
-// SUBSYSTEM REGISTRATION & TRACKING
-// ============================================================================
 
 void bootRegisterSubsystem(const char* name) {
   if (subsystem_count >= MAX_BOOT_SUBSYSTEMS) { 
-    Serial.println("[BOOT_VAL] ERROR: Too many subsystems!");
+    logError("[BOOT_VAL] Too many subsystems!");
     return;
   }
   
@@ -117,64 +104,24 @@ void bootMarkUnhealthy(const char* name, const char* error_msg) {
   }
 }
 
-// ============================================================================
-// VALIDATION & DIAGNOSTICS
-// ============================================================================
-
 bool bootValidateAllSystems() {
-  Serial.println("\n[BOOT] === BOOT VALIDATION SEQUENCE ===\n");
+  logInfo("[BOOT] === VALIDATION SEQUENCE ===");
   
-  int initialized_count = 0;
-  int healthy_count = 0;
   int failed_count = 0;
-  
-  Serial.println("Subsystem Status:");
-  Serial.println("------------------------------------------------");
-  Serial.println(" Subsystem          | Init     | Health");
-  Serial.println("------------------------------------------------");
+  int healthy_count = 0;
   
   for (int i = 0; i < subsystem_count; i++) {
-    Serial.print(" ");
-    Serial.print(subsystems[i].subsystem_name);
-    Serial.print(String(19 - strlen(subsystems[i].subsystem_name), ' '));
-    Serial.print("| ");
+    const char* status = subsystems[i].healthy ? "[OK]" : "[FAIL]";
+    logInfo("[BOOT] %-15s: %s (Init: %lums)", subsystems[i].subsystem_name, status, subsystems[i].init_time_ms);
     
-    if (subsystems[i].initialized) {
-      Serial.print("[OK]     ");
-      initialized_count++;
-    } else {
-      Serial.print("[FAIL]   ");
-      failed_count++;
-    }
-    
-    Serial.print("| ");
-    
-    if (subsystems[i].healthy) {
-      Serial.print("[OK]     ");
-      healthy_count++;
-    } else {
-      Serial.print("[BAD]    ");
-    }
-    
-    Serial.println();
+    if (!subsystems[i].healthy) failed_count++;
+    else healthy_count++;
   }
-  
-  Serial.println("------------------------------------------------\n");
-  
-  Serial.print("Summary: ");
-  Serial.print(initialized_count);
-  Serial.print("/");
-  Serial.print(subsystem_count);
-  Serial.print(" initialized, ");
-  Serial.print(healthy_count);
-  Serial.print(" healthy, ");
-  Serial.print(failed_count);
-  Serial.println(" failed\n");
   
   bool can_proceed = false;
   
   if (failed_count == 0) {
-    Serial.println("[BOOT] [PASS] All systems healthy.");
+    logInfo("[BOOT] [PASS] All systems healthy.");
     boot_seq.boot_validation_passed = true;
     boot_seq.overall_status = BOOT_OK;
     
@@ -186,15 +133,13 @@ bool bootValidateAllSystems() {
     
     can_proceed = true;
   } else if (healthy_count >= (subsystem_count - 2)) {
-    Serial.println("[BOOT] [WARN] DEGRADED MODE - Some systems failed.");
-    Serial.println("[BOOT] System operating with reduced functionality.");
-    
+    logWarning("[BOOT] [WARN] DEGRADED MODE.");
     degraded_mode = true;
     boot_seq.boot_validation_passed = true;
     boot_seq.overall_status = BOOT_OK;
     can_proceed = true;
   } else {
-    Serial.println("[BOOT] [FAIL] CRITICAL FAILURE - Too many systems down!");
+    logError("[BOOT] [FAIL] CRITICAL FAILURE (%d systems down)", failed_count);
     boot_seq.boot_validation_passed = false;
     boot_seq.overall_status = BOOT_CRITICAL_ERROR;
     
@@ -221,130 +166,58 @@ bool bootIsSubsystemHealthy(const char* name) {
   return false;
 }
 
-boot_status_code_t bootGetStatus() {
-  return boot_seq.overall_status;
-}
+boot_status_code_t bootGetStatus() { return boot_seq.overall_status; }
 
+// CLI Helper: Uses Serial because it is user-requested
 void bootShowStatus() {
-  Serial.println("\n=== BOOT SEQUENCE STATUS ===\n");
-  
-  Serial.print("Overall Status: ");
-  if (boot_seq.boot_validation_passed) {
-    if (degraded_mode) {
-      Serial.println("[WARN] DEGRADED MODE");
-    } else {
-      Serial.println("[OK] NORMAL");
-    }
-  } else {
-    Serial.println("[FAIL] FAILED");
-  }
-  
-  Serial.print("Total Boot Time: ");
-  Serial.print(boot_seq.total_boot_time_ms);
-  Serial.println(" ms");
-  
-  Serial.print("Systems Initialized: ");
-  Serial.print(boot_seq.systems_initialized);
-  Serial.print("/");
-  Serial.println(subsystem_count);
-  
-  Serial.print("Systems Healthy: ");
-  Serial.print(boot_seq.systems_healthy);
-  Serial.print("/");
-  Serial.println(subsystem_count);
-  
-  Serial.print("Systems Failed: ");
-  Serial.println(boot_seq.systems_failed);
-  Serial.println();
+  Serial.println("\n=== BOOT STATUS ===");
+  Serial.printf("Status: %s\n", boot_seq.boot_validation_passed ? "[OK]" : "[FAIL]");
+  Serial.printf("Time:   %lu ms\n", boot_seq.total_boot_time_ms);
+  Serial.printf("Failed: %d\n", boot_seq.systems_failed);
 }
 
 void bootShowDetailedReport() {
-  Serial.println("\n=== DETAILED BOOT REPORT ===\n");
-  Serial.println("Subsystem Details:");
-  
+  Serial.println("\n=== DETAILED BOOT REPORT ===");
   for (int i = 0; i < subsystem_count; i++) {
-    Serial.print("  ");
-    Serial.print(subsystems[i].subsystem_name);
-    Serial.print(": ");
-    
-    if (subsystems[i].initialized) {
-      Serial.print("[INIT]");
-    } else {
-      Serial.print("[FAIL]");
-    }
-    
-    Serial.print(" | Health: ");
-    if (subsystems[i].healthy) {
-      Serial.print("[OK]");
-    } else {
-      Serial.print("[BAD]");
-    }
-    
-    Serial.print(" | Time: ");
-    Serial.print(subsystems[i].init_time_ms);
-    Serial.print("ms | Errors: ");
-    Serial.println(subsystems[i].error_count);
-    
+    Serial.printf("  %-15s: %s | Time: %4lums | Errors: %lu\n", 
+      subsystems[i].subsystem_name,
+      subsystems[i].healthy ? "[OK]" : "[FAIL]",
+      subsystems[i].init_time_ms,
+      subsystems[i].error_count);
+      
     if (subsystems[i].last_error) {
-      Serial.print("    Error: ");
-      Serial.println(subsystems[i].last_error);
+      Serial.printf("    Error: %s\n", subsystems[i].last_error);
     }
   }
-  Serial.println();
 }
 
 void bootShowSubsystemHealth() {
-  Serial.println("\n=== SUBSYSTEM HEALTH MONITOR ===\n");
+  Serial.println("\n=== HEALTH MONITOR ===");
   for (int i = 0; i < subsystem_count; i++) {
-    Serial.print("  ");
-    Serial.print(subsystems[i].subsystem_name);
-    Serial.print(": ");
-    
-    if (subsystems[i].healthy) {
-      Serial.println("[GOOD]");
-    } else {
-      Serial.println("[BAD]");
-    }
+    Serial.printf("  %-15s: %s\n", subsystems[i].subsystem_name, subsystems[i].healthy ? "[GOOD]" : "[BAD]");
   }
-  Serial.println();
 }
 
 void bootShowInitTimes() {
-  Serial.println("\n=== INITIALIZATION TIMING ===\n");
-  Serial.println("Subsystem              Init Time (ms)");
-  Serial.println("-------------------------------------");
-  
+  Serial.println("\n=== INIT TIMING ===");
   for (int i = 0; i < subsystem_count; i++) {
-    Serial.print(" ");
-    Serial.print(subsystems[i].subsystem_name);
-    Serial.print(String(23 - strlen(subsystems[i].subsystem_name), ' '));
-    Serial.println(subsystems[i].init_time_ms);
+    Serial.printf("  %-15s: %lu ms\n", subsystems[i].subsystem_name, subsystems[i].init_time_ms);
   }
-  
-  Serial.print("Total Boot Time: ");
-  Serial.print(boot_seq.total_boot_time_ms);
-  Serial.println(" ms\n");
+  Serial.printf("Total: %lu ms\n", boot_seq.total_boot_time_ms);
 }
 
 bool bootAttemptRecovery(const char* subsystem) {
-  Serial.print("[RECOVERY] Attempting recovery of ");
-  Serial.print(subsystem);
-  Serial.println("...");
-  
+  logWarning("[BOOT_RECOVERY] Attempting recovery of %s", subsystem);
   faultLogWarning(FAULT_BOOT_RECOVERY_ATTEMPTED, subsystem);
   return false;
 }
 
 void bootHandleCriticalError(const char* error_msg) {
-  Serial.println("\n*** CRITICAL ERROR - SYSTEM HALT ***\n");
-  Serial.print("Error: ");
-  Serial.println(error_msg);
-  
+  logError("[BOOT] CRITICAL HALT: %s", error_msg);
   faultLogError(FAULT_CRITICAL_SYSTEM_ERROR, error_msg);
-  bootLogErrors();
   
-  Serial.println("System cannot proceed.");
-  Serial.println("Please check error logs and restart system.\n");
+  Serial.println("\n*** SYSTEM HALTED ***");
+  Serial.println("Critical error during boot.");
   
   while (1) {
     delay(1000);
@@ -352,84 +225,53 @@ void bootHandleCriticalError(const char* error_msg) {
 }
 
 void bootRebootSystem() {
-  Serial.println("[BOOT] Gracefully rebooting system...");
+  logInfo("[BOOT] Reboot requested.");
   delay(1000);
   esp_restart();
 }
 
 void bootEmergencyHalt(const char* reason) {
-  Serial.println("\n*** EMERGENCY HALT ***\n");
-  Serial.print("Reason: ");
-  Serial.println(reason);
-  
+  logError("[BOOT] EMERGENCY HALT: %s", reason);
   faultLogError(FAULT_EMERGENCY_HALT, reason);
   shutting_down = true;
-  
-  while (1) {
-    delay(10000);
-  }
+  while (1) delay(10000);
 }
 
-bool bootCanOperateDegraded() {
-  return (boot_seq.systems_failed <= 2);
-}
+bool bootCanOperateDegraded() { return (boot_seq.systems_failed <= 2); }
 
 void bootSetDegradedMode(bool enabled) {
   degraded_mode = enabled;
-  if (enabled) {
-    Serial.println("[BOOT] [WARN] System operating in DEGRADED MODE");
-  } else {
-    Serial.println("[BOOT] Normal mode resumed");
-  }
+  if (enabled) logWarning("[BOOT] Switched to DEGRADED MODE");
+  else logInfo("[BOOT] Switched to NORMAL MODE");
 }
 
-bool bootIsDegradedMode() {
-  return degraded_mode;
-}
+bool bootIsDegradedMode() { return degraded_mode; }
 
 void bootShowDegradedModeStatus() {
-  Serial.println("\n=== DEGRADED MODE STATUS ===\n");
-  
-  if (!degraded_mode) {
-    Serial.println("System running in NORMAL MODE");
-    return;
+  Serial.printf("\nMode: %s\n", degraded_mode ? "DEGRADED" : "NORMAL");
+  if (degraded_mode) {
+      Serial.println("Operational Systems:");
+      for (int i = 0; i < subsystem_count; i++) {
+          if (subsystems[i].healthy) Serial.printf("  [OK] %s\n", subsystems[i].subsystem_name);
+      }
   }
-  
-  Serial.println("System running in DEGRADED MODE");
-  Serial.println("Available Subsystems:");
-  
-  for (int i = 0; i < subsystem_count; i++) {
-    if (subsystems[i].healthy) {
-      Serial.print(" [OK]  ");
-    } else {
-      Serial.print(" [BAD] ");
-    }
-    Serial.println(subsystems[i].subsystem_name);
-  }
-  Serial.println();
 }
 
 void bootLogErrors() {
   if (!boot_prefs.begin(BOOT_NVS_NAMESPACE, true)) {
-    logError("[BOOT] Cannot read errors: NVS not started.");
+    logError("[BOOT] NVS Error");
     return;
   }
-  
   uint32_t error_count = boot_prefs.getUInt("errors", 0);
   boot_prefs.end();
-
-  Serial.print("[BOOT] Logged ");
-  Serial.print(error_count);
-  Serial.println(" boot errors to NVS");
+  logInfo("[BOOT] Total recorded errors: %lu", error_count);
 }
 
 const char* bootGetLastError() {
   for (int i = subsystem_count - 1; i >= 0; i--) {
-    if (subsystems[i].last_error) {
-      return subsystems[i].last_error;
-    }
+    if (subsystems[i].last_error) return subsystems[i].last_error;
   }
-  return "No errors";
+  return "None";
 }
 
 uint32_t bootGetErrorCount() {
@@ -451,27 +293,17 @@ uint32_t bootGetConsecutiveSuccesses() {
 }
 
 void bootShowRecoveryHistory() {
-  Serial.println("\n=== BOOT RECOVERY HISTORY ===\n");
-  Serial.print("Consecutive Successful Boots: ");
-  Serial.println(bootGetConsecutiveSuccesses());
-  Serial.print("Total Boot Errors: ");
-  Serial.println(bootGetErrorCount());
-  Serial.println();
+  Serial.println("\n=== RECOVERY HISTORY ===");
+  Serial.printf("Consecutive Boots: %lu\n", bootGetConsecutiveSuccesses());
+  Serial.printf("Total Errors:      %lu\n", bootGetErrorCount());
 }
 
 void bootGracefulShutdown(const char* reason) {
-  Serial.println("\n=== GRACEFUL SYSTEM SHUTDOWN ===\n");
-  Serial.print("Reason: ");
-  Serial.println(reason);
-  
+  logInfo("[BOOT] Shutdown: %s", reason);
   shutting_down = true;
   faultLogWarning(FAULT_GRACEFUL_SHUTDOWN, reason);
-  
-  Serial.println("System shutting down...");
   delay(2000);
-  Serial.println("Safe to power off now");
+  logInfo("[BOOT] Power off safe.");
 }
 
-bool bootIsShuttingDown() {
-  return shutting_down;
-}
+bool bootIsShuttingDown() { return shutting_down; }

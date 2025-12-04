@@ -7,18 +7,16 @@
 static uint8_t input_cache = 0xFF; 
 
 void boardInputsInit() {
-    Serial.println("[INPUTS] Initializing...");
-    
+    logInfo("[INPUTS] Initializing...");
     uint8_t temp_data = 0xFF;
     i2c_result_t result = i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &temp_data, 1);
     
     if (result == I2C_RESULT_OK) {
         input_cache = temp_data;
-        Serial.println("[INPUTS] [OK] Board (0x24) detected.");
+        logInfo("[INPUTS] Board detected (0x24)");
     } else {
-        Serial.println("[INPUTS] [FAIL] Board (0x24) NOT detected.");
-        faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, BOARD_INPUT_I2C_ADDR, 
-                      "Board Inputs init failed (Result: %d)", result);
+        logError("[INPUTS] Board NOT detected (0x24)");
+        faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, BOARD_INPUT_I2C_ADDR, "Inputs init failed");
     }
 }
 
@@ -46,7 +44,7 @@ void boardInputsDiagnostics() {
     bool pause = !(input_cache & (1 << INPUT_BIT_PAUSE));
     bool resume = !(input_cache & (1 << INPUT_BIT_RESUME));
     
-    Serial.printf("  E-STOP (NC): %s\n", estop ? "TRIGGERED (Open)" : "NORMAL (Closed)");
+    Serial.printf("  E-STOP (NC): %s\n", estop ? "OPEN (Trip)" : "CLOSED (OK)");
     Serial.printf("  PAUSE  (NO): %s\n", pause ? "PRESSED" : "RELEASED");
     Serial.printf("  RESUME (NO): %s\n", resume ? "PRESSED" : "RELEASED");
 }

@@ -15,7 +15,6 @@ static int config_count = 0;
 static uint32_t last_nvs_save = 0;
 static bool config_dirty = false;
 
-// Critical keys that should save immediately
 static const char* critical_keys[] = {
   KEY_PPM_X, KEY_PPM_Y, KEY_PPM_Z, KEY_PPM_A,
   KEY_X_LIMIT_MIN, KEY_X_LIMIT_MAX,
@@ -46,16 +45,16 @@ static char* configGetStringBuffer() {
 }
 
 void configUnifiedInit() {
-  Serial.println("[CONFIG] Initializing...");
+  logInfo("[CONFIG] Initializing...");
   memset(config_table, 0, sizeof(config_table));
   config_count = 0;
   
   if (!prefs.begin("bisso_config", false)) {
-    Serial.println("[CONFIG] [FAIL] NVS init failed!");
+    logError("[CONFIG] NVS Init Failed!");
     return;
   }
   configUnifiedLoad();
-  Serial.printf("[CONFIG] [OK] Loaded %d entries\n", config_count);
+  logInfo("[CONFIG] Loaded %d entries", config_count);
 }
 
 static int findConfigEntry(const char* key) {
@@ -87,7 +86,7 @@ void configSetInt(const char* key, int32_t value) {
     config_table[idx].type = CONFIG_INT32;
   }
 
-  // SMART WRITE: Check if value changed
+  // SMART WRITE
   if (config_table[idx].is_set && config_table[idx].value.int_val == value) return;
   
   config_table[idx].value.int_val = value;
@@ -98,6 +97,9 @@ void configSetInt(const char* key, int32_t value) {
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putInt(key, value);
     config_dirty = false; 
+    logInfo("[CONFIG] Set %s = %d (Saved)", key, value);
+  } else {
+    logInfo("[CONFIG] Set %s = %d (Cached)", key, value);
   }
 }
 
@@ -190,7 +192,7 @@ void configUnifiedFlush() {
 }
 
 void configUnifiedSave() {
-  Serial.printf("[CONFIG] Saving %d entries... ", config_count);
+  logInfo("[CONFIG] Saving to NVS...");
   for (int i = 0; i < config_count; i++) {
     if (!config_table[i].is_set) continue;
     if (config_table[i].type != CONFIG_INT32 || !isCriticalKey(config_table[i].key)) {
@@ -203,41 +205,35 @@ void configUnifiedSave() {
   }
   prefs.end(); 
   prefs.begin("bisso_config", false); 
-  Serial.println("[OK]");
+  logInfo("[CONFIG] Save complete.");
   last_nvs_save = millis();
   config_dirty = false;
 }
 
 void configUnifiedLoad() {
-  Serial.println("[CONFIG] Cache ready.");
+  // Just a placeholder if we were loading whole tables. 
+  // Current logic loads on demand.
 }
 
 void configUnifiedReset() {
-  Serial.print("[CONFIG] Resetting defaults... ");
-  
+  logInfo("[CONFIG] Resetting defaults...");
   configSetInt(KEY_X_LIMIT_MIN, -500000); configSetInt(KEY_X_LIMIT_MAX, 500000);
   configSetInt(KEY_Y_LIMIT_MIN, -300000); configSetInt(KEY_Y_LIMIT_MAX, 300000);
   configSetInt(KEY_Z_LIMIT_MIN, -50000);  configSetInt(KEY_Z_LIMIT_MAX, 150000);
   configSetInt(KEY_A_LIMIT_MIN, -45000);  configSetInt(KEY_A_LIMIT_MAX, 45000);
-  
   configSetFloat(KEY_DEFAULT_SPEED, 15.0f); 
   configSetFloat(KEY_DEFAULT_ACCEL, 5.0f);
-  
   configSetInt(KEY_PPM_X, 1000); configSetInt(KEY_PPM_Y, 1000);
   configSetInt(KEY_PPM_Z, 1000); configSetInt(KEY_PPM_A, 1000); 
-  
   configSetInt(KEY_ALARM_PIN, 2);
   configSetInt(KEY_STALL_TIMEOUT, 2000);
   configSetInt(KEY_X_APPROACH, 50);
   configSetInt(KEY_MOTION_DEADBAND, 10);
-  
-  configSetFloat(KEY_SPEED_CAL_X, 0.0f);
-  configSetFloat(KEY_SPEED_CAL_Y, 0.0f);
-  configSetFloat(KEY_SPEED_CAL_Z, 0.0f);
-  configSetFloat(KEY_SPEED_CAL_A, 0.0f);
+  configSetFloat(KEY_SPEED_CAL_X, 0.0f); configSetFloat(KEY_SPEED_CAL_Y, 0.0f);
+  configSetFloat(KEY_SPEED_CAL_Z, 0.0f); configSetFloat(KEY_SPEED_CAL_A, 0.0f);
   
   configUnifiedSave();
-  Serial.println("[OK]");
+  logInfo("[CONFIG] Defaults saved.");
 }
 
 void configUnifiedClear() {
@@ -248,7 +244,7 @@ void configUnifiedClear() {
 int configGetKeyCount() { return config_count; }
 
 void configUnifiedDiagnostics() {
-  Serial.println("\n[CONFIG] === Diagnostics ===");
+  Serial.println("\n=== CONFIG CACHE ===");
   Serial.printf("Entries: %d | Dirty: %s\n", config_count, config_dirty ? "YES" : "NO");
   for (int i = 0; i < config_count; i++) {
     Serial.printf("  [%d] %s = ", i, config_table[i].key);

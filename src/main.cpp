@@ -18,7 +18,8 @@
 #include "web_server.h"
 #include "boot_validation.h"
 #include "board_inputs.h" 
-#include "firmware_version.h" // <-- Ensure this is included
+#include "firmware_version.h" 
+#include "serial_logger.h" // Required for logging
 
 static uint32_t boot_time_ms = 0;
 extern WebServerManager webServer;
@@ -28,6 +29,7 @@ extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskNa
     static volatile bool handling = false;
     if (handling) return;
     handling = true;
+    // Direct serial output for panic situations (bypass logger logic)
     Serial.println("\n\n[CRITICAL] STACK OVERFLOW DETECTED");
     Serial.printf("Task: %s\n", pcTaskName);
     Serial.println("System Halting.");
@@ -51,28 +53,32 @@ bool init_cli_wrapper() { cliInit(); return true; }
 bool init_web_wrapper() { webServer.init(); webServer.begin(); return true; }
 bool init_inputs_wrapper() { boardInputsInit(); return true; }
 
+// FIX: Use logInfo/logError for consistent system logging
 #define BOOT_INIT(name, func, code) \
   do { \
-    Serial.printf("[BOOT] Init %s... ", name); \
     if (func()) { \
-      Serial.println("[OK]"); \
+      logInfo("[BOOT] Init %s [OK]", name); \
       bootMarkInitialized(name); \
     } else { \
-      Serial.println("[FAIL]"); \
+      logError("[BOOT] Init %s [FAIL]", name); \
       bootMarkFailed(name, "Init failed", code); \
     } \
   } while(0)
 
 void setup() {
+  // Initialize Serial for the logger
   Serial.begin(115200);
   delay(1000);
+  
+  // Initialize Logger first
+  serialLoggerInit(LOG_LEVEL); // Uses LOG_LEVEL from platformio.ini
+
   boot_time_ms = millis();
 
-  // FIX: Dynamic Version String
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(ver_str, sizeof(ver_str));
   
-  Serial.printf("\n=== %s PRO FIRMWARE ===\n", ver_str);
+  logInfo("=== %s PRO FIRMWARE STARTING ===", ver_str);
   
   bootValidationInit();
   
@@ -88,7 +94,7 @@ void setup() {
   BOOT_INIT("CLI", init_cli_wrapper, BOOT_ERROR_CLI);
   BOOT_INIT("Web", init_web_wrapper, (boot_status_code_t)13);
 
-  Serial.println("\n[BOOT] Validating system...");
+  logInfo("[BOOT] Validating system health...");
   if (!bootValidateAllSystems()) {
     bootHandleCriticalError("Boot validation failed.");
     return;
@@ -97,7 +103,9 @@ void setup() {
   taskManagerInit();
   taskManagerStart();
   
-  Serial.printf("[BOOT] [OK] Complete in %lu ms\n\n", millis() - boot_time_ms);
+  logInfo("[BOOT] [OK] Complete in %lu ms", millis() - boot_time_ms);
+  
+  // Delete setup task
   vTaskDelete(NULL);
 }
 
