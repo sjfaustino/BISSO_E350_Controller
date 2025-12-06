@@ -23,7 +23,7 @@
 #define TASK_PRIORITY_IDLE        1
 
 // ============================================================================
-// TASK STACK SIZES (in words, ESP32 = 4 bytes/word)
+// TASK STACK SIZES
 // ============================================================================
 
 #define TASK_STACK_SAFETY        2048
@@ -63,7 +63,6 @@
 // MESSAGE QUEUE DEFINITIONS
 // ============================================================================
 
-// FIX: Increased to 96 bytes to hold the full fault_entry_t (~80 bytes)
 #define QUEUE_ITEM_SIZE          96 
 #define QUEUE_LEN_MOTION         10
 #define QUEUE_LEN_SAFETY         20
@@ -77,32 +76,21 @@
 // ============================================================================
 
 typedef enum {
-  // Safety events
   MSG_SAFETY_ESTOP_REQUESTED,
   MSG_SAFETY_ESTOP_CLEAR,
   MSG_SAFETY_ALARM_TRIGGERED,
   MSG_SAFETY_ALARM_CLEARED,
-  
-  // Motion events
   MSG_MOTION_START,
   MSG_MOTION_STOP,
   MSG_MOTION_EMERGENCY_HALT,
-  
-  // Encoder events
   MSG_ENCODER_DATA_READY,
   MSG_ENCODER_ERROR,
   MSG_ENCODER_CALIBRATION_DONE,
-  
-  // PLC events
   MSG_PLC_COMMAND_RECEIVED,
   MSG_PLC_STATUS_UPDATE,
   MSG_PLC_ERROR,
-  
-  // Fault events
   MSG_FAULT_LOGGED,
   MSG_FAULT_CRITICAL,
-  
-  // Display events
   MSG_DISPLAY_UPDATE,
 } message_type_t;
 
@@ -113,10 +101,6 @@ typedef struct {
   uint8_t data[QUEUE_ITEM_SIZE];
   uint32_t timestamp;
 } queue_message_t;
-
-// ============================================================================
-// TASK STATISTICS
-// ============================================================================
 
 typedef struct {
   TaskHandle_t handle;
@@ -129,20 +113,11 @@ typedef struct {
   uint16_t stack_high_water;
 } task_stats_t;
 
-// Accessors for task statistics array
 int taskGetStatsCount();
 task_stats_t* taskGetStatsArray();
 
-// ============================================================================
-// TASK MANAGER INITIALIZATION
-// ============================================================================
-
 void taskManagerInit();
 void taskManagerStart();
-
-// ============================================================================
-// INDIVIDUAL TASK FUNCTION PROTOTYPES (Defined externally in tasks_*.cpp)
-// ============================================================================
 
 void taskSafetyFunction(void* parameter);
 void taskMotionFunction(void* parameter);
@@ -154,7 +129,6 @@ void taskFaultLogFunction(void* parameter);
 void taskMonitorFunction(void* parameter);
 void taskLcdFunction(void* parameter);
 
-// Dispatchers
 void taskSafetyCreate();
 void taskMotionCreate();
 void taskEncoderCreate();
@@ -165,11 +139,6 @@ void taskFaultLogCreate();
 void taskMonitorCreate();
 void taskLcdCreate();
 
-// ============================================================================
-// INTER-TASK COMMUNICATION FUNCTIONS
-// ============================================================================
-
-// Queue management
 QueueHandle_t taskGetMotionQueue();
 QueueHandle_t taskGetSafetyQueue();
 QueueHandle_t taskGetEncoderQueue();
@@ -177,20 +146,17 @@ QueueHandle_t taskGetPlcQueue();
 QueueHandle_t taskGetFaultQueue();
 QueueHandle_t taskGetDisplayQueue();
 
-// Send/Receive messages
 bool taskSendMessage(QueueHandle_t queue, const queue_message_t* msg);
 bool taskReceiveMessage(QueueHandle_t queue, queue_message_t* msg, uint32_t timeout_ms);
 
-// SYNCHRONIZATION PRIMITIVES
+// NEW: Direct Task Notification for high-speed signaling
+void taskSignalMotionUpdate(); 
+
 SemaphoreHandle_t taskGetConfigMutex();
 SemaphoreHandle_t taskGetI2cMutex();
 SemaphoreHandle_t taskGetMotionMutex();
 bool taskLockMutex(SemaphoreHandle_t mutex, uint32_t timeout_ms);
 void taskUnlockMutex(SemaphoreHandle_t mutex);
-
-// ============================================================================
-// DIAGNOSTICS
-// ============================================================================
 
 void taskShowStats();
 void taskShowAllTasks();

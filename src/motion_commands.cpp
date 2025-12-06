@@ -51,7 +51,6 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   float scales[] = {scale_x, scale_y, scale_z, scale_a};
 
   int active_axes_count = 0;
-  
   for (int i = 0; i < MOTION_AXES; i++) {
     int32_t target_counts = (int32_t)(targets_mm[i] * scales[i]);
     if (abs(target_counts - motionGetPosition(i)) > 1) { 
@@ -108,8 +107,11 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   axes[target_axis].state = MOTION_WAIT_CONSENSO; 
   axes[target_axis].state_entry_ms = millis();
   
-  logInfo("[MOTION] Moving Axis %d -> %d (Wait Consensus)", target_axis, target_pos);
+  logInfo("[MOTION] Moving Axis %d -> %d", target_axis, target_pos);
   taskUnlockMutex(taskGetMotionMutex());
+  
+  // Signal task to wake immediately
+  taskSignalMotionUpdate();
 }
 
 void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s) {
@@ -142,6 +144,7 @@ void motionStop() {
     logInfo("[MOTION] Idle stop");
   }
   taskUnlockMutex(taskGetMotionMutex());
+  taskSignalMotionUpdate(); // Immediate response
 }
 
 void motionPause() {
@@ -154,6 +157,7 @@ void motionPause() {
       logInfo("[MOTION] Paused axis %d", active_axis);
   }
   taskUnlockMutex(taskGetMotionMutex());
+  taskSignalMotionUpdate();
 }
 
 void motionResume() {
@@ -175,6 +179,7 @@ void motionResume() {
       axes[active_axis].state_entry_ms = millis();
   }
   taskUnlockMutex(taskGetMotionMutex());
+  taskSignalMotionUpdate();
 }
 
 void motionEmergencyStop() {
@@ -190,6 +195,8 @@ void motionEmergencyStop() {
   
   logError("[MOTION] [CRITICAL] EMERGENCY STOP ACTIVATED");
   faultLogError(FAULT_EMERGENCY_HALT, "E-Stop Activated");
+  
+  taskSignalMotionUpdate();
 }
 
 bool motionClearEmergencyStop() {
@@ -211,5 +218,6 @@ bool motionClearEmergencyStop() {
   
   emergencyStopSetActive(false); 
   Serial.println("[MOTION] [OK] Emergency stop cleared");
+  taskSignalMotionUpdate();
   return true;
 }

@@ -8,7 +8,9 @@
 #include <string.h>
 
 void taskMotionFunction(void* parameter) {
-  TickType_t last_wake = xTaskGetTickCount();
+  // 100Hz Motion Loop
+  const TickType_t xPeriod = pdMS_TO_TICKS(TASK_PERIOD_MOTION);
+  TickType_t xLastWakeTime = xTaskGetTickCount();
   
   logInfo("[MOTION_TASK] [OK] Started on core 1");
   watchdogTaskAdd("Motion");
@@ -17,28 +19,36 @@ void taskMotionFunction(void* parameter) {
   while (1) {
     uint32_t task_start = millis();
     
-    // Core motion operations
+    // 1. Core Motion Logic
     motionUpdate();
     
-    // Check for motion commands
+    // 2. Queue Processing (Legacy / Info Messages)
     queue_message_t msg;
     while (taskReceiveMessage(taskGetMotionQueue(), &msg, 0)) {
       switch (msg.type) {
-        case MSG_MOTION_START:
-          logInfo("[MOTION_TASK] Start command received");
-          break;
-        case MSG_MOTION_STOP:
-          logInfo("[MOTION_TASK] Stop command received");
-          break;
-        case MSG_MOTION_EMERGENCY_HALT:
-          logError("[MOTION_TASK] Emergency halt!");
-          break;
-        default:
-          break;
+        case MSG_MOTION_START: logInfo("[MOTION_TASK] Start received"); break;
+        case MSG_MOTION_STOP:  logInfo("[MOTION_TASK] Stop received"); break;
+        case MSG_MOTION_EMERGENCY_HALT: logError("[MOTION_TASK] Emergency Halt"); break;
+        default: break;
       }
     }
     
     watchdogFeed("Motion");
-    vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_MOTION));
+    
+    // 3. Hybrid Wait: Periodic + Event Driven
+    // Calculate remaining time in the 10ms slot
+    TickType_t xNow = xTaskGetTickCount();
+    xLastWakeTime += xPeriod; // Target next wake
+    
+    // Use Notification Wait instead of Delay to allow "Kick" from other tasks
+    // If notified (e.g. E-Stop/Move), we wake immediately.
+    // If not, we wake at the 10ms mark.
+    if (xLastWakeTime > xNow) {
+        ulTaskNotifyTake(pdTRUE, xLastWakeTime - xNow);
+    } else {
+        // Overrun, yield briefly
+        xLastWakeTime = xNow; 
+        vTaskDelay(1);
+    }
   }
 }
