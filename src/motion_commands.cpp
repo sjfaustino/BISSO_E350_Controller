@@ -1,4 +1,11 @@
+/**
+ * @file motion_commands.cpp
+ * @brief High-level Trajectory Generation (G-Code -> Targets)
+ * @project Gemini v2.1.0
+ */
+
 #include "motion.h"
+#include "motion_buffer.h" // For buffer access if needed, though usually handled by parser
 #include "system_constants.h"
 #include "plc_iface.h"
 #include "encoder_motion_integration.h"
@@ -8,17 +15,21 @@
 #include "safety.h"
 #include "encoder_calibration.h" 
 #include "encoder_wj66.h"        
+#include "config_unified.h"
+#include "config_keys.h" 
 #include <math.h> 
 #include <string.h>
 #include <stdlib.h> 
 #include <stdio.h>
 
-#define MOTION_MED_SPEED_DEFAULT 90.0f 
-
 extern motion_axis_t axes[MOTION_AXES];
 extern uint8_t active_axis;
 extern int32_t active_start_position;
 extern bool global_enabled;
+
+// ============================================================================
+// MOVEMENT COMMANDS
+// ============================================================================
 
 void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   if (!global_enabled) {
@@ -31,6 +42,7 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
     return;
   }
 
+  // 1. Encoder Health Check
   for (int i = 0; i < MOTION_AXES; i++) {
       if (wj66IsStale(i)) {
           logError("[MOTION] Move rejected. Encoder %d stale.", i);
@@ -40,6 +52,8 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
       }
   }
   
+  // 2. Determine Target Axis
+  // (Standard Single-Axis Logic)
   uint8_t target_axis = 255;
   int32_t target_pos = 0;
   float targets_mm[] = {x, y, z, a};
@@ -53,6 +67,7 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   int active_axes_count = 0;
   for (int i = 0; i < MOTION_AXES; i++) {
     int32_t target_counts = (int32_t)(targets_mm[i] * scales[i]);
+    // Check deviation > 1 count
     if (abs(target_counts - motionGetPosition(i)) > 1) { 
       active_axes_count++;
       target_axis = i;
@@ -61,13 +76,14 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   }
 
   if (active_axes_count == 0) {
-    logInfo("[MOTION] Already at target.");
+    // Already there
     taskUnlockMutex(taskGetMotionMutex());
     return;
   }
 
   if (active_axes_count > 1) {
-    logError("[MOTION] Multi-axis move rejected.");
+    // This should be caught by GCodeParser splitting, but safe to keep as hard limit
+    logError("[MOTION] Multi-axis move rejected (Safety Interlock).");
     taskUnlockMutex(taskGetMotionMutex());
     return;
   }
@@ -78,8 +94,10 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
       return;
   }
   
-  float effective_speed = (speed_mm_s == 0.0f) ? MOTION_MED_SPEED_DEFAULT : speed_mm_s;
+  // 3. Speed Profile Selection
+  float effective_speed = (speed_mm_s <= 0.1f) ? 90.0f : speed_mm_s;
   
+  // 4. Soft Limit Check
   if (axes[target_axis].soft_limit_enabled) {
     if (target_pos < axes[target_axis].soft_limit_min || target_pos > axes[target_axis].soft_limit_max) {
       logError("[MOTION] Soft limit violation axis %d", target_axis);
@@ -89,6 +107,7 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
     }
   }
   
+  // 5. Execute
   axes[target_axis].target_position = target_pos;
   axes[target_axis].position_at_stop = motionGetPosition(target_axis);
 
@@ -98,7 +117,7 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   motionSetPLCSpeedProfile(profile); 
 
   bool is_forward = (target_pos > motionGetPosition(target_axis));
-  motionSetPLCAxisDirection(255, false, false); 
+  motionSetPLCAxisDirection(255, false, false); // Reset others
   motionSetPLCAxisDirection(target_axis, true, is_forward); 
 
   active_axis = target_axis;
@@ -108,116 +127,20 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   axes[target_axis].state_entry_ms = millis();
   
   logInfo("[MOTION] Moving Axis %d -> %d", target_axis, target_pos);
+  
   taskUnlockMutex(taskGetMotionMutex());
   
-  // Signal task to wake immediately
+  // Signal task to wake immediately for fast response
   taskSignalMotionUpdate();
 }
 
 void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s) {
-  float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
-  float scale_y = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
-  float scale_z = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
-  float scale_a = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR_DEG;
+  // Helper: Converts relative MM to absolute MM and calls MoveAbsolute
+  // This is safe because MoveAbsolute calculates current position freshly
+  float cur_x = motionGetPositionMM(0);
+  float cur_y = motionGetPositionMM(1);
+  float cur_z = motionGetPositionMM(2);
+  float cur_a = motionGetPositionMM(3);
 
-  float current_x = motionGetPosition(0) / scale_x;
-  float current_y = motionGetPosition(1) / scale_y;
-  float current_z = motionGetPosition(2) / scale_z;
-  float current_a = motionGetPosition(3) / scale_a;
-
-  motionMoveAbsolute(current_x + dx, current_y + dy, current_z + dz, current_a + da, speed_mm_s);
-}
-
-void motionStop() {
-  if (!taskLockMutex(taskGetMotionMutex(), 100)) {
-    logError("[MOTION] Mutex timeout (Stop)");
-    return;
-  }
-  
-  if (active_axis != 255) {
-    motionSetPLCAxisDirection(255, false, false); 
-    axes[active_axis].position_at_stop = motionGetPosition(active_axis); 
-    axes[active_axis].state = MOTION_STOPPING;
-    axes[active_axis].state_entry_ms = millis();
-    logInfo("[MOTION] Stop axis %d", active_axis);
-  } else {
-    logInfo("[MOTION] Idle stop");
-  }
-  taskUnlockMutex(taskGetMotionMutex());
-  taskSignalMotionUpdate(); // Immediate response
-}
-
-void motionPause() {
-  if (!global_enabled) return;
-  if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
-
-  if (active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO)) {
-      motionSetPLCAxisDirection(255, false, false);
-      axes[active_axis].state = MOTION_PAUSED;
-      logInfo("[MOTION] Paused axis %d", active_axis);
-  }
-  taskUnlockMutex(taskGetMotionMutex());
-  taskSignalMotionUpdate();
-}
-
-void motionResume() {
-  if (!global_enabled) return;
-  if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
-
-  if (active_axis != 255 && axes[active_axis].state == MOTION_PAUSED) {
-      logInfo("[MOTION] Resuming axis %d", active_axis);
-      motionSetPLCSpeedProfile(axes[active_axis].saved_speed_profile);
-
-      int32_t current_pos = motionGetPosition(active_axis);
-      int32_t target_pos = axes[active_axis].target_position;
-      bool is_forward = (target_pos > current_pos); 
-
-      motionSetPLCAxisDirection(255, false, false); 
-      motionSetPLCAxisDirection(active_axis, true, is_forward);
-
-      axes[active_axis].state = MOTION_WAIT_CONSENSO;
-      axes[active_axis].state_entry_ms = millis();
-  }
-  taskUnlockMutex(taskGetMotionMutex());
-  taskSignalMotionUpdate();
-}
-
-void motionEmergencyStop() {
-  bool got_mutex = taskLockMutex(taskGetMotionMutex(), 10); 
-  motionSetPLCAxisDirection(255, false, false);
-  global_enabled = false;
-  
-  for (int i = 0; i < MOTION_AXES; i++) axes[i].state = MOTION_ERROR;
-  active_axis = 255;
-  
-  if (got_mutex) taskUnlockMutex(taskGetMotionMutex());
-  else logError("[MOTION] E-Stop forced (Mutex timeout)");
-  
-  logError("[MOTION] [CRITICAL] EMERGENCY STOP ACTIVATED");
-  faultLogError(FAULT_EMERGENCY_HALT, "E-Stop Activated");
-  
-  taskSignalMotionUpdate();
-}
-
-bool motionClearEmergencyStop() {
-  if (global_enabled == true) {
-    Serial.println("[MOTION] [INFO] E-Stop already cleared");
-    return true;
-  }
-  
-  if (safetyIsAlarmed()) {
-    Serial.println("[MOTION] [ERR] Cannot clear - Safety Alarm Active");
-    return false;
-  }
-  
-  global_enabled = true;
-  for (int i = 0; i < MOTION_AXES; i++) {
-    if (axes[i].state == MOTION_ERROR) axes[i].state = MOTION_IDLE;
-  }
-  active_axis = 255;
-  
-  emergencyStopSetActive(false); 
-  Serial.println("[MOTION] [OK] Emergency stop cleared");
-  taskSignalMotionUpdate();
-  return true;
+  motionMoveAbsolute(cur_x + dx, cur_y + dy, cur_z + dz, cur_a + da, speed_mm_s);
 }
