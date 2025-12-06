@@ -7,8 +7,8 @@
 
 static Preferences schema_prefs;
 
-// Current Schema Version (Matches Header)
-// #define CONFIG_SCHEMA_VERSION 2
+// Update schema version to 2 for G-Code/Buffering features
+// #define CONFIG_SCHEMA_VERSION 2 
 
 static const schema_record_t schema_history[] = {
   {0, "Initial schema (v0.1)", "Base motion control", 0},
@@ -17,6 +17,7 @@ static const schema_record_t schema_history[] = {
 };
 
 static const config_key_metadata_t key_metadata[] = {
+  // Motion Limits
   {KEY_X_LIMIT_MIN, 0, 0, "int32", "X min limit", true, true},
   {KEY_X_LIMIT_MAX, 0, 0, "int32", "X max limit", true, true},
   {KEY_Y_LIMIT_MIN, 0, 0, "int32", "Y min limit", true, true},
@@ -26,19 +27,21 @@ static const config_key_metadata_t key_metadata[] = {
   {KEY_A_LIMIT_MIN, 0, 0, "int32", "A min limit", true, true},
   {KEY_A_LIMIT_MAX, 0, 0, "int32", "A max limit", true, true},
   
+  // Dynamics
   {KEY_DEFAULT_SPEED, 0, 0, "float", "Default speed", true, true},
   {KEY_DEFAULT_ACCEL, 0, 0, "float", "Default accel", true, true},
   
+  // Calibration
   {KEY_SPEED_CAL_X, 1, 0, "float", "Calib X Speed", true, false},
   {KEY_SPEED_CAL_Y, 1, 0, "float", "Calib Y Speed", true, false},
   {KEY_SPEED_CAL_Z, 1, 0, "float", "Calib Z Speed", true, false},
   {KEY_SPEED_CAL_A, 1, 0, "float", "Calib A Speed", true, false},
-  
   {KEY_PPM_X, 0, 0, "int32", "X PPM", true, true},
   {KEY_PPM_Y, 0, 0, "int32", "Y PPM", true, true},
   {KEY_PPM_Z, 0, 0, "int32", "Z PPM", true, true},
   {KEY_PPM_A, 0, 0, "int32", "A PPM", true, true},
   
+  // Advanced Tuning
   {KEY_STALL_TIMEOUT, 0, 0, "int32", "Stall Timeout", true, true},
   {KEY_X_APPROACH, 1, 0, "int32", "X Final Approach", true, true},
   {KEY_MOTION_DEADBAND, 1, 0, "int32", "Motion Deadband", true, true},
@@ -131,7 +134,6 @@ migration_result_t configMigrateSchema(uint8_t from_version, uint8_t to_version)
     }
     
     if (configIsKeyActiveInVersion(key, to_version)) {
-        // V1->V2 Upgrade (Example logic, mostly new keys so auto-handled)
         result.items_migrated++;
     } else {
         result.items_new++;

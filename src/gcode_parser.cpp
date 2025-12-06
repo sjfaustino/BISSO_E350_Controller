@@ -102,6 +102,7 @@ void GCodeParser::handleG0_G1(const char* line) {
     if (buffer_enabled) {
         if (motionBuffer.isFull()) {
             logWarning("[GCODE] Buffer Full! Dropping cmd..."); 
+            // In a real system we might block here, but in async loop we return false
             return;
         }
         motionBuffer.push(x, y, z, a, currentFeedRate);

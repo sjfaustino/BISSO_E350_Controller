@@ -8,9 +8,11 @@ WebServerManager webServer(80);
 static char json_response_buffer[WEB_BUFFER_SIZE];
 
 // Credentials for Web Interface
+// Note: In v2.0 these should be moved to NVS config
 const char* http_username = "admin";
-const char* http_password = "password"; // Should be configurable in NVS in future
+const char* http_password = "password"; 
 
+// FIX: Initializer list order matches header declaration
 WebServerManager::WebServerManager(uint16_t port) : server(nullptr), ws(nullptr), port(port) {
     memset(&current_status, 0, sizeof(current_status));
     strcpy(current_status.status, "INITIALIZING");
@@ -32,8 +34,7 @@ void WebServerManager::init() {
     server = new AsyncWebServer(port);
     ws = new AsyncWebSocket("/ws");
     
-    // WebSocket also needs auth, but standard browser WS doesn't support headers easily.
-    // For now, we secure the page serving.
+    // WebSocket Event Handler
     ws->onEvent([this](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
         this->onWsEvent(server, client, type, arg, data, len);
     });
@@ -51,7 +52,9 @@ void WebServerManager::begin() {
     }
 }
 
-void WebServerManager::handleClient() { }
+void WebServerManager::handleClient() { 
+    // No-op for AsyncWebServer
+}
 
 void WebServerManager::setupRoutes() {
     // 1. Static Files (Protected)
@@ -79,9 +82,29 @@ void WebServerManager::setupRoutes() {
         [](AsyncWebServerRequest *request){ request->send(200); }, 
         NULL,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-            // Note: We can't auth in the body handler, must check request first. 
-            // AsyncWebServer handles auth before body callback usually.
+            // Note: Body handler cannot easily check Auth, so we rely on the request header check implicit in the route?
+            // AsyncWebServer auth is usually checked before body callbacks. 
             this->handleJogBody(request, data, len, index, total);
+        }
+    ).setAuthentication(http_username, http_password);
+    
+    // 4. API: List Files (Protected)
+    server->on("/api/files", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+        this->handleFileList(request);
+    });
+
+    // 5. API: Delete File (Protected)
+    server->on("/api/files", HTTP_DELETE, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+        this->handleFileDelete(request);
+    });
+
+    // 6. API: Upload File (Protected)
+    server->on("/api/upload", HTTP_POST, 
+        [](AsyncWebServerRequest *request) { request->send(200); }, 
+        [this](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+            this->handleFileUpload(request, filename, index, data, len, final);
         }
     ).setAuthentication(http_username, http_password);
     
@@ -89,6 +112,8 @@ void WebServerManager::setupRoutes() {
         request->send(404, "text/plain", "Not Found");
     });
 }
+
+// --- Handlers ---
 
 void WebServerManager::handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     JsonDocument doc;
@@ -116,6 +141,64 @@ void WebServerManager::handleJogBody(AsyncWebServerRequest *request, uint8_t *da
     else if (strcmp(direction, "A+") == 0) motionMoveRelative(0, 0, 0, distance, speed);
     else if (strcmp(direction, "A-") == 0) motionMoveRelative(0, 0, 0, -distance, speed);
     else if (strcmp(direction, "STOP") == 0) motionStop();
+}
+
+void WebServerManager::handleFileList(AsyncWebServerRequest *request) {
+    JsonDocument doc;
+    JsonArray array = doc.to<JsonArray>();
+
+    File root = SPIFFS.open("/");
+    File file = root.openNextFile();
+    while(file){
+        JsonObject obj = array.add<JsonObject>();
+        obj["name"] = String(file.name());
+        obj["size"] = file.size();
+        file = root.openNextFile();
+    }
+    
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+}
+
+void WebServerManager::handleFileDelete(AsyncWebServerRequest *request) {
+    if(!request->hasParam("name")) {
+        request->send(400, "text/plain", "Missing name param");
+        return;
+    }
+    
+    String path = request->getParam("name")->value();
+    if(SPIFFS.exists(path)) {
+        SPIFFS.remove(path);
+        request->send(200, "text/plain", "Deleted");
+        Serial.printf("[WEB] Deleted file: %s\n", path.c_str());
+    } else {
+        request->send(404, "text/plain", "File not found");
+    }
+}
+
+void WebServerManager::handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    // Security: Filter extensions
+    if (!filename.endsWith(".nc") && !filename.endsWith(".gcode") && !filename.endsWith(".txt")) {
+        // We can't cancel the upload stream easily mid-stream, but we can refuse to write
+        if(index == 0) Serial.println("[WEB] Blocked upload of non-GCode file");
+        return;
+    }
+
+    if (!index) {
+        Serial.printf("[WEB] Upload Start: %s\n", filename.c_str());
+        if(!filename.startsWith("/")) filename = "/" + filename;
+        request->_tempFile = SPIFFS.open(filename, "w");
+    }
+    
+    if (request->_tempFile) {
+        request->_tempFile.write(data, len);
+    }
+
+    if (final) {
+        if(request->_tempFile) request->_tempFile.close();
+        Serial.printf("[WEB] Upload Complete: %s (%u bytes)\n", filename.c_str(), index + len);
+    }
 }
 
 void WebServerManager::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {

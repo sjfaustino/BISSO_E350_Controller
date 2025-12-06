@@ -1,7 +1,7 @@
 /**
  * @file web_server.h
- * @brief Async Web Server manager with WebSockets
- * @project Gemini v1.1.0
+ * @brief Async Web Server manager with WebSockets, Auth, and File Management
+ * @project Gemini v1.3.0
  * @author Sergio Faustino - sjfaustino@gmail.com
  */
 
@@ -23,7 +23,7 @@ public:
     void init();
     void begin();
     
-    // Legacy support (No-op in Async mode, kept for compatibility)
+    // Legacy support (No-op in Async mode)
     void handleClient(); 
 
     // Telemetry & State
@@ -31,7 +31,7 @@ public:
     void setAxisPosition(char axis, float position);
     void setSystemUptime(uint32_t seconds);
     
-    // NEW: Push state to all connected WebSocket clients
+    // Push state to all connected WebSocket clients
     void broadcastState();
 
 private:
@@ -50,6 +50,11 @@ private:
     void setupRoutes();
     void handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+
+    // File Manager Handlers
+    void handleFileList(AsyncWebServerRequest *request);
+    void handleFileDelete(AsyncWebServerRequest *request);
+    void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
 };
 
 extern WebServerManager webServer;
