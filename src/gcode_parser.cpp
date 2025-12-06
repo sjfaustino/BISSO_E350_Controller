@@ -62,13 +62,13 @@ bool GCodeParser::processCommand(const char* line) {
 }
 
 void GCodeParser::handleG0_G1(const char* line) {
-    // 1. Update Feed Rate
+    // 1. Update Feed Rate if present
     float fVal = 0.0f;
     if (parseCode(line, 'F', fVal)) {
         if (fVal > 0) currentFeedRate = fVal;
     }
 
-    // 2. Parse Axes Presence
+    // 2. Parse Axes
     float reqX = 0, reqY = 0, reqZ = 0, reqA = 0;
     bool hasX = parseCode(line, 'X', reqX);
     bool hasY = parseCode(line, 'Y', reqY);
@@ -83,7 +83,7 @@ void GCodeParser::handleG0_G1(const char* line) {
     float curZ = motionGetPositionMM(2);
     float curA = motionGetPositionMM(3);
 
-    // 4. Determine Target Positions (Normalize to Absolute)
+    // 4. Determine Absolute Targets
     float targetX = curX;
     float targetY = curY;
     float targetZ = curZ;
@@ -102,7 +102,7 @@ void GCodeParser::handleG0_G1(const char* line) {
         if (hasA) targetA += reqA;
     }
 
-    // 5. Detect Active Axes (Change in position > small epsilon)
+    // 5. Detect Active Axes (Change > epsilon)
     bool moveX = (fabs(targetX - curX) > 0.01f);
     bool moveY = (fabs(targetY - curY) > 0.01f);
     bool moveZ = (fabs(targetZ - curZ) > 0.01f);
@@ -110,53 +110,48 @@ void GCodeParser::handleG0_G1(const char* line) {
 
     int activeCount = (moveX ? 1 : 0) + (moveY ? 1 : 0) + (moveZ ? 1 : 0) + (moveA ? 1 : 0);
 
-    // 6. Serialization Logic
-    // If only one axis is moving, or no axes (feed rate update only), push single command.
+    // 6. Serialization Logic (The Auto-Splitter)
     if (activeCount <= 1) {
+        // Single axis or no move: Pass through directly
         pushMove(targetX, targetY, targetZ, targetA);
         return;
     }
 
-    // MULTI-AXIS DETECTED: Serialize!
-    // We split the move into sequential steps to respect single-VFD hardware.
-    // Order: X -> Y -> Z -> A (Standard cascade)
-    // Note: We maintain the "Target" state for non-moving axes at each step 
-    // so they hold position.
-
+    // MULTI-AXIS DETECTED: Split into sequential moves
+    // We update the "current" tracking variable after each push so the next move
+    // starts where the previous one ended.
+    
     logInfo("[GCODE] Auto-Splitting %d-axis move...", activeCount);
 
     if (moveX) {
-        pushMove(targetX, curY, curZ, curA); // Move X, hold others at START
-        curX = targetX; // Update "Current" for next step logic
+        pushMove(targetX, curY, curZ, curA); // Move X, hold Y/Z/A
+        curX = targetX; 
     }
     if (moveY) {
-        pushMove(targetX, targetY, curZ, curA); // Move Y, X is now at TARGET, others at START
+        pushMove(targetX, targetY, curZ, curA); // Move Y, hold X/Z/A
         curY = targetY;
     }
     if (moveZ) {
-        pushMove(targetX, targetY, targetZ, curA);
+        pushMove(targetX, targetY, targetZ, curA); // Move Z, hold X/Y/A
         curZ = targetZ;
     }
     if (moveA) {
-        pushMove(targetX, targetY, targetZ, targetA);
+        pushMove(targetX, targetY, targetZ, targetA); // Move A, hold X/Y/Z
     }
 }
 
-// Helper to encapsulate Buffer vs Direct logic
+// Helper to push to buffer or execute directly
 void GCodeParser::pushMove(float x, float y, float z, float a) {
     int buffer_enabled = configGetInt(KEY_MOTION_BUFFER_ENABLE, 0); 
     
     if (buffer_enabled) {
-        // Retry loop or drop? For simplicity, we drop if full, but in job mode 
-        // the JobManager handles flow control, so this shouldn't happen often.
         if (motionBuffer.isFull()) {
-            logWarning("[GCODE] Buffer Full! Move Dropped (X%.1f Y%.1f)", x, y); 
+            logWarning("[GCODE] Buffer Full! Move Dropped."); 
             return;
         }
         motionBuffer.push(x, y, z, a, currentFeedRate);
-        // logVerbose("[GCODE] Buffered: %.1f, %.1f, %.1f", x, y, z);
     } else {
-        // Direct Mode (Blocking/Immediate)
+        // Direct Mode (Legacy) - Will fail if multi-axis splitting logic wasn't here!
         motionMoveAbsolute(x, y, z, a, currentFeedRate);
     }
 }

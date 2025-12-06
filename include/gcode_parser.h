@@ -27,7 +27,7 @@ private:
     void handleG91();
     void handleG92(const char* line);
     
-    // Internal helper to route move to Buffer or Core
+    // Internal helper
     void pushMove(float x, float y, float z, float a);
 };
 
