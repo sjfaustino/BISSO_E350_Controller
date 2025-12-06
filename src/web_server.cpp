@@ -5,8 +5,11 @@
 // Global instance
 WebServerManager webServer(80);
 
-// Buffer for WebSocket broadcasts
 static char json_response_buffer[WEB_BUFFER_SIZE];
+
+// Credentials for Web Interface
+const char* http_username = "admin";
+const char* http_password = "password"; // Should be configurable in NVS in future
 
 WebServerManager::WebServerManager(uint16_t port) : server(nullptr), ws(nullptr), port(port) {
     memset(&current_status, 0, sizeof(current_status));
@@ -29,7 +32,8 @@ void WebServerManager::init() {
     server = new AsyncWebServer(port);
     ws = new AsyncWebSocket("/ws");
     
-    // Setup WebSocket
+    // WebSocket also needs auth, but standard browser WS doesn't support headers easily.
+    // For now, we secure the page serving.
     ws->onEvent([this](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
         this->onWsEvent(server, client, type, arg, data, len);
     });
@@ -47,17 +51,16 @@ void WebServerManager::begin() {
     }
 }
 
-void WebServerManager::handleClient() {
-    // No-op for AsyncWebServer
-    // Kept to prevent breaking existing main.cpp loop calls if any
-}
+void WebServerManager::handleClient() { }
 
 void WebServerManager::setupRoutes() {
-    // 1. Static Files (Non-blocking)
-    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+    // 1. Static Files (Protected)
+    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setAuthentication(http_username, http_password);
 
-    // 2. API Status (GET)
+    // 2. API Status (Protected)
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+        
         JsonDocument doc;
         doc["status"] = current_status.status;
         doc["x_pos"] = current_status.x_pos;
@@ -71,14 +74,16 @@ void WebServerManager::setupRoutes() {
         request->send(200, "application/json", response);
     });
 
-    // 3. API Jog (POST) with Body Handling
+    // 3. API Jog (Protected)
     server->on("/api/jog", HTTP_POST, 
         [](AsyncWebServerRequest *request){ request->send(200); }, 
         NULL,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            // Note: We can't auth in the body handler, must check request first. 
+            // AsyncWebServer handles auth before body callback usually.
             this->handleJogBody(request, data, len, index, total);
         }
-    );
+    ).setAuthentication(http_username, http_password);
     
     server->onNotFound([](AsyncWebServerRequest *request){
         request->send(404, "text/plain", "Not Found");
@@ -86,10 +91,6 @@ void WebServerManager::setupRoutes() {
 }
 
 void WebServerManager::handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    // Note: Simple implementation assuming small JSON body < buffer size
-    // In production, accumulation might be needed for large packets, 
-    // but Jog commands are tiny (~50 bytes).
-    
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, data, len);
     
@@ -120,7 +121,6 @@ void WebServerManager::handleJogBody(AsyncWebServerRequest *request, uint8_t *da
 void WebServerManager::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
     if(type == WS_EVT_CONNECT){
         Serial.printf("[WEB] WS Client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-        // Send immediate update on connect
         broadcastState();
     } else if(type == WS_EVT_DISCONNECT){
         Serial.printf("[WEB] WS Client #%u disconnected\n", client->id());
@@ -128,12 +128,11 @@ void WebServerManager::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 }
 
 void WebServerManager::broadcastState() {
-    // Only broadcast if clients are connected
     if (ws->count() == 0) return;
 
     JsonDocument doc;
     doc["status"] = current_status.status;
-    doc["x"] = current_status.x_pos; // Shortened keys for efficiency
+    doc["x"] = current_status.x_pos; 
     doc["y"] = current_status.y_pos;
     doc["z"] = current_status.z_pos;
     doc["a"] = current_status.a_pos;

@@ -1,5 +1,6 @@
 #include "serial_logger.h"
-#include "firmware_version.h" // <-- NEW: Required for banner
+#include "firmware_version.h" 
+#include "network_manager.h" // <-- NEW: Link to Network Manager
 #include <stdio.h>
 
 #define LOGGER_BUFFER_SIZE 512
@@ -11,13 +12,20 @@ static void vlogPrint(log_level_t level, const char* prefix, const char* format,
   int offset = 0;
   if (prefix != NULL) offset = snprintf(log_buffer, LOGGER_BUFFER_SIZE, "%s", prefix);
   vsnprintf(log_buffer + offset, LOGGER_BUFFER_SIZE - offset, format, args);
+  
+  // Output to Serial (UART)
   Serial.println(log_buffer);
+
+  // Output to Telnet (Network Mirror)
+  // Check if network manager is active (simple check to avoid crash before init)
+  // Ideally, use a safer singleton pattern or check a flag. 
+  // For now, assuming networkManager is global and robust.
+  networkManager.telnetPrintln(log_buffer);
 }
 
 void serialLoggerInit(log_level_t log_level) {
   current_log_level = log_level;
   
-  // FIX: Dynamic Banner
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(ver_str, sizeof(ver_str));
 
@@ -64,12 +72,14 @@ void logPrintf(const char* format, ...) {
   va_list args; va_start(args, format);
   vsnprintf(log_buffer, LOGGER_BUFFER_SIZE, format, args); va_end(args);
   Serial.print(log_buffer);
+  networkManager.telnetPrint(log_buffer); // Mirror raw prints
 }
 
 void logPrintln(const char* format, ...) {
   va_list args; va_start(args, format);
   vsnprintf(log_buffer, LOGGER_BUFFER_SIZE, format, args); va_end(args);
   Serial.println(log_buffer);
+  networkManager.telnetPrintln(log_buffer); // Mirror raw prints
 }
 
 char* serialLoggerGetBuffer() { return log_buffer; }

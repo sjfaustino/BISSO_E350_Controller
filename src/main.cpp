@@ -11,12 +11,13 @@
 #include "motion.h"
 #include "plc_iface.h"
 #include "safety.h"
-#include "serial_logger.h"
+#include "serial_logger.h" 
 #include "system_constants.h"
 #include "task_manager.h"
 #include "timeout_manager.h"
 #include "watchdog_manager.h"
 #include "web_server.h"
+#include "network_manager.h" // <-- NEW
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -49,8 +50,15 @@ bool init_enc_wrapper() { wj66Init(); return true; }
 bool init_safety_wrapper() { safetyInit(); return true; }
 bool init_motion_wrapper() { motionInit(); return true; }
 bool init_cli_wrapper() { cliInit(); return true; }
-bool init_web_wrapper() { webServer.init(); webServer.begin(); return true; }
 bool init_inputs_wrapper() { boardInputsInit(); return true; }
+
+// NEW: Network init handles WiFi + Web Server + Telnet
+bool init_network_wrapper() { 
+    networkManager.init(); 
+    webServer.init(); 
+    webServer.begin(); 
+    return true; 
+}
 
 #define BOOT_INIT(name, func, code) \
   do { \
@@ -87,7 +95,9 @@ void setup() {
   BOOT_INIT("Safety", init_safety_wrapper, BOOT_ERROR_SAFETY);
   BOOT_INIT("Motion", init_motion_wrapper, BOOT_ERROR_MOTION);
   BOOT_INIT("CLI", init_cli_wrapper, BOOT_ERROR_CLI);
-  BOOT_INIT("Web", init_web_wrapper, (boot_status_code_t)13);
+  
+  // Initialize Network Stack (WiFi/OTA/Web/Telnet)
+  BOOT_INIT("Network", init_network_wrapper, (boot_status_code_t)13);
 
   logInfo("[BOOT] Validating system health...");
   if (!bootValidateAllSystems()) {
@@ -100,12 +110,15 @@ void setup() {
 
   logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
 
-  // AsyncWebServer runs on the LwIP task. We can delete the Arduino Loop Task
-  // to free up heap and stack for other RTOS tasks.
-  vTaskDelete(NULL);
+  // Note: We do NOT delete the loop task anymore, because the Network Manager
+  // needs to run in the main loop context for OTA and Telnet polling.
+  // vTaskDelete(NULL); 
 }
 
 void loop() {
-  // Unreachable code due to vTaskDelete above.
-  // Kept empty to satisfy Arduino linker requirements.
+  // Run Network maintenance loops
+  networkManager.update();
+  
+  // Small delay to prevent watchdog starvation of the IDLE task
+  delay(10); 
 }
