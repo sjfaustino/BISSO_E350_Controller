@@ -1,11 +1,12 @@
 #include "gcode_parser.h"
 #include "motion.h"
+#include "motion_buffer.h" // <-- NEW: Buffer integration
+#include "config_unified.h"
+#include "config_keys.h"
 #include "serial_logger.h"
-#include "system_constants.h"
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include <ctype.h>
-#include <math.h>
 
 GCodeParser gcodeParser;
 
@@ -14,7 +15,6 @@ GCodeParser::GCodeParser() : distanceMode(G_MODE_ABSOLUTE), currentFeedRate(50.0
 void GCodeParser::init() {
     logInfo("[GCODE] Initializing Interpreter...");
     distanceMode = G_MODE_ABSOLUTE;
-    // Default to medium speed
     currentFeedRate = 50.0f; 
     logInfo("[GCODE] Ready. Mode: Absolute, Feed: %.1f mm/s", currentFeedRate);
 }
@@ -61,7 +61,7 @@ bool GCodeParser::processCommand(const char* line) {
 }
 
 void GCodeParser::handleG0_G1(const char* line) {
-    // 1. Update Feed Rate if present
+    // 1. Update Feed Rate
     float fVal = 0.0f;
     if (parseCode(line, 'F', fVal)) {
         if (fVal > 0) currentFeedRate = fVal;
@@ -74,28 +74,41 @@ void GCodeParser::handleG0_G1(const char* line) {
     bool hasZ = parseCode(line, 'Z', z);
     bool hasA = parseCode(line, 'A', a);
 
-    if (!hasX && !hasY && !hasZ && !hasA) {
-        // No move data
-        return;
-    }
+    if (!hasX && !hasY && !hasZ && !hasA) return;
 
-    // 3. Execute Move based on Mode
-    if (distanceMode == G_MODE_RELATIVE) {
-        // Relative: Pass deltas directly (0 if not present)
-        motionMoveRelative(
-            hasX ? x : 0, 
-            hasY ? y : 0, 
-            hasZ ? z : 0, 
-            hasA ? a : 0, 
-            currentFeedRate
-        );
-    } else {
-        // Absolute: Fetch current position for missing axes to maintain position
+    // 3. Resolve Coordinates (Relative vs Absolute)
+    if (distanceMode == G_MODE_ABSOLUTE) {
+        // Fill missing axes with CURRENT position to maintain state
         if (!hasX) x = motionGetPositionMM(0);
         if (!hasY) y = motionGetPositionMM(1);
         if (!hasZ) z = motionGetPositionMM(2);
         if (!hasA) a = motionGetPositionMM(3);
+    } else {
+        // Relative: Add delta to current position
+        float currX = motionGetPositionMM(0);
+        float currY = motionGetPositionMM(1);
+        float currZ = motionGetPositionMM(2);
+        float currA = motionGetPositionMM(3);
         
+        if (hasX) x = currX + x; else x = currX;
+        if (hasY) y = currY + y; else y = currY;
+        if (hasZ) z = currZ + z; else z = currZ;
+        if (hasA) a = currA + a; else a = currA;
+    }
+
+    // 4. Execute or Buffer
+    int buffer_enabled = configGetInt(KEY_MOTION_BUFFER_ENABLE, 0); // Default OFF (Direct)
+    
+    if (buffer_enabled) {
+        if (motionBuffer.isFull()) {
+            logWarning("[GCODE] Buffer Full! Dropping cmd..."); 
+            return;
+        }
+        motionBuffer.push(x, y, z, a, currentFeedRate);
+        logInfo("[GCODE] Buffered: X%.1f Y%.1f", x, y);
+    } else {
+        // Direct Mode (Legacy/Manual)
+        // Note: Will fail if axis busy
         motionMoveAbsolute(x, y, z, a, currentFeedRate);
     }
 }

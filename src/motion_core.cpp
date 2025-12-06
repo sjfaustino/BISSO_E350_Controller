@@ -1,4 +1,5 @@
 #include "motion.h"
+#include "motion_buffer.h" // <-- NEW: Buffer integration
 #include "system_constants.h"
 #include "plc_iface.h"
 #include "encoder_motion_integration.h"
@@ -11,9 +12,6 @@
 #include "config_unified.h" 
 #include "config_keys.h"
 #include <math.h> 
-#include <string.h>
-#include <stdlib.h> 
-#include <stdio.h>
 
 // ============================================================================
 // CORE STATE DEFINITIONS
@@ -41,7 +39,6 @@ const uint8_t AXIS_TO_CONSENSO_BIT[] = {ELBO_Q73_CONSENSO_X, ELBO_Q73_CONSENSO_Y
 
 void motionInit() {
   logInfo("[MOTION] Initializing...");
-  
   if (MOTION_AXES != 4) {
     faultLogError(FAULT_BOOT_FAILED, "Invalid axis count");
     return;
@@ -51,6 +48,8 @@ void motionInit() {
     axes[i].state = MOTION_IDLE;
     axes[i].enabled = true;
   }
+  
+  motionBuffer.init(); // Initialize the G-Code Ring Buffer
   
   last_update_ms = millis();
   motionSetPLCAxisDirection(255, false, false); 
@@ -69,6 +68,26 @@ void motionUpdate() {
   
   uint32_t now = millis();
   last_update_ms = now;
+
+  // --- 1. BUFFER DRAIN LOGIC (Look-Ahead) ---
+  if (active_axis == 255 && !motionBuffer.isEmpty()) {
+      // Check if Buffering is enabled in config
+      int buffer_enabled = configGetInt(KEY_MOTION_BUFFER_ENABLE, 0);
+      
+      if (buffer_enabled) {
+          motion_cmd_t cmd;
+          if (motionBuffer.pop(&cmd)) {
+              // We must unlock to call the API (which re-locks)
+              taskUnlockMutex(taskGetMotionMutex()); 
+              
+              // Execute the popped command
+              // Note: This call is blocking relative to the mutex, but safe here.
+              motionMoveAbsolute(cmd.x, cmd.y, cmd.z, cmd.a, cmd.speed_mm_s);
+              return; // Exit to let the loop re-enter with new state
+          }
+      }
+  }
+  // ------------------------------------------
   
   if (active_axis != 255) {
     motion_axis_t* axis = &axes[active_axis];
@@ -98,7 +117,6 @@ void motionUpdate() {
             axis->state = MOTION_ERROR;
         } else {
             uint8_t bit = AXIS_TO_CONSENSO_BIT[active_axis];
-            // If no bit assigned (255) or bit is active, proceed
             if (bit == 255 || elboQ73GetConsenso(bit)) {
                 axis->state = MOTION_EXECUTING;
                 axis->state_entry_ms = now;
@@ -108,24 +126,22 @@ void motionUpdate() {
 
       case MOTION_EXECUTING:
         {
-            // --- X-AXIS FINAL APPROACH LOGIC ---
-            if (active_axis == 0) { // Axis 0 = X
+            // --- X-AXIS DYNAMIC APPROACH LOGIC ---
+            if (active_axis == 0) { 
                 int32_t dist = abs(axis->target_position - current_pos);
                 int32_t threshold_counts = 0;
                 float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
 
-                // 1. Get Mode
                 int mode = configGetInt(KEY_MOTION_APPROACH_MODE, APPROACH_MODE_FIXED);
 
                 if (mode == APPROACH_MODE_FIXED) {
-                    // FIXED MODE: Configured Distance (Default 50mm)
+                    // FIXED MODE
                     int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
                     threshold_counts = (int32_t)(approach_mm * scale_x);
                 } else {
-                    // DYNAMIC MODE: Physics-based calculation
+                    // DYNAMIC MODE: Physics-based calculation (v^2 / 2a)
                     float current_speed_mm_s = 0.0f;
                     
-                    // Determine current target speed from profile
                     if (axis->saved_speed_profile == SPEED_PROFILE_3) 
                         current_speed_mm_s = machineCal.X.speed_fast_mm_min / 60.0f;
                     else if (axis->saved_speed_profile == SPEED_PROFILE_2) 
@@ -133,20 +149,16 @@ void motionUpdate() {
                     else 
                         current_speed_mm_s = machineCal.X.speed_slow_mm_min / 60.0f;
 
-                    // Get Deceleration (Default 5.0 mm/s^2)
                     float accel = configGetFloat(KEY_DEFAULT_ACCEL, 5.0f);
-                    if (accel < 0.1f) accel = 0.1f; // Safety clamp
+                    if (accel < 0.1f) accel = 0.1f; 
 
-                    // d = v^2 / (2*a)
                     float stop_dist_mm = (current_speed_mm_s * current_speed_mm_s) / (2.0f * accel);
-                    
-                    // Add 10% safety margin
-                    stop_dist_mm *= 1.1f;
+                    stop_dist_mm *= 1.1f; // 10% Safety Margin
                     
                     threshold_counts = (int32_t)(stop_dist_mm * scale_x);
                 }
 
-                // 2. Apply Downshift Logic
+                // Apply Downshift
                 if (dist <= threshold_counts && dist > 100 && axis->saved_speed_profile != SPEED_PROFILE_1) {
                     if (mode == APPROACH_MODE_DYNAMIC) {
                         logInfo("[MOTION] Dynamic Approach Trigger: %ld counts", (long)threshold_counts);
@@ -157,7 +169,7 @@ void motionUpdate() {
             }
             // ----------------------------------------
 
-            // Check if target is reached (Simple crossing check)
+            // Check if target is reached
             if ((active_start_position < axis->target_position && current_pos >= axis->target_position) ||
                 (active_start_position > axis->target_position && current_pos <= axis->target_position)) {
               
@@ -174,11 +186,10 @@ void motionUpdate() {
         
       case MOTION_STOPPING:
         {
-            // Use Configurable Deadband for Settling
             int32_t deadband = configGetInt(KEY_MOTION_DEADBAND, 10);
             if (abs(current_pos - axis->position_at_stop) < deadband) { 
                 axis->state = MOTION_IDLE;
-                active_axis = 255;
+                active_axis = 255; // Free axis, buffer can pick up next move now
             }
         }
         break;
@@ -197,11 +208,10 @@ int32_t motionGetPosition(uint8_t axis) { return (axis < MOTION_AXES) ? wj66GetP
 int32_t motionGetTarget(uint8_t axis) { return (axis < MOTION_AXES) ? axes[axis].target_position : 0; }
 motion_state_t motionGetState(uint8_t axis) { return (axis < MOTION_AXES) ? axes[axis].state : MOTION_ERROR; }
 
-// Helper: Convert raw counts to physical units (mm or degrees)
+// HELPER: Convert Raw Counts -> MM/Deg
 float motionGetPositionMM(uint8_t axis) {
     if (axis >= MOTION_AXES) return 0.0f;
     int32_t counts = motionGetPosition(axis);
-    
     float scale = 1.0f;
     
     if (axis == 0) scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
@@ -228,13 +238,9 @@ uint8_t motionGetActiveAxis() { return active_axis; }
 
 void motionDiagnostics() {
   Serial.printf("\n[MOTION] Global: %s | Active: %d\n", global_enabled ? "ON" : "OFF", active_axis);
-  
   for (int i = 0; i < MOTION_AXES; i++) {
     Serial.printf("  Axis %d: %s | Pos: %ld | Tgt: %ld\n", 
-                  i, 
-                  motionStateToString(axes[i].state), 
-                  (long)motionGetPosition(i), 
-                  (long)axes[i].target_position);
+                  i, motionStateToString(axes[i].state), (long)motionGetPosition(i), (long)axes[i].target_position);
   }
 }
 
@@ -265,7 +271,7 @@ bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos) {
 
 bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) {
   if (axis >= MOTION_AXES) return false;
-  return true; // Simplified validation
+  return true; 
 }
 
 bool motionSetState(uint8_t axis, motion_state_t new_state) {

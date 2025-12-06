@@ -4,8 +4,8 @@
 /**
  * @file config_keys.h
  * @brief Centralized definition of all NVS configuration keys.
- * @project Gemini v1.0.0
- * @author Sergio Faustino - sjfaustino@gmail.com
+ * @project Gemini v2.0.0
+ * @author Sergio Faustino
  */
 
 // ============================================================================
@@ -57,11 +57,14 @@ static const char* const KEY_DEFAULT_ACCEL = "default_acceleration";
 // Final approach distance for X-axis (mm)
 static const char* const KEY_X_APPROACH = "x_approach_mm";
 
-// NEW: Approach Mode (0=Fixed, 1=Dynamic)
+// Approach Mode (0=Fixed, 1=Dynamic)
 static const char* const KEY_MOTION_APPROACH_MODE = "motion_approach_mode";
 
 // Encoder count deadband for declaring motion "stopped"
 static const char* const KEY_MOTION_DEADBAND = "motion_settle_deadband";
+
+// NEW: Enable Motion Ring Buffer (0=Direct, 1=Buffered)
+static const char* const KEY_MOTION_BUFFER_ENABLE = "motion_buffer_enable"; 
 
 // ============================================================================
 // SAFETY & HARDWARE

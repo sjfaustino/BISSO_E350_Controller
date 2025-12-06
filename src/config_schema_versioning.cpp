@@ -7,12 +7,13 @@
 
 static Preferences schema_prefs;
 
-// FIX: Removed unused variable to silence compiler warning
-// static uint8_t current_schema_version = CONFIG_SCHEMA_VERSION; 
+// Current Schema Version (Matches Header)
+// #define CONFIG_SCHEMA_VERSION 2
 
 static const schema_record_t schema_history[] = {
   {0, "Initial schema (v0.1)", "Base motion control", 0},
-  {1, "Enhanced schema (v4.2)", "Speed calibration, NVS persistence", 1700000000}
+  {1, "Enhanced schema (v4.2)", "Speed calibration, NVS persistence", 1700000000},
+  {2, "Gemini v2.0", "Motion Buffering & G-Code Support", 1710000000}
 };
 
 static const config_key_metadata_t key_metadata[] = {
@@ -41,8 +42,10 @@ static const config_key_metadata_t key_metadata[] = {
   {KEY_STALL_TIMEOUT, 0, 0, "int32", "Stall Timeout", true, true},
   {KEY_X_APPROACH, 1, 0, "int32", "X Final Approach", true, true},
   {KEY_MOTION_DEADBAND, 1, 0, "int32", "Motion Deadband", true, true},
-  
   {KEY_MOTION_APPROACH_MODE, 1, 0, "int32", "Approach Mode", true, true},
+
+  // NEW in v2.0
+  {KEY_MOTION_BUFFER_ENABLE, 2, 0, "int32", "Enable Motion Queue (0/1)", true, true},
 
   {NULL, 0, 0, NULL, NULL, false, false}
 };
@@ -101,7 +104,6 @@ const char* configGetKeyMetadata(const char* key) {
   return "Unknown";
 }
 
-// FIX: Added missing implementation for configGetKeyType used in CLI
 const char* configGetKeyType(const char* key) {
   for (int i = 0; key_metadata[i].key != NULL; i++) {
     if (strcmp(key_metadata[i].key, key) == 0) return key_metadata[i].type;
@@ -129,14 +131,7 @@ migration_result_t configMigrateSchema(uint8_t from_version, uint8_t to_version)
     }
     
     if (configIsKeyActiveInVersion(key, to_version)) {
-        // V0->V1 Upgrade Logic
-        if (from_version == 0 && to_version == 1 && strcmp(key, KEY_DEFAULT_SPEED) == 0) {
-             float old_spd = configGetFloat(KEY_DEFAULT_SPEED, 15.0f);
-             configSetFloat(KEY_SPEED_CAL_X, old_spd);
-             configSetFloat(KEY_SPEED_CAL_Y, old_spd);
-             configSetFloat(KEY_SPEED_CAL_Z, old_spd);
-             configSetFloat(KEY_SPEED_CAL_A, old_spd);
-        }
+        // V1->V2 Upgrade (Example logic, mostly new keys so auto-handled)
         result.items_migrated++;
     } else {
         result.items_new++;
@@ -147,7 +142,6 @@ migration_result_t configMigrateSchema(uint8_t from_version, uint8_t to_version)
   configUnifiedSave();
   
   result.success = true;
-  // FIX: Cast items_migrated to unsigned long for %lu
   snprintf(result.migration_log, 512, "Migrated: %lu items", (unsigned long)result.items_migrated);
   Serial.printf("[SCHEMA] [OK] Migration complete: %s\n", result.migration_log);
   
@@ -164,7 +158,6 @@ bool configIsMigrationNeeded() {
 }
 
 bool configRollbackToVersion(uint8_t target_version) {
-  // FIX: Check against 0 explicitly instead of macro if macro is 0 (unsigned comparison warning)
   if (target_version > CONFIG_SCHEMA_VERSION) { 
       Serial.println("[SCHEMA] [ERR] Target version too new");
       return false;
