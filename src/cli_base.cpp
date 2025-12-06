@@ -5,6 +5,7 @@
 #include "task_manager.h"
 #include "system_utilities.h" 
 #include "firmware_version.h" 
+#include "gcode_parser.h" // <-- NEW: G-Code integration
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -45,16 +46,21 @@ void cliInit() {
   cli_pos = 0;
   command_count = 0;
   
+  // Register Core Commands
   cliRegisterCommand("help", "Show help", cmd_help);
   cliRegisterCommand("info", "System information", cmd_system_info);
   cliRegisterCommand("reset", "System reset", cmd_system_reset);
   
+  // Register Modules
   cliRegisterConfigCommands();
   cliRegisterMotionCommands();
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
   cliRegisterWifiCommands(); 
   
+  // Initialize G-Code Engine
+  gcodeParser.init();
+
   Serial.printf("[CLI] [OK] Ready (%d commands)\n", command_count);
   cliPrintPrompt();
 }
@@ -96,6 +102,20 @@ void cliUpdate() {
 void cliProcessCommand(const char* cmd) {
   if (strlen(cmd) == 0) return;
   
+  // --- G-Code Auto-Detection ---
+  // If line starts with 'G' or 'M' followed by a digit, send to Parser
+  // Example: "G1 X100" or "M2"
+  if ((cmd[0] == 'G' || cmd[0] == 'M') && isdigit(cmd[1])) {
+      if (gcodeParser.processCommand(cmd)) {
+          // Command successfully handled by G-Code engine
+          return; 
+      }
+      // If parser returns false (e.g. unknown code), we could fall through
+      // or just print an error. For now, fall through to CLI to see if 
+      // there is a CLI command named "G99" (unlikely but safe).
+  }
+  // ----------------------------------
+
   char cmd_copy[CLI_BUFFER_SIZE];
   strncpy(cmd_copy, cmd, CLI_BUFFER_SIZE - 1);
   cmd_copy[CLI_BUFFER_SIZE - 1] = '\0';
@@ -220,8 +240,6 @@ void cmd_system_info(int argc, char** argv) {
   Serial.println("\n=== SYSTEM INFORMATION ===");
   Serial.printf("Firmware:  %s\n", version_str);
   Serial.printf("Platform:  ESP32-S3 (KC868-A16)\n");
-  
-  // FIX: Cast uptime to unsigned long to match %lu
   Serial.printf("Uptime:    %lu seconds\n", (unsigned long)taskGetUptime());
   
   bootShowStatus();

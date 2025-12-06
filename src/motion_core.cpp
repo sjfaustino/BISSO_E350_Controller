@@ -68,9 +68,6 @@ void motionUpdate() {
   if (!taskLockMutex(taskGetMotionMutex(), 0)) return; 
   
   uint32_t now = millis();
-  
-  // Redundant timing check removed as Task Manager handles 100Hz pacing, 
-  // but keeping delta update for state logic if needed.
   last_update_ms = now;
   
   if (active_axis != 255) {
@@ -200,6 +197,21 @@ int32_t motionGetPosition(uint8_t axis) { return (axis < MOTION_AXES) ? wj66GetP
 int32_t motionGetTarget(uint8_t axis) { return (axis < MOTION_AXES) ? axes[axis].target_position : 0; }
 motion_state_t motionGetState(uint8_t axis) { return (axis < MOTION_AXES) ? axes[axis].state : MOTION_ERROR; }
 
+// Helper: Convert raw counts to physical units (mm or degrees)
+float motionGetPositionMM(uint8_t axis) {
+    if (axis >= MOTION_AXES) return 0.0f;
+    int32_t counts = motionGetPosition(axis);
+    
+    float scale = 1.0f;
+    
+    if (axis == 0) scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
+    else if (axis == 1) scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
+    else if (axis == 2) scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
+    else if (axis == 3) scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR_DEG;
+    
+    return (float)counts / scale;
+}
+
 bool motionIsMoving() {
   return active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO);
 }
@@ -218,7 +230,6 @@ void motionDiagnostics() {
   Serial.printf("\n[MOTION] Global: %s | Active: %d\n", global_enabled ? "ON" : "OFF", active_axis);
   
   for (int i = 0; i < MOTION_AXES; i++) {
-    // FIX: Cast to long for printf compatibility with int32_t on all platforms
     Serial.printf("  Axis %d: %s | Pos: %ld | Tgt: %ld\n", 
                   i, 
                   motionStateToString(axes[i].state), 
