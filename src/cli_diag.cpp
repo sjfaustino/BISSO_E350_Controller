@@ -19,6 +19,7 @@
 #include "plc_iface.h"
 #include "motion.h" 
 #include "config_unified.h"
+#include "config_manager.h"   // <-- NEW: Required for configValidate
 #include "config_schema_versioning.h"
 #include "config_validator.h"
 #include "safety.h"           
@@ -27,6 +28,8 @@
 #include "encoder_calibration.h" 
 #include "system_utilities.h" 
 #include "input_validation.h" 
+#include "board_inputs.h"     // <-- NEW: Required for BOARD_INPUT_I2C_ADDR
+#include "system_constants.h" 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -43,6 +46,81 @@ void debugEncodersHandler();
 void debugAllHandler();
 void debugConfigHandler();
 void cmd_diag_scheduler_main(int argc, char** argv);
+
+// ============================================================================
+// SELF-TEST COMMAND IMPLEMENTATION
+// ============================================================================
+void cmd_selftest(int argc, char** argv) {
+    Serial.println("\n=== SYSTEM SELF-TEST SEQUENCE ===");
+    bool overall_pass = true;
+
+    // 1. I2C Bus Validation
+    Serial.println("[TEST] 1. Checking I2C Devices...");
+    const uint8_t addresses[] = {
+        PCF8574_I72_ADDR, 
+        PCF8574_I73_ADDR, 
+        PCF8574_Q73_ADDR, 
+        BOARD_INPUT_I2C_ADDR
+    };
+    const char* names[] = {
+        "PLC_OUT_1 (Speed 0x20)", 
+        "PLC_OUT_2 (Axis 0x21)", 
+        "PLC_IN (Consenso 0x22)", 
+        "BOARD_INPUTS (0x24)"
+    };
+    
+    for(int i=0; i<4; i++) {
+        uint8_t dummy;
+        // Use standard read to ping device
+        i2c_result_t res = i2cReadWithRetry(addresses[i], &dummy, 1);
+        if(res == I2C_RESULT_OK) {
+            Serial.printf("  [PASS] %s: OK\n", names[i]);
+        } else {
+            Serial.printf("  [FAIL] %s: MISSING/ERROR (%s)\n", names[i], i2cResultToString(res));
+            overall_pass = false;
+        }
+    }
+
+    // 2. Encoder Validation
+    Serial.println("[TEST] 2. Checking Encoder Communication...");
+    // Check if we are receiving data (age < 200ms implies active stream)
+    uint32_t age = wj66GetAxisAge(0);
+    encoder_status_t enc_status = wj66GetStatus();
+    
+    if(age < 500 && enc_status == ENCODER_OK) {
+        Serial.printf("  [PASS] Encoder Link OK (Last update: %lu ms ago)\n", (unsigned long)age);
+    } else {
+        Serial.printf("  [FAIL] Encoder Timeout/Error (Age: %lu ms, Status: %d)\n", (unsigned long)age, enc_status);
+        overall_pass = false;
+    }
+
+    // 3. Configuration Integrity
+    Serial.println("[TEST] 3. Checking Configuration...");
+    if(configValidate(false)) {
+        Serial.println("  [PASS] Configuration Schema Valid");
+    } else {
+        Serial.println("  [FAIL] Configuration Schema Invalid (Run 'config validate')");
+        overall_pass = false;
+    }
+
+    // 4. Memory Health
+    Serial.println("[TEST] 4. Checking System Resources...");
+    memoryMonitorUpdate();
+    uint32_t free_heap = memoryMonitorGetFreeHeap();
+    if(free_heap > MEMORY_CRITICAL_THRESHOLD_BYTES) {
+        Serial.printf("  [PASS] Heap OK (%lu bytes free)\n", (unsigned long)free_heap);
+    } else {
+        Serial.printf("  [FAIL] Low Memory (%lu bytes < %d)\n", (unsigned long)free_heap, MEMORY_CRITICAL_THRESHOLD_BYTES);
+        overall_pass = false;
+    }
+
+    Serial.println("---------------------------------");
+    if(overall_pass) {
+        Serial.println("[RESULT] SELF-TEST PASSED");
+    } else {
+        Serial.println("[RESULT] SELF-TEST FAILED");
+    }
+}
 
 // ============================================================================
 // DEBUG MAIN DISPATCHER
@@ -65,7 +143,7 @@ void cmd_debug_main(int argc, char** argv) {
 }
 
 // ============================================================================
-// WDT / TASK CONSOLIDATED HANDLERS (Defined here to fix linker)
+// WDT / TASK CONSOLIDATED HANDLERS
 // ============================================================================
 extern void watchdogShowStatus();
 extern void watchdogShowTasks();
@@ -124,7 +202,6 @@ void cmd_faults_clear(int argc, char** argv) { faultClearHistory(); }
 void cmd_faults_stats(int argc, char** argv) {
     fault_stats_t stats = faultGetStats();
     Serial.println("\n[FAULT] === Fault Statistics ===");
-    // FIX: Explicit casts to unsigned long for %lu
     Serial.printf("Total: %lu | Encoder: %lu | Motion: %lu | Safety: %lu\n", 
                   (unsigned long)stats.total_faults, (unsigned long)stats.encoder_faults, 
                   (unsigned long)stats.motion_faults, (unsigned long)stats.safety_faults);
@@ -176,7 +253,6 @@ void cmd_encoder_set_baud(int argc, char** argv) {
     return;
   }
   if (encoderSetBaudRate((uint32_t)new_baud_rate_i32)) {
-    // FIX: Cast to long for %ld
     Serial.printf("[CLI] [OK] Encoder baud rate set to %ld.\n", (long)new_baud_rate_i32);
   } else {
     Serial.printf("[CLI] [ERR] Failed to set encoder baud rate.\n");
@@ -236,7 +312,6 @@ void debugAllHandler() {
     Serial.println("[DEBUG] -- System Dump --");
     char ver[FIRMWARE_VERSION_STRING_LEN]; 
     firmwareGetVersionString(ver, sizeof(ver));
-    // FIX: Cast uptime to unsigned long
     Serial.printf("Firmware: %s | Uptime: %lu s\n", ver, (unsigned long)taskGetUptime());
     debugEncodersHandler();
     motionDiagnostics();
@@ -255,6 +330,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("i2c", "I2C diagnostics", cmd_i2c_main);
     cliRegisterCommand("encoder", "Encoder management", cmd_encoder_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
+    cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest); // <-- NEW REGISTRATION
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
     cliRegisterCommand("encoder_baud_set", "Set baud rate", cmd_encoder_set_baud);
     // External definition via cli_config.cpp
