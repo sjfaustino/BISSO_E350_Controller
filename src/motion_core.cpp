@@ -15,6 +15,10 @@
 #include <stdlib.h> 
 #include <stdio.h>
 
+// ============================================================================
+// CORE STATE DEFINITIONS
+// ============================================================================
+
 motion_axis_t axes[MOTION_AXES] = {
   {0, 0, MOTION_IDLE, 0, 0, true, -500000, 500000, true, 0, 0, SPEED_PROFILE_1}, 
   {0, 0, MOTION_IDLE, 0, 0, true, -300000, 300000, true, 0, 0, SPEED_PROFILE_1}, 
@@ -24,31 +28,50 @@ motion_axis_t axes[MOTION_AXES] = {
 
 uint8_t active_axis = 255; 
 int32_t active_start_position = 0;
+static uint32_t last_update_ms = 0;
 bool global_enabled = true; 
 static bool encoder_feedback_enabled = false;
 
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y, ELBO_I73_AXIS_Z, 255}; 
 const uint8_t AXIS_TO_CONSENSO_BIT[] = {ELBO_Q73_CONSENSO_X, ELBO_Q73_CONSENSO_Y, ELBO_Q73_CONSENSO_Z, 255};
 
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
 void motionInit() {
   logInfo("[MOTION] Initializing...");
+  
   if (MOTION_AXES != 4) {
     faultLogError(FAULT_BOOT_FAILED, "Invalid axis count");
     return;
   }
+  
   for (int i = 0; i < MOTION_AXES; i++) {
     axes[i].state = MOTION_IDLE;
     axes[i].enabled = true;
   }
+  
+  last_update_ms = millis();
   motionSetPLCAxisDirection(255, false, false); 
   logInfo("[MOTION] [OK] Ready");
 }
 
+// ============================================================================
+// MAIN UPDATE LOOP
+// ============================================================================
+
 void motionUpdate() {
   if (!global_enabled) return;
+  
+  // Fast mutex check (0 wait) to prevent blocking high-freq loop
   if (!taskLockMutex(taskGetMotionMutex(), 0)) return; 
   
   uint32_t now = millis();
+  
+  // Redundant timing check removed as Task Manager handles 100Hz pacing, 
+  // but keeping delta update for state logic if needed.
+  last_update_ms = now;
   
   if (active_axis != 255) {
     motion_axis_t* axis = &axes[active_axis];
@@ -60,6 +83,7 @@ void motionUpdate() {
       return;
     }
     
+    // Soft Limit Check
     if (axis->soft_limit_enabled) {
       if (current_pos < axis->soft_limit_min || current_pos > axis->soft_limit_max) {
         faultLogEntry(FAULT_WARNING, FAULT_SOFT_LIMIT_EXCEEDED, active_axis, current_pos, "Soft Limit Hit");
@@ -77,6 +101,7 @@ void motionUpdate() {
             axis->state = MOTION_ERROR;
         } else {
             uint8_t bit = AXIS_TO_CONSENSO_BIT[active_axis];
+            // If no bit assigned (255) or bit is active, proceed
             if (bit == 255 || elboQ73GetConsenso(bit)) {
                 axis->state = MOTION_EXECUTING;
                 axis->state_entry_ms = now;
@@ -86,24 +111,65 @@ void motionUpdate() {
 
       case MOTION_EXECUTING:
         {
-            if (active_axis == 0) { 
+            // --- X-AXIS FINAL APPROACH LOGIC ---
+            if (active_axis == 0) { // Axis 0 = X
                 int32_t dist = abs(axis->target_position - current_pos);
-                int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
+                int32_t threshold_counts = 0;
                 float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
-                int32_t approach_cnt = (int32_t)(approach_mm * scale_x);
-                
-                if (dist <= approach_cnt && dist > 100 && axis->saved_speed_profile != SPEED_PROFILE_1) {
+
+                // 1. Get Mode
+                int mode = configGetInt(KEY_MOTION_APPROACH_MODE, APPROACH_MODE_FIXED);
+
+                if (mode == APPROACH_MODE_FIXED) {
+                    // FIXED MODE: Configured Distance (Default 50mm)
+                    int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
+                    threshold_counts = (int32_t)(approach_mm * scale_x);
+                } else {
+                    // DYNAMIC MODE: Physics-based calculation
+                    float current_speed_mm_s = 0.0f;
+                    
+                    // Determine current target speed from profile
+                    if (axis->saved_speed_profile == SPEED_PROFILE_3) 
+                        current_speed_mm_s = machineCal.X.speed_fast_mm_min / 60.0f;
+                    else if (axis->saved_speed_profile == SPEED_PROFILE_2) 
+                        current_speed_mm_s = machineCal.X.speed_med_mm_min / 60.0f;
+                    else 
+                        current_speed_mm_s = machineCal.X.speed_slow_mm_min / 60.0f;
+
+                    // Get Deceleration (Default 5.0 mm/s^2)
+                    float accel = configGetFloat(KEY_DEFAULT_ACCEL, 5.0f);
+                    if (accel < 0.1f) accel = 0.1f; // Safety clamp
+
+                    // d = v^2 / (2*a)
+                    float stop_dist_mm = (current_speed_mm_s * current_speed_mm_s) / (2.0f * accel);
+                    
+                    // Add 10% safety margin
+                    stop_dist_mm *= 1.1f;
+                    
+                    threshold_counts = (int32_t)(stop_dist_mm * scale_x);
+                }
+
+                // 2. Apply Downshift Logic
+                if (dist <= threshold_counts && dist > 100 && axis->saved_speed_profile != SPEED_PROFILE_1) {
+                    if (mode == APPROACH_MODE_DYNAMIC) {
+                        logInfo("[MOTION] Dynamic Approach Trigger: %ld counts", (long)threshold_counts);
+                    }
                     motionSetPLCSpeedProfile(SPEED_PROFILE_1);
                     axis->saved_speed_profile = SPEED_PROFILE_1;
                 }
             }
+            // ----------------------------------------
 
+            // Check if target is reached (Simple crossing check)
             if ((active_start_position < axis->target_position && current_pos >= axis->target_position) ||
                 (active_start_position > axis->target_position && current_pos <= axis->target_position)) {
+              
               axis->position = axis->target_position;
               axis->state = MOTION_STOPPING;         
               axis->state_entry_ms = now;
-              motionSetPLCAxisDirection(255, false, false); 
+              
+              motionSetPLCAxisDirection(255, false, false); // Stop movement
+              
               axis->position_at_stop = current_pos;
             }
         }
@@ -111,6 +177,7 @@ void motionUpdate() {
         
       case MOTION_STOPPING:
         {
+            // Use Configurable Deadband for Settling
             int32_t deadband = configGetInt(KEY_MOTION_DEADBAND, 10);
             if (abs(current_pos - axis->position_at_stop) < deadband) { 
                 axis->state = MOTION_IDLE;
@@ -118,27 +185,45 @@ void motionUpdate() {
             }
         }
         break;
+        
       default: break;
     }
   }
   taskUnlockMutex(taskGetMotionMutex());
 }
 
+// ============================================================================
+// ACCESSORS & HELPERS
+// ============================================================================
+
 int32_t motionGetPosition(uint8_t axis) { return (axis < MOTION_AXES) ? wj66GetPosition(axis) : 0; }
 int32_t motionGetTarget(uint8_t axis) { return (axis < MOTION_AXES) ? axes[axis].target_position : 0; }
 motion_state_t motionGetState(uint8_t axis) { return (axis < MOTION_AXES) ? axes[axis].state : MOTION_ERROR; }
-bool motionIsMoving() { return active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO); }
-bool motionIsStalled(uint8_t axis) { return (axis < MOTION_AXES && axis == active_axis && axes[axis].state == MOTION_EXECUTING) ? encoderMotionHasError(axis) : false; }
+
+bool motionIsMoving() {
+  return active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO);
+}
+
+bool motionIsStalled(uint8_t axis) {
+  if (axis < MOTION_AXES && axis == active_axis && axes[axis].state == MOTION_EXECUTING) {
+    return encoderMotionHasError(axis);
+  }
+  return false;
+}
+
 bool motionIsEmergencyStopped() { return !global_enabled; }
 uint8_t motionGetActiveAxis() { return active_axis; }
 
 void motionDiagnostics() {
   Serial.printf("\n[MOTION] Global: %s | Active: %d\n", global_enabled ? "ON" : "OFF", active_axis);
+  
   for (int i = 0; i < MOTION_AXES; i++) {
-    // FIX: Cast to long for %ld format specifier
+    // FIX: Cast to long for printf compatibility with int32_t on all platforms
     Serial.printf("  Axis %d: %s | Pos: %ld | Tgt: %ld\n", 
-                  i, motionStateToString(axes[i].state), 
-                  (long)motionGetPosition(i), (long)axes[i].target_position);
+                  i, 
+                  motionStateToString(axes[i].state), 
+                  (long)motionGetPosition(i), 
+                  (long)axes[i].target_position);
   }
 }
 
@@ -169,17 +254,23 @@ bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos) {
 
 bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) {
   if (axis >= MOTION_AXES) return false;
-  return true; 
+  return true; // Simplified validation
 }
 
 bool motionSetState(uint8_t axis, motion_state_t new_state) {
   if (axis >= MOTION_AXES || !taskLockMutex(taskGetMotionMutex(), 100)) return false;
+  
   axes[axis].state = new_state;
-  if (new_state == MOTION_WAIT_CONSENSO || new_state == MOTION_STOPPING) axes[axis].state_entry_ms = millis();
+  
+  if (new_state == MOTION_WAIT_CONSENSO || new_state == MOTION_STOPPING) {
+      axes[axis].state_entry_ms = millis();
+  }
+  
   if (new_state == MOTION_IDLE || new_state == MOTION_ERROR) {
       motionSetPLCAxisDirection(255, false, false);
       active_axis = 255;
   }
+  
   taskUnlockMutex(taskGetMotionMutex());
   return true;
 }
@@ -189,4 +280,6 @@ void motionEnableEncoderFeedback(bool enable) {
   encoderMotionEnableFeedback(enable);
 }
 
-bool motionIsEncoderFeedbackEnabled() { return encoder_feedback_enabled; }
+bool motionIsEncoderFeedbackEnabled() {
+  return encoder_feedback_enabled;
+}
