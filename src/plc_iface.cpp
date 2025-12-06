@@ -42,37 +42,33 @@ void plcIfaceInit() {
   
   // Initialize I2C Bus Manager
   i2cRecoveryInit();
+  
+  // OPTIMIZATION: Set global I2C clock to 400kHz
+  Wire.setClock(PLC_I2C_SPEED);
 
   // --- SAFETY: FORCE SAFE STATE (Active LOW Logic: 1 = OFF) ---
-  // We explicitly write 0xFF to both output expanders to ensure all relays are OFF
-  // before any other logic runs. This prevents startup chatter or unsafe motion.
   uint8_t safe_output = 0xFF; 
   
-  // 1. Safe State for Speed Profile (I72) - Use Retry logic for robust init
   i2c_result_t res1 = i2cWriteWithRetry(PCF8574_I72_ADDR, &safe_output, 1);
   if (res1 != I2C_RESULT_OK) {
       logWarning("[PLC] Failed to set safe state on I72 (Speed)");
       faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I72_ADDR, "Init Safe State I72 Failed");
   }
 
-  // 2. Safe State for Axis/Direction (I73) - Use Retry logic
   i2c_result_t res2 = i2cWriteWithRetry(PCF8574_I73_ADDR, &safe_output, 1);
   if (res2 != I2C_RESULT_OK) {
       logWarning("[PLC] Failed to set safe state on I73 (Axis/Dir)");
       faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR, "Init Safe State I73 Failed");
   }
   
-  // Update internal state to match hardware
   plc_state.I72_byte = 0xFF;
   plc_state.I73_byte = 0xFF;
-  // -----------------------------------------------------------
 
   plc_state.status = PLC_OK;
   plc_state.last_read_ms = millis();
   plc_state.error_count = 0;
   plc_state.read_count = 0;
   
-  // Set initial stable byte to current state
   uint8_t initial_read;
   if (i2cReadWithRetry(PCF8574_Q73_ADDR, &initial_read, 1) == I2C_RESULT_OK) {
       input_last_stable_byte = initial_read;
@@ -90,40 +86,29 @@ void plcIfaceUpdate() {
   
   uint8_t current_read_byte;
   
-  // Input reading runs in the PLC task, so we can use standard retry logic
   i2c_result_t result = i2cReadWithRetry(PCF8574_Q73_ADDR, &current_read_byte, 1);
   
   if (result == I2C_RESULT_OK) {
     plc_state.read_count++;
     
-    // --- DEBOUNCE LOGIC ---
     if (current_read_byte == input_last_stable_byte) {
-        // State is the same as the last stable state
         input_debounce_count++;
         
         if (input_debounce_count >= PLC_DEBOUNCE_REQUIRED_READS) {
-            // Stability achieved: Update the official state only now
             plc_state.Q73_byte = current_read_byte;
             plc_state.status = PLC_OK;
             plc_state.last_read_ms = millis();
-            
-            // Lock debounce counter to prevent wrap-around
             input_debounce_count = PLC_DEBOUNCE_REQUIRED_READS; 
         }
     } else {
-        // State changed or is bouncing: Reset counter and update the reference byte.
-        // The official plc_state.Q73_byte remains UNCHANGED until debounce count is met.
         input_last_stable_byte = current_read_byte;
         input_debounce_count = 1;
-        plc_state.status = PLC_TIMEOUT; // Temporarily mark as unstable/timeout while debounce is running
+        plc_state.status = PLC_TIMEOUT; 
     }
-    // --- END DEBOUNCE LOGIC ---
 
   } else {
-    // I2C read failed or timed out: Mark error and reset debounce
     plc_state.error_count++;
     input_debounce_count = 0;
-    
     plc_state.status = (result == I2C_RESULT_NACK) ? PLC_NOT_FOUND : PLC_TIMEOUT; 
     
     logWarning("[PLC] Q73 read failed: %s", i2cResultToString(result));
@@ -136,7 +121,6 @@ void plcIfaceUpdate() {
 // ============================================================================
 
 bool plcGetBit(uint8_t bit) {
-  // Q73 only (consenso feedback)
   if (bit >= 8) return false;
   return (plc_state.Q73_byte & (1 << bit)) != 0;
 }
@@ -158,13 +142,8 @@ void plcSetByte(uint8_t offset, uint8_t value) {
   logWarning("[PLC] plcSetByte() deprecated. Use ELBO functions.");
 }
 
-uint16_t plcGetWord(uint8_t offset) {
-  return 0;
-}
-
-void plcSetWord(uint8_t offset, uint16_t value) {
-  // Not used
-}
+uint16_t plcGetWord(uint8_t offset) { return 0; }
+void plcSetWord(uint8_t offset, uint16_t value) {}
 
 // ============================================================================
 // ELBO I72 Functions (Speed Control)
@@ -178,24 +157,34 @@ bool elboI72GetSpeed(uint8_t speed_bit) {
 bool elboI72SetSpeed(uint8_t speed_bit, bool value) {
   if (speed_bit >= 8) return false;
   
-  if (value) {
-    plc_state.I72_byte &= ~(1 << speed_bit); // Set bit low (ON)
-  } else {
-    plc_state.I72_byte |= (1 << speed_bit);  // Set bit high (OFF)
-  }
+  if (value) plc_state.I72_byte &= ~(1 << speed_bit);
+  else plc_state.I72_byte |= (1 << speed_bit);
   
-  // FIX: Use Fast Write for runtime motion updates (2ms timeout)
   i2c_result_t result = i2cWriteFast(PCF8574_I72_ADDR, &plc_state.I72_byte, 1);
   
-  if (result == I2C_RESULT_OK) {
-    return true;
-  } else {
+  if (result == I2C_RESULT_OK) return true;
+  else {
     logError("[ELBO] I72 speed write failed: %s", i2cResultToString(result));
     plc_state.error_count++;
-    faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I72_ADDR,
-                  "I72 Speed Write Failed (Bit %d, Res %d)", speed_bit, result);
+    faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I72_ADDR, "I72 Write Fail");
     return false;
   }
+}
+
+bool elboI72WriteBatch(uint8_t clear_mask, uint8_t set_bits) {
+    uint8_t old_byte = plc_state.I72_byte;
+    uint8_t new_byte = (old_byte & ~clear_mask) | (set_bits & clear_mask);
+    
+    if (new_byte == old_byte) return true; // Optimization: No write needed
+
+    plc_state.I72_byte = new_byte;
+    i2c_result_t result = i2cWriteFast(PCF8574_I72_ADDR, &plc_state.I72_byte, 1);
+
+    if (result == I2C_RESULT_OK) return true;
+    
+    plc_state.error_count++;
+    logError("[ELBO] I72 Batch Write Failed: %s", i2cResultToString(result));
+    return false;
 }
 
 // ============================================================================
@@ -210,22 +199,16 @@ bool elboI73GetAxis(uint8_t axis_bit) {
 bool elboI73SetAxis(uint8_t axis_bit, bool value) {
   if (axis_bit >= 8) return false;
   
-  if (value) {
-    plc_state.I73_byte &= ~(1 << axis_bit);
-  } else {
-    plc_state.I73_byte |= (1 << axis_bit);
-  }
+  if (value) plc_state.I73_byte &= ~(1 << axis_bit);
+  else plc_state.I73_byte |= (1 << axis_bit);
   
-  // FIX: Use Fast Write
   i2c_result_t result = i2cWriteFast(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
   
-  if (result == I2C_RESULT_OK) {
-    return true;
-  } else {
+  if (result == I2C_RESULT_OK) return true;
+  else {
     logError("[ELBO] I73 axis write failed: %s", i2cResultToString(result));
     plc_state.error_count++;
-    faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR,
-                  "I73 Axis Write Failed (Bit %d, Res %d)", axis_bit, result);
+    faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR, "I73 Write Fail");
     return false;
   }
 }
@@ -238,22 +221,16 @@ bool elboI73GetDirection(uint8_t dir_bit) {
 bool elboI73SetDirection(uint8_t dir_bit, bool value) {
   if (dir_bit >= 8) return false;
   
-  if (value) {
-    plc_state.I73_byte &= ~(1 << dir_bit);
-  } else {
-    plc_state.I73_byte |= (1 << dir_bit);
-  }
+  if (value) plc_state.I73_byte &= ~(1 << dir_bit);
+  else plc_state.I73_byte |= (1 << dir_bit);
   
-  // FIX: Use Fast Write
   i2c_result_t result = i2cWriteFast(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
   
-  if (result == I2C_RESULT_OK) {
-    return true;
-  } else {
+  if (result == I2C_RESULT_OK) return true;
+  else {
     logError("[ELBO] I73 direction write failed: %s", i2cResultToString(result));
     plc_state.error_count++;
-    faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR,
-                  "I73 Dir Write Failed (Bit %d, Res %d)", dir_bit, result);
+    faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, PCF8574_I73_ADDR, "I73 Write Fail");
     return false;
   }
 }
@@ -263,23 +240,46 @@ bool elboI73GetVSMode() {
 }
 
 bool elboI73SetVSMode(bool value) {
-  if (value) {
-    plc_state.I73_byte &= ~(1 << ELBO_I73_V_S_MODE);
-  } else {
-    plc_state.I73_byte |= (1 << ELBO_I73_V_S_MODE);
-  }
+  if (value) plc_state.I73_byte &= ~(1 << ELBO_I73_V_S_MODE);
+  else plc_state.I73_byte |= (1 << ELBO_I73_V_S_MODE);
   
-  // FIX: Use Fast Write
   i2c_result_t result = i2cWriteFast(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
   
-  if (result == I2C_RESULT_OK) {
-    return true;
-  } else {
+  if (result == I2C_RESULT_OK) return true;
+  else {
     logError("[ELBO] I2C Error writing I73 V/S mode: %s", i2cResultToString(result));
     plc_state.error_count++;
     faultLogWarning(FAULT_I2C_ERROR, "I73 V/S Write Failed");
     return false;
   }
+}
+
+bool elboI73WriteBatch(uint8_t clear_mask, uint8_t set_bits) {
+    uint8_t old_byte = plc_state.I73_byte;
+    // Apply changes: Clear bits in mask, then set new bits
+    // Note: PCF8574 is Active LOW. 'true' means 0 (sink current), 'false' means 1 (float high).
+    // logic: 
+    // If bit in clear_mask is 1, we want to update it.
+    // If corresponding bit in set_bits is 1 (ON), we write 0.
+    // If corresponding bit in set_bits is 0 (OFF), we write 1.
+    
+    // However, the caller will pass "set_bits" where 1=Active (LOW).
+    // So we need to invert logic carefully or stick to raw register logic.
+    // Let's assume clear_mask/set_bits operate on the RAW REGISTER value (1=OFF, 0=ON).
+    // Caller calculates the register value directly.
+    
+    uint8_t new_byte = (old_byte & ~clear_mask) | (set_bits & clear_mask);
+    
+    if (new_byte == old_byte) return true; 
+
+    plc_state.I73_byte = new_byte;
+    i2c_result_t result = i2cWriteFast(PCF8574_I73_ADDR, &plc_state.I73_byte, 1);
+
+    if (result == I2C_RESULT_OK) return true;
+    
+    plc_state.error_count++;
+    logError("[ELBO] I73 Batch Write Failed: %s", i2cResultToString(result));
+    return false;
 }
 
 // ============================================================================
@@ -299,43 +299,22 @@ bool elboQ73GetAutoManual() {
 // Diagnostics
 // ============================================================================
 
-plc_status_t plcGetStatus() {
-  return plc_state.status;
-}
-
-uint32_t plcGetLastReadTime() {
-  return plc_state.last_read_ms;
-}
-
-uint32_t plcGetErrorCount() {
-  return plc_state.error_count;
-}
+plc_status_t plcGetStatus() { return plc_state.status; }
+uint32_t plcGetLastReadTime() { return plc_state.last_read_ms; }
+uint32_t plcGetErrorCount() { return plc_state.error_count; }
 
 void plcDiagnostics() {
   Serial.println("\n[PLC] === Diagnostics ===");
-  Serial.printf("Status: %d (0=OK, 1=TIMEOUT, 2=NOT_FOUND)\n", plc_state.status);
-  Serial.printf("Debounce Count: %d (Req: %d)\n", input_debounce_count, PLC_DEBOUNCE_REQUIRED_READS);
-  Serial.printf("Errors: %lu\n", (unsigned long)plc_state.error_count); // FIX: Cast to unsigned long
-  Serial.printf("Reads: %lu\n", (unsigned long)plc_state.read_count);   // FIX: Cast to unsigned long
-  Serial.printf("Last read: %lu ms ago\n", (unsigned long)(millis() - plc_state.last_read_ms)); // FIX: Cast
+  Serial.printf("Status: %d\n", plc_state.status);
+  Serial.printf("Errors: %lu\n", (unsigned long)plc_state.error_count); 
+  Serial.printf("Reads: %lu\n", (unsigned long)plc_state.read_count);
+  Serial.printf("Last read: %lu ms ago\n", (unsigned long)(millis() - plc_state.last_read_ms));
   
-  Serial.printf("\nI72 Output (Speed): 0x%02X\n", plc_state.I72_byte);
+  Serial.printf("\nI72 Output: 0x%02X\n", plc_state.I72_byte);
   Serial.printf("  FAST (P0): %s\n", elboI72GetSpeed(ELBO_I72_FAST) ? "ON" : "OFF");
-  Serial.printf("  MED (P1): %s\n", elboI72GetSpeed(ELBO_I72_MED) ? "ON" : "OFF");
   
-  Serial.printf("\nI73 Output (Axis/Dir/Mode): 0x%02X\n", plc_state.I73_byte);
-  Serial.printf("  AXIS_Y (P0): %s\n", elboI73GetAxis(ELBO_I73_AXIS_Y) ? "ON" : "OFF");
+  Serial.printf("\nI73 Output: 0x%02X\n", plc_state.I73_byte);
   Serial.printf("  AXIS_X (P1): %s\n", elboI73GetAxis(ELBO_I73_AXIS_X) ? "ON" : "OFF");
-  Serial.printf("  AXIS_Z (P2): %s\n", elboI73GetAxis(ELBO_I73_AXIS_Z) ? "ON" : "OFF");
-  Serial.printf("  DIR+ (P5): %s\n", elboI73GetDirection(ELBO_I73_DIRECTION_PLUS) ? "ON" : "OFF");
-  Serial.printf("  DIR- (P6): %s\n", elboI73GetDirection(ELBO_I73_DIRECTION_MINUS) ? "ON" : "OFF");
-  Serial.printf("  V/S (P7): %s\n", elboI73GetVSMode() ? "ON" : "OFF");
-  
-  Serial.printf("\nQ73 Input (Consenso): 0x%02X\n", plc_state.Q73_byte);
-  Serial.printf("  Consenso Y (P0): %s\n", elboQ73GetConsenso(0) ? "READY" : "NOT READY");
-  Serial.printf("  Consenso X (P1): %s\n", elboQ73GetConsenso(1) ? "READY" : "NOT READY");
-  Serial.printf("  Consenso Z (P2): %s\n", elboQ73GetConsenso(2) ? "READY" : "NOT READY");
-  Serial.printf("  Auto/Manual (P3): %s\n", elboQ73GetAutoManual() ? "AUTO" : "MANUAL");
   
   Serial.println("=== End Diagnostics ===\n");
 }

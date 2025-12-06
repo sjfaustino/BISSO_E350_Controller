@@ -39,7 +39,8 @@
 #define ELBO_Q73_AUTO_MANUAL 3     
 
 // I2C Configuration
-#define PLC_I2C_SPEED 100000
+// OPTIMIZATION: Increased to 400kHz (Fast Mode) to reduce bus latency
+#define PLC_I2C_SPEED 400000 
 #define PLC_READ_INTERVAL_MS 50
 #define PLC_READ_TIMEOUT_MS 1000
 
@@ -73,6 +74,11 @@ bool elboI73GetVSMode();
 bool elboI73SetVSMode(bool value);              
 bool elboQ73GetConsenso(uint8_t axis);          
 bool elboQ73GetAutoManual();                    
+
+// --- NEW: Atomic Batch Operations ---
+// Allows modifying multiple bits in one I2C transaction
+bool elboI72WriteBatch(uint8_t clear_mask, uint8_t set_bits);
+bool elboI73WriteBatch(uint8_t clear_mask, uint8_t set_bits);
 
 plc_status_t plcGetStatus();
 uint32_t plcGetLastReadTime();
