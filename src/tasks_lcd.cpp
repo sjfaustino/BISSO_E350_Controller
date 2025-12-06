@@ -42,6 +42,7 @@ void taskLcdFunction(void* parameter) {
         lcdInterfacePrintLine(3, faultCodeToString((fault_code_t)current_fault_code)); 
     } else if (motionIsMoving()) {
         lcdInterfacePrintLine(2, "STATUS: EXECUTING");
+        // Ensure header motion.h contains this declaration!
         lcdInterfacePrintLine(3, motionStateToString(motionGetState(0)));
     } else {
         lcdInterfacePrintLine(2, "STATUS: IDLE");
