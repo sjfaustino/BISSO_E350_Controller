@@ -1,17 +1,11 @@
-/**
- * @file i2c_bus_recovery.cpp
- * @brief Robust I2C bus recovery and management
- * @project Gemini v1.0.0
- * @author Sergio Faustino - sjfaustino@gmail.com
- */
-
 #include "i2c_bus_recovery.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "system_constants.h" 
 #include <Wire.h>
 
-static i2c_stats_t stats = {0};
+// FIX: Fully initialized struct to suppress -Wmissing-field-initializers
+static i2c_stats_t stats = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0f};
 static i2c_retry_config_t retry_config = {3, 10, 100, 2.0f};
 
 const char* i2cResultToString(i2c_result_t result) {
@@ -188,11 +182,12 @@ i2c_stats_t i2cGetStats() { if (stats.transactions_total > 0) stats.success_rate
 
 void i2cShowStats() {
   Serial.println("\n[I2C] === Statistics ===");
+  // FIX: Cast to unsigned long for printf
   Serial.printf("Total: %lu | OK: %lu (%.1f%%) | Fail: %lu\n", 
-    stats.transactions_total, stats.transactions_success, stats.success_rate, stats.transactions_failed);
-  Serial.printf("Retries: %lu | Recoveries: %lu\n", stats.retries_performed, stats.bus_recoveries);
+    (unsigned long)stats.transactions_total, (unsigned long)stats.transactions_success, stats.success_rate, (unsigned long)stats.transactions_failed);
+  Serial.printf("Retries: %lu | Recoveries: %lu\n", (unsigned long)stats.retries_performed, (unsigned long)stats.bus_recoveries);
   Serial.printf("Errors: NACK=%lu Time=%lu Bus=%lu\n", 
-    stats.error_nack, stats.error_timeout, stats.error_bus);
+    (unsigned long)stats.error_nack, (unsigned long)stats.error_timeout, (unsigned long)stats.error_bus);
 }
 
 void i2cMonitorBusHealth() {

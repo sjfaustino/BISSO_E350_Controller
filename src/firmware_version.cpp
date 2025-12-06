@@ -1,7 +1,8 @@
 #include "firmware_version.h"
 #include <stdio.h> 
 
-static char version_buffer[FIRMWARE_VERSION_STRING_LEN];
+// FIX: Removed unused static buffer version_buffer
+// static char version_buffer[FIRMWARE_VERSION_STRING_LEN];
 
 const char* firmwareGetVersionString(char* buffer, size_t buffer_size) {
     if (buffer == NULL || buffer_size < FIRMWARE_VERSION_STRING_LEN) {

@@ -4,14 +4,24 @@
 #include "encoder_calibration.h" 
 #include "fault_logging.h"
 #include "serial_logger.h"
+#include "task_manager.h" // <-- NEW: Required for Mutex access
 #include <math.h>
 
 #define MOTION_MED_SPEED_DEFAULT 90.0f 
+#define I2C_LOCK_TIMEOUT_MS 10 // Max wait time for bus access
 
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction) {
     if (axis >= MOTION_AXES && axis != 255) {
         logError("[MOTION] Invalid axis %d for IO", axis);
         return;
+    }
+
+    // --- CRITICAL SECTION START: Acquire I2C Bus ---
+    // Prevents collision with PLC (P18) and Safety (P24) tasks
+    if (!taskLockMutex(taskGetI2cMutex(), I2C_LOCK_TIMEOUT_MS)) {
+        logError("[MOTION] [CRIT] I2C Mutex Timeout (Dir Set)");
+        faultLogEntry(FAULT_CRITICAL, FAULT_I2C_ERROR, axis, 0, "Motion I2C Lock Fail");
+        return; // Abort to prevent bus corruption
     }
 
     if (enable || axis == 255) {
@@ -20,7 +30,11 @@ void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction
         elboI73SetAxis(ELBO_I73_AXIS_Z, false); 
         elboI73SetDirection(ELBO_I73_DIRECTION_PLUS, false);
         elboI73SetDirection(ELBO_I73_DIRECTION_MINUS, false);
-        if (axis == 255) return;
+        
+        if (axis == 255) {
+            taskUnlockMutex(taskGetI2cMutex());
+            return;
+        }
     }
 
     if (enable) {
@@ -30,6 +44,9 @@ void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction
         if (is_plus_direction) elboI73SetDirection(ELBO_I73_DIRECTION_PLUS, true);
         else elboI73SetDirection(ELBO_I73_DIRECTION_MINUS, true);
     }
+
+    taskUnlockMutex(taskGetI2cMutex());
+    // --- CRITICAL SECTION END ---
 }
 
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float requested_speed_mm_s) {
@@ -53,6 +70,13 @@ speed_profile_t motionMapSpeedToProfile(uint8_t axis, float requested_speed_mm_s
 }
 
 void motionSetPLCSpeedProfile(speed_profile_t profile) {
+  // --- CRITICAL SECTION START ---
+  if (!taskLockMutex(taskGetI2cMutex(), I2C_LOCK_TIMEOUT_MS)) {
+      logError("[MOTION] [CRIT] I2C Mutex Timeout (Speed Set)");
+      faultLogEntry(FAULT_WARNING, FAULT_I2C_ERROR, -1, profile, "Speed Profile I2C Lock Fail");
+      return; 
+  }
+
   elboI73SetVSMode(false);
 
   uint8_t bit0 = (profile == SPEED_PROFILE_2);
@@ -64,12 +88,21 @@ void motionSetPLCSpeedProfile(speed_profile_t profile) {
   if (!fast_ok || !med_ok) {
     logError("[MOTION] [CRITICAL] Speed profile I2C failed");
     faultLogError(FAULT_I2C_ERROR, "PLC speed profile I2C fail");
-    return;
+  } else {
+    logInfo("[MOTION] Profile %d active", profile);
   }
-  logInfo("[MOTION] Profile %d active", profile);
+
+  taskUnlockMutex(taskGetI2cMutex());
+  // --- CRITICAL SECTION END ---
 }
 
 void motionSetVSMode(bool active) {
+    // --- CRITICAL SECTION START ---
+    if (!taskLockMutex(taskGetI2cMutex(), I2C_LOCK_TIMEOUT_MS)) {
+        logError("[MOTION] [CRIT] I2C Mutex Timeout (VS Mode)");
+        return;
+    }
+
     if (active) {
         elboI72SetSpeed(ELBO_I72_FAST, false);
         elboI72SetSpeed(ELBO_I72_MED, false);
@@ -86,4 +119,7 @@ void motionSetVSMode(bool active) {
              logInfo("[MOTION] VS Mode [DISABLED]");
         }
     }
+
+    taskUnlockMutex(taskGetI2cMutex());
+    // --- CRITICAL SECTION END ---
 }

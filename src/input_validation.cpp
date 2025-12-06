@@ -1,4 +1,6 @@
 #include "input_validation.h"
+#include <string.h>
+#include <stdlib.h> 
 
 // ============================================================================
 // INPUT VALIDATION IMPLEMENTATION
@@ -18,7 +20,8 @@ bool validateStringLength(const char* str, size_t max_len) {
 }
 
 bool validateAxisNumber(uint8_t axis) {
-  return (axis >= 0 && axis < 4);  // 4-axis system
+  // FIX: Removed 'axis >= 0' comparison as uint8_t is always >= 0
+  return (axis < 4);  // 4-axis system
 }
 
 bool validateMotionPosition(uint8_t axis, int32_t position) {

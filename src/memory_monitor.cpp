@@ -1,7 +1,8 @@
 #include "memory_monitor.h"
 #include <esp_heap_caps.h>
 
-static memory_stats_t mem_stats = {0};
+// FIX: Fully initialize struct to suppress warnings
+static memory_stats_t mem_stats = {0, 0, 0, 0, 0, 0, 0};
 static bool mem_monitor_initialized = false;
 static uint32_t total_heap_size = 0;
 
@@ -16,7 +17,8 @@ void memoryMonitorInit() {
   mem_stats.largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
   mem_stats.sample_count = 0;
   mem_monitor_initialized = true;
-  Serial.printf("[MEM] [OK] Heap: %lu bytes\n", total_heap_size);
+  // FIX: Cast for printf
+  Serial.printf("[MEM] [OK] Heap: %lu bytes\n", (unsigned long)total_heap_size);
 }
 
 void memoryMonitorUpdate() {
@@ -46,12 +48,13 @@ void memoryMonitorPrintStats() {
   uint32_t used = total_heap_size - free;
   uint8_t percent = (used * 100) / total_heap_size;
   
-  Serial.printf("Total Heap:   %lu\n", total_heap_size);
-  Serial.printf("Current Free: %lu (%u%% used)\n", free, percent);
-  Serial.printf("Min Free:     %lu\n", mem_stats.minimum_free);
-  Serial.printf("Max Used:     %lu\n", mem_stats.maximum_used);
-  Serial.printf("Largest Blk:  %lu\n", mem_stats.largest_block);
-  Serial.printf("Samples:      %lu\n", mem_stats.sample_count);
+  // FIX: Cast all uint32_t to unsigned long for %lu
+  Serial.printf("Total Heap:   %lu\n", (unsigned long)total_heap_size);
+  Serial.printf("Current Free: %lu (%u%% used)\n", (unsigned long)free, percent);
+  Serial.printf("Min Free:     %lu\n", (unsigned long)mem_stats.minimum_free);
+  Serial.printf("Max Used:     %lu\n", (unsigned long)mem_stats.maximum_used);
+  Serial.printf("Largest Blk:  %lu\n", (unsigned long)mem_stats.largest_block);
+  Serial.printf("Samples:      %lu\n", (unsigned long)mem_stats.sample_count);
   
   if (free > (total_heap_size / 2)) Serial.println("Status: [GOOD]");
   else if (free > (total_heap_size / 4)) Serial.println("Status: [WARN]");

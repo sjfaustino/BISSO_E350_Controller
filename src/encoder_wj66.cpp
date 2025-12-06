@@ -26,7 +26,7 @@ void wj66Init() {
   p.end();
 
   if (saved_baud > 0) {
-      logInfo("[WJ66] Trying saved baud: %lu...", saved_baud);
+      logInfo("[WJ66] Trying saved baud: %lu...", (unsigned long)saved_baud);
       
       Serial1.begin(saved_baud, SERIAL_8N1, 14, 33);
       while(Serial1.available()) Serial1.read(); // Clear buffer
@@ -56,13 +56,13 @@ void wj66Init() {
       
       if (res.detected) {
           final_baud = res.baud_rate;
-          logInfo("[WJ66] Detected baud: %lu. Saving.", final_baud);
+          logInfo("[WJ66] Detected baud: %lu. Saving.", (unsigned long)final_baud);
           
           p.begin("wj66_config", false);
           p.putUInt("baud_rate", final_baud);
           p.end();
       } else {
-          logError("[WJ66] Auto-detect failed. Defaulting to %lu.", WJ66_BAUD);
+          logError("[WJ66] Auto-detect failed. Defaulting to %lu.", (unsigned long)WJ66_BAUD);
           faultLogWarning(FAULT_ENCODER_TIMEOUT, "WJ66 Auto-detect failed");
           Serial1.begin(WJ66_BAUD, SERIAL_8N1, 14, 33);
       }
@@ -77,7 +77,7 @@ void wj66Init() {
     wj66_state.last_read[i] = millis();
   }
   wj66_state.status = ENCODER_OK;
-  logInfo("[WJ66] Ready @ %lu baud", final_baud);
+  logInfo("[WJ66] Ready @ %lu baud", (unsigned long)final_baud);
 }
 
 void wj66Update() {
@@ -173,9 +173,10 @@ void wj66Reset() {
 
 void wj66Diagnostics() {
   Serial.println("\n=== ENCODER STATUS ===");
-  Serial.printf("Status: %d\nErrors: %lu\n", wj66_state.status, wj66_state.error_count);
+  // FIX: Casts for printf
+  Serial.printf("Status: %d\nErrors: %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
   for (int i = 0; i < WJ66_AXES; i++) {
-    Serial.printf("  Axis %d: %ld\n", i, wj66_state.position[i]);
+    Serial.printf("  Axis %d: %ld\n", i, (long)wj66_state.position[i]);
   }
 }
 void wj66PrintStatus() { wj66Diagnostics(); }

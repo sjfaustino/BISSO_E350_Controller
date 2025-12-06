@@ -49,7 +49,7 @@ void safetyUpdate() {
                     safetyReportStall(axis); 
                     
                     logError("[SAFETY] [FAIL] Stall Axis %d (Dur: %lu ms > Limit: %lu ms)", 
-                             axis, encoderMotionGetErrorDuration(axis), stall_limit_ms);
+                             axis, (unsigned long)encoderMotionGetErrorDuration(axis), (unsigned long)stall_limit_ms);
                 }
             }
         }
@@ -82,7 +82,8 @@ void safetyTriggerAlarm(const char* reason) {
   digitalWrite(SAFETY_ALARM_PIN, HIGH);
   
   Serial.printf("[SAFETY] [ALARM] Triggered: %s\n", reason);
-  Serial.printf("[SAFETY] Fault Count: %lu\n", safety_state.fault_count);
+  // FIX: Cast for printf
+  Serial.printf("[SAFETY] Fault Count: %lu\n", (unsigned long)safety_state.fault_count);
   
   motionEmergencyStop();
 }
@@ -95,7 +96,8 @@ void safetyResetAlarm() {
   safety_state.current_fault = SAFETY_OK;
   safety_state.fault_duration_ms = millis() - alarm_trigger_time;
   
-  Serial.printf("[SAFETY] [OK] Alarm reset (Duration: %lu ms)\n", safety_state.fault_duration_ms);
+  // FIX: Cast for printf
+  Serial.printf("[SAFETY] [OK] Alarm reset (Duration: %lu ms)\n", (unsigned long)safety_state.fault_duration_ms);
 }
 
 void safetyReportStall(uint8_t axis) {
@@ -156,11 +158,12 @@ void safetyDiagnostics() {
   }
   Serial.printf("Current Fault: %s\n", faultStr);
   Serial.printf("GPIO State: %s\n", digitalRead(SAFETY_ALARM_PIN) ? "HIGH" : "LOW");
-  Serial.printf("Count: %lu\n", safety_state.fault_count);
+  // FIX: Cast for printf
+  Serial.printf("Count: %lu\n", (unsigned long)safety_state.fault_count);
   Serial.printf("Last Msg: %s\n", safety_state.fault_message);
   
   if (alarm_active) {
-    Serial.printf("Duration: %lu ms\n", safetyGetAlarmDuration());
+    Serial.printf("Duration: %lu ms\n", (unsigned long)safetyGetAlarmDuration());
   }
   
   Serial.println("\nHistory (Last 16):");

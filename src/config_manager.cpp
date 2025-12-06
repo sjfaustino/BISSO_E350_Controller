@@ -37,12 +37,15 @@ size_t configExportToJSON(char* buffer, size_t buffer_size) {
   if (!buffer || buffer_size < 256) return 0;
   int offset = 0;
   offset += snprintf(buffer + offset, buffer_size - offset,
-    "{\n  \"version\": 1,\n  \"timestamp\": %lu,\n  \"configuration\": {\n", millis());
+    "{\n  \"version\": 1,\n  \"timestamp\": %lu,\n  \"configuration\": {\n", (unsigned long)millis());
+  
+  // FIX: Explicit casting to match %ld and %lu format specifiers
   offset += snprintf(buffer + offset, buffer_size - offset,
     "    \"max_position\": %ld,\n    \"min_position\": %ld,\n    \"max_velocity\": %lu,\n"
     "    \"max_acceleration\": %lu,\n    \"num_axes\": %u,\n    \"timeout_ms\": %lu,\n    \"retry_count\": %u\n",
-    current_limits.max_position, current_limits.min_position, current_limits.max_velocity,
-    current_limits.max_acceleration, current_limits.num_axes, current_limits.timeout_ms, current_limits.retry_count);
+    (long)current_limits.max_position, (long)current_limits.min_position, (unsigned long)current_limits.max_velocity,
+    (unsigned long)current_limits.max_acceleration, current_limits.num_axes, (unsigned long)current_limits.timeout_ms, current_limits.retry_count);
+    
   offset += snprintf(buffer + offset, buffer_size - offset, "  }\n}\n");
   return offset;
 }
@@ -50,18 +53,30 @@ size_t configExportToJSON(char* buffer, size_t buffer_size) {
 bool configImportFromJSON(const char* json_string) {
   if (!json_string) return false;
   config_limits_t new_limits = current_limits;
+  
+  // FIX: Use temporary long variables for sscanf to match types
+  long t_max_pos = new_limits.max_position;
+  long t_min_pos = new_limits.min_position;
+  unsigned long t_max_vel = new_limits.max_velocity;
+  unsigned long t_max_acc = new_limits.max_acceleration;
+
   char* pos = strstr(json_string, "\"max_position\":");
-  if (pos) sscanf(pos, "\"max_position\": %ld", &new_limits.max_position);
+  if (pos) sscanf(pos, "\"max_position\": %ld", &t_max_pos);
   
   pos = strstr(json_string, "\"min_position\":");
-  if (pos) sscanf(pos, "\"min_position\": %ld", &new_limits.min_position);
+  if (pos) sscanf(pos, "\"min_position\": %ld", &t_min_pos);
   
   pos = strstr(json_string, "\"max_velocity\":");
-  if (pos) sscanf(pos, "\"max_velocity\": %lu", &new_limits.max_velocity);
+  if (pos) sscanf(pos, "\"max_velocity\": %lu", &t_max_vel);
   
   pos = strstr(json_string, "\"max_acceleration\":");
-  if (pos) sscanf(pos, "\"max_acceleration\": %lu", &new_limits.max_acceleration);
+  if (pos) sscanf(pos, "\"max_acceleration\": %lu", &t_max_acc);
   
+  new_limits.max_position = (int32_t)t_max_pos;
+  new_limits.min_position = (int32_t)t_min_pos;
+  new_limits.max_velocity = (uint32_t)t_max_vel;
+  new_limits.max_acceleration = (uint32_t)t_max_acc;
+
   if (!configValidate(false)) {
     Serial.println("[CONFIG] [FAIL] Import validation failed");
     return false;
@@ -116,7 +131,12 @@ bool configSaveAsPreset(config_preset_t preset, const char* name) {
 }
 
 config_preset_info_t configGetPresetInfo(config_preset_t preset) {
-  if (preset >= 5) { config_preset_info_t empty = {{0}}; return empty; }
+  // FIX: Explicit initialization to avoid -Wmissing-field-initializers
+  if (preset >= 5) { 
+      config_preset_info_t empty;
+      memset(&empty, 0, sizeof(empty));
+      return empty; 
+  }
   return preset_info[preset];
 }
 
@@ -152,13 +172,19 @@ bool configResetToDefaults() {
 int configCompareTo(const char* json_compare, char* diff_buffer, size_t diff_size) {
   if (!json_compare || !diff_buffer) return 0;
   config_limits_t compare_limits = current_limits;
+  
+  // FIX: Use temporary var for sscanf
+  long t_max_pos = compare_limits.max_position;
   char* pos = strstr(json_compare, "\"max_position\":");
-  if (pos) sscanf(pos, "\"max_position\": %ld", &compare_limits.max_position);
+  if (pos) sscanf(pos, "\"max_position\": %ld", &t_max_pos);
+  compare_limits.max_position = (int32_t)t_max_pos;
   
   int diff_count = 0;
   int offset = 0;
   if (compare_limits.max_position != current_limits.max_position) {
-    offset += snprintf(diff_buffer + offset, diff_size - offset, "max_pos: %ld -> %ld\n", current_limits.max_position, compare_limits.max_position);
+    // FIX: Cast for printf
+    offset += snprintf(diff_buffer + offset, diff_size - offset, "max_pos: %ld -> %ld\n", 
+        (long)current_limits.max_position, (long)compare_limits.max_position);
     diff_count++;
   }
   last_diff_count = diff_count;
@@ -235,8 +261,9 @@ bool configSetLimits(const config_limits_t* limits) {
 
 void configPrintValidationReport() {
   Serial.println("\n=== CONFIG VALIDATION REPORT ===");
-  Serial.printf("Max Pos: %ld\nMin Pos: %ld\n", current_limits.max_position, current_limits.min_position);
-  Serial.printf("Max Vel: %lu\nMax Acc: %lu\n", current_limits.max_velocity, current_limits.max_acceleration);
+  // FIX: Cast to long/unsigned long for printf
+  Serial.printf("Max Pos: %ld\nMin Pos: %ld\n", (long)current_limits.max_position, (long)current_limits.min_position);
+  Serial.printf("Max Vel: %lu\nMax Acc: %lu\n", (unsigned long)current_limits.max_velocity, (unsigned long)current_limits.max_acceleration);
   Serial.printf("Status: %s\n", configValidate(false) ? "[VALID]" : "[INVALID]");
   Serial.println();
 }

@@ -11,7 +11,8 @@ size_t safe_vsnprintf(char* buffer, size_t buffer_size, const char* format, va_l
   size_t result = vsnprintf(buffer, buffer_size, format, args);
   if (result >= buffer_size) {
     buffer[buffer_size - 1] = '\0';
-    Serial.printf("[SAFETY] [WARN] String truncated (Req: %lu, Avail: %lu)\n", result + 1, buffer_size);
+    // FIX: Cast size_t to unsigned long for %lu
+    Serial.printf("[SAFETY] [WARN] String truncated (Req: %lu, Avail: %lu)\n", (unsigned long)result + 1, (unsigned long)buffer_size);
     faultLogWarning(FAULT_BOOT_FAILED, "String truncation");
   }
   return result;
@@ -34,7 +35,8 @@ bool safe_strcpy(char* dest, size_t dest_size, const char* src) {
   if (src_len >= dest_size) {
     strncpy(dest, src, dest_size - 1);
     dest[dest_size - 1] = '\0';
-    Serial.printf("[SAFETY] [WARN] Copy truncated (Src: %lu, Dest: %lu)\n", src_len, dest_size - 1);
+    // FIX: Cast size_t to unsigned long
+    Serial.printf("[SAFETY] [WARN] Copy truncated (Src: %lu, Dest: %lu)\n", (unsigned long)src_len, (unsigned long)dest_size - 1);
     faultLogWarning(FAULT_BOOT_FAILED, "String copy truncation");
     return false;
   }
@@ -48,7 +50,8 @@ bool safe_strcat(char* dest, size_t dest_size, const char* src) {
   size_t src_len = strlen(src);
   
   if (dest_len + src_len >= dest_size) {
-    Serial.printf("[SAFETY] [WARN] Concat truncated (Needed: %lu, Avail: %lu)\n", dest_len + src_len + 1, dest_size);
+    // FIX: Cast size_t to unsigned long
+    Serial.printf("[SAFETY] [WARN] Concat truncated (Needed: %lu, Avail: %lu)\n", (unsigned long)(dest_len + src_len + 1), (unsigned long)dest_size);
     faultLogWarning(FAULT_BOOT_FAILED, "String concat truncation");
     return false;
   }
@@ -61,6 +64,7 @@ bool safe_is_valid_string(const char* buffer, size_t max_size) {
   for (size_t i = 0; i < max_size; i++) {
     if (buffer[i] == '\0') return true;
   }
-  Serial.printf("[SAFETY] [ERR] String not null-terminated in %lu bytes\n", max_size);
+  // FIX: Cast size_t to unsigned long
+  Serial.printf("[SAFETY] [ERR] String not null-terminated in %lu bytes\n", (unsigned long)max_size);
   return false;
 }

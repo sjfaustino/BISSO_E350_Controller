@@ -8,7 +8,8 @@ WebServerManager webServer(80);
 // Static buffer for JSON responses
 static char json_response_buffer[WEB_BUFFER_SIZE];
 
-WebServerManager::WebServerManager(uint16_t port) : port(port), server(nullptr) {
+// FIX: Reordered initialization list to match header declaration order (server, then port)
+WebServerManager::WebServerManager(uint16_t port) : server(nullptr), port(port) {
     memset(&current_status, 0, sizeof(current_status));
     strcpy(current_status.status, "INITIALIZING");
     current_status.z_pos = 25.0; 

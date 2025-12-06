@@ -8,6 +8,7 @@ static validation_result_t last_result = {0, 0, 0, 0, 0};
 
 validation_result_t configValidatorRun(validator_level_t level) {
   uint32_t start_time = millis();
+  // FIX: Explicit initialization
   validation_result_t result = {0, 0, 0, 0, 0};
   
   Serial.println("\n=== CONFIG VALIDATION ENGINE ===");
@@ -60,7 +61,8 @@ validation_result_t configValidatorRun(validator_level_t level) {
   result.validation_time_ms = millis() - start_time;
   last_result = result;
   
-  Serial.printf("\nSummary: %d/%d Passed (%lu ms)\n", result.passed_checks, result.total_checks, result.validation_time_ms);
+  // FIX: Cast to unsigned long
+  Serial.printf("\nSummary: %d/%d Passed (%lu ms)\n", result.passed_checks, result.total_checks, (unsigned long)result.validation_time_ms);
   return result;
 }
 
@@ -127,9 +129,10 @@ uint8_t configValidatorCheckCommonMistakes(char* buffer, size_t buffer_size) {
 
 size_t configValidatorGenerateReport(char* buffer, size_t buffer_size) {
   config_limits_t limits = configGetLimits();
+  // FIX: Casts for format specifiers
   return snprintf(buffer, buffer_size, 
     "Report:\n  Pos: %ld to %ld\n  Vel: %lu\n  Acc: %lu\n  Status: %s",
-    limits.min_position, limits.max_position, limits.max_velocity, limits.max_acceleration,
+    (long)limits.min_position, (long)limits.max_position, (unsigned long)limits.max_velocity, (unsigned long)limits.max_acceleration,
     (last_result.failed_checks == 0) ? "OK" : "FAIL");
 }
 

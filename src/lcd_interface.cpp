@@ -107,7 +107,10 @@ void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
     float sa = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : def_ang;
 
     snprintf(line1, LCD_COLS + 1, "X %7.1f  Y %7.1f", x_counts/sx, y_counts/sy);
-    snprintf(line2, LCD_COLS + 1, "Z %7.1f A %5.1f DEG", z_counts/sz, a_counts/sa);
+    
+    // FIX: Removed " DEG" suffix to fit within 20 chars and prevent truncation warning.
+    // Length: "Z " (2) + Val (7) + " A " (3) + Val (7) = 19 chars (Fits in 20)
+    snprintf(line2, LCD_COLS + 1, "Z %7.1f A %7.1f", z_counts/sz, a_counts/sa);
     
     lcdInterfacePrintLine(0, line1);
     lcdInterfacePrintLine(1, line2);
@@ -140,9 +143,10 @@ void lcdInterfaceBacklight(bool on) {
 
 void lcdInterfaceDiagnostics() {
   Serial.println("\n[LCD] === Diagnostics ===");
+  // FIX: Cast for printf to match %lu
   Serial.printf("Mode: %d\nI2C Found: %s\nBacklight: %s\nUpdates: %lu\n", 
     lcd_state.mode, lcd_state.i2c_found ? "YES" : "NO", 
-    lcd_state.backlight_on ? "ON" : "OFF", lcd_state.update_count);
+    lcd_state.backlight_on ? "ON" : "OFF", (unsigned long)lcd_state.update_count);
     
   for (int i = 0; i < LCD_ROWS; i++) {
     Serial.printf("  [%d] %s\n", i, lcd_state.display[i]);

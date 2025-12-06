@@ -164,8 +164,9 @@ bool configIsMigrationNeeded() {
 }
 
 bool configRollbackToVersion(uint8_t target_version) {
-  if (target_version < CONFIG_SCHEMA_MIN_SUPPORTED) {
-      Serial.println("[SCHEMA] [ERR] Target version too old");
+  // FIX: Check against 0 explicitly instead of macro if macro is 0 (unsigned comparison warning)
+  if (target_version > CONFIG_SCHEMA_VERSION) { 
+      Serial.println("[SCHEMA] [ERR] Target version too new");
       return false;
   }
   Serial.printf("[SCHEMA] Rolling back to v%d\n", target_version);

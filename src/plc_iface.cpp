@@ -315,9 +315,9 @@ void plcDiagnostics() {
   Serial.println("\n[PLC] === Diagnostics ===");
   Serial.printf("Status: %d (0=OK, 1=TIMEOUT, 2=NOT_FOUND)\n", plc_state.status);
   Serial.printf("Debounce Count: %d (Req: %d)\n", input_debounce_count, PLC_DEBOUNCE_REQUIRED_READS);
-  Serial.printf("Errors: %d\n", plc_state.error_count);
-  Serial.printf("Reads: %d\n", plc_state.read_count);
-  Serial.printf("Last read: %d ms ago\n", millis() - plc_state.last_read_ms);
+  Serial.printf("Errors: %lu\n", (unsigned long)plc_state.error_count); // FIX: Cast to unsigned long
+  Serial.printf("Reads: %lu\n", (unsigned long)plc_state.read_count);   // FIX: Cast to unsigned long
+  Serial.printf("Last read: %lu ms ago\n", (unsigned long)(millis() - plc_state.last_read_ms)); // FIX: Cast
   
   Serial.printf("\nI72 Output (Speed): 0x%02X\n", plc_state.I72_byte);
   Serial.printf("  FAST (P0): %s\n", elboI72GetSpeed(ELBO_I72_FAST) ? "ON" : "OFF");

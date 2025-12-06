@@ -88,10 +88,11 @@ void timeoutShowDiagnostics() {
   
   for (int i = 0; i < MAX_TIMEOUT_HANDLES; i++) {
     if (timeout_handles[i].active) {
+        // FIX: Cast for printf
         Serial.printf("  [%d] %s: Elapsed=%lu ms | Remaining=%lu ms\n",
             i, timeout_names[timeout_handles[i].type],
-            timeoutElapsed(&timeout_handles[i]),
-            timeoutRemaining(&timeout_handles[i]));
+            (unsigned long)timeoutElapsed(&timeout_handles[i]),
+            (unsigned long)timeoutRemaining(&timeout_handles[i]));
     }
   }
   Serial.println();

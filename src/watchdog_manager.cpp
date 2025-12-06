@@ -15,10 +15,20 @@ static wdt_status_t wdt_status = WDT_STATUS_OK;
 static reset_reason_t last_reset_reason = RESET_REASON_UNKNOWN;
 
 static Preferences wdt_prefs;
-static watchdog_stats_t wdt_stats = {0};
-static watchdog_tick_t wdt_tasks[10] = {0};
-static int wdt_task_count = 0;
 
+// FIX: Fully initialized struct to suppress -Wmissing-field-initializers
+static watchdog_stats_t wdt_stats = {0, 0, 0, 0, 0, 0, 0, RESET_REASON_UNKNOWN, 0, 0};
+
+// FIX: Fully initialized array of structs
+static watchdog_tick_t wdt_tasks[10] = {
+    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
+    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
+    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
+    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
+    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0}
+};
+
+static int wdt_task_count = 0;
 static watchdog_callback_t wdt_callback = NULL;
 static uint32_t wdt_pause_count = 0;
 
@@ -78,7 +88,7 @@ void watchdogInit() {
       wdt_prefs.putUInt("reset_count", wdt_stats.reset_count);
       wdt_prefs.putUInt("timeouts", wdt_stats.timeouts_detected);
       
-      logError("[WDT] WATCHDOG TIMEOUT RESET DETECTED (Count: %lu)", wdt_stats.reset_count);
+      logError("[WDT] WATCHDOG TIMEOUT RESET DETECTED (Count: %lu)", (unsigned long)wdt_stats.reset_count);
       faultLogError(FAULT_WATCHDOG_TIMEOUT, "Watchdog timeout reset detected");
     }
   }
@@ -213,8 +223,9 @@ void watchdogShowStatus() {
   }
   
   Serial.printf("Last Reset: %s\n", resetReasonString(last_reset_reason));
-  Serial.printf("Total Resets: %lu\n", wdt_stats.reset_count);
-  Serial.printf("Timeouts: %lu\n", wdt_stats.timeouts_detected);
+  // FIX: Cast to unsigned long for printf
+  Serial.printf("Total Resets: %lu\n", (unsigned long)wdt_stats.reset_count);
+  Serial.printf("Timeouts: %lu\n", (unsigned long)wdt_stats.timeouts_detected);
   Serial.println();
 }
 
@@ -227,9 +238,12 @@ void watchdogShowTasks() {
   for (int i = 0; i < wdt_task_count; i++) {
     uint32_t age = now - wdt_tasks[i].last_tick;
     
+    // FIX: Cast to unsigned long for printf
     Serial.printf("%-20s  %-8lu  %-8lu %-8lu ", 
-        wdt_tasks[i].task_name, wdt_tasks[i].tick_count, 
-        wdt_tasks[i].missed_ticks, age);
+        wdt_tasks[i].task_name, 
+        (unsigned long)wdt_tasks[i].tick_count, 
+        (unsigned long)wdt_tasks[i].missed_ticks, 
+        (unsigned long)age);
     
     if (age < (WATCHDOG_TIMEOUT_SEC * 1000 / 2)) Serial.println("[OK]");
     else if (age < WATCHDOG_TIMEOUT_SEC * 1000) Serial.println("[WARN]");
@@ -240,12 +254,13 @@ void watchdogShowTasks() {
 
 void watchdogShowStats() {
   Serial.println("\n=== WATCHDOG STATISTICS ===");
-  Serial.printf("Timeouts: %lu\n", wdt_stats.timeouts_detected);
-  Serial.printf("Recoveries: %lu\n", wdt_stats.automatic_recoveries);
-  Serial.printf("Task Resets: %lu\n", wdt_stats.task_resets);
-  Serial.printf("Sys Resets: %lu\n", wdt_stats.system_resets);
-  Serial.printf("Total Feeds: %lu\n", wdt_stats.total_ticks);
-  Serial.printf("Missed Ticks: %lu\n", wdt_stats.missed_ticks);
+  // FIX: Cast to unsigned long for printf
+  Serial.printf("Timeouts: %lu\n", (unsigned long)wdt_stats.timeouts_detected);
+  Serial.printf("Recoveries: %lu\n", (unsigned long)wdt_stats.automatic_recoveries);
+  Serial.printf("Task Resets: %lu\n", (unsigned long)wdt_stats.task_resets);
+  Serial.printf("Sys Resets: %lu\n", (unsigned long)wdt_stats.system_resets);
+  Serial.printf("Total Feeds: %lu\n", (unsigned long)wdt_stats.total_ticks);
+  Serial.printf("Missed Ticks: %lu\n", (unsigned long)wdt_stats.missed_ticks);
   Serial.println();
 }
 
