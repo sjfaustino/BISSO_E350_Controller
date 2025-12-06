@@ -61,15 +61,20 @@ task_stats_t task_stats[] = {
 static int stats_count = sizeof(task_stats) / sizeof(task_stats_t);
 static uint32_t boot_time_ms = 0;
 
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
 void taskManagerInit() {
   Serial.println("[TASKS] Initializing FreeRTOS manager...");
   boot_time_ms = millis();
   
+  // Create Queues
   queue_motion = xQueueCreate(QUEUE_LEN_MOTION, QUEUE_ITEM_SIZE);
   queue_safety = xQueueCreate(QUEUE_LEN_SAFETY, QUEUE_ITEM_SIZE);
   queue_encoder = xQueueCreate(QUEUE_LEN_ENCODER, QUEUE_ITEM_SIZE);
   queue_plc = xQueueCreate(QUEUE_LEN_PLC, QUEUE_ITEM_SIZE);
-  queue_fault = xQueueCreate(QUEUE_LEN_FAULT, QUEUE_ITEM_SIZE); 
+  queue_fault = xQueueCreate(QUEUE_LEN_FAULT, QUEUE_ITEM_SIZE); // Size 96 for async logs
   queue_display = xQueueCreate(QUEUE_LEN_DISPLAY, QUEUE_ITEM_SIZE);
   
   if (!queue_motion || !queue_safety || !queue_encoder || 
@@ -78,6 +83,7 @@ void taskManagerInit() {
     faultLogError(FAULT_BOOT_FAILED, "Task queue creation failed");
   }
   
+  // Create Mutexes
   mutex_config = xSemaphoreCreateMutex();
   mutex_i2c = xSemaphoreCreateMutex();
   mutex_motion = xSemaphoreCreateMutex();
@@ -91,6 +97,7 @@ void taskManagerInit() {
 
 void taskManagerStart() {
   Serial.println("[TASKS] Starting scheduler...");
+  
   taskSafetyCreate();
   taskMotionCreate();
   taskEncoderCreate();
@@ -100,10 +107,14 @@ void taskManagerStart() {
   taskFaultLogCreate();
   taskMonitorCreate();
   taskLcdCreate();
+  
   Serial.println("[TASKS] [OK] All tasks active");
 }
 
-// Accessors
+// ============================================================================
+// ACCESSORS & SIGNALS
+// ============================================================================
+
 QueueHandle_t taskGetMotionQueue() { return queue_motion; }
 QueueHandle_t taskGetSafetyQueue() { return queue_safety; }
 QueueHandle_t taskGetEncoderQueue() { return queue_encoder; }
@@ -115,7 +126,7 @@ SemaphoreHandle_t taskGetConfigMutex() { return mutex_config; }
 SemaphoreHandle_t taskGetI2cMutex() { return mutex_i2c; }
 SemaphoreHandle_t taskGetMotionMutex() { return mutex_motion; }
 
-// NEW: Direct Notification
+// NEW: Direct Notification for low-latency wakeups
 void taskSignalMotionUpdate() {
     if (task_motion) xTaskNotifyGive(task_motion);
 }
@@ -143,7 +154,10 @@ bool taskReceiveMessage(QueueHandle_t queue, queue_message_t* msg, uint32_t time
 int taskGetStatsCount() { return stats_count; }
 task_stats_t* taskGetStatsArray() { return task_stats; }
 
-// Dispatchers
+// ============================================================================
+// TASK DISPATCHERS
+// ============================================================================
+
 void taskSafetyCreate() {
   if(xTaskCreatePinnedToCore(taskSafetyFunction, "Safety", TASK_STACK_SAFETY, NULL, TASK_PRIORITY_SAFETY, &task_safety, CORE_1) == pdPASS) task_stats[0].handle = task_safety;
 }
@@ -172,6 +186,10 @@ void taskLcdCreate() {
   if(xTaskCreatePinnedToCore(taskLcdFunction, "LCD", TASK_STACK_LCD, NULL, TASK_PRIORITY_LCD, &task_lcd, CORE_1) == pdPASS) task_stats[8].handle = task_lcd;
 }
 
+// ============================================================================
+// DIAGNOSTICS
+// ============================================================================
+
 void taskShowStats() {
   Serial.println("\n=== TASK STATISTICS ===");
   Serial.println("Task               Runs      Avg(ms)   Max(ms)   CPU%");
@@ -181,11 +199,17 @@ void taskShowStats() {
   for (int i = 0; i < stats_count; i++) total_time += task_stats[i].total_time_ms;
   
   for (int i = 0; i < stats_count; i++) {
-    float avg_time = (task_stats[i].run_count > 0) ? (float)task_stats[i].total_time_ms / task_stats[i].run_count : 0;
-    float cpu_percent = (total_time > 0) ? ((float)task_stats[i].total_time_ms / total_time) * 100.0 : 0;
+    float avg_time = (task_stats[i].run_count > 0) ? 
+      (float)task_stats[i].total_time_ms / task_stats[i].run_count : 0;
+    float cpu_percent = (total_time > 0) ? 
+      ((float)task_stats[i].total_time_ms / total_time) * 100.0 : 0;
     
     Serial.printf("%-18s %-9lu %-9.2f %-9lu %-6.1f%%\n", 
-        task_stats[i].name, task_stats[i].run_count, avg_time, task_stats[i].max_run_time_ms, cpu_percent);
+        task_stats[i].name, 
+        (unsigned long)task_stats[i].run_count, 
+        avg_time, 
+        (unsigned long)task_stats[i].max_run_time_ms, 
+        cpu_percent);
   }
   Serial.println();
 }
@@ -197,9 +221,14 @@ void taskShowAllTasks() {
   for (int i = 0; i < stats_count; i++) {
     if (!task_stats[i].handle) continue;
     UBaseType_t priority = uxTaskPriorityGet(task_stats[i].handle);
-    UBaseType_t stack = uxTaskGetStackHighWaterMark(task_stats[i].handle);
-    BaseType_t core = xTaskGetAffinity(task_stats[i].handle);
-    Serial.printf("%-21s %-9lu %-13lu %ld\n", task_stats[i].name, priority, stack * 4, core);
+    UBaseType_t stack_high_water = uxTaskGetStackHighWaterMark(task_stats[i].handle);
+    BaseType_t core_id = xTaskGetAffinity(task_stats[i].handle);
+    
+    Serial.printf("%-21s %-9lu %-13lu %ld\n", 
+        task_stats[i].name, 
+        (unsigned long)priority, 
+        (unsigned long)(stack_high_water * 4), 
+        (long)core_id);
   }
   Serial.println();
 }

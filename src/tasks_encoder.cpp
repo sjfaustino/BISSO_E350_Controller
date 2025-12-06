@@ -15,9 +15,7 @@ void taskEncoderFunction(void* parameter) {
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Encoder"); 
 
   while (1) {
-    uint32_t task_start = millis();
-    
-    // Encoder operations (20ms)
+    // Encoder operations (20ms = 50 Hz)
     wj66Update();
     encoderMotionUpdate(); 
 

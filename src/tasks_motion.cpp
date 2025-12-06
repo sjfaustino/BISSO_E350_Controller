@@ -17,12 +17,10 @@ void taskMotionFunction(void* parameter) {
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Motion");
 
   while (1) {
-    uint32_t task_start = millis();
-    
-    // 1. Core Motion Logic
+    // Core motion operations
     motionUpdate();
     
-    // 2. Queue Processing (Legacy / Info Messages)
+    // Check for motion commands
     queue_message_t msg;
     while (taskReceiveMessage(taskGetMotionQueue(), &msg, 0)) {
       switch (msg.type) {
@@ -35,18 +33,13 @@ void taskMotionFunction(void* parameter) {
     
     watchdogFeed("Motion");
     
-    // 3. Hybrid Wait: Periodic + Event Driven
-    // Calculate remaining time in the 10ms slot
+    // Hybrid Wait: Periodic + Event Driven
     TickType_t xNow = xTaskGetTickCount();
-    xLastWakeTime += xPeriod; // Target next wake
+    xLastWakeTime += xPeriod;
     
-    // Use Notification Wait instead of Delay to allow "Kick" from other tasks
-    // If notified (e.g. E-Stop/Move), we wake immediately.
-    // If not, we wake at the 10ms mark.
     if (xLastWakeTime > xNow) {
         ulTaskNotifyTake(pdTRUE, xLastWakeTime - xNow);
     } else {
-        // Overrun, yield briefly
         xLastWakeTime = xNow; 
         vTaskDelay(1);
     }

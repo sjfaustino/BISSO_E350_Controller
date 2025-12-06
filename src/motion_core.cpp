@@ -86,57 +86,20 @@ void motionUpdate() {
 
       case MOTION_EXECUTING:
         {
-            if (active_axis == 0) { // X-Axis Final Approach Logic
+            if (active_axis == 0) { 
                 int32_t dist = abs(axis->target_position - current_pos);
-                int32_t threshold_counts = 0;
+                int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
                 float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
-
-                // 1. Get Mode
-                int mode = configGetInt(KEY_MOTION_APPROACH_MODE, APPROACH_MODE_FIXED);
-
-                if (mode == APPROACH_MODE_FIXED) {
-                    // FIXED MODE: Configured Distance (Default 50mm)
-                    int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
-                    threshold_counts = (int32_t)(approach_mm * scale_x);
-                } else {
-                    // DYNAMIC MODE: Physics-based calculation
-                    float current_speed_mm_s = 0.0f;
-                    // Determine current target speed from state (Approximate, as VFD ramps are unknown)
-                    if (axis->saved_speed_profile == SPEED_PROFILE_3) 
-                        current_speed_mm_s = machineCal.X.speed_fast_mm_min / 60.0f;
-                    else if (axis->saved_speed_profile == SPEED_PROFILE_2) 
-                        current_speed_mm_s = machineCal.X.speed_med_mm_min / 60.0f;
-                    else 
-                        current_speed_mm_s = machineCal.X.speed_slow_mm_min / 60.0f;
-
-                    // Get Deceleration (Default 5.0 mm/s^2)
-                    float accel = configGetFloat(KEY_DEFAULT_ACCEL, 5.0f);
-                    if (accel < 0.1f) accel = 0.1f; // Safety clamp
-
-                    // d = v^2 / (2*a)
-                    float stop_dist_mm = (current_speed_mm_s * current_speed_mm_s) / (2.0f * accel);
-                    
-                    // Add 10% safety margin
-                    stop_dist_mm *= 1.1f;
-                    
-                    threshold_counts = (int32_t)(stop_dist_mm * scale_x);
-                }
-
-                // 2. Apply Downshift Logic
-                if (dist <= threshold_counts && dist > 100 && axis->saved_speed_profile != SPEED_PROFILE_1) {
-                    // Only log if we are actually switching modes
-                    if (mode == APPROACH_MODE_DYNAMIC) {
-                        logInfo("[MOTION] Dynamic Approach Trigger: %ld counts", threshold_counts);
-                    }
+                int32_t approach_cnt = (int32_t)(approach_mm * scale_x);
+                
+                if (dist <= approach_cnt && dist > 100 && axis->saved_speed_profile != SPEED_PROFILE_1) {
                     motionSetPLCSpeedProfile(SPEED_PROFILE_1);
                     axis->saved_speed_profile = SPEED_PROFILE_1;
                 }
             }
 
-            // Check if target is reached
             if ((active_start_position < axis->target_position && current_pos >= axis->target_position) ||
                 (active_start_position > axis->target_position && current_pos <= axis->target_position)) {
-              
               axis->position = axis->target_position;
               axis->state = MOTION_STOPPING;         
               axis->state_entry_ms = now;
@@ -172,7 +135,10 @@ uint8_t motionGetActiveAxis() { return active_axis; }
 void motionDiagnostics() {
   Serial.printf("\n[MOTION] Global: %s | Active: %d\n", global_enabled ? "ON" : "OFF", active_axis);
   for (int i = 0; i < MOTION_AXES; i++) {
-    Serial.printf("  Axis %d: %s | Pos: %ld | Tgt: %ld\n", i, motionStateToString(axes[i].state), motionGetPosition(i), axes[i].target_position);
+    // FIX: Cast to long for %ld format specifier
+    Serial.printf("  Axis %d: %s | Pos: %ld | Tgt: %ld\n", 
+                  i, motionStateToString(axes[i].state), 
+                  (long)motionGetPosition(i), (long)axes[i].target_position);
   }
 }
 

@@ -7,26 +7,30 @@
 #include <freertos/task.h>
 
 void taskFaultLogFunction(void* parameter) {
-  TickType_t last_wake = xTaskGetTickCount();
+  // Removed unused last_wake variable since this task blocks on the queue
   
   logInfo("[FAULT_TASK] [OK] Started on core 0");
   watchdogTaskAdd("Fault_Log");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Fault_Log");
 
   while (1) {
+    // Process Fault Queue
     queue_message_t msg;
-    // Block up to 500ms waiting for message
+    
+    // Block up to 500ms waiting for message.
+    // This timeout acts as our loop delay if no messages arrive.
     if (xQueueReceive(taskGetFaultQueue(), &msg, pdMS_TO_TICKS(500)) == pdTRUE) {
       if (msg.type == MSG_FAULT_LOGGED) {
-          // Reconstruct and write to NVS
+          // Reconstruct and write to NVS (Slow Blocking Operation)
           const fault_entry_t* entry = (const fault_entry_t*)msg.data;
           faultLogToNVS(entry);
       }
       else if (msg.type == MSG_FAULT_CRITICAL) {
-          logError("[FAULT_TASK] [CRITICAL] Signal received.");
+          logError("[FAULT_TASK] [CRIT] Critical signal received.");
       }
     }
     
+    // Feed watchdog every loop (at least every 500ms due to timeout)
     watchdogFeed("Fault_Log");
   }
 }

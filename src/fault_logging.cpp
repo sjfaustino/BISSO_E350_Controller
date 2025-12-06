@@ -138,7 +138,9 @@ void faultLogCritical(fault_code_t code, const char* message) {
 }
 
 fault_stats_t faultGetStats() {
-    fault_stats_t stats = {0};
+    // FIX: Fully initialize struct to prevent "missing initializer" warnings
+    fault_stats_t stats = {0, 0, 0, 0, 0, 0, 0, 0, 0xFFFFFFFF, 0};
+    
     uint32_t first_time = 0xFFFFFFFF;
     uint32_t last_time = 0;
 
@@ -176,7 +178,7 @@ fault_stats_t faultGetStats() {
                 case FAULT_CALIBRATION_MISSING:
                 case FAULT_BOOT_FAILED:
                 case FAULT_BOOT_RECOVERY_ATTEMPTED:
-                    stats.config_faults++; // Matches struct member
+                    stats.config_faults++; 
                     break;
                 case FAULT_PLC_COMM_LOSS:
                 case FAULT_I2C_ERROR:
@@ -201,8 +203,7 @@ fault_stats_t faultGetStats() {
 }
 
 void faultShowHistory() {
-    // Implementation simplified for size
-    Serial.println("[FAULT] History dump command received");
+    Serial.println("[FAULT] Full history dump via CLI only.");
 }
 
 void faultClearHistory() {
