@@ -1,11 +1,15 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer
- * @project Gemini v3.0.0
+ * @brief Real-Time Hardware Execution Layer (Gemini v3.1.0)
+ * @details Handles the high-priority control loop, hardware I/O, and safety.
+ * Owner of the 'axes' array.
+ * @project Gemini v3.1.0
+ * @author Sergio Faustino
  */
 
 #include "motion.h"
-#include "motion_planner.h"
+#include "motion_state.h" // Links to Accessors
+#include "motion_planner.h" // Links to the Brain
 #include "system_constants.h"
 #include "plc_iface.h"
 #include "encoder_motion_integration.h"
@@ -13,7 +17,6 @@
 #include "serial_logger.h"
 #include "task_manager.h"
 #include "safety.h"
-#include "encoder_calibration.h" 
 #include "encoder_wj66.h"        
 #include "config_unified.h" 
 #include "config_keys.h"
@@ -23,34 +26,38 @@
 #include <stdio.h>
 
 // ============================================================================
-// CORE STATE
+// CORE STATE DEFINITIONS (Owner)
 // ============================================================================
 
 motion_axis_t axes[MOTION_AXES] = {
-  {0, 0, MOTION_IDLE, 0, 0, true, -500000, 500000, true, 0, 0, SPEED_PROFILE_1, 0.0f}, 
-  {0, 0, MOTION_IDLE, 0, 0, true, -300000, 300000, true, 0, 0, SPEED_PROFILE_1, 0.0f}, 
-  {0, 0, MOTION_IDLE, 0, 0, true, 0, 150000, true, 0, 0, SPEED_PROFILE_1, 0.0f},       
-  {0, 0, MOTION_IDLE, 0, 0, true, -45000, 45000, true, 0, 0, SPEED_PROFILE_1, 0.0f}   
+  {0, 0, MOTION_IDLE, 0, 0, true, -500000, 500000, true, 0, 0, SPEED_PROFILE_1, 0.0f}, // X
+  {0, 0, MOTION_IDLE, 0, 0, true, -300000, 300000, true, 0, 0, SPEED_PROFILE_1, 0.0f}, // Y
+  {0, 0, MOTION_IDLE, 0, 0, true, 0, 150000, true, 0, 0, SPEED_PROFILE_1, 0.0f},       // Z
+  {0, 0, MOTION_IDLE, 0, 0, true, -45000, 45000, true, 0, 0, SPEED_PROFILE_1, 0.0f}    // A
 };
 
 uint8_t active_axis = 255; 
 int32_t active_start_position = 0;
 bool global_enabled = true; 
-static bool encoder_feedback_enabled = false;
+static bool encoder_feedback_enabled = false; 
 
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y, ELBO_I73_AXIS_Z, 255}; 
 const uint8_t AXIS_TO_CONSENSO_BIT[] = {ELBO_Q73_CONSENSO_X, ELBO_Q73_CONSENSO_Y, ELBO_Q73_CONSENSO_Z, 255};
 
-// Forward declaration
-void motionStartInternalMove(float x, float y, float z, float a, float speed_mm_s);
+// Forward declaration for motion_commands.cpp to use
+extern void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
 
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
 
 void motionInit() {
-  logInfo("[MOTION] Initializing Control Layer v3.0...");
-  if (MOTION_AXES != 4) { faultLogError(FAULT_BOOT_FAILED, "Invalid axis count"); return; }
+  logInfo("[MOTION] Initializing Control Layer v3.1...");
+  
+  if (MOTION_AXES != 4) {
+    faultLogError(FAULT_BOOT_FAILED, "Invalid axis count");
+    return;
+  }
   
   for (int i = 0; i < MOTION_AXES; i++) {
     axes[i].state = MOTION_IDLE;
@@ -63,7 +70,7 @@ void motionInit() {
 }
 
 // ============================================================================
-// MAIN LOOP
+// MAIN REAL-TIME LOOP (10ms)
 // ============================================================================
 
 void motionUpdate() {
@@ -75,10 +82,10 @@ void motionUpdate() {
       axes[active_axis].position = wj66GetPosition(active_axis);
   }
 
-  // 2. PLANNER
+  // 2. RUN PLANNER
   motionPlanner.update(axes, active_axis, active_start_position);
 
-  // 3. EXECUTION
+  // 3. EXECUTE STATE MACHINE
   if (active_axis != 255) {
     motion_axis_t* axis = &axes[active_axis];
     int32_t current_pos = axis->position;
@@ -140,61 +147,8 @@ void motionUpdate() {
 }
 
 // ----------------------------------------------------------------------------
-// HELPERS
+// CONTROL & SAFETY API (Modifiers)
 // ----------------------------------------------------------------------------
-
-void motionStartInternalMove(float x, float y, float z, float a, float speed_mm_s) {
-    motionMoveAbsolute(x, y, z, a, speed_mm_s);
-}
-
-// --- NEW: Helper implementation moved UP to be visible ---
-const char* motionStateToString(motion_state_t state) {
-  switch (state) {
-    case MOTION_IDLE: return "IDLE";
-    case MOTION_WAIT_CONSENSO: return "WAIT";
-    case MOTION_EXECUTING: return "RUN";
-    case MOTION_STOPPING: return "STOP";
-    case MOTION_PAUSED: return "PAUSE";
-    case MOTION_ERROR: return "ERR";
-    default: return "UNK";
-  }
-}
-
-// ----------------------------------------------------------------------------
-// API IMPLEMENTATIONS
-// ----------------------------------------------------------------------------
-
-void motionSetFeedOverride(float factor) { motionPlanner.setFeedOverride(factor); }
-float motionGetFeedOverride() { return motionPlanner.getFeedOverride(); }
-
-int32_t motionGetPosition(uint8_t axis) { return (axis < MOTION_AXES) ? wj66GetPosition(axis) : 0; }
-int32_t motionGetTarget(uint8_t axis) { return (axis < MOTION_AXES) ? axes[axis].target_position : 0; }
-motion_state_t motionGetState(uint8_t axis) { return (axis < MOTION_AXES) ? axes[axis].state : MOTION_ERROR; }
-
-float motionGetPositionMM(uint8_t axis) {
-    if (axis >= MOTION_AXES) return 0.0f;
-    int32_t counts = motionGetPosition(axis);
-    float scale = 1.0f;
-    if(axis==0) scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
-    else if(axis==1) scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
-    else if(axis==2) scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
-    else if(axis==3) scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG;
-    return (float)counts / scale;
-}
-
-bool motionIsMoving() { return active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO); }
-bool motionIsStalled(uint8_t axis) { return (axis < MOTION_AXES && axis == active_axis && axes[axis].state == MOTION_EXECUTING && encoderMotionHasError(axis)); }
-bool motionIsEmergencyStopped() { return !global_enabled; }
-uint8_t motionGetActiveAxis() { return active_axis; }
-
-void motionDiagnostics() {
-  Serial.printf("\n[MOTION] Global: %s | Active: %d | Feed: %.0f%%\n", 
-      global_enabled ? "ON" : "OFF", active_axis, motionPlanner.getFeedOverride() * 100.0f);
-  for (int i = 0; i < MOTION_AXES; i++) {
-    Serial.printf("  Axis %d: %s | Pos: %ld | Tgt: %ld | Spd: %.1f\n", 
-                  i, motionStateToString(axes[i].state), (long)motionGetPosition(i), (long)axes[i].target_position, axes[i].commanded_speed_mm_s);
-  }
-}
 
 void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos) {
   if (axis < MOTION_AXES) {
@@ -203,8 +157,7 @@ void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos) {
   }
 }
 
-// --- NEW: Implementation Added ---
-void motionEnableSoftLimits(uint8_t axis, bool enable) {
+void motionEnableSoftLimits(uint8_t axis, bool enable) { 
   if (axis < MOTION_AXES) {
     axes[axis].soft_limit_enabled = enable;
   }
@@ -216,33 +169,6 @@ bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos) {
   *max_pos = axes[axis].soft_limit_max;
   return axes[axis].soft_limit_enabled;
 }
-
-bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) { return true; }
-
-bool motionSetState(uint8_t axis, motion_state_t new_state) {
-  if (axis >= MOTION_AXES || !taskLockMutex(taskGetMotionMutex(), 100)) return false;
-  axes[axis].state = new_state;
-  if (new_state == MOTION_WAIT_CONSENSO || new_state == MOTION_STOPPING) axes[axis].state_entry_ms = millis();
-  if (new_state == MOTION_IDLE || new_state == MOTION_ERROR) {
-      motionSetPLCAxisDirection(255, false, false);
-      active_axis = 255;
-  }
-  taskUnlockMutex(taskGetMotionMutex());
-  return true;
-}
-
-void motionEnableEncoderFeedback(bool enable) {
-  encoder_feedback_enabled = enable;
-  encoderMotionEnableFeedback(enable);
-}
-
-bool motionIsEncoderFeedbackEnabled() {
-  return encoder_feedback_enabled;
-}
-
-// ============================================================================
-// CRITICAL CONTROL
-// ============================================================================
 
 void motionStop() {
   if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
@@ -274,6 +200,7 @@ void motionResume() {
   if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
   if (active_axis != 255 && axes[active_axis].state == MOTION_PAUSED) {
       logInfo("[MOTION] Resuming axis %d", active_axis);
+      // Use helper from Planner
       float effective_speed = axes[active_axis].commanded_speed_mm_s * motionPlanner.getFeedOverride();
       speed_profile_t prof = motionMapSpeedToProfile(active_axis, effective_speed);
       motionSetPLCSpeedProfile(prof);
@@ -296,7 +223,7 @@ void motionEmergencyStop() {
   global_enabled = false;
   for (int i = 0; i < MOTION_AXES; i++) axes[i].state = MOTION_ERROR;
   active_axis = 255;
-  motionBuffer.clear(); 
+  motionBuffer.clear(); // Safety: Purge
   if (got_mutex) taskUnlockMutex(taskGetMotionMutex());
   logError("[MOTION] [CRITICAL] EMERGENCY STOP ACTIVATED");
   faultLogError(FAULT_EMERGENCY_HALT, "E-Stop Activated");
@@ -304,12 +231,63 @@ void motionEmergencyStop() {
 }
 
 bool motionClearEmergencyStop() {
-  if (global_enabled) return true;
-  if (safetyIsAlarmed()) return false;
+  if (global_enabled) { Serial.println("[MOTION] E-Stop already cleared"); return true; }
+  if (safetyIsAlarmed()) { Serial.println("[MOTION] Cannot clear - Alarm Active"); return false; }
   global_enabled = true;
   for (int i = 0; i < MOTION_AXES; i++) if (axes[i].state == MOTION_ERROR) axes[i].state = MOTION_IDLE;
   active_axis = 255;
   emergencyStopSetActive(false); 
+  Serial.println("[MOTION] [OK] Emergency stop cleared");
   taskSignalMotionUpdate();
+  return true;
+}
+
+// ----------------------------------------------------------------------------
+// API WRAPPERS (Fixes for Linker Errors)
+// ----------------------------------------------------------------------------
+
+void motionSetFeedOverride(float factor) { 
+    motionPlanner.setFeedOverride(factor); 
+}
+
+float motionGetFeedOverride() { 
+    return motionPlanner.getFeedOverride(); 
+}
+
+void motionStartInternalMove(float x, float y, float z, float a, float speed_mm_s) {
+    // This is called by Planner to execute a popped command
+    motionMoveAbsolute(x, y, z, a, speed_mm_s);
+}
+
+void motionDiagnostics() {
+  Serial.printf("\n[MOTION] Global: %s | Active: %d | Feed: %.0f%%\n", 
+      global_enabled ? "ON" : "OFF", active_axis, motionPlanner.getFeedOverride() * 100.0f);
+  for (int i = 0; i < MOTION_AXES; i++) {
+    Serial.printf("  Axis %d: %s | Pos: %ld | Tgt: %ld | Spd: %.1f\n", 
+                  i, motionStateToString(axes[i].state), (long)motionGetPosition(i), (long)axes[i].target_position, axes[i].commanded_speed_mm_s);
+  }
+}
+
+// --- Internal Configuration ---
+void motionEnableEncoderFeedback(bool enable) {
+  encoder_feedback_enabled = enable;
+  encoderMotionEnableFeedback(enable);
+}
+
+bool motionIsEncoderFeedbackEnabled() {
+  return encoder_feedback_enabled;
+}
+
+bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) { return true; }
+
+bool motionSetState(uint8_t axis, motion_state_t new_state) {
+  if (axis >= MOTION_AXES || !taskLockMutex(taskGetMotionMutex(), 100)) return false;
+  axes[axis].state = new_state;
+  if (new_state == MOTION_WAIT_CONSENSO || new_state == MOTION_STOPPING) axes[axis].state_entry_ms = millis();
+  if (new_state == MOTION_IDLE || new_state == MOTION_ERROR) {
+      motionSetPLCAxisDirection(255, false, false);
+      active_axis = 255;
+  }
+  taskUnlockMutex(taskGetMotionMutex());
   return true;
 }
