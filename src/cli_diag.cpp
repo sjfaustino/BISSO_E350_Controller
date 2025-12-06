@@ -1,3 +1,10 @@
+/**
+ * @file cli_diag.cpp
+ * @brief Diagnostic CLI commands implementation
+ * @project Gemini v1.0.0
+ * @author Sergio Faustino - sjfaustino@gmail.com
+ */
+
 #include "cli.h"
 #include "serial_logger.h"
 #include "fault_logging.h"
@@ -117,8 +124,15 @@ void cmd_faults_clear(int argc, char** argv) { faultClearHistory(); }
 void cmd_faults_stats(int argc, char** argv) {
     fault_stats_t stats = faultGetStats();
     Serial.println("\n[FAULT] === Fault Statistics ===");
+    // FIX: Explicit casts to unsigned long for %lu
     Serial.printf("Total: %lu | Encoder: %lu | Motion: %lu | Safety: %lu\n", 
-                  stats.total_faults, stats.encoder_faults, stats.motion_faults, stats.safety_faults);
+                  (unsigned long)stats.total_faults, (unsigned long)stats.encoder_faults, 
+                  (unsigned long)stats.motion_faults, (unsigned long)stats.safety_faults);
+    
+    Serial.printf("PLC/I2C: %lu | Config: %lu | System: %lu\n",
+                  (unsigned long)stats.plc_faults, (unsigned long)stats.config_faults,
+                  (unsigned long)stats.system_faults);
+
     if (stats.total_faults > 0) {
         Serial.printf("Last Fault: %s\n", formatTimestamp(stats.last_fault_time_ms));
     } else {
@@ -162,7 +176,8 @@ void cmd_encoder_set_baud(int argc, char** argv) {
     return;
   }
   if (encoderSetBaudRate((uint32_t)new_baud_rate_i32)) {
-    Serial.printf("[CLI] [OK] Encoder baud rate set to %ld.\n", new_baud_rate_i32);
+    // FIX: Cast to long for %ld
+    Serial.printf("[CLI] [OK] Encoder baud rate set to %ld.\n", (long)new_baud_rate_i32);
   } else {
     Serial.printf("[CLI] [ERR] Failed to set encoder baud rate.\n");
   }
@@ -219,8 +234,10 @@ void debugConfigHandler() {
 
 void debugAllHandler() {
     Serial.println("[DEBUG] -- System Dump --");
-    char ver[32]; firmwareGetVersionString(ver, 32);
-    Serial.printf("Firmware: %s | Uptime: %lu s\n", ver, taskGetUptime());
+    char ver[FIRMWARE_VERSION_STRING_LEN]; 
+    firmwareGetVersionString(ver, sizeof(ver));
+    // FIX: Cast uptime to unsigned long
+    Serial.printf("Firmware: %s | Uptime: %lu s\n", ver, (unsigned long)taskGetUptime());
     debugEncodersHandler();
     motionDiagnostics();
     safetyDiagnostics();
@@ -240,6 +257,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
     cliRegisterCommand("encoder_baud_set", "Set baud rate", cmd_encoder_set_baud);
+    // External definition via cli_config.cpp
     cliRegisterCommand("config", "Configuration management", cmd_config_main); 
     cliRegisterCommand("wdt", "Watchdog management", cmd_diag_scheduler_main);
     cliRegisterCommand("task", "Task monitoring", cmd_diag_scheduler_main);

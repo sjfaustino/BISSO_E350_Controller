@@ -1,6 +1,7 @@
 #include "config_unified.h"
 #include "serial_logger.h"
 #include "config_keys.h" 
+#include "system_constants.h" // <-- FIX: Added for APPROACH_MODE_FIXED
 #include <Preferences.h>
 #include <string.h>
 #include <math.h> 
@@ -15,13 +16,15 @@ static int config_count = 0;
 static uint32_t last_nvs_save = 0;
 static bool config_dirty = false;
 
+// Critical keys that should save immediately
 static const char* critical_keys[] = {
   KEY_PPM_X, KEY_PPM_Y, KEY_PPM_Z, KEY_PPM_A,
   KEY_X_LIMIT_MIN, KEY_X_LIMIT_MAX,
   KEY_Y_LIMIT_MIN, KEY_Y_LIMIT_MAX,
   KEY_Z_LIMIT_MIN, KEY_Z_LIMIT_MAX,
   KEY_A_LIMIT_MIN, KEY_A_LIMIT_MAX,
-  KEY_STALL_TIMEOUT, KEY_ALARM_PIN
+  KEY_STALL_TIMEOUT, KEY_ALARM_PIN,
+  KEY_MOTION_APPROACH_MODE
 };
 
 static bool isCriticalKey(const char* key) {
@@ -211,8 +214,7 @@ void configUnifiedSave() {
 }
 
 void configUnifiedLoad() {
-  // Just a placeholder if we were loading whole tables. 
-  // Current logic loads on demand.
+  Serial.println("[CONFIG] Cache ready.");
 }
 
 void configUnifiedReset() {
@@ -229,6 +231,10 @@ void configUnifiedReset() {
   configSetInt(KEY_STALL_TIMEOUT, 2000);
   configSetInt(KEY_X_APPROACH, 50);
   configSetInt(KEY_MOTION_DEADBAND, 10);
+  
+  // Initialize new mode to FIXED (0)
+  configSetInt(KEY_MOTION_APPROACH_MODE, APPROACH_MODE_FIXED);
+
   configSetFloat(KEY_SPEED_CAL_X, 0.0f); configSetFloat(KEY_SPEED_CAL_Y, 0.0f);
   configSetFloat(KEY_SPEED_CAL_Z, 0.0f); configSetFloat(KEY_SPEED_CAL_A, 0.0f);
   

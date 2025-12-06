@@ -1,15 +1,21 @@
 #include "boot_validation.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
-#include "system_constants.h" 
+#include "system_constants.h" // Required for MAX_BOOT_SUBSYSTEMS
 #include <Preferences.h>
 #include <string.h>
 #include <Arduino.h>
 
 #define BOOT_NVS_NAMESPACE "bisso_boot"
 
-static boot_sequence_t boot_seq = {0};
-static subsystem_health_t subsystems[MAX_BOOT_SUBSYSTEMS] = {0};
+#ifndef MAX_BOOT_SUBSYSTEMS
+#define MAX_BOOT_SUBSYSTEMS 15
+#endif
+
+// Fully initialize struct to prevent warnings
+static boot_sequence_t boot_seq = {0, 0, 0, 0, 0, 0, BOOT_OK, false};
+
+static subsystem_health_t subsystems[MAX_BOOT_SUBSYSTEMS]; 
 static int subsystem_count = 0;
 static bool degraded_mode = false;
 static bool shutting_down = false;
@@ -17,6 +23,9 @@ static Preferences boot_prefs;
 
 void bootValidationInit() {
   logInfo("[BOOT_VAL] Initializing...");
+  
+  // Clear subsystems array safely
+  memset(subsystems, 0, sizeof(subsystems));
   
   boot_seq.boot_start_time = millis();
   boot_seq.overall_status = BOOT_OK;
@@ -26,7 +35,7 @@ void bootValidationInit() {
   } else {
     uint32_t consecutive = boot_prefs.getUInt("consecutive_ok", 0);
     boot_prefs.end();
-    logInfo("[BOOT_VAL] Consecutive boots: %lu", consecutive);
+    logInfo("[BOOT_VAL] Consecutive boots: %u", consecutive);
   }
   
   logInfo("[BOOT_VAL] Ready");
@@ -112,7 +121,9 @@ bool bootValidateAllSystems() {
   
   for (int i = 0; i < subsystem_count; i++) {
     const char* status = subsystems[i].healthy ? "[OK]" : "[FAIL]";
-    logInfo("[BOOT] %-15s: %s (Init: %lums)", subsystems[i].subsystem_name, status, subsystems[i].init_time_ms);
+    // Cast to unsigned long for printf safety
+    logInfo("[BOOT] %-15s: %s (Init: %lums)", 
+            subsystems[i].subsystem_name, status, (unsigned long)subsystems[i].init_time_ms);
     
     if (!subsystems[i].healthy) failed_count++;
     else healthy_count++;
@@ -166,13 +177,17 @@ bool bootIsSubsystemHealthy(const char* name) {
   return false;
 }
 
-boot_status_code_t bootGetStatus() { return boot_seq.overall_status; }
+boot_status_code_t bootGetStatus() {
+  return boot_seq.overall_status;
+}
 
-// CLI Helper: Uses Serial because it is user-requested
 void bootShowStatus() {
   Serial.println("\n=== BOOT STATUS ===");
+  
   Serial.printf("Status: %s\n", boot_seq.boot_validation_passed ? "[OK]" : "[FAIL]");
-  Serial.printf("Time:   %lu ms\n", boot_seq.total_boot_time_ms);
+  if (degraded_mode) Serial.println("Mode:   [WARN] DEGRADED");
+  
+  Serial.printf("Time:   %lu ms\n", (unsigned long)boot_seq.total_boot_time_ms);
   Serial.printf("Failed: %d\n", boot_seq.systems_failed);
 }
 
@@ -182,8 +197,8 @@ void bootShowDetailedReport() {
     Serial.printf("  %-15s: %s | Time: %4lums | Errors: %lu\n", 
       subsystems[i].subsystem_name,
       subsystems[i].healthy ? "[OK]" : "[FAIL]",
-      subsystems[i].init_time_ms,
-      subsystems[i].error_count);
+      (unsigned long)subsystems[i].init_time_ms,
+      (unsigned long)subsystems[i].error_count);
       
     if (subsystems[i].last_error) {
       Serial.printf("    Error: %s\n", subsystems[i].last_error);
@@ -201,9 +216,9 @@ void bootShowSubsystemHealth() {
 void bootShowInitTimes() {
   Serial.println("\n=== INIT TIMING ===");
   for (int i = 0; i < subsystem_count; i++) {
-    Serial.printf("  %-15s: %lu ms\n", subsystems[i].subsystem_name, subsystems[i].init_time_ms);
+    Serial.printf("  %-15s: %lu ms\n", subsystems[i].subsystem_name, (unsigned long)subsystems[i].init_time_ms);
   }
-  Serial.printf("Total: %lu ms\n", boot_seq.total_boot_time_ms);
+  Serial.printf("Total: %lu ms\n", (unsigned long)boot_seq.total_boot_time_ms);
 }
 
 bool bootAttemptRecovery(const char* subsystem) {
@@ -217,7 +232,7 @@ void bootHandleCriticalError(const char* error_msg) {
   faultLogError(FAULT_CRITICAL_SYSTEM_ERROR, error_msg);
   
   Serial.println("\n*** SYSTEM HALTED ***");
-  Serial.println("Critical error during boot.");
+  Serial.println("Critical error during boot. Check logs.");
   
   while (1) {
     delay(1000);
@@ -233,11 +248,17 @@ void bootRebootSystem() {
 void bootEmergencyHalt(const char* reason) {
   logError("[BOOT] EMERGENCY HALT: %s", reason);
   faultLogError(FAULT_EMERGENCY_HALT, reason);
+  
   shutting_down = true;
-  while (1) delay(10000);
+  
+  while (1) {
+    delay(10000);
+  }
 }
 
-bool bootCanOperateDegraded() { return (boot_seq.systems_failed <= 2); }
+bool bootCanOperateDegraded() {
+  return (boot_seq.systems_failed <= 2);
+}
 
 void bootSetDegradedMode(bool enabled) {
   degraded_mode = enabled;
@@ -245,14 +266,18 @@ void bootSetDegradedMode(bool enabled) {
   else logInfo("[BOOT] Switched to NORMAL MODE");
 }
 
-bool bootIsDegradedMode() { return degraded_mode; }
+bool bootIsDegradedMode() {
+  return degraded_mode;
+}
 
 void bootShowDegradedModeStatus() {
   Serial.printf("\nMode: %s\n", degraded_mode ? "DEGRADED" : "NORMAL");
   if (degraded_mode) {
       Serial.println("Operational Systems:");
       for (int i = 0; i < subsystem_count; i++) {
-          if (subsystems[i].healthy) Serial.printf("  [OK] %s\n", subsystems[i].subsystem_name);
+          if (subsystems[i].healthy) {
+            Serial.printf("  [OK] %s\n", subsystems[i].subsystem_name);
+          }
       }
   }
 }
@@ -264,12 +289,14 @@ void bootLogErrors() {
   }
   uint32_t error_count = boot_prefs.getUInt("errors", 0);
   boot_prefs.end();
-  logInfo("[BOOT] Total recorded errors: %lu", error_count);
+  logInfo("[BOOT] Total recorded errors: %u", error_count);
 }
 
 const char* bootGetLastError() {
   for (int i = subsystem_count - 1; i >= 0; i--) {
-    if (subsystems[i].last_error) return subsystems[i].last_error;
+    if (subsystems[i].last_error) {
+      return subsystems[i].last_error;
+    }
   }
   return "None";
 }
@@ -294,8 +321,8 @@ uint32_t bootGetConsecutiveSuccesses() {
 
 void bootShowRecoveryHistory() {
   Serial.println("\n=== RECOVERY HISTORY ===");
-  Serial.printf("Consecutive Boots: %lu\n", bootGetConsecutiveSuccesses());
-  Serial.printf("Total Errors:      %lu\n", bootGetErrorCount());
+  Serial.printf("Consecutive Boots: %lu\n", (unsigned long)bootGetConsecutiveSuccesses());
+  Serial.printf("Total Errors:      %lu\n", (unsigned long)bootGetErrorCount());
 }
 
 void bootGracefulShutdown(const char* reason) {
@@ -306,4 +333,6 @@ void bootGracefulShutdown(const char* reason) {
   logInfo("[BOOT] Power off safe.");
 }
 
-bool bootIsShuttingDown() { return shutting_down; }
+bool bootIsShuttingDown() {
+  return shutting_down;
+}

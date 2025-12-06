@@ -9,7 +9,7 @@
 #include "encoder_calibration.h" 
 #include "encoder_wj66.h"        
 #include "config_unified.h" 
-#include "config_keys.h" // <-- NEW
+#include "config_keys.h"
 #include <math.h> 
 #include <string.h>
 #include <stdlib.h> 
@@ -24,7 +24,6 @@ motion_axis_t axes[MOTION_AXES] = {
 
 uint8_t active_axis = 255; 
 int32_t active_start_position = 0;
-static uint32_t last_update_ms = 0;
 bool global_enabled = true; 
 static bool encoder_feedback_enabled = false;
 
@@ -32,7 +31,7 @@ const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y, ELBO_I73_AX
 const uint8_t AXIS_TO_CONSENSO_BIT[] = {ELBO_Q73_CONSENSO_X, ELBO_Q73_CONSENSO_Y, ELBO_Q73_CONSENSO_Z, 255};
 
 void motionInit() {
-  Serial.println("[MOTION] Initializing...");
+  logInfo("[MOTION] Initializing...");
   if (MOTION_AXES != 4) {
     faultLogError(FAULT_BOOT_FAILED, "Invalid axis count");
     return;
@@ -41,21 +40,15 @@ void motionInit() {
     axes[i].state = MOTION_IDLE;
     axes[i].enabled = true;
   }
-  last_update_ms = millis();
   motionSetPLCAxisDirection(255, false, false); 
-  Serial.println("[MOTION] [OK] Ready");
+  logInfo("[MOTION] [OK] Ready");
 }
 
 void motionUpdate() {
   if (!global_enabled) return;
-  if (!taskLockMutex(taskGetMotionMutex(), 5)) return; 
+  if (!taskLockMutex(taskGetMotionMutex(), 0)) return; 
   
   uint32_t now = millis();
-  if (now - last_update_ms < MOTION_UPDATE_INTERVAL_MS) {
-    taskUnlockMutex(taskGetMotionMutex());
-    return;
-  }
-  last_update_ms = now;
   
   if (active_axis != 255) {
     motion_axis_t* axis = &axes[active_axis];
@@ -93,22 +86,57 @@ void motionUpdate() {
 
       case MOTION_EXECUTING:
         {
-            if (active_axis == 0) { // X-Axis Final Approach
+            if (active_axis == 0) { // X-Axis Final Approach Logic
                 int32_t dist = abs(axis->target_position - current_pos);
-                // Use Constant Key
-                int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
-                
+                int32_t threshold_counts = 0;
                 float scale_x = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
-                int32_t approach_cnt = (int32_t)(approach_mm * scale_x);
-                
-                if (dist <= approach_cnt && dist > 100 && axis->saved_speed_profile != SPEED_PROFILE_1) {
+
+                // 1. Get Mode
+                int mode = configGetInt(KEY_MOTION_APPROACH_MODE, APPROACH_MODE_FIXED);
+
+                if (mode == APPROACH_MODE_FIXED) {
+                    // FIXED MODE: Configured Distance (Default 50mm)
+                    int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
+                    threshold_counts = (int32_t)(approach_mm * scale_x);
+                } else {
+                    // DYNAMIC MODE: Physics-based calculation
+                    float current_speed_mm_s = 0.0f;
+                    // Determine current target speed from state (Approximate, as VFD ramps are unknown)
+                    if (axis->saved_speed_profile == SPEED_PROFILE_3) 
+                        current_speed_mm_s = machineCal.X.speed_fast_mm_min / 60.0f;
+                    else if (axis->saved_speed_profile == SPEED_PROFILE_2) 
+                        current_speed_mm_s = machineCal.X.speed_med_mm_min / 60.0f;
+                    else 
+                        current_speed_mm_s = machineCal.X.speed_slow_mm_min / 60.0f;
+
+                    // Get Deceleration (Default 5.0 mm/s^2)
+                    float accel = configGetFloat(KEY_DEFAULT_ACCEL, 5.0f);
+                    if (accel < 0.1f) accel = 0.1f; // Safety clamp
+
+                    // d = v^2 / (2*a)
+                    float stop_dist_mm = (current_speed_mm_s * current_speed_mm_s) / (2.0f * accel);
+                    
+                    // Add 10% safety margin
+                    stop_dist_mm *= 1.1f;
+                    
+                    threshold_counts = (int32_t)(stop_dist_mm * scale_x);
+                }
+
+                // 2. Apply Downshift Logic
+                if (dist <= threshold_counts && dist > 100 && axis->saved_speed_profile != SPEED_PROFILE_1) {
+                    // Only log if we are actually switching modes
+                    if (mode == APPROACH_MODE_DYNAMIC) {
+                        logInfo("[MOTION] Dynamic Approach Trigger: %ld counts", threshold_counts);
+                    }
                     motionSetPLCSpeedProfile(SPEED_PROFILE_1);
                     axis->saved_speed_profile = SPEED_PROFILE_1;
                 }
             }
 
+            // Check if target is reached
             if ((active_start_position < axis->target_position && current_pos >= axis->target_position) ||
                 (active_start_position > axis->target_position && current_pos <= axis->target_position)) {
+              
               axis->position = axis->target_position;
               axis->state = MOTION_STOPPING;         
               axis->state_entry_ms = now;
@@ -120,7 +148,6 @@ void motionUpdate() {
         
       case MOTION_STOPPING:
         {
-            // Use Constant Key
             int32_t deadband = configGetInt(KEY_MOTION_DEADBAND, 10);
             if (abs(current_pos - axis->position_at_stop) < deadband) { 
                 axis->state = MOTION_IDLE;
@@ -130,7 +157,6 @@ void motionUpdate() {
         break;
       default: break;
     }
-    axis->last_update_ms = now;
   }
   taskUnlockMutex(taskGetMotionMutex());
 }

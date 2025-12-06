@@ -4,11 +4,15 @@
 #include "memory_monitor.h"
 #include "task_manager.h"
 #include "system_utilities.h" 
-#include "firmware_version.h" // <-- Required
+#include "firmware_version.h" 
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
+
+// ============================================================================
+// CLI STATE DEFINITIONS
+// ============================================================================
 
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint16_t cli_pos = 0;
@@ -18,6 +22,10 @@ static int command_count = 0;
 static char cli_history[CLI_HISTORY_SIZE][CLI_BUFFER_SIZE];
 static int history_index = 0;
 
+// ============================================================================
+// FORWARD DECLARATIONS
+// ============================================================================
+
 void cmd_help(int argc, char** argv);
 void cmd_system_info(int argc, char** argv);
 void cmd_system_reset(int argc, char** argv);
@@ -25,6 +33,10 @@ void cmd_system_reset(int argc, char** argv);
 extern void bootShowStatus();      
 extern void bootRebootSystem();    
 extern uint32_t taskGetUptime();   
+
+// ============================================================================
+// CORE CLI FUNCTIONS
+// ============================================================================
 
 void cliInit() {
   Serial.println("[CLI] Initializing...");
@@ -56,6 +68,7 @@ void cliCleanup() {
 void cliUpdate() {
   while (Serial.available() > 0) {
     char c = Serial.read();
+    
     if (c == '\n' || c == '\r') {
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
@@ -69,7 +82,9 @@ void cliUpdate() {
     } else if (c == '\b' || c == 0x7F) {
       if (cli_pos > 0) {
         cli_pos--;
-        Serial.write('\b'); Serial.write(' '); Serial.write('\b');
+        Serial.write('\b');
+        Serial.write(' ');
+        Serial.write('\b');
       }
     } else if (c >= 32 && c < 127 && cli_pos < CLI_BUFFER_SIZE - 1) {
       cli_buffer[cli_pos++] = c;
@@ -102,6 +117,8 @@ void cliProcessCommand(const char* cmd) {
     history_index++;
   }
   
+  // --- Custom Parsing for Multi-Word Commands ---
+  
   // 1. "calibrate ppmm end"
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && strcmp(argv[1], "ppmm") == 0 && strcmp(argv[2], "end") == 0) {
       for (int i = 0; i < command_count; i++) {
@@ -128,7 +145,7 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 3. "calibrate speed"
+  // 3. "calibrate speed" / "calibrate ppmm"
   if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0)) {
       if (axisCharToIndex(argv[2]) == 255) { 
           Serial.printf("[CLI] [ERR] Invalid axis: %s\n", argv[2]);
@@ -151,13 +168,14 @@ void cliProcessCommand(const char* cmd) {
       }
   }
   
-  // 4. Default
+  // 4. Default Parsing
   for (int i = 0; i < command_count; i++) {
     if (strcmp(commands[i].command, argv[0]) == 0) {
       commands[i].handler(argc, argv);
       return;
     }
   }
+  
   Serial.printf("[CLI] Unknown command: '%s'. Type 'help'.\n", argv[0]);
 }
 
@@ -171,12 +189,10 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
 }
 
 void cliPrintHelp() {
-  // FIX: Dynamic Banner
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(ver_str, sizeof(ver_str));
-  
+
   Serial.printf("\n=== %s Commands ===\n", ver_str);
-  
   for (int i = 0; i < command_count; i++) {
     Serial.print("  ");
     Serial.print(commands[i].command);
@@ -189,15 +205,25 @@ void cliPrintHelp() {
   Serial.println();
 }
 
-void cliPrintPrompt() { Serial.print("> "); }
+void cliPrintPrompt() {
+  Serial.print("> ");
+}
+
+// ============================================================================
+// LOCAL COMMAND IMPLEMENTATIONS
+// ============================================================================
 
 void cmd_system_info(int argc, char** argv) {
   char version_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(version_str, sizeof(version_str));
+  
   Serial.println("\n=== SYSTEM INFORMATION ===");
   Serial.printf("Firmware:  %s\n", version_str);
   Serial.printf("Platform:  ESP32-S3 (KC868-A16)\n");
-  Serial.printf("Uptime:    %lu seconds\n", taskGetUptime());
+  
+  // FIX: Cast uptime to unsigned long to match %lu
+  Serial.printf("Uptime:    %lu seconds\n", (unsigned long)taskGetUptime());
+  
   bootShowStatus();
 }
 
@@ -206,4 +232,6 @@ void cmd_system_reset(int argc, char** argv) {
   bootRebootSystem(); 
 }
 
-void cmd_help(int argc, char** argv) { cliPrintHelp(); }
+void cmd_help(int argc, char** argv) {
+  cliPrintHelp();
+}

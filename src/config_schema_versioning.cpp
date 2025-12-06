@@ -6,7 +6,9 @@
 #include <string.h>
 
 static Preferences schema_prefs;
-static uint8_t current_schema_version = CONFIG_SCHEMA_VERSION;
+
+// FIX: Removed unused variable to silence compiler warning
+// static uint8_t current_schema_version = CONFIG_SCHEMA_VERSION; 
 
 static const schema_record_t schema_history[] = {
   {0, "Initial schema (v0.1)", "Base motion control", 0},
@@ -39,6 +41,8 @@ static const config_key_metadata_t key_metadata[] = {
   {KEY_STALL_TIMEOUT, 0, 0, "int32", "Stall Timeout", true, true},
   {KEY_X_APPROACH, 1, 0, "int32", "X Final Approach", true, true},
   {KEY_MOTION_DEADBAND, 1, 0, "int32", "Motion Deadband", true, true},
+  
+  {KEY_MOTION_APPROACH_MODE, 1, 0, "int32", "Approach Mode", true, true},
 
   {NULL, 0, 0, NULL, NULL, false, false}
 };
@@ -97,6 +101,14 @@ const char* configGetKeyMetadata(const char* key) {
   return "Unknown";
 }
 
+// FIX: Added missing implementation for configGetKeyType used in CLI
+const char* configGetKeyType(const char* key) {
+  for (int i = 0; key_metadata[i].key != NULL; i++) {
+    if (strcmp(key_metadata[i].key, key) == 0) return key_metadata[i].type;
+  }
+  return NULL;
+}
+
 migration_result_t configMigrateSchema(uint8_t from_version, uint8_t to_version) {
   migration_result_t result = {false, from_version, to_version, 0, 0, 0, ""};
   Serial.printf("[SCHEMA] Migrating v%d -> v%d\n", from_version, to_version);
@@ -135,7 +147,8 @@ migration_result_t configMigrateSchema(uint8_t from_version, uint8_t to_version)
   configUnifiedSave();
   
   result.success = true;
-  snprintf(result.migration_log, 512, "Migrated: %lu items", result.items_migrated);
+  // FIX: Cast items_migrated to unsigned long for %lu
+  snprintf(result.migration_log, 512, "Migrated: %lu items", (unsigned long)result.items_migrated);
   Serial.printf("[SCHEMA] [OK] Migration complete: %s\n", result.migration_log);
   
   return result;

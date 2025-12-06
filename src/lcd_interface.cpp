@@ -1,3 +1,10 @@
+/**
+ * @file lcd_interface.cpp
+ * @brief LCD (20x4) abstraction layer (I2C/Serial)
+ * @project Gemini v1.0.0
+ * @author Sergio Faustino - sjfaustino@gmail.com
+ */
+
 #include "lcd_interface.h"
 #include <Wire.h>
 #include <string.h>
@@ -35,7 +42,8 @@ void lcdInterfaceInit() {
   lcd_state.last_update = millis();
   lcd_state.update_count = 0;
   
-  Wire.begin(PLC_SDA_PIN, PLC_SCL_PIN, PLC_I2C_SPEED);
+  // Uses centralized pin constants
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
   Wire.beginTransmission(LCD_I2C_ADDR);
   if (Wire.endTransmission() == 0) {
     lcd_state.mode = LCD_MODE_I2C;

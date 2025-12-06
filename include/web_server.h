@@ -1,3 +1,10 @@
+/**
+ * @file web_server.h
+ * @brief Web Server manager for UI and JSON API
+ * @project Gemini v1.0.0
+ * @author Sergio Faustino - sjfaustino@gmail.com
+ */
+
 #ifndef WEB_SERVER_H
 #define WEB_SERVER_H
 
@@ -5,7 +12,7 @@
 #include <WebServer.h>
 #include <SPIFFS.h>
 #include "config_unified.h"
-#include "system_constants.h" // Added for WEB_BUFFER_SIZE
+#include "system_constants.h" 
 
 // Forward declarations
 class WebServer;
@@ -46,7 +53,6 @@ private:
     
     // Helper methods
     void serveFile(const char* filename, const char* contentType);
-    // Removed: String getStatusJSON(); (Replaced by direct buffer usage)
 };
 
 extern WebServerManager webServer;

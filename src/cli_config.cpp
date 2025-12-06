@@ -6,8 +6,12 @@
 #include <stdlib.h> 
 #include <string.h> 
 
+// Helper from config_schema_versioning.cpp
+extern const char* configGetKeyType(const char* key);
+
 // Forward declarations
 void cmd_config_show(int argc, char** argv);
+void cmd_config_set(int argc, char** argv); 
 void cmd_config_reset(int argc, char** argv);
 void cmd_config_save(int argc, char** argv);
 void cmd_config_schema_show(int argc, char** argv);
@@ -16,14 +20,7 @@ void cmd_config_rollback(int argc, char** argv);
 void cmd_config_validate(int argc, char** argv);
 
 void cliRegisterConfigCommands() {
-  // Deprecated direct commands kept for compatibility
-  cliRegisterCommand("config", "Show configuration", cmd_config_show);
-  cliRegisterCommand("config_reset", "Reset config to defaults", cmd_config_reset);
-  cliRegisterCommand("config_save", "Save configuration", cmd_config_save);
-  cliRegisterCommand("config_schema", "Show schema history", cmd_config_schema_show);
-  cliRegisterCommand("config_migrate", "Migrate configuration to new schema", cmd_config_migrate);
-  cliRegisterCommand("config_rollback", "Rollback to previous schema", cmd_config_rollback);
-  cliRegisterCommand("config_validate", "Validate configuration schema", cmd_config_validate);
+  cliRegisterCommand("config", "Configuration management", cmd_config_main);
 }
 
 void cmd_config_main(int argc, char** argv) {
@@ -32,16 +29,18 @@ void cmd_config_main(int argc, char** argv) {
         Serial.println("[CONFIG] Usage: config [command] <parameter>");
         Serial.println("[CONFIG] Commands:");
         Serial.println("  show      - Show current run-time settings and NVS cache.");
+        Serial.println("  set       - Set value: config set <key> <val>");
         Serial.println("  save      - Force save current configuration cache to NVS.");
         Serial.println("  reset     - Reset ALL configuration settings to factory defaults.");
         Serial.println("  validate  - Run full consistency validation report on the config.");
         Serial.println("  schema    - Show schema version history and key metadata.");
         Serial.println("  migrate   - Automatically migrate configuration schema to current version.");
-        Serial.println("  rollback <v>- Rollback schema to a specific version.");
+        Serial.println("  rollback <v>- Rollback schema to a specific version (e.g., rollback 0).");
         return;
     }
 
     if (strcmp(argv[1], "show") == 0) cmd_config_show(argc, argv);
+    else if (strcmp(argv[1], "set") == 0) cmd_config_set(argc, argv);
     else if (strcmp(argv[1], "save") == 0) cmd_config_save(argc, argv);
     else if (strcmp(argv[1], "reset") == 0) cmd_config_reset(argc, argv);
     else if (strcmp(argv[1], "validate") == 0) cmd_config_validate(argc, argv);
@@ -49,12 +48,48 @@ void cmd_config_main(int argc, char** argv) {
     else if (strcmp(argv[1], "migrate") == 0) cmd_config_migrate(argc, argv);
     else if (strcmp(argv[1], "rollback") == 0) {
         if (argc < 3) {
-             Serial.println("[CONFIG] [ERR] Rollback requires a target version number.");
+             Serial.println("[CONFIG] [ERR] Usage: config rollback <version>");
              return;
         }
         cmd_config_rollback(argc, argv); 
     } else {
         Serial.printf("[CONFIG] Error: Unknown parameter '%s'.\n", argv[1]);
+    }
+}
+
+void cmd_config_set(int argc, char** argv) {
+    if (argc < 4) {
+        Serial.println("[CONFIG] Usage: config set <key> <value>");
+        Serial.println("[CONFIG] Example: config set motion_approach_mode 1");
+        return;
+    }
+    
+    const char* key = argv[2];
+    const char* value_str = argv[3];
+    
+    const char* type = configGetKeyType(key);
+    
+    if (type == NULL) {
+        Serial.printf("[CONFIG] [ERR] Unknown key: '%s'\n", key);
+        return;
+    }
+    
+    if (strcmp(type, "int32") == 0) {
+        int32_t val = atol(value_str);
+        configSetInt(key, val);
+        Serial.printf("[CONFIG] [OK] Set %s = %ld\n", key, (long)val);
+    } 
+    else if (strcmp(type, "float") == 0) {
+        float val = atof(value_str);
+        configSetFloat(key, val);
+        Serial.printf("[CONFIG] [OK] Set %s = %.3f\n", key, val);
+    } 
+    else if (strcmp(type, "string") == 0) {
+        configSetString(key, value_str);
+        Serial.printf("[CONFIG] [OK] Set %s = \"%s\"\n", key, value_str);
+    } 
+    else {
+        Serial.printf("[CONFIG] [ERR] Unsupported type for key '%s'\n", key);
     }
 }
 

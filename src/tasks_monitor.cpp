@@ -1,3 +1,10 @@
+/**
+ * @file tasks_monitor.cpp
+ * @brief System health monitoring task (Memory, Stack, Config Flush)
+ * @project Gemini v1.0.0
+ * @author Sergio Faustino - sjfaustino@gmail.com
+ */
+
 #include "task_manager.h"
 #include "memory_monitor.h"
 #include "serial_logger.h"
@@ -25,7 +32,9 @@ void taskMonitorFunction(void* parameter) {
   memoryMonitorInit();
   
   while (1) {
-    // 1. Memory
+    uint32_t task_start = millis();
+    
+    // 1. Memory Monitoring
     memoryMonitorUpdate();
     if (memoryMonitorIsCriticallyLow(MEMORY_CRITICAL_THRESHOLD_BYTES)) {
       faultLogWarning(FAULT_WATCHDOG_TIMEOUT, "Memory critical");
@@ -38,13 +47,26 @@ void taskMonitorFunction(void* parameter) {
         taskUnlockMutex(taskGetConfigMutex());
     }
     
-    // 3. Slow Task Detection
+    // 3. Task Execution & Stack Monitoring
     int stats_count = taskGetStatsCount();
     task_stats_t* stats_array = taskGetStatsArray();
+
     for (int i = 0; i < stats_count; i++) {
+        // Check execution time
         if (stats_array[i].last_run_time_ms > TASK_EXECUTION_WARNING_MS) {
             logWarning("[MONITOR] [WARN] Task '%s' slow: %lu ms",
                        stats_array[i].name, stats_array[i].last_run_time_ms);
+        }
+        
+        // Check stack usage (NEW)
+        if (stats_array[i].handle != NULL) {
+            UBaseType_t high_water = uxTaskGetStackHighWaterMark(stats_array[i].handle);
+            if (high_water < 50) { // < 200 bytes
+                logError("[MONITOR] [CRITICAL] Task '%s' near stack overflow (%lu words left)", 
+                         stats_array[i].name, high_water);
+                faultLogEntry(FAULT_WARNING, FAULT_TASK_HUNG, -1, high_water, 
+                              "Low Stack: %s", stats_array[i].name);
+            }
         }
     }
     

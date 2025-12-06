@@ -61,34 +61,13 @@ calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profi
     run.counts = abs(wj66GetPosition(axis) - start_pos); 
 
     if (!motion_complete || run.time_ms >= max_timeout - 100) { 
-        logError("[CALIB] [FAIL] Timeout on %s move. Measured: %ld counts.", is_forward ? "FORWARD" : "REVERSE", run.counts);
+        // FIX: Format specifier %ld for int32_t
+        logError("[CALIB] [FAIL] Timeout on %s move. Measured: %ld counts.", is_forward ? "FORWARD" : "REVERSE", (long)run.counts);
         faultLogError(FAULT_CALIBRATION_MISSING, "Speed calibration failed: Timeout");
         run.time_ms = 0xFFFFFFFF; 
     }
 
     return run;
-}
-
-// ============================================================================
-// FORWARD DECLARATIONS FOR COMMAND HANDLERS
-// ============================================================================
-void cmd_encoder_calib(int argc, char** argv);
-void cmd_auto_calibrate_speed(int argc, char** argv);
-void cmd_encoder_reset(int argc, char** argv);
-void cmd_calib_ppmm_start(int argc, char** argv); 
-void cmd_calib_ppmm_end(int argc, char** argv);
-void cmd_calib_ppmm_reset(int argc, char** argv); 
-
-// ============================================================================
-// REGISTRATION FUNCTION (The missing link!)
-// ============================================================================
-void cliRegisterCalibCommands() {
-  cliRegisterCommand("calib", "Start automatic distance calibration (calib axis distance)", cmd_encoder_calib);
-  cliRegisterCommand("calibrate speed", "Auto-detect and save profile speeds (calibrate speed X FAST 500)", cmd_auto_calibrate_speed);
-  cliRegisterCommand("calibrate speed X reset", "Reset speed profiles to defaults (e.g., calibrate speed X reset)", cmd_encoder_reset);
-  cliRegisterCommand("calibrate ppmm", "Start manual PPM measurement (calibrate ppmm X 1000)", cmd_calib_ppmm_start); 
-  cliRegisterCommand("calibrate ppmm end", "Signal manual move end (calculate PPM)", cmd_calib_ppmm_end);
-  cliRegisterCommand("calibrate ppmm X reset", "Reset PPM calibration to default (e.g., calibrate ppmm X reset)", cmd_calib_ppmm_reset); 
 }
 
 // ============================================================================
@@ -133,7 +112,7 @@ void cmd_encoder_reset(int argc, char** argv) {
         cal->speed_med_mm_min = 900.0f;
         cal->speed_fast_mm_min = 2400.0f;
         saveAllCalibration();
-        Serial.printf("[CLI] [OK] Speed profiles reset and saved.\n");
+        Serial.println("[CLI] [OK] Speed profiles reset and saved.");
     } else {
          Serial.printf("[CLI] [ERR] Calibration data not found for Axis %c.\n", axisIndexToChar(axis));
     }
@@ -172,7 +151,9 @@ void cmd_calib_ppmm_start(int argc, char** argv) {
     
     Serial.println("\n=== MANUAL PPM CALIBRATION ===");
     Serial.printf("Axis: %c | Target: %.1f mm\n", axis_char, distance_mm);
-    Serial.printf("Start Pos: %ld counts\n", g_manual_calib.start_counts);
+    Serial.printf("Start Pos: %ld counts\n", (long)g_manual_calib.start_counts);
+    
+    // FIX: Use printf instead of println for formatted string
     Serial.printf("\nACTION: Move axis exactly %.1f mm, then type 'calibrate ppmm end'.\n\n", distance_mm);
     
     g_manual_calib.state = CALIB_MANUAL_WAIT_MOVE;
@@ -199,9 +180,9 @@ void cmd_calib_ppmm_end(int argc, char** argv) {
     encoderCalibrationSetPPM(axis, calculated_ppmm); 
     
     Serial.println("\n=== CALIBRATION COMPLETE ===");
-    Serial.printf("Measured: %ld counts\n", moved_counts);
+    Serial.printf("Measured: %ld counts\n", (long)moved_counts);
     Serial.printf("Target:   %.1f mm\n", target_mm);
-    Serial.printf("Result:   %.3f pulses/mm\n", calculated_ppmm);
+    Serial.printf("Result:   %.3f pulses/unit\n", calculated_ppmm);
     
     g_manual_calib.state = CALIBRATION_IDLE;
 }
@@ -290,4 +271,16 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     
     saveAllCalibration(); 
     Serial.println("[CALIB] [OK] Calibration saved to NVS.");
+}
+
+// ============================================================================
+// REGISTRATION FUNCTION
+// ============================================================================
+void cliRegisterCalibCommands() {
+  cliRegisterCommand("calib", "Start automatic distance calibration (calib axis distance)", cmd_encoder_calib);
+  cliRegisterCommand("calibrate speed", "Auto-detect and save profile speeds (calibrate speed X FAST 500)", cmd_auto_calibrate_speed);
+  cliRegisterCommand("calibrate speed X reset", "Reset speed profiles to defaults (e.g., calibrate speed X reset)", cmd_encoder_reset);
+  cliRegisterCommand("calibrate ppmm", "Start manual PPM measurement (calibrate ppmm X 1000)", cmd_calib_ppmm_start); 
+  cliRegisterCommand("calibrate ppmm end", "Signal manual move end (calculate PPM)", cmd_calib_ppmm_end);
+  cliRegisterCommand("calibrate ppmm X reset", "Reset PPM calibration to default (e.g., calibrate ppmm X reset)", cmd_calib_ppmm_reset); 
 }
