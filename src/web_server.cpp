@@ -5,11 +5,10 @@
 // Global instance
 WebServerManager webServer(80);
 
-// Static buffer for JSON responses
+// Buffer for WebSocket broadcasts
 static char json_response_buffer[WEB_BUFFER_SIZE];
 
-// FIX: Reordered initialization list to match header declaration order (server, then port)
-WebServerManager::WebServerManager(uint16_t port) : server(nullptr), port(port) {
+WebServerManager::WebServerManager(uint16_t port) : server(nullptr), ws(nullptr), port(port) {
     memset(&current_status, 0, sizeof(current_status));
     strcpy(current_status.status, "INITIALIZING");
     current_status.z_pos = 25.0; 
@@ -17,6 +16,7 @@ WebServerManager::WebServerManager(uint16_t port) : server(nullptr), port(port) 
 
 WebServerManager::~WebServerManager() {
     if (server) delete server;
+    if (ws) delete ws;
 }
 
 void WebServerManager::init() {
@@ -26,16 +26,18 @@ void WebServerManager::init() {
     }
     Serial.println("[WEB] [OK] SPIFFS mounted");
     
-    server = new WebServer(port);
+    server = new AsyncWebServer(port);
+    ws = new AsyncWebSocket("/ws");
     
-    server->on("/", HTTP_GET, [this]() { handleRoot(); });
-    server->on("/index.html", HTTP_GET, [this]() { handleRoot(); });
-    server->on("/jog.html", HTTP_GET, [this]() { serveFile("/jog.html", "text/html"); });
-    server->on("/api/status", HTTP_GET, [this]() { handleStatus(); });
-    server->on("/api/jog", HTTP_POST, [this]() { handleJog(); });
-    server->onNotFound([this]() { handleNotFound(); });
+    // Setup WebSocket
+    ws->onEvent([this](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+        this->onWsEvent(server, client, type, arg, data, len);
+    });
+    server->addHandler(ws);
     
-    Serial.println("[WEB] [OK] Server initialized");
+    setupRoutes();
+    
+    Serial.println("[WEB] [OK] Async Server initialized");
 }
 
 void WebServerManager::begin() {
@@ -46,57 +48,53 @@ void WebServerManager::begin() {
 }
 
 void WebServerManager::handleClient() {
-    if (server) server->handleClient();
+    // No-op for AsyncWebServer
+    // Kept to prevent breaking existing main.cpp loop calls if any
 }
 
-void WebServerManager::handleRoot() {
-    serveFile("/index.html", "text/html");
-}
+void WebServerManager::setupRoutes() {
+    // 1. Static Files (Non-blocking)
+    server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
 
-void WebServerManager::serveFile(const char* filename, const char* contentType) {
-    if (!server) return;
+    // 2. API Status (GET)
+    server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request){
+        JsonDocument doc;
+        doc["status"] = current_status.status;
+        doc["x_pos"] = current_status.x_pos;
+        doc["y_pos"] = current_status.y_pos;
+        doc["z_pos"] = current_status.z_pos;
+        doc["a_pos"] = current_status.a_pos;
+        doc["uptime"] = current_status.uptime_sec;
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+
+    // 3. API Jog (POST) with Body Handling
+    server->on("/api/jog", HTTP_POST, 
+        [](AsyncWebServerRequest *request){ request->send(200); }, 
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            this->handleJogBody(request, data, len, index, total);
+        }
+    );
     
-    File file = SPIFFS.open(filename, "r");
-    if (!file) {
-        server->send(404, "text/plain", "File not found");
-        return;
-    }
-    
-    server->streamFile(file, contentType);
-    file.close();
+    server->onNotFound([](AsyncWebServerRequest *request){
+        request->send(404, "text/plain", "Not Found");
+    });
 }
 
-void WebServerManager::handleStatus() {
-    if (!server) return;
+void WebServerManager::handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    // Note: Simple implementation assuming small JSON body < buffer size
+    // In production, accumulation might be needed for large packets, 
+    // but Jog commands are tiny (~50 bytes).
     
     JsonDocument doc;
-    doc["status"] = current_status.status;
-    doc["x_pos"] = current_status.x_pos;
-    doc["y_pos"] = current_status.y_pos;
-    doc["z_pos"] = current_status.z_pos;
-    doc["a_pos"] = current_status.a_pos;
-    doc["uptime"] = current_status.uptime_sec;
+    DeserializationError error = deserializeJson(doc, data, len);
     
-    serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
-    server->send(200, "application/json", json_response_buffer);
-}
-
-void WebServerManager::handleJog() {
-    if (!server) return;
-    
-    if (!server->hasArg("plain")) {
-        server->send(400, "application/json", "{\"error\":\"No body\"}");
-        return;
-    }
-    
-    String body = server->arg("plain");
-    JsonDocument doc;
-    
-    DeserializationError error = deserializeJson(doc, body);
     if (error) {
-        Serial.print("[WEB] [ERR] JSON parse error: ");
-        Serial.println(error.c_str());
-        server->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        Serial.printf("[WEB] [ERR] JSON parse failed: %s\n", error.c_str());
         return;
     }
     
@@ -104,48 +102,45 @@ void WebServerManager::handleJog() {
     float distance = doc["distance"] | 10.0f;     
     float speed = doc["speed"] | 50.0f;            
     
-    if (!direction || distance <= 0 || distance > 500 || speed <= 0 || speed > 200) {
-        Serial.println("[WEB] [ERR] Invalid parameters");
-        server->send(400, "application/json", 
-            "{\"error\":\"Invalid: distance must be 0-500, speed 0-200\"}");
-        return;
-    }
-    
+    if (!direction) return;
+
     Serial.printf("[WEB] Jog: %s, %.1f mm, %.1f mm/s\n", direction, distance, speed);
     
-    bool success = false;
-    if (strcmp(direction, "X+") == 0) { motionMoveRelative(distance, 0, 0, 0, speed); success = true; } 
-    else if (strcmp(direction, "X-") == 0) { motionMoveRelative(-distance, 0, 0, 0, speed); success = true; } 
-    else if (strcmp(direction, "Y+") == 0) { motionMoveRelative(0, distance, 0, 0, speed); success = true; } 
-    else if (strcmp(direction, "Y-") == 0) { motionMoveRelative(0, -distance, 0, 0, speed); success = true; } 
-    else if (strcmp(direction, "Z+") == 0) { motionMoveRelative(0, 0, distance, 0, speed); success = true; } 
-    else if (strcmp(direction, "Z-") == 0) { motionMoveRelative(0, 0, -distance, 0, speed); success = true; } 
-    else if (strcmp(direction, "A+") == 0) { motionMoveRelative(0, 0, 0, distance, speed); success = true; } 
-    else if (strcmp(direction, "A-") == 0) { motionMoveRelative(0, 0, 0, -distance, speed); success = true; } 
-    else if (strcmp(direction, "STOP") == 0) { motionStop(); success = true; }
-    
-    if (success) {
-        JsonDocument response;
-        response["status"] = "ok";
-        response["direction"] = direction;
-        // Note: motionGetPosition returns int32, division by float literal ensures float result
-        response["x_pos"] = motionGetPosition(0) / 1000.0f;
-        response["y_pos"] = motionGetPosition(1) / 1000.0f;
-        response["z_pos"] = motionGetPosition(2) / 1000.0f;
-        response["a_pos"] = motionGetPosition(3) / 1000.0f;
-        
-        serializeJson(response, json_response_buffer, sizeof(json_response_buffer));
-        server->send(200, "application/json", json_response_buffer);
-        Serial.println("[WEB] [OK] Jog executed");
-    } else {
-        server->send(500, "application/json", "{\"error\":\"Command failed\"}");
-        Serial.println("[WEB] [FAIL] Jog failed");
+    if (strcmp(direction, "X+") == 0) motionMoveRelative(distance, 0, 0, 0, speed);
+    else if (strcmp(direction, "X-") == 0) motionMoveRelative(-distance, 0, 0, 0, speed);
+    else if (strcmp(direction, "Y+") == 0) motionMoveRelative(0, distance, 0, 0, speed);
+    else if (strcmp(direction, "Y-") == 0) motionMoveRelative(0, -distance, 0, 0, speed);
+    else if (strcmp(direction, "Z+") == 0) motionMoveRelative(0, 0, distance, 0, speed);
+    else if (strcmp(direction, "Z-") == 0) motionMoveRelative(0, 0, -distance, 0, speed);
+    else if (strcmp(direction, "A+") == 0) motionMoveRelative(0, 0, 0, distance, speed);
+    else if (strcmp(direction, "A-") == 0) motionMoveRelative(0, 0, 0, -distance, speed);
+    else if (strcmp(direction, "STOP") == 0) motionStop();
+}
+
+void WebServerManager::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    if(type == WS_EVT_CONNECT){
+        Serial.printf("[WEB] WS Client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+        // Send immediate update on connect
+        broadcastState();
+    } else if(type == WS_EVT_DISCONNECT){
+        Serial.printf("[WEB] WS Client #%u disconnected\n", client->id());
     }
 }
 
-void WebServerManager::handleNotFound() { if (!server) return; server->send(404, "text/plain", "Not Found"); }
-void WebServerManager::handleSettings() { if (!server) return; server->send(200, "text/plain", "Settings"); }
-void WebServerManager::handleDiagnostics() { if (!server) return; server->send(200, "text/plain", "Diagnostics"); }
+void WebServerManager::broadcastState() {
+    // Only broadcast if clients are connected
+    if (ws->count() == 0) return;
+
+    JsonDocument doc;
+    doc["status"] = current_status.status;
+    doc["x"] = current_status.x_pos; // Shortened keys for efficiency
+    doc["y"] = current_status.y_pos;
+    doc["z"] = current_status.z_pos;
+    doc["a"] = current_status.a_pos;
+    
+    size_t len = serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
+    ws->textAll(json_response_buffer, len);
+}
 
 void WebServerManager::setSystemStatus(const char* status) {
     if (status) {

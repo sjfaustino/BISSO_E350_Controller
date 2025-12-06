@@ -1,7 +1,7 @@
 /**
  * @file web_server.h
- * @brief Web Server manager for UI and JSON API
- * @project Gemini v1.0.0
+ * @brief Async Web Server manager with WebSockets
+ * @project Gemini v1.1.0
  * @author Sergio Faustino - sjfaustino@gmail.com
  */
 
@@ -9,13 +9,10 @@
 #define WEB_SERVER_H
 
 #include <Arduino.h>
-#include <WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
 #include "config_unified.h"
 #include "system_constants.h" 
-
-// Forward declarations
-class WebServer;
 
 class WebServerManager {
 public:
@@ -25,34 +22,34 @@ public:
     // Initialization
     void init();
     void begin();
-    void handleClient();
+    
+    // Legacy support (No-op in Async mode, kept for compatibility)
+    void handleClient(); 
 
-    // Status updates
+    // Telemetry & State
     void setSystemStatus(const char* status);
     void setAxisPosition(char axis, float position);
     void setSystemUptime(uint32_t seconds);
+    
+    // NEW: Push state to all connected WebSocket clients
+    void broadcastState();
 
 private:
-    WebServer* server;
+    AsyncWebServer* server;
+    AsyncWebSocket* ws;
     uint16_t port;
     
-    // Status data
+    // Internal State Cache
     struct {
         char status[32];
         float x_pos, y_pos, z_pos, a_pos;
         uint32_t uptime_sec;
     } current_status;
 
-    // HTTP handlers
-    void handleRoot();
-    void handleNotFound();
-    void handleStatus();
-    void handleJog();
-    void handleSettings();
-    void handleDiagnostics();
-    
-    // Helper methods
-    void serveFile(const char* filename, const char* contentType);
+    // Handlers
+    void setupRoutes();
+    void handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+    void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 };
 
 extern WebServerManager webServer;

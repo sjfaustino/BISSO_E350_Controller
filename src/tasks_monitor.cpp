@@ -45,7 +45,7 @@ void taskMonitorFunction(void* parameter) {
     for (int i = 0; i < stats_count; i++) {
         if (stats_array[i].last_run_time_ms > TASK_EXECUTION_WARNING_MS) {
             logWarning("[MONITOR] [WARN] Task '%s' slow: %lu ms",
-                       stats_array[i].name, stats_array[i].last_run_time_ms);
+                       stats_array[i].name, (unsigned long)stats_array[i].last_run_time_ms);
         }
         
         // Stack check
@@ -57,7 +57,7 @@ void taskMonitorFunction(void* parameter) {
         }
     }
     
-    // 4. Telemetry Update
+    // 4. Telemetry Update & Broadcast
     webServer.setAxisPosition('X', motionGetPosition(0) / (float)MOTION_POSITION_SCALE_FACTOR);
     webServer.setAxisPosition('Y', motionGetPosition(1) / (float)MOTION_POSITION_SCALE_FACTOR);
     webServer.setAxisPosition('Z', motionGetPosition(2) / (float)MOTION_POSITION_SCALE_FACTOR);
@@ -69,6 +69,9 @@ void taskMonitorFunction(void* parameter) {
     else if (safetyIsAlarmed()) status = "ALARMED";
     else if (motionIsMoving()) status = "MOVING";
     webServer.setSystemStatus(status);
+    
+    // Push update to all connected WebSocket clients
+    webServer.broadcastState();
     
     watchdogFeed("Monitor");
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_MONITOR));

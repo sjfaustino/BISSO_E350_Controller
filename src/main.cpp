@@ -11,7 +11,7 @@
 #include "motion.h"
 #include "plc_iface.h"
 #include "safety.h"
-#include "serial_logger.h" // Required for logging
+#include "serial_logger.h"
 #include "system_constants.h"
 #include "task_manager.h"
 #include "timeout_manager.h"
@@ -25,13 +25,10 @@ static uint32_t boot_time_ms = 0;
 extern WebServerManager webServer;
 
 // --- Stack Overflow Hook ---
-extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask,
-                                              char *pcTaskName) {
+extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
   static volatile bool handling = false;
-  if (handling)
-    return;
+  if (handling) return;
   handling = true;
-  // Direct serial output for panic situations (bypass logger logic)
   Serial.println("\n\n[CRITICAL] STACK OVERFLOW DETECTED");
   Serial.printf("Task: %s\n", pcTaskName);
   Serial.println("System Halting.");
@@ -41,81 +38,36 @@ extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask,
 }
 
 // --- Init Wrappers ---
-bool init_fault_logging_wrapper() {
-  faultLoggingInit();
-  return true;
-}
-bool init_watchdog_wrapper() {
-  watchdogInit();
-  return true;
-}
-bool init_timeout_wrapper() {
-  timeoutManagerInit();
-  return true;
-}
-bool init_config_wrapper() {
-  configUnifiedInit();
-  return true;
-}
-bool init_schema_wrapper() {
-  configSchemaVersioningInit();
-  return !configIsMigrationNeeded();
-}
-bool init_calib_wrapper() {
-  loadAllCalibration();
-  encoderCalibrationInit();
-  return true;
-}
-bool init_plc_wrapper() {
-  plcIfaceInit();
-  return true;
-}
-bool init_enc_wrapper() {
-  wj66Init();
-  return true;
-}
-bool init_safety_wrapper() {
-  safetyInit();
-  return true;
-}
-bool init_motion_wrapper() {
-  motionInit();
-  return true;
-}
-bool init_cli_wrapper() {
-  cliInit();
-  return true;
-}
-bool init_web_wrapper() {
-  webServer.init();
-  webServer.begin();
-  return true;
-}
-bool init_inputs_wrapper() {
-  boardInputsInit();
-  return true;
-}
+bool init_fault_logging_wrapper() { faultLoggingInit(); return true; }
+bool init_watchdog_wrapper() { watchdogInit(); return true; }
+bool init_timeout_wrapper() { timeoutManagerInit(); return true; }
+bool init_config_wrapper() { configUnifiedInit(); return true; }
+bool init_schema_wrapper() { configSchemaVersioningInit(); return !configIsMigrationNeeded(); }
+bool init_calib_wrapper() { loadAllCalibration(); encoderCalibrationInit(); return true; }
+bool init_plc_wrapper() { plcIfaceInit(); return true; }
+bool init_enc_wrapper() { wj66Init(); return true; }
+bool init_safety_wrapper() { safetyInit(); return true; }
+bool init_motion_wrapper() { motionInit(); return true; }
+bool init_cli_wrapper() { cliInit(); return true; }
+bool init_web_wrapper() { webServer.init(); webServer.begin(); return true; }
+bool init_inputs_wrapper() { boardInputsInit(); return true; }
 
-// FIX: Use logInfo/logError for consistent system logging
-#define BOOT_INIT(name, func, code)                                            \
-  do {                                                                         \
-    if (func()) {                                                              \
-      logInfo("[BOOT] Init %s [OK]", name);                                    \
-      bootMarkInitialized(name);                                               \
-    } else {                                                                   \
-      logError("[BOOT] Init %s [FAIL]", name);                                 \
-      bootMarkFailed(name, "Init failed", code);                               \
-    }                                                                          \
+#define BOOT_INIT(name, func, code) \
+  do { \
+    if (func()) { \
+      logInfo("[BOOT] Init %s [OK]", name); \
+      bootMarkInitialized(name); \
+    } else { \
+      logError("[BOOT] Init %s [FAIL]", name); \
+      bootMarkFailed(name, "Init failed", code); \
+    } \
   } while (0)
 
 void setup() {
-  // Initialize Serial for the logger
   Serial.begin(115200);
   delay(1000);
 
-  // Initialize Logger first
-  serialLoggerInit(LOG_LEVEL); // Uses LOG_LEVEL from platformio.ini
-
+  serialLoggerInit(LOG_LEVEL);
   boot_time_ms = millis();
 
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
@@ -146,13 +98,14 @@ void setup() {
   taskManagerInit();
   taskManagerStart();
 
-  logInfo("[BOOT] [OK] Complete in %lu ms", millis() - boot_time_ms);
+  logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
 
-  // Delete setup task
+  // AsyncWebServer runs on the LwIP task. We can delete the Arduino Loop Task
+  // to free up heap and stack for other RTOS tasks.
   vTaskDelete(NULL);
 }
 
 void loop() {
-  webServer.handleClient();
-  delay(1); // Yield to other tasks, but keep main loop responsive
+  // Unreachable code due to vTaskDelete above.
+  // Kept empty to satisfy Arduino linker requirements.
 }
