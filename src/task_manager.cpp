@@ -80,7 +80,7 @@ void taskManagerInit() {
   if (!queue_motion || !queue_safety || !queue_encoder || 
       !queue_plc || !queue_fault || !queue_display) {
     Serial.println("[TASKS] [FAIL] Queue creation failed!");
-    faultLogError(FAULT_BOOT_FAILED, "Task queue creation failed");
+    // faultLogError(FAULT_BOOT_FAILED, "Task queue creation failed"); // Avoid circular dependency if fault log relies on queue
   }
   
   // Create Mutexes
@@ -90,7 +90,7 @@ void taskManagerInit() {
   
   if (!mutex_config || !mutex_i2c || !mutex_motion) {
     Serial.println("[TASKS] [FAIL] Mutex creation failed!");
-    faultLogError(FAULT_BOOT_FAILED, "Mutex creation failed");
+    // faultLogError(FAULT_BOOT_FAILED, "Mutex creation failed");
   }
   Serial.println("[TASKS] [OK] Primitives created");
 }
@@ -132,6 +132,7 @@ void taskSignalMotionUpdate() {
 }
 
 bool taskLockMutex(SemaphoreHandle_t mutex, uint32_t timeout_ms) {
+  if (!mutex) return false;
   TickType_t ticks = (timeout_ms == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
   return xSemaphoreTake(mutex, ticks) == pdTRUE;
 }

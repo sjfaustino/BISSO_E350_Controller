@@ -41,7 +41,9 @@
 // I2C Configuration
 // OPTIMIZATION: Increased to 400kHz (Fast Mode) to reduce bus latency
 #define PLC_I2C_SPEED 400000 
-#define PLC_READ_INTERVAL_MS 50
+
+// OPTIMIZATION: Reduced internal throttle to 10ms to match new Task Period
+#define PLC_READ_INTERVAL_MS 10
 #define PLC_READ_TIMEOUT_MS 1000
 
 typedef enum {
