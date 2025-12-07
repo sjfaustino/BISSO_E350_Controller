@@ -1,6 +1,12 @@
+/**
+ * @file tasks_lcd.cpp
+ * @brief LCD Update Task
+ */
+
 #include "task_manager.h"
 #include "lcd_interface.h"
 #include "motion.h"
+#include "motion_state.h" // <-- CRITICAL FIX: Provides accessors
 #include "safety.h"
 #include "serial_logger.h"
 #include "watchdog_manager.h"
@@ -27,6 +33,7 @@ void taskLcdFunction(void* parameter) {
   lcdInterfaceUpdate();
 
   while (1) {
+    // Now visible via motion_state.h
     int32_t x_pos = motionGetPosition(0); 
     int32_t y_pos = motionGetPosition(1);
     int32_t z_pos = motionGetPosition(2);
@@ -42,7 +49,6 @@ void taskLcdFunction(void* parameter) {
         lcdInterfacePrintLine(3, faultCodeToString((fault_code_t)current_fault_code)); 
     } else if (motionIsMoving()) {
         lcdInterfacePrintLine(2, "STATUS: EXECUTING");
-        // Ensure header motion.h contains this declaration!
         lcdInterfacePrintLine(3, motionStateToString(motionGetState(0)));
     } else {
         lcdInterfacePrintLine(2, "STATUS: IDLE");

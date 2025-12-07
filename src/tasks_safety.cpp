@@ -1,3 +1,8 @@
+/**
+ * @file tasks_safety.cpp
+ * @brief Safety Monitor Task
+ */
+
 #include "task_manager.h"
 #include "safety.h"
 #include "serial_logger.h"
@@ -6,6 +11,7 @@
 #include "fault_logging.h"
 #include "board_inputs.h" 
 #include "motion.h"       
+#include "motion_state.h" // <-- CRITICAL FIX: Provides motionIsMoving
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <string.h>
@@ -21,7 +27,6 @@ void taskSafetyFunction(void* parameter) {
   watchdogTaskAdd("Safety");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Safety");
   
-  // Protected Initialization
   if (taskLockMutex(taskGetI2cMutex(), 100)) {
       boardInputsInit();
       taskUnlockMutex(taskGetI2cMutex());
@@ -32,10 +37,10 @@ void taskSafetyFunction(void* parameter) {
   while (1) {
     uint32_t now = millis();
     
-    // 1. Critical Safety Operations (Internal)
+    // 1. Critical Safety Operations
     safetyUpdate();
     
-    // 2. Poll Physical Buttons (Protected)
+    // 2. Poll Physical Buttons
     if (taskLockMutex(taskGetI2cMutex(), 2)) {
         
         button_state_t btns = boardInputsUpdate();
@@ -53,6 +58,7 @@ void taskSafetyFunction(void* parameter) {
             // PAUSE
             if (btns.pause_pressed && !btns.estop_active) {
                 if (now - last_pause_press > BUTTON_DEBOUNCE_MS) {
+                    // Now visible
                     if (motionIsMoving()) { 
                         logInfo("[SAFETY] Physical PAUSE button pressed");
                         motionPause();
@@ -72,7 +78,6 @@ void taskSafetyFunction(void* parameter) {
                 }
             }
         } else {
-            // Throttled error logging
             static uint32_t last_io_err = 0;
             if (now - last_io_err > 5000) {
                 faultLogEntry(FAULT_ERROR, FAULT_I2C_ERROR, -1, BOARD_INPUT_I2C_ADDR, "Failed to read Safety Inputs");

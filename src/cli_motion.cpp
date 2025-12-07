@@ -1,13 +1,14 @@
 /**
  * @file cli_motion.cpp
  * @brief Motion CLI Commands
- * @project Gemini v2.4.0
+ * @project Gemini v3.5.0
  */
 
 #include "cli.h"
 #include "motion.h"
+#include "motion_state.h" // <-- CRITICAL FIX: Provides status accessors
 #include "serial_logger.h"
-#include "input_validation.h" // Now includes axisCharToIndex
+#include "input_validation.h" 
 #include <string.h>
 #include <stdlib.h>
 

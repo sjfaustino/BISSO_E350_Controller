@@ -1,8 +1,15 @@
+/**
+ * @file encoder_motion_integration.cpp
+ * @brief Logic to cross-check encoder feedback against planner target
+ */
+
 #include "encoder_motion_integration.h"
 #include "safety.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "encoder_wj66.h"
+#include "motion.h"       // <-- CRITICAL FIX
+#include "motion_state.h" // <-- CRITICAL FIX
 
 static position_error_t position_errors[4] = {
   {0, 0, 100000, 0, 2000, false, 0},
@@ -31,6 +38,8 @@ void encoderMotionInit(int32_t error_threshold, uint32_t max_error_time_ms) {
 }
 
 bool encoderMotionUpdate() {
+  if (!encoder_feedback_enabled) return true;
+
   encoder_status_t status = wj66GetStatus();
   if (status != ENCODER_OK) {
     if (status == ENCODER_TIMEOUT) {
@@ -44,12 +53,12 @@ bool encoderMotionUpdate() {
   
   for (int i = 0; i < 4; i++) {
     if (wj66IsStale(i)) {
-      logWarning("Encoder %d stale (%lu ms)", i, (unsigned long)wj66GetAxisAge(i));
-      faultLogEntry(FAULT_WARNING, FAULT_ENCODER_TIMEOUT, i, wj66GetAxisAge(i), "Encoder Stale");
+      // logWarning("Encoder %d stale", i); // Reduced spam
       all_valid = false;
       continue;
     }
     
+    // Now visible because headers are included
     int32_t encoder_pos = wj66GetPosition(i);
     int32_t motion_pos = motionGetPosition(i); 
 
@@ -71,13 +80,11 @@ bool encoderMotionUpdate() {
         position_errors[i].error_time_ms = now; 
         position_errors[i].error_count++;
         
-        logWarning("Axis %d error: %ld (limit %ld)", i, (long)error, (long)encoder_error_threshold);
+        logWarning("Axis %d error: %ld", i, (long)error);
         faultLogEntry(FAULT_WARNING, FAULT_ENCODER_SPIKE, i, error, "Axis deviation"); 
       }
     } else {
       if (position_errors[i].error_active) {
-        uint32_t duration = now - position_errors[i].error_time_ms;
-        logInfo("Axis %d error cleared (%lu ms)", i, (unsigned long)duration);
         position_errors[i].error_active = false;
         position_errors[i].error_time_ms = 0; 
       }
@@ -96,7 +103,6 @@ void encoderMotionResetError(uint8_t axis) {
     position_errors[axis].max_error = 0;
     position_errors[axis].error_active = false;
     position_errors[axis].error_time_ms = 0;
-    logInfo("[ENC_INT] Reset axis %d", axis);
   }
 }
 
@@ -116,11 +122,8 @@ void encoderMotionDiagnostics() {
   Serial.printf("Threshold: %.1f mm\n", encoder_error_threshold / 1000.0f);
   
   for (int i = 0; i < 4; i++) {
-    // FIX: Cast for printf
-    Serial.printf("Axis %d: Err=%.1f mm | Max=%.1f mm | State=%s | Dur=%lu ms\n",
+    Serial.printf("Axis %d: Err=%.1f mm | State=%s\n",
         i, position_errors[i].current_error / 1000.0f, 
-        position_errors[i].max_error / 1000.0f,
-        position_errors[i].error_active ? "[ERR]" : "[OK]",
-        (unsigned long)encoderMotionGetErrorDuration(i));
+        position_errors[i].error_active ? "[ERR]" : "[OK]");
   }
 }

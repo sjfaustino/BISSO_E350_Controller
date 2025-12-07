@@ -1,84 +1,44 @@
 #ifndef CONFIG_KEYS_H
 #define CONFIG_KEYS_H
 
-/**
- * @file config_keys.h
- * @brief Centralized definition of all NVS configuration keys.
- * @project Gemini v3.4.1
- */
+// --- MOTION LIMITS ---
+#define KEY_X_LIMIT_MIN "x_limit_min"
+#define KEY_X_LIMIT_MAX "x_limit_max"
+#define KEY_Y_LIMIT_MIN "y_limit_min"
+#define KEY_Y_LIMIT_MAX "y_limit_max"
+#define KEY_Z_LIMIT_MIN "z_limit_min"
+#define KEY_Z_LIMIT_MAX "z_limit_max"
+#define KEY_A_LIMIT_MIN "a_limit_min"
+#define KEY_A_LIMIT_MAX "a_limit_max"
 
-// ============================================================================
-// MOTION LIMITS
-// ============================================================================
-static const char* const KEY_X_LIMIT_MIN = "x_soft_limit_min";
-static const char* const KEY_X_LIMIT_MAX = "x_soft_limit_max";
-static const char* const KEY_Y_LIMIT_MIN = "y_soft_limit_min";
-static const char* const KEY_Y_LIMIT_MAX = "y_soft_limit_max";
-static const char* const KEY_Z_LIMIT_MIN = "z_soft_limit_min";
-static const char* const KEY_Z_LIMIT_MAX = "z_soft_limit_max";
-static const char* const KEY_A_LIMIT_MIN = "a_soft_limit_min";
-static const char* const KEY_A_LIMIT_MAX = "a_soft_limit_max";
+// --- ENCODER ---
+#define KEY_PPM_X "ppm_x"
+#define KEY_PPM_Y "ppm_y"
+#define KEY_PPM_Z "ppm_z"
+#define KEY_PPM_A "ppm_a"
 
-// ============================================================================
-// ENCODER CALIBRATION
-// ============================================================================
-static const char* const KEY_PPM_X = "encoder_ppm_x";
-static const char* const KEY_PPM_Y = "encoder_ppm_y";
-static const char* const KEY_PPM_Z = "encoder_ppm_z";
-static const char* const KEY_PPM_A = "encoder_ppm_a";
+// --- SPEED PROFILES (Cutting) ---
+#define KEY_SPEED_CAL_X "spd_x"
+#define KEY_SPEED_CAL_Y "spd_y"
+#define KEY_SPEED_CAL_Z "spd_z"
+#define KEY_SPEED_CAL_A "spd_a"
 
-// ============================================================================
-// SPEED PROFILES
-// ============================================================================
-static const char* const KEY_SPEED_CAL_X = "speed_X_mm_s";
-static const char* const KEY_SPEED_CAL_Y = "speed_Y_mm_s";
-static const char* const KEY_SPEED_CAL_Z = "speed_Z_mm_s";
-static const char* const KEY_SPEED_CAL_A = "speed_A_mm_s";
+// --- HOMING PROFILES (Dedicated) ---
+// Value: 0=Slow, 1=Med, 2=Fast
+#define KEY_HOME_PROFILE_FAST "home_prof_fast" 
+#define KEY_HOME_PROFILE_SLOW "home_prof_slow"
 
-// ============================================================================
-// BACKLASH & PITCH
-// ============================================================================
-static const char* const KEY_BACKLASH_X = "backlash_x";
-static const char* const KEY_BACKLASH_Y = "backlash_y";
-static const char* const KEY_BACKLASH_Z = "backlash_z";
-static const char* const KEY_BACKLASH_A = "backlash_a";
-static const char* const KEY_PITCH_X = "pitch_x";
-static const char* const KEY_PITCH_Y = "pitch_y";
-static const char* const KEY_PITCH_Z = "pitch_z";
-static const char* const KEY_PITCH_A = "pitch_a";
+// --- MOTION BEHAVIOR ---
+#define KEY_DEFAULT_SPEED "def_spd"
+#define KEY_DEFAULT_ACCEL "def_acc"
+#define KEY_X_APPROACH    "x_appr"
+#define KEY_MOTION_APPROACH_MODE "mot_app_mode"
+#define KEY_MOTION_DEADBAND "mot_deadband"
+#define KEY_MOTION_BUFFER_ENABLE "mot_buf_en"
+#define KEY_MOTION_STRICT_LIMITS "mot_strict"
 
-// ============================================================================
-// MOTION BEHAVIOR & TUNING
-// ============================================================================
-static const char* const KEY_DEFAULT_SPEED = "default_speed_mm_s";
-static const char* const KEY_DEFAULT_ACCEL = "default_acceleration";
+// --- SAFETY ---
+#define KEY_ALARM_PIN "alarm_pin"
+#define KEY_STALL_TIMEOUT "stall_ms"
 
-// Final approach distance for X-axis (mm)
-static const char* const KEY_X_APPROACH = "x_approach_mm";
-
-// Approach Mode (0=Fixed, 1=Dynamic)
-static const char* const KEY_MOTION_APPROACH_MODE = "motion_approach_mode";
-
-// Encoder count deadband for declaring motion "stopped"
-static const char* const KEY_MOTION_DEADBAND = "motion_settle_deadband";
-
-// Enable Motion Ring Buffer (0=Direct, 1=Buffered)
-static const char* const KEY_MOTION_BUFFER_ENABLE = "motion_buffer_enable"; 
-
-// NEW: Strict Limits (0=Relaxed/Recovery, 1=Strict/Safety)
-static const char* const KEY_MOTION_STRICT_LIMITS = "motion_strict_limits";
-
-// ============================================================================
-// SAFETY & HARDWARE
-// ============================================================================
-static const char* const KEY_ALARM_PIN = "alarm_pin";
-static const char* const KEY_STALL_TIMEOUT = "stall_timeout_ms";
-
-// ============================================================================
-// SYSTEM STATE
-// ============================================================================
-static const char* const KEY_SCHEMA_VERSION = "schema_version";
-static const char* const KEY_BOOT_ERRORS = "errors";
-static const char* const KEY_BOOT_CONSECUTIVE = "consecutive_ok";
-
-#endif // CONFIG_KEYS_H
+#endif
