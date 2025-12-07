@@ -1,7 +1,7 @@
 /**
  * @file motion.h
- * @brief Core Motion Engine Definitions & API (Gemini v3.5.16)
- * @project Gemini v3.5.16
+ * @brief Core Motion Engine Definitions & API (Gemini v3.5.18)
+ * @details Updated API signatures to return bool for error handling consistency.
  */
 
 #ifndef MOTION_H
@@ -63,20 +63,25 @@ private:
     bool _error_logged; 
 };
 
-// Global Array
 extern Axis axes[MOTION_AXES];
 
-// --- CORE CONTROL API ---
+// --- CORE CONTROL API (Updated to return bool) ---
 void motionInit();
 void motionUpdate();
-void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
-void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s); 
-void motionStop();
-void motionPause();   
-void motionResume();  
+
+// Motion Commands
+bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
+bool motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s);
+bool motionHome(uint8_t axis); 
+
+// State Commands
+bool motionStop();
+bool motionPause();   
+bool motionResume();  
+
+// Safety (E-Stop always succeeds/void)
 void motionEmergencyStop();
 bool motionClearEmergencyStop();
-void motionHome(uint8_t axis); 
 
 // --- CONFIGURATION WRAPPERS ---
 void motionSetFeedOverride(float factor);
@@ -84,7 +89,7 @@ float motionGetFeedOverride();
 void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos);
 void motionEnableSoftLimits(uint8_t axis, bool enable);
 bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos);
-void motionSetStrictLimits(bool enable); // <-- Added Setter
+void motionSetStrictLimits(bool enable);
 void motionEnableEncoderFeedback(bool enable);
 bool motionIsEncoderFeedbackEnabled();
 

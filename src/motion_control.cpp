@@ -1,13 +1,13 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer (Gemini v3.5.16)
- * @details Performance Fix: Cached strict_limits to avoid hash lookup in 10ms loop.
+ * @brief Real-Time Hardware Execution Layer (Gemini v3.5.18)
+ * @details Implemented consistent Error Handling (bool returns).
  * @author Sergio Faustino
  */
 
 #include "motion.h"
 #include "motion_planner.h"
-#include "motion_state.h" // Implements these interfaces
+#include "motion_state.h" 
 #include "system_constants.h"
 #include "plc_iface.h"
 #include "encoder_wj66.h"        
@@ -18,7 +18,7 @@
 #include "encoder_calibration.h" 
 #include "config_unified.h" 
 #include "config_keys.h"
-#include "encoder_motion_integration.h" 
+#include "encoder_motion_integration.h"
 #include <math.h>
 #include <stdlib.h> 
 #include <stdio.h>
@@ -31,13 +31,11 @@
 
 Axis axes[MOTION_AXES]; 
 
-// Protected Global State
-// Added strict_limits to cache
 static struct {
     uint8_t active_axis;
     int32_t active_start_position;
     bool global_enabled;
-    int strict_limits; // 0=Relaxed, 1=Strict (Cached)
+    int strict_limits;
 } m_state = { 255, 0, true, 1 };
 
 static portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -112,7 +110,6 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
         case MOTION_EXECUTING:
             if ((m_state.active_start_position < target_position && position >= target_position) ||
                 (m_state.active_start_position > target_position && position <= target_position)) {
-                
                 state = MOTION_STOPPING;
                 state_entry_ms = millis();
                 position_at_stop = position; 
@@ -189,9 +186,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 // ============================================================================
 
 void motionInit() {
-    logInfo("[MOTION] Init v3.5.16...");
-    
-    // Load Configuration Cache
+    logInfo("[MOTION] Init v3.5.18...");
     m_state.strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
     
     for(int i=0; i<MOTION_AXES; i++) {
@@ -216,7 +211,6 @@ void motionUpdate() {
     }
     consecutive_skips = 0;
 
-    // FIX: Use cached value instead of NVS lookup
     int strict_mode = m_state.strict_limits;
     
     for (int i=0; i<MOTION_AXES; i++) {
@@ -299,12 +293,16 @@ const char* motionStateToString(motion_state_t state) {
 }
 
 // ============================================================================
-// CONTROL API
+// CONTROL API (NOW RETURNS BOOL)
 // ============================================================================
 
-void motionHome(uint8_t axis) {
-    if (axis >= MOTION_AXES || !taskLockMutex(taskGetMotionMutex(), 100)) return;
-    if (m_state.active_axis != 255) { taskUnlockMutex(taskGetMotionMutex()); return; }
+bool motionHome(uint8_t axis) {
+    if (axis >= MOTION_AXES) return false;
+    if (!taskLockMutex(taskGetMotionMutex(), 100)) return false;
+    if (m_state.active_axis != 255) { 
+        taskUnlockMutex(taskGetMotionMutex()); 
+        return false; 
+    }
 
     logInfo("[HOME] Axis %d Start", axis);
     m_state.active_axis = axis;
@@ -316,11 +314,18 @@ void motionHome(uint8_t axis) {
     motionSetPLCAxisDirection(axis, true, false); 
     
     taskUnlockMutex(taskGetMotionMutex());
+    return true;
 }
 
-void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
-    if (!m_state.global_enabled) { logError("[MOTION] Disabled"); return; }
-    if (!taskLockMutex(taskGetMotionMutex(), 100)) { logError("[MOTION] Busy"); return; }
+bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
+    if (!m_state.global_enabled) { 
+        logError("[MOTION] Disabled"); 
+        return false; 
+    }
+    if (!taskLockMutex(taskGetMotionMutex(), 100)) { 
+        logError("[MOTION] Busy (Mutex)"); 
+        return false; 
+    }
 
     float targets[] = {x, y, z, a};
     float scales[] = {
@@ -342,7 +347,8 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
     }
 
     if (cnt > 1 || cnt == 0 || m_state.active_axis != 255) { 
-        taskUnlockMutex(taskGetMotionMutex()); return; 
+        taskUnlockMutex(taskGetMotionMutex()); 
+        return false; 
     }
 
     axes[target_axis].commanded_speed_mm_s = speed_mm_s;
@@ -350,7 +356,8 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
     if (axes[target_axis].soft_limit_enabled) {
         if(target_pos < axes[target_axis].soft_limit_min || target_pos > axes[target_axis].soft_limit_max) {
             logError("[MOTION] Target Limit Violation");
-            taskUnlockMutex(taskGetMotionMutex()); return;
+            taskUnlockMutex(taskGetMotionMutex()); 
+            return false;
         }
     }
 
@@ -372,10 +379,11 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
     
     taskUnlockMutex(taskGetMotionMutex());
     taskSignalMotionUpdate(); 
+    return true;
 }
 
 // ============================================================================
-// HELPERS & WRAPPERS
+// WRAPPERS AND HELPERS
 // ============================================================================
 
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus) {
@@ -398,16 +406,17 @@ speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed) {
     return SPEED_PROFILE_3;
 }
 
-void motionStartInternalMove(float x, float y, float z, float a, float speed_mm_s) { 
-    motionMoveAbsolute(x, y, z, a, speed_mm_s); 
+// WRAPPER UPDATES: Return the result of the call
+bool motionStartInternalMove(float x, float y, float z, float a, float speed_mm_s) { 
+    return motionMoveAbsolute(x, y, z, a, speed_mm_s); 
 }
 
-void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s) {
+bool motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s) {
     float cur_x = motionGetPositionMM(0);
     float cur_y = motionGetPositionMM(1);
     float cur_z = motionGetPositionMM(2);
     float cur_a = motionGetPositionMM(3);
-    motionMoveAbsolute(cur_x + dx, cur_y + dy, cur_z + dz, cur_a + da, speed_mm_s);
+    return motionMoveAbsolute(cur_x + dx, cur_y + dy, cur_z + dz, cur_a + da, speed_mm_s);
 }
 
 void motionSetFeedOverride(float factor) { motionPlanner.setFeedOverride(factor); }
@@ -420,7 +429,6 @@ void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos) {
     }
 }
 
-// FIX: Added setter to allow runtime updates of cached value
 void motionSetStrictLimits(bool enable) {
     m_state.strict_limits = enable ? 1 : 0;
     configSetInt(KEY_MOTION_STRICT_LIMITS, m_state.strict_limits);
@@ -460,8 +468,8 @@ bool motionIsEncoderFeedbackEnabled() {
 bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) { return true; }
 bool motionSetState(uint8_t axis, motion_state_t new_state) { if(axis>=4) return false; axes[axis].state=new_state; return true; }
 
-void motionStop() {
-    if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
+bool motionStop() {
+    if (!taskLockMutex(taskGetMotionMutex(), 100)) return false;
     if (m_state.active_axis != 255) {
         motionSetPLCAxisDirection(255, false, false);
         axes[m_state.active_axis].state = MOTION_STOPPING;
@@ -470,11 +478,12 @@ void motionStop() {
     }
     taskUnlockMutex(taskGetMotionMutex());
     taskSignalMotionUpdate();
+    return true;
 }
 
-void motionPause() {
-    if (!m_state.global_enabled) return;
-    if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
+bool motionPause() {
+    if (!m_state.global_enabled) return false;
+    if (!taskLockMutex(taskGetMotionMutex(), 100)) return false;
     if (m_state.active_axis != 255 && (axes[m_state.active_axis].state == MOTION_EXECUTING || axes[m_state.active_axis].state == MOTION_WAIT_CONSENSO)) {
         motionSetPLCAxisDirection(255, false, false);
         axes[m_state.active_axis].state = MOTION_PAUSED;
@@ -482,11 +491,12 @@ void motionPause() {
     }
     taskUnlockMutex(taskGetMotionMutex());
     taskSignalMotionUpdate();
+    return true;
 }
 
-void motionResume() {
-    if (!m_state.global_enabled) return;
-    if (!taskLockMutex(taskGetMotionMutex(), 100)) return;
+bool motionResume() {
+    if (!m_state.global_enabled) return false;
+    if (!taskLockMutex(taskGetMotionMutex(), 100)) return false;
     if (m_state.active_axis != 255 && axes[m_state.active_axis].state == MOTION_PAUSED) {
         float effective_speed = axes[m_state.active_axis].commanded_speed_mm_s * motionPlanner.getFeedOverride();
         speed_profile_t prof = motionMapSpeedToProfile(m_state.active_axis, effective_speed);
@@ -500,6 +510,7 @@ void motionResume() {
     }
     taskUnlockMutex(taskGetMotionMutex());
     taskSignalMotionUpdate();
+    return true;
 }
 
 void motionEmergencyStop() {

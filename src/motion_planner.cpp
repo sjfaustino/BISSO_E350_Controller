@@ -1,7 +1,6 @@
 /**
  * @file motion_planner.cpp
- * @brief Implementation of Motion Planning Logic v3.5.1
- * @details Fixed Missing Constants Include.
+ * @brief Implementation of Motion Planning Logic v3.5.18
  */
 
 #include "motion_planner.h"
@@ -9,13 +8,14 @@
 #include "config_keys.h"
 #include "encoder_calibration.h" 
 #include "serial_logger.h"
-#include "system_constants.h" // <-- CRITICAL FIX: Provides MOTION_POSITION_SCALE_FACTOR
+#include "system_constants.h" 
 #include <math.h>
 #include <stdlib.h>
 
 MotionPlanner motionPlanner;
 
-extern void motionStartInternalMove(float x, float y, float z, float a, float speed_mm_s);
+// CRITICAL FIX: Signature matched to motion_control.cpp
+extern bool motionStartInternalMove(float x, float y, float z, float a, float speed_mm_s);
 
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
@@ -59,8 +59,12 @@ bool MotionPlanner::checkBufferDrain(uint8_t& active_axis) {
     if (!buffer_enabled) return false;
 
     motion_cmd_t cmd;
+    // Check if next move is valid before popping (Peek logic could be added here)
     if (motionBuffer.pop(&cmd)) {
-        motionStartInternalMove(cmd.x, cmd.y, cmd.z, cmd.a, cmd.speed_mm_s);
+        if (!motionStartInternalMove(cmd.x, cmd.y, cmd.z, cmd.a, cmd.speed_mm_s)) {
+            logError("[PLANNER] Buffered move failed to start!");
+            // Retry logic or Halt could go here
+        }
         return true;
     }
     return false;
