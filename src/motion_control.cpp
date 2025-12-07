@@ -1,7 +1,7 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer (Gemini v3.5.7)
- * @details Fixed Deadband Logic (Check vs Target). Added Safety Timeout for Stopping state.
+ * @brief Real-Time Hardware Execution Layer (Gemini v3.5.12)
+ * @details Fixed Thread Safety: Added timeout and starvation logging to motion loop.
  * @author Sergio Faustino
  */
 
@@ -119,15 +119,12 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
             break;
 
         case MOTION_STOPPING:
-            // FIX: Check against TARGET POSITION, not the snapshot at stop start.
-            // This handles cases where the motor moves/skids towards the target.
             if (abs(position - target_position) < configGetInt(KEY_MOTION_DEADBAND, 10)) {
                 state = MOTION_IDLE;
                 m_state.active_axis = 255; 
             }
-            // SAFETY: Timeout if we never reach the deadband (e.g. massive skid or stall)
             else if (millis() - state_entry_ms > 5000) {
-                logWarning("[AXIS %d] Stop Settlement Timeout (Skid?)", id);
+                logWarning("[AXIS %d] Stop Settlement Timeout", id);
                 state = MOTION_IDLE;
                 m_state.active_axis = 255;
             }
@@ -190,7 +187,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 // ============================================================================
 
 void motionInit() {
-    logInfo("[MOTION] Init v3.5.7...");
+    logInfo("[MOTION] Init v3.5.12...");
     for(int i=0; i<MOTION_AXES; i++) {
         axes[i].init(i);
         axes[i].soft_limit_min = -500000;
@@ -202,7 +199,21 @@ void motionInit() {
 
 void motionUpdate() {
     if (!m_state.global_enabled) return;
-    if (!taskLockMutex(taskGetMotionMutex(), 0)) return;
+    
+    // FIX: Starvation Watchdog
+    static uint32_t consecutive_skips = 0;
+
+    // Try to acquire lock with 5ms timeout (Half a cycle)
+    if (!taskLockMutex(taskGetMotionMutex(), 5)) {
+        consecutive_skips++;
+        if (consecutive_skips >= 5) { // 50ms blockage
+            logWarning("[MOTION] Starvation: Loop skipped %lu times (Mutex busy)", (unsigned long)consecutive_skips);
+        }
+        return; // Skip this cycle, but track it
+    }
+    
+    // Reset counter on success
+    consecutive_skips = 0;
 
     int strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
     
@@ -417,7 +428,6 @@ void motionEnableSoftLimits(uint8_t axis, bool enable) {
             logError("[MOTION] Reject Limit Config: System must be Disabled (E-Stop)");
             return;
         }
-        
         axes[axis].soft_limit_enabled = enable;
         logInfo("[MOTION] Soft Limits Axis %d: %s", axis, enable ? "ON" : "OFF");
     }
@@ -440,7 +450,6 @@ void motionStop() {
     if (m_state.active_axis != 255) {
         motionSetPLCAxisDirection(255, false, false);
         axes[m_state.active_axis].state = MOTION_STOPPING;
-        // FIX: Snap the target to current position to make deadband check pass
         axes[m_state.active_axis].target_position = axes[m_state.active_axis].position;
         axes[m_state.active_axis].position_at_stop = axes[m_state.active_axis].position;
     }
