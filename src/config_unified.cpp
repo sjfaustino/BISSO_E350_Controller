@@ -1,7 +1,7 @@
 /**
  * @file config_unified.cpp
- * @brief Unified Configuration Manager (NVS) v3.5.0
- * @details Handles loading, saving, and defaults for system settings.
+ * @brief Unified Configuration Manager (NVS) v3.5.13
+ * @details Implements Input Validation and Hardened String Buffer Pool.
  * @author Sergio Faustino
  */
 
@@ -53,9 +53,15 @@ static bool isCriticalKey(const char* key) {
   return false;
 }
 
-// String Buffer Pool for returning const char* safely
-#define CONFIG_STRING_BUFFER_COUNT 4
+// ----------------------------------------------------------------------------
+// STRING BUFFER POOL (Safety Fix)
+// ----------------------------------------------------------------------------
+// Increased to 8 to prevent overwrites during complex logging/formatting.
+// WARNING: Strings returned by configGetString are valid only until 
+// the pool rotates (8 calls later). Do not store pointers long-term.
+#define CONFIG_STRING_BUFFER_COUNT 8
 #define CONFIG_STRING_BUFFER_SIZE 256
+
 static struct {
   char buffers[CONFIG_STRING_BUFFER_COUNT][CONFIG_STRING_BUFFER_SIZE];
   uint8_t current_buffer = 0;
@@ -98,6 +104,48 @@ static void addToCacheFloat(const char* key, float val) {
     config_table[idx].is_set = true;
 }
 
+// ----------------------------------------------------------------------------
+// VALIDATION LOGIC (Safety Fix)
+// ----------------------------------------------------------------------------
+
+static int32_t validateInt(const char* key, int32_t value) {
+    // 1. Pulses Per MM/Degree (Must be positive)
+    if (strcmp(key, KEY_PPM_X) == 0 || strcmp(key, KEY_PPM_Y) == 0 ||
+        strcmp(key, KEY_PPM_Z) == 0 || strcmp(key, KEY_PPM_A) == 0) {
+        if (value <= 0) {
+            logError("[CONFIG] Invalid PPM value %d (Must be > 0)", value);
+            return 1000; // Default safe value
+        }
+    }
+    
+    // 2. Timeout Safety
+    if (strcmp(key, KEY_STALL_TIMEOUT) == 0) {
+        if (value < 100) return 100; // Minimum 100ms
+        if (value > 60000) return 60000; // Max 60s
+    }
+    
+    // 3. Profiles (0-2)
+    if (strcmp(key, KEY_HOME_PROFILE_FAST) == 0 || strcmp(key, KEY_HOME_PROFILE_SLOW) == 0) {
+        if (value < 0) return 0;
+        if (value > 2) return 2;
+    }
+    
+    // 4. Deadband (Positive)
+    if (strcmp(key, KEY_MOTION_DEADBAND) == 0) {
+        if (value < 0) return 0;
+    }
+
+    return value;
+}
+
+static float validateFloat(const char* key, float value) {
+    // 1. Acceleration / Speed (Must be positive)
+    if (strcmp(key, KEY_DEFAULT_ACCEL) == 0 || strcmp(key, KEY_DEFAULT_SPEED) == 0) {
+        if (value < 0.1f) return 0.1f;
+    }
+    return value;
+}
+
 // ============================================================================
 // INITIALIZATION & DEFAULTS
 // ============================================================================
@@ -131,12 +179,11 @@ void configSetDefaults() {
 void configUnifiedLoad() {
     logInfo("[CONFIG] Pre-loading Cache...");
     
-    // Iterate through critical keys and load them into RAM
     for (uint8_t i = 0; i < sizeof(critical_keys)/sizeof(critical_keys[0]); i++) {
         const char* key = critical_keys[i];
         
         if (prefs.isKey(key)) {
-            // Heuristic: Check key name for float types
+            // Heuristic for types
             if (strstr(key, "accel") || strstr(key, "speed")) {
                 float val = prefs.getFloat(key, 0.0f);
                 addToCacheFloat(key, val);
@@ -174,7 +221,6 @@ int32_t configGetInt(const char* key, int32_t default_val) {
   if (idx >= 0 && config_table[idx].type == CONFIG_INT32 && config_table[idx].is_set) {
     return config_table[idx].value.int_val;
   }
-  // Fallback
   return prefs.getInt(key, default_val);
 }
 
@@ -204,12 +250,15 @@ const char* configGetString(const char* key, const char* default_val) {
 }
 
 // ============================================================================
-// SETTERS
+// SETTERS (With Validation)
 // ============================================================================
 
 void configSetInt(const char* key, int32_t value) {
   if (!initialized) return;
   
+  // VALIDATION STEP
+  value = validateInt(key, value);
+
   int idx = findConfigEntry(key);
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) return;
@@ -237,6 +286,10 @@ void configSetInt(const char* key, int32_t value) {
 
 void configSetFloat(const char* key, float value) {
   if (!initialized) return;
+  
+  // VALIDATION STEP
+  value = validateFloat(key, value);
+
   int idx = findConfigEntry(key);
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) return;
@@ -295,7 +348,6 @@ void configUnifiedSave() {
   logInfo("[CONFIG] Flushing NVS...");
   for (int i = 0; i < config_count; i++) {
     if (!config_table[i].is_set) continue;
-    // Skip if already write-through
     if (config_table[i].type == CONFIG_INT32 && isCriticalKey(config_table[i].key)) continue;
 
     switch(config_table[i].type) {
@@ -313,7 +365,6 @@ void configUnifiedReset() {
   prefs.clear(); 
   configSetDefaults();
   
-  // Basic Limits Restore
   configSetInt(KEY_X_LIMIT_MIN, -500000); configSetInt(KEY_X_LIMIT_MAX, 500000);
   
   logInfo("[CONFIG] Reset Complete. Reboot recommended.");
