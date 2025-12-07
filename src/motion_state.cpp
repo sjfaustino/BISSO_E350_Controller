@@ -9,8 +9,9 @@
 #include "motion_state.h"
 #include "motion.h"
 #include "encoder_wj66.h"
-#include "encoder_calibration.h"
-#include "encoder_motion_integration.h" // For encoderMotionHasError
+#include "config_unified.h"
+#include "encoder_calibration.h" // Provides machineCal
+#include "encoder_motion_integration.h"
 #include "system_constants.h"
 #include "safety.h" 
 #include <math.h>
@@ -20,6 +21,9 @@
 extern motion_axis_t axes[MOTION_AXES];
 extern uint8_t active_axis;
 extern bool global_enabled;
+
+// NOTE: We rely on "encoder_calibration.h" to declare 'machineCal'.
+// Removing the manual extern declaration fixes the type error.
 
 // ============================================================================
 // ACCESSOR IMPLEMENTATIONS (Read-Only)
@@ -42,7 +46,7 @@ float motionGetPositionMM(uint8_t axis) {
     int32_t counts = motionGetPosition(axis);
     float scale = 1.0f;
     
-    // Retrieve calibration scaling
+    // Retrieve calibration scaling from the global struct provided by encoder_calibration.h
     if (axis == 0) scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
     else if (axis == 1) scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
     else if (axis == 2) scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
@@ -52,7 +56,6 @@ float motionGetPositionMM(uint8_t axis) {
 }
 
 bool motionIsMoving() {
-  // Considered moving if an axis is assigned and in an active state
   return active_axis != 255 && (axes[active_axis].state == MOTION_EXECUTING || axes[active_axis].state == MOTION_WAIT_CONSENSO);
 }
 
