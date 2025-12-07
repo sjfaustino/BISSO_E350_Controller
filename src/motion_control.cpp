@@ -1,13 +1,13 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer (Gemini v3.5.6)
- * @details Unified Engine. Fixed missing motionMapSpeedToProfile implementation.
+ * @brief Real-Time Hardware Execution Layer (Gemini v3.5.7)
+ * @details Fixed Deadband Logic (Check vs Target). Added Safety Timeout for Stopping state.
  * @author Sergio Faustino
  */
 
 #include "motion.h"
 #include "motion_planner.h"
-#include "motion_state.h"
+#include "motion_state.h" // Implements these interfaces
 #include "system_constants.h"
 #include "plc_iface.h"
 #include "encoder_wj66.h"        
@@ -119,9 +119,17 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
             break;
 
         case MOTION_STOPPING:
-            if (abs(position - position_at_stop) < configGetInt(KEY_MOTION_DEADBAND, 10)) {
+            // FIX: Check against TARGET POSITION, not the snapshot at stop start.
+            // This handles cases where the motor moves/skids towards the target.
+            if (abs(position - target_position) < configGetInt(KEY_MOTION_DEADBAND, 10)) {
                 state = MOTION_IDLE;
                 m_state.active_axis = 255; 
+            }
+            // SAFETY: Timeout if we never reach the deadband (e.g. massive skid or stall)
+            else if (millis() - state_entry_ms > 5000) {
+                logWarning("[AXIS %d] Stop Settlement Timeout (Skid?)", id);
+                state = MOTION_IDLE;
+                m_state.active_axis = 255;
             }
             break;
 
@@ -182,7 +190,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 // ============================================================================
 
 void motionInit() {
-    logInfo("[MOTION] Init v3.5.6...");
+    logInfo("[MOTION] Init v3.5.7...");
     for(int i=0; i<MOTION_AXES; i++) {
         axes[i].init(i);
         axes[i].soft_limit_min = -500000;
@@ -371,7 +379,6 @@ void motionSetPLCSpeedProfile(speed_profile_t profile) {
     elboSetSpeedProfile((uint8_t)profile);
 }
 
-// FIX: Added missing implementation
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed) {
     if (speed < 10.0f) return SPEED_PROFILE_1;
     if (speed < 30.0f) return SPEED_PROFILE_2;
@@ -410,6 +417,7 @@ void motionEnableSoftLimits(uint8_t axis, bool enable) {
             logError("[MOTION] Reject Limit Config: System must be Disabled (E-Stop)");
             return;
         }
+        
         axes[axis].soft_limit_enabled = enable;
         logInfo("[MOTION] Soft Limits Axis %d: %s", axis, enable ? "ON" : "OFF");
     }
@@ -432,6 +440,8 @@ void motionStop() {
     if (m_state.active_axis != 255) {
         motionSetPLCAxisDirection(255, false, false);
         axes[m_state.active_axis].state = MOTION_STOPPING;
+        // FIX: Snap the target to current position to make deadband check pass
+        axes[m_state.active_axis].target_position = axes[m_state.active_axis].position;
         axes[m_state.active_axis].position_at_stop = axes[m_state.active_axis].position;
     }
     taskUnlockMutex(taskGetMotionMutex());
@@ -511,8 +521,7 @@ bool motionClearEmergencyStop() {
 }
 
 void motionDiagnostics() {
-    Serial.printf("\n[MOTION] State: %s | Active: %d | Feed: %.0f%%\n", 
-        m_state.global_enabled ? "ON" : "ESTOP", m_state.active_axis, motionPlanner.getFeedOverride() * 100.0f);
+    Serial.printf("\n[MOTION] State: %s | Active: %d\n", m_state.global_enabled ? "ON" : "ESTOP", m_state.active_axis);
     for (int i = 0; i < MOTION_AXES; i++) {
         Serial.printf("  Axis %d: Pos=%ld | Tgt=%ld | State=%s\n", 
             i, (long)axes[i].position, (long)axes[i].target_position, motionStateToString(axes[i].state));
