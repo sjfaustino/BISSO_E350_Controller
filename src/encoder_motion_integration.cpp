@@ -1,7 +1,8 @@
 /**
  * @file encoder_motion_integration.cpp
- * @brief Logic to cross-check encoder feedback against planner target (Gemini v3.5.12)
- * @details "Source of Truth" for encoder feedback state.
+ * @brief Logic to cross-check encoder feedback against planner target (Gemini v3.5.17)
+ * @details Fixed Magic Numbers. Now loads thresholds from Config System.
+ * @author Sergio Faustino
  */
 
 #include "encoder_motion_integration.h"
@@ -11,36 +12,50 @@
 #include "encoder_wj66.h"
 #include "motion.h"       
 #include "motion_state.h" 
+#include "config_unified.h"
+#include "config_keys.h"
 
+// FIX: Initialized to zero. Actual values loaded in Init().
 static position_error_t position_errors[4] = {
-  {0, 0, 100000, 0, 2000, false, 0},
-  {0, 0, 100000, 0, 2000, false, 0},
-  {0, 0, 100000, 0, 2000, false, 0},
-  {0, 0, 100000, 0, 2000, false, 0}
+  {0, 0, 0, 0, 0, false, 0},
+  {0, 0, 0, 0, 0, false, 0},
+  {0, 0, 0, 0, 0, false, 0},
+  {0, 0, 0, 0, 0, false, 0}
 };
 
 static bool encoder_feedback_enabled = false;
 static int32_t encoder_error_threshold = 100000;  
 static uint32_t max_error_duration_ms = 2000;     
 
-void encoderMotionInit(int32_t error_threshold, uint32_t max_error_time_ms) {
-  encoder_error_threshold = error_threshold;
-  max_error_duration_ms = max_error_time_ms;
+// Local key definition if not in header
+#ifndef KEY_ENC_ERR_THRESHOLD
+#define KEY_ENC_ERR_THRESHOLD "enc_thresh" 
+#endif
+
+void encoderMotionInit(int32_t default_threshold, uint32_t default_timeout) {
+  // FIX: Load from Configuration System (Single Source of Truth)
+  // We use the passed arguments as defaults for the config system lookup
+  encoder_error_threshold = configGetInt(KEY_ENC_ERR_THRESHOLD, default_threshold > 0 ? default_threshold : 100000);
+  max_error_duration_ms = configGetInt(KEY_STALL_TIMEOUT, default_timeout > 0 ? default_timeout : 2000);
+  
+  logInfo("[ENC_INT] Loading Config: Thresh=%ld, Timeout=%lu ms", 
+          (long)encoder_error_threshold, (unsigned long)max_error_duration_ms);
+
   for (int i = 0; i < 4; i++) {
-    position_errors[i].error_threshold = error_threshold;
-    position_errors[i].max_error_time_ms = max_error_time_ms;
+    position_errors[i].error_threshold = encoder_error_threshold;
+    position_errors[i].max_error_time_ms = max_error_duration_ms;
     position_errors[i].current_error = 0;
     position_errors[i].max_error = 0;
     position_errors[i].error_active = false;
     position_errors[i].error_count = 0;
     position_errors[i].error_time_ms = 0; 
   }
-  Serial.println("[ENC_INT] Initialized");
 }
 
 bool encoderMotionUpdate() {
   if (!encoder_feedback_enabled) return true;
 
+  // Check hardware health
   encoder_status_t status = wj66GetStatus();
   if (status != ENCODER_OK) {
     if (status == ENCODER_TIMEOUT) {
@@ -58,17 +73,23 @@ bool encoderMotionUpdate() {
       continue;
     }
     
+    // 1. Get Data
     int32_t encoder_pos = wj66GetPosition(i);
     int32_t target_pos = motionGetTarget(i); 
     motion_state_t state = motionGetState(i);
 
+    // 2. Calculate Error
     int32_t error = 0;
+
+    // Only check for position error when the axis is stationary (IDLE).
     if (state == MOTION_IDLE) {
         error = encoder_pos - target_pos;
     } else {
+        // Mask error during motion to prevent false E-Stops until PID is implemented
         error = 0; 
     }
     
+    // 3. Threshold Logic
     position_errors[i].current_error = error;
     if (abs(error) > abs(position_errors[i].max_error)) {
       position_errors[i].max_error = error;
@@ -80,7 +101,7 @@ bool encoderMotionUpdate() {
         position_errors[i].error_time_ms = now; 
         position_errors[i].error_count++;
         
-        logWarning("Axis %d Drift Error: %ld", i, (long)error);
+        logWarning("Axis %d Drift Error: %ld (Limit: %ld)", i, (long)error, (long)encoder_error_threshold);
         faultLogEntry(FAULT_WARNING, FAULT_ENCODER_SPIKE, i, error, "Axis Drift (Static)"); 
       }
     } else {
@@ -92,6 +113,8 @@ bool encoderMotionUpdate() {
   }
   return all_valid;
 }
+
+// --- Accessors ---
 
 int32_t encoderMotionGetPositionError(uint8_t axis) { return (axis < 4) ? position_errors[axis].current_error : 0; }
 int32_t encoderMotionGetMaxError(uint8_t axis) { return (axis < 4) ? position_errors[axis].max_error : 0; }
@@ -119,7 +142,7 @@ bool encoderMotionIsFeedbackActive() { return encoder_feedback_enabled; }
 void encoderMotionDiagnostics() {
   Serial.println("\n=== ENCODER INTEGRATION ===");
   Serial.printf("Feedback: %s\n", encoder_feedback_enabled ? "[ON]" : "[OFF]");
-  Serial.printf("Threshold: %.1f mm\n", encoder_error_threshold / 1000.0f);
+  Serial.printf("Threshold: %.1f mm\n", encoder_error_threshold / 1000.0f); // Assuming 1000 steps/mm default
   
   for (int i = 0; i < 4; i++) {
     Serial.printf("Axis %d: Err=%.1f mm | State=%s\n",
