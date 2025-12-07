@@ -1,7 +1,7 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer (Gemini v3.5.8)
- * @details Fixed Duplicate State. Feedback logic delegated to encoder_motion_integration.
+ * @brief Real-Time Hardware Execution Layer (Gemini v3.5.16)
+ * @details Performance Fix: Cached strict_limits to avoid hash lookup in 10ms loop.
  * @author Sergio Faustino
  */
 
@@ -18,7 +18,7 @@
 #include "encoder_calibration.h" 
 #include "config_unified.h" 
 #include "config_keys.h"
-#include "encoder_motion_integration.h" // <-- CRITICAL: Delegating feedback state
+#include "encoder_motion_integration.h" 
 #include <math.h>
 #include <stdlib.h> 
 #include <stdio.h>
@@ -32,12 +32,13 @@
 Axis axes[MOTION_AXES]; 
 
 // Protected Global State
+// Added strict_limits to cache
 static struct {
     uint8_t active_axis;
     int32_t active_start_position;
     bool global_enabled;
-    // bool encoder_feedback_enabled; // REMOVED: Now managed by encoder module
-} m_state = { 255, 0, true };
+    int strict_limits; // 0=Relaxed, 1=Strict (Cached)
+} m_state = { 255, 0, true, 1 };
 
 static portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -188,7 +189,11 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 // ============================================================================
 
 void motionInit() {
-    logInfo("[MOTION] Init v3.5.8...");
+    logInfo("[MOTION] Init v3.5.16...");
+    
+    // Load Configuration Cache
+    m_state.strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
+    
     for(int i=0; i<MOTION_AXES; i++) {
         axes[i].init(i);
         axes[i].soft_limit_min = -500000;
@@ -201,7 +206,6 @@ void motionInit() {
 void motionUpdate() {
     if (!m_state.global_enabled) return;
     
-    // Starvation Watchdog
     static uint32_t consecutive_skips = 0;
     if (!taskLockMutex(taskGetMotionMutex(), 5)) {
         consecutive_skips++;
@@ -212,13 +216,14 @@ void motionUpdate() {
     }
     consecutive_skips = 0;
 
-    int strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
+    // FIX: Use cached value instead of NVS lookup
+    int strict_mode = m_state.strict_limits;
     
     for (int i=0; i<MOTION_AXES; i++) {
         int32_t pos = wj66GetPosition(i);
         axes[i].position = pos;
         
-        if (axes[i].checkSoftLimits(strict_limits)) {
+        if (axes[i].checkSoftLimits(strict_mode)) {
             motionEmergencyStop();
             taskUnlockMutex(taskGetMotionMutex());
             return;
@@ -415,6 +420,13 @@ void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos) {
     }
 }
 
+// FIX: Added setter to allow runtime updates of cached value
+void motionSetStrictLimits(bool enable) {
+    m_state.strict_limits = enable ? 1 : 0;
+    configSetInt(KEY_MOTION_STRICT_LIMITS, m_state.strict_limits);
+    logInfo("[MOTION] Strict Limits: %s", enable ? "ON" : "OFF");
+}
+
 void motionEnableSoftLimits(uint8_t axis, bool enable) {
     if (axis < MOTION_AXES) {
         if (axes[axis].state != MOTION_IDLE) {
@@ -437,7 +449,6 @@ bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos) {
     return axes[axis].soft_limit_enabled;
 }
 
-// FIX: Delegated to integration module
 void motionEnableEncoderFeedback(bool enable) { 
     encoderMotionEnableFeedback(enable); 
 }
@@ -534,9 +545,7 @@ bool motionClearEmergencyStop() {
 }
 
 void motionDiagnostics() {
-    Serial.printf("\n[MOTION] State: %s | Active: %d | Feed: %.0f%%\n", 
-        m_state.global_enabled ? "ON" : "ESTOP", m_state.active_axis, motionPlanner.getFeedOverride() * 100.0f);
-        
+    Serial.printf("\n[MOTION] State: %s | Active: %d\n", m_state.global_enabled ? "ON" : "ESTOP", m_state.active_axis);
     for (int i = 0; i < MOTION_AXES; i++) {
         Serial.printf("  Axis %d: Pos=%ld | Tgt=%ld | State=%s\n", 
             i, (long)axes[i].position, (long)axes[i].target_position, motionStateToString(axes[i].state));

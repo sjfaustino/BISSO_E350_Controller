@@ -1,7 +1,7 @@
 /**
  * @file motion.h
- * @brief Core Motion Engine Definitions & API
- * @project Gemini v3.5.0
+ * @brief Core Motion Engine Definitions & API (Gemini v3.5.16)
+ * @project Gemini v3.5.16
  */
 
 #ifndef MOTION_H
@@ -70,10 +70,10 @@ extern Axis axes[MOTION_AXES];
 void motionInit();
 void motionUpdate();
 void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
-void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s); // Added
+void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s); 
 void motionStop();
-void motionPause();   // Added
-void motionResume();  // Added
+void motionPause();   
+void motionResume();  
 void motionEmergencyStop();
 bool motionClearEmergencyStop();
 void motionHome(uint8_t axis); 
@@ -84,11 +84,12 @@ float motionGetFeedOverride();
 void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos);
 void motionEnableSoftLimits(uint8_t axis, bool enable);
 bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos);
+void motionSetStrictLimits(bool enable); // <-- Added Setter
 void motionEnableEncoderFeedback(bool enable);
 bool motionIsEncoderFeedbackEnabled();
 
 // --- DIAGNOSTICS ---
-void motionDiagnostics(); // Added
+void motionDiagnostics(); 
 
 // --- HELPERS ---
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed);
