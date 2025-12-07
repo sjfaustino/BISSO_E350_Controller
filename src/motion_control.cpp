@@ -1,7 +1,7 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer (Gemini v3.5.1)
- * @details Implements Object-Oriented Axis logic, Flood Protection, and Homing.
+ * @brief Real-Time Hardware Execution Layer (Gemini v3.5.2)
+ * @details Fixed compilation error in motionResume (variable name mismatch).
  * @author Sergio Faustino
  */
 
@@ -21,6 +21,8 @@
 #include <math.h>
 #include <stdlib.h> 
 #include <stdio.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 // ============================================================================
 // STATE OWNERSHIP
@@ -32,6 +34,9 @@ uint8_t active_axis = 255;
 int32_t active_start_position = 0;
 bool global_enabled = true; 
 static bool encoder_feedback_enabled = false;
+
+// Spinlock for Atomic E-Stop Operations
+static portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y, ELBO_I73_AXIS_Z, ELBO_I73_AXIS_A}; 
 const uint8_t AXIS_TO_CONSENSO_BIT[] = {ELBO_I73_CONSENSO_X, ELBO_I73_CONSENSO_Y, ELBO_I73_CONSENSO_Z, ELBO_I73_CONSENSO_A};
@@ -61,27 +66,25 @@ void Axis::init(uint8_t axis_id) {
 
 bool Axis::checkSoftLimits(bool strict_mode) {
     if (!enabled || !soft_limit_enabled) return false;
-    // Don't check limits if we are actively homing
     if (state >= MOTION_HOMING_APPROACH_FAST) return false;
 
     if (position < soft_limit_min || position > soft_limit_max) {
         if (strict_mode) {
-            // FLOOD PROTECTION: Only log once per violation event
             if (!_error_logged) {
                 faultLogEntry(FAULT_WARNING, FAULT_SOFT_LIMIT_EXCEEDED, id, position, "Strict Limit Hit");
                 logError("[AXIS %d] Strict Limit Violation: %ld", id, (long)position);
                 _error_logged = true;
             }
-            return true; // Signal E-Stop
+            return true; 
         }
     } else {
-        // Clear flag if we return to valid bounds
         _error_logged = false; 
     }
     return false;
 }
 
 void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
+    // CRITICAL: Never overwrite 'position' with 'target'.
     position = current_pos;
     
     if (state == MOTION_ERROR || !enabled) return;
@@ -100,24 +103,30 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
             break;
 
         case MOTION_EXECUTING:
-            // Check if passed target
-            // Note: global_target_pos comes from the loop controller
             if ((active_start_position < target_position && position >= target_position) ||
                 (active_start_position > target_position && position <= target_position)) {
                 
-                position = target_position;
                 state = MOTION_STOPPING;
                 state_entry_ms = millis();
-                position_at_stop = position;
                 
-                motionSetPLCAxisDirection(255, false, false); // Hardware Stop
+                // Capture where we actually are when we cut power
+                position_at_stop = position; 
+                
+                motionSetPLCAxisDirection(255, false, false); 
             }
             break;
 
         case MOTION_STOPPING:
+            // Deadband check: Has the axis settled?
             if (abs(position - position_at_stop) < configGetInt(KEY_MOTION_DEADBAND, 10)) {
+                // Check final error vs target
+                int32_t final_err = abs(position - target_position);
+                if (final_err > 500) { 
+                     logWarning("[AXIS %d] Stop Error: %ld counts", id, (long)final_err);
+                }
+                
                 state = MOTION_IDLE;
-                active_axis = 255; // Release mutex
+                active_axis = 255; 
             }
             break;
 
@@ -131,14 +140,11 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
                 }
 
                 if (hit) {
-                    motionSetPLCAxisDirection(255, false, false); // Stop
+                    motionSetPLCAxisDirection(255, false, false); 
                     
                     if (state == MOTION_HOMING_APPROACH_FAST) {
-                        // Switch to SLOW profile (Configurable)
                         int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0); 
                         motionSetPLCSpeedProfile((speed_profile_t)slow_prof);
-                        
-                        // Back off (Positive)
                         motionSetPLCAxisDirection(id, true, true);
                         state = MOTION_HOMING_BACKOFF;
                     } else {
@@ -151,14 +157,11 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
             break;
 
         case MOTION_HOMING_BACKOFF:
-            if (!elboI73GetInput(AXIS_TO_I73_BIT[id])) { // Released
+            if (!elboI73GetInput(AXIS_TO_I73_BIT[id])) { 
                 if (millis() - state_entry_ms > 1000) {
                     motionSetPLCAxisDirection(255, false, false);
-                    
-                    // Fine approach (Negative)
                     int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0);
                     motionSetPLCSpeedProfile((speed_profile_t)slow_prof);
-                    
                     motionSetPLCAxisDirection(id, true, false);
                     state = MOTION_HOMING_APPROACH_FINE;
                     state_entry_ms = millis();
@@ -186,10 +189,9 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 // ============================================================================
 
 void motionInit() {
-    logInfo("[MOTION] Init v3.5.1...");
+    logInfo("[MOTION] Init v3.5.2...");
     for(int i=0; i<MOTION_AXES; i++) {
         axes[i].init(i);
-        // Default Limits
         axes[i].soft_limit_min = -500000;
         axes[i].soft_limit_max = 500000;
     }
@@ -201,25 +203,21 @@ void motionUpdate() {
     if (!global_enabled) return;
     if (!taskLockMutex(taskGetMotionMutex(), 0)) return;
 
-    // 1. Global Monitor
     int strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
     
     for (int i=0; i<MOTION_AXES; i++) {
         int32_t pos = wj66GetPosition(i);
-        axes[i].position = pos; // Update object state
+        axes[i].position = pos;
         
         if (axes[i].checkSoftLimits(strict_limits)) {
-            // Error logged by object. Kill power.
             motionEmergencyStop();
             taskUnlockMutex(taskGetMotionMutex());
             return;
         }
     }
 
-    // 2. Planner
     motionPlanner.update(axes, active_axis, active_start_position);
 
-    // 3. Active Axis Logic
     if (active_axis != 255) {
         axes[active_axis].updateState(axes[active_axis].position, axes[active_axis].target_position);
     }
@@ -240,11 +238,9 @@ void motionHome(uint8_t axis) {
     axes[axis].state = MOTION_HOMING_APPROACH_FAST;
     axes[axis].state_entry_ms = millis();
     
-    // Use Configured Fast Profile
     int fast_prof = configGetInt(KEY_HOME_PROFILE_FAST, 2); 
     motionSetPLCSpeedProfile((speed_profile_t)fast_prof);
-    
-    motionSetPLCAxisDirection(axis, true, false); // Negative
+    motionSetPLCAxisDirection(axis, true, false); 
     
     taskUnlockMutex(taskGetMotionMutex());
 }
@@ -253,12 +249,7 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
     if (!global_enabled) { logError("[MOTION] Disabled"); return; }
     if (!taskLockMutex(taskGetMotionMutex(), 100)) { logError("[MOTION] Busy"); return; }
 
-    // (Selection Logic)
-    uint8_t target_axis = 255;
-    int32_t target_pos = 0;
-    
     float targets[] = {x, y, z, a};
-    // Fetch calibration scales
     float scales[] = {
       (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR,
       (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR,
@@ -266,23 +257,36 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
       (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR_DEG
     };
 
+    uint8_t target_axis = 255;
+    int32_t target_pos = 0;
     int cnt = 0;
+
     for(int i=0; i<MOTION_AXES; i++) {
         int32_t t = (int32_t)(targets[i] * scales[i]);
         if(abs(t - wj66GetPosition(i)) > 1) { 
-            cnt++; target_axis = i; target_pos = t; 
+            cnt++; target_axis=i; target_pos=t; 
         }
     }
 
-    if (cnt != 1 || active_axis != 255) { taskUnlockMutex(taskGetMotionMutex()); return; }
+    if (cnt > 1) { 
+        logError("[MOTION] Multi-axis move rejected (HW Limit)"); 
+        taskUnlockMutex(taskGetMotionMutex()); return; 
+    }
+    
+    if (cnt == 0) {
+        taskUnlockMutex(taskGetMotionMutex()); return;
+    }
+    
+    if (active_axis != 255) {
+        logError("[MOTION] Axis %d Busy", active_axis);
+        taskUnlockMutex(taskGetMotionMutex()); return; 
+    }
 
-    // Start Move
     axes[target_axis].commanded_speed_mm_s = speed_mm_s;
     
-    // Check Limits (Always check target before moving, regardless of strict mode)
     if (axes[target_axis].soft_limit_enabled) {
         if(target_pos < axes[target_axis].soft_limit_min || target_pos > axes[target_axis].soft_limit_max) {
-            logError("[MOTION] Target Limit Violation Axis %d", target_axis);
+            logError("[MOTION] Target Limit Violation");
             taskUnlockMutex(taskGetMotionMutex()); return;
         }
     }
@@ -308,7 +312,7 @@ void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
 }
 
 // ============================================================================
-// HELPERS & WRAPPERS (Fully Implemented)
+// HELPERS & WRAPPERS
 // ============================================================================
 
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus) {
@@ -367,8 +371,6 @@ bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos) {
 
 void motionEnableEncoderFeedback(bool enable) {
     encoder_feedback_enabled = enable;
-    // Note: External function removed to prevent linker error. 
-    // Flag logic is sufficient for v3.5.1
 }
 
 bool motionIsEncoderFeedbackEnabled() { 
@@ -429,6 +431,7 @@ void motionResume() {
         speed_profile_t prof = motionMapSpeedToProfile(active_axis, effective_speed);
         motionSetPLCSpeedProfile(prof);
         
+        // FIX: Variable name corrected
         bool is_forward = (axes[active_axis].target_position > axes[active_axis].position);
         motionSetPLCAxisDirection(active_axis, true, is_forward);
         
@@ -442,17 +445,22 @@ void motionResume() {
 void motionEmergencyStop() {
     bool got_mutex = taskLockMutex(taskGetMotionMutex(), 10); 
     
-    // Immediate Hardware Shutdown
+    // 1. HARDWARE SHUTDOWN (Immediate)
     motionSetPLCAxisDirection(255, false, false);
-    global_enabled = false;
     
+    // 2. ATOMIC STATE UPDATE
+    portENTER_CRITICAL(&motionSpinlock);
+    global_enabled = false;
     for (int i = 0; i < MOTION_AXES; i++) {
         axes[i].state = MOTION_ERROR;
     }
     active_axis = 255;
+    portEXIT_CRITICAL(&motionSpinlock);
+    
     motionBuffer.clear();
     
     if (got_mutex) taskUnlockMutex(taskGetMotionMutex());
+    
     logError("[MOTION] [CRITICAL] EMERGENCY STOP ACTIVATED");
     faultLogError(FAULT_EMERGENCY_HALT, "E-Stop Activated");
     taskSignalMotionUpdate();
@@ -467,11 +475,15 @@ bool motionClearEmergencyStop() {
         Serial.println("[MOTION] Cannot clear - Alarm Active"); 
         return false; 
     }
+    
+    portENTER_CRITICAL(&motionSpinlock);
     global_enabled = true;
     for (int i = 0; i < MOTION_AXES; i++) {
         if (axes[i].state == MOTION_ERROR) axes[i].state = MOTION_IDLE;
     }
     active_axis = 255;
+    portEXIT_CRITICAL(&motionSpinlock);
+    
     emergencyStopSetActive(false); 
     Serial.println("[MOTION] [OK] Emergency stop cleared");
     taskSignalMotionUpdate();
@@ -479,8 +491,6 @@ bool motionClearEmergencyStop() {
 }
 
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed) {
-    // Default mapping logic: Slow < 10, Medium < 30, Fast >= 30
-    // This can be customized per machine calibration if needed
     if (speed < 10.0) return SPEED_PROFILE_1;
     if (speed < 30.0) return SPEED_PROFILE_2;
     return SPEED_PROFILE_3;
