@@ -1,7 +1,7 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer (Gemini v3.5.12)
- * @details Fixed Thread Safety: Added timeout and starvation logging to motion loop.
+ * @brief Real-Time Hardware Execution Layer (Gemini v3.5.8)
+ * @details Fixed Duplicate State. Feedback logic delegated to encoder_motion_integration.
  * @author Sergio Faustino
  */
 
@@ -18,6 +18,7 @@
 #include "encoder_calibration.h" 
 #include "config_unified.h" 
 #include "config_keys.h"
+#include "encoder_motion_integration.h" // <-- CRITICAL: Delegating feedback state
 #include <math.h>
 #include <stdlib.h> 
 #include <stdio.h>
@@ -35,8 +36,8 @@ static struct {
     uint8_t active_axis;
     int32_t active_start_position;
     bool global_enabled;
-    bool encoder_feedback_enabled;
-} m_state = { 255, 0, true, false };
+    // bool encoder_feedback_enabled; // REMOVED: Now managed by encoder module
+} m_state = { 255, 0, true };
 
 static portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -187,7 +188,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 // ============================================================================
 
 void motionInit() {
-    logInfo("[MOTION] Init v3.5.12...");
+    logInfo("[MOTION] Init v3.5.8...");
     for(int i=0; i<MOTION_AXES; i++) {
         axes[i].init(i);
         axes[i].soft_limit_min = -500000;
@@ -200,19 +201,15 @@ void motionInit() {
 void motionUpdate() {
     if (!m_state.global_enabled) return;
     
-    // FIX: Starvation Watchdog
+    // Starvation Watchdog
     static uint32_t consecutive_skips = 0;
-
-    // Try to acquire lock with 5ms timeout (Half a cycle)
     if (!taskLockMutex(taskGetMotionMutex(), 5)) {
         consecutive_skips++;
-        if (consecutive_skips >= 5) { // 50ms blockage
-            logWarning("[MOTION] Starvation: Loop skipped %lu times (Mutex busy)", (unsigned long)consecutive_skips);
+        if (consecutive_skips >= 5) {
+            logWarning("[MOTION] Starvation: Loop skipped %lu times", (unsigned long)consecutive_skips);
         }
-        return; // Skip this cycle, but track it
+        return; 
     }
-    
-    // Reset counter on success
     consecutive_skips = 0;
 
     int strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
@@ -440,8 +437,15 @@ bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos) {
     return axes[axis].soft_limit_enabled;
 }
 
-void motionEnableEncoderFeedback(bool enable) { m_state.encoder_feedback_enabled=enable; }
-bool motionIsEncoderFeedbackEnabled() { return m_state.encoder_feedback_enabled; }
+// FIX: Delegated to integration module
+void motionEnableEncoderFeedback(bool enable) { 
+    encoderMotionEnableFeedback(enable); 
+}
+
+bool motionIsEncoderFeedbackEnabled() { 
+    return encoderMotionIsFeedbackActive(); 
+}
+
 bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) { return true; }
 bool motionSetState(uint8_t axis, motion_state_t new_state) { if(axis>=4) return false; axes[axis].state=new_state; return true; }
 
@@ -530,7 +534,9 @@ bool motionClearEmergencyStop() {
 }
 
 void motionDiagnostics() {
-    Serial.printf("\n[MOTION] State: %s | Active: %d\n", m_state.global_enabled ? "ON" : "ESTOP", m_state.active_axis);
+    Serial.printf("\n[MOTION] State: %s | Active: %d | Feed: %.0f%%\n", 
+        m_state.global_enabled ? "ON" : "ESTOP", m_state.active_axis, motionPlanner.getFeedOverride() * 100.0f);
+        
     for (int i = 0; i < MOTION_AXES; i++) {
         Serial.printf("  Axis %d: Pos=%ld | Tgt=%ld | State=%s\n", 
             i, (long)axes[i].position, (long)axes[i].target_position, motionStateToString(axes[i].state));
