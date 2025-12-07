@@ -1,30 +1,32 @@
+/**
+ * @file tasks_plc.cpp
+ * @brief PLC Interface Task
+ * @details In v3.3+, the ELBO driver is synchronous (direct I2C).
+ * This task is kept for monitoring or polling if needed, but is largely idle.
+ */
+
 #include "task_manager.h"
 #include "plc_iface.h"
 #include "serial_logger.h"
 #include "watchdog_manager.h"
-#include "system_constants.h"
-#include "fault_logging.h" 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
+#include <Arduino.h>
 
 void taskPlcCommFunction(void* parameter) {
+  logInfo("[PLC_TASK] Started on Core 1");
+  watchdogTaskAdd("PLC");
+  watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "PLC");
+
   TickType_t last_wake = xTaskGetTickCount();
-  
-  logInfo("[PLC_TASK] [OK] Started on core 1");
-  watchdogTaskAdd("PLC_Comm");
-  watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "PLC_Comm");
 
   while (1) {
-    // PLC communication (50ms)
-    if (taskLockMutex(taskGetI2cMutex(), 10)) {
-      plcIfaceUpdate(); 
-      taskUnlockMutex(taskGetI2cMutex());
-    } else {
-      logWarning("[PLC_TASK] [WARN] Mutex timeout, skipped read.");
-      faultLogEntry(FAULT_WARNING, FAULT_TASK_HUNG, -1, 10, "PLC Mutex Timeout");
-    }
+    // In v3.3, motion logic drives the PLC directly via elboSet... functions.
+    // We can use this task to monitor input states periodically if needed for telemetry,
+    // or just feed the watchdog.
     
-    watchdogFeed("PLC_Comm");
+    // Optional: Periodically read inputs to keep cache fresh if not moving?
+    // For now, it just keeps the task alive.
+    
+    watchdogFeed("PLC");
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_PLC_COMM));
   }
 }

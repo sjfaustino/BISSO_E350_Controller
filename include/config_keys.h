@@ -4,8 +4,7 @@
 /**
  * @file config_keys.h
  * @brief Centralized definition of all NVS configuration keys.
- * @project Gemini v2.0.0
- * @author Sergio Faustino
+ * @project Gemini v3.4.1
  */
 
 // ============================================================================
@@ -63,8 +62,11 @@ static const char* const KEY_MOTION_APPROACH_MODE = "motion_approach_mode";
 // Encoder count deadband for declaring motion "stopped"
 static const char* const KEY_MOTION_DEADBAND = "motion_settle_deadband";
 
-// NEW: Enable Motion Ring Buffer (0=Direct, 1=Buffered)
+// Enable Motion Ring Buffer (0=Direct, 1=Buffered)
 static const char* const KEY_MOTION_BUFFER_ENABLE = "motion_buffer_enable"; 
+
+// NEW: Strict Limits (0=Relaxed/Recovery, 1=Strict/Safety)
+static const char* const KEY_MOTION_STRICT_LIMITS = "motion_strict_limits";
 
 // ============================================================================
 // SAFETY & HARDWARE

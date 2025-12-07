@@ -1,7 +1,7 @@
 #include "config_unified.h"
 #include "serial_logger.h"
 #include "config_keys.h" 
-#include "system_constants.h" // <-- FIX: Added for APPROACH_MODE_FIXED
+#include "system_constants.h"
 #include <Preferences.h>
 #include <string.h>
 #include <math.h> 
@@ -24,7 +24,8 @@ static const char* critical_keys[] = {
   KEY_Z_LIMIT_MIN, KEY_Z_LIMIT_MAX,
   KEY_A_LIMIT_MIN, KEY_A_LIMIT_MAX,
   KEY_STALL_TIMEOUT, KEY_ALARM_PIN,
-  KEY_MOTION_APPROACH_MODE
+  KEY_MOTION_APPROACH_MODE,
+  KEY_MOTION_STRICT_LIMITS // <-- Added to critical list
 };
 
 static bool isCriticalKey(const char* key) {
@@ -56,6 +57,12 @@ void configUnifiedInit() {
     logError("[CONFIG] NVS Init Failed!");
     return;
   }
+  
+  // Auto-set default strict limits if key doesn't exist yet (Safety First)
+  if (!prefs.isKey(KEY_MOTION_STRICT_LIMITS)) {
+      prefs.putInt(KEY_MOTION_STRICT_LIMITS, 1);
+  }
+
   configUnifiedLoad();
   logInfo("[CONFIG] Loaded %d entries", config_count);
 }
@@ -234,6 +241,9 @@ void configUnifiedReset() {
   
   // Initialize new mode to FIXED (0)
   configSetInt(KEY_MOTION_APPROACH_MODE, APPROACH_MODE_FIXED);
+  
+  // NEW: Initialize Safety Logic (1=Strict, 0=Recovery)
+  configSetInt(KEY_MOTION_STRICT_LIMITS, 1);
 
   configSetFloat(KEY_SPEED_CAL_X, 0.0f); configSetFloat(KEY_SPEED_CAL_Y, 0.0f);
   configSetFloat(KEY_SPEED_CAL_Z, 0.0f); configSetFloat(KEY_SPEED_CAL_A, 0.0f);
@@ -252,6 +262,8 @@ int configGetKeyCount() { return config_count; }
 void configUnifiedDiagnostics() {
   Serial.println("\n=== CONFIG CACHE ===");
   Serial.printf("Entries: %d | Dirty: %s\n", config_count, config_dirty ? "YES" : "NO");
+  Serial.printf("Strict Limits: %s\n", configGetInt(KEY_MOTION_STRICT_LIMITS, 1) ? "ON" : "OFF");
+  
   for (int i = 0; i < config_count; i++) {
     Serial.printf("  [%d] %s = ", i, config_table[i].key);
     switch(config_table[i].type) {

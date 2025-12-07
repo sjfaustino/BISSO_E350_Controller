@@ -17,7 +17,7 @@
 #include "timeout_manager.h"
 #include "watchdog_manager.h"
 #include "web_server.h"
-#include "network_manager.h" // <-- NEW
+#include "network_manager.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -25,63 +25,47 @@
 static uint32_t boot_time_ms = 0;
 extern WebServerManager webServer;
 
-// --- Stack Overflow Hook ---
 extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
   static volatile bool handling = false;
   if (handling) return;
   handling = true;
-  Serial.println("\n\n[CRITICAL] STACK OVERFLOW DETECTED");
-  Serial.printf("Task: %s\n", pcTaskName);
-  Serial.println("System Halting.");
+  Serial.println("\n\n[CRITICAL] STACK OVERFLOW");
   faultLogCritical(FAULT_CRITICAL_SYSTEM_ERROR, "Stack Overflow");
   delay(1000);
   ESP.restart();
 }
 
-// --- Init Wrappers ---
+// Wrappers
 bool init_fault_logging_wrapper() { faultLoggingInit(); return true; }
 bool init_watchdog_wrapper() { watchdogInit(); return true; }
 bool init_timeout_wrapper() { timeoutManagerInit(); return true; }
 bool init_config_wrapper() { configUnifiedInit(); return true; }
 bool init_schema_wrapper() { configSchemaVersioningInit(); return !configIsMigrationNeeded(); }
 bool init_calib_wrapper() { loadAllCalibration(); encoderCalibrationInit(); return true; }
-bool init_plc_wrapper() { plcIfaceInit(); return true; }
+
+// UPDATED: Using correct init function
+bool init_plc_wrapper() { elboInit(); return true; }
+
 bool init_enc_wrapper() { wj66Init(); return true; }
 bool init_safety_wrapper() { safetyInit(); return true; }
 bool init_motion_wrapper() { motionInit(); return true; }
 bool init_cli_wrapper() { cliInit(); return true; }
 bool init_inputs_wrapper() { boardInputsInit(); return true; }
-
-// NEW: Network init handles WiFi + Web Server + Telnet
-bool init_network_wrapper() { 
-    networkManager.init(); 
-    webServer.init(); 
-    webServer.begin(); 
-    return true; 
-}
+bool init_network_wrapper() { networkManager.init(); webServer.init(); webServer.begin(); return true; }
 
 #define BOOT_INIT(name, func, code) \
-  do { \
-    if (func()) { \
-      logInfo("[BOOT] Init %s [OK]", name); \
-      bootMarkInitialized(name); \
-    } else { \
-      logError("[BOOT] Init %s [FAIL]", name); \
-      bootMarkFailed(name, "Init failed", code); \
-    } \
-  } while (0)
+  do { if (func()) { logInfo("[BOOT] Init %s [OK]", name); bootMarkInitialized(name); } \
+       else { logError("[BOOT] Init %s [FAIL]", name); bootMarkFailed(name, "Init failed", code); } } while (0)
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
-
   serialLoggerInit(LOG_LEVEL);
   boot_time_ms = millis();
 
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(ver_str, sizeof(ver_str));
-
-  logInfo("=== %s PRO FIRMWARE STARTING ===", ver_str);
+  logInfo("=== %s STARTING ===", ver_str);
 
   bootValidationInit();
 
@@ -95,8 +79,6 @@ void setup() {
   BOOT_INIT("Safety", init_safety_wrapper, BOOT_ERROR_SAFETY);
   BOOT_INIT("Motion", init_motion_wrapper, BOOT_ERROR_MOTION);
   BOOT_INIT("CLI", init_cli_wrapper, BOOT_ERROR_CLI);
-  
-  // Initialize Network Stack (WiFi/OTA/Web/Telnet)
   BOOT_INIT("Network", init_network_wrapper, (boot_status_code_t)13);
 
   logInfo("[BOOT] Validating system health...");
@@ -107,18 +89,10 @@ void setup() {
 
   taskManagerInit();
   taskManagerStart();
-
   logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
-
-  // Note: We do NOT delete the loop task anymore, because the Network Manager
-  // needs to run in the main loop context for OTA and Telnet polling.
-  // vTaskDelete(NULL); 
 }
 
 void loop() {
-  // Run Network maintenance loops
   networkManager.update();
-  
-  // Small delay to prevent watchdog starvation of the IDLE task
   delay(10); 
 }
