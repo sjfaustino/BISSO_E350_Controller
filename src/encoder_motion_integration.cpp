@@ -1,6 +1,8 @@
 /**
  * @file encoder_motion_integration.cpp
- * @brief Logic to cross-check encoder feedback against planner target
+ * @brief Logic to cross-check encoder feedback against planner target (Gemini v3.5.11)
+ * @details Fixed False Stall Detection by restricting error checks to IDLE state.
+ * @author Sergio Faustino
  */
 
 #include "encoder_motion_integration.h"
@@ -8,8 +10,8 @@
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "encoder_wj66.h"
-#include "motion.h"       // <-- CRITICAL FIX
-#include "motion_state.h" // <-- CRITICAL FIX
+#include "motion.h"       
+#include "motion_state.h" 
 
 static position_error_t position_errors[4] = {
   {0, 0, 100000, 0, 2000, false, 0},
@@ -40,6 +42,7 @@ void encoderMotionInit(int32_t error_threshold, uint32_t max_error_time_ms) {
 bool encoderMotionUpdate() {
   if (!encoder_feedback_enabled) return true;
 
+  // Check hardware health
   encoder_status_t status = wj66GetStatus();
   if (status != ENCODER_OK) {
     if (status == ENCODER_TIMEOUT) {
@@ -53,22 +56,29 @@ bool encoderMotionUpdate() {
   
   for (int i = 0; i < 4; i++) {
     if (wj66IsStale(i)) {
-      // logWarning("Encoder %d stale", i); // Reduced spam
       all_valid = false;
       continue;
     }
     
-    // Now visible because headers are included
+    // 1. Get Data
     int32_t encoder_pos = wj66GetPosition(i);
-    int32_t motion_pos = motionGetPosition(i); 
+    int32_t target_pos = motionGetTarget(i); 
+    motion_state_t state = motionGetState(i);
 
+    // 2. Calculate Error
     int32_t error = 0;
-    if (motionGetState(i) == MOTION_EXECUTING) {
-      error = encoder_pos - motionGetTarget(i); 
+
+    // FIX: Only check for position error when the axis is stationary (IDLE).
+    // During motion, the "Error" = (Current - FinalTarget) is huge and invalid.
+    // Real-time following error requires instantaneous setpoints which are not yet available.
+    if (state == MOTION_IDLE) {
+        error = encoder_pos - target_pos;
     } else {
-      error = encoder_pos - motion_pos;
+        // Mask error during motion to prevent false E-Stops
+        error = 0; 
     }
     
+    // 3. Threshold Logic
     position_errors[i].current_error = error;
     if (abs(error) > abs(position_errors[i].max_error)) {
       position_errors[i].max_error = error;
@@ -80,8 +90,8 @@ bool encoderMotionUpdate() {
         position_errors[i].error_time_ms = now; 
         position_errors[i].error_count++;
         
-        logWarning("Axis %d error: %ld", i, (long)error);
-        faultLogEntry(FAULT_WARNING, FAULT_ENCODER_SPIKE, i, error, "Axis deviation"); 
+        logWarning("Axis %d Drift Error: %ld", i, (long)error);
+        faultLogEntry(FAULT_WARNING, FAULT_ENCODER_SPIKE, i, error, "Axis Drift (Static)"); 
       }
     } else {
       if (position_errors[i].error_active) {
@@ -92,6 +102,8 @@ bool encoderMotionUpdate() {
   }
   return all_valid;
 }
+
+// --- Accessors ---
 
 int32_t encoderMotionGetPositionError(uint8_t axis) { return (axis < 4) ? position_errors[axis].current_error : 0; }
 int32_t encoderMotionGetMaxError(uint8_t axis) { return (axis < 4) ? position_errors[axis].max_error : 0; }
