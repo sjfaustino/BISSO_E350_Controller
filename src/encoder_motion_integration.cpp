@@ -1,8 +1,6 @@
 /**
  * @file encoder_motion_integration.cpp
- * @brief Logic to cross-check encoder feedback against planner target (Gemini v3.5.17)
- * @details Fixed Magic Numbers. Now loads thresholds from Config System.
- * @author Sergio Faustino
+ * @brief Logic to cross-check encoder feedback against planner target (Gemini v3.5.19)
  */
 
 #include "encoder_motion_integration.h"
@@ -15,7 +13,10 @@
 #include "config_unified.h"
 #include "config_keys.h"
 
-// FIX: Initialized to zero. Actual values loaded in Init().
+// Defined Defaults (Magic Number Fix)
+#define DEFAULT_ENCODER_ERROR_THRESHOLD 100000 
+#define DEFAULT_ERROR_TIMEOUT_MS 2000
+
 static position_error_t position_errors[4] = {
   {0, 0, 0, 0, 0, false, 0},
   {0, 0, 0, 0, 0, false, 0},
@@ -24,19 +25,17 @@ static position_error_t position_errors[4] = {
 };
 
 static bool encoder_feedback_enabled = false;
-static int32_t encoder_error_threshold = 100000;  
-static uint32_t max_error_duration_ms = 2000;     
+static int32_t encoder_error_threshold = DEFAULT_ENCODER_ERROR_THRESHOLD;  
+static uint32_t max_error_duration_ms = DEFAULT_ERROR_TIMEOUT_MS;     
 
-// Local key definition if not in header
 #ifndef KEY_ENC_ERR_THRESHOLD
 #define KEY_ENC_ERR_THRESHOLD "enc_thresh" 
 #endif
 
 void encoderMotionInit(int32_t default_threshold, uint32_t default_timeout) {
-  // FIX: Load from Configuration System (Single Source of Truth)
-  // We use the passed arguments as defaults for the config system lookup
-  encoder_error_threshold = configGetInt(KEY_ENC_ERR_THRESHOLD, default_threshold > 0 ? default_threshold : 100000);
-  max_error_duration_ms = configGetInt(KEY_STALL_TIMEOUT, default_timeout > 0 ? default_timeout : 2000);
+  // Load from Config System
+  encoder_error_threshold = configGetInt(KEY_ENC_ERR_THRESHOLD, default_threshold > 0 ? default_threshold : DEFAULT_ENCODER_ERROR_THRESHOLD);
+  max_error_duration_ms = configGetInt(KEY_STALL_TIMEOUT, default_timeout > 0 ? default_timeout : DEFAULT_ERROR_TIMEOUT_MS);
   
   logInfo("[ENC_INT] Loading Config: Thresh=%ld, Timeout=%lu ms", 
           (long)encoder_error_threshold, (unsigned long)max_error_duration_ms);
@@ -55,7 +54,6 @@ void encoderMotionInit(int32_t default_threshold, uint32_t default_timeout) {
 bool encoderMotionUpdate() {
   if (!encoder_feedback_enabled) return true;
 
-  // Check hardware health
   encoder_status_t status = wj66GetStatus();
   if (status != ENCODER_OK) {
     if (status == ENCODER_TIMEOUT) {
@@ -73,23 +71,17 @@ bool encoderMotionUpdate() {
       continue;
     }
     
-    // 1. Get Data
     int32_t encoder_pos = wj66GetPosition(i);
     int32_t target_pos = motionGetTarget(i); 
     motion_state_t state = motionGetState(i);
 
-    // 2. Calculate Error
     int32_t error = 0;
-
-    // Only check for position error when the axis is stationary (IDLE).
     if (state == MOTION_IDLE) {
         error = encoder_pos - target_pos;
     } else {
-        // Mask error during motion to prevent false E-Stops until PID is implemented
         error = 0; 
     }
     
-    // 3. Threshold Logic
     position_errors[i].current_error = error;
     if (abs(error) > abs(position_errors[i].max_error)) {
       position_errors[i].max_error = error;
@@ -142,7 +134,7 @@ bool encoderMotionIsFeedbackActive() { return encoder_feedback_enabled; }
 void encoderMotionDiagnostics() {
   Serial.println("\n=== ENCODER INTEGRATION ===");
   Serial.printf("Feedback: %s\n", encoder_feedback_enabled ? "[ON]" : "[OFF]");
-  Serial.printf("Threshold: %.1f mm\n", encoder_error_threshold / 1000.0f); // Assuming 1000 steps/mm default
+  Serial.printf("Threshold: %.1f mm\n", encoder_error_threshold / 1000.0f);
   
   for (int i = 0; i < 4; i++) {
     Serial.printf("Axis %d: Err=%.1f mm | State=%s\n",
