@@ -1,33 +1,58 @@
+/**
+ * @file gcode_parser.h
+ * @brief G-Code Parser with WCS Support (Gemini v3.5.24)
+ */
+
 #ifndef GCODE_PARSER_H
 #define GCODE_PARSER_H
 
-#include <Arduino.h>
+#include <stdint.h>
+#include <stddef.h> // Required for size_t
 
 typedef enum {
-    G_MODE_ABSOLUTE = 0,
-    G_MODE_RELATIVE = 1
+    G_MODE_ABSOLUTE = 90,
+    G_MODE_RELATIVE = 91
 } gcode_distance_mode_t;
+
+typedef enum {
+    WCS_G54 = 0, WCS_G55, WCS_G56, WCS_G57, WCS_G58, WCS_G59
+} wcs_system_t;
 
 class GCodeParser {
 public:
     GCodeParser();
     void init();
+    
+    // Core Processing
     bool processCommand(const char* line);
+    
+    // Status Reporting
     gcode_distance_mode_t getDistanceMode();
+    void getParserState(char* buffer, size_t len); // Signature fixed
+    
+    // WCS Helpers
+    float getWorkPosition(uint8_t axis, float mpos); 
+    void getWCO(float* wco_array); 
 
 private:
     gcode_distance_mode_t distanceMode;
     float currentFeedRate;
+    wcs_system_t currentWCS;
+    
+    float wcs_offsets[6][4]; 
 
     bool parseCode(const char* line, char code, float& value);
     bool hasCode(const char* line, char code);
     
     void handleG0_G1(const char* line);
+    void handleG10(const char* line); 
+    void handleG5x(int system_idx);   
     void handleG90();
     void handleG91();
     void handleG92(const char* line);
     
-    // Internal helper
+    void loadWCS();
+    void saveWCS(uint8_t system);
     void pushMove(float x, float y, float z, float a);
 };
 

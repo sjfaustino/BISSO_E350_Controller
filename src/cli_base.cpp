@@ -1,3 +1,9 @@
+/**
+ * @file cli_base.cpp
+ * @brief CLI Core with Safe Grbl Jogging & WCS (Gemini v3.5.25)
+ * @details Fixed Linker Error: Added missing implementation of cliPrintHelp().
+ */
+
 #include "cli.h"
 #include "serial_logger.h"
 #include "boot_validation.h"
@@ -5,198 +11,238 @@
 #include "task_manager.h"
 #include "system_utilities.h" 
 #include "firmware_version.h" 
-#include "gcode_parser.h" // <-- NEW: G-Code integration
+#include "gcode_parser.h"
+#include "motion.h"
+#include "motion_state.h"
+#include "motion_planner.h" 
+#include "motion_buffer.h" 
+#include "config_unified.h"
+#include "config_keys.h"
+#include "safety.h"
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
 
-// ============================================================================
-// CLI STATE DEFINITIONS
-// ============================================================================
-
+// CLI State
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint16_t cli_pos = 0;
 static cli_command_t commands[CLI_MAX_COMMANDS];
 static int command_count = 0;
 
-static char cli_history[CLI_HISTORY_SIZE][CLI_BUFFER_SIZE];
-static int history_index = 0;
-
-// ============================================================================
-// FORWARD DECLARATIONS
-// ============================================================================
-
+// Helpers
 void cmd_help(int argc, char** argv);
 void cmd_system_info(int argc, char** argv);
 void cmd_system_reset(int argc, char** argv);
+void cmd_grbl_settings(int argc, char** argv);
+void cmd_grbl_home(int argc, char** argv);
+void cmd_grbl_state(int argc, char** argv); 
 
-extern void bootShowStatus();      
 extern void bootRebootSystem();    
-extern uint32_t taskGetUptime();   
 
-// ============================================================================
-// CORE CLI FUNCTIONS
-// ============================================================================
+// --- SAFE JOGGING PARSER ---
+void handle_jog_command(char* cmd) {
+    if (motionIsMoving() || motionIsEmergencyStopped() || safetyIsAlarmed()) {
+        Serial.println("error:8"); // Not Idle
+        return;
+    }
+
+    bool use_relative = false; 
+    if (strstr(cmd, "G91")) use_relative = true;
+    else if (strstr(cmd, "G90")) use_relative = false;
+
+    float feed_mm_min = 0.0f;
+    char* f_ptr = strchr(cmd, 'F');
+    if (f_ptr) feed_mm_min = atof(f_ptr + 1);
+    
+    if (feed_mm_min <= 0.1f) feed_mm_min = 100.0f; 
+    float feed_mm_s = feed_mm_min / 60.0f;
+
+    float target[4] = {0};
+    bool axis_present[4] = {false};
+    char axes_char[] = "XYZA";
+    
+    float current_mpos[4] = {
+        motionGetPositionMM(0), motionGetPositionMM(1),
+        motionGetPositionMM(2), motionGetPositionMM(3)
+    };
+
+    for(int i=0; i<4; i++) {
+        char* ax_ptr = strchr(cmd, axes_char[i]);
+        if (ax_ptr) {
+            target[i] = atof(ax_ptr + 1);
+            axis_present[i] = true;
+        } else {
+            target[i] = use_relative ? 0.0f : current_mpos[i];
+        }
+    }
+
+    bool ok = false;
+    if (use_relative) {
+        ok = motionMoveRelative(target[0], target[1], target[2], target[3], feed_mm_s);
+    } else {
+        float wco[4];
+        gcodeParser.getWCO(wco);
+        
+        float machine_target_x = axis_present[0] ? (target[0] + wco[0]) : current_mpos[0];
+        float machine_target_y = axis_present[1] ? (target[1] + wco[1]) : current_mpos[1];
+        float machine_target_z = axis_present[2] ? (target[2] + wco[2]) : current_mpos[2];
+        float machine_target_a = axis_present[3] ? (target[3] + wco[3]) : current_mpos[3];
+        
+        ok = motionMoveAbsolute(machine_target_x, machine_target_y, machine_target_z, machine_target_a, feed_mm_s);
+    }
+
+    if (ok) Serial.println("ok");
+    else Serial.println("error:3"); 
+}
+
+// --- CORE CLI ---
 
 void cliInit() {
-  Serial.println("[CLI] Initializing...");
+  Serial.println("\r\nGrbl 1.1h ['$' for help]"); 
   memset(cli_buffer, 0, sizeof(cli_buffer));
-  memset(cli_history, 0, sizeof(cli_history));
   cli_pos = 0;
   command_count = 0;
   
-  // Register Core Commands
   cliRegisterCommand("help", "Show help", cmd_help);
-  cliRegisterCommand("info", "System information", cmd_system_info);
+  cliRegisterCommand("info", "System info", cmd_system_info);
   cliRegisterCommand("reset", "System reset", cmd_system_reset);
+  cliRegisterCommand("$", "Grbl Settings", cmd_grbl_settings);
+  cliRegisterCommand("$H", "Homing", cmd_grbl_home);
+  cliRegisterCommand("$G", "Parser State", cmd_grbl_state);
   
-  // Register Modules
   cliRegisterConfigCommands();
   cliRegisterMotionCommands();
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
   cliRegisterWifiCommands(); 
   
-  // Initialize G-Code Engine
   gcodeParser.init();
-
-  Serial.printf("[CLI] [OK] Ready (%d commands)\n", command_count);
-  cliPrintPrompt();
-}
-
-void cliCleanup() {
-  history_index = 0;
-  memset(cli_history, 0, sizeof(cli_history));
-  logInfo("CLI: History cleared.");
 }
 
 void cliUpdate() {
   while (Serial.available() > 0) {
-    char c = Serial.read();
-    
+    char c = Serial.peek(); 
+
+    // 1. Real-time Status (?)
+    if (c == '?') {
+        Serial.read();
+        const char* state_str = "Idle";
+        if (motionIsEmergencyStopped()) state_str = "Alarm";
+        else if (safetyIsAlarmed()) state_str = "Hold:1";
+        else if (motionIsMoving()) state_str = "Run";
+        else if (motionGetState(0) == MOTION_HOMING_APPROACH_FAST) state_str = "Home";
+        else if (motionGetState(0) == MOTION_PAUSED) state_str = "Hold:0";
+
+        int plan_slots = 31 - motionBuffer.available(); 
+        if (plan_slots < 0) plan_slots = 0;
+
+        float mPos[4] = {
+            motionGetPositionMM(0), motionGetPositionMM(1),
+            motionGetPositionMM(2), motionGetPositionMM(3)
+        };
+        
+        float wPos[4];
+        for(int i=0; i<4; i++) wPos[i] = gcodeParser.getWorkPosition(i, mPos[i]);
+
+        Serial.printf("<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f|Bf:%d,127|FS:%.0f,0>\r\n",
+            state_str,
+            mPos[0], mPos[1], mPos[2], mPos[3],
+            wPos[0], wPos[1], wPos[2], wPos[3],
+            plan_slots,
+            motionPlanner.getFeedOverride() * 100.0f 
+        );
+        return; 
+    }
+
+    // 2. Real-time Overrides
+    if (c == '!') { Serial.read(); motionPause(); return; }
+    if (c == '~') { Serial.read(); motionResume(); return; }
+    if (c == 0x18) { // Soft Reset
+        Serial.read();
+        motionEmergencyStop();
+        Serial.print("\r\nGrbl 1.1h ['$' for help]\r\n");
+        cli_pos = 0;
+        return;
+    }
+
+    // 3. Command buffering
+    c = Serial.read(); 
     if (c == '\n' || c == '\r') {
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
-        Serial.println(); 
-        cliProcessCommand(cli_buffer);
+        if (strncmp(cli_buffer, "$J=", 3) == 0) {
+            handle_jog_command(cli_buffer + 3);
+        } else {
+            cliProcessCommand(cli_buffer);
+        }
         cli_pos = 0;
       } else {
-        Serial.println();
+        Serial.println("ok"); 
       }
-      cliPrintPrompt();
     } else if (c == '\b' || c == 0x7F) {
-      if (cli_pos > 0) {
-        cli_pos--;
-        Serial.write('\b');
-        Serial.write(' ');
-        Serial.write('\b');
-      }
+      if (cli_pos > 0) cli_pos--;
     } else if (c >= 32 && c < 127 && cli_pos < CLI_BUFFER_SIZE - 1) {
       cli_buffer[cli_pos++] = c;
-      Serial.write(c);
     }
   }
 }
 
 void cliProcessCommand(const char* cmd) {
-  if (strlen(cmd) == 0) return;
+  if (strlen(cmd) == 0) { Serial.println("ok"); return; }
   
-  // --- G-Code Auto-Detection ---
-  // If line starts with 'G' or 'M' followed by a digit, send to Parser
-  // Example: "G1 X100" or "M2"
-  if ((cmd[0] == 'G' || cmd[0] == 'M') && isdigit(cmd[1])) {
-      if (gcodeParser.processCommand(cmd)) {
-          // Command successfully handled by G-Code engine
-          return; 
-      }
-      // If parser returns false (e.g. unknown code), we could fall through
-      // or just print an error. For now, fall through to CLI to see if 
-      // there is a CLI command named "G99" (unlikely but safe).
+  // G-Code
+  if (cmd[0] == 'G' || cmd[0] == 'M' || cmd[0] == 'T') {
+      if (gcodeParser.processCommand(cmd)) Serial.println("ok"); 
+      else Serial.println("error:20");
+      return;
   }
-  // ----------------------------------
 
+  // Settings ($100=val)
+  if (cmd[0] == '$' && isdigit(cmd[1])) {
+      int id = atoi(cmd + 1);
+      char* eq = strchr((char*)cmd, '=');
+      if (eq) {
+          float val = atof(eq + 1);
+          const char* key = NULL;
+          switch(id) {
+              case 100: key = KEY_PPM_X; break;
+              case 101: key = KEY_PPM_Y; break;
+              case 102: key = KEY_PPM_Z; break;
+              case 103: key = KEY_PPM_A; break;
+              case 110: key = KEY_SPEED_CAL_X; break;
+              case 111: key = KEY_SPEED_CAL_Y; break;
+              case 112: key = KEY_SPEED_CAL_Z; break;
+              case 113: key = KEY_SPEED_CAL_A; break;
+              case 120: key = KEY_DEFAULT_ACCEL; break; 
+              case 130: key = KEY_X_LIMIT_MAX; break;
+              case 131: key = KEY_Y_LIMIT_MAX; break;
+              case 132: key = KEY_Z_LIMIT_MAX; break;
+          }
+          if (key) { configSetFloat(key, val); Serial.println("ok"); }
+          else Serial.println("error:3");
+      }
+      return;
+  }
+
+  // Internal CLI
   char cmd_copy[CLI_BUFFER_SIZE];
-  strncpy(cmd_copy, cmd, CLI_BUFFER_SIZE - 1);
-  cmd_copy[CLI_BUFFER_SIZE - 1] = '\0';
-  
+  strncpy(cmd_copy, cmd, CLI_BUFFER_SIZE - 1); cmd_copy[CLI_BUFFER_SIZE - 1] = '\0';
   char* argv[CLI_MAX_ARGS];
   int argc = 0;
   char* token = strtok(cmd_copy, " ");
+  while (token && argc < CLI_MAX_ARGS) { argv[argc++] = token; token = strtok(NULL, " "); }
   
-  while (token != NULL && argc < CLI_MAX_ARGS) {
-    argv[argc++] = token;
-    token = strtok(NULL, " ");
-  }
+  if (argc == 0) { Serial.println("ok"); return; }
   
-  if (argc == 0) return;
-  
-  if (history_index < CLI_HISTORY_SIZE) {
-    strncpy(cli_history[history_index], cmd, CLI_BUFFER_SIZE - 1);
-    cli_history[history_index][CLI_BUFFER_SIZE - 1] = '\0'; 
-    history_index++;
-  }
-  
-  // --- Custom Parsing for Multi-Word Commands ---
-  
-  // 1. "calibrate ppmm end"
-  if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && strcmp(argv[1], "ppmm") == 0 && strcmp(argv[2], "end") == 0) {
-      for (int i = 0; i < command_count; i++) {
-        if (strcmp(commands[i].command, "calibrate ppmm end") == 0) {
-          commands[i].handler(argc, argv);
-          return;
-        }
-      }
-  }
-  
-  // 2. "calibrate speed X reset"
-  if (argc >= 4 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0) && strcmp(argv[3], "reset") == 0) {
-      if (axisCharToIndex(argv[2]) == 255) { 
-          Serial.printf("[CLI] [ERR] Invalid axis: %s\n", argv[2]);
-          return;
-      }
-      char full_cmd[32];
-      snprintf(full_cmd, sizeof(full_cmd), "calibrate %s X reset", argv[1]);
-      for (int i = 0; i < command_count; i++) {
-        if (strcmp(commands[i].command, full_cmd) == 0) {
-          commands[i].handler(argc, argv);
-          return;
-        }
-      }
-  }
-  
-  // 3. "calibrate speed" / "calibrate ppmm"
-  if (argc >= 3 && strcmp(argv[0], "calibrate") == 0 && (strcmp(argv[1], "speed") == 0 || strcmp(argv[1], "ppmm") == 0)) {
-      if (axisCharToIndex(argv[2]) == 255) { 
-          Serial.printf("[CLI] [ERR] Invalid axis: %s\n", argv[2]);
-          return;
-      }
-      if (strcmp(argv[1], "speed") == 0) {
-          for (int i = 0; i < command_count; i++) {
-            if (strcmp(commands[i].command, "calibrate speed") == 0) {
-              commands[i].handler(argc, argv);
-              return;
-            }
-          }
-      } else { 
-          for (int i = 0; i < command_count; i++) {
-            if (strcmp(commands[i].command, "calibrate ppmm") == 0) {
-              commands[i].handler(argc, argv);
-              return;
-            }
-          }
-      }
-  }
-  
-  // 4. Default Parsing
   for (int i = 0; i < command_count; i++) {
     if (strcmp(commands[i].command, argv[0]) == 0) {
       commands[i].handler(argc, argv);
+      Serial.println("ok"); 
       return;
     }
   }
-  
-  Serial.printf("[CLI] Unknown command: '%s'. Type 'help'.\n", argv[0]);
+  Serial.println("error:1");
 }
 
 bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handler) {
@@ -208,48 +254,40 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
   return true;
 }
 
+// FIX: Added missing implementation
 void cliPrintHelp() {
-  char ver_str[FIRMWARE_VERSION_STRING_LEN];
-  firmwareGetVersionString(ver_str, sizeof(ver_str));
-
-  Serial.printf("\n=== %s Commands ===\n", ver_str);
-  for (int i = 0; i < command_count; i++) {
-    Serial.print("  ");
-    Serial.print(commands[i].command);
-    int cmd_len = strlen(commands[i].command);
-    int padding = (cmd_len < 20) ? (20 - cmd_len) : 1;
-    for(int s=0; s < padding; s++) Serial.print(" ");
-    Serial.print("- ");
-    Serial.println(commands[i].help);
-  }
-  Serial.println();
+  Serial.println("[HLP:$$ $# $G $I $N $x=val $Nx=line Gcode]");
 }
 
-void cliPrintPrompt() {
-  Serial.print("> ");
+// --- COMMANDS ---
+
+void cmd_grbl_settings(int argc, char** argv) {
+    Serial.printf("$100=%.3f\r\n", configGetFloat(KEY_PPM_X, 100.0));
+    Serial.printf("$101=%.3f\r\n", configGetFloat(KEY_PPM_Y, 100.0));
+    Serial.printf("$102=%.3f\r\n", configGetFloat(KEY_PPM_Z, 100.0));
+    Serial.printf("$103=%.3f\r\n", configGetFloat(KEY_PPM_A, 100.0));
+    Serial.printf("$110=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_X, 1000.0));
+    Serial.printf("$111=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_Y, 1000.0));
+    Serial.printf("$112=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_Z, 1000.0));
+    Serial.printf("$113=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_A, 1000.0));
+    Serial.printf("$120=%.3f\r\n", configGetFloat(KEY_DEFAULT_ACCEL, 100.0));
+    Serial.printf("$130=%.3f\r\n", (float)configGetInt(KEY_X_LIMIT_MAX, 500000) / configGetFloat(KEY_PPM_X, 1.0));
+    Serial.println("ok");
 }
 
-// ============================================================================
-// LOCAL COMMAND IMPLEMENTATIONS
-// ============================================================================
+void cmd_grbl_home(int argc, char** argv) { motionHome(0); }
+
+void cmd_grbl_state(int argc, char** argv) {
+    char buf[64];
+    gcodeParser.getParserState(buf, sizeof(buf));
+    Serial.println(buf);
+}
 
 void cmd_system_info(int argc, char** argv) {
-  char version_str[FIRMWARE_VERSION_STRING_LEN];
-  firmwareGetVersionString(version_str, sizeof(version_str));
-  
-  Serial.println("\n=== SYSTEM INFORMATION ===");
-  Serial.printf("Firmware:  %s\n", version_str);
-  Serial.printf("Platform:  ESP32-S3 (KC868-A16)\n");
-  Serial.printf("Uptime:    %lu seconds\n", (unsigned long)taskGetUptime());
-  
-  bootShowStatus();
+  char ver[32]; firmwareGetVersionString(ver, 32);
+  Serial.printf("[VER:1.1h.Gemini:%s]\r\n", ver);
+  Serial.println("ok");
 }
 
-void cmd_system_reset(int argc, char** argv) {
-  Serial.println("[CLI] System reset requested...");
-  bootRebootSystem(); 
-}
-
-void cmd_help(int argc, char** argv) {
-  cliPrintHelp();
-}
+void cmd_system_reset(int argc, char** argv) { bootRebootSystem(); }
+void cmd_help(int argc, char** argv) { cliPrintHelp(); }

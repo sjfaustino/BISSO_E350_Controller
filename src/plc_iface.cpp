@@ -1,10 +1,10 @@
 /**
  * @file plc_iface.cpp
- * @brief Hardware Abstraction Layer for ELBO PLC (Gemini v3.5.10)
- * @details Uses constants from plc_iface.h to avoid redefinition errors.
+ * @brief Hardware Abstraction Layer for ELBO PLC (Gemini v3.5.21)
+ * @details Implements robust I2C drivers with error checking.
  */
 
-#include "plc_iface.h" // Source of Truth for Addresses
+#include "plc_iface.h" 
 #include "system_constants.h"
 #include "serial_logger.h"
 #include "fault_logging.h"
@@ -44,7 +44,6 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char* context) {
 
 void elboInit() {
     logInfo("[PLC] Initializing I2C Bus...");
-    // Wire.begin() handled by main/task manager
     
     // Reset Outputs (Safe State: All OFF)
     q73_shadow_register = 0x00;
@@ -106,12 +105,16 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
 // INPUT READING
 // ============================================================================
 
-bool elboI73GetInput(uint8_t bit) {
+bool elboI73GetInput(uint8_t bit, bool* success) {
     uint8_t count = Wire.requestFrom((uint8_t)ADDR_I73_INPUT, (uint8_t)1);
     
     if (count == 1) {
         i73_input_shadow = Wire.read();
+        if (success) *success = true;
     } else {
+        if (success) *success = false;
+        
+        // Throttled logging
         static uint32_t last_log = 0;
         if (millis() - last_log > 2000) {
             logError("[PLC] I2C Read Failed (I73)");
@@ -119,7 +122,7 @@ bool elboI73GetInput(uint8_t bit) {
         }
     }
     
-    // Check bit state
+    // Check bit state (Returns cached value on failure)
     return (i73_input_shadow & (1 << bit));
 }
 
