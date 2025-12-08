@@ -98,8 +98,11 @@ bool GCodeParser::processCommand(const char* line) {
         switch (cmd) {
             case 0:
             case 2:  motionStop(); break;
-            case 3:  elboQ73SetRelay(ELBO_Q73_SPEED_1, true); break; 
-            case 5:  elboQ73SetRelay(ELBO_Q73_SPEED_1, false); break; 
+            case 3:  // M3 - Spindle ON (manual operation - command accepted but no action)
+            case 5:  // M5 - Spindle OFF (manual operation - command accepted but no action)
+                     // NOTE: Spindle/blade is manually controlled by operator
+                     // These commands are parsed for G-code compatibility but do nothing
+                     break; 
             case 112: motionEmergencyStop(); break;
             default: return false;
         }

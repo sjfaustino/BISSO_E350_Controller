@@ -47,7 +47,8 @@ void handle_jog_command(char* cmd) {
         return;
     }
 
-    bool use_relative = false; 
+    // Default to parser's current mode, allow G90/G91 to override
+    bool use_relative = (gcodeParser.getDistanceMode() == G_MODE_RELATIVE);
     if (strstr(cmd, "G91")) use_relative = true;
     else if (strstr(cmd, "G90")) use_relative = false;
 
