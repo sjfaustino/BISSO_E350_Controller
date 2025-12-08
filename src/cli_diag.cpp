@@ -17,19 +17,20 @@
 #include "timeout_manager.h"
 #include "memory_monitor.h"
 #include "plc_iface.h"        // <-- THIS MUST MATCH THE FILE ABOVE
-#include "motion.h" 
+#include "motion.h"
 #include "config_unified.h"
 #include "config_manager.h"
 #include "config_schema_versioning.h"
 #include "config_validator.h"
-#include "safety.h"           
-#include "firmware_version.h" 
+#include "safety.h"
+#include "firmware_version.h"
 #include "encoder_motion_integration.h"
-#include "encoder_calibration.h" 
-#include "system_utilities.h" 
-#include "input_validation.h" 
-#include "board_inputs.h"     
-#include "system_constants.h" 
+#include "encoder_calibration.h"
+#include "system_utilities.h"
+#include "input_validation.h"
+#include "board_inputs.h"
+#include "system_constants.h"
+#include "performance_profiler.h" 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -242,12 +243,48 @@ void cmd_encoder_main(int argc, char** argv) {
 void cmd_i2c_main(int argc, char** argv) {
     extern void i2cShowStats();
     extern void i2cRecoverBus();
-    if (argc < 2) { 
+    if (argc < 2) {
         Serial.println("[I2C] Usage: i2c [diag | recover]");
         return;
     }
     if (strcmp(argv[1], "diag") == 0) i2cShowStats();
     else if (strcmp(argv[1], "recover") == 0) i2cRecoverBus();
+}
+
+// ============================================================================
+// PROFILER MAIN
+// ============================================================================
+void cmd_profile_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[PROFILE] Usage: profile [report | reset | health]");
+        Serial.println("  report [all] - Show performance statistics (add 'all' for all sections)");
+        Serial.println("  reset        - Clear all statistics");
+        Serial.println("  health       - Show system health status");
+        return;
+    }
+
+    if (strcmp(argv[1], "report") == 0) {
+        bool detailed = (argc > 2 && strcmp(argv[2], "all") == 0);
+        profilerPrintReport(detailed);
+    }
+    else if (strcmp(argv[1], "reset") == 0) {
+        profilerReset();
+        Serial.println("[PROFILER] Statistics cleared");
+    }
+    else if (strcmp(argv[1], "health") == 0) {
+        health_status_t health;
+        profilerGetHealthStatus(&health);
+
+        Serial.println("\n=== SYSTEM HEALTH ===");
+        Serial.printf("Motion Loop:  %s\n", health.motion_loop_healthy ? "✓ OK" : "✗ SLOW");
+        Serial.printf("Safety Loop:  %s\n", health.safety_loop_healthy ? "✓ OK" : "✗ SLOW");
+        Serial.printf("Memory:       %s\n", health.memory_healthy ? "✓ OK" : "✗ LOW");
+        Serial.printf("I2C Bus:      %s\n", health.i2c_healthy ? "✓ OK" : "✗ ERRORS");
+        Serial.printf("Warnings/min: %lu\n", (unsigned long)health.warnings_last_minute);
+    }
+    else {
+        Serial.printf("[PROFILE] Unknown subcommand '%s'\n", argv[1]);
+    }
 }
 
 // ============================================================================
@@ -301,7 +338,8 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
     cliRegisterCommand("encoder_baud_set", "Set baud rate", cmd_encoder_set_baud);
-    cliRegisterCommand("config", "Configuration management", cmd_config_main); 
+    cliRegisterCommand("config", "Configuration management", cmd_config_main);
     cliRegisterCommand("wdt", "Watchdog management", cmd_diag_scheduler_main);
     cliRegisterCommand("task", "Task monitoring", cmd_diag_scheduler_main);
+    cliRegisterCommand("profile", "Performance profiling tools", cmd_profile_main);
 }
