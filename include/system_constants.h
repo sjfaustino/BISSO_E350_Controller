@@ -135,4 +135,59 @@ typedef enum {
 
 const char* resultToString(result_t result);
 
+// ============================================================================
+// COMPILE-TIME SAFETY CHECKS
+// ============================================================================
+
+// Validate motion timing constraints
+static_assert(MOTION_UPDATE_INTERVAL_MS >= 1, "Motion update interval too fast (min 1ms)!");
+static_assert(MOTION_UPDATE_INTERVAL_MS <= 100, "Motion update interval too slow (max 100ms)!");
+static_assert(MOTION_STALL_TIMEOUT_MS > MOTION_UPDATE_INTERVAL_MS,
+              "Stall timeout must be greater than update interval!");
+static_assert(SAFETY_STALL_CHECK_INTERVAL_MS < MOTION_STALL_TIMEOUT_MS,
+              "Stall check interval must be faster than stall timeout!");
+
+// Validate watchdog timing
+static_assert(WATCHDOG_FEED_INTERVAL_MS < (WATCHDOG_TIMEOUT_SEC * 1000),
+              "Watchdog feed interval must be less than watchdog timeout!");
+static_assert(WATCHDOG_FEED_INTERVAL_MS >= 1000,
+              "Watchdog feed interval should be at least 1 second!");
+
+// Validate encoder timing
+static_assert(WJ66_READ_INTERVAL_MS > 0, "Encoder read interval must be positive!");
+static_assert(ENCODER_TIMEOUT_MS > WJ66_READ_INTERVAL_MS,
+              "Encoder timeout must be greater than read interval!");
+
+// Validate PLC communication timing
+static_assert(PLC_TIMEOUT_MS > PLC_COMM_INTERVAL_MS,
+              "PLC timeout must be greater than communication interval!");
+static_assert(PLC_MAX_RETRIES > 0, "PLC must have at least 1 retry attempt!");
+static_assert(PLC_MAX_RETRIES <= 10, "Too many PLC retries (max 10)!");
+
+// Validate I2C timing
+static_assert(I2C_TRANSACTION_TIMEOUT_MS <= I2C_RECOVERY_TIMEOUT_MS,
+              "I2C transaction timeout should not exceed recovery timeout!");
+
+// Validate buffer sizes
+static_assert(ENCODER_BUFFER_SIZE >= 32, "Encoder buffer too small (min 32 bytes)!");
+static_assert(ENCODER_BUFFER_SIZE <= 256, "Encoder buffer too large (max 256 bytes)!");
+static_assert(SERIAL_RX_BUFFER_SIZE >= 128, "Serial RX buffer too small (min 128 bytes)!");
+static_assert(SERIAL_TX_BUFFER_SIZE >= 128, "Serial TX buffer too small (min 128 bytes)!");
+
+// Validate fault logging
+static_assert(FAULT_LOG_SIZE > 0, "Fault log must have non-zero size!");
+static_assert(FAULT_LOG_SIZE <= 1000, "Fault log too large (max 1000 entries)!");
+
+// Validate configuration
+static_assert(CONFIG_MAX_SIZE >= 1024, "Config storage too small (min 1KB)!");
+static_assert(CONFIG_MAX_SIZE <= 65536, "Config storage too large (max 64KB)!");
+
+// Validate memory thresholds
+static_assert(MEMORY_CRITICAL_THRESHOLD_BYTES < MEMORY_WARNING_THRESHOLD_BYTES,
+              "Critical memory threshold must be less than warning threshold!");
+
+// Validate web server
+static_assert(WEB_SERVER_PORT > 0 && WEB_SERVER_PORT <= 65535,
+              "Web server port must be valid (1-65535)!");
+
 #endif // SYSTEM_CONSTANTS_H

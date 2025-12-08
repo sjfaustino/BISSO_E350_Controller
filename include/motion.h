@@ -108,4 +108,23 @@ void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
 extern const uint8_t AXIS_TO_I73_BIT[];
 extern const uint8_t AXIS_TO_CONSENSO_BIT[];
 
+// ============================================================================
+// COMPILE-TIME SAFETY CHECKS
+// ============================================================================
+
+// Validate core assumptions about motion system
+static_assert(MOTION_AXES == 4, "Code assumes exactly 4 axes (X,Y,Z,A)!");
+static_assert(MOTION_CONSENSO_TIMEOUT_MS >= 1000, "Consenso timeout too short (min 1s)!");
+static_assert(MOTION_CONSENSO_TIMEOUT_MS <= 10000, "Consenso timeout too long (max 10s)!");
+static_assert(HOMING_SETTLE_MS >= 100, "Homing settle time too short (min 100ms)!");
+
+// Validate speed profile enum values (must match PLC interface expectations)
+static_assert((int)SPEED_PROFILE_1 == 0, "SPEED_PROFILE_1 must be 0 for PLC encoding!");
+static_assert((int)SPEED_PROFILE_2 == 1, "SPEED_PROFILE_2 must be 1 for PLC encoding!");
+static_assert((int)SPEED_PROFILE_3 == 2, "SPEED_PROFILE_3 must be 2 for PLC encoding!");
+
+// Type safety checks
+static_assert(sizeof(speed_profile_t) == 1, "Speed profile must be 1 byte for PLC interface!");
+static_assert(sizeof(motion_state_t) <= 2, "Motion state enum should fit in 16 bits!");
+
 #endif

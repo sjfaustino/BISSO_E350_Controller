@@ -1,0 +1,299 @@
+# Copyright Header Template
+# For BISSO E350 Bridge Saw Controller Project
+
+## Standard C/C++ Header (.h / .cpp)
+
+```cpp
+/**
+ * @file filename.h
+ * @brief Brief description of this file's purpose
+ *
+ * @copyright Copyright (c) 2025 Sergio Faustino
+ * @license [Choose: MIT License | Apache 2.0 | GPL-3.0 | Proprietary]
+ *
+ * @project BISSO E350 Bridge Saw Controller
+ * @version 1.0.0
+ * @date 2025-12-08
+ * @author Sergio Faustino <sjfaustino@gmail.com>
+ *
+ * @details
+ * Detailed description of what this file contains, its role in the
+ * system, and any important implementation notes.
+ */
+```
+
+## Example: Motion Control Header
+
+```cpp
+/**
+ * @file motion.h
+ * @brief Core Motion Engine Definitions & API
+ *
+ * @copyright Copyright (c) 2025 Sergio Faustino
+ * @license MIT License
+ *
+ * @project BISSO E350 Bridge Saw Controller
+ * @version 1.0.0
+ * @date 2025-12-08
+ * @author Sergio Faustino <sjfaustino@gmail.com>
+ *
+ * @details
+ * Provides the motion control system for sequential axis movement
+ * on the BISSO E350 stone bridge saw. Supports four axes (X,Y,Z,A)
+ * with three discrete speed profiles controlled via PLC interface.
+ *
+ * Hardware: Single VFD with mechanical axis switching
+ * Limitations: One axis moves at a time (sequential motion)
+ */
+```
+
+## Markdown Header (.md)
+
+```markdown
+<!--
+  File: DOCUMENT_NAME.md
+  BISSO E350 Bridge Saw Controller
+  Copyright (c) 2025 Sergio Faustino
+  License: [MIT License | Apache 2.0 | Proprietary]
+-->
+
+# Document Title
+```
+
+## Python Header (.py)
+
+```python
+#!/usr/bin/env python3
+"""
+File: script_name.py
+Brief description
+
+Copyright (c) 2025 Sergio Faustino
+License: [MIT License | Apache 2.0 | GPL-3.0]
+
+Project: BISSO E350 Bridge Saw Controller
+Author: Sergio Faustino <sjfaustino@gmail.com>
+Date: 2025-12-08
+"""
+```
+
+## Script to Add Headers Automatically
+
+### add_copyright.sh (Bash)
+
+```bash
+#!/bin/bash
+# Script to add copyright headers to source files
+
+YEAR="2025"
+AUTHOR="Sergio Faustino"
+EMAIL="sjfaustino@gmail.com"
+LICENSE="MIT License"  # Change as needed
+PROJECT="BISSO E350 Bridge Saw Controller"
+VERSION="1.0.0"
+
+add_cpp_header() {
+    local file=$1
+    local filename=$(basename "$file")
+    local brief="$2"
+
+    local header="/**
+ * @file $filename
+ * @brief $brief
+ *
+ * @copyright Copyright (c) $YEAR $AUTHOR
+ * @license $LICENSE
+ *
+ * @project $PROJECT
+ * @version $VERSION
+ * @date $(date +%Y-%m-%d)
+ * @author $AUTHOR <$EMAIL>
+ */
+
+"
+    # Backup original
+    cp "$file" "$file.bak"
+
+    # Add header
+    echo "$header" | cat - "$file" > temp && mv temp "$file"
+    echo "Added header to $file"
+}
+
+# Usage example
+# add_cpp_header "src/motion.cpp" "Motion control implementation"
+```
+
+## License Options
+
+### Option 1: MIT License (Recommended for Open Source)
+
+**Pros:**
+- Very permissive
+- Commercial use allowed
+- No copyleft (derivatives can be proprietary)
+- Simple and well-understood
+
+**Use when:** You want maximum adoption and don't care if others close-source derivatives
+
+```
+MIT License
+
+Copyright (c) 2025 Sergio Faustino
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### Option 2: Apache 2.0 (Better Patent Protection)
+
+**Pros:**
+- Permissive like MIT
+- Includes explicit patent grant
+- Better for commercial use
+- Well-understood legally
+
+**Use when:** You want patent protection but still allow commercial use
+
+```
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+```
+
+### Option 3: GPL-3.0 (Copyleft)
+
+**Pros:**
+- Ensures derivatives remain open source
+- Strong community protection
+- Prevents proprietary forks
+
+**Use when:** You want to ensure all derivatives stay open source
+
+```
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+```
+
+### Option 4: Proprietary (Commercial)
+
+**Use when:** You want to keep full commercial rights
+
+```
+/**
+ * @copyright Copyright (c) 2025 Sergio Faustino. All rights reserved.
+ * @license Proprietary and confidential
+ *
+ * Unauthorized copying of this file, via any medium, is strictly prohibited.
+ * This software is provided under a commercial license agreement.
+ * Contact: sjfaustino@gmail.com for licensing inquiries.
+ */
+```
+
+## Recommendation
+
+For the BISSO E350 Controller:
+
+**Suggested License: MIT License**
+
+Reasoning:
+- Maximum flexibility for commercial use
+- Allows customers to modify for their needs
+- Simple and widely understood
+- Minimal legal overhead
+- Good for building business relationships
+
+**Next Steps:**
+
+1. Choose license (MIT recommended)
+2. Add LICENSE file to project root
+3. Add copyright headers to all source files
+4. Update platformio.ini or build files if needed
+5. Add license badge to README.md
+
+## Adding Headers to Existing Files
+
+### Manual Process (Small Projects)
+
+1. Open each .h/.cpp file
+2. Add header template at top
+3. Fill in brief description
+4. Save file
+
+### Semi-Automated (Medium Projects)
+
+```bash
+#!/bin/bash
+# Add headers to all source files
+
+for file in src/*.cpp include/*.h; do
+    if ! grep -q "Copyright (c)" "$file"; then
+        echo "Adding header to $file"
+        # Use editor to add header
+        # OR use sed/awk to insert at line 1
+    else
+        echo "Skipping $file (already has copyright)"
+    fi
+done
+```
+
+### Fully Automated (Large Projects)
+
+Use tools like:
+- `licenseheaders` (Python package)
+- `addlicense` (Go tool)
+- Custom script (see add_copyright.sh above)
+
+## Important Notes
+
+1. **Add LICENSE file first** - Headers reference the license
+2. **Be consistent** - Use same format for all files
+3. **Update year** - When modifying files in new year
+4. **Don't overwrite** - Check if header already exists
+5. **Backup first** - Always backup before bulk operations
+6. **Test compile** - Ensure headers don't break builds
+
+## Example Complete File
+
+```cpp
+/**
+ * @file motion_planner.cpp
+ * @brief Motion planning and feed override implementation
+ *
+ * @copyright Copyright (c) 2025 Sergio Faustino
+ * @license MIT License
+ *
+ * @project BISSO E350 Bridge Saw Controller
+ * @version 1.0.0
+ * @date 2025-12-08
+ * @author Sergio Faustino <sjfaustino@gmail.com>
+ *
+ * @details
+ * Implements motion planning for sequential axis movement with
+ * feed rate override and automatic speed profile selection.
+ */
+
+#include "motion_planner.h"
+#include "motion.h"
+#include "config_safe_access.h"
+
+// ... rest of file
+```

@@ -86,4 +86,23 @@ bool emergencyStopIsActive();
 bool emergencyStopRequestRecovery();
 void emergencyStopClearRecovery();
 
+// ============================================================================
+// COMPILE-TIME SAFETY CHECKS
+// ============================================================================
+
+// Validate fault code enum fits in uint8_t (for NVS storage efficiency)
+static_assert((int)FAULT_TASK_HUNG < 256, "Fault codes must fit in uint8_t!");
+
+// Validate fault severity levels are ordered correctly
+static_assert((int)FAULT_NONE < (int)FAULT_WARNING, "Fault severity ordering incorrect!");
+static_assert((int)FAULT_WARNING < (int)FAULT_ERROR, "Fault severity ordering incorrect!");
+static_assert((int)FAULT_ERROR < (int)FAULT_CRITICAL, "Fault severity ordering incorrect!");
+
+// Validate fault entry structure size (should be reasonable for NVS)
+static_assert(sizeof(fault_entry_t) <= 128, "Fault entry too large for efficient NVS storage!");
+
+// Ensure message buffer is reasonable
+static_assert(sizeof(((fault_entry_t*)0)->message) >= 32, "Fault message buffer too small!");
+static_assert(sizeof(((fault_entry_t*)0)->message) <= 256, "Fault message buffer too large!");
+
 #endif
