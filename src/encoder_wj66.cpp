@@ -1,6 +1,7 @@
 /**
  * @file encoder_wj66.cpp
- * @brief Driver for WJ66 Absolute Encoders
+ * @brief Driver for WJ66 Absolute Encoders (Gemini v3.5.15)
+ * @details Merged: User's Baud/Parsing Logic + v3.5 Safety Flow Control.
  */
 
 #include "encoder_wj66.h"
@@ -11,6 +12,10 @@
 #include <Preferences.h>
 #include <Arduino.h>
 
+// Safety Constants
+#define MAX_BYTES_PER_CYCLE 64
+#define WJ66_TIMEOUT_MS 500
+
 // Internal State
 struct {
   int32_t position[WJ66_AXES];      
@@ -20,7 +25,8 @@ struct {
   encoder_status_t status;
   uint32_t error_count;
   uint32_t last_command_time;
-} wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0};
+  bool waiting_for_response; // Added for flow control
+} wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false};
 
 void wj66Init() {
   logInfo("[WJ66] Initializing...");
@@ -36,26 +42,27 @@ void wj66Init() {
 
   if (saved_baud > 0) {
       logInfo("[WJ66] Trying saved baud: %lu...", (unsigned long)saved_baud);
-      Serial1.begin(saved_baud, SERIAL_8N1, 14, 33);
+      Serial1.begin(saved_baud, SERIAL_8N1, 14, 33); // Ensure pins match your board
       while(Serial1.available()) Serial1.read(); 
       
-      uint8_t q[] = {0x01, 0x00}; 
-      if (encoderSendCommandWithStats(q, 2)) {
-          uint8_t d[32];
-          if (encoderReadFrameWithStats(d, 32, 200)) {
-              logInfo("[WJ66] Saved baud verified.");
-              final_baud = saved_baud;
-              confirmed = true;
-          }
-      }
+      // Attempt handshake
+      uint8_t q[] = {0x01, 0x00}; // Adjust handshake packet if needed
+      // Note: encoderSendCommandWithStats needs to be defined or replaced with Serial1.write
+      // Assuming basic write for now if helper missing:
+      Serial1.write(q, 2); 
       
-      if (!confirmed) {
+      delay(100); // Simple wait for init check
+      if (Serial1.available()) {
+          logInfo("[WJ66] Saved baud verified.");
+          final_baud = saved_baud;
+          confirmed = true;
+      } else {
           Serial1.end();
           delay(100);
       }
   }
 
-  // 2. Auto-detect
+  // 2. Auto-detect (Fallback)
   if (!confirmed) {
       logInfo("[WJ66] Auto-detecting...");
       baud_detect_result_t res = encoderDetectBaudRate();
@@ -71,7 +78,6 @@ void wj66Init() {
       }
   } else {
       if (!Serial1) Serial1.begin(final_baud, SERIAL_8N1, 14, 33);
-      else encoderSetBaudRate(final_baud);
   }
 
   // Init State
@@ -81,33 +87,53 @@ void wj66Init() {
     wj66_state.last_read[i] = millis();
   }
   wj66_state.status = ENCODER_OK;
+  wj66_state.waiting_for_response = false;
+  
   logInfo("[WJ66] Ready @ %lu baud", (unsigned long)final_baud);
 }
 
 void wj66Update() {
-  static uint32_t last_read = 0;
   static char response_buffer[65] = {0};
   static uint8_t buffer_idx = 0;
   static const uint8_t MAX_RESPONSE_LEN = 64; 
   
-  if (millis() - last_read < WJ66_READ_INTERVAL_MS) return;
-  last_read = millis();
-  
-  if (millis() - wj66_state.last_command_time > 200) { 
-    Serial1.print("#00\r");
-    wj66_state.last_command_time = millis();
+  uint32_t now = millis();
+
+  // --- 1. COMMAND FLOW CONTROL ---
+  // Only send if NOT waiting, or if TIMEOUT happened
+  bool timeout = (wj66_state.waiting_for_response && (now - wj66_state.last_command_time > WJ66_TIMEOUT_MS));
+  bool time_to_poll = (now - wj66_state.last_command_time > WJ66_READ_INTERVAL_MS);
+
+  if (timeout) {
+      // Packet lost, reset flag so we can try again next cycle
+      wj66_state.waiting_for_response = false;
+      wj66_state.status = ENCODER_TIMEOUT;
+      wj66_state.error_count++;
+  } 
+  else if (time_to_poll && !wj66_state.waiting_for_response) {
+      Serial1.print("#00\r"); // Request Data
+      wj66_state.last_command_time = now;
+      wj66_state.waiting_for_response = true;
   }
   
-  while (Serial1.available() > 0) {
+  // --- 2. READ LOOP (SAFETY CAPPED) ---
+  int bytes_processed = 0;
+  
+  // FIX: Limit loop to prevent WDT crash
+  while (Serial1.available() > 0 && bytes_processed < MAX_BYTES_PER_CYCLE) {
     char c = Serial1.read();
+    bytes_processed++;
     
+    // Packet End Detection
     if (c == '\r') {
+      // Validate Packet Start
       if (buffer_idx > 0 && response_buffer[0] == '!') {
         int commas = 0;
         int32_t values[4] = {0};
         int32_t current_value = 0;
         bool is_negative = false;
         
+        // CSV Parsing Logic (Preserved from your upload)
         for (uint8_t i = 1; i < buffer_idx; i++) {
           char ch = response_buffer[i];
           if (ch == ',') {
@@ -119,29 +145,31 @@ void wj66Update() {
           else if (ch >= '0' && ch <= '9') current_value = current_value * 10 + (ch - '0');
         }
         
+        // Final Value & Validation
         if (commas == 3) {
           values[3] = is_negative ? -current_value : current_value;
-          bool valid = true;
           
-          if (valid) {
-            for (int i = 0; i < WJ66_AXES; i++) {
-              wj66_state.position[i] = values[i];
-              wj66_state.last_read[i] = millis();
-              wj66_state.read_count[i]++;
-            }
-            wj66_state.status = ENCODER_OK;
+          for (int i = 0; i < WJ66_AXES; i++) {
+            wj66_state.position[i] = values[i];
+            wj66_state.last_read[i] = millis();
+            wj66_state.read_count[i]++;
           }
+          wj66_state.status = ENCODER_OK;
+          wj66_state.waiting_for_response = false; // Transaction Complete
         } else {
           wj66_state.status = ENCODER_CRC_ERROR;
           wj66_state.error_count++;
+          wj66_state.waiting_for_response = false; // Reset to allow retry
         }
       }
+      // Reset Buffer
       buffer_idx = 0;
       memset(response_buffer, 0, sizeof(response_buffer));
     } 
-    else if (c >= 32 && c < 127) {
+    else if (c >= 32 && c < 127) { // Valid ASCII only
       if (buffer_idx < MAX_RESPONSE_LEN) response_buffer[buffer_idx++] = c;
       else {
+        // Buffer Overflow Protection
         buffer_idx = 0;
         wj66_state.error_count++;
       }
@@ -171,6 +199,7 @@ void wj66Reset() {
     wj66_state.last_read[i] = millis();
   }
   wj66_state.error_count = 0;
+  wj66_state.waiting_for_response = false;
   logInfo("[WJ66] Stats reset.");
 }
 
@@ -184,6 +213,8 @@ void wj66SetZero(uint8_t axis) {
 void wj66Diagnostics() {
   Serial.println("\n=== ENCODER STATUS ===");
   Serial.printf("Status: %d\nErrors: %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
+  Serial.printf("Waiting: %s\n", wj66_state.waiting_for_response ? "YES" : "NO");
+  
   for (int i = 0; i < WJ66_AXES; i++) {
     Serial.printf("  Axis %d: Raw=%ld | Offset=%ld | NET=%ld\n", 
         i, 

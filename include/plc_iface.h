@@ -1,20 +1,21 @@
 /**
  * @file plc_iface.h
- * @brief Concrete Hardware Interface for KC868 I/O Expansion Boards
- * @project Gemini v3.3.1
+ * @brief ELBO PLC I2C Interface Definitions (v3.5.10)
+ * @details synchronized with plc_iface.cpp
  */
 
 #ifndef PLC_IFACE_H
 #define PLC_IFACE_H
 
-#include <Arduino.h>
 #include <stdint.h>
+#include <Arduino.h>
 
 // ============================================================================
-// I2C ADDRESS CONFIGURATION (CRITICAL: Defines ADDR_I73_INPUT)
+// I2C ADDRESS CONFIGURATION
 // ============================================================================
-#define ADDR_I73_INPUT  0x21  // Limit Switches & Sensors
-#define ADDR_Q73_OUTPUT 0x22  // Relays & VFD Control
+// User defined addresses (Match your board jumpers!)
+#define ADDR_I73_INPUT  0x21  // Limit Switches & Sensors (PCF8574)
+#define ADDR_Q73_OUTPUT 0x22  // Relays & VFD Control   (PCF8574)
 
 // ============================================================================
 // I73 INPUT MAP (Read-Only)
@@ -31,10 +32,13 @@
 // ============================================================================
 // Q73 OUTPUT MAP (Write-Only)
 // ============================================================================
-#define ELBO_Q73_DIR_X      0
-#define ELBO_Q73_DIR_Y      1
-#define ELBO_Q73_DIR_Z      2
-#define ELBO_Q73_DIR_A      3
+// Direction Relays
+#define ELBO_Q73_AXIS_X_DIR 0
+#define ELBO_Q73_AXIS_Y_DIR 1
+#define ELBO_Q73_AXIS_Z_DIR 2
+#define ELBO_Q73_AXIS_A_DIR 3
+
+// Speed & Control
 #define ELBO_Q73_SPEED_1    4 
 #define ELBO_Q73_SPEED_2    5 
 #define ELBO_Q73_SPEED_3    6 
@@ -47,11 +51,8 @@
 void elboInit(); 
 bool elboI73GetInput(uint8_t bit);
 void elboQ73SetRelay(uint8_t bit, bool state);
-bool elboQ73GetConsenso(uint8_t bit);
 void elboSetSpeedProfile(uint8_t profile_idx);
 void elboSetDirection(uint8_t axis, bool forward);
-
-// Diagnostics (Used by CLI)
 void elboDiagnostics(); 
 
 #endif // PLC_IFACE_H

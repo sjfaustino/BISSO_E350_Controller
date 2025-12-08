@@ -1,31 +1,49 @@
+/**
+ * @file config_unified.cpp
+ * @brief Unified Configuration Manager (NVS) v3.5.20
+ * @details Implements Input Validation, Hardened String Pool, and Dump Utility.
+ * @author Sergio Faustino
+ */
+
 #include "config_unified.h"
+#include "config_keys.h"
 #include "serial_logger.h"
-#include "config_keys.h" 
 #include "system_constants.h"
 #include <Preferences.h>
+#include <Arduino.h>
 #include <string.h>
-#include <math.h> 
+#include <math.h>
 
+// NVS Persistence Object
 static Preferences prefs;
+
+// Internal Cache Table
 static config_entry_t config_table[CONFIG_MAX_KEYS];
 static int config_count = 0;
 
+// State Flags
+static bool initialized = false;
+static bool config_dirty = false;
+static uint32_t last_nvs_save = 0;
+
+// Auto-Save Configuration
 #define NVS_CONFIG_SAVE_INTERVAL_MS 5000 
 #define NVS_SAVE_ON_CRITICAL true        
 
-static uint32_t last_nvs_save = 0;
-static bool config_dirty = false;
-
-// Critical keys that should save immediately
+// Critical keys trigger immediate write to flash to prevent data loss
 static const char* critical_keys[] = {
   KEY_PPM_X, KEY_PPM_Y, KEY_PPM_Z, KEY_PPM_A,
   KEY_X_LIMIT_MIN, KEY_X_LIMIT_MAX,
   KEY_Y_LIMIT_MIN, KEY_Y_LIMIT_MAX,
   KEY_Z_LIMIT_MIN, KEY_Z_LIMIT_MAX,
   KEY_A_LIMIT_MIN, KEY_A_LIMIT_MAX,
-  KEY_STALL_TIMEOUT, KEY_ALARM_PIN,
+  KEY_ALARM_PIN, KEY_STALL_TIMEOUT,
   KEY_MOTION_APPROACH_MODE,
-  KEY_MOTION_STRICT_LIMITS // <-- Added to critical list
+  KEY_MOTION_STRICT_LIMITS, // Safety Critical
+  KEY_HOME_PROFILE_FAST,    // Homing
+  KEY_HOME_PROFILE_SLOW,
+  KEY_DEFAULT_ACCEL,        // Float
+  KEY_DEFAULT_SPEED         // Float
 };
 
 static bool isCriticalKey(const char* key) {
@@ -35,8 +53,15 @@ static bool isCriticalKey(const char* key) {
   return false;
 }
 
-#define CONFIG_STRING_BUFFER_COUNT 4
+// ----------------------------------------------------------------------------
+// STRING BUFFER POOL (Safety Fix)
+// ----------------------------------------------------------------------------
+// Increased to 8 to prevent overwrites during complex logging/formatting.
+// WARNING: Strings returned by configGetString are valid only until 
+// the pool rotates (8 calls later). Do not store pointers long-term.
+#define CONFIG_STRING_BUFFER_COUNT 8
 #define CONFIG_STRING_BUFFER_SIZE 256
+
 static struct {
   char buffers[CONFIG_STRING_BUFFER_COUNT][CONFIG_STRING_BUFFER_SIZE];
   uint8_t current_buffer = 0;
@@ -48,24 +73,9 @@ static char* configGetStringBuffer() {
   return buffer;
 }
 
-void configUnifiedInit() {
-  logInfo("[CONFIG] Initializing...");
-  memset(config_table, 0, sizeof(config_table));
-  config_count = 0;
-  
-  if (!prefs.begin("bisso_config", false)) {
-    logError("[CONFIG] NVS Init Failed!");
-    return;
-  }
-  
-  // Auto-set default strict limits if key doesn't exist yet (Safety First)
-  if (!prefs.isKey(KEY_MOTION_STRICT_LIMITS)) {
-      prefs.putInt(KEY_MOTION_STRICT_LIMITS, 1);
-  }
-
-  configUnifiedLoad();
-  logInfo("[CONFIG] Loaded %d entries", config_count);
-}
+// ============================================================================
+// INTERNAL HELPERS
+// ============================================================================
 
 static int findConfigEntry(const char* key) {
   for (int i = 0; i < config_count; i++) {
@@ -74,29 +84,190 @@ static int findConfigEntry(const char* key) {
   return -1;
 }
 
+static void addToCacheInt(const char* key, int32_t val) {
+    if (config_count >= CONFIG_MAX_KEYS) return;
+    int idx = config_count++;
+    strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
+    config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
+    config_table[idx].type = CONFIG_INT32;
+    config_table[idx].value.int_val = val;
+    config_table[idx].is_set = true;
+}
+
+static void addToCacheFloat(const char* key, float val) {
+    if (config_count >= CONFIG_MAX_KEYS) return;
+    int idx = config_count++;
+    strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
+    config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
+    config_table[idx].type = CONFIG_FLOAT;
+    config_table[idx].value.float_val = val;
+    config_table[idx].is_set = true;
+}
+
+// ----------------------------------------------------------------------------
+// VALIDATION LOGIC (Safety Fix)
+// ----------------------------------------------------------------------------
+
+static int32_t validateInt(const char* key, int32_t value) {
+    // 1. Pulses Per MM/Degree (Must be positive)
+    if (strcmp(key, KEY_PPM_X) == 0 || strcmp(key, KEY_PPM_Y) == 0 ||
+        strcmp(key, KEY_PPM_Z) == 0 || strcmp(key, KEY_PPM_A) == 0) {
+        if (value <= 0) {
+            logError("[CONFIG] Invalid PPM value %d (Must be > 0)", (long)value);
+            return 1000; // Default safe value
+        }
+    }
+    
+    // 2. Timeout Safety
+    if (strcmp(key, KEY_STALL_TIMEOUT) == 0) {
+        if (value < 100) return 100; // Minimum 100ms
+        if (value > 60000) return 60000; // Max 60s
+    }
+    
+    // 3. Profiles (0-2)
+    if (strcmp(key, KEY_HOME_PROFILE_FAST) == 0 || strcmp(key, KEY_HOME_PROFILE_SLOW) == 0) {
+        if (value < 0) return 0;
+        if (value > 2) return 2;
+    }
+    
+    // 4. Deadband (Positive)
+    if (strcmp(key, KEY_MOTION_DEADBAND) == 0) {
+        if (value < 0) return 0;
+    }
+
+    return value;
+}
+
+static float validateFloat(const char* key, float value) {
+    // 1. Acceleration / Speed (Must be positive)
+    if (strcmp(key, KEY_DEFAULT_ACCEL) == 0 || strcmp(key, KEY_DEFAULT_SPEED) == 0) {
+        if (value < 0.1f) return 0.1f;
+    }
+    return value;
+}
+
+// ============================================================================
+// INITIALIZATION & DEFAULTS
+// ============================================================================
+
+void configSetDefaults() {
+    if (!initialized) return;
+    
+    logInfo("[CONFIG] Applying Factory Defaults...");
+    
+    // SAFETY: Default to Strict Limits (1 = E-Stop on any drift)
+    if (!prefs.isKey(KEY_MOTION_STRICT_LIMITS)) prefs.putInt(KEY_MOTION_STRICT_LIMITS, 1);
+    
+    // HOMING
+    if (!prefs.isKey(KEY_HOME_PROFILE_FAST)) prefs.putInt(KEY_HOME_PROFILE_FAST, 2);
+    if (!prefs.isKey(KEY_HOME_PROFILE_SLOW)) prefs.putInt(KEY_HOME_PROFILE_SLOW, 0);
+
+    // MOTION
+    if (!prefs.isKey(KEY_MOTION_DEADBAND))      prefs.putInt(KEY_MOTION_DEADBAND, 10);
+    if (!prefs.isKey(KEY_MOTION_BUFFER_ENABLE)) prefs.putInt(KEY_MOTION_BUFFER_ENABLE, 1);
+    if (!prefs.isKey(KEY_MOTION_APPROACH_MODE)) prefs.putInt(KEY_MOTION_APPROACH_MODE, 0); 
+    
+    // AXIS
+    if (!prefs.isKey(KEY_X_APPROACH))    prefs.putInt(KEY_X_APPROACH, 50);
+    if (!prefs.isKey(KEY_DEFAULT_ACCEL)) prefs.putFloat(KEY_DEFAULT_ACCEL, 100.0f);
+    
+    // HARDWARE
+    if (!prefs.isKey(KEY_ALARM_PIN))     prefs.putInt(KEY_ALARM_PIN, 2);
+    if (!prefs.isKey(KEY_STALL_TIMEOUT)) prefs.putInt(KEY_STALL_TIMEOUT, 2000);
+}
+
+void configUnifiedLoad() {
+    logInfo("[CONFIG] Pre-loading Cache...");
+    
+    for (uint8_t i = 0; i < sizeof(critical_keys)/sizeof(critical_keys[0]); i++) {
+        const char* key = critical_keys[i];
+        
+        if (prefs.isKey(key)) {
+            // Heuristic for types based on key name content
+            if (strstr(key, "accel") || strstr(key, "speed")) {
+                float val = prefs.getFloat(key, 0.0f);
+                addToCacheFloat(key, val);
+            } else {
+                int32_t val = prefs.getInt(key, 0);
+                addToCacheInt(key, val);
+            }
+        }
+    }
+}
+
+void configUnifiedInit() {
+    logInfo("[CONFIG] Initializing NVS...");
+    memset(config_table, 0, sizeof(config_table));
+    config_count = 0;
+    
+    if (!prefs.begin("gemini_cfg", false)) { 
+        logError("[CONFIG] NVS Mount Failed!");
+        return;
+    }
+    
+    initialized = true;
+    configSetDefaults(); 
+    configUnifiedLoad();
+    logInfo("[CONFIG] Ready. Loaded %d entries.", config_count);
+}
+
+// ============================================================================
+// GETTERS
+// ============================================================================
+
 int32_t configGetInt(const char* key, int32_t default_val) {
+  if (!initialized) return default_val;
   int idx = findConfigEntry(key);
   if (idx >= 0 && config_table[idx].type == CONFIG_INT32 && config_table[idx].is_set) {
     return config_table[idx].value.int_val;
   }
-  if (prefs.isKey(key)) return prefs.getInt(key, default_val);
-  return default_val;
+  return prefs.getInt(key, default_val);
 }
 
+float configGetFloat(const char* key, float default_val) {
+  if (!initialized) return default_val;
+  int idx = findConfigEntry(key);
+  if (idx >= 0 && config_table[idx].type == CONFIG_FLOAT && config_table[idx].is_set) {
+    return config_table[idx].value.float_val;
+  }
+  return prefs.getFloat(key, default_val);
+}
+
+const char* configGetString(const char* key, const char* default_val) {
+  if (!initialized) return default_val ? default_val : "";
+  int idx = findConfigEntry(key);
+  if (idx >= 0 && config_table[idx].type == CONFIG_STRING && config_table[idx].is_set) {
+    return config_table[idx].value.str_val;
+  }
+  
+  if (prefs.isKey(key)) {
+    char* buffer = configGetStringBuffer();
+    if (prefs.getString(key, buffer, CONFIG_STRING_BUFFER_SIZE) > 0) {
+        return buffer;
+    }
+  }
+  return default_val ? default_val : "";
+}
+
+// ============================================================================
+// SETTERS (With Validation)
+// ============================================================================
+
 void configSetInt(const char* key, int32_t value) {
+  if (!initialized) return;
+  
+  // VALIDATION STEP
+  value = validateInt(key, value);
+
   int idx = findConfigEntry(key);
   if (idx < 0) {
-    if (config_count >= CONFIG_MAX_KEYS) {
-      logError("[CONFIG] Table full!");
-      return;
-    }
+    if (config_count >= CONFIG_MAX_KEYS) return;
     idx = config_count++;
     strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
     config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
     config_table[idx].type = CONFIG_INT32;
   }
 
-  // SMART WRITE
   if (config_table[idx].is_set && config_table[idx].value.int_val == value) return;
   
   config_table[idx].value.int_val = value;
@@ -107,22 +278,18 @@ void configSetInt(const char* key, int32_t value) {
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putInt(key, value);
     config_dirty = false; 
-    logInfo("[CONFIG] Set %s = %d (Saved)", key, value);
+    logInfo("[CONFIG] Set %s = %ld (Saved)", key, (long)value);
   } else {
-    logInfo("[CONFIG] Set %s = %d (Cached)", key, value);
+    logInfo("[CONFIG] Set %s = %ld (Cached)", key, (long)value);
   }
-}
-
-float configGetFloat(const char* key, float default_val) {
-  int idx = findConfigEntry(key);
-  if (idx >= 0 && config_table[idx].type == CONFIG_FLOAT && config_table[idx].is_set) {
-    return config_table[idx].value.float_val;
-  }
-  if (prefs.isKey(key)) return prefs.getFloat(key, default_val);
-  return default_val;
 }
 
 void configSetFloat(const char* key, float value) {
+  if (!initialized) return;
+  
+  // VALIDATION STEP
+  value = validateFloat(key, value);
+
   int idx = findConfigEntry(key);
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) return;
@@ -132,7 +299,6 @@ void configSetFloat(const char* key, float value) {
     config_table[idx].type = CONFIG_FLOAT;
   }
   
-  // SMART WRITE
   if (config_table[idx].is_set && fabsf(config_table[idx].value.float_val - value) < 0.0001f) return;
 
   config_table[idx].value.float_val = value;
@@ -146,34 +312,8 @@ void configSetFloat(const char* key, float value) {
   }
 }
 
-const char* configGetString(const char* key, const char* default_val) {
-  int idx = findConfigEntry(key);
-  if (idx >= 0 && config_table[idx].type == CONFIG_STRING && config_table[idx].is_set) {
-    return config_table[idx].value.str_val;
-  }
-  if (prefs.isKey(key)) {
-    char* buffer = configGetStringBuffer();
-    size_t bytes_read = prefs.getString(key, buffer, CONFIG_STRING_BUFFER_SIZE);
-    if (bytes_read > 0) {
-      buffer[CONFIG_STRING_BUFFER_SIZE - 1] = '\0';
-      if (idx < 0 && config_count < CONFIG_MAX_KEYS) {
-        idx = config_count++;
-        strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
-        config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
-      }
-      if (idx >= 0) {
-        config_table[idx].type = CONFIG_STRING;
-        strncpy(config_table[idx].value.str_val, buffer, CONFIG_VALUE_LEN - 1);
-        config_table[idx].value.str_val[CONFIG_VALUE_LEN - 1] = '\0';
-        config_table[idx].is_set = true;
-      }
-      return buffer;
-    }
-  }
-  return default_val ? default_val : "";
-}
-
 void configSetString(const char* key, const char* value) {
+  if (!initialized) return;
   int idx = findConfigEntry(key);
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) return;
@@ -183,7 +323,6 @@ void configSetString(const char* key, const char* value) {
     config_table[idx].type = CONFIG_STRING;
   }
   
-  // SMART WRITE
   if (config_table[idx].is_set && strncmp(config_table[idx].value.str_val, value, CONFIG_VALUE_LEN) == 0) return;
 
   strncpy(config_table[idx].value.str_val, value, CONFIG_VALUE_LEN - 1);
@@ -192,6 +331,10 @@ void configSetString(const char* key, const char* value) {
   config_dirty = true;
   last_nvs_save = millis();
 }
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
 
 void configUnifiedFlush() {
     if (!config_dirty) return;
@@ -202,54 +345,32 @@ void configUnifiedFlush() {
 }
 
 void configUnifiedSave() {
-  logInfo("[CONFIG] Saving to NVS...");
+  logInfo("[CONFIG] Flushing NVS...");
   for (int i = 0; i < config_count; i++) {
     if (!config_table[i].is_set) continue;
-    if (config_table[i].type != CONFIG_INT32 || !isCriticalKey(config_table[i].key)) {
-        switch(config_table[i].type) {
-        case CONFIG_INT32: prefs.putInt(config_table[i].key, config_table[i].value.int_val); break;
-        case CONFIG_FLOAT: prefs.putFloat(config_table[i].key, config_table[i].value.float_val); break;
-        case CONFIG_STRING: prefs.putString(config_table[i].key, config_table[i].value.str_val); break;
-        }
+    // Skip if critical key (already write-through)
+    if (config_table[i].type == CONFIG_INT32 && isCriticalKey(config_table[i].key)) continue;
+
+    switch(config_table[i].type) {
+      case CONFIG_INT32: prefs.putInt(config_table[i].key, config_table[i].value.int_val); break;
+      case CONFIG_FLOAT: prefs.putFloat(config_table[i].key, config_table[i].value.float_val); break;
+      case CONFIG_STRING: prefs.putString(config_table[i].key, config_table[i].value.str_val); break;
     }
   }
-  prefs.end(); 
-  prefs.begin("bisso_config", false); 
-  logInfo("[CONFIG] Save complete.");
-  last_nvs_save = millis();
   config_dirty = false;
-}
-
-void configUnifiedLoad() {
-  Serial.println("[CONFIG] Cache ready.");
+  logInfo("[CONFIG] Flush Complete.");
 }
 
 void configUnifiedReset() {
-  logInfo("[CONFIG] Resetting defaults...");
-  configSetInt(KEY_X_LIMIT_MIN, -500000); configSetInt(KEY_X_LIMIT_MAX, 500000);
-  configSetInt(KEY_Y_LIMIT_MIN, -300000); configSetInt(KEY_Y_LIMIT_MAX, 300000);
-  configSetInt(KEY_Z_LIMIT_MIN, -50000);  configSetInt(KEY_Z_LIMIT_MAX, 150000);
-  configSetInt(KEY_A_LIMIT_MIN, -45000);  configSetInt(KEY_A_LIMIT_MAX, 45000);
-  configSetFloat(KEY_DEFAULT_SPEED, 15.0f); 
-  configSetFloat(KEY_DEFAULT_ACCEL, 5.0f);
-  configSetInt(KEY_PPM_X, 1000); configSetInt(KEY_PPM_Y, 1000);
-  configSetInt(KEY_PPM_Z, 1000); configSetInt(KEY_PPM_A, 1000); 
-  configSetInt(KEY_ALARM_PIN, 2);
-  configSetInt(KEY_STALL_TIMEOUT, 2000);
-  configSetInt(KEY_X_APPROACH, 50);
-  configSetInt(KEY_MOTION_DEADBAND, 10);
+  logWarning("[CONFIG] Resetting to Factory Defaults...");
+  prefs.clear(); 
+  configSetDefaults();
   
-  // Initialize new mode to FIXED (0)
-  configSetInt(KEY_MOTION_APPROACH_MODE, APPROACH_MODE_FIXED);
+  // Safe defaults
+  configSetInt(KEY_X_LIMIT_MIN, -500000); 
+  configSetInt(KEY_X_LIMIT_MAX, 500000);
   
-  // NEW: Initialize Safety Logic (1=Strict, 0=Recovery)
-  configSetInt(KEY_MOTION_STRICT_LIMITS, 1);
-
-  configSetFloat(KEY_SPEED_CAL_X, 0.0f); configSetFloat(KEY_SPEED_CAL_Y, 0.0f);
-  configSetFloat(KEY_SPEED_CAL_Z, 0.0f); configSetFloat(KEY_SPEED_CAL_A, 0.0f);
-  
-  configUnifiedSave();
-  logInfo("[CONFIG] Defaults saved.");
+  logInfo("[CONFIG] Reset Complete. Reboot recommended.");
 }
 
 void configUnifiedClear() {
@@ -260,16 +381,33 @@ void configUnifiedClear() {
 int configGetKeyCount() { return config_count; }
 
 void configUnifiedDiagnostics() {
-  Serial.println("\n=== CONFIG CACHE ===");
-  Serial.printf("Entries: %d | Dirty: %s\n", config_count, config_dirty ? "YES" : "NO");
-  Serial.printf("Strict Limits: %s\n", configGetInt(KEY_MOTION_STRICT_LIMITS, 1) ? "ON" : "OFF");
-  
-  for (int i = 0; i < config_count; i++) {
-    Serial.printf("  [%d] %s = ", i, config_table[i].key);
-    switch(config_table[i].type) {
-      case CONFIG_INT32: Serial.println(config_table[i].value.int_val); break;
-      case CONFIG_FLOAT: Serial.println(config_table[i].value.float_val); break;
-      case CONFIG_STRING: Serial.println(config_table[i].value.str_val); break;
+  Serial.println("\n=== CONFIG DIAGNOSTICS ===");
+  Serial.printf("Strict Limits: %s\n", configGetInt(KEY_MOTION_STRICT_LIMITS, 1) ? "ON (Safe)" : "OFF (Recovery)");
+  Serial.printf("Home Fast Profile: %ld\n", (long)configGetInt(KEY_HOME_PROFILE_FAST, 2));
+  Serial.printf("Buffer Enable: %s\n", configGetInt(KEY_MOTION_BUFFER_ENABLE, 1) ? "YES" : "NO");
+  Serial.printf("Total Keys: %d\n", config_count);
+  Serial.println("==========================\n");
+}
+
+// Added for CLI 'config dump' command
+void configUnifiedPrintAll() {
+    for (int i = 0; i < config_count; i++) {
+        if (!config_table[i].is_set) continue;
+        
+        // Pad key for alignment
+        Serial.printf("%-30s | ", config_table[i].key);
+        
+        switch(config_table[i].type) {
+            case CONFIG_INT32: 
+                Serial.printf("%ld", (long)config_table[i].value.int_val); 
+                break;
+            case CONFIG_FLOAT: 
+                Serial.printf("%.3f", config_table[i].value.float_val); 
+                break;
+            case CONFIG_STRING: 
+                Serial.printf("\"%s\"", config_table[i].value.str_val); 
+                break;
+        }
+        Serial.println();
     }
-  }
 }

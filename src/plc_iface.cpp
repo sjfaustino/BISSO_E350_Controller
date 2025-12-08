@@ -1,95 +1,134 @@
 /**
  * @file plc_iface.cpp
- * @brief Implementation of I2C Communication for KC868
+ * @brief Hardware Abstraction Layer for ELBO PLC (Gemini v3.5.10)
+ * @details Uses constants from plc_iface.h to avoid redefinition errors.
  */
 
-#include "plc_iface.h"
+#include "plc_iface.h" // Source of Truth for Addresses
+#include "system_constants.h"
+#include "serial_logger.h"
+#include "fault_logging.h"
+#include "task_manager.h"
 #include <Wire.h>
 
-static uint8_t q73_shadow_register = 0xFF;
+// Shadow Registers
+static uint8_t i73_input_shadow = 0xFF; 
+static uint8_t q73_shadow_register = 0x00; 
 
-void elboInit() {
-    Wire.beginTransmission(ADDR_Q73_OUTPUT);
-    Wire.write(0xFF);
-    Wire.endTransmission();
-    q73_shadow_register = 0xFF;
+#define I2C_RETRIES 3
 
-    Wire.beginTransmission(ADDR_I73_INPUT);
-    Wire.write(0xFF);
-    Wire.endTransmission();
-}
+// ============================================================================
+// INTERNAL I2C HELPER
+// ============================================================================
 
-bool elboI73GetInput(uint8_t bit) {
-    if (bit > 7) return false;
-    if (Wire.requestFrom(ADDR_I73_INPUT, 1) > 0) {
-        uint8_t state = Wire.read();
-        return (state & (1 << bit)) != 0; 
+static bool plcWriteI2C(uint8_t address, uint8_t data, const char* context) {
+    uint8_t error = 0;
+    for (int i = 0; i < I2C_RETRIES; i++) {
+        Wire.beginTransmission(address);
+        Wire.write(data);
+        error = Wire.endTransmission();
+        
+        if (error == 0) return true; // Success
+        
+        vTaskDelay(pdMS_TO_TICKS(1)); 
     }
+
+    logError("[PLC] I2C Write Failed (Addr 0x%02X, Err %d): %s", address, error, context);
+    faultLogEntry(FAULT_ERROR, FAULT_I2C_ERROR, -1, address, context);
     return false;
 }
 
-void elboQ73SetRelay(uint8_t bit, bool state) {
-    if (bit > 7) return;
-    if (state) q73_shadow_register &= ~(1 << bit); 
-    else q73_shadow_register |= (1 << bit);
-    Wire.beginTransmission(ADDR_Q73_OUTPUT);
-    Wire.write(q73_shadow_register);
-    Wire.endTransmission();
-}
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
 
-bool elboQ73GetConsenso(uint8_t bit) {
-    return elboI73GetInput(bit);
-}
-
-// --- MISSING FUNCTIONS IMPLEMENTED HERE ---
-
-void elboSetSpeedProfile(uint8_t profile_idx) {
-    // Clear old speed bits (4,5,6) -> Set them HIGH (OFF)
-    q73_shadow_register |= ((1<<ELBO_Q73_SPEED_1)|(1<<ELBO_Q73_SPEED_2)|(1<<ELBO_Q73_SPEED_3));
+void elboInit() {
+    logInfo("[PLC] Initializing I2C Bus...");
+    // Wire.begin() handled by main/task manager
     
-    // Enable new speed bit -> Set LOW (ON)
-    switch (profile_idx) {
-        case 0: q73_shadow_register &= ~(1 << ELBO_Q73_SPEED_1); break;
-        case 1: q73_shadow_register &= ~(1 << ELBO_Q73_SPEED_2); break;
-        case 2: q73_shadow_register &= ~(1 << ELBO_Q73_SPEED_3); break;
-        default: q73_shadow_register &= ~(1 << ELBO_Q73_SPEED_1); break;
+    // Reset Outputs (Safe State: All OFF)
+    q73_shadow_register = 0x00;
+    
+    if (plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Init Q73")) {
+        logInfo("[PLC] Q73 Output Board OK (Addr 0x%02X)", ADDR_Q73_OUTPUT);
+    } else {
+        logError("[PLC] [CRITICAL] Q73 Output Board Missing!");
     }
-    
-    Wire.beginTransmission(ADDR_Q73_OUTPUT);
-    Wire.write(q73_shadow_register);
-    Wire.endTransmission();
 }
+
+// ============================================================================
+// OUTPUT CONTROL
+// ============================================================================
 
 void elboSetDirection(uint8_t axis, bool forward) {
-    uint8_t relay_bit = 255;
-    switch(axis) {
-        case 0: relay_bit = ELBO_Q73_DIR_X; break;
-        case 1: relay_bit = ELBO_Q73_DIR_Y; break;
-        case 2: relay_bit = ELBO_Q73_DIR_Z; break;
-        case 3: relay_bit = ELBO_Q73_DIR_A; break;
+    if (axis >= 4) return;
+
+    // Use standard shift. Relays 0-3 are X,Y,Z,A Directions
+    uint8_t mask = (1 << axis);
+
+    if (forward) {
+        q73_shadow_register |= mask;  
+    } else {
+        q73_shadow_register &= ~mask; 
     }
+
+    // Do NOT modify Enable bit here.
+    plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Set Direction");
+}
+
+void elboSetSpeedProfile(uint8_t profile_index) {
+    // Clear Speed bits (4, 5, 6)
+    q73_shadow_register &= ~( (1<<ELBO_Q73_SPEED_1) | (1<<ELBO_Q73_SPEED_2) | (1<<ELBO_Q73_SPEED_3) );
+
+    switch(profile_index) {
+        case 0: q73_shadow_register |= (1 << ELBO_Q73_SPEED_1); break;
+        case 1: q73_shadow_register |= (1 << ELBO_Q73_SPEED_2); break;
+        case 2: q73_shadow_register |= (1 << ELBO_Q73_SPEED_3); break;
+        default: break; 
+    }
+
+    plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Set Speed");
+}
+
+void elboQ73SetRelay(uint8_t relay_bit, bool state) {
     if (relay_bit > 7) return;
 
-    if (forward) q73_shadow_register &= ~(1 << relay_bit);
-    else q73_shadow_register |= (1 << relay_bit);
+    if (state) {
+        q73_shadow_register |= (1 << relay_bit);
+    } else {
+        q73_shadow_register &= ~(1 << relay_bit);
+    }
 
-    // Ensure Enable is ON
-    q73_shadow_register &= ~(1 << ELBO_Q73_ENABLE);
+    plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Set Relay");
+}
 
-    Wire.beginTransmission(ADDR_Q73_OUTPUT);
-    Wire.write(q73_shadow_register);
-    Wire.endTransmission();
+// ============================================================================
+// INPUT READING
+// ============================================================================
+
+bool elboI73GetInput(uint8_t bit) {
+    uint8_t count = Wire.requestFrom((uint8_t)ADDR_I73_INPUT, (uint8_t)1);
+    
+    if (count == 1) {
+        i73_input_shadow = Wire.read();
+    } else {
+        static uint32_t last_log = 0;
+        if (millis() - last_log > 2000) {
+            logError("[PLC] I2C Read Failed (I73)");
+            last_log = millis();
+        }
+    }
+    
+    // Check bit state
+    return (i73_input_shadow & (1 << bit));
 }
 
 void elboDiagnostics() {
-    Serial.println("\n[PLC] Diagnostics");
-    Serial.printf("  Q73 Output: 0x%02X\n", q73_shadow_register);
+    Serial.println("\n[PLC] === IO Diagnostics ===");
+    Serial.printf("Output Register: 0x%02X\n", q73_shadow_register);
+    Serial.printf("Input Register:  0x%02X\n", i73_input_shadow);
     
-    Wire.beginTransmission(ADDR_I73_INPUT);
-    if (Wire.endTransmission() == 0) {
-        Wire.requestFrom(ADDR_I73_INPUT, 1);
-        Serial.printf("  I73 Input:  0x%02X\n", Wire.read());
-    } else {
-        Serial.println("  I73 Input:  ERROR");
-    }
+    Wire.beginTransmission(ADDR_Q73_OUTPUT);
+    uint8_t err = Wire.endTransmission();
+    Serial.printf("Q73 (0x%02X) Status: %s\n", ADDR_Q73_OUTPUT, (err == 0) ? "OK" : "ERROR");
 }

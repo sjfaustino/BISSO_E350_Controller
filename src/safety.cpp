@@ -1,11 +1,18 @@
+/**
+ * @file safety.cpp
+ * @brief Safety Monitor
+ * @project Gemini v3.5.0
+ */
+
 #include "safety.h"
 #include "motion.h"
+#include "motion_state.h" // <-- CRITICAL FIX: Provides motionIsMoving, motionGetState
 #include "fault_logging.h"
 #include "encoder_motion_integration.h"
 #include "system_constants.h"
 #include "serial_logger.h"
 #include "config_unified.h" 
-#include "config_keys.h" // <-- NEW
+#include "config_keys.h"
 #include <Arduino.h>
 #include "safety_state_machine.h"
 #include <string.h>
@@ -37,7 +44,6 @@ void safetyUpdate() {
   if (now - last_stall_check > SAFETY_STALL_CHECK_INTERVAL_MS) {
     last_stall_check = now;
     
-    // FIX: Use Constant Key
     uint32_t stall_limit_ms = (uint32_t)configGetInt(KEY_STALL_TIMEOUT, SAFETY_MAX_STALL_TIME_MS);
 
     if (motionIsMoving()) {
@@ -82,7 +88,6 @@ void safetyTriggerAlarm(const char* reason) {
   digitalWrite(SAFETY_ALARM_PIN, HIGH);
   
   Serial.printf("[SAFETY] [ALARM] Triggered: %s\n", reason);
-  // FIX: Cast for printf
   Serial.printf("[SAFETY] Fault Count: %lu\n", (unsigned long)safety_state.fault_count);
   
   motionEmergencyStop();
@@ -96,7 +101,6 @@ void safetyResetAlarm() {
   safety_state.current_fault = SAFETY_OK;
   safety_state.fault_duration_ms = millis() - alarm_trigger_time;
   
-  // FIX: Cast for printf
   Serial.printf("[SAFETY] [OK] Alarm reset (Duration: %lu ms)\n", (unsigned long)safety_state.fault_duration_ms);
 }
 
@@ -158,7 +162,6 @@ void safetyDiagnostics() {
   }
   Serial.printf("Current Fault: %s\n", faultStr);
   Serial.printf("GPIO State: %s\n", digitalRead(SAFETY_ALARM_PIN) ? "HIGH" : "LOW");
-  // FIX: Cast for printf
   Serial.printf("Count: %lu\n", (unsigned long)safety_state.fault_count);
   Serial.printf("Last Msg: %s\n", safety_state.fault_message);
   

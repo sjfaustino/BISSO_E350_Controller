@@ -1,20 +1,21 @@
+/**
+ * @file motion.h
+ * @brief Core Motion Engine Definitions & API (Gemini v3.5.19)
+ * @details Final Polish: Full Encapsulation of Axis Array.
+ */
+
 #ifndef MOTION_H
 #define MOTION_H
 
 #include <Arduino.h>
 #include <stdint.h>
-#include "system_constants.h"
-#include "plc_iface.h" 
+#include "plc_iface.h"
 
 #define MOTION_AXES 4
-#define MOTION_UPDATE_INTERVAL_MS 10
 #define MOTION_CONSENSO_TIMEOUT_MS 5000 
+#define HOMING_SETTLE_MS 1000
 
-// Homing Settings
-#define HOMING_SETTLE_MS 1000     // Time to wait for axis to stop fully
-#define HOMING_BACKOFF_MM 20.0f   // Distance to back off after fast approach
-
-typedef enum { SPEED_PROFILE_1 = 0, SPEED_PROFILE_2 = 1, SPEED_PROFILE_3 = 2 } speed_profile_t;
+typedef enum { SPEED_PROFILE_1=0, SPEED_PROFILE_2=1, SPEED_PROFILE_3=2 } speed_profile_t;
 
 typedef enum { 
   MOTION_IDLE = 0,
@@ -23,78 +24,88 @@ typedef enum {
   MOTION_STOPPING = 3,
   MOTION_PAUSED = 4,        
   MOTION_ERROR = 5,
-  
-  // Homing States
   MOTION_HOMING_APPROACH_FAST = 6,
   MOTION_HOMING_BACKOFF = 7,
   MOTION_HOMING_APPROACH_FINE = 8,
   MOTION_HOMING_SETTLE = 9 
 } motion_state_t;
 
-typedef struct {
-  int32_t position;                   
-  int32_t target_position;            
-  motion_state_t state;               
-  uint32_t last_update_ms;            
-  uint32_t state_entry_ms;            
-  bool enabled;                       
-  int32_t soft_limit_min;             
-  int32_t soft_limit_max;             
-  bool soft_limit_enabled;            
-  uint32_t limit_violation_count;     
-  int32_t position_at_stop;           
-  speed_profile_t saved_speed_profile; 
-  float commanded_speed_mm_s;
-  int32_t homing_trigger_pos; // Diagnostics
-} motion_axis_t;
+class Axis {
+public:
+    Axis(); 
+    void init(uint8_t axis_id);
+    void updateState(int32_t current_pos, int32_t global_target);
+    bool checkSoftLimits(bool strict_mode); 
 
-// Init
+    uint8_t id;
+    int32_t position;                   
+    int32_t target_position;            
+    motion_state_t state;               
+    
+    bool enabled;                       
+    int32_t soft_limit_min;             
+    int32_t soft_limit_max;             
+    bool soft_limit_enabled;            
+    
+    float commanded_speed_mm_s;
+    speed_profile_t saved_speed_profile; 
+    int32_t position_at_stop;           
+    uint32_t state_entry_ms;            
+    int32_t homing_trigger_pos;
+
+private:
+    bool _error_logged; 
+};
+
+// --- DATA ACCESS ---
+// Removed direct array access to enforce encapsulation
+const Axis* motionGetAxis(uint8_t axis); 
+
+// --- CORE CONTROL API ---
 void motionInit();
 void motionUpdate();
 
-// Control
-void motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
-void motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s);
-void motionStop();
-void motionPause();
-void motionResume();
+bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
+bool motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s);
+bool motionHome(uint8_t axis); 
+
+bool motionStop();
+bool motionPause();   
+bool motionResume();  
+
 void motionEmergencyStop();
 bool motionClearEmergencyStop();
-bool motionIsEmergencyStopped();
 
-// Homing
-void motionHome(uint8_t axis); 
+// --- CONFIGURATION ---
+void motionSetFeedOverride(float factor);
+float motionGetFeedOverride();
+void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos);
+void motionEnableSoftLimits(uint8_t axis, bool enable);
+bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos);
+void motionSetStrictLimits(bool enable);
+void motionEnableEncoderFeedback(bool enable);
+bool motionIsEncoderFeedbackEnabled();
 
-// State
+// --- DIAGNOSTICS ---
+void motionDiagnostics(); 
+
+// --- ACCESSORS ---
 int32_t motionGetPosition(uint8_t axis);
 int32_t motionGetTarget(uint8_t axis);
 float motionGetPositionMM(uint8_t axis); 
 motion_state_t motionGetState(uint8_t axis);
 bool motionIsMoving();
 bool motionIsStalled(uint8_t axis);
-uint8_t motionGetActiveAxis(); 
-
-// Feed Override
-void motionSetFeedOverride(float factor);
-float motionGetFeedOverride();
-
-void motionDiagnostics();
-
-// Limits & Internal
-void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos);
-void motionEnableSoftLimits(uint8_t axis, bool enable);
-bool motionGetSoftLimits(uint8_t axis, int32_t* min_pos, int32_t* max_pos);
-speed_profile_t motionMapSpeedToProfile(uint8_t axis, float requested_speed_mm_s);
-void motionSetPLCSpeedProfile(speed_profile_t profile);
-void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus_direction); 
-void motionEnableEncoderFeedback(bool enable);
-bool motionIsEncoderFeedbackEnabled();
-
-// NEW: Helper Declaration (Fixes LCD Error)
+bool motionIsEmergencyStopped();
+uint8_t motionGetActiveAxis();
 const char* motionStateToString(motion_state_t state);
 
-// Hardware Map
-extern const uint8_t AXIS_TO_I73_BIT[]; 
+// --- HELPERS ---
+speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed);
+void motionSetPLCSpeedProfile(speed_profile_t profile);
+void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
+
+extern const uint8_t AXIS_TO_I73_BIT[];
 extern const uint8_t AXIS_TO_CONSENSO_BIT[];
 
 #endif

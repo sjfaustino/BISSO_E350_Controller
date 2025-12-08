@@ -1,36 +1,59 @@
+/**
+ * @file encoder_motion_integration.cpp
+ * @brief Logic to cross-check encoder feedback against planner target (Gemini v3.5.19)
+ */
+
 #include "encoder_motion_integration.h"
 #include "safety.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "encoder_wj66.h"
+#include "motion.h"       
+#include "motion_state.h" 
+#include "config_unified.h"
+#include "config_keys.h"
+
+// Defined Defaults (Magic Number Fix)
+#define DEFAULT_ENCODER_ERROR_THRESHOLD 100000 
+#define DEFAULT_ERROR_TIMEOUT_MS 2000
 
 static position_error_t position_errors[4] = {
-  {0, 0, 100000, 0, 2000, false, 0},
-  {0, 0, 100000, 0, 2000, false, 0},
-  {0, 0, 100000, 0, 2000, false, 0},
-  {0, 0, 100000, 0, 2000, false, 0}
+  {0, 0, 0, 0, 0, false, 0},
+  {0, 0, 0, 0, 0, false, 0},
+  {0, 0, 0, 0, 0, false, 0},
+  {0, 0, 0, 0, 0, false, 0}
 };
 
 static bool encoder_feedback_enabled = false;
-static int32_t encoder_error_threshold = 100000;  
-static uint32_t max_error_duration_ms = 2000;     
+static int32_t encoder_error_threshold = DEFAULT_ENCODER_ERROR_THRESHOLD;  
+static uint32_t max_error_duration_ms = DEFAULT_ERROR_TIMEOUT_MS;     
 
-void encoderMotionInit(int32_t error_threshold, uint32_t max_error_time_ms) {
-  encoder_error_threshold = error_threshold;
-  max_error_duration_ms = max_error_time_ms;
+#ifndef KEY_ENC_ERR_THRESHOLD
+#define KEY_ENC_ERR_THRESHOLD "enc_thresh" 
+#endif
+
+void encoderMotionInit(int32_t default_threshold, uint32_t default_timeout) {
+  // Load from Config System
+  encoder_error_threshold = configGetInt(KEY_ENC_ERR_THRESHOLD, default_threshold > 0 ? default_threshold : DEFAULT_ENCODER_ERROR_THRESHOLD);
+  max_error_duration_ms = configGetInt(KEY_STALL_TIMEOUT, default_timeout > 0 ? default_timeout : DEFAULT_ERROR_TIMEOUT_MS);
+  
+  logInfo("[ENC_INT] Loading Config: Thresh=%ld, Timeout=%lu ms", 
+          (long)encoder_error_threshold, (unsigned long)max_error_duration_ms);
+
   for (int i = 0; i < 4; i++) {
-    position_errors[i].error_threshold = error_threshold;
-    position_errors[i].max_error_time_ms = max_error_time_ms;
+    position_errors[i].error_threshold = encoder_error_threshold;
+    position_errors[i].max_error_time_ms = max_error_duration_ms;
     position_errors[i].current_error = 0;
     position_errors[i].max_error = 0;
     position_errors[i].error_active = false;
     position_errors[i].error_count = 0;
     position_errors[i].error_time_ms = 0; 
   }
-  Serial.println("[ENC_INT] Initialized");
 }
 
 bool encoderMotionUpdate() {
+  if (!encoder_feedback_enabled) return true;
+
   encoder_status_t status = wj66GetStatus();
   if (status != ENCODER_OK) {
     if (status == ENCODER_TIMEOUT) {
@@ -44,20 +67,19 @@ bool encoderMotionUpdate() {
   
   for (int i = 0; i < 4; i++) {
     if (wj66IsStale(i)) {
-      logWarning("Encoder %d stale (%lu ms)", i, (unsigned long)wj66GetAxisAge(i));
-      faultLogEntry(FAULT_WARNING, FAULT_ENCODER_TIMEOUT, i, wj66GetAxisAge(i), "Encoder Stale");
       all_valid = false;
       continue;
     }
     
     int32_t encoder_pos = wj66GetPosition(i);
-    int32_t motion_pos = motionGetPosition(i); 
+    int32_t target_pos = motionGetTarget(i); 
+    motion_state_t state = motionGetState(i);
 
     int32_t error = 0;
-    if (motionGetState(i) == MOTION_EXECUTING) {
-      error = encoder_pos - motionGetTarget(i); 
+    if (state == MOTION_IDLE) {
+        error = encoder_pos - target_pos;
     } else {
-      error = encoder_pos - motion_pos;
+        error = 0; 
     }
     
     position_errors[i].current_error = error;
@@ -71,13 +93,11 @@ bool encoderMotionUpdate() {
         position_errors[i].error_time_ms = now; 
         position_errors[i].error_count++;
         
-        logWarning("Axis %d error: %ld (limit %ld)", i, (long)error, (long)encoder_error_threshold);
-        faultLogEntry(FAULT_WARNING, FAULT_ENCODER_SPIKE, i, error, "Axis deviation"); 
+        logWarning("Axis %d Drift Error: %ld (Limit: %ld)", i, (long)error, (long)encoder_error_threshold);
+        faultLogEntry(FAULT_WARNING, FAULT_ENCODER_SPIKE, i, error, "Axis Drift (Static)"); 
       }
     } else {
       if (position_errors[i].error_active) {
-        uint32_t duration = now - position_errors[i].error_time_ms;
-        logInfo("Axis %d error cleared (%lu ms)", i, (unsigned long)duration);
         position_errors[i].error_active = false;
         position_errors[i].error_time_ms = 0; 
       }
@@ -85,6 +105,8 @@ bool encoderMotionUpdate() {
   }
   return all_valid;
 }
+
+// --- Accessors ---
 
 int32_t encoderMotionGetPositionError(uint8_t axis) { return (axis < 4) ? position_errors[axis].current_error : 0; }
 int32_t encoderMotionGetMaxError(uint8_t axis) { return (axis < 4) ? position_errors[axis].max_error : 0; }
@@ -96,7 +118,6 @@ void encoderMotionResetError(uint8_t axis) {
     position_errors[axis].max_error = 0;
     position_errors[axis].error_active = false;
     position_errors[axis].error_time_ms = 0;
-    logInfo("[ENC_INT] Reset axis %d", axis);
   }
 }
 
@@ -116,11 +137,8 @@ void encoderMotionDiagnostics() {
   Serial.printf("Threshold: %.1f mm\n", encoder_error_threshold / 1000.0f);
   
   for (int i = 0; i < 4; i++) {
-    // FIX: Cast for printf
-    Serial.printf("Axis %d: Err=%.1f mm | Max=%.1f mm | State=%s | Dur=%lu ms\n",
+    Serial.printf("Axis %d: Err=%.1f mm | State=%s\n",
         i, position_errors[i].current_error / 1000.0f, 
-        position_errors[i].max_error / 1000.0f,
-        position_errors[i].error_active ? "[ERR]" : "[OK]",
-        (unsigned long)encoderMotionGetErrorDuration(i));
+        position_errors[i].error_active ? "[ERR]" : "[OK]");
   }
 }

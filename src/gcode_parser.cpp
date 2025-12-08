@@ -1,5 +1,11 @@
+/**
+ * @file gcode_parser.cpp
+ * @brief Simple G-Code Parser
+ */
+
 #include "gcode_parser.h"
 #include "motion.h"
+#include "motion_state.h" // <-- CRITICAL FIX: Provides motionGetPositionMM
 #include "motion_buffer.h"
 #include "config_unified.h"
 #include "config_keys.h"
@@ -78,6 +84,7 @@ void GCodeParser::handleG0_G1(const char* line) {
     if (!hasX && !hasY && !hasZ && !hasA) return;
 
     // 3. Fetch Current Positions (Physical Units)
+    // Needs motion_state.h included to work
     float curX = motionGetPositionMM(0);
     float curY = motionGetPositionMM(1);
     float curZ = motionGetPositionMM(2);
@@ -118,25 +125,22 @@ void GCodeParser::handleG0_G1(const char* line) {
     }
 
     // MULTI-AXIS DETECTED: Split into sequential moves
-    // We update the "current" tracking variable after each push so the next move
-    // starts where the previous one ended.
-    
     logInfo("[GCODE] Auto-Splitting %d-axis move...", activeCount);
 
     if (moveX) {
-        pushMove(targetX, curY, curZ, curA); // Move X, hold Y/Z/A
+        pushMove(targetX, curY, curZ, curA); 
         curX = targetX; 
     }
     if (moveY) {
-        pushMove(targetX, targetY, curZ, curA); // Move Y, hold X/Z/A
+        pushMove(targetX, targetY, curZ, curA); 
         curY = targetY;
     }
     if (moveZ) {
-        pushMove(targetX, targetY, targetZ, curA); // Move Z, hold X/Y/A
+        pushMove(targetX, targetY, targetZ, curA); 
         curZ = targetZ;
     }
     if (moveA) {
-        pushMove(targetX, targetY, targetZ, targetA); // Move A, hold X/Y/Z
+        pushMove(targetX, targetY, targetZ, targetA); 
     }
 }
 
@@ -151,7 +155,7 @@ void GCodeParser::pushMove(float x, float y, float z, float a) {
         }
         motionBuffer.push(x, y, z, a, currentFeedRate);
     } else {
-        // Direct Mode (Legacy) - Will fail if multi-axis splitting logic wasn't here!
+        // Direct Mode
         motionMoveAbsolute(x, y, z, a, currentFeedRate);
     }
 }
