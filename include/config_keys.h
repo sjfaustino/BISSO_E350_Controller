@@ -1,6 +1,6 @@
 /**
  * @file config_keys.h
- * @brief Central registry of NVS Configuration Keys (Gemini v3.5.19)
+ * @brief Central registry of NVS Configuration Keys (Gemini v3.5.22)
  */
 
 #ifndef CONFIG_KEYS_H
@@ -41,10 +41,14 @@
 #define KEY_MOTION_DEADBAND "mot_deadband"
 #define KEY_MOTION_BUFFER_ENABLE "mot_buf_en"
 #define KEY_MOTION_STRICT_LIMITS "mot_strict"
-#define KEY_STOP_TIMEOUT "stop_timeout" // <-- New Key
+#define KEY_STOP_TIMEOUT "stop_timeout"
 
 // --- SAFETY ---
 #define KEY_ALARM_PIN "alarm_pin"
 #define KEY_STALL_TIMEOUT "stall_ms"
+
+// --- WCS OFFSETS (Generated Keys) ---
+// Base keys, suffixes will be appended (e.g. "g54_x")
+#define KEY_WCS_PREFIX "g" 
 
 #endif

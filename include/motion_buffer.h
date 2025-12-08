@@ -1,22 +1,19 @@
 /**
  * @file motion_buffer.h
- * @brief Ring Buffer for G-Code Look-Ahead
- * @project Gemini v1.3.0
+ * @brief Ring Buffer for Motion Commands (Gemini v3.5.23)
  */
 
 #ifndef MOTION_BUFFER_H
 #define MOTION_BUFFER_H
 
-#include <Arduino.h>
-#include "motion.h"
+#include <stdint.h>
+#include <stddef.h>
 
-// Buffer Depth (Number of pending moves)
-#define MOTION_BUFFER_DEPTH 16
+#define MOTION_BUFFER_SIZE 32 // Power of 2 for efficiency
 
 typedef struct {
     float x, y, z, a;
     float speed_mm_s;
-    bool is_valid;
 } motion_cmd_t;
 
 class MotionBuffer {
@@ -24,24 +21,25 @@ public:
     MotionBuffer();
     void init();
     
-    // Producer Methods
+    // Core Ops
     bool push(float x, float y, float z, float a, float speed);
-    bool isFull();
-    bool isEmpty();
-    
-    // Consumer Methods
     bool pop(motion_cmd_t* cmd);
     bool peek(motion_cmd_t* cmd);
     
-    // Management
+    // State Ops
+    bool isFull();
+    bool isEmpty();
     void clear();
-    uint32_t getCount();
+    
+    // NEW: Added for Grbl Status Reporting
+    int available();     // Returns number of items currently in buffer
+    int getCapacity();   // Returns total size (32)
 
 private:
-    motion_cmd_t buffer[MOTION_BUFFER_DEPTH];
-    volatile uint32_t head;
-    volatile uint32_t tail;
-    volatile uint32_t count;
+    motion_cmd_t buffer[MOTION_BUFFER_SIZE];
+    volatile uint8_t head;
+    volatile uint8_t tail;
+    volatile int count;
 };
 
 extern MotionBuffer motionBuffer;
