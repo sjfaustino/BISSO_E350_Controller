@@ -1,3 +1,8 @@
+/**
+ * @file config_keys.h
+ * @brief Central registry of NVS Configuration Keys (Gemini v3.5.19)
+ */
+
 #ifndef CONFIG_KEYS_H
 #define CONFIG_KEYS_H
 
@@ -16,15 +21,15 @@
 #define KEY_PPM_Y "ppm_y"
 #define KEY_PPM_Z "ppm_z"
 #define KEY_PPM_A "ppm_a"
+#define KEY_ENC_ERR_THRESHOLD "enc_thresh" 
 
-// --- SPEED PROFILES (Cutting) ---
+// --- SPEED PROFILES ---
 #define KEY_SPEED_CAL_X "spd_x"
 #define KEY_SPEED_CAL_Y "spd_y"
 #define KEY_SPEED_CAL_Z "spd_z"
 #define KEY_SPEED_CAL_A "spd_a"
 
-// --- HOMING PROFILES (Dedicated) ---
-// Value: 0=Slow, 1=Med, 2=Fast
+// --- HOMING ---
 #define KEY_HOME_PROFILE_FAST "home_prof_fast" 
 #define KEY_HOME_PROFILE_SLOW "home_prof_slow"
 
@@ -36,6 +41,7 @@
 #define KEY_MOTION_DEADBAND "mot_deadband"
 #define KEY_MOTION_BUFFER_ENABLE "mot_buf_en"
 #define KEY_MOTION_STRICT_LIMITS "mot_strict"
+#define KEY_STOP_TIMEOUT "stop_timeout" // <-- New Key
 
 // --- SAFETY ---
 #define KEY_ALARM_PIN "alarm_pin"

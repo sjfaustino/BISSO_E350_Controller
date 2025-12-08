@@ -1,7 +1,7 @@
 /**
  * @file config_unified.cpp
- * @brief Unified Configuration Manager (NVS) v3.5.13
- * @details Implements Input Validation and Hardened String Buffer Pool.
+ * @brief Unified Configuration Manager (NVS) v3.5.20
+ * @details Implements Input Validation, Hardened String Pool, and Dump Utility.
  * @author Sergio Faustino
  */
 
@@ -30,7 +30,7 @@ static uint32_t last_nvs_save = 0;
 #define NVS_CONFIG_SAVE_INTERVAL_MS 5000 
 #define NVS_SAVE_ON_CRITICAL true        
 
-// Critical keys triggers immediate write to flash to prevent data loss
+// Critical keys trigger immediate write to flash to prevent data loss
 static const char* critical_keys[] = {
   KEY_PPM_X, KEY_PPM_Y, KEY_PPM_Z, KEY_PPM_A,
   KEY_X_LIMIT_MIN, KEY_X_LIMIT_MAX,
@@ -113,7 +113,7 @@ static int32_t validateInt(const char* key, int32_t value) {
     if (strcmp(key, KEY_PPM_X) == 0 || strcmp(key, KEY_PPM_Y) == 0 ||
         strcmp(key, KEY_PPM_Z) == 0 || strcmp(key, KEY_PPM_A) == 0) {
         if (value <= 0) {
-            logError("[CONFIG] Invalid PPM value %d (Must be > 0)", value);
+            logError("[CONFIG] Invalid PPM value %d (Must be > 0)", (long)value);
             return 1000; // Default safe value
         }
     }
@@ -183,7 +183,7 @@ void configUnifiedLoad() {
         const char* key = critical_keys[i];
         
         if (prefs.isKey(key)) {
-            // Heuristic for types
+            // Heuristic for types based on key name content
             if (strstr(key, "accel") || strstr(key, "speed")) {
                 float val = prefs.getFloat(key, 0.0f);
                 addToCacheFloat(key, val);
@@ -278,9 +278,9 @@ void configSetInt(const char* key, int32_t value) {
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putInt(key, value);
     config_dirty = false; 
-    logInfo("[CONFIG] Set %s = %d (Saved)", key, (long)value);
+    logInfo("[CONFIG] Set %s = %ld (Saved)", key, (long)value);
   } else {
-    logInfo("[CONFIG] Set %s = %d (Cached)", key, (long)value);
+    logInfo("[CONFIG] Set %s = %ld (Cached)", key, (long)value);
   }
 }
 
@@ -348,6 +348,7 @@ void configUnifiedSave() {
   logInfo("[CONFIG] Flushing NVS...");
   for (int i = 0; i < config_count; i++) {
     if (!config_table[i].is_set) continue;
+    // Skip if critical key (already write-through)
     if (config_table[i].type == CONFIG_INT32 && isCriticalKey(config_table[i].key)) continue;
 
     switch(config_table[i].type) {
@@ -365,7 +366,9 @@ void configUnifiedReset() {
   prefs.clear(); 
   configSetDefaults();
   
-  configSetInt(KEY_X_LIMIT_MIN, -500000); configSetInt(KEY_X_LIMIT_MAX, 500000);
+  // Safe defaults
+  configSetInt(KEY_X_LIMIT_MIN, -500000); 
+  configSetInt(KEY_X_LIMIT_MAX, 500000);
   
   logInfo("[CONFIG] Reset Complete. Reboot recommended.");
 }
@@ -384,4 +387,27 @@ void configUnifiedDiagnostics() {
   Serial.printf("Buffer Enable: %s\n", configGetInt(KEY_MOTION_BUFFER_ENABLE, 1) ? "YES" : "NO");
   Serial.printf("Total Keys: %d\n", config_count);
   Serial.println("==========================\n");
+}
+
+// Added for CLI 'config dump' command
+void configUnifiedPrintAll() {
+    for (int i = 0; i < config_count; i++) {
+        if (!config_table[i].is_set) continue;
+        
+        // Pad key for alignment
+        Serial.printf("%-30s | ", config_table[i].key);
+        
+        switch(config_table[i].type) {
+            case CONFIG_INT32: 
+                Serial.printf("%ld", (long)config_table[i].value.int_val); 
+                break;
+            case CONFIG_FLOAT: 
+                Serial.printf("%.3f", config_table[i].value.float_val); 
+                break;
+            case CONFIG_STRING: 
+                Serial.printf("\"%s\"", config_table[i].value.str_val); 
+                break;
+        }
+        Serial.println();
+    }
 }

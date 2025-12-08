@@ -1,7 +1,7 @@
 /**
  * @file motion.h
- * @brief Core Motion Engine Definitions & API (Gemini v3.5.18)
- * @details Updated API signatures to return bool for error handling consistency.
+ * @brief Core Motion Engine Definitions & API (Gemini v3.5.19)
+ * @details Final Polish: Full Encapsulation of Axis Array.
  */
 
 #ifndef MOTION_H
@@ -15,10 +15,8 @@
 #define MOTION_CONSENSO_TIMEOUT_MS 5000 
 #define HOMING_SETTLE_MS 1000
 
-// Speed Profiles
 typedef enum { SPEED_PROFILE_1=0, SPEED_PROFILE_2=1, SPEED_PROFILE_3=2 } speed_profile_t;
 
-// Motion States
 typedef enum { 
   MOTION_IDLE = 0,
   MOTION_WAIT_CONSENSO = 1, 
@@ -32,7 +30,6 @@ typedef enum {
   MOTION_HOMING_SETTLE = 9 
 } motion_state_t;
 
-// --- THE AXIS CLASS ---
 class Axis {
 public:
     Axis(); 
@@ -40,19 +37,16 @@ public:
     void updateState(int32_t current_pos, int32_t global_target);
     bool checkSoftLimits(bool strict_mode); 
 
-    // Public State
     uint8_t id;
     int32_t position;                   
     int32_t target_position;            
     motion_state_t state;               
     
-    // Configuration
     bool enabled;                       
     int32_t soft_limit_min;             
     int32_t soft_limit_max;             
     bool soft_limit_enabled;            
     
-    // Internals
     float commanded_speed_mm_s;
     speed_profile_t saved_speed_profile; 
     int32_t position_at_stop;           
@@ -63,27 +57,26 @@ private:
     bool _error_logged; 
 };
 
-extern Axis axes[MOTION_AXES];
+// --- DATA ACCESS ---
+// Removed direct array access to enforce encapsulation
+const Axis* motionGetAxis(uint8_t axis); 
 
-// --- CORE CONTROL API (Updated to return bool) ---
+// --- CORE CONTROL API ---
 void motionInit();
 void motionUpdate();
 
-// Motion Commands
 bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
 bool motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s);
 bool motionHome(uint8_t axis); 
 
-// State Commands
 bool motionStop();
 bool motionPause();   
 bool motionResume();  
 
-// Safety (E-Stop always succeeds/void)
 void motionEmergencyStop();
 bool motionClearEmergencyStop();
 
-// --- CONFIGURATION WRAPPERS ---
+// --- CONFIGURATION ---
 void motionSetFeedOverride(float factor);
 float motionGetFeedOverride();
 void motionSetSoftLimits(uint8_t axis, int32_t min_pos, int32_t max_pos);
@@ -96,12 +89,22 @@ bool motionIsEncoderFeedbackEnabled();
 // --- DIAGNOSTICS ---
 void motionDiagnostics(); 
 
+// --- ACCESSORS ---
+int32_t motionGetPosition(uint8_t axis);
+int32_t motionGetTarget(uint8_t axis);
+float motionGetPositionMM(uint8_t axis); 
+motion_state_t motionGetState(uint8_t axis);
+bool motionIsMoving();
+bool motionIsStalled(uint8_t axis);
+bool motionIsEmergencyStopped();
+uint8_t motionGetActiveAxis();
+const char* motionStateToString(motion_state_t state);
+
 // --- HELPERS ---
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed);
 void motionSetPLCSpeedProfile(speed_profile_t profile);
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
 
-// Hardware Map Arrays
 extern const uint8_t AXIS_TO_I73_BIT[];
 extern const uint8_t AXIS_TO_CONSENSO_BIT[];
 

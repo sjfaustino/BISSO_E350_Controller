@@ -1,7 +1,7 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer (Gemini v3.5.18)
- * @details Implemented consistent Error Handling (bool returns).
+ * @brief Real-Time Hardware Execution Layer (Gemini v3.5.19)
+ * @details Final Polish: Encapsulation, Configurable Timeouts, Stall Logic.
  * @author Sergio Faustino
  */
 
@@ -18,7 +18,7 @@
 #include "encoder_calibration.h" 
 #include "config_unified.h" 
 #include "config_keys.h"
-#include "encoder_motion_integration.h"
+#include "encoder_motion_integration.h" 
 #include <math.h>
 #include <stdlib.h> 
 #include <stdio.h>
@@ -29,7 +29,8 @@
 // STATE OWNERSHIP
 // ============================================================================
 
-Axis axes[MOTION_AXES]; 
+// FIX: Made static to enforce encapsulation
+static Axis axes[MOTION_AXES]; 
 
 static struct {
     uint8_t active_axis;
@@ -110,6 +111,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
         case MOTION_EXECUTING:
             if ((m_state.active_start_position < target_position && position >= target_position) ||
                 (m_state.active_start_position > target_position && position <= target_position)) {
+                
                 state = MOTION_STOPPING;
                 state_entry_ms = millis();
                 position_at_stop = position; 
@@ -122,10 +124,14 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
                 state = MOTION_IDLE;
                 m_state.active_axis = 255; 
             }
-            else if (millis() - state_entry_ms > 5000) {
-                logWarning("[AXIS %d] Stop Settlement Timeout", id);
-                state = MOTION_IDLE;
-                m_state.active_axis = 255;
+            else {
+                // FIX: Configurable Timeout
+                uint32_t timeout = configGetInt(KEY_STOP_TIMEOUT, 5000);
+                if (millis() - state_entry_ms > timeout) {
+                    logWarning("[AXIS %d] Stop Settlement Timeout", id);
+                    state = MOTION_IDLE;
+                    m_state.active_axis = 255;
+                }
             }
             break;
 
@@ -186,7 +192,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 // ============================================================================
 
 void motionInit() {
-    logInfo("[MOTION] Init v3.5.18...");
+    logInfo("[MOTION] Init v3.5.19...");
     m_state.strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
     
     for(int i=0; i<MOTION_AXES; i++) {
@@ -237,6 +243,11 @@ void motionUpdate() {
 // PUBLIC ACCESSORS
 // ============================================================================
 
+// FIX: Read-only Accessor Implementation
+const Axis* motionGetAxis(uint8_t axis) {
+    return (axis < MOTION_AXES) ? &axes[axis] : nullptr;
+}
+
 int32_t motionGetPosition(uint8_t axis) {
     return (axis < MOTION_AXES) ? axes[axis].position : 0;
 }
@@ -270,7 +281,10 @@ bool motionIsMoving() {
             s == MOTION_HOMING_APPROACH_FAST || s == MOTION_HOMING_BACKOFF || s == MOTION_HOMING_APPROACH_FINE);
 }
 
-bool motionIsStalled(uint8_t axis) { return false; } 
+// FIX: Delegating to encoder integration instead of hardcoded false
+bool motionIsStalled(uint8_t axis) { 
+    return encoderMotionHasError(axis); 
+}
 
 bool motionIsEmergencyStopped() { return !m_state.global_enabled; }
 
@@ -293,7 +307,7 @@ const char* motionStateToString(motion_state_t state) {
 }
 
 // ============================================================================
-// CONTROL API (NOW RETURNS BOOL)
+// CONTROL API
 // ============================================================================
 
 bool motionHome(uint8_t axis) {
@@ -406,7 +420,6 @@ speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed) {
     return SPEED_PROFILE_3;
 }
 
-// WRAPPER UPDATES: Return the result of the call
 bool motionStartInternalMove(float x, float y, float z, float a, float speed_mm_s) { 
     return motionMoveAbsolute(x, y, z, a, speed_mm_s); 
 }
@@ -464,9 +477,6 @@ void motionEnableEncoderFeedback(bool enable) {
 bool motionIsEncoderFeedbackEnabled() { 
     return encoderMotionIsFeedbackActive(); 
 }
-
-bool motionIsValidStateTransition(uint8_t axis, motion_state_t new_state) { return true; }
-bool motionSetState(uint8_t axis, motion_state_t new_state) { if(axis>=4) return false; axes[axis].state=new_state; return true; }
 
 bool motionStop() {
     if (!taskLockMutex(taskGetMotionMutex(), 100)) return false;
