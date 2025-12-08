@@ -1,7 +1,6 @@
 /**
  * @file gcode_parser.cpp
- * @brief G-Code Parser with WCS Logic (Gemini v3.5.24)
- * @details Fixed signature mismatch.
+ * @brief G-Code Parser with WCS Logic (Gemini v3.5.25)
  */
 
 #include "gcode_parser.h"
@@ -62,8 +61,8 @@ void GCodeParser::getWCO(float* wco_array) {
     for(int i=0; i<4; i++) wco_array[i] = wcs_offsets[currentWCS][i];
 }
 
-// FIX: Signature matches header exactly (size_t)
 void GCodeParser::getParserState(char* buffer, size_t len) {
+    // Standard Grbl response string
     snprintf(buffer, len, "[GC:G%d G%d %s G94 M5]", 
         (motionIsMoving() ? 1 : 0), 
         (54 + currentWCS),
@@ -83,8 +82,8 @@ bool GCodeParser::processCommand(const char* line) {
         switch (cmd) {
             case 0:
             case 1:  handleG0_G1(line); break;
-            case 10: handleG10(line); break; 
-            case 54 ... 59: handleG5x(cmd - 54); break; 
+            case 10: handleG10(line); break; // G10 L20 P1...
+            case 54 ... 59: handleG5x(cmd - 54); break; // WCS Select
             case 90: handleG90(); break;
             case 91: handleG91(); break;
             case 92: handleG92(line); break;
@@ -111,6 +110,7 @@ bool GCodeParser::processCommand(const char* line) {
 }
 
 void GCodeParser::handleG10(const char* line) {
+    // G10 L20 P1 X0 Y0 (Set WCS G54 offset so current pos = 0)
     float pVal = 0, lVal = 0;
     if(!parseCode(line, 'L', lVal) || lVal != 20) return; 
     if(!parseCode(line, 'P', pVal)) pVal = 1; 
