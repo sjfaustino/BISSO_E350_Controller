@@ -1,7 +1,7 @@
 /**
  * @file plc_iface.h
- * @brief ELBO PLC I2C Interface Definitions (v3.5.10)
- * @details synchronized with plc_iface.cpp
+ * @brief ELBO PLC I2C Interface Definitions (v3.5.21)
+ * @details Updated input reading API to support error detection.
  */
 
 #ifndef PLC_IFACE_H
@@ -13,7 +13,6 @@
 // ============================================================================
 // I2C ADDRESS CONFIGURATION
 // ============================================================================
-// User defined addresses (Match your board jumpers!)
 #define ADDR_I73_INPUT  0x21  // Limit Switches & Sensors (PCF8574)
 #define ADDR_Q73_OUTPUT 0x22  // Relays & VFD Control   (PCF8574)
 
@@ -49,7 +48,15 @@
 // ============================================================================
 
 void elboInit(); 
-bool elboI73GetInput(uint8_t bit);
+
+/**
+ * @brief Reads a specific bit from the I73 input board.
+ * @param bit Bit index (0-7).
+ * @param success [Optional] Pointer to bool. Set to true if I2C read succeeded, false if failed.
+ * @return State of the bit (true/false). Returns stale cache if I2C fails.
+ */
+bool elboI73GetInput(uint8_t bit, bool* success = nullptr);
+
 void elboQ73SetRelay(uint8_t bit, bool state);
 void elboSetSpeedProfile(uint8_t profile_idx);
 void elboSetDirection(uint8_t axis, bool forward);
