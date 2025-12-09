@@ -10,6 +10,7 @@
 #include "motion.h"
 #include "motion_state.h"     // Read-only state access
 #include "api_file_manager.h" // Delegated file handling
+#include "network_manager.h"  // For captive portal detection
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -69,10 +70,33 @@ void WebServerManager::handleClient() {
 }
 
 void WebServerManager::setupRoutes() {
-    // 1. Static Files (Protected)
+    // 1. Captive Portal Detection Endpoints (NO AUTH - must respond to OS checks)
+    // These endpoints are used by devices to detect captive portals
+
+    // Apple iOS/macOS captive portal detection
+    server->on("/hotspot-detect.html", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->redirect("/");
+    });
+
+    // Android captive portal detection
+    server->on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->redirect("/");
+    });
+
+    // Microsoft Windows captive portal detection
+    server->on("/connecttest.txt", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->redirect("/");
+    });
+
+    // General captive portal success page (NO AUTH)
+    server->on("/success.txt", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send(200, "text/plain", "success");
+    });
+
+    // 2. Static Files (Protected)
     server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setAuthentication(http_username, http_password);
 
-    // 2. API Status (Protected)
+    // 3. API Status (Protected)
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request){
         if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
         
@@ -93,21 +117,32 @@ void WebServerManager::setupRoutes() {
         request->send(200, "application/json", response);
     });
 
-    // 3. API Jog (Protected)
-    server->on("/api/jog", HTTP_POST, 
-        [](AsyncWebServerRequest *request){ request->send(200); }, 
+    // 4. API Jog (Protected)
+    server->on("/api/jog", HTTP_POST,
+        [](AsyncWebServerRequest *request){ request->send(200); },
         NULL,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             this->handleJogBody(request, data, len, index, total);
         }
     ).setAuthentication(http_username, http_password);
-    
-    // 4. DELEGATE FILE MANAGEMENT
+
+    // 5. DELEGATE FILE MANAGEMENT
     // Registers /api/files (GET, DELETE) and /api/upload (POST)
     apiRegisterFileRoutes(server, http_username, http_password);
 
+    // 6. Captive Portal Fallback Handler
     server->onNotFound([](AsyncWebServerRequest *request){
-        request->send(404, "text/plain", "Not Found");
+        // Check if this is a captive portal request
+        String host = request->host();
+
+        // If the request is for a captive portal detection URL, redirect to root
+        if (networkManager.isCaptivePortalRequest(host)) {
+            Serial.printf("[WEB] Captive portal redirect: %s -> /\n", host.c_str());
+            request->redirect("/");
+        } else {
+            // Normal 404 for other requests
+            request->send(404, "text/plain", "Not Found");
+        }
     });
 }
 

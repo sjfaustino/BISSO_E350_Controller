@@ -6,10 +6,11 @@
 #include "config_keys.h"
 #include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
 #include <ArduinoOTA.h>
+#include <ESPmDNS.h>  // For hostname.local support
 
 NetworkManager networkManager;
 
-NetworkManager::NetworkManager() : telnetServer(nullptr), clientConnected(false) {}
+NetworkManager::NetworkManager() : telnetServer(nullptr), clientConnected(false), dnsServer(nullptr), captivePortalActive(false) {}
 
 void NetworkManager::init() {
     Serial.println("[NET] Initializing Network Stack...");
@@ -91,6 +92,9 @@ void NetworkManager::init() {
             Serial.print("[NET] [OK] AP IP: ");
             Serial.println(WiFi.softAPIP());
             Serial.println("[NET] [OK] Connect to AP and access http://192.168.4.1");
+
+            // Start Captive Portal DNS
+            startCaptivePortal();
         } else {
             Serial.println("[NET] [FAIL] Failed to start AP");
         }
@@ -103,9 +107,23 @@ void NetworkManager::init() {
         Serial.println("[NET] [WARN] Running in OFFLINE mode (no network)");
     }
 
-    // 2. OTA Setup
+    // 4. Get hostname for mDNS and OTA
     char hostname[32];
     configGetString(KEY_HOSTNAME, hostname, sizeof(hostname), "bisso-e350");
+
+    // 5. Start mDNS service for hostname.local access
+    if (MDNS.begin(hostname)) {
+        Serial.printf("[NET] [OK] mDNS started: %s.local\n", hostname);
+        MDNS.addService("http", "tcp", 80);
+
+        if (wifi_connected) {
+            Serial.printf("[NET] [OK] Access web UI at: http://%s.local\n", hostname);
+        }
+    } else {
+        Serial.println("[NET] [WARN] mDNS failed to start");
+    }
+
+    // 6. OTA Setup
     ArduinoOTA.setHostname(hostname);
     ArduinoOTA.setPassword("admin123"); // Secure OTA
 
@@ -131,7 +149,7 @@ void NetworkManager::init() {
     });
     ArduinoOTA.begin();
 
-    // 3. Telnet Server
+    // 7. Telnet Server
     telnetServer = new WiFiServer(TELNET_PORT);
     telnetServer->begin();
     telnetServer->setNoDelay(true);
@@ -142,7 +160,15 @@ void NetworkManager::update() {
     // 1. Handle OTA
     ArduinoOTA.handle();
 
-    // 2. Handle Telnet
+    // 2. Handle mDNS
+    MDNS.update();
+
+    // 3. Handle DNS Server (Captive Portal)
+    if (dnsServer) {
+        dnsServer->processNextRequest();
+    }
+
+    // 4. Handle Telnet
     if (telnetServer->hasClient()) {
         if (!telnetClient || !telnetClient.connected()) {
             if (telnetClient) telnetClient.stop();
@@ -183,4 +209,66 @@ void NetworkManager::telnetPrintln(const char* str) {
     if (telnetClient && telnetClient.connected()) {
         telnetClient.println(str);
     }
+}
+
+// ======================================
+// CAPTIVE PORTAL METHODS
+// ======================================
+
+void NetworkManager::startCaptivePortal() {
+    if (!dnsServer) {
+        dnsServer = new DNSServer();
+
+        // Redirect all DNS requests to the AP IP (192.168.4.1)
+        // This makes all hostnames resolve to the ESP32
+        if (dnsServer->start(DNS_PORT, "*", WiFi.softAPIP())) {
+            captivePortalActive = true;
+            Serial.println("[NET] [OK] Captive Portal DNS started");
+            Serial.println("[NET] [OK] All DNS requests redirect to web UI");
+        } else {
+            Serial.println("[NET] [WARN] Captive Portal DNS failed to start");
+            delete dnsServer;
+            dnsServer = nullptr;
+        }
+    }
+}
+
+void NetworkManager::stopCaptivePortal() {
+    if (dnsServer) {
+        dnsServer->stop();
+        delete dnsServer;
+        dnsServer = nullptr;
+        captivePortalActive = false;
+        Serial.println("[NET] Captive Portal stopped");
+    }
+}
+
+bool NetworkManager::isCaptivePortalRequest(const String& host) {
+    // Check if request is likely from captive portal detection
+    // Captive portals try to access known URLs to detect internet connectivity
+
+    // If captive portal is not active, return false
+    if (!captivePortalActive) return false;
+
+    // Check for common captive portal detection hostnames
+    if (host.indexOf("captive.apple.com") >= 0) return true;
+    if (host.indexOf("connectivitycheck.gstatic.com") >= 0) return true;
+    if (host.indexOf("www.msftconnecttest.com") >= 0) return true;
+    if (host.indexOf("detectportal.firefox.com") >= 0) return true;
+    if (host.indexOf("nmcheck.gnome.org") >= 0) return true;
+
+    // If host is not our IP address and not our mDNS hostname, it's probably captive portal
+    char hostname[32];
+    configGetString(KEY_HOSTNAME, hostname, sizeof(hostname), "bisso-e350");
+
+    String local_hostname = String(hostname) + ".local";
+    String ap_ip = WiFi.softAPIP().toString();
+
+    // If host matches our hostname or IP, it's a direct request
+    if (host == local_hostname || host == ap_ip || host == "192.168.4.1") {
+        return false;
+    }
+
+    // Everything else when connected to AP is likely captive portal
+    return true;
 }
