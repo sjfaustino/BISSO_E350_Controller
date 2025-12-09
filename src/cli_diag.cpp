@@ -240,15 +240,133 @@ void cmd_encoder_main(int argc, char** argv) {
 // ============================================================================
 // I2C MAIN
 // ============================================================================
+void cmd_i2c_scan(int argc, char** argv) {
+    Serial.println("\n[I2C] === Scanning I2C Bus ===");
+    Serial.println("[I2C] Searching for devices on address range 0x03 - 0x77...");
+    Serial.println();
+
+    int devices_found = 0;
+
+    // Scan standard I2C address range (0x03 to 0x77)
+    // 0x00-0x02 and 0x78-0x7F are reserved
+    for (uint8_t address = 0x03; address <= 0x77; address++) {
+        // Try to read 1 byte from the device
+        uint8_t dummy;
+        i2c_result_t result = i2cReadWithRetry(address, &dummy, 1);
+
+        if (result == I2C_RESULT_OK) {
+            Serial.printf("[I2C] [FOUND] Device at 0x%02X", address);
+
+            // Identify known devices
+            if (address == ADDR_I73_INPUT) {
+                Serial.print(" (I73 INPUT - Limit Switches)");
+            } else if (address == ADDR_Q73_OUTPUT) {
+                Serial.print(" (Q73 OUTPUT - Relays/VFD)");
+            } else if (address == BOARD_INPUT_I2C_ADDR) {
+                Serial.print(" (BOARD INPUTS)");
+            }
+
+            Serial.println();
+            devices_found++;
+        }
+
+        // Small delay between scans to avoid bus congestion
+        delay(5);
+    }
+
+    Serial.println();
+    Serial.printf("[I2C] Scan complete. Found %d device(s)\n", devices_found);
+
+    if (devices_found == 0) {
+        Serial.println("[I2C] [WARN] No devices found!");
+        Serial.println("[I2C] Check:");
+        Serial.println("  - I2C wiring (SDA=GPIO4, SCL=GPIO5)");
+        Serial.println("  - Device power");
+        Serial.println("  - Pull-up resistors (typically 4.7k ohm)");
+        Serial.println("  - Try 'i2c recover' if bus is stuck");
+    }
+
+    // Show expected devices
+    Serial.println("\nExpected devices:");
+    Serial.println("  0x21 - I73 INPUT (Limit Switches & Sensors)");
+    Serial.println("  0x22 - Q73 OUTPUT (Relays & VFD Control)");
+    Serial.println("  0x24 - BOARD INPUTS");
+}
+
 void cmd_i2c_main(int argc, char** argv) {
     extern void i2cShowStats();
     extern void i2cRecoverBus();
     if (argc < 2) {
-        Serial.println("[I2C] Usage: i2c [diag | recover]");
+        Serial.println("[I2C] Usage: i2c [scan | diag | recover]");
+        Serial.println("  scan    - Scan I2C bus for devices");
+        Serial.println("  diag    - Show I2C statistics");
+        Serial.println("  recover - Recover stuck I2C bus");
         return;
     }
-    if (strcmp(argv[1], "diag") == 0) i2cShowStats();
+    if (strcmp(argv[1], "scan") == 0) cmd_i2c_scan(argc, argv);
+    else if (strcmp(argv[1], "diag") == 0) i2cShowStats();
     else if (strcmp(argv[1], "recover") == 0) i2cRecoverBus();
+    else Serial.printf("[I2C] Unknown subcommand '%s'\n", argv[1]);
+}
+
+// ============================================================================
+// PIN TEST COMMAND
+// ============================================================================
+void cmd_pins_main(int argc, char** argv) {
+    Serial.println("\n[PINS] === GPIO Pin Status ===");
+    Serial.println();
+
+    // I2C Pins
+    Serial.println("I2C Bus:");
+    Serial.printf("  GPIO %d (SDA): %s\n", PIN_I2C_SDA, digitalRead(PIN_I2C_SDA) ? "HIGH" : "LOW");
+    Serial.printf("  GPIO %d (SCL): %s\n", PIN_I2C_SCL, digitalRead(PIN_I2C_SCL) ? "HIGH" : "LOW");
+    Serial.println();
+
+    Serial.println("Note: For comprehensive I2C testing, use:");
+    Serial.println("  i2c scan    - Scan for I2C devices");
+    Serial.println("  i2c diag    - Show I2C statistics");
+    Serial.println("  i2c recover - Recover stuck I2C bus");
+    Serial.println();
+
+    // I2C Bus Health Check
+    Serial.println("I2C Bus Health:");
+    bool sda_state = digitalRead(PIN_I2C_SDA);
+    bool scl_state = digitalRead(PIN_I2C_SCL);
+
+    if (sda_state && scl_state) {
+        Serial.println("  [OK] Both SDA and SCL are HIGH (idle state)");
+    } else if (!sda_state && !scl_state) {
+        Serial.println("  [ERROR] Both SDA and SCL are LOW - Bus may be stuck!");
+        Serial.println("  Try: i2c recover");
+    } else if (!sda_state) {
+        Serial.println("  [WARN] SDA is LOW - Device may be holding bus");
+    } else if (!scl_state) {
+        Serial.println("  [WARN] SCL is LOW - Clock stretching or stuck bus");
+    }
+    Serial.println();
+
+    // Show I2C devices
+    Serial.println("Known I2C Devices:");
+    Serial.println("  0x21 - I73 INPUT (Limit Switches & Sensors)");
+    Serial.println("  0x22 - Q73 OUTPUT (Relays & VFD Control)");
+    Serial.println("  0x24 - BOARD INPUTS");
+    Serial.println();
+
+    Serial.println("Testing I2C device connectivity...");
+
+    const uint8_t test_addresses[] = {ADDR_I73_INPUT, ADDR_Q73_OUTPUT, BOARD_INPUT_I2C_ADDR};
+    const char* test_names[] = {"I73 INPUT", "Q73 OUTPUT", "BOARD INPUTS"};
+
+    for (int i = 0; i < 3; i++) {
+        uint8_t dummy;
+        i2c_result_t result = i2cReadWithRetry(test_addresses[i], &dummy, 1);
+
+        if (result == I2C_RESULT_OK) {
+            Serial.printf("  [OK] 0x%02X %s: Responding\n", test_addresses[i], test_names[i]);
+        } else {
+            Serial.printf("  [FAIL] 0x%02X %s: %s\n", test_addresses[i], test_names[i], i2cResultToString(result));
+        }
+    }
 }
 
 // ============================================================================
@@ -333,6 +451,7 @@ void debugAllHandler() {
 void cliRegisterDiagCommands() {
     cliRegisterCommand("faults", "Fault log management", cmd_faults_main);
     cliRegisterCommand("i2c", "I2C diagnostics", cmd_i2c_main);
+    cliRegisterCommand("pins", "GPIO pin status and I2C test", cmd_pins_main);
     cliRegisterCommand("encoder", "Encoder management", cmd_encoder_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
