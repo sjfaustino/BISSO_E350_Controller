@@ -26,8 +26,56 @@ void NetworkManager::init() {
     Serial.printf("[NET] AP Mode: %s\n", ap_mode);
     Serial.printf("[NET] AP SSID: %s\n", ap_ssid);
 
-    // 1. Try to connect to WiFi using saved credentials
+    // 1. Configure IP mode (DHCP or Static)
+    char ip_mode[16];
+    configGetString(KEY_IP_MODE, ip_mode, sizeof(ip_mode), "dhcp");
+
     WiFi.mode(WIFI_STA);
+
+    if (strcmp(ip_mode, "static") == 0) {
+        // Configure static IP
+        char static_ip_str[16];
+        char static_gw_str[16];
+        char static_sn_str[16];
+        char static_dns1_str[16];
+        char static_dns2_str[16];
+
+        configGetString(KEY_STATIC_IP, static_ip_str, sizeof(static_ip_str), "");
+        configGetString(KEY_STATIC_GATEWAY, static_gw_str, sizeof(static_gw_str), "");
+        configGetString(KEY_STATIC_SUBNET, static_sn_str, sizeof(static_sn_str), "255.255.255.0");
+        configGetString(KEY_STATIC_DNS1, static_dns1_str, sizeof(static_dns1_str), "8.8.8.8");
+        configGetString(KEY_STATIC_DNS2, static_dns2_str, sizeof(static_dns2_str), "8.8.4.4");
+
+        // Only configure static IP if IP address is set
+        if (strlen(static_ip_str) > 0) {
+            IPAddress static_ip, static_gw, static_sn, static_dns1, static_dns2;
+
+            if (static_ip.fromString(static_ip_str) &&
+                static_gw.fromString(static_gw_str) &&
+                static_sn.fromString(static_sn_str)) {
+
+                static_dns1.fromString(static_dns1_str);
+                static_dns2.fromString(static_dns2_str);
+
+                if (WiFi.config(static_ip, static_gw, static_sn, static_dns1, static_dns2)) {
+                    Serial.println("[NET] Static IP configuration applied");
+                    Serial.printf("[NET] IP: %s\n", static_ip_str);
+                    Serial.printf("[NET] Gateway: %s\n", static_gw_str);
+                    Serial.printf("[NET] Subnet: %s\n", static_sn_str);
+                } else {
+                    Serial.println("[NET] [WARN] Failed to apply static IP config, using DHCP");
+                }
+            } else {
+                Serial.println("[NET] [WARN] Invalid static IP configuration, using DHCP");
+            }
+        } else {
+            Serial.println("[NET] [WARN] Static IP not set, using DHCP");
+        }
+    } else {
+        Serial.println("[NET] IP Mode: DHCP (automatic)");
+    }
+
+    // 2. Try to connect to WiFi using saved credentials
     WiFi.begin();  // Use saved credentials from WiFiManager
 
     Serial.print("[NET] Connecting to WiFi");
@@ -44,11 +92,15 @@ void NetworkManager::init() {
     if (wifi_connected) {
         Serial.print("[NET] [OK] WiFi Connected. IP: ");
         Serial.println(WiFi.localIP());
+        Serial.print("[NET] [OK] Gateway: ");
+        Serial.println(WiFi.gatewayIP());
+        Serial.print("[NET] [OK] DNS: ");
+        Serial.println(WiFi.dnsIP());
     } else {
         Serial.println("[NET] [WARN] WiFi connection failed");
     }
 
-    // 2. Start Access Point based on mode
+    // 3. Start Access Point based on mode
     bool start_ap = false;
 
     if (strcmp(ap_mode, "always") == 0) {
@@ -73,7 +125,7 @@ void NetworkManager::init() {
         Serial.println("[NET] AP Mode: UNKNOWN, defaulting to ALWAYS ON");
     }
 
-    // 3. Configure WiFi mode and start AP if needed
+    // 4. Configure WiFi mode and start AP if needed
     if (start_ap) {
         if (wifi_connected) {
             // Both WiFi and AP (AP+STA mode)
@@ -107,11 +159,11 @@ void NetworkManager::init() {
         Serial.println("[NET] [WARN] Running in OFFLINE mode (no network)");
     }
 
-    // 4. Get hostname for mDNS and OTA
+    // 5. Get hostname for mDNS and OTA
     char hostname[32];
     configGetString(KEY_HOSTNAME, hostname, sizeof(hostname), "bisso-e350");
 
-    // 5. Start mDNS service for hostname.local access
+    // 6. Start mDNS service for hostname.local access
     if (MDNS.begin(hostname)) {
         Serial.printf("[NET] [OK] mDNS started: %s.local\n", hostname);
         MDNS.addService("http", "tcp", 80);
@@ -123,7 +175,7 @@ void NetworkManager::init() {
         Serial.println("[NET] [WARN] mDNS failed to start");
     }
 
-    // 6. OTA Setup
+    // 7. OTA Setup
     ArduinoOTA.setHostname(hostname);
     ArduinoOTA.setPassword("admin123"); // Secure OTA
 
@@ -149,7 +201,7 @@ void NetworkManager::init() {
     });
     ArduinoOTA.begin();
 
-    // 7. Telnet Server
+    // 8. Telnet Server
     telnetServer = new WiFiServer(TELNET_PORT);
     telnetServer->begin();
     telnetServer->setNoDelay(true);

@@ -57,4 +57,12 @@
 #define KEY_HOSTNAME "hostname"
 #define KEY_AP_MODE "ap_mode"  // Values: "always", "auto", "off"
 
+// WiFi Client IP Configuration
+#define KEY_IP_MODE "ip_mode"          // Values: "dhcp", "static"
+#define KEY_STATIC_IP "static_ip"      // Static IP address
+#define KEY_STATIC_GATEWAY "static_gw" // Static gateway
+#define KEY_STATIC_SUBNET "static_sn"  // Static subnet mask
+#define KEY_STATIC_DNS1 "static_dns1"  // Primary DNS server
+#define KEY_STATIC_DNS2 "static_dns2"  // Secondary DNS server
+
 #endif
