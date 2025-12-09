@@ -49,6 +49,11 @@
 
 // --- WCS OFFSETS (Generated Keys) ---
 // Base keys, suffixes will be appended (e.g. "g54_x")
-#define KEY_WCS_PREFIX "g" 
+#define KEY_WCS_PREFIX "g"
+
+// --- NETWORK / WIFI ---
+#define KEY_AP_SSID "ap_ssid"
+#define KEY_AP_PASSWORD "ap_password"
+#define KEY_HOSTNAME "hostname"
 
 #endif

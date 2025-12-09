@@ -2,6 +2,8 @@
 #include "serial_logger.h"
 #include "cli.h"
 #include "web_server.h"
+#include "config_unified.h"
+#include "config_keys.h"
 #include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
 #include <ArduinoOTA.h>
 
@@ -21,10 +23,17 @@ void NetworkManager::init() {
     
     // Config: Set timeout to 3 minutes (180s)
     // Note: setClass() is not supported in the Async version, so it was removed.
-    wm.setConfigPortalTimeout(180); 
-    
+    wm.setConfigPortalTimeout(180);
+
     // SSID and Password for the Configuration Access Point
-    bool res = wm.autoConnect("BISSO_SETUP", "setup1234"); 
+    // Read from NVS with defaults: BISSO_E350 / 1234
+    char ap_ssid[32];
+    char ap_password[64];
+    configGetString(KEY_AP_SSID, ap_ssid, sizeof(ap_ssid), "BISSO_E350");
+    configGetString(KEY_AP_PASSWORD, ap_password, sizeof(ap_password), "1234");
+
+    Serial.printf("[NET] AP SSID: %s\n", ap_ssid);
+    bool res = wm.autoConnect(ap_ssid, ap_password); 
 
     if(!res) {
         Serial.println("[NET] [FAIL] WiFi connection failed. Starting Offline Mode.");
@@ -39,7 +48,9 @@ void NetworkManager::init() {
     delete dns;
 
     // 2. OTA Setup
-    ArduinoOTA.setHostname("bisso-e350");
+    char hostname[32];
+    configGetString(KEY_HOSTNAME, hostname, sizeof(hostname), "bisso-e350");
+    ArduinoOTA.setHostname(hostname);
     ArduinoOTA.setPassword("admin123"); // Secure OTA
 
     ArduinoOTA.onStart([]() {
