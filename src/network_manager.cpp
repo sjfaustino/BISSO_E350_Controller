@@ -14,38 +14,94 @@ NetworkManager::NetworkManager() : telnetServer(nullptr), clientConnected(false)
 void NetworkManager::init() {
     Serial.println("[NET] Initializing Network Stack...");
 
-    // 1. WiFi Provisioning (Async Manager)
-    AsyncWebServer* provServer = new AsyncWebServer(80);
-    DNSServer* dns = new DNSServer();
-    
-    // FIX: Correct class name is AsyncWiFiManager (not ESPAsyncWiFiManager)
-    AsyncWiFiManager wm(provServer, dns);
-    
-    // Config: Set timeout to 3 minutes (180s)
-    // Note: setClass() is not supported in the Async version, so it was removed.
-    wm.setConfigPortalTimeout(180);
-
-    // SSID and Password for the Configuration Access Point
-    // Read from NVS with defaults: BISSO_E350 / 1234
+    // Read AP configuration from NVS
     char ap_ssid[32];
     char ap_password[64];
+    char ap_mode[16];
     configGetString(KEY_AP_SSID, ap_ssid, sizeof(ap_ssid), "BISSO_E350");
     configGetString(KEY_AP_PASSWORD, ap_password, sizeof(ap_password), "1234");
+    configGetString(KEY_AP_MODE, ap_mode, sizeof(ap_mode), "always");  // Default: always-on
 
+    Serial.printf("[NET] AP Mode: %s\n", ap_mode);
     Serial.printf("[NET] AP SSID: %s\n", ap_ssid);
-    bool res = wm.autoConnect(ap_ssid, ap_password); 
 
-    if(!res) {
-        Serial.println("[NET] [FAIL] WiFi connection failed. Starting Offline Mode.");
-        // We continue boot even without WiFi to allow local Motion control
-    } else {
+    // 1. Try to connect to WiFi using saved credentials
+    WiFi.mode(WIFI_STA);
+    WiFi.begin();  // Use saved credentials from WiFiManager
+
+    Serial.print("[NET] Connecting to WiFi");
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    Serial.println();
+
+    bool wifi_connected = (WiFi.status() == WL_CONNECTED);
+
+    if (wifi_connected) {
         Serial.print("[NET] [OK] WiFi Connected. IP: ");
         Serial.println(WiFi.localIP());
+    } else {
+        Serial.println("[NET] [WARN] WiFi connection failed");
     }
-    
-    // Clean up provisioning resources
-    delete provServer;
-    delete dns;
+
+    // 2. Start Access Point based on mode
+    bool start_ap = false;
+
+    if (strcmp(ap_mode, "always") == 0) {
+        // Always-on AP mode
+        start_ap = true;
+        Serial.println("[NET] AP Mode: ALWAYS ON");
+    } else if (strcmp(ap_mode, "auto") == 0) {
+        // Auto mode - AP only when WiFi fails
+        start_ap = !wifi_connected;
+        if (start_ap) {
+            Serial.println("[NET] AP Mode: AUTO (WiFi failed, starting AP)");
+        } else {
+            Serial.println("[NET] AP Mode: AUTO (WiFi connected, AP disabled)");
+        }
+    } else if (strcmp(ap_mode, "off") == 0) {
+        // AP disabled
+        start_ap = false;
+        Serial.println("[NET] AP Mode: OFF (AP disabled)");
+    } else {
+        // Unknown mode, default to always
+        start_ap = true;
+        Serial.println("[NET] AP Mode: UNKNOWN, defaulting to ALWAYS ON");
+    }
+
+    // 3. Configure WiFi mode and start AP if needed
+    if (start_ap) {
+        if (wifi_connected) {
+            // Both WiFi and AP (AP+STA mode)
+            WiFi.mode(WIFI_AP_STA);
+            Serial.println("[NET] WiFi Mode: AP+STA (Access Point + Station)");
+        } else {
+            // AP only
+            WiFi.mode(WIFI_AP);
+            Serial.println("[NET] WiFi Mode: AP (Access Point only)");
+        }
+
+        // Start the Access Point
+        bool ap_started = WiFi.softAP(ap_ssid, ap_password);
+        if (ap_started) {
+            Serial.printf("[NET] [OK] AP Started: %s\n", ap_ssid);
+            Serial.print("[NET] [OK] AP IP: ");
+            Serial.println(WiFi.softAPIP());
+            Serial.println("[NET] [OK] Connect to AP and access http://192.168.4.1");
+        } else {
+            Serial.println("[NET] [FAIL] Failed to start AP");
+        }
+    } else if (wifi_connected) {
+        // WiFi only mode
+        WiFi.mode(WIFI_STA);
+        Serial.println("[NET] WiFi Mode: STA (Station only)");
+    } else {
+        // No WiFi, No AP - offline mode
+        Serial.println("[NET] [WARN] Running in OFFLINE mode (no network)");
+    }
 
     // 2. OTA Setup
     char hostname[32];

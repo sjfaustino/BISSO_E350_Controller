@@ -55,5 +55,6 @@
 #define KEY_AP_SSID "ap_ssid"
 #define KEY_AP_PASSWORD "ap_password"
 #define KEY_HOSTNAME "hostname"
+#define KEY_AP_MODE "ap_mode"  // Values: "always", "auto", "off"
 
 #endif

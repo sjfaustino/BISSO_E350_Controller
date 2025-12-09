@@ -75,18 +75,80 @@ void cmd_wifi_ap(int argc, char** argv) {
         char ap_ssid[32];
         char ap_password[64];
         char hostname[32];
+        char ap_mode[16];
         configGetString(KEY_AP_SSID, ap_ssid, sizeof(ap_ssid), "BISSO_E350");
         configGetString(KEY_AP_PASSWORD, ap_password, sizeof(ap_password), "1234");
         configGetString(KEY_HOSTNAME, hostname, sizeof(hostname), "bisso-e350");
+        configGetString(KEY_AP_MODE, ap_mode, sizeof(ap_mode), "always");
 
         Serial.println("\n[WIFI] === Access Point Configuration ===");
+        Serial.printf("  AP Mode:     %s\n", ap_mode);
         Serial.printf("  AP SSID:     %s\n", ap_ssid);
         Serial.printf("  AP Password: ");
         for (size_t i = 0; i < strlen(ap_password); i++) Serial.print("*");
         Serial.printf(" (%d chars)\n", strlen(ap_password));
         Serial.printf("  Hostname:    %s\n", hostname);
-        Serial.println("\nNote: AP activates when WiFi connection fails");
-        Serial.println("Usage: wifi ap [ssid|password|hostname|reset] <value>");
+        Serial.println("\nAP Modes:");
+        Serial.println("  always - AP always on (even when WiFi connected)");
+        Serial.println("  auto   - AP only when WiFi fails");
+        Serial.println("  off    - AP disabled");
+        Serial.println("\nCurrent Status:");
+        if (WiFi.getMode() == WIFI_AP_STA) {
+            Serial.println("  WiFi:  Connected");
+            Serial.printf("  WiFi IP: %s\n", WiFi.localIP().toString().c_str());
+            Serial.println("  AP:    Running");
+            Serial.printf("  AP IP:   %s\n", WiFi.softAPIP().toString().c_str());
+        } else if (WiFi.getMode() == WIFI_AP) {
+            Serial.println("  WiFi:  Disconnected");
+            Serial.println("  AP:    Running");
+            Serial.printf("  AP IP:   %s\n", WiFi.softAPIP().toString().c_str());
+        } else if (WiFi.getMode() == WIFI_STA) {
+            Serial.println("  WiFi:  Connected");
+            Serial.printf("  WiFi IP: %s\n", WiFi.localIP().toString().c_str());
+            Serial.println("  AP:    Off");
+        } else {
+            Serial.println("  WiFi:  Disconnected");
+            Serial.println("  AP:    Off");
+        }
+        Serial.println("\nUsage: wifi ap [mode|ssid|password|hostname|reset] <value>");
+        return;
+    }
+
+    // wifi ap mode <always|auto|off>
+    if (strcmp(argv[1], "mode") == 0) {
+        if (argc < 3) {
+            char ap_mode[16];
+            configGetString(KEY_AP_MODE, ap_mode, sizeof(ap_mode), "always");
+            Serial.println("\n[WIFI] === AP Mode ===");
+            Serial.printf("Current: %s\n", ap_mode);
+            Serial.println("\nAvailable modes:");
+            Serial.println("  always - AP always on (recommended for standalone use)");
+            Serial.println("  auto   - AP only when WiFi connection fails");
+            Serial.println("  off    - AP completely disabled");
+            Serial.println("\nUsage: wifi ap mode <always|auto|off>");
+            return;
+        }
+
+        // Validate mode
+        if (strcmp(argv[2], "always") != 0 && strcmp(argv[2], "auto") != 0 && strcmp(argv[2], "off") != 0) {
+            Serial.println("[WIFI] Error: Invalid mode");
+            Serial.println("Valid modes: always, auto, off");
+            return;
+        }
+
+        configSetString(KEY_AP_MODE, argv[2]);
+        Serial.printf("[WIFI] AP mode set to: %s\n", argv[2]);
+
+        if (strcmp(argv[2], "always") == 0) {
+            Serial.println("[WIFI] AP will always run (even when WiFi connected)");
+            Serial.println("[WIFI] Access web UI at http://192.168.4.1 from AP");
+        } else if (strcmp(argv[2], "auto") == 0) {
+            Serial.println("[WIFI] AP will only run when WiFi connection fails");
+        } else if (strcmp(argv[2], "off") == 0) {
+            Serial.println("[WIFI] AP disabled completely");
+        }
+
+        Serial.println("[WIFI] Changes take effect after reboot");
         return;
     }
 
@@ -165,19 +227,21 @@ void cmd_wifi_ap(int argc, char** argv) {
 
     // wifi ap reset
     if (strcmp(argv[1], "reset") == 0) {
+        configSetString(KEY_AP_MODE, "always");
         configSetString(KEY_AP_SSID, "BISSO_E350");
         configSetString(KEY_AP_PASSWORD, "1234");
         configSetString(KEY_HOSTNAME, "bisso-e350");
         Serial.println("[WIFI] AP configuration reset to factory defaults:");
+        Serial.println("  AP Mode:     always");
         Serial.println("  AP SSID:     BISSO_E350");
         Serial.println("  AP Password: 1234");
         Serial.println("  Hostname:    bisso-e350");
-        Serial.println("[WIFI] Changes take effect on next WiFi failure or reboot");
+        Serial.println("[WIFI] Changes take effect after reboot");
         return;
     }
 
     Serial.printf("[WIFI] Error: Unknown parameter '%s'\n", argv[1]);
-    Serial.println("Usage: wifi ap [ssid|password|hostname|reset] <value>");
+    Serial.println("Usage: wifi ap [mode|ssid|password|hostname|reset] <value>");
 }
 
 void cmd_wifi_main(int argc, char** argv) {
@@ -190,6 +254,7 @@ void cmd_wifi_main(int argc, char** argv) {
         Serial.println("  wifi connect <ssid> <password> - Connect to WiFi network");
         Serial.println("  wifi status                    - Show connection status");
         Serial.println("  wifi ap                        - Show/configure Access Point");
+        Serial.println("  wifi ap mode <always|auto|off> - Set AP mode");
         Serial.println("  wifi ap ssid <name>            - Set AP SSID");
         Serial.println("  wifi ap password <password>    - Set AP password");
         Serial.println("  wifi ap hostname <name>        - Set device hostname");
