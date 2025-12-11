@@ -56,25 +56,25 @@ void cmd_selftest(int argc, char** argv) {
 
     // 1. I2C Bus Validation
     Serial.println("[TEST] 1. Checking I2C Devices...");
-    
+
     // Ensure these constants match plc_iface.h
     const uint8_t addresses[] = {
-        ADDR_I73_INPUT, 
-        ADDR_Q73_OUTPUT, 
+        ADDR_I73_INPUT,
+        ADDR_Q73_OUTPUT,
         BOARD_INPUT_I2C_ADDR
     };
     const char* names[] = {
-        "I73 INPUT (0x21)", 
-        "Q73 OUTPUT (0x22)", 
+        "I73 INPUT (0x21)",
+        "Q73 OUTPUT (0x22)",
         "BOARD_INPUTS (0x24)"
     };
-    
+
     // Check 3 devices
     for(int i=0; i<3; i++) {
         uint8_t dummy;
         // Simple read to ping the device
         i2c_result_t res = i2cReadWithRetry(addresses[i], &dummy, 1);
-        
+
         if(res == I2C_RESULT_OK) {
             Serial.printf("  [PASS] %s: OK\n", names[i]);
         } else {
@@ -236,19 +236,7 @@ void cmd_encoder_main(int argc, char** argv) {
     else if (strcmp(argv[1], "baud") == 0) cmd_encoder_baud_detect(argc, argv);
 }
 
-// ============================================================================
-// I2C MAIN
-// ============================================================================
-void cmd_i2c_main(int argc, char** argv) {
-    extern void i2cShowStats();
-    extern void i2cRecoverBus();
-    if (argc < 2) { 
-        Serial.println("[I2C] Usage: i2c [diag | recover]");
-        return;
-    }
-    if (strcmp(argv[1], "diag") == 0) i2cShowStats();
-    else if (strcmp(argv[1], "recover") == 0) i2cRecoverBus();
-}
+// Note: I2C commands have been moved to cli_i2c.cpp for better organization
 
 // ============================================================================
 // SCHEDULER DISPATCHER
@@ -295,13 +283,12 @@ void debugAllHandler() {
 // ============================================================================
 void cliRegisterDiagCommands() {
     cliRegisterCommand("faults", "Fault log management", cmd_faults_main);
-    cliRegisterCommand("i2c", "I2C diagnostics", cmd_i2c_main);
     cliRegisterCommand("encoder", "Encoder management", cmd_encoder_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
     cliRegisterCommand("encoder_baud_set", "Set baud rate", cmd_encoder_set_baud);
-    cliRegisterCommand("config", "Configuration management", cmd_config_main); 
+    cliRegisterCommand("config", "Configuration management", cmd_config_main);
     cliRegisterCommand("wdt", "Watchdog management", cmd_diag_scheduler_main);
     cliRegisterCommand("task", "Task monitoring", cmd_diag_scheduler_main);
 }

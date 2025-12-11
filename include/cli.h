@@ -36,6 +36,7 @@ int cliGetCommandCount();
 void cliRegisterConfigCommands();
 void cliRegisterMotionCommands();
 void cliRegisterDiagCommands();
+void cliRegisterI2CCommands();
 void cliRegisterCalibCommands();
 void cliRegisterWifiCommands(); 
 
@@ -57,10 +58,12 @@ void cmd_estop_off(int argc, char** argv);
 // --- Diagnostics & Hardware (cli_diag.cpp) ---
 // Consolidated Dispatchers
 void cmd_faults_main(int argc, char** argv);        // 'faults' command
-void cmd_i2c_main(int argc, char** argv);           // 'i2c' command
 void cmd_encoder_main(int argc, char** argv);       // 'encoder' command
 void cmd_debug_main(int argc, char** argv);         // 'debug' command
 void cmd_diag_scheduler_main(int argc, char** argv);// 'wdt' and 'task' dispatcher
+
+// --- I2C Management (cli_i2c.cpp) ---
+void cmd_i2c_main(int argc, char** argv);           // 'i2c' command
 
 // Standalone Diagnostic Commands
 void cmd_timeout_diag(int argc, char** argv);

@@ -110,9 +110,10 @@ void cliInit() {
   cliRegisterCommand("$", "Grbl Settings", cmd_grbl_settings);
   cliRegisterCommand("$H", "Homing", cmd_grbl_home);
   cliRegisterCommand("$G", "Parser State", cmd_grbl_state);
-  
+
   cliRegisterConfigCommands();
   cliRegisterMotionCommands();
+  cliRegisterI2CCommands();
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
   cliRegisterWifiCommands(); 
