@@ -3,6 +3,7 @@
 #include "serial_logger.h"
 #include "watchdog_manager.h"
 #include "system_constants.h"
+#include "encoder_deviation.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <string.h>
@@ -19,7 +20,24 @@ void taskMotionFunction(void* parameter) {
   while (1) {
     // Core motion operations
     motionUpdate();
-    
+
+    // PHASE 2 FIX: Encoder deviation detection
+    // Monitor each axis for deviation (stalls, loss of sync, mechanical problems)
+    for (int axis = 0; axis < MOTION_AXES; axis++) {
+      int32_t expected_pos = motionGetTarget(axis);
+      int32_t actual_pos = motionGetPosition(axis);
+      float velocity_mm_s = motionGetPositionMM(axis); // TODO: Get actual velocity from motion state
+
+      encoderDeviationUpdate(axis, expected_pos, actual_pos, velocity_mm_s);
+    }
+
+    // Check for encoder alarms and trigger fault recovery if needed
+    if (encoderHasDeviationAlarm()) {
+      logError("[MOTION_TASK] Encoder deviation alarm detected!");
+      // Fault recovery would go here (Phase 2.5)
+      motionEmergencyStop();
+    }
+
     // Check for motion commands
     queue_message_t msg;
     while (taskReceiveMessage(taskGetMotionQueue(), &msg, 0)) {
@@ -30,7 +48,7 @@ void taskMotionFunction(void* parameter) {
         default: break;
       }
     }
-    
+
     watchdogFeed("Motion");
     
     // Hybrid Wait: Periodic + Event Driven

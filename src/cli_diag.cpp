@@ -279,6 +279,88 @@ void debugAllHandler() {
 }
 
 // ============================================================================
+// PHASE 2: ENHANCED DIAGNOSTICS
+// ============================================================================
+
+extern void encoderDeviationDiagnostics();
+extern void faultRecoveryDiagnostics();
+
+void cmd_encoder_deviation_diag(int argc, char** argv) {
+    encoderDeviationDiagnostics();
+}
+
+void cmd_fault_recovery_diag(int argc, char** argv) {
+    faultRecoveryDiagnostics();
+}
+
+void cmd_task_list_detailed(int argc, char** argv) {
+    Serial.println("\n[TASK] === Detailed Task List ===");
+
+    int task_count = taskGetStatsCount();
+    if (task_count <= 0) {
+        Serial.println("[TASK] No tasks registered");
+        return;
+    }
+
+    task_stats_t* tasks = taskGetStatsArray();
+
+    // Header
+    Serial.println("\nTask Name          | Priority | Stack HWM | Runs    | Time(ms)  | Max(ms)");
+    Serial.println("-------------------|----------|-----------|---------|-----------|--------");
+
+    for (int i = 0; i < task_count; i++) {
+        const task_stats_t* task = &tasks[i];
+        if (task->handle == NULL) continue;
+
+        Serial.printf("%-18s | %8u | %9u | %7lu | %9lu | %7lu\n",
+            (task->name ? task->name : "UNKNOWN"),
+            (unsigned int)task->priority,
+            (unsigned int)task->stack_high_water,
+            (unsigned long)task->run_count,
+            (unsigned long)task->total_time_ms,
+            (unsigned long)task->max_run_time_ms);
+    }
+
+    Serial.println("\nNote: Stack HWM = High Water Mark (bytes still available)");
+    Serial.println("      Time = Total cumulative time");
+}
+
+void cmd_memory_detailed(int argc, char** argv) {
+    Serial.println("\n[MEMORY] === Detailed Memory Analysis ===");
+
+    // Update memory monitor
+    extern void memoryMonitorUpdate();
+    extern uint32_t memoryMonitorGetFreeHeap();
+    extern uint32_t memoryMonitorGetTotalHeap();
+    extern uint32_t memoryMonitorGetMinFreeHeap();
+    extern uint32_t memoryMonitorGetLargestFreeBlock();
+
+    memoryMonitorUpdate();
+
+    uint32_t total = memoryMonitorGetTotalHeap();
+    uint32_t free = memoryMonitorGetFreeHeap();
+    uint32_t min_free = memoryMonitorGetMinFreeHeap();
+    uint32_t largest = memoryMonitorGetLargestFreeBlock();
+    uint32_t used = total - free;
+
+    Serial.printf("\nHeap Summary:\n");
+    Serial.printf("  Total:      %lu bytes\n", (unsigned long)total);
+    Serial.printf("  Used:       %lu bytes (%.1f%%)\n", (unsigned long)used, (used * 100.0f) / total);
+    Serial.printf("  Free:       %lu bytes (%.1f%%)\n", (unsigned long)free, (free * 100.0f) / total);
+    Serial.printf("  Minimum:    %lu bytes (lowest ever)\n", (unsigned long)min_free);
+    Serial.printf("  Largest Block: %lu bytes (max contiguous)\n", (unsigned long)largest);
+
+    // Fragmentation estimate
+    if (largest > 0 && free > 0) {
+        float fragmentation = 100.0f * (1.0f - ((float)largest / free));
+        Serial.printf("\nFragmentation: %.1f%%\n", fragmentation);
+        if (fragmentation > 50) {
+            Serial.println("[WARN] High memory fragmentation detected!");
+        }
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
@@ -291,4 +373,10 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("config", "Configuration management", cmd_config_main);
     cliRegisterCommand("wdt", "Watchdog management", cmd_diag_scheduler_main);
     cliRegisterCommand("task", "Task monitoring", cmd_diag_scheduler_main);
+
+    // PHASE 2: New diagnostic commands
+    cliRegisterCommand("encoder_deviation", "Encoder deviation diagnostics", cmd_encoder_deviation_diag);
+    cliRegisterCommand("fault_recovery", "Fault recovery status", cmd_fault_recovery_diag);
+    cliRegisterCommand("task_list", "Detailed task list with stack usage", cmd_task_list_detailed);
+    cliRegisterCommand("memory_detailed", "Detailed memory analysis with fragmentation", cmd_memory_detailed);
 }

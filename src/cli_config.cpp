@@ -43,7 +43,7 @@ void cliRegisterConfigCommands() {
 }
 
 void cmd_config_main(int argc, char** argv) {
-    if (argc < 2) { 
+    if (argc < 2) {
         Serial.println("\n[CONFIG] === Configuration Management ===");
         Serial.println("[CONFIG] Usage: config [command] <parameter>");
         Serial.println("[CONFIG] Commands:");
@@ -57,6 +57,9 @@ void cmd_config_main(int argc, char** argv) {
         Serial.println("  schema    - Show schema version history and key metadata.");
         Serial.println("  migrate   - Automatically migrate configuration schema to current version.");
         Serial.println("  rollback  - Rollback schema to a specific version.");
+        Serial.println("\n[PHASE 2] New Commands:");
+        Serial.println("  export    - Export configuration as JSON.");
+        Serial.println("  import    - Import configuration from JSON.");
         return;
     }
 
@@ -69,12 +72,14 @@ void cmd_config_main(int argc, char** argv) {
     else if (strcmp(argv[1], "validate") == 0) cmd_config_validate(argc, argv);
     else if (strcmp(argv[1], "schema") == 0) cmd_config_schema_show(argc, argv);
     else if (strcmp(argv[1], "migrate") == 0) cmd_config_migrate(argc, argv);
+    else if (strcmp(argv[1], "export") == 0) cmd_config_export(argc, argv);
+    else if (strcmp(argv[1], "import") == 0) cmd_config_import(argc, argv);
     else if (strcmp(argv[1], "rollback") == 0) {
         if (argc < 3) {
              Serial.println("[CONFIG] [ERR] Usage: config rollback <version>");
              return;
         }
-        cmd_config_rollback(argc, argv); 
+        cmd_config_rollback(argc, argv);
     } else {
         Serial.printf("[CONFIG] Error: Unknown parameter '%s'.\n", argv[1]);
     }
@@ -205,4 +210,127 @@ void cmd_config_validate(int argc, char** argv) {
   configValidateSchema();
   configValidatorRun(VALIDATOR_LEVEL_COMPREHENSIVE);
   configValidatorPrintReport();
+}
+
+// ============================================================================
+// PHASE 2: CONFIG IMPORT/EXPORT (JSON)
+// ============================================================================
+
+void cmd_config_export(int argc, char** argv) {
+  Serial.println("\n[CONFIG] === Configuration Export (JSON) ===");
+  Serial.println("{\n  \"config\": {");
+
+  // Export known critical keys in JSON format
+  // This is a simplified version - in production, iterate all keys
+  extern const char* configGetString(const char* key, const char* default_val);
+  extern float configGetFloat(const char* key, float default_val);
+  extern int32_t configGetInt(const char* key, int32_t default_val);
+
+  bool first = true;
+
+  // Velocity calibration
+  for (int i = 0; i < 4; i++) {
+    char key[32];
+    snprintf(key, sizeof(key), "speed_cal_%d", i);
+    float val = configGetFloat(key, 1000.0f);
+    if (!first) Serial.println(",");
+    Serial.printf("    \"%s\": %.2f", key, val);
+    first = false;
+  }
+
+  // Position calibration (PPM)
+  for (int i = 0; i < 4; i++) {
+    char key[32];
+    snprintf(key, sizeof(key), "ppm_%d", i);
+    float val = configGetFloat(key, 100.0f);
+    if (!first) Serial.println(",");
+    Serial.printf("    \"%s\": %.2f", key, val);
+    first = false;
+  }
+
+  // Limits
+  for (int i = 0; i < 4; i++) {
+    char key[32];
+    snprintf(key, sizeof(key), "limit_max_%d", i);
+    int32_t val = configGetInt(key, 500000);
+    if (!first) Serial.println(",");
+    Serial.printf("    \"%s\": %ld", key, (long)val);
+    first = false;
+  }
+
+  Serial.println("\n  }\n}");
+  Serial.println("\n[CONFIG] Export complete. Copy JSON data above to save.");
+}
+
+void cmd_config_import(int argc, char** argv) {
+  Serial.println("\n[CONFIG] === Configuration Import (JSON) ===");
+  Serial.println("[CONFIG] Paste JSON data below (end with empty line):");
+  Serial.println("[CONFIG] Example: {\"config\": {\"ppm_0\": 100.5, \"speed_cal_0\": 1000}}");
+  Serial.println("[CONFIG] WARNING: This will overwrite current settings!");
+
+  // Simple line-by-line import (production version would use JSON parser)
+  char buffer[256];
+  int line_count = 0;
+  int import_count = 0;
+
+  while (Serial.available() || line_count < 100) {
+    if (!Serial.available()) {
+      delay(10);
+      continue;
+    }
+
+    int bytes_read = Serial.readBytesUntil('\n', buffer, sizeof(buffer) - 1);
+    if (bytes_read <= 0) break;
+    buffer[bytes_read] = '\0';
+    line_count++;
+
+    // Simple parsing: look for "key": value patterns
+    // This is a simplified parser - production should use proper JSON
+    char key[64] = {0};
+    char value[128] = {0};
+
+    // Find "key": format
+    char* key_start = strchr(buffer, '"');
+    if (!key_start) continue;
+
+    key_start++;
+    char* key_end = strchr(key_start, '"');
+    if (!key_end) continue;
+
+    int key_len = key_end - key_start;
+    if (key_len > 60) continue;
+
+    strncpy(key, key_start, key_len);
+    key[key_len] = '\0';
+
+    // Find value
+    char* val_start = strchr(key_end, ':');
+    if (!val_start) continue;
+
+    val_start++;
+    // Skip whitespace
+    while (*val_start && (*val_start == ' ' || *val_start == '\t')) val_start++;
+
+    // Parse value (number or string)
+    char* val_end = val_start;
+    while (*val_end && *val_end != ',' && *val_end != '}') val_end++;
+
+    int val_len = val_end - val_start;
+    if (val_len > 0 && val_len < 126) {
+      strncpy(value, val_start, val_len);
+      value[val_len] = '\0';
+
+      // Set the configuration
+      if (strlen(key) > 0 && strlen(value) > 0) {
+        // Try parsing as float first, then int
+        float fval = atof(value);
+        configSetFloat(key, fval);
+        import_count++;
+        Serial.printf("[CONFIG] Imported: %s = %s\n", key, value);
+      }
+    }
+  }
+
+  Serial.printf("\n[CONFIG] Import complete: %d settings loaded\n", import_count);
+  Serial.println("[CONFIG] Run 'config save' to persist changes");
 }

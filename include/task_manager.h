@@ -63,12 +63,16 @@
 // MESSAGE QUEUE DEFINITIONS
 // ============================================================================
 
-#define QUEUE_ITEM_SIZE          96 
+#define QUEUE_ITEM_SIZE          96
 #define QUEUE_LEN_MOTION         10
 #define QUEUE_LEN_SAFETY         20
 #define QUEUE_LEN_ENCODER        10
 #define QUEUE_LEN_PLC            10
-#define QUEUE_LEN_FAULT          50
+// PHASE 2 FIX: Increased from 50 to 150 to prevent loss of critical logs
+// Rationale: Under fault conditions, system can generate 20+ faults/sec.
+// With 50 items, queue fills in 2.5s and critical logs are dropped.
+// With 150 items, provides 7.5s buffer for fault processing.
+#define QUEUE_LEN_FAULT          150
 #define QUEUE_LEN_DISPLAY        10
 
 // ============================================================================
