@@ -1,6 +1,7 @@
 /**
  * @file motion_buffer.h
  * @brief Ring Buffer for Motion Commands (Gemini v3.5.23)
+ * @details Thread-safe implementation with mutex protection for multi-task access
  */
 
 #ifndef MOTION_BUFFER_H
@@ -8,6 +9,8 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 #define MOTION_BUFFER_SIZE 32 // Power of 2 for efficiency
 
@@ -20,18 +23,19 @@ class MotionBuffer {
 public:
     MotionBuffer();
     void init();
-    
-    // Core Ops
+    void setMutex(SemaphoreHandle_t mtx);  // Called by task manager during init
+
+    // Core Ops (THREAD-SAFE with mutex)
     bool push(float x, float y, float z, float a, float speed);
     bool pop(motion_cmd_t* cmd);
     bool peek(motion_cmd_t* cmd);
-    
-    // State Ops
+
+    // State Ops (THREAD-SAFE with mutex)
     bool isFull();
     bool isEmpty();
     void clear();
-    
-    // NEW: Added for Grbl Status Reporting
+
+    // Status Queries (THREAD-SAFE with mutex)
     int available();     // Returns number of items currently in buffer
     int getCapacity();   // Returns total size (32)
 
@@ -40,6 +44,15 @@ private:
     volatile uint8_t head;
     volatile uint8_t tail;
     volatile int count;
+    SemaphoreHandle_t buffer_mutex;  // Protects head, tail, count modifications
+
+    // Internal unsafe versions (called within critical section)
+    bool push_unsafe(float x, float y, float z, float a, float speed);
+    bool pop_unsafe(motion_cmd_t* cmd);
+    bool peek_unsafe(motion_cmd_t* cmd);
+    bool isFull_unsafe();
+    bool isEmpty_unsafe();
+    int available_unsafe();
 };
 
 extern MotionBuffer motionBuffer;

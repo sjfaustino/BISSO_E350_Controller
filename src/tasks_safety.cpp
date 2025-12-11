@@ -41,8 +41,12 @@ void taskSafetyFunction(void* parameter) {
     safetyUpdate();
     
     // 2. Poll Physical Buttons
-    if (taskLockMutex(taskGetI2cMutex(), 2)) {
-        
+    // CRITICAL FIX: Increased timeout from 2ms to 50ms
+    // Reason: I2C @ 100kHz requires minimum ~1.4ms for 16-byte transaction.
+    //         At 5ms period, 2ms timeout causes frequent failures under load.
+    //         50ms provides sufficient buffer without blocking critical task.
+    if (taskLockMutex(taskGetI2cMutex(), 50)) {
+
         button_state_t btns = boardInputsUpdate();
         taskUnlockMutex(taskGetI2cMutex()); 
         

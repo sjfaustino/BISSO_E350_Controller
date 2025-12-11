@@ -91,19 +91,32 @@ bool Axis::checkSoftLimits(bool strict_mode) {
 }
 
 void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
-    position = current_pos; 
-    
-    if (state == MOTION_ERROR || !enabled) return;
+    position = current_pos;
 
-    switch (state) {
+    // CRITICAL FIX: Use spinlock to protect state reads/writes
+    // This ensures atomic state transitions and prevents race conditions
+    // when multiple tasks access state (motion task vs CLI/status reporting)
+    portENTER_CRITICAL(&motionSpinlock);
+
+    motion_state_t current_state = state;
+
+    portEXIT_CRITICAL(&motionSpinlock);
+
+    if (current_state == MOTION_ERROR || !enabled) return;
+
+    switch (current_state) {
         case MOTION_WAIT_CONSENSO:
             if (millis() - state_entry_ms > MOTION_CONSENSO_TIMEOUT_MS) {
                 faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, id, 0, "Consensus Timeout");
+                portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_ERROR;
+                portEXIT_CRITICAL(&motionSpinlock);
             } else {
                 if (elboI73GetInput(AXIS_TO_CONSENSO_BIT[id])) {
+                    portENTER_CRITICAL(&motionSpinlock);
                     state = MOTION_EXECUTING;
                     state_entry_ms = millis();
+                    portEXIT_CRITICAL(&motionSpinlock);
                 }
             }
             break;
@@ -111,26 +124,33 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
         case MOTION_EXECUTING:
             if ((m_state.active_start_position < target_position && position >= target_position) ||
                 (m_state.active_start_position > target_position && position <= target_position)) {
-                
+
+                portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_STOPPING;
                 state_entry_ms = millis();
-                position_at_stop = position; 
-                motionSetPLCAxisDirection(255, false, false); 
+                portEXIT_CRITICAL(&motionSpinlock);
+
+                position_at_stop = position;
+                motionSetPLCAxisDirection(255, false, false);
             }
             break;
 
         case MOTION_STOPPING:
             if (abs(position - target_position) < configGetInt(KEY_MOTION_DEADBAND, 10)) {
+                portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_IDLE;
-                m_state.active_axis = 255; 
+                m_state.active_axis = 255;
+                portEXIT_CRITICAL(&motionSpinlock);
             }
             else {
                 // FIX: Configurable Timeout
                 uint32_t timeout = configGetInt(KEY_STOP_TIMEOUT, 5000);
                 if (millis() - state_entry_ms > timeout) {
                     logWarning("[AXIS %d] Stop Settlement Timeout", id);
+                    portENTER_CRITICAL(&motionSpinlock);
                     state = MOTION_IDLE;
                     m_state.active_axis = 255;
+                    portEXIT_CRITICAL(&motionSpinlock);
                 }
             }
             break;
@@ -139,35 +159,45 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
         case MOTION_HOMING_APPROACH_FINE:
             {
                 bool hit = elboI73GetInput(AXIS_TO_I73_BIT[id]);
-                if (millis() - state_entry_ms > 45000) { 
-                    state = MOTION_ERROR; logError("[HOME] Timeout"); 
+                if (millis() - state_entry_ms > 45000) {
+                    portENTER_CRITICAL(&motionSpinlock);
+                    state = MOTION_ERROR;
+                    portEXIT_CRITICAL(&motionSpinlock);
+                    logError("[HOME] Timeout");
                 }
 
                 if (hit) {
-                    motionSetPLCAxisDirection(255, false, false); 
-                    if (state == MOTION_HOMING_APPROACH_FAST) {
-                        int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0); 
+                    motionSetPLCAxisDirection(255, false, false);
+                    if (current_state == MOTION_HOMING_APPROACH_FAST) {
+                        int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0);
                         motionSetPLCSpeedProfile((speed_profile_t)slow_prof);
                         motionSetPLCAxisDirection(id, true, true);
+                        portENTER_CRITICAL(&motionSpinlock);
                         state = MOTION_HOMING_BACKOFF;
+                        state_entry_ms = millis();
+                        portEXIT_CRITICAL(&motionSpinlock);
                     } else {
                         homing_trigger_pos = position;
+                        portENTER_CRITICAL(&motionSpinlock);
                         state = MOTION_HOMING_SETTLE;
+                        state_entry_ms = millis();
+                        portEXIT_CRITICAL(&motionSpinlock);
                     }
-                    state_entry_ms = millis();
                 }
             }
             break;
 
         case MOTION_HOMING_BACKOFF:
-            if (!elboI73GetInput(AXIS_TO_I73_BIT[id])) { 
+            if (!elboI73GetInput(AXIS_TO_I73_BIT[id])) {
                 if (millis() - state_entry_ms > 1000) {
                     motionSetPLCAxisDirection(255, false, false);
                     int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0);
                     motionSetPLCSpeedProfile((speed_profile_t)slow_prof);
                     motionSetPLCAxisDirection(id, true, false);
+                    portENTER_CRITICAL(&motionSpinlock);
                     state = MOTION_HOMING_APPROACH_FINE;
                     state_entry_ms = millis();
+                    portEXIT_CRITICAL(&motionSpinlock);
                 }
             }
             break;
@@ -177,12 +207,14 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
                 wj66SetZero(id);
                 position = 0;
                 target_position = 0;
+                portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_IDLE;
                 m_state.active_axis = 255;
+                portEXIT_CRITICAL(&motionSpinlock);
                 logInfo("[HOME] Axis %d Zeroed.", id);
             }
             break;
-            
+
         default: break;
     }
 }
@@ -257,7 +289,14 @@ int32_t motionGetTarget(uint8_t axis) {
 }
 
 motion_state_t motionGetState(uint8_t axis) {
-    return (axis < MOTION_AXES) ? axes[axis].state : MOTION_ERROR;
+    if (axis >= MOTION_AXES) return MOTION_ERROR;
+
+    // CRITICAL FIX: Use spinlock to protect state read
+    portENTER_CRITICAL(&motionSpinlock);
+    motion_state_t s = axes[axis].state;
+    portEXIT_CRITICAL(&motionSpinlock);
+
+    return s;
 }
 
 float motionGetPositionMM(uint8_t axis) {
@@ -274,10 +313,14 @@ float motionGetPositionMM(uint8_t axis) {
 }
 
 bool motionIsMoving() {
+    // CRITICAL FIX: Use spinlock to protect state read
+    portENTER_CRITICAL(&motionSpinlock);
     uint8_t ax = m_state.active_axis;
+    motion_state_t s = (ax < MOTION_AXES) ? axes[ax].state : MOTION_ERROR;
+    portEXIT_CRITICAL(&motionSpinlock);
+
     if (ax >= MOTION_AXES) return false;
-    motion_state_t s = axes[ax].state;
-    return (s == MOTION_EXECUTING || s == MOTION_WAIT_CONSENSO || 
+    return (s == MOTION_EXECUTING || s == MOTION_WAIT_CONSENSO ||
             s == MOTION_HOMING_APPROACH_FAST || s == MOTION_HOMING_BACKOFF || s == MOTION_HOMING_APPROACH_FINE);
 }
 

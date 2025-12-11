@@ -2,18 +2,26 @@
  * @file plc_iface.cpp
  * @brief Hardware Abstraction Layer for ELBO PLC (Gemini v3.5.21)
  * @details Implements robust I2C drivers with error checking.
+ *          CRITICAL FIX: Added spinlock protection for shadow register access
+ *          to prevent race conditions when multiple tasks modify the relay states.
  */
 
-#include "plc_iface.h" 
+#include "plc_iface.h"
 #include "system_constants.h"
 #include "serial_logger.h"
 #include "fault_logging.h"
 #include "task_manager.h"
 #include <Wire.h>
+#include <freertos/FreeRTOS.h>
 
 // Shadow Registers
-static uint8_t i73_input_shadow = 0xFF; 
-static uint8_t q73_shadow_register = 0x00; 
+static uint8_t i73_input_shadow = 0xFF;
+static uint8_t q73_shadow_register = 0x00;
+
+// CRITICAL FIX: Spinlock to protect shadow register access
+// Multiple tasks can call elboSetDirection(), elboSetSpeedProfile(), elboQ73SetRelay()
+// Without protection, race conditions can corrupt relay state
+static portMUX_TYPE plc_spinlock = portMUX_INITIALIZER_UNLOCKED; 
 
 #define I2C_RETRIES 3
 
@@ -62,20 +70,34 @@ void elboInit() {
 void elboSetDirection(uint8_t axis, bool forward) {
     if (axis >= 4) return;
 
+    // CRITICAL FIX: Use spinlock to protect shadow register modification
+    // Race condition: Motion task and CLI task could both call this function,
+    // causing one task's modification to overwrite the other's
+    portENTER_CRITICAL(&plc_spinlock);
+
     // Use standard shift. Relays 0-3 are X,Y,Z,A Directions
     uint8_t mask = (1 << axis);
 
     if (forward) {
-        q73_shadow_register |= mask;  
+        q73_shadow_register |= mask;
     } else {
-        q73_shadow_register &= ~mask; 
+        q73_shadow_register &= ~mask;
     }
 
+    // Make a copy for I2C write before releasing spinlock
+    uint8_t register_copy = q73_shadow_register;
+
+    portEXIT_CRITICAL(&plc_spinlock);
+
     // Do NOT modify Enable bit here.
-    plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Set Direction");
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Direction");
 }
 
 void elboSetSpeedProfile(uint8_t profile_index) {
+    // CRITICAL FIX: Use spinlock to protect shadow register modification
+    // Race condition: Motion task could be interrupted mid-operation
+    portENTER_CRITICAL(&plc_spinlock);
+
     // Clear Speed bits (4, 5, 6)
     q73_shadow_register &= ~( (1<<ELBO_Q73_SPEED_1) | (1<<ELBO_Q73_SPEED_2) | (1<<ELBO_Q73_SPEED_3) );
 
@@ -83,14 +105,23 @@ void elboSetSpeedProfile(uint8_t profile_index) {
         case 0: q73_shadow_register |= (1 << ELBO_Q73_SPEED_1); break;
         case 1: q73_shadow_register |= (1 << ELBO_Q73_SPEED_2); break;
         case 2: q73_shadow_register |= (1 << ELBO_Q73_SPEED_3); break;
-        default: break; 
+        default: break;
     }
 
-    plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Set Speed");
+    // Make a copy for I2C write before releasing spinlock
+    uint8_t register_copy = q73_shadow_register;
+
+    portEXIT_CRITICAL(&plc_spinlock);
+
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Speed");
 }
 
 void elboQ73SetRelay(uint8_t relay_bit, bool state) {
     if (relay_bit > 7) return;
+
+    // CRITICAL FIX: Use spinlock to protect shadow register modification
+    // Race condition: Multiple relay commands could be lost if not protected
+    portENTER_CRITICAL(&plc_spinlock);
 
     if (state) {
         q73_shadow_register |= (1 << relay_bit);
@@ -98,7 +129,12 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
         q73_shadow_register &= ~(1 << relay_bit);
     }
 
-    plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Set Relay");
+    // Make a copy for I2C write before releasing spinlock
+    uint8_t register_copy = q73_shadow_register;
+
+    portEXIT_CRITICAL(&plc_spinlock);
+
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Relay");
 }
 
 // ============================================================================

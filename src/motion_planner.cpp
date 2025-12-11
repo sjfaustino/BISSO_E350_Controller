@@ -6,9 +6,10 @@
 #include "motion_planner.h"
 #include "config_unified.h"
 #include "config_keys.h"
-#include "encoder_calibration.h" 
+#include "encoder_calibration.h"
 #include "serial_logger.h"
-#include "system_constants.h" 
+#include "system_constants.h"
+#include "task_manager.h"  // For taskGetMotionMutex()
 #include <math.h>
 #include <stdlib.h>
 
@@ -24,6 +25,8 @@ extern bool motionStartInternalMove(float x, float y, float z, float a, float sp
 MotionPlanner::MotionPlanner() : feed_override(1.0f) {}
 
 void MotionPlanner::init() {
+    // CRITICAL FIX: Set mutex BEFORE init to enable thread-safe operations
+    motionBuffer.setMutex(taskGetMotionMutex());
     motionBuffer.init();
     feed_override = 1.0f;
     logInfo("[PLANNER] Initialized");

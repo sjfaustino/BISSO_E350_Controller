@@ -93,7 +93,10 @@ void wj66Init() {
 }
 
 void wj66Update() {
-  static char response_buffer[65] = {0};
+  // CRITICAL FIX: Buffer size must match MAX_RESPONSE_LEN to prevent overflow
+  // Original: buffer[65] with MAX_RESPONSE_LEN=64 creates off-by-one confusion
+  // Fixed: buffer[64] with MAX_RESPONSE_LEN=64 ensures exact match
+  static char response_buffer[64] = {0};
   static uint8_t buffer_idx = 0;
   static const uint8_t MAX_RESPONSE_LEN = 64; 
   
@@ -167,10 +170,15 @@ void wj66Update() {
       memset(response_buffer, 0, sizeof(response_buffer));
     } 
     else if (c >= 32 && c < 127) { // Valid ASCII only
-      if (buffer_idx < MAX_RESPONSE_LEN) response_buffer[buffer_idx++] = c;
-      else {
-        // Buffer Overflow Protection
+      // CRITICAL FIX: Explicit bounds check to prevent buffer overflow
+      // Ensure buffer_idx stays within [0, MAX_RESPONSE_LEN)
+      if (buffer_idx < MAX_RESPONSE_LEN) {
+        response_buffer[buffer_idx++] = c;
+      } else {
+        // Buffer Overflow Protection: Reset and log error
+        logWarning("[WJ66] Response buffer overflow (idx=%d, max=%d)", buffer_idx, MAX_RESPONSE_LEN);
         buffer_idx = 0;
+        memset(response_buffer, 0, sizeof(response_buffer));
         wj66_state.error_count++;
       }
     }
