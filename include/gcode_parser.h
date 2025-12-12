@@ -53,6 +53,8 @@ private:
     void handleG92(const char* line);
     // PHASE 3.2: M117 LCD message handler
     void handleM117(const char* line);
+    // PHASE 4.0: M114 Get current position handler
+    void handleM114();
     
     void loadWCS();
     void saveWCS(uint8_t system);

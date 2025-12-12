@@ -104,6 +104,8 @@ bool GCodeParser::processCommand(const char* line) {
             case 5:  elboQ73SetRelay(ELBO_Q73_SPEED_1, false); break;
             // PHASE 3.2: M117 - Display message on LCD (standard gcode command)
             case 117: handleM117(line); break;
+            // PHASE 4.0: M114 - Get current position
+            case 114: handleM114(); break;
             case 112: motionEmergencyStop(); break;
             default: return false;
         }
@@ -241,6 +243,40 @@ void GCodeParser::handleM117(const char* line) {
     // Display message for 3 seconds (3000ms)
     lcdMessageSet(msg_start, 3000);
     logInfo("[GCODE] M117: Display message: '%s'", msg_start);
+}
+
+// PHASE 4.0: M114 - Get current position (standard gcode command)
+void GCodeParser::handleM114() {
+    // M114 Get Position (standard gcode format)
+    // Reports: X:<value> Y:<value> Z:<value> A:<value>
+    // Units: mm for X/Y/Z, degrees for A (rotary axis)
+
+    float x_mm = motionGetPositionMM(0);
+    float y_mm = motionGetPositionMM(1);
+    float z_mm = motionGetPositionMM(2);
+
+    // For A axis (rotary), convert counts to degrees using calibration
+    int32_t a_counts = motionGetPosition(3);
+    float a_deg = 0.0f;
+
+    // Get calibration data for A axis (from hardware_config.h extern)
+    extern MachineCalibration machineCal;
+    if (machineCal.A.pulses_per_degree > 0) {
+        a_deg = a_counts / machineCal.A.pulses_per_degree;
+    } else {
+        // Fallback to default scale factor if calibration not set
+        a_deg = a_counts / 1000.0f;  // MOTION_POSITION_SCALE_FACTOR_DEG
+    }
+
+    // Report current position in standard Grbl format
+    char response[80];
+    snprintf(response, sizeof(response),
+             "[POS:X:%.1f Y:%.1f Z:%.1f A:%.1f]",
+             x_mm, y_mm, z_mm, a_deg);
+
+    Serial.println(response);
+    logInfo("[GCODE] M114 Position: X:%.1f Y:%.1f Z:%.1f A:%.1f",
+            x_mm, y_mm, z_mm, a_deg);
 }
 
 bool GCodeParser::parseCode(const char* line, char code, float& value) {
