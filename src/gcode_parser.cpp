@@ -12,6 +12,9 @@
 #include "serial_logger.h"
 #include "lcd_message.h"  // PHASE 3.2: M117 LCD message support
 #include "auto_report.h"  // PHASE 4.0: M154 auto-report support
+#include "lcd_sleep.h"    // PHASE 4.0: M255 LCD sleep support
+#include "plc_iface.h"    // PHASE 4.0: M226 pin state reading
+#include "board_inputs.h"  // PHASE 4.0: M226 board input reading
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -111,6 +114,10 @@ bool GCodeParser::processCommand(const char* line) {
             case 115: handleM115(); break;
             // PHASE 4.0: M154 - Position auto-report
             case 154: handleM154(line); break;
+            // PHASE 4.0: M226 - Wait for pin state
+            case 226: handleM226(line); break;
+            // PHASE 4.0: M255 - LCD sleep/backlight timeout
+            case 255: handleM255(line); break;
             case 112: motionEmergencyStop(); break;
             default: return false;
         }
@@ -331,6 +338,94 @@ void GCodeParser::handleM154(const char* line) {
         }
     } else {
         logWarning("[GCODE] M154 requires S<interval> parameter (in seconds)");
+    }
+}
+
+// PHASE 4.0: M226 - Wait for pin state (non-blocking)
+void GCodeParser::handleM226(const char* line) {
+    // M226 Wait for Pin State (non-blocking with timeout)
+    // M226 P<pin> S<state> [A<type>] [T<timeout>]
+    // P: Pin ID (0-7 for I2C)
+    // S: State to wait for (0 or 1)
+    // A: Pin type (0=I73, 1=Board, 2=GPIO) - default 0
+    // T: Timeout in seconds (0 = no timeout, default = 5)
+    // Example: M226 P3 S1     (wait for I73 pin 3 to go HIGH)
+    // Example: M226 P0 S0 A1 T10  (wait for Board pin 0 to go LOW, timeout 10sec)
+
+    float p_val = -1.0f;
+    float s_val = -1.0f;
+    float a_val = 0.0f;  // Default to I73
+    float t_val = 5.0f;  // Default 5 second timeout
+
+    // Parse parameters
+    if (!parseCode(line, 'P', p_val) || p_val < 0) {
+        logWarning("[GCODE] M226 requires P<pin> parameter");
+        return;
+    }
+
+    if (!parseCode(line, 'S', s_val) || (s_val != 0 && s_val != 1)) {
+        logWarning("[GCODE] M226 requires S<state> parameter (0 or 1)");
+        return;
+    }
+
+    parseCode(line, 'A', a_val);  // Optional, defaults to 0
+    parseCode(line, 'T', t_val);  // Optional, defaults to 5
+
+    uint8_t pin_id = (uint8_t)p_val;
+    uint8_t pin_type = (uint8_t)a_val;
+    uint8_t pin_state = (uint8_t)s_val;
+    uint32_t timeout_sec = (uint32_t)t_val;
+
+    // Validate pin type
+    if (pin_type > 2) {
+        logWarning("[GCODE] M226 invalid A<type> (0=I73, 1=Board, 2=GPIO)");
+        return;
+    }
+
+    // Validate pin ranges
+    if ((pin_type == 0 || pin_type == 1) && pin_id > 7) {
+        logWarning("[GCODE] M226 invalid P<pin> for I2C (0-7)");
+        return;
+    }
+    if (pin_type == 2 && pin_id > 39) {
+        logWarning("[GCODE] M226 invalid P<pin> for GPIO (0-39)");
+        return;
+    }
+
+    // Start waiting for pin
+    if (motionWaitPin(pin_id, pin_type, pin_state, timeout_sec)) {
+        logInfo("[GCODE] M226 Wait for pin %d type %d state %d timeout %lu sec",
+                pin_id, pin_type, pin_state, (unsigned long)timeout_sec);
+    } else {
+        logWarning("[GCODE] M226 failed - motion may be active");
+    }
+}
+
+// PHASE 4.0: M255 - LCD sleep/backlight timeout
+void GCodeParser::handleM255(const char* line) {
+    // M255 LCD Sleep/Backlight Timeout Control
+    // M255 S<seconds>   - Set backlight timeout (0 = never sleep)
+    // Example: M255 S0   (disable sleep, always on)
+    // Example: M255 S300 (sleep after 300 seconds of inactivity)
+    // Example: M255 S60  (sleep after 1 minute of inactivity)
+
+    float s_val = 0.0f;
+
+    // Check for S parameter (timeout in seconds)
+    if (parseCode(line, 'S', s_val) && s_val >= 0) {
+        uint32_t timeout_sec = (uint32_t)s_val;
+
+        if (lcdSleepSetTimeout(timeout_sec)) {
+            if (timeout_sec == 0) {
+                logInfo("[GCODE] M255 LCD sleep disabled - always on");
+            } else {
+                logInfo("[GCODE] M255 LCD sleep enabled - timeout %lu seconds", (unsigned long)timeout_sec);
+            }
+        } else {
+            logWarning("[GCODE] M255 failed to set timeout");
+        }
+    } else {
+        logWarning("[GCODE] M255 requires S<timeout> parameter (in seconds)");
     }
 }
 

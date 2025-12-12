@@ -20,6 +20,8 @@
 #include "config_keys.h"
 #include "encoder_motion_integration.h"
 #include "auto_report.h"  // PHASE 4.0: M154 auto-report support
+#include "lcd_sleep.h"    // PHASE 4.0: M255 LCD sleep support
+#include "board_inputs.h"  // PHASE 4.0: M226 board input reading
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -64,6 +66,10 @@ Axis::Axis() {
     soft_limit_min = -1000000;
     soft_limit_max = 1000000;
     dwell_end_ms = 0;
+    wait_pin_id = 0;
+    wait_pin_type = 0;
+    wait_pin_state = 0;
+    wait_pin_timeout_ms = 0;
 }
 
 void Axis::init(uint8_t axis_id) {
@@ -228,6 +234,53 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
             }
             break;
 
+        case MOTION_WAIT_PIN: {
+            // Non-blocking pin state wait with optional timeout
+            bool pin_state = false;
+            bool pin_ready = false;
+
+            // Read pin state based on type
+            if (wait_pin_type == 0) {
+                // I73 input (ELBO PLC)
+                pin_state = elboI73GetInput(wait_pin_id);
+                pin_ready = true;
+            } else if (wait_pin_type == 1) {
+                // Board input (KC868-A16)
+                button_state_t buttons = boardInputsUpdate();
+                // Map button state based on pin ID
+                if (wait_pin_id == 0) pin_state = buttons.estop_active;
+                else if (wait_pin_id == 1) pin_state = buttons.pause_pressed;
+                else if (wait_pin_id == 2) pin_state = buttons.resume_pressed;
+                else pin_state = false;
+                pin_ready = buttons.connection_ok;
+            } else if (wait_pin_type == 2) {
+                // Direct ESP32 GPIO
+                pinMode(wait_pin_id, INPUT);
+                pin_state = (digitalRead(wait_pin_id) == HIGH);
+                pin_ready = true;
+            }
+
+            // Check if pin state matches what we're waiting for
+            if (pin_ready && pin_state == wait_pin_state) {
+                portENTER_CRITICAL(&motionSpinlock);
+                state = MOTION_IDLE;
+                m_state.active_axis = 255;
+                portEXIT_CRITICAL(&motionSpinlock);
+                logInfo("[MOTION] Pin %d state %d detected", wait_pin_id, wait_pin_state);
+                break;
+            }
+
+            // Check for timeout
+            if (wait_pin_timeout_ms > 0 && millis() - state_entry_ms >= wait_pin_timeout_ms) {
+                portENTER_CRITICAL(&motionSpinlock);
+                state = MOTION_ERROR;
+                portEXIT_CRITICAL(&motionSpinlock);
+                faultLogEntry(FAULT_WARNING, FAULT_TIMEOUT, id, 0, "Pin wait timeout");
+                logWarning("[MOTION] Pin %d wait timeout", wait_pin_id);
+            }
+            break;
+        }
+
         default: break;
     }
 }
@@ -247,6 +300,7 @@ void motionInit() {
     }
     motionPlanner.init();
     autoReportInit();  // PHASE 4.0: Initialize auto-report system
+    lcdSleepInit();    // PHASE 4.0: Initialize LCD sleep system
     motionSetPLCAxisDirection(255, false, false);
 }
 
@@ -286,6 +340,9 @@ void motionUpdate() {
 
     // PHASE 4.0: Check if auto-report interval elapsed (non-blocking)
     autoReportUpdate();
+
+    // PHASE 4.0: Check if LCD sleep timeout elapsed (non-blocking)
+    lcdSleepUpdate();
 }
 
 // ============================================================================
@@ -606,6 +663,33 @@ bool motionDwell(uint32_t ms) {
     return false;  // Cannot dwell while motion is active
 }
 
+bool motionWaitPin(uint8_t pin_id, uint8_t pin_type, uint8_t state, uint32_t timeout_sec) {
+    // Non-blocking pin state wait command for M226 gcode
+    // Uses axis 0 as the wait controller
+    if (!m_state.global_enabled) return false;
+    if (!taskLockMutex(taskGetMotionMutex(), 100)) return false;
+
+    // Only execute pin wait if no motion is active
+    if (m_state.active_axis == 255 && axes[0].state == MOTION_IDLE) {
+        axes[0].state = MOTION_WAIT_PIN;
+        axes[0].wait_pin_id = pin_id;
+        axes[0].wait_pin_type = pin_type;
+        axes[0].wait_pin_state = state;
+        axes[0].wait_pin_timeout_ms = (timeout_sec > 0) ? (timeout_sec * 1000) : 0;
+        axes[0].state_entry_ms = millis();
+        m_state.active_axis = 0;  // Mark axis 0 as "active" during wait
+
+        logInfo("[MOTION] Wait for pin: id=%d type=%d state=%d timeout=%lu sec",
+                pin_id, pin_type, state, (unsigned long)timeout_sec);
+        taskUnlockMutex(taskGetMotionMutex());
+        taskSignalMotionUpdate();
+        return true;
+    }
+
+    taskUnlockMutex(taskGetMotionMutex());
+    return false;  // Cannot wait while motion is active
+}
+
 void motionEmergencyStop() {
     bool got_mutex = taskLockMutex(taskGetMotionMutex(), 10); 
     motionSetPLCAxisDirection(255, false, false);
@@ -618,6 +702,7 @@ void motionEmergencyStop() {
     
     motionBuffer.clear();
     autoReportDisable();  // PHASE 4.0: Disable auto-report on E-Stop
+    lcdSleepWakeup();    // PHASE 4.0: Wake display on E-Stop for visibility
     if (got_mutex) taskUnlockMutex(taskGetMotionMutex());
 
     logError("[MOTION] [CRITICAL] EMERGENCY STOP ACTIVATED");

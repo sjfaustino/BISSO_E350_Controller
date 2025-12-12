@@ -59,6 +59,10 @@ private:
     void handleM115();
     // PHASE 4.0: M154 Position auto-report handler
     void handleM154(const char* line);
+    // PHASE 4.0: M226 Wait for pin state handler
+    void handleM226(const char* line);
+    // PHASE 4.0: M255 LCD sleep/backlight timeout handler
+    void handleM255(const char* line);
 
     void loadWCS();
     void saveWCS(uint8_t system);

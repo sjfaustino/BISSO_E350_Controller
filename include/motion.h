@@ -28,7 +28,8 @@ typedef enum {
   MOTION_HOMING_BACKOFF = 7,
   MOTION_HOMING_APPROACH_FINE = 8,
   MOTION_HOMING_SETTLE = 9,
-  MOTION_DWELL = 10              // Non-blocking dwell/pause
+  MOTION_DWELL = 10,             // Non-blocking dwell/pause
+  MOTION_WAIT_PIN = 11           // Wait for GPIO/I2C pin state
 } motion_state_t;
 
 class Axis {
@@ -55,6 +56,12 @@ public:
     int32_t homing_trigger_pos;
     uint32_t dwell_end_ms;              // When dwell completes (for MOTION_DWELL state)
 
+    // Pin wait state (MOTION_WAIT_PIN)
+    uint8_t wait_pin_id;                // Pin to monitor
+    uint8_t wait_pin_type;              // 0=I73, 1=Board, 2=GPIO
+    uint8_t wait_pin_state;             // State to wait for (0 or 1)
+    uint32_t wait_pin_timeout_ms;       // Timeout (0 = no timeout)
+
 private:
     bool _error_logged; 
 };
@@ -75,6 +82,7 @@ bool motionStop();
 bool motionPause();
 bool motionResume();
 bool motionDwell(uint32_t ms);      // Non-blocking dwell/pause for G4 command
+bool motionWaitPin(uint8_t pin_id, uint8_t pin_type, uint8_t state, uint32_t timeout_sec); // M226 Wait for pin
 
 void motionEmergencyStop();
 bool motionClearEmergencyStop();
