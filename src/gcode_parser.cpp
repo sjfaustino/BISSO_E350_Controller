@@ -10,6 +10,7 @@
 #include "config_unified.h"
 #include "config_keys.h"
 #include "serial_logger.h"
+#include "lcd_message.h"  // PHASE 3.2: M117 LCD message support
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -98,8 +99,10 @@ bool GCodeParser::processCommand(const char* line) {
         switch (cmd) {
             case 0:
             case 2:  motionStop(); break;
-            case 3:  elboQ73SetRelay(ELBO_Q73_SPEED_1, true); break; 
-            case 5:  elboQ73SetRelay(ELBO_Q73_SPEED_1, false); break; 
+            case 3:  elboQ73SetRelay(ELBO_Q73_SPEED_1, true); break;
+            case 5:  elboQ73SetRelay(ELBO_Q73_SPEED_1, false); break;
+            // PHASE 3.2: M117 - Display message on LCD (standard gcode command)
+            case 117: handleM117(line); break;
             case 112: motionEmergencyStop(); break;
             default: return false;
         }
@@ -188,6 +191,25 @@ void GCodeParser::pushMove(float x, float y, float z, float a) {
 void GCodeParser::handleG90() { distanceMode = G_MODE_ABSOLUTE; }
 void GCodeParser::handleG91() { distanceMode = G_MODE_RELATIVE; }
 void GCodeParser::handleG92(const char* line) { logWarning("[GCODE] G92 not supported, use G10 L20"); }
+
+// PHASE 3.2: M117 - Display message on LCD
+void GCodeParser::handleM117(const char* line) {
+    // M117 Display Message (standard gcode format)
+    // Syntax: M117 <message text>
+    // Example: M117 Cutting edge...
+
+    if (!line || strlen(line) < 4) return;
+
+    // Find the start of the message (skip "M117" and whitespace)
+    const char* msg_start = line + 4;  // Skip "M117"
+    while (*msg_start && (*msg_start == ' ' || *msg_start == '\t')) msg_start++;
+
+    if (*msg_start == '\0') return;  // No message text
+
+    // Display message for 3 seconds (3000ms)
+    lcdMessageSet(msg_start, 3000);
+    logInfo("[GCODE] M117: Display message: '%s'", msg_start);
+}
 
 bool GCodeParser::parseCode(const char* line, char code, float& value) {
     char* ptr = strchr((char*)line, code);

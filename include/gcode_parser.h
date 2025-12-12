@@ -45,11 +45,13 @@ private:
     bool hasCode(const char* line, char code);
     
     void handleG0_G1(const char* line);
-    void handleG10(const char* line); 
-    void handleG5x(int system_idx);   
+    void handleG10(const char* line);
+    void handleG5x(int system_idx);
     void handleG90();
     void handleG91();
     void handleG92(const char* line);
+    // PHASE 3.2: M117 LCD message handler
+    void handleM117(const char* line);
     
     void loadWCS();
     void saveWCS(uint8_t system);
