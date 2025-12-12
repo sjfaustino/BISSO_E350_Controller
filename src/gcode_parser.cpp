@@ -83,6 +83,7 @@ bool GCodeParser::processCommand(const char* line) {
         switch (cmd) {
             case 0:
             case 1:  handleG0_G1(line); break;
+            case 4:  handleG4(line); break;  // G4 Dwell
             case 10: handleG10(line); break; // G10 L20 P1...
             case 54 ... 59: handleG5x(cmd - 54); break; // WCS Select
             case 90: handleG90(); break;
@@ -176,8 +177,39 @@ void GCodeParser::handleG0_G1(const char* line) {
 
     bool move = false;
     for(int i=0; i<4; i++) if(fabs(targetM[i] - curM[i]) > 0.01) move=true;
-    
+
     if(move) pushMove(targetM[0], targetM[1], targetM[2], targetM[3]);
+}
+
+void GCodeParser::handleG4(const char* line) {
+    // G4 Dwell command - non-blocking pause
+    // G4 P<ms>  - Dwell for P milliseconds
+    // G4 S<sec> - Dwell for S seconds
+    // Example: G4 P500  (dwell 500ms)
+    // Example: G4 S2    (dwell 2 seconds)
+
+    float p_val = 0.0f;
+    float s_val = 0.0f;
+    uint32_t dwell_ms = 0;
+
+    // Check for P parameter (milliseconds)
+    if (parseCode(line, 'P', p_val) && p_val > 0) {
+        dwell_ms = (uint32_t)p_val;
+    }
+    // Check for S parameter (seconds) - takes precedence if both specified
+    else if (parseCode(line, 'S', s_val) && s_val > 0) {
+        dwell_ms = (uint32_t)(s_val * 1000.0f);
+    }
+
+    if (dwell_ms > 0) {
+        if (motionDwell(dwell_ms)) {
+            logInfo("[GCODE] G4 Dwell: %lu ms", (unsigned long)dwell_ms);
+        } else {
+            logWarning("[GCODE] G4 Dwell failed - motion may be active");
+        }
+    } else {
+        logWarning("[GCODE] G4 requires P<ms> or S<sec> parameter");
+    }
 }
 
 void GCodeParser::pushMove(float x, float y, float z, float a) {

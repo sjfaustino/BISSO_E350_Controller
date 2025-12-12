@@ -17,17 +17,18 @@
 
 typedef enum { SPEED_PROFILE_1=0, SPEED_PROFILE_2=1, SPEED_PROFILE_3=2 } speed_profile_t;
 
-typedef enum { 
+typedef enum {
   MOTION_IDLE = 0,
-  MOTION_WAIT_CONSENSO = 1, 
+  MOTION_WAIT_CONSENSO = 1,
   MOTION_EXECUTING = 2,
   MOTION_STOPPING = 3,
-  MOTION_PAUSED = 4,        
+  MOTION_PAUSED = 4,
   MOTION_ERROR = 5,
   MOTION_HOMING_APPROACH_FAST = 6,
   MOTION_HOMING_BACKOFF = 7,
   MOTION_HOMING_APPROACH_FINE = 8,
-  MOTION_HOMING_SETTLE = 9 
+  MOTION_HOMING_SETTLE = 9,
+  MOTION_DWELL = 10              // Non-blocking dwell/pause
 } motion_state_t;
 
 class Axis {
@@ -48,10 +49,11 @@ public:
     bool soft_limit_enabled;            
     
     float commanded_speed_mm_s;
-    speed_profile_t saved_speed_profile; 
-    int32_t position_at_stop;           
-    uint32_t state_entry_ms;            
+    speed_profile_t saved_speed_profile;
+    int32_t position_at_stop;
+    uint32_t state_entry_ms;
     int32_t homing_trigger_pos;
+    uint32_t dwell_end_ms;              // When dwell completes (for MOTION_DWELL state)
 
 private:
     bool _error_logged; 
@@ -70,8 +72,9 @@ bool motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s
 bool motionHome(uint8_t axis); 
 
 bool motionStop();
-bool motionPause();   
-bool motionResume();  
+bool motionPause();
+bool motionResume();
+bool motionDwell(uint32_t ms);      // Non-blocking dwell/pause for G4 command
 
 void motionEmergencyStop();
 bool motionClearEmergencyStop();

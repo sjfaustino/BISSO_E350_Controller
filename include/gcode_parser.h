@@ -45,6 +45,7 @@ private:
     bool hasCode(const char* line, char code);
     
     void handleG0_G1(const char* line);
+    void handleG4(const char* line);   // G4 Dwell command
     void handleG10(const char* line);
     void handleG5x(int system_idx);
     void handleG90();

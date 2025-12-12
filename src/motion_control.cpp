@@ -62,6 +62,7 @@ Axis::Axis() {
     soft_limit_enabled = true;
     soft_limit_min = -1000000;
     soft_limit_max = 1000000;
+    dwell_end_ms = 0;
 }
 
 void Axis::init(uint8_t axis_id) {
@@ -212,6 +213,17 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
                 m_state.active_axis = 255;
                 portEXIT_CRITICAL(&motionSpinlock);
                 logInfo("[HOME] Axis %d Zeroed.", id);
+            }
+            break;
+
+        case MOTION_DWELL:
+            // Non-blocking dwell - just wait for timer to expire
+            if (millis() >= dwell_end_ms) {
+                portENTER_CRITICAL(&motionSpinlock);
+                state = MOTION_IDLE;
+                m_state.active_axis = 255;
+                portEXIT_CRITICAL(&motionSpinlock);
+                logInfo("[MOTION] Dwell complete");
             }
             break;
 
@@ -564,6 +576,29 @@ bool motionResume() {
     taskUnlockMutex(taskGetMotionMutex());
     taskSignalMotionUpdate();
     return true;
+}
+
+bool motionDwell(uint32_t ms) {
+    // Non-blocking dwell command for G4 gcode
+    // Uses one axis (axis 0) as the dwell controller
+    if (!m_state.global_enabled) return false;
+    if (!taskLockMutex(taskGetMotionMutex(), 100)) return false;
+
+    // Only execute dwell if no motion is active
+    if (m_state.active_axis == 255 && axes[0].state == MOTION_IDLE) {
+        axes[0].state = MOTION_DWELL;
+        axes[0].dwell_end_ms = millis() + ms;
+        axes[0].state_entry_ms = millis();
+        m_state.active_axis = 0;  // Mark axis 0 as "active" during dwell
+
+        logInfo("[MOTION] Dwell: %lu ms (end at %lu)", (unsigned long)ms, (unsigned long)axes[0].dwell_end_ms);
+        taskUnlockMutex(taskGetMotionMutex());
+        taskSignalMotionUpdate();
+        return true;
+    }
+
+    taskUnlockMutex(taskGetMotionMutex());
+    return false;  // Cannot dwell while motion is active
 }
 
 void motionEmergencyStop() {
