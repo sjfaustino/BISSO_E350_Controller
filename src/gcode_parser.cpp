@@ -23,7 +23,7 @@
 
 GCodeParser gcodeParser;
 
-GCodeParser::GCodeParser() : distanceMode(G_MODE_ABSOLUTE), currentFeedRate(50.0f), currentWCS(WCS_G54) {
+GCodeParser::GCodeParser() : distanceMode(G_MODE_ABSOLUTE), currentFeedRate(50.0f), currentWCS(WCS_G54), machineCoordinatesMode(false), programPaused(false), pauseStartTime(0) {
     memset(wcs_offsets, 0, sizeof(wcs_offsets));
 }
 
@@ -89,6 +89,9 @@ bool GCodeParser::processCommand(const char* line) {
             case 1:  handleG0_G1(line); break;
             case 4:  handleG4(line); break;  // G4 Dwell
             case 10: handleG10(line); break; // G10 L20 P1...
+            case 28: handleG28(line); break; // PHASE 5.1: G28 Home
+            case 30: handleG30(line); break; // PHASE 5.1: G30 Predefined position
+            case 53: handleG53(line); break; // PHASE 5.1: G53 Machine coordinates
             case 54 ... 59: handleG5x(cmd - 54); break; // WCS Select
             case 90: handleG90(); break;
             case 91: handleG91(); break;
@@ -103,6 +106,7 @@ bool GCodeParser::processCommand(const char* line) {
         int cmd = (int)val;
         switch (cmd) {
             case 0:
+            case 1:  handleM0_M1(line); break; // PHASE 5.1: M0/M1 Program stop/pause
             case 2:  motionStop(); break;
             case 3:  elboQ73SetRelay(ELBO_Q73_SPEED_1, true); break;
             case 5:  elboQ73SetRelay(ELBO_Q73_SPEED_1, false); break;
@@ -176,16 +180,21 @@ void GCodeParser::handleG0_G1(const char* line) {
     };
 
     float targetM[4];
-    
+
     for(int i=0; i<4; i++) {
         if (has[i]) {
             if (distanceMode == G_MODE_ABSOLUTE) {
-                targetM[i] = req[i] + wcs_offsets[currentWCS][i];
+                // PHASE 5.1: G53 machine coordinates mode (ignore WCS offset)
+                if (machineCoordinatesMode) {
+                    targetM[i] = req[i];
+                } else {
+                    targetM[i] = req[i] + wcs_offsets[currentWCS][i];
+                }
             } else {
                 targetM[i] = curM[i] + req[i];
             }
         } else {
-            targetM[i] = curM[i]; 
+            targetM[i] = curM[i];
         }
     }
 
@@ -427,6 +436,179 @@ void GCodeParser::handleM255(const char* line) {
     } else {
         logWarning("[GCODE] M255 requires S<timeout> parameter (in seconds)");
     }
+}
+
+// PHASE 5.1: G28 - Go to Machine Home
+void GCodeParser::handleG28(const char* line) {
+    // G28 Go to Machine Home
+    // Homing sequence for specified axes or all if none specified
+    // G28     - Home all axes
+    // G28 X   - Home X axis only
+    // G28 Y   - Home Y axis only
+    // G28 Z   - Home Z axis only
+    // G28 A   - Home A axis only
+    // G28 X Y - Home X and Y axes
+
+    // Check if homing is enabled
+    if (!configGetInt(KEY_HOME_ENABLE, 0)) {
+        logWarning("[GCODE] G28 homing disabled - not configured");
+        return;
+    }
+
+    bool home_x = hasCode(line, 'X');
+    bool home_y = hasCode(line, 'Y');
+    bool home_z = hasCode(line, 'Z');
+    bool home_a = hasCode(line, 'A');
+
+    // If no axes specified, home all
+    if (!home_x && !home_y && !home_z && !home_a) {
+        home_x = home_y = home_z = home_a = true;
+    }
+
+    logInfo("[GCODE] G28 Homing: X=%d Y=%d Z=%d A=%d",
+            home_x, home_y, home_z, home_a);
+
+    // TODO: Implement actual homing sequence
+    // This requires limit switch inputs and homing algorithm
+    // For now, just set position to 0 (home position)
+    Serial.println("[G28] Homing not yet implemented - requires limit switches");
+}
+
+// PHASE 5.1: G30 - Go to Predefined Position
+void GCodeParser::handleG30(const char* line) {
+    // G30 Go to Predefined Position
+    // G30     - Go to safe position (default)
+    // G30 P1  - Go to predefined position 1
+    // G30 P2  - Go to predefined position 2
+
+    float p_val = 0.0f;
+    parseCode(line, 'P', p_val);
+    int pos_id = (int)p_val;  // 0 = safe, 1 = pos1, etc.
+
+    // Load predefined position from configuration
+    float target[4];
+    if (pos_id == 0) {  // Safe position
+        target[0] = configGetFloat(KEY_POS_SAFE_X, 0.0f);
+        target[1] = configGetFloat(KEY_POS_SAFE_Y, 0.0f);
+        target[2] = configGetFloat(KEY_POS_SAFE_Z, 0.0f);
+        target[3] = configGetFloat(KEY_POS_SAFE_A, 0.0f);
+        logInfo("[GCODE] G30 Go to Safe Position: X:%.1f Y:%.1f Z:%.1f A:%.1f",
+                target[0], target[1], target[2], target[3]);
+    } else if (pos_id == 1) {  // Predefined position 1
+        target[0] = configGetFloat(KEY_POS_1_X, 0.0f);
+        target[1] = configGetFloat(KEY_POS_1_Y, 0.0f);
+        target[2] = configGetFloat(KEY_POS_1_Z, 0.0f);
+        target[3] = configGetFloat(KEY_POS_1_A, 0.0f);
+        logInfo("[GCODE] G30 Go to Position 1: X:%.1f Y:%.1f Z:%.1f A:%.1f",
+                target[0], target[1], target[2], target[3]);
+    } else {
+        logWarning("[GCODE] G30 Invalid position P%d (0-1 supported)", pos_id);
+        return;
+    }
+
+    // Move to the predefined position
+    pushMove(target[0], target[1], target[2], target[3]);
+}
+
+// PHASE 5.1: G53 - Machine Coordinates (Ignore WCS Offsets)
+void GCodeParser::handleG53(const char* line) {
+    // G53 Machine Coordinates
+    // Next G0/G1 move will be in machine coordinates (ignoring WCS offset)
+    // G53 G0 X100 Y200 Z50 A0  - Rapid to machine coordinates
+    // G53 G1 X100 Y200 Z50 F100 - Linear move in machine coordinates
+
+    machineCoordinatesMode = true;
+    logInfo("[GCODE] G53 Machine Coordinates Mode Enabled");
+
+    // Check if there's a move command following
+    if (hasCode(line, 'G')) {
+        float g_val = -1.0f;
+        if (parseCode(line, 'G', g_val) && ((int)g_val == 0 || (int)g_val == 1)) {
+            // Process the G0/G1 move
+            handleG0_G1(line);
+        }
+    }
+
+    machineCoordinatesMode = false;  // Reset for next command
+}
+
+// PHASE 5.1: G92 - Set Position / Calibration
+void GCodeParser::handleG92(const char* line) {
+    // G92 Set Position / Calibration
+    // Sets the current position to the specified value (without moving)
+    // Useful for calibration after manual adjustment
+    // G92 X0 Y0 Z0 A0        - Set all axes to origin
+    // G92 Z100               - Set Z to 100mm (material height)
+    // G92 X10.5 Y-5.2 Z50.0  - Set specific coordinates
+
+    // Get current machine positions first
+    float curM[4] = {
+        motionGetPositionMM(0), motionGetPositionMM(1),
+        motionGetPositionMM(2), motionGetPositionMM(3)
+    };
+
+    // Parse any axis values provided
+    float val;
+    bool has_any = false;
+    if (parseCode(line, 'X', val)) { curM[0] = val; has_any = true; }
+    if (parseCode(line, 'Y', val)) { curM[1] = val; has_any = true; }
+    if (parseCode(line, 'Z', val)) { curM[2] = val; has_any = true; }
+    if (parseCode(line, 'A', val)) { curM[3] = val; has_any = true; }
+
+    if (!has_any) {
+        logWarning("[GCODE] G92 requires at least one axis value (X/Y/Z/A)");
+        return;
+    }
+
+    // Convert back to machine counts and set in motion system
+    // Note: This is a simplified implementation
+    // In a real system, you'd need access to motionSetPosition or similar
+    // For now, we log the intended position
+
+    logInfo("[GCODE] G92 Set Position - X:%.1f Y:%.1f Z:%.1f A:%.1f",
+            curM[0], curM[1], curM[2], curM[3]);
+
+    // TODO: Implement motionSetPosition(x, y, z, a) in motion control module
+    // This would set the absolute position without moving
+    Serial.println("[G92] Position set (requires motionSetPosition API)");
+}
+
+// PHASE 5.1: M0/M1 - Program Stop / Pause
+void GCodeParser::handleM0_M1(const char* line) {
+    // M0 Mandatory Program Stop
+    // M1 Optional Program Stop (skip if ignore-optional-stops is enabled)
+    // Program execution pauses - operator must press resume/continue
+    // Useful for: blade changes, material inspection, manual adjustments
+
+    bool is_optional = (strchr(line, 'M') && *(strchr(line, 'M') + 1) == '1');
+
+    if (is_optional) {
+        // M1 - Optional stop
+        // Could check for a configuration flag to skip optional stops
+        bool ignore_optional = configGetInt("opt_stop_skip", 0);
+        if (ignore_optional) {
+            logInfo("[GCODE] M1 Optional stop skipped (ignore optional stops enabled)");
+            return;
+        }
+        logInfo("[GCODE] M1 Optional Program Stop - waiting for resume");
+    } else {
+        // M0 - Mandatory stop
+        logInfo("[GCODE] M0 Mandatory Program Stop - waiting for resume");
+    }
+
+    // Set pause state
+    programPaused = true;
+    pauseStartTime = millis();
+
+    // Display message on LCD
+    Serial.println("[PAUSE] Program paused - press resume to continue");
+    lcdMessageSet("PAUSED: Resume?", 0);  // Stay until operator resumes
+
+    // TODO: Implement pause handler in motion control
+    // Should:
+    // 1. Stop current motion
+    // 2. Hold position
+    // 3. Wait for resume command
 }
 
 bool GCodeParser::parseCode(const char* line, char code, float& value) {

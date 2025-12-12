@@ -38,7 +38,8 @@ private:
     gcode_distance_mode_t distanceMode;
     float currentFeedRate;
     wcs_system_t currentWCS;
-    
+    bool machineCoordinatesMode;  // PHASE 5.1: G53 machine coordinates
+
     float wcs_offsets[6][4]; 
 
     bool parseCode(const char* line, char code, float& value);
@@ -48,9 +49,12 @@ private:
     void handleG4(const char* line);   // G4 Dwell command
     void handleG10(const char* line);
     void handleG5x(int system_idx);
+    void handleG28(const char* line);  // PHASE 5.1: G28 Go to Machine Home
+    void handleG30(const char* line);  // PHASE 5.1: G30 Go to Predefined Position
+    void handleG53(const char* line);  // PHASE 5.1: G53 Machine Coordinates
     void handleG90();
     void handleG91();
-    void handleG92(const char* line);
+    void handleG92(const char* line);  // PHASE 5.1: G92 Set Position/Calibration
     // PHASE 3.2: M117 LCD message handler
     void handleM117(const char* line);
     // PHASE 4.0: M114 Get current position handler
@@ -63,6 +67,12 @@ private:
     void handleM226(const char* line);
     // PHASE 4.0: M255 LCD sleep/backlight timeout handler
     void handleM255(const char* line);
+    // PHASE 5.1: M0/M1 Program Stop/Pause handler
+    void handleM0_M1(const char* line);
+
+    // PHASE 5.1: State for M0/M1 program pause
+    bool programPaused;
+    uint32_t pauseStartTime;
 
     void loadWCS();
     void saveWCS(uint8_t system);

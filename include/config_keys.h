@@ -29,17 +29,28 @@
 #define KEY_SPINDLE_ENABLED "spindl_en"   // Enable/disable spindle current monitoring (0=disable, 1=enable)
 #define KEY_SPINDLE_ADDRESS "spindl_addr" // JXK-10 Modbus slave address (1-247, default 1)
 #define KEY_SPINDLE_THRESHOLD "spindl_thr"// Overcurrent threshold in integer amperes (30 = 30A)
-#define KEY_SPINDLE_POLL_MS "spindl_poll" // Poll interval in milliseconds (default 1000) 
+#define KEY_SPINDLE_POLL_MS "spindl_poll" // Poll interval in milliseconds (default 1000)
+
+// --- PREDEFINED POSITIONS (G30) ---
+#define KEY_POS_SAFE_X "pos_safe_x"       // Safe position X coordinate in mm
+#define KEY_POS_SAFE_Y "pos_safe_y"       // Safe position Y coordinate in mm
+#define KEY_POS_SAFE_Z "pos_safe_z"       // Safe position Z coordinate in mm
+#define KEY_POS_SAFE_A "pos_safe_a"       // Safe position A coordinate in degrees
+#define KEY_POS_1_X "pos_1_x"             // Predefined position 1 X
+#define KEY_POS_1_Y "pos_1_y"             // Predefined position 1 Y
+#define KEY_POS_1_Z "pos_1_z"             // Predefined position 1 Z
+#define KEY_POS_1_A "pos_1_a"             // Predefined position 1 A
+
+// --- HOMING ---
+#define KEY_HOME_ENABLE "home_enable"     // Enable homing (1=yes, 0=no)
+#define KEY_HOME_PROFILE_FAST "home_prof_fast"
+#define KEY_HOME_PROFILE_SLOW "home_prof_slow"
 
 // --- SPEED PROFILES ---
 #define KEY_SPEED_CAL_X "spd_x"
 #define KEY_SPEED_CAL_Y "spd_y"
 #define KEY_SPEED_CAL_Z "spd_z"
 #define KEY_SPEED_CAL_A "spd_a"
-
-// --- HOMING ---
-#define KEY_HOME_PROFILE_FAST "home_prof_fast" 
-#define KEY_HOME_PROFILE_SLOW "home_prof_slow"
 
 // --- MOTION BEHAVIOR ---
 #define KEY_DEFAULT_SPEED "def_spd"
