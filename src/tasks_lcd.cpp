@@ -19,9 +19,11 @@
 #include "plc_iface.h"          // For speed profile display
 // PHASE 3.2: G-code LCD message support and detailed motion display
 #include "lcd_message.h"
+#include "calibration.h"        // For converting counts to mm/degrees
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <string.h>
+#include <math.h>
 
 void taskLcdFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
@@ -84,26 +86,57 @@ void taskLcdFunction(void* parameter) {
         lcdInterfacePrintLine(2, "M117 Message:");
         lcdInterfacePrintLine(3, custom_msg.text);
     } else if (motionIsMoving()) {
-        // PHASE 3.2: Detailed motion display - show which axis and target
+        // PHASE 3.2: Detailed motion display - show which axis and target distance in mm
         uint8_t active_axis = motionGetActiveAxis();
-        int32_t target = motionGetTarget(active_axis);
-        int32_t current = motionGetPosition(active_axis);
+        int32_t target_counts = motionGetTarget(active_axis);
+        float current_mm = motionGetPositionMM(active_axis);
+
+        // Convert target counts to mm/degrees using calibration data
+        float target_mm = 0.0f;
+        const char* unit = "mm";
+
+        // PHASE 3.2 FIX: Use proper calibration data to convert counts to user-friendly units
+        const float def_lin = (float)MOTION_POSITION_SCALE_FACTOR;
+        const float def_ang = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
+
+        if (active_axis == 0) {  // X axis
+            float sx = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : def_lin;
+            target_mm = target_counts / sx;
+        } else if (active_axis == 1) {  // Y axis
+            float sy = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : def_lin;
+            target_mm = target_counts / sy;
+        } else if (active_axis == 2) {  // Z axis
+            float sz = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : def_lin;
+            target_mm = target_counts / sz;
+        } else if (active_axis == 3) {  // A axis (rotary - in degrees)
+            float sa = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : def_ang;
+            target_mm = target_counts / sa;
+            unit = "°";  // Degrees for A axis
+            current_mm = motionGetPosition(3) / sa;  // Convert A position to degrees
+        }
 
         // Line 2: Speed profile + Status + Encoder health
         char status_line[21];
         snprintf(status_line, 21, "SPD[%c] E[%s]", speed_char, enc_status);
         lcdInterfacePrintLine(2, status_line);
 
-        // Line 3: Detailed motion - axis and movement direction/target
-        // Example: "EXEC: X->+10000" or "EXEC: Y->-5000"
+        // Line 3: Detailed motion - axis and movement in mm (operator-friendly units)
+        // Example: "EXEC: X->+25.4mm" or "EXEC: A->-45.0°"
         char motion_line[21];
         char axis_char = "XYZA"[active_axis % 4];
-        char direction = (target >= current) ? '+' : ' ';
-        int32_t delta = (target >= current) ? (target - current) : (current - target);
+        float delta_mm = (target_mm >= current_mm) ? (target_mm - current_mm) : (current_mm - target_mm);
+        char direction = (target_mm >= current_mm) ? '+' : '-';
 
-        // Format: "EXEC: X->+12345" (14 chars max)
-        snprintf(motion_line, 21, "EXEC: %c->%c%ld",
-                 axis_char, direction, (long)delta);
+        // Format with proper decimal places and unit
+        // For mm axes, show 1 decimal place: "EXEC: X->+25.4mm"
+        // For angle axis, show 1 decimal place: "EXEC: A->+45.0°"
+        if (active_axis == 3) {  // Angle axis
+            snprintf(motion_line, 21, "EXEC: %c->%c%5.1f%s",
+                     axis_char, direction, fabsf(delta_mm), unit);
+        } else {  // Linear axes
+            snprintf(motion_line, 21, "EXEC: %c->%c%5.1f%s",
+                     axis_char, direction, fabsf(delta_mm), unit);
+        }
         lcdInterfacePrintLine(3, motion_line);
     } else {
         // Line 2: Speed profile + Status + Encoder health
