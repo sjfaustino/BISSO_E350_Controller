@@ -22,6 +22,7 @@
 #include "auto_report.h"  // PHASE 4.0: M154 auto-report support
 #include "lcd_sleep.h"    // PHASE 4.0: M255 LCD sleep support
 #include "board_inputs.h"  // PHASE 4.0: M226 board input reading
+#include "spindle_current_monitor.h"  // PHASE 5.0: Spindle current monitoring
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -301,6 +302,14 @@ void motionInit() {
     motionPlanner.init();
     autoReportInit();  // PHASE 4.0: Initialize auto-report system
     lcdSleepInit();    // PHASE 4.0: Initialize LCD sleep system
+
+    // PHASE 5.0: Initialize spindle current monitoring
+    uint8_t spindle_addr = configGetInt(KEY_SPINDLE_ADDRESS, 1);
+    float spindle_threshold = (float)configGetInt(KEY_SPINDLE_THRESHOLD, 30);
+    if (!spindleMonitorInit(spindle_addr, spindle_threshold)) {
+        logWarning("[MOTION] Failed to initialize spindle current monitor");
+    }
+
     motionSetPLCAxisDirection(255, false, false);
 }
 
@@ -343,6 +352,9 @@ void motionUpdate() {
 
     // PHASE 4.0: Check if LCD sleep timeout elapsed (non-blocking)
     lcdSleepUpdate();
+
+    // PHASE 5.0: Update spindle current monitoring (non-blocking, includes safety shutdown)
+    spindleMonitorUpdate();
 }
 
 // ============================================================================

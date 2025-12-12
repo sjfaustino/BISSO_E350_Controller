@@ -12,6 +12,9 @@
 #include "encoder_wj66.h"
 #include "encoder_comm_stats.h"
 #include "encoder_hal.h"
+#include "spindle_current_rs485.h"
+#include "jxk10_modbus.h"
+#include "spindle_current_monitor.h"
 #include "i2c_bus_recovery.h"
 #include "task_manager.h"
 #include "watchdog_manager.h"
@@ -364,6 +367,166 @@ void cmd_encoder_main(int argc, char** argv) {
     else Serial.printf("[ENCODER] Unknown sub-command: %s\n", argv[1]);
 }
 
+// ============================================================================
+// SPINDLE CURRENT SENSOR CONFIGURATION (JXK-10 MANAGEMENT)
+// ============================================================================
+
+void cmd_spindle_config_show(int argc, char** argv) {
+    Serial.println("\n[SPINDLE CONFIG] === JXK-10 Configuration ===");
+
+    const spindle_monitor_state_t* state = spindleMonitorGetState();
+    if (!state) {
+        Serial.println("[SPINDLE CONFIG] Error: Unable to get spindle state");
+        return;
+    }
+
+    Serial.printf("Status:              %s\n", state->enabled ? "ENABLED" : "DISABLED");
+    Serial.printf("JXK-10 Address:      %u\n", state->jxk10_slave_address);
+    Serial.printf("Baud Rate:           %lu bps\n", (unsigned long)state->jxk10_baud_rate);
+    Serial.printf("Overcurrent Thresh:  %.1f A\n", state->overcurrent_threshold_amps);
+    Serial.printf("Poll Interval:       %lu ms\n", (unsigned long)state->poll_interval_ms);
+
+    uint32_t stored_enabled = configGetInt(KEY_SPINDLE_ENABLED, 1);
+    uint32_t stored_addr = configGetInt(KEY_SPINDLE_ADDRESS, 1);
+    uint32_t stored_thresh = configGetInt(KEY_SPINDLE_THRESHOLD, 30);
+    uint32_t stored_poll = configGetInt(KEY_SPINDLE_POLL_MS, 1000);
+
+    Serial.printf("\nStored in NVS:       Enabled=%lu, Address=%lu, Threshold=%luA, Poll=%lums\n",
+                  (unsigned long)stored_enabled,
+                  (unsigned long)stored_addr,
+                  (unsigned long)stored_thresh,
+                  (unsigned long)stored_poll);
+}
+
+void cmd_spindle_config_enable(int argc, char** argv) {
+    if (argc < 3) {
+        Serial.println("[SPINDLE CONFIG] Usage: spindle config enable [on | off]");
+        Serial.printf("Current status: %s\n", spindleMonitorIsEnabled() ? "ON" : "OFF");
+        return;
+    }
+
+    bool enable = false;
+    if (strcmp(argv[2], "on") == 0 || strcmp(argv[2], "yes") == 0 || strcmp(argv[2], "1") == 0) {
+        enable = true;
+    } else if (strcmp(argv[2], "off") == 0 || strcmp(argv[2], "no") == 0 || strcmp(argv[2], "0") == 0) {
+        enable = false;
+    } else {
+        Serial.println("[SPINDLE CONFIG] Invalid option (use: on, off)");
+        return;
+    }
+
+    spindleMonitorSetEnabled(enable);
+    configSetInt(KEY_SPINDLE_ENABLED, enable ? 1 : 0);
+    Serial.printf("[SPINDLE CONFIG] Spindle monitoring %s and saved to NVS\n",
+                  enable ? "ENABLED" : "DISABLED");
+}
+
+void cmd_spindle_config_address(int argc, char** argv) {
+    if (argc < 3) {
+        const spindle_monitor_state_t* state = spindleMonitorGetState();
+        Serial.printf("[SPINDLE CONFIG] Current JXK-10 Address: %u\n", state->jxk10_slave_address);
+        Serial.println("[SPINDLE CONFIG] Usage: spindle config address <1-247>");
+        return;
+    }
+
+    int32_t addr_i32 = 0;
+    if (!parseAndValidateInt(argv[2], &addr_i32, 1, 247)) {
+        Serial.println("[SPINDLE CONFIG] Invalid address (must be 1-247)");
+        return;
+    }
+
+    uint8_t addr = (uint8_t)addr_i32;
+    // TODO: Implement Modbus write to change device address
+    // For now, just update local configuration
+    configSetInt(KEY_SPINDLE_ADDRESS, (int)addr);
+    Serial.printf("[SPINDLE CONFIG] JXK-10 address set to %u and saved to NVS\n", addr);
+    Serial.println("[SPINDLE CONFIG] Note: Restart system to apply address change");
+}
+
+void cmd_spindle_config_threshold(int argc, char** argv) {
+    if (argc < 3) {
+        const spindle_monitor_state_t* state = spindleMonitorGetState();
+        Serial.printf("[SPINDLE CONFIG] Current Threshold: %.1f A\n", state->overcurrent_threshold_amps);
+        Serial.println("[SPINDLE CONFIG] Usage: spindle config threshold <0-50>");
+        return;
+    }
+
+    float threshold = atof(argv[2]);
+    if (threshold < 0.0f || threshold > 50.0f) {
+        Serial.println("[SPINDLE CONFIG] Invalid threshold (must be 0.0-50.0 A)");
+        return;
+    }
+
+    spindleMonitorSetThreshold(threshold);
+    configSetInt(KEY_SPINDLE_THRESHOLD, (int)threshold);
+    Serial.printf("[SPINDLE CONFIG] Overcurrent threshold set to %.1f A and saved to NVS\n", threshold);
+}
+
+void cmd_spindle_config_interval(int argc, char** argv) {
+    if (argc < 3) {
+        const spindle_monitor_state_t* state = spindleMonitorGetState();
+        Serial.printf("[SPINDLE CONFIG] Current Poll Interval: %lu ms\n",
+                      (unsigned long)state->poll_interval_ms);
+        Serial.println("[SPINDLE CONFIG] Usage: spindle config interval <100-60000>");
+        return;
+    }
+
+    int32_t interval_i32 = 0;
+    if (!parseAndValidateInt(argv[2], &interval_i32, 100, 60000)) {
+        Serial.println("[SPINDLE CONFIG] Invalid interval (must be 100-60000 ms)");
+        return;
+    }
+
+    uint32_t interval = (uint32_t)interval_i32;
+    spindleMonitorSetPollInterval(interval);
+    configSetInt(KEY_SPINDLE_POLL_MS, (int)interval);
+    Serial.printf("[SPINDLE CONFIG] Poll interval set to %lu ms and saved to NVS\n",
+                  (unsigned long)interval);
+}
+
+void cmd_spindle_config_main(int argc, char** argv) {
+    if (argc < 3) {
+        Serial.println("\n[SPINDLE CONFIG] Usage: spindle config [show | enable | address | threshold | interval]");
+        Serial.println("  show:       Display current configuration");
+        Serial.println("  enable:     Enable/disable monitoring (on/off)");
+        Serial.println("  address:    Set JXK-10 Modbus address (1-247)");
+        Serial.println("  threshold:  Set overcurrent threshold (0-50 A)");
+        Serial.println("  interval:   Set poll interval (100-60000 ms)");
+        return;
+    }
+
+    if (strcmp(argv[2], "show") == 0) {
+        cmd_spindle_config_show(argc, argv);
+    } else if (strcmp(argv[2], "enable") == 0) {
+        cmd_spindle_config_enable(argc, argv);
+    } else if (strcmp(argv[2], "address") == 0) {
+        cmd_spindle_config_address(argc, argv);
+    } else if (strcmp(argv[2], "threshold") == 0) {
+        cmd_spindle_config_threshold(argc, argv);
+    } else if (strcmp(argv[2], "interval") == 0) {
+        cmd_spindle_config_interval(argc, argv);
+    } else {
+        Serial.printf("[SPINDLE CONFIG] Unknown sub-command: %s\n", argv[2]);
+    }
+}
+
+void cmd_spindle_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[SPINDLE] Usage: spindle [diag | config]");
+        return;
+    }
+
+    if (strcmp(argv[1], "diag") == 0) {
+        spindleMonitorPrintDiagnostics();
+        jxk10PrintDiagnostics();
+        rs485MuxPrintDiagnostics();
+    } else if (strcmp(argv[1], "config") == 0) {
+        cmd_spindle_config_main(argc, argv);
+    } else {
+        Serial.printf("[SPINDLE] Unknown sub-command: %s\n", argv[1]);
+    }
+}
+
 // Note: I2C commands have been moved to cli_i2c.cpp for better organization
 
 // ============================================================================
@@ -494,6 +657,7 @@ void cmd_memory_detailed(int argc, char** argv) {
 void cliRegisterDiagCommands() {
     cliRegisterCommand("faults", "Fault log management", cmd_faults_main);
     cliRegisterCommand("encoder", "Encoder management", cmd_encoder_main);
+    cliRegisterCommand("spindle", "Spindle current monitoring", cmd_spindle_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);

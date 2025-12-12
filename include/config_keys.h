@@ -23,7 +23,13 @@
 #define KEY_PPM_A "ppm_a"
 #define KEY_ENC_ERR_THRESHOLD "enc_thresh"
 #define KEY_ENC_INTERFACE "enc_iface"     // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)
-#define KEY_ENC_BAUD "enc_baud"           // WJ66 baud rate 
+#define KEY_ENC_BAUD "enc_baud"           // WJ66 baud rate
+
+// --- SPINDLE CURRENT SENSOR ---
+#define KEY_SPINDLE_ENABLED "spindl_en"   // Enable/disable spindle current monitoring (0=disable, 1=enable)
+#define KEY_SPINDLE_ADDRESS "spindl_addr" // JXK-10 Modbus slave address (1-247, default 1)
+#define KEY_SPINDLE_THRESHOLD "spindl_thr"// Overcurrent threshold in integer amperes (30 = 30A)
+#define KEY_SPINDLE_POLL_MS "spindl_poll" // Poll interval in milliseconds (default 1000) 
 
 // --- SPEED PROFILES ---
 #define KEY_SPEED_CAL_X "spd_x"

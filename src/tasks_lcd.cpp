@@ -20,6 +20,8 @@
 // PHASE 3.2: G-code LCD message support and detailed motion display
 #include "lcd_message.h"
 #include "calibration.h"        // For converting counts to mm/degrees
+// PHASE 5.0: Spindle current monitoring
+#include "spindle_current_monitor.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <string.h>
@@ -115,10 +117,16 @@ void taskLcdFunction(void* parameter) {
             current_mm = motionGetPosition(3) / sa;  // Convert A position to degrees
         }
 
-        // Line 2: Speed profile + Status + Encoder health
-        char status_line[21];
-        snprintf(status_line, 21, "SPD[%c] E[%s]", speed_char, enc_status);
-        lcdInterfacePrintLine(2, status_line);
+        // PHASE 5.0: Line 2: Z position + A position + Spindle current
+        // Format: "Z +999.9  A +99 30A"
+        float z_pos_mm = motionGetPosition(2) / ((machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : def_lin);
+        float a_pos_deg = motionGetPosition(3) / ((machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : def_ang);
+        float spindle_current = spindleMonitorGetCurrent();
+
+        char position_line[21];
+        snprintf(position_line, 21, "Z%+6.1f A%+3.0f%4.1fA",
+                 z_pos_mm, a_pos_deg, spindle_current);
+        lcdInterfacePrintLine(2, position_line);
 
         // Line 3: Detailed motion - axis and movement with right-aligned distance
         // Example: "EXEC: Mv X   +25.4mm" or "EXEC: Mv A    +45.0°"
@@ -139,10 +147,19 @@ void taskLcdFunction(void* parameter) {
                  axis_char, distance_str);
         lcdInterfacePrintLine(3, motion_line);
     } else {
-        // Line 2: Speed profile + Status + Encoder health
-        char status_line[21];
-        snprintf(status_line, 21, "SPD[%c] E[%s]", speed_char, enc_status);
-        lcdInterfacePrintLine(2, status_line);
+        // PHASE 5.0: Line 2: Z position + A position + Spindle current (IDLE state)
+        // Format: "Z +999.9  A +99 30A"
+        const float def_lin = (float)MOTION_POSITION_SCALE_FACTOR;
+        const float def_ang = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
+
+        float z_pos_mm = motionGetPosition(2) / ((machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : def_lin);
+        float a_pos_deg = motionGetPosition(3) / ((machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : def_ang);
+        float spindle_current = spindleMonitorGetCurrent();
+
+        char position_line[21];
+        snprintf(position_line, 21, "Z%+6.1f A%+3.0f%4.1fA",
+                 z_pos_mm, a_pos_deg, spindle_current);
+        lcdInterfacePrintLine(2, position_line);
 
         // Line 3: Ready message
         lcdInterfacePrintLine(3, "IDLE: System Ready");
