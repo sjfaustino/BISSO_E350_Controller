@@ -11,25 +11,27 @@
 #include "boot_validation.h"
 #include "encoder_wj66.h"
 #include "encoder_comm_stats.h"
+#include "encoder_hal.h"
 #include "i2c_bus_recovery.h"
 #include "task_manager.h"
 #include "watchdog_manager.h"
 #include "timeout_manager.h"
 #include "memory_monitor.h"
 #include "plc_iface.h"        // <-- THIS MUST MATCH THE FILE ABOVE
-#include "motion.h" 
+#include "motion.h"
 #include "config_unified.h"
 #include "config_manager.h"
 #include "config_schema_versioning.h"
 #include "config_validator.h"
-#include "safety.h"           
-#include "firmware_version.h" 
+#include "config_keys.h"
+#include "safety.h"
+#include "firmware_version.h"
 #include "encoder_motion_integration.h"
-#include "encoder_calibration.h" 
-#include "system_utilities.h" 
-#include "input_validation.h" 
-#include "board_inputs.h"     
-#include "system_constants.h" 
+#include "encoder_calibration.h"
+#include "system_utilities.h"
+#include "input_validation.h"
+#include "board_inputs.h"
+#include "system_constants.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -213,13 +215,13 @@ void cmd_encoder_set_baud(int argc, char** argv) {
     Serial.println("[CLI] Usage: encoder_baud_set <baud_rate>");
     return;
   }
-  
+
   int32_t new_baud_rate_i32 = 0;
   if (!parseAndValidateInt(argv[1], &new_baud_rate_i32, 1200, 115200)) {
     Serial.println("[CLI] Invalid baud rate (1200-115200).");
     return;
   }
-  
+
   if (encoderSetBaudRate((uint32_t)new_baud_rate_i32)) {
     Serial.printf("[CLI] [OK] Encoder baud set to %ld.\n", (long)new_baud_rate_i32);
   } else {
@@ -227,13 +229,139 @@ void cmd_encoder_set_baud(int argc, char** argv) {
   }
 }
 
+// ============================================================================
+// ENCODER CONFIGURATION (WJ66 INTERFACE MANAGEMENT)
+// ============================================================================
+
+void cmd_encoder_config_show(int argc, char** argv) {
+    Serial.println("\n[ENCODER CONFIG] === WJ66 Configuration ===");
+
+    const encoder_hal_config_t* config = encoderHalGetConfig();
+    if (!config) {
+        Serial.println("[ENCODER CONFIG] Error: Unable to get HAL configuration");
+        return;
+    }
+
+    Serial.printf("Interface:      %s\n", encoderHalGetInterfaceName(config->interface));
+    Serial.printf("Description:    %s\n", encoderHalGetInterfaceDescription(config->interface));
+    Serial.printf("Baud Rate:      %lu\n", (unsigned long)config->baud_rate);
+    Serial.printf("RX Pin:         %u\n", config->rx_pin);
+    Serial.printf("TX Pin:         %u\n", config->tx_pin);
+    Serial.printf("Read Interval:  %lu ms\n", (unsigned long)config->read_interval_ms);
+    Serial.printf("Timeout:        %lu ms\n", (unsigned long)config->timeout_ms);
+
+    uint32_t stored_iface = configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS232_HT);
+    uint32_t stored_baud = configGetInt(KEY_ENC_BAUD, 9600);
+    Serial.printf("\nStored in NVS:  Interface=%lu, Baud=%lu\n", (unsigned long)stored_iface, (unsigned long)stored_baud);
+}
+
+void cmd_encoder_config_interface(int argc, char** argv) {
+    if (argc < 3) {
+        Serial.println("[ENCODER CONFIG] Usage: encoder config interface [RS232_HT | RS485_RXD2 | CUSTOM]");
+        Serial.println("  RS232_HT:    GPIO14/33 (HT1/HT2) - RS232 3.3V (standard)");
+        Serial.println("  RS485_RXD2:  GPIO17/18 (RXD2/TXD2) - RS485 Differential (alternative)");
+        Serial.println("  CUSTOM:      User-defined pins");
+
+        // Show current
+        const encoder_hal_config_t* config = encoderHalGetConfig();
+        if (config) {
+            Serial.printf("\nCurrent: %s\n", encoderHalGetInterfaceName(config->interface));
+        }
+        return;
+    }
+
+    encoder_interface_t interface_type = (encoder_interface_t)255;  // INVALID
+
+    if (strcmp(argv[2], "RS232_HT") == 0) {
+        interface_type = ENCODER_INTERFACE_RS232_HT;
+    } else if (strcmp(argv[2], "RS485_RXD2") == 0) {
+        interface_type = ENCODER_INTERFACE_RS485_RXD2;
+    } else if (strcmp(argv[2], "CUSTOM") == 0) {
+        interface_type = ENCODER_INTERFACE_CUSTOM;
+    } else {
+        Serial.printf("[ENCODER CONFIG] Unknown interface: %s\n", argv[2]);
+        return;
+    }
+
+    // Get current baud rate
+    uint32_t baud_rate = configGetInt(KEY_ENC_BAUD, 9600);
+
+    // Switch interface
+    if (encoderHalSwitchInterface(interface_type, baud_rate)) {
+        Serial.printf("[ENCODER CONFIG] Switched to %s\n", encoderHalGetInterfaceName(interface_type));
+
+        // Save to NVS
+        configSetInt(KEY_ENC_INTERFACE, (int)interface_type);
+        Serial.printf("[ENCODER CONFIG] Configuration saved to NVS\n");
+    } else {
+        Serial.println("[ENCODER CONFIG] Failed to switch interface");
+    }
+}
+
+void cmd_encoder_config_baud(int argc, char** argv) {
+    if (argc < 3) {
+        const encoder_hal_config_t* config = encoderHalGetConfig();
+        if (config) {
+            Serial.printf("[ENCODER CONFIG] Current Baud Rate: %lu\n", (unsigned long)config->baud_rate);
+        }
+        Serial.println("[ENCODER CONFIG] Usage: encoder config baud <rate>");
+        Serial.println("  Valid rates: 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200");
+        return;
+    }
+
+    int32_t new_baud_i32 = 0;
+    if (!parseAndValidateInt(argv[2], &new_baud_i32, 1200, 115200)) {
+        Serial.println("[ENCODER CONFIG] Invalid baud rate (must be 1200-115200)");
+        return;
+    }
+
+    uint32_t new_baud = (uint32_t)new_baud_i32;
+
+    // Get current interface
+    const encoder_hal_config_t* config = encoderHalGetConfig();
+    encoder_interface_t interface = (config) ? config->interface : ENCODER_INTERFACE_RS232_HT;
+
+    // Re-initialize with new baud rate
+    if (encoderHalInit(interface, new_baud)) {
+        Serial.printf("[ENCODER CONFIG] Baud rate set to %lu\n", (unsigned long)new_baud);
+
+        // Save to NVS
+        configSetInt(KEY_ENC_BAUD, (int)new_baud);
+        Serial.printf("[ENCODER CONFIG] Configuration saved to NVS\n");
+    } else {
+        Serial.println("[ENCODER CONFIG] Failed to set baud rate");
+    }
+}
+
+void cmd_encoder_config_main(int argc, char** argv) {
+    if (argc < 3) {
+        Serial.println("\n[ENCODER CONFIG] Usage: encoder config [show | interface | baud]");
+        Serial.println("  show:       Display current configuration");
+        Serial.println("  interface:  Set encoder interface (RS232_HT or RS485_RXD2)");
+        Serial.println("  baud:       Set baud rate");
+        return;
+    }
+
+    if (strcmp(argv[2], "show") == 0) {
+        cmd_encoder_config_show(argc, argv);
+    } else if (strcmp(argv[2], "interface") == 0) {
+        cmd_encoder_config_interface(argc, argv);
+    } else if (strcmp(argv[2], "baud") == 0) {
+        cmd_encoder_config_baud(argc, argv);
+    } else {
+        Serial.printf("[ENCODER CONFIG] Unknown sub-command: %s\n", argv[2]);
+    }
+}
+
 void cmd_encoder_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[ENCODER] Usage: encoder [diag | baud]");
+        Serial.println("[ENCODER] Usage: encoder [diag | baud | config]");
         return;
     }
     if (strcmp(argv[1], "diag") == 0) cmd_encoder_diag(argc, argv);
     else if (strcmp(argv[1], "baud") == 0) cmd_encoder_baud_detect(argc, argv);
+    else if (strcmp(argv[1], "config") == 0) cmd_encoder_config_main(argc, argv);
+    else Serial.printf("[ENCODER] Unknown sub-command: %s\n", argv[1]);
 }
 
 // Note: I2C commands have been moved to cli_i2c.cpp for better organization

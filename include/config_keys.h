@@ -21,7 +21,9 @@
 #define KEY_PPM_Y "ppm_y"
 #define KEY_PPM_Z "ppm_z"
 #define KEY_PPM_A "ppm_a"
-#define KEY_ENC_ERR_THRESHOLD "enc_thresh" 
+#define KEY_ENC_ERR_THRESHOLD "enc_thresh"
+#define KEY_ENC_INTERFACE "enc_iface"     // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)
+#define KEY_ENC_BAUD "enc_baud"           // WJ66 baud rate 
 
 // --- SPEED PROFILES ---
 #define KEY_SPEED_CAL_X "spd_x"
