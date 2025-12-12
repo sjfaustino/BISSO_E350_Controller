@@ -11,6 +11,7 @@
 #include "config_keys.h"
 #include "serial_logger.h"
 #include "lcd_message.h"  // PHASE 3.2: M117 LCD message support
+#include "auto_report.h"  // PHASE 4.0: M154 auto-report support
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -106,6 +107,10 @@ bool GCodeParser::processCommand(const char* line) {
             case 117: handleM117(line); break;
             // PHASE 4.0: M114 - Get current position
             case 114: handleM114(); break;
+            // PHASE 4.0: M115 - Firmware info
+            case 115: handleM115(); break;
+            // PHASE 4.0: M154 - Position auto-report
+            case 154: handleM154(line); break;
             case 112: motionEmergencyStop(); break;
             default: return false;
         }
@@ -277,6 +282,56 @@ void GCodeParser::handleM114() {
     Serial.println(response);
     logInfo("[GCODE] M114 Position: X:%.1f Y:%.1f Z:%.1f A:%.1f",
             x_mm, y_mm, z_mm, a_deg);
+}
+
+// PHASE 4.0: M115 - Firmware info (standard gcode command)
+void GCodeParser::handleM115() {
+    // M115 Report Firmware Version & Capabilities
+    // Standard Grbl response format
+
+    // Build firmware info response
+    Serial.println("[VER:Gemini v4.0.0 BISSO-E350]");
+    Serial.println("[OPT:B#,M,T#]");  // Options: Block #, Messages, Real-time status
+
+    // Report capabilities
+    Serial.println("[CAPABILITY:4-axis]");        // 4 axes: X, Y, Z, A
+    Serial.println("[CAPABILITY:adaptive-feed]");  // Feed override support
+    Serial.println("[CAPABILITY:G4-dwell]");       // G4 dwell support
+    Serial.println("[CAPABILITY:M114-position]");  // M114 position reporting
+    Serial.println("[CAPABILITY:M154-auto-report]"); // M154 auto-report support
+    Serial.println("[CAPABILITY:M117-lcd-msg]");  // M117 LCD message support
+    Serial.println("[CAPABILITY:WCS-6-system]");  // 6 work coordinate systems
+    Serial.println("[CAPABILITY:soft-limits]");   // Soft limits enabled
+
+    logInfo("[GCODE] M115 Firmware Info Reported");
+}
+
+// PHASE 4.0: M154 - Position auto-report (non-blocking)
+void GCodeParser::handleM154(const char* line) {
+    // M154 Position Auto-Report
+    // M154 S<interval>  - Set auto-report interval (0 = disable)
+    // Interval in seconds, 0.1 to 60.0 supported
+    // Example: M154 S1   (report every 1 second)
+    // Example: M154 S0   (disable auto-report)
+
+    float s_val = 0.0f;
+
+    // Check for S parameter (interval in seconds)
+    if (parseCode(line, 'S', s_val) && s_val >= 0) {
+        uint32_t interval_sec = (uint32_t)s_val;
+
+        if (autoReportSetInterval(interval_sec)) {
+            if (interval_sec == 0) {
+                logInfo("[GCODE] M154 Auto-Report Disabled");
+            } else {
+                logInfo("[GCODE] M154 Auto-Report Enabled - %lu sec", (unsigned long)interval_sec);
+            }
+        } else {
+            logWarning("[GCODE] M154 Failed to set interval");
+        }
+    } else {
+        logWarning("[GCODE] M154 requires S<interval> parameter (in seconds)");
+    }
 }
 
 bool GCodeParser::parseCode(const char* line, char code, float& value) {

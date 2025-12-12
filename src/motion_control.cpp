@@ -7,20 +7,21 @@
 
 #include "motion.h"
 #include "motion_planner.h"
-#include "motion_state.h" 
+#include "motion_state.h"
 #include "system_constants.h"
 #include "plc_iface.h"
-#include "encoder_wj66.h"        
+#include "encoder_wj66.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "task_manager.h"
 #include "safety.h"
-#include "encoder_calibration.h" 
-#include "config_unified.h" 
+#include "encoder_calibration.h"
+#include "config_unified.h"
 #include "config_keys.h"
-#include "encoder_motion_integration.h" 
+#include "encoder_motion_integration.h"
+#include "auto_report.h"  // PHASE 4.0: M154 auto-report support
 #include <math.h>
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <stdio.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -238,13 +239,14 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 void motionInit() {
     logInfo("[MOTION] Init v3.5.19...");
     m_state.strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
-    
+
     for(int i=0; i<MOTION_AXES; i++) {
         axes[i].init(i);
         axes[i].soft_limit_min = -500000;
         axes[i].soft_limit_max = 500000;
     }
     motionPlanner.init();
+    autoReportInit();  // PHASE 4.0: Initialize auto-report system
     motionSetPLCAxisDirection(255, false, false);
 }
 
@@ -281,6 +283,9 @@ void motionUpdate() {
     }
 
     taskUnlockMutex(taskGetMotionMutex());
+
+    // PHASE 4.0: Check if auto-report interval elapsed (non-blocking)
+    autoReportUpdate();
 }
 
 // ============================================================================
@@ -612,8 +617,9 @@ void motionEmergencyStop() {
     portEXIT_CRITICAL(&motionSpinlock);
     
     motionBuffer.clear();
+    autoReportDisable();  // PHASE 4.0: Disable auto-report on E-Stop
     if (got_mutex) taskUnlockMutex(taskGetMotionMutex());
-    
+
     logError("[MOTION] [CRITICAL] EMERGENCY STOP ACTIVATED");
     faultLogError(FAULT_EMERGENCY_HALT, "E-Stop Activated");
     taskSignalMotionUpdate();

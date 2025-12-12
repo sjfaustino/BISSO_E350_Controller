@@ -55,7 +55,11 @@ private:
     void handleM117(const char* line);
     // PHASE 4.0: M114 Get current position handler
     void handleM114();
-    
+    // PHASE 4.0: M115 Firmware info handler
+    void handleM115();
+    // PHASE 4.0: M154 Position auto-report handler
+    void handleM154(const char* line);
+
     void loadWCS();
     void saveWCS(uint8_t system);
     void pushMove(float x, float y, float z, float a);
