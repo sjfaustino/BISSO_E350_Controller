@@ -59,6 +59,8 @@ bool elboI73GetInput(uint8_t bit, bool* success = nullptr);
 
 void elboQ73SetRelay(uint8_t bit, bool state);
 void elboSetSpeedProfile(uint8_t profile_idx);
+// PHASE 3.1: Added getter to allow LCD and diagnostics to display active speed profile
+uint8_t elboGetSpeedProfile();  // Returns current speed profile (1-3)
 void elboSetDirection(uint8_t axis, bool forward);
 void elboDiagnostics(); 
 

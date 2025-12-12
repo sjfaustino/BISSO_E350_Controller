@@ -13,7 +13,10 @@
 #include "system_constants.h"
 #include "safety_state_machine.h"
 #include "fault_logging.h"
-#include "firmware_version.h" 
+#include "firmware_version.h"
+// PHASE 3.1: Operator awareness improvements
+#include "encoder_deviation.h"  // For encoder health status
+#include "plc_iface.h"          // For speed profile display
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <string.h>
@@ -44,15 +47,47 @@ void taskLcdFunction(void* parameter) {
     safety_fsm_state_t fsm_state = safetyGetState();
     safety_fault_t current_fault_code = safetyGetCurrentFault();
 
+    // PHASE 3.1: Get speed profile and encoder health for display
+    uint8_t speed_profile = elboGetSpeedProfile();
+    char speed_char = (speed_profile <= 2) ? ('1' + speed_profile) : '?';
+
+    // Check encoder health across all axes
+    char enc_status[4] = "OK";
+    for (int axis = 0; axis < MOTION_AXES; axis++) {
+      const encoder_deviation_t* dev = encoderGetDeviationData(axis);
+      if (dev && dev->status == DEVIATION_WARNING) {
+        snprintf(enc_status, sizeof(enc_status), "WN");
+        break;
+      } else if (dev && dev->status == DEVIATION_ERROR) {
+        snprintf(enc_status, sizeof(enc_status), "ER");
+        break;
+      }
+    }
+
     if (fsm_state == FSM_EMERGENCY || fsm_state == FSM_ALARM) {
         lcdInterfacePrintLine(2, "ALARM: MOTION HALTED");
-        lcdInterfacePrintLine(3, faultCodeToString((fault_code_t)current_fault_code)); 
+        // Fault code display with error status
+        char fault_line[21];
+        snprintf(fault_line, 21, "F#%02X %s", current_fault_code, faultCodeToString((fault_code_t)current_fault_code));
+        lcdInterfacePrintLine(3, fault_line);
     } else if (motionIsMoving()) {
-        lcdInterfacePrintLine(2, "STATUS: EXECUTING");
-        lcdInterfacePrintLine(3, motionStateToString(motionGetState(0)));
+        // Line 2: Speed profile + Status + Encoder health
+        char status_line[21];
+        snprintf(status_line, 21, "SPD[%c] E[%s]", speed_char, enc_status);
+        lcdInterfacePrintLine(2, status_line);
+
+        // Line 3: Motion state
+        char motion_line[21];
+        snprintf(motion_line, 21, "EXEC: %s", motionStateToString(motionGetState(0)));
+        lcdInterfacePrintLine(3, motion_line);
     } else {
-        lcdInterfacePrintLine(2, "STATUS: IDLE");
-        lcdInterfacePrintLine(3, "INFO: System Ready");
+        // Line 2: Speed profile + Status + Encoder health
+        char status_line[21];
+        snprintf(status_line, 21, "SPD[%c] E[%s]", speed_char, enc_status);
+        lcdInterfacePrintLine(2, status_line);
+
+        // Line 3: Ready message
+        lcdInterfacePrintLine(3, "IDLE: System Ready");
     }
 
     lcdInterfaceUpdate(); 

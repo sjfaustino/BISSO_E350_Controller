@@ -57,7 +57,9 @@
 #define TASK_PERIOD_CLI          100
 #define TASK_PERIOD_FAULT_LOG    500
 #define TASK_PERIOD_MONITOR      1000
-#define TASK_PERIOD_LCD          100
+// PHASE 3.1: Increased from 100ms to 20ms (50Hz) to match encoder update frequency
+// Reduces position display staleness from ±100ms to ±20ms
+#define TASK_PERIOD_LCD          20
 
 // ============================================================================
 // ADAPTIVE I2C TIMEOUT CONFIGURATION

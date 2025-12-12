@@ -116,6 +116,21 @@ void elboSetSpeedProfile(uint8_t profile_index) {
     plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Speed");
 }
 
+// PHASE 3.1: Added getter to read current speed profile
+// Allows LCD and diagnostics to display active speed profile
+uint8_t elboGetSpeedProfile() {
+    // Read speed profile bits (4, 5, 6) from shadow register
+    // No spinlock needed for read-only operation
+    uint8_t speed_bits = (q73_shadow_register >> ELBO_Q73_SPEED_1) & 0x07;
+
+    // Decode speed bits to profile index
+    if (speed_bits & (1 << (ELBO_Q73_SPEED_1 - ELBO_Q73_SPEED_1))) return 0;  // Profile 0
+    if (speed_bits & (1 << (ELBO_Q73_SPEED_2 - ELBO_Q73_SPEED_1))) return 1;  // Profile 1
+    if (speed_bits & (1 << (ELBO_Q73_SPEED_3 - ELBO_Q73_SPEED_1))) return 2;  // Profile 2
+
+    return 0xFF;  // No profile set or error
+}
+
 void elboQ73SetRelay(uint8_t relay_bit, bool state) {
     if (relay_bit > 7) return;
 
