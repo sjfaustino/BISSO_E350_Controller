@@ -10,6 +10,7 @@
 #include "motion.h"
 #include "motion_state.h"     // Read-only state access
 #include "api_file_manager.h" // Delegated file handling
+#include "spindle_current_monitor.h"  // PHASE 5.1: Spindle telemetry
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -102,7 +103,47 @@ void WebServerManager::setupRoutes() {
         }
     ).setAuthentication(http_username, http_password);
     
-    // 4. DELEGATE FILE MANAGEMENT
+    // 4. API Spindle Telemetry (Protected) - PHASE 5.1
+    server->on("/api/spindle", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        JsonDocument doc;
+
+        // Get spindle monitor state
+        const spindle_monitor_state_t* spindle_state = spindleMonitorGetState();
+
+        if (spindle_state) {
+            doc["enabled"] = spindle_state->enabled;
+            doc["current_amps"] = spindle_state->current_amps;
+            doc["peak_amps"] = spindle_state->current_peak_amps;
+            doc["average_amps"] = spindle_state->current_average_amps;
+            doc["threshold_amps"] = spindle_state->overcurrent_threshold_amps;
+            doc["poll_interval_ms"] = spindle_state->poll_interval_ms;
+            doc["read_count"] = spindle_state->read_count;
+            doc["error_count"] = spindle_state->error_count;
+            doc["overload_count"] = spindle_state->overload_count;
+            doc["shutdown_count"] = spindle_state->shutdown_count;
+            doc["jxk10_address"] = spindle_state->jxk10_slave_address;
+            doc["jxk10_baud"] = spindle_state->jxk10_baud_rate;
+
+            // JXK-10 device status
+            if (spindleMonitorIsOverload()) {
+                doc["jxk10_status"] = "OVERLOAD";
+            } else if (spindleMonitorIsFault()) {
+                doc["jxk10_status"] = "FAULT";
+            } else {
+                doc["jxk10_status"] = "OK";
+            }
+
+            doc["overcurrent"] = spindleMonitorIsOvercurrent();
+        }
+
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+
+    // 5. DELEGATE FILE MANAGEMENT
     // Registers /api/files (GET, DELETE) and /api/upload (POST)
     apiRegisterFileRoutes(server, http_username, http_password);
 

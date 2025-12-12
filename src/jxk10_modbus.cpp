@@ -135,6 +135,30 @@ static const uint16_t* modbusParseReadResponse(const uint8_t* buffer, uint16_t l
     return (const uint16_t*)&buffer[3];  // Point to data
 }
 
+/**
+ * @brief Build Modbus RTU write single register request (FC 06)
+ * @param slave_addr Slave address
+ * @param reg_addr Register address
+ * @param value Register value to write
+ * @param buffer Output buffer for request frame
+ * @return Length of request frame
+ */
+static uint16_t modbusWriteSingleRegisterRequest(uint8_t slave_addr, uint16_t reg_addr,
+                                                 uint16_t value, uint8_t* buffer) {
+    buffer[0] = slave_addr;
+    buffer[1] = 0x06;  // Function code: Write Single Register
+    buffer[2] = (reg_addr >> 8) & 0xFF;
+    buffer[3] = reg_addr & 0xFF;
+    buffer[4] = (value >> 8) & 0xFF;
+    buffer[5] = value & 0xFF;
+
+    uint16_t crc = modbusCrc16(buffer, 6);
+    buffer[6] = crc & 0xFF;
+    buffer[7] = (crc >> 8) & 0xFF;
+
+    return 8;
+}
+
 bool jxk10ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
     jxk10_state.slave_address = slave_address;
     jxk10_state.baud_rate = baud_rate;
@@ -266,10 +290,72 @@ bool jxk10ModbusSetSlaveAddress(uint8_t new_address) {
         return false;
     }
 
-    // TODO: Implement Modbus write for address change
-    // This requires FC 06 (Write Single Register)
-    // For now, just update local state
+    // Ensure we're on the spindle device
+    if (rs485MuxGetCurrentDevice() != RS485_DEVICE_SPINDLE) {
+        return false;
+    }
+
+    // Build Modbus FC 06 write request for address register (0x0002)
+    uint16_t tx_len = modbusWriteSingleRegisterRequest(jxk10_state.slave_address,
+                                                        JXK10_REG_SLAVE_ADDR, new_address,
+                                                        modbus_tx_buffer);
+
+    // Send write request
+    if (!encoderHalSend(modbus_tx_buffer, tx_len)) {
+        jxk10_state.error_count++;
+        return false;
+    }
+
+    // Wait for response
+    delay(100);
+
+    // Attempt to receive response
+    uint8_t rx_data[32];
+    memset(rx_data, 0, sizeof(rx_data));
+    int rx_len = encoderHalReceive(rx_data, sizeof(rx_data));
+
+    if (rx_len < 8) {
+        jxk10_state.error_count++;
+        return false;  // Invalid response
+    }
+
+    // Verify FC 06 response (should echo request)
+    if (rx_data[1] != 0x06) {
+        jxk10_state.error_count++;
+        return false;  // Wrong function code
+    }
+
+    // Verify CRC
+    uint16_t crc = modbusCrc16(rx_data, rx_len - 2);
+    uint16_t rx_crc = rx_data[rx_len - 2] | (rx_data[rx_len - 1] << 8);
+    if (crc != rx_crc) {
+        jxk10_state.error_count++;
+        return false;  // CRC mismatch
+    }
+
+    // Now write 1 to register 0x0005 to save config
+    tx_len = modbusWriteSingleRegisterRequest(jxk10_state.slave_address,
+                                               JXK10_REG_SAVE_CONFIG, 1,
+                                               modbus_tx_buffer);
+
+    if (!encoderHalSend(modbus_tx_buffer, tx_len)) {
+        jxk10_state.error_count++;
+        return false;
+    }
+
+    delay(100);
+
+    memset(rx_data, 0, sizeof(rx_data));
+    rx_len = encoderHalReceive(rx_data, sizeof(rx_data));
+
+    if (rx_len < 8) {
+        jxk10_state.error_count++;
+        return false;  // Save failed
+    }
+
+    // Update local state with new address
     jxk10_state.slave_address = new_address;
+
     return true;
 }
 
