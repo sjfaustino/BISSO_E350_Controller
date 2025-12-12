@@ -169,22 +169,22 @@ bool MotionBuffer::isEmpty() {
 
 void MotionBuffer::clear() {
     if (buffer_mutex == NULL) {
-        logWarning("[BUFFER] WARNING: clear() called with uninitialized mutex");
-        head = tail = count = 0;
+        logError("[BUFFER] CRITICAL: clear() called with uninitialized mutex - cannot proceed");
         return;
     }
 
+    // PHASE 5.1: Must acquire mutex before clearing to prevent race conditions
     if (!xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
-        logWarning("[BUFFER] Clear timeout - force clearing");
+        logError("[BUFFER] CRITICAL: Clear timeout - cannot clear buffer safely");
+        return;  // Do NOT clear without mutex - risk of data corruption
     }
 
+    // Safe to clear while holding mutex
     head = 0;
     tail = 0;
     count = 0;
 
-    if (buffer_mutex != NULL) {
-        xSemaphoreGive(buffer_mutex);
-    }
+    xSemaphoreGive(buffer_mutex);
 }
 
 int MotionBuffer::available() {

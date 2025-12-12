@@ -68,6 +68,11 @@
 
 // --- WCS OFFSETS (Generated Keys) ---
 // Base keys, suffixes will be appended (e.g. "g54_x")
-#define KEY_WCS_PREFIX "g" 
+#define KEY_WCS_PREFIX "g"
+
+// --- WEB SERVER CREDENTIALS ---
+#define KEY_WEB_USERNAME "web_user"      // Web server username
+#define KEY_WEB_PASSWORD "web_pass"      // Web server password
+#define KEY_WEB_PW_CHANGED "web_pw_chg"  // Flag: password changed from default (1=changed, 0=default)
 
 #endif

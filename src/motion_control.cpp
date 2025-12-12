@@ -315,23 +315,65 @@ void motionInit() {
 
 void motionUpdate() {
     if (!m_state.global_enabled) return;
-    
+
+    // PHASE 5.1: Exponential backoff with safety escalation
     static uint32_t consecutive_skips = 0;
-    if (!taskLockMutex(taskGetMotionMutex(), 5)) {
-        consecutive_skips++;
-        if (consecutive_skips >= 5) {
-            logWarning("[MOTION] Starvation: Loop skipped %lu times", (unsigned long)consecutive_skips);
-        }
-        return; 
+    static uint32_t last_timeout_warning_ms = 0;
+    static uint8_t backoff_level = 0;  // 0=100ms, 1=200ms, 2=400ms, 3=escalate
+
+    // Calculate timeout with exponential backoff
+    uint32_t timeout_ms = 100;  // Base: 100ms (was 5ms - too aggressive)
+    if (backoff_level > 0) {
+        timeout_ms = 100 << backoff_level;  // 100, 200, 400ms
+        if (timeout_ms > 400) timeout_ms = 400;  // Cap at 400ms
     }
-    consecutive_skips = 0;
+
+    if (!taskLockMutex(taskGetMotionMutex(), timeout_ms)) {
+        consecutive_skips++;
+
+        // Increase backoff level after repeated failures
+        if (consecutive_skips >= 3) {
+            backoff_level = 1;
+        }
+        if (consecutive_skips >= 10) {
+            backoff_level = 2;
+        }
+
+        // Log warning after threshold
+        uint32_t now = millis();
+        if ((uint32_t)(now - last_timeout_warning_ms) >= 5000) {  // Log once per 5 seconds
+            logWarning("[MOTION] Mutex timeout (%lums): Skipped %lu times, backoff level %u",
+                      (unsigned long)timeout_ms, (unsigned long)consecutive_skips, backoff_level);
+            faultLog(FAULT_MOTION_TIMEOUT,
+                    "Motion mutex timeout: %lu consecutive failures, backoff level %u",
+                    (unsigned long)consecutive_skips, backoff_level);
+            last_timeout_warning_ms = now;
+        }
+
+        // Escalate to emergency stop if critical timeout threshold reached
+        if (consecutive_skips >= 20) {
+            logError("[MOTION] CRITICAL: Motion mutex timeout escalation!");
+            faultLog(FAULT_MOTION_TIMEOUT, "Motion mutex critical failure - escalating to emergency stop");
+            motionEmergencyStop();
+            consecutive_skips = 0;
+            backoff_level = 0;
+        }
+
+        return;
+    }
+
+    // Successfully acquired mutex - reset backoff
+    if (consecutive_skips > 0) {
+        consecutive_skips = 0;
+        backoff_level = 0;
+    }
 
     int strict_mode = m_state.strict_limits;
-    
+
     for (int i=0; i<MOTION_AXES; i++) {
         int32_t pos = wj66GetPosition(i);
         axes[i].position = pos;
-        
+
         if (axes[i].checkSoftLimits(strict_mode)) {
             motionEmergencyStop();
             taskUnlockMutex(taskGetMotionMutex());

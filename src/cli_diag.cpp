@@ -27,6 +27,7 @@
 #include "config_schema_versioning.h"
 #include "config_validator.h"
 #include "config_keys.h"
+#include "web_server.h"       // PHASE 5.1: Web credential management
 #include "safety.h"
 #include "firmware_version.h"
 #include "encoder_motion_integration.h"
@@ -652,12 +653,107 @@ void cmd_memory_detailed(int argc, char** argv) {
 }
 
 // ============================================================================
+// WEB CREDENTIALS CONFIGURATION (PHASE 5.1: Security hardening)
+// ============================================================================
+
+void cmd_web_config_show(int argc, char** argv) {
+    Serial.println("\n[WEB CONFIG] === Web Server Credentials ===");
+
+    const char* username = configGetString(KEY_WEB_USERNAME, "admin");
+    uint32_t pw_changed = configGetInt(KEY_WEB_PW_CHANGED, 0);
+
+    Serial.printf("Username:            %s\n", username);
+    Serial.printf("Password Changed:    %s\n", pw_changed ? "YES" : "NO (default)");
+    if (pw_changed == 0) {
+        Serial.println("\n[WEB CONFIG] WARNING: Using default password! Please set a new password.");
+        Serial.println("[WEB CONFIG] Usage: web config password <password>");
+    }
+}
+
+void cmd_web_config_username(int argc, char** argv) {
+    if (argc < 3) {
+        Serial.println("[WEB CONFIG] Usage: web config username <username>");
+        Serial.printf("Current:   %s\n", configGetString(KEY_WEB_USERNAME, "admin"));
+        Serial.println("Limits:    3-32 characters");
+        return;
+    }
+
+    const char* username = argv[2];
+    if (strlen(username) < 3 || strlen(username) > 32) {
+        Serial.println("[WEB CONFIG] [ERR] Username must be 3-32 characters");
+        return;
+    }
+
+    configSetString(KEY_WEB_USERNAME, username);
+    configUnifiedSave();
+    webServer.loadCredentials();
+
+    Serial.printf("[WEB CONFIG] [OK] Username set to '%s' and saved to NVS\n", username);
+}
+
+void cmd_web_config_password(int argc, char** argv) {
+    if (argc < 3) {
+        Serial.println("[WEB CONFIG] Usage: web config password <password>");
+        Serial.println("Limits:    4-64 characters");
+        return;
+    }
+
+    const char* password = argv[2];
+    if (strlen(password) < 4 || strlen(password) > 64) {
+        Serial.println("[WEB CONFIG] [ERR] Password must be 4-64 characters");
+        return;
+    }
+
+    configSetString(KEY_WEB_PASSWORD, password);
+    configSetInt(KEY_WEB_PW_CHANGED, 1);  // Mark password as changed
+    configUnifiedSave();
+    webServer.loadCredentials();
+
+    Serial.printf("[WEB CONFIG] [OK] Password updated and saved to NVS\n");
+    Serial.println("[WEB CONFIG] WARNING: Password is stored in plaintext in NVS");
+}
+
+void cmd_web_config_main(int argc, char** argv) {
+    if (argc < 3) {
+        Serial.println("\n[WEB CONFIG] Usage: web config [show | username | password]");
+        Serial.println("  show:       Display current configuration");
+        Serial.println("  username:   Set web server username (3-32 chars)");
+        Serial.println("  password:   Set web server password (4-64 chars)");
+        return;
+    }
+
+    if (strcmp(argv[2], "show") == 0) {
+        cmd_web_config_show(argc, argv);
+    } else if (strcmp(argv[2], "username") == 0) {
+        cmd_web_config_username(argc, argv);
+    } else if (strcmp(argv[2], "password") == 0) {
+        cmd_web_config_password(argc, argv);
+    } else {
+        Serial.printf("[WEB CONFIG] [ERR] Unknown sub-command: %s\n", argv[2]);
+    }
+}
+
+void cmd_web_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[WEB] Usage: web [config]");
+        return;
+    }
+
+    if (strcmp(argv[1], "config") == 0) {
+        cmd_web_config_main(argc, argv);
+    } else {
+        Serial.printf("[WEB] [ERR] Unknown sub-command: %s\n", argv[1]);
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
     cliRegisterCommand("faults", "Fault log management", cmd_faults_main);
     cliRegisterCommand("encoder", "Encoder management", cmd_encoder_main);
     cliRegisterCommand("spindle", "Spindle current monitoring", cmd_spindle_main);
+    cliRegisterCommand("web", "Web server configuration", cmd_web_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);

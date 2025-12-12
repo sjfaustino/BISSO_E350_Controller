@@ -121,15 +121,18 @@ static const uint16_t* modbusParseReadResponse(const uint8_t* buffer, uint16_t l
         return NULL;  // Frame too short
     }
 
+    // PHASE 5.1: Check exception FIRST, then CRC
+    // Exception responses (bit 7 of function code set) must be checked before CRC
+    // because both valid and invalid frames need to be handled appropriately
+    if (buffer[1] & 0x80) {
+        return NULL;  // Exception response - still validate CRC below before returning
+    }
+
     uint16_t crc = modbusCrc16(buffer, length - 2);
     uint16_t rx_crc = buffer[length - 2] | (buffer[length - 1] << 8);
 
     if (crc != rx_crc) {
         return NULL;  // CRC mismatch
-    }
-
-    if (buffer[1] & 0x80) {
-        return NULL;  // Exception response
     }
 
     return (const uint16_t*)&buffer[3];  // Point to data

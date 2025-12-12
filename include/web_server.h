@@ -22,17 +22,22 @@ public:
     // Initialization
     void init();
     void begin();
-    
+
     // Legacy support (No-op in Async mode)
-    void handleClient(); 
+    void handleClient();
 
     // Telemetry & State
     void setSystemStatus(const char* status);
     void setAxisPosition(char axis, float position);
     void setSystemUptime(uint32_t seconds);
-    
+
     // Push state to all connected WebSocket clients
     void broadcastState();
+
+    // Credentials Management (PHASE 5.1: Security hardening)
+    void loadCredentials();
+    bool isPasswordChangeRequired();
+    void setPassword(const char* new_password);
 
 private:
     AsyncWebServer* server;

@@ -43,7 +43,10 @@ static const char* critical_keys[] = {
   KEY_HOME_PROFILE_FAST,    // Homing
   KEY_HOME_PROFILE_SLOW,
   KEY_DEFAULT_ACCEL,        // Float
-  KEY_DEFAULT_SPEED         // Float
+  KEY_DEFAULT_SPEED,        // Float
+  KEY_WEB_USERNAME,         // Security Critical
+  KEY_WEB_PASSWORD,         // Security Critical
+  KEY_WEB_PW_CHANGED        // Security Critical
 };
 
 static bool isCriticalKey(const char* key) {
@@ -146,18 +149,44 @@ static float validateFloat(const char* key, float value) {
     return value;
 }
 
+static void validateString(const char* key, char* value, size_t len) {
+    // 1. Web credentials (Non-empty, reasonable length)
+    if (strcmp(key, KEY_WEB_USERNAME) == 0 || strcmp(key, KEY_WEB_PASSWORD) == 0) {
+        if (value[0] == '\0') {
+            // Empty string - use default
+            if (strcmp(key, KEY_WEB_USERNAME) == 0) {
+                strncpy(value, "admin", len - 1);
+            } else {
+                strncpy(value, "password", len - 1);
+            }
+            value[len - 1] = '\0';
+            logWarning("[CONFIG] %s was empty, using default", key);
+        }
+        // Enforce minimum length of 4 characters for security
+        if (strlen(value) < 4) {
+            logWarning("[CONFIG] %s too short (min 4 chars), padding", key);
+            if (strcmp(key, KEY_WEB_USERNAME) == 0) {
+                strncpy(value, "admin", len - 1);
+            } else {
+                strncpy(value, "password", len - 1);
+            }
+            value[len - 1] = '\0';
+        }
+    }
+}
+
 // ============================================================================
 // INITIALIZATION & DEFAULTS
 // ============================================================================
 
 void configSetDefaults() {
     if (!initialized) return;
-    
+
     logInfo("[CONFIG] Applying Factory Defaults...");
-    
+
     // SAFETY: Default to Strict Limits (1 = E-Stop on any drift)
     if (!prefs.isKey(KEY_MOTION_STRICT_LIMITS)) prefs.putInt(KEY_MOTION_STRICT_LIMITS, 1);
-    
+
     // HOMING
     if (!prefs.isKey(KEY_HOME_PROFILE_FAST)) prefs.putInt(KEY_HOME_PROFILE_FAST, 2);
     if (!prefs.isKey(KEY_HOME_PROFILE_SLOW)) prefs.putInt(KEY_HOME_PROFILE_SLOW, 0);
@@ -165,15 +194,20 @@ void configSetDefaults() {
     // MOTION
     if (!prefs.isKey(KEY_MOTION_DEADBAND))      prefs.putInt(KEY_MOTION_DEADBAND, 10);
     if (!prefs.isKey(KEY_MOTION_BUFFER_ENABLE)) prefs.putInt(KEY_MOTION_BUFFER_ENABLE, 1);
-    if (!prefs.isKey(KEY_MOTION_APPROACH_MODE)) prefs.putInt(KEY_MOTION_APPROACH_MODE, 0); 
-    
+    if (!prefs.isKey(KEY_MOTION_APPROACH_MODE)) prefs.putInt(KEY_MOTION_APPROACH_MODE, 0);
+
     // AXIS
     if (!prefs.isKey(KEY_X_APPROACH))    prefs.putInt(KEY_X_APPROACH, 50);
     if (!prefs.isKey(KEY_DEFAULT_ACCEL)) prefs.putFloat(KEY_DEFAULT_ACCEL, 100.0f);
-    
+
     // HARDWARE
     if (!prefs.isKey(KEY_ALARM_PIN))     prefs.putInt(KEY_ALARM_PIN, 2);
     if (!prefs.isKey(KEY_STALL_TIMEOUT)) prefs.putInt(KEY_STALL_TIMEOUT, 2000);
+
+    // WEB SERVER CREDENTIALS
+    if (!prefs.isKey(KEY_WEB_USERNAME)) prefs.putString(KEY_WEB_USERNAME, "admin");
+    if (!prefs.isKey(KEY_WEB_PASSWORD)) prefs.putString(KEY_WEB_PASSWORD, "password");
+    if (!prefs.isKey(KEY_WEB_PW_CHANGED)) prefs.putInt(KEY_WEB_PW_CHANGED, 0);  // 0 = default, needs change
 }
 
 void configUnifiedLoad() {
@@ -314,6 +348,15 @@ void configSetFloat(const char* key, float value) {
 
 void configSetString(const char* key, const char* value) {
   if (!initialized) return;
+
+  // Create a mutable copy for validation
+  char validated_value[CONFIG_VALUE_LEN];
+  strncpy(validated_value, value ? value : "", CONFIG_VALUE_LEN - 1);
+  validated_value[CONFIG_VALUE_LEN - 1] = '\0';
+
+  // VALIDATION STEP
+  validateString(key, validated_value, CONFIG_VALUE_LEN);
+
   int idx = findConfigEntry(key);
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) return;
@@ -322,14 +365,22 @@ void configSetString(const char* key, const char* value) {
     config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
     config_table[idx].type = CONFIG_STRING;
   }
-  
-  if (config_table[idx].is_set && strncmp(config_table[idx].value.str_val, value, CONFIG_VALUE_LEN) == 0) return;
 
-  strncpy(config_table[idx].value.str_val, value, CONFIG_VALUE_LEN - 1);
+  if (config_table[idx].is_set && strncmp(config_table[idx].value.str_val, validated_value, CONFIG_VALUE_LEN) == 0) return;
+
+  strncpy(config_table[idx].value.str_val, validated_value, CONFIG_VALUE_LEN - 1);
   config_table[idx].value.str_val[CONFIG_VALUE_LEN - 1] = '\0';
   config_table[idx].is_set = true;
   config_dirty = true;
   last_nvs_save = millis();
+
+  if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
+    prefs.putString(key, validated_value);
+    config_dirty = false;
+    logInfo("[CONFIG] Set %s (Saved)", key);
+  } else {
+    logInfo("[CONFIG] Set %s (Cached)", key);
+  }
 }
 
 // ============================================================================

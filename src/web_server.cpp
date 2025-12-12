@@ -11,30 +11,76 @@
 #include "motion_state.h"     // Read-only state access
 #include "api_file_manager.h" // Delegated file handling
 #include "spindle_current_monitor.h"  // PHASE 5.1: Spindle telemetry
+#include "config_unified.h"   // NVS configuration
+#include "config_keys.h"      // Configuration keys
+#include "string_safety.h"    // Safe string operations
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
 // Global instance
 WebServerManager webServer(80);
 
-// Credentials
-// Note: In a future update, these should be loaded from NVS
-const char* http_username = "admin";
-const char* http_password = "password"; 
+// Credentials loaded from NVS (PHASE 5.1: Security hardening)
+static char http_username[CONFIG_VALUE_LEN] = "admin";
+static char http_password[CONFIG_VALUE_LEN] = "password";
+static bool password_change_enforced = false;
 
 // Telemetry Buffer
 static char json_response_buffer[WEB_BUFFER_SIZE];
 
 WebServerManager::WebServerManager(uint16_t port) : server(nullptr), ws(nullptr), port(port) {
     memset(&current_status, 0, sizeof(current_status));
-    strcpy(current_status.status, "INITIALIZING");
+    safe_strcpy(current_status.status, sizeof(current_status.status), "INITIALIZING");
     // Initialize default safe positions if needed
-    current_status.z_pos = 0.0f; 
+    current_status.z_pos = 0.0f;
 }
 
 WebServerManager::~WebServerManager() {
     if (server) delete server;
     if (ws) delete ws;
+}
+
+// Load credentials from NVS (PHASE 5.1: Security hardening)
+void WebServerManager::loadCredentials() {
+    const char* user = configGetString(KEY_WEB_USERNAME, "admin");
+    const char* pass = configGetString(KEY_WEB_PASSWORD, "password");
+    int pw_changed = configGetInt(KEY_WEB_PW_CHANGED, 0);
+
+    strncpy(http_username, user, CONFIG_VALUE_LEN - 1);
+    http_username[CONFIG_VALUE_LEN - 1] = '\0';
+    strncpy(http_password, pass, CONFIG_VALUE_LEN - 1);
+    http_password[CONFIG_VALUE_LEN - 1] = '\0';
+
+    if (pw_changed == 0) {
+        Serial.println("[WEB] [WARN] Default credentials detected - password change required!");
+        password_change_enforced = true;
+    } else {
+        Serial.println("[WEB] [OK] Credentials loaded from NVS");
+        password_change_enforced = false;
+    }
+}
+
+// Check if password has been changed from default
+bool WebServerManager::isPasswordChangeRequired() {
+    return password_change_enforced;
+}
+
+// Set new password (for CLI command)
+void WebServerManager::setPassword(const char* new_password) {
+    if (!new_password || strlen(new_password) < 4) {
+        Serial.println("[WEB] [ERR] Password must be at least 4 characters");
+        return;
+    }
+
+    configSetString(KEY_WEB_PASSWORD, new_password);
+    configSetInt(KEY_WEB_PW_CHANGED, 1);
+    configUnifiedSave();
+
+    strncpy(http_password, new_password, CONFIG_VALUE_LEN - 1);
+    http_password[CONFIG_VALUE_LEN - 1] = '\0';
+    password_change_enforced = false;
+
+    Serial.println("[WEB] [OK] Password changed successfully");
 }
 
 void WebServerManager::init() {
@@ -43,18 +89,21 @@ void WebServerManager::init() {
         return;
     }
     Serial.println("[WEB] [OK] SPIFFS mounted");
-    
+
+    // Load credentials from NVS (PHASE 5.1)
+    loadCredentials();
+
     server = new AsyncWebServer(port);
     ws = new AsyncWebSocket("/ws");
-    
+
     // WebSocket Event Handler
     ws->onEvent([this](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
         this->onWsEvent(server, client, type, arg, data, len);
     });
     server->addHandler(ws);
-    
+
     setupRoutes();
-    
+
     Serial.println("[WEB] [OK] Async Server initialized");
 }
 

@@ -1,5 +1,6 @@
 #include "config_manager.h"
 #include "config_unified.h"
+#include "string_safety.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -12,24 +13,24 @@ static int last_diff_count = 0;
 static bool presets_initialized = false;
 
 static void initializePresets() {
-  strcpy(preset_info[CONFIG_PRESET_DEFAULT].name, "Factory Default");
-  strcpy(preset_info[CONFIG_PRESET_DEFAULT].description, "Balanced performance");
+  safe_strcpy(preset_info[CONFIG_PRESET_DEFAULT].name, sizeof(preset_info[CONFIG_PRESET_DEFAULT].name), "Factory Default");
+  safe_strcpy(preset_info[CONFIG_PRESET_DEFAULT].description, sizeof(preset_info[CONFIG_PRESET_DEFAULT].description), "Balanced performance");
   preset_info[CONFIG_PRESET_DEFAULT].valid = true;
-  
-  strcpy(preset_info[CONFIG_PRESET_PERFORMANCE].name, "Performance");
-  strcpy(preset_info[CONFIG_PRESET_PERFORMANCE].description, "Max speed, higher power");
+
+  safe_strcpy(preset_info[CONFIG_PRESET_PERFORMANCE].name, sizeof(preset_info[CONFIG_PRESET_PERFORMANCE].name), "Performance");
+  safe_strcpy(preset_info[CONFIG_PRESET_PERFORMANCE].description, sizeof(preset_info[CONFIG_PRESET_PERFORMANCE].description), "Max speed, higher power");
   preset_info[CONFIG_PRESET_PERFORMANCE].valid = true;
-  
-  strcpy(preset_info[CONFIG_PRESET_PRECISION].name, "Precision");
-  strcpy(preset_info[CONFIG_PRESET_PRECISION].description, "Low speed, high accuracy");
+
+  safe_strcpy(preset_info[CONFIG_PRESET_PRECISION].name, sizeof(preset_info[CONFIG_PRESET_PRECISION].name), "Precision");
+  safe_strcpy(preset_info[CONFIG_PRESET_PRECISION].description, sizeof(preset_info[CONFIG_PRESET_PRECISION].description), "Low speed, high accuracy");
   preset_info[CONFIG_PRESET_PRECISION].valid = true;
-  
-  strcpy(preset_info[CONFIG_PRESET_CONSERVATIVE].name, "Conservative");
-  strcpy(preset_info[CONFIG_PRESET_CONSERVATIVE].description, "Safe, reduced speed");
+
+  safe_strcpy(preset_info[CONFIG_PRESET_CONSERVATIVE].name, sizeof(preset_info[CONFIG_PRESET_CONSERVATIVE].name), "Conservative");
+  safe_strcpy(preset_info[CONFIG_PRESET_CONSERVATIVE].description, sizeof(preset_info[CONFIG_PRESET_CONSERVATIVE].description), "Safe, reduced speed");
   preset_info[CONFIG_PRESET_CONSERVATIVE].valid = true;
-  
-  strcpy(preset_info[CONFIG_PRESET_CUSTOM].name, "Custom");
-  strcpy(preset_info[CONFIG_PRESET_CUSTOM].description, "User-defined");
+
+  safe_strcpy(preset_info[CONFIG_PRESET_CUSTOM].name, sizeof(preset_info[CONFIG_PRESET_CUSTOM].name), "Custom");
+  safe_strcpy(preset_info[CONFIG_PRESET_CUSTOM].description, sizeof(preset_info[CONFIG_PRESET_CUSTOM].description), "User-defined");
   preset_info[CONFIG_PRESET_CUSTOM].valid = false;
 }
 

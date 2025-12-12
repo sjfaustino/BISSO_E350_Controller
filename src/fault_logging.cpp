@@ -57,6 +57,8 @@ const char* faultCodeToString(fault_code_t code) {
     case FAULT_ENCODER_SPIKE: return "ENCODER_SPIKE";
     case FAULT_I2C_ERROR: return "I2C_ERROR";
     case FAULT_TASK_HUNG: return "TASK_HUNG";
+    case FAULT_MOTION_TIMEOUT: return "MOTION_TIMEOUT";  // PHASE 5.1
+    case FAULT_SPINDLE_OVERCURRENT: return "SPINDLE_OVERCURRENT";  // PHASE 5.1
     default: return "UNKNOWN";
   }
 }
