@@ -9,10 +9,11 @@
 #include "memory_monitor.h"
 #include "serial_logger.h"
 #include "watchdog_manager.h"
+#include "task_stall_detection.h"  // PHASE 2.5: Automatic task stall detection
 #include "system_constants.h"
 #include "fault_logging.h"
 #include "config_unified.h"
-#include "web_server.h" 
+#include "web_server.h"
 #include "motion.h"
 #include "motion_state.h" // Provides motionGetPositionMM, motionIsMoving
 #include "safety.h"       // <-- CRITICAL FIX: Provides safetyIsAlarmed()
@@ -24,12 +25,13 @@ extern WebServerManager webServer;
 
 void taskMonitorFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
-  
+
   logInfo("[MONITOR_TASK] [OK] Started on core 1");
   watchdogTaskAdd("Monitor");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Monitor");
-  
+
   memoryMonitorInit();
+  taskStallDetectionInit();  // PHASE 2.5: Initialize task stall detection
   
   while (1) {
     // 1. Memory Integrity Check
@@ -46,7 +48,11 @@ void taskMonitorFunction(void* parameter) {
         taskUnlockMutex(taskGetConfigMutex());
     }
     
-    // 3. Task Health Analysis
+    // 3. Task Stall Detection
+    // PHASE 2.5: Check for task stalls and log warnings
+    taskStallDetectionUpdate();
+
+    // 4. Task Health Analysis
     // Scans all registered tasks for stack overflows or execution starvation.
     int stats_count = taskGetStatsCount();
     task_stats_t* stats_array = taskGetStatsArray();
@@ -68,17 +74,17 @@ void taskMonitorFunction(void* parameter) {
         }
     }
     
-    // 4. Web Telemetry Broadcast
+    // 5. Web Telemetry Broadcast
     // Push real-time state to the Web UI via WebSockets.
-    
+
     // Use the Motion State Accessors to get physical units (MM)
     webServer.setAxisPosition('X', motionGetPositionMM(0));
     webServer.setAxisPosition('Y', motionGetPositionMM(1));
     webServer.setAxisPosition('Z', motionGetPositionMM(2));
     webServer.setAxisPosition('A', motionGetPositionMM(3));
-    
+
     webServer.setSystemUptime(taskGetUptime());
-    
+
     // Determine high-level system status string
     const char* status = "READY";
     if (motionIsEmergencyStopped()) {
@@ -88,13 +94,13 @@ void taskMonitorFunction(void* parameter) {
     } else if (motionIsMoving()) {
         status = "MOVING";
     }
-    
+
     webServer.setSystemStatus(status);
-    
+
     // Trigger the broadcast to all connected clients
     webServer.broadcastState();
-    
-    // 5. Watchdog & Sleep
+
+    // 6. Watchdog & Sleep
     watchdogFeed("Monitor");
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_MONITOR));
   }

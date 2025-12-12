@@ -60,6 +60,18 @@
 #define TASK_PERIOD_LCD          100
 
 // ============================================================================
+// ADAPTIVE I2C TIMEOUT CONFIGURATION
+// ============================================================================
+
+// PHASE 2.5: Adaptive I2C timeout based on system load
+// At low CPU: 50ms (system idle, I2C operations should complete quickly)
+// At high CPU: 500ms (system busy, I2C may be delayed by other tasks)
+// Formula: timeout_ms = base_ms + (cpu_usage_percent * scale_factor)
+#define I2C_TIMEOUT_BASE_MS      50
+#define I2C_TIMEOUT_MAX_MS       500
+#define I2C_TIMEOUT_SCALE        4.5f
+
+// ============================================================================
 // MESSAGE QUEUE DEFINITIONS
 // ============================================================================
 
@@ -166,5 +178,9 @@ void taskShowStats();
 void taskShowAllTasks();
 uint8_t taskGetCpuUsage();
 uint32_t taskGetUptime();
+
+// PHASE 2.5: Adaptive I2C timeout based on CPU load
+// Returns timeout in milliseconds, scaled from base to max based on current CPU usage
+uint32_t taskGetAdaptiveI2cTimeout();
 
 #endif

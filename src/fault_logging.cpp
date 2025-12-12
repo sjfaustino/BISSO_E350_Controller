@@ -1,12 +1,13 @@
 #include "fault_logging.h"
 #include "config_unified.h"
-#include "motion.h"          
-#include "safety_state_machine.h" 
-#include "serial_logger.h"   
-#include "task_manager.h"    
+#include "motion.h"
+#include "safety_state_machine.h"
+#include "serial_logger.h"
+#include "task_manager.h"
+#include "log_rate_limiter.h"  // PHASE 2.5: Rate limit duplicate faults
 #include <Preferences.h>
-#include <stdio.h>    
-#include <string.h>   
+#include <stdio.h>
+#include <string.h>
 #include <time.h>     
 
 static Preferences fault_prefs;
@@ -18,16 +19,19 @@ static uint32_t last_fault_id = 0;
 
 void faultLoggingInit() {
   logInfo("[FAULT] Initializing...");
-  
+
   if (!fault_prefs.begin(FAULT_LOG_NAMESPACE, false)) {
     logError("[FAULT] [FAIL] NVS init failed!");
     return;
   }
-  
+
   last_fault_id = fault_prefs.getUInt("last_id", 0);
   uint32_t boot_count = fault_prefs.getUInt("boot_count", 0);
   fault_prefs.putUInt("boot_count", boot_count + 1);
-  
+
+  // PHASE 2.5: Initialize rate limiter to prevent duplicate fault log flooding
+  logRateLimiterInit();
+
   logInfo("[FAULT] [OK] Ready. Boot count: %u", boot_count + 1);
 }
 
@@ -75,12 +79,26 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, i
   va_end(args);
   msg_buffer[sizeof(msg_buffer) - 1] = '\0';
 
+  // PHASE 2.5: Rate limit duplicate faults to prevent log flooding
+  // Critical faults always log, but we check rate limiter for throttling warnings
+  bool should_log = true;
+  if (severity != FAULT_CRITICAL) {
+    // Use fault code as ID, use axis as sub_id for per-axis tracking
+    int16_t rate_limit_sub_id = (axis >= 0 && axis < 10) ? axis : -1;
+    should_log = logRateLimiterCheck((uint16_t)code, rate_limit_sub_id);
+
+    if (!should_log) {
+      // Suppress duplicate, but note in diagnostics
+      return;
+    }
+  }
+
   Serial.printf("[FAULT_RT] %s: %s\n", faultSeverityToString(severity), msg_buffer);
 
   queue_message_t msg;
   msg.type = MSG_FAULT_LOGGED;
   msg.timestamp = millis();
-  
+
   fault_entry_t* payload = (fault_entry_t*)msg.data;
   payload->severity = severity;
   payload->code = code;

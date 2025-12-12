@@ -243,3 +243,26 @@ uint8_t taskGetCpuUsage() {
 }
 
 uint32_t taskGetUptime() { return (millis() - boot_time_ms) / 1000; }
+
+// ============================================================================
+// PHASE 2.5: ADAPTIVE I2C TIMEOUT
+// ============================================================================
+
+uint32_t taskGetAdaptiveI2cTimeout() {
+  // PHASE 2.5: Scale I2C timeout based on current system load
+  // Rationale: Under high load, I2C transactions may be delayed by higher-priority
+  // tasks. Adaptive timeout prevents spurious failures while keeping latency low
+  // during light load. Scaling formula: timeout = base + (cpu_usage * scale)
+
+  uint8_t cpu_usage = taskGetCpuUsage();
+
+  // Linear scaling: 50ms @ 0% CPU, 500ms @ 100% CPU
+  uint32_t timeout_ms = I2C_TIMEOUT_BASE_MS + (uint32_t)((float)cpu_usage * I2C_TIMEOUT_SCALE);
+
+  // Cap at maximum to prevent excessive waits
+  if (timeout_ms > I2C_TIMEOUT_MAX_MS) {
+    timeout_ms = I2C_TIMEOUT_MAX_MS;
+  }
+
+  return timeout_ms;
+}

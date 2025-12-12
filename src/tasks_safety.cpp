@@ -27,7 +27,9 @@ void taskSafetyFunction(void* parameter) {
   watchdogTaskAdd("Safety");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Safety");
   
-  if (taskLockMutex(taskGetI2cMutex(), 100)) {
+  // PHASE 2.5: Use adaptive timeout for initialization
+  uint32_t init_timeout = taskGetAdaptiveI2cTimeout();
+  if (taskLockMutex(taskGetI2cMutex(), init_timeout)) {
       boardInputsInit();
       taskUnlockMutex(taskGetI2cMutex());
   } else {
@@ -41,11 +43,11 @@ void taskSafetyFunction(void* parameter) {
     safetyUpdate();
     
     // 2. Poll Physical Buttons
-    // CRITICAL FIX: Increased timeout from 2ms to 50ms
-    // Reason: I2C @ 100kHz requires minimum ~1.4ms for 16-byte transaction.
-    //         At 5ms period, 2ms timeout causes frequent failures under load.
-    //         50ms provides sufficient buffer without blocking critical task.
-    if (taskLockMutex(taskGetI2cMutex(), 50)) {
+    // PHASE 2.5: Use adaptive I2C timeout based on system load
+    // At low CPU: 50ms, at high CPU: 500ms
+    // Prevents spurious failures under high load while keeping latency low during idle
+    uint32_t button_timeout = taskGetAdaptiveI2cTimeout();
+    if (taskLockMutex(taskGetI2cMutex(), button_timeout)) {
 
         button_state_t btns = boardInputsUpdate();
         taskUnlockMutex(taskGetI2cMutex()); 

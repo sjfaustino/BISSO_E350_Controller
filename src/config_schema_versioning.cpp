@@ -1,6 +1,7 @@
 #include "config_schema_versioning.h"
 #include "config_unified.h"
-#include "config_keys.h" 
+#include "config_keys.h"
+#include "config_migration.h"  // PHASE 2.5: Migration framework
 #include "fault_logging.h"
 #include <Preferences.h>
 #include <string.h>
@@ -59,13 +60,24 @@ void configSchemaVersioningInit() {
     Serial.println("[SCHEMA] [FAIL] Init storage failed");
     return;
   }
-  
+
   uint8_t stored_version = schema_prefs.getUChar("schema_version", CONFIG_SCHEMA_VERSION);
   Serial.printf("[SCHEMA] Stored: v%d | Current: v%d\n", stored_version, CONFIG_SCHEMA_VERSION);
-  
+
   if (stored_version != CONFIG_SCHEMA_VERSION) {
-    Serial.println("[SCHEMA] [WARN] Version mismatch. Migrating...");
-    configAutoMigrate();
+    Serial.println("[SCHEMA] [WARN] Version mismatch. Executing migration...");
+
+    // PHASE 2.5: Use migration framework with defaults and validation
+    configMigrationInit();
+    bool success = configMigrationExecute(stored_version, CONFIG_SCHEMA_VERSION);
+
+    if (success) {
+      Serial.println("[SCHEMA] [OK] Migration successful");
+      configMigrationShowReport();
+    } else {
+      Serial.println("[SCHEMA] [FAIL] Migration failed");
+      faultLogWarning(FAULT_CONFIGURATION_INVALID, "Schema migration failed");
+    }
   } else {
     Serial.println("[SCHEMA] [OK] Versions match");
   }

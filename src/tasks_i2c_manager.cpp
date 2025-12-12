@@ -15,13 +15,15 @@ void taskI2cManagerFunction(void* parameter) {
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "I2C_Manager");
 
   while (1) {
-    // Monitor bus health (20 Hz)
-    if (taskLockMutex(taskGetI2cMutex(), 10)) {
-      i2cMonitorBusHealth(); 
+    // PHASE 2.5: Monitor bus health with adaptive timeout
+    // Scaling prevents spurious timeouts under high system load
+    uint32_t bus_timeout = taskGetAdaptiveI2cTimeout();
+    if (taskLockMutex(taskGetI2cMutex(), bus_timeout)) {
+      i2cMonitorBusHealth();
       taskUnlockMutex(taskGetI2cMutex());
     } else {
       logWarning("[I2C_TASK] [WARN] Mutex timeout.");
-      faultLogEntry(FAULT_WARNING, FAULT_TASK_HUNG, -1, 10, "I2C Mutex Timeout");
+      faultLogEntry(FAULT_WARNING, FAULT_TASK_HUNG, -1, bus_timeout, "I2C Mutex Timeout");
     }
     
     watchdogFeed("I2C_Manager");
