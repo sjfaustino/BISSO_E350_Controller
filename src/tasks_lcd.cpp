@@ -120,23 +120,23 @@ void taskLcdFunction(void* parameter) {
         snprintf(status_line, 21, "SPD[%c] E[%s]", speed_char, enc_status);
         lcdInterfacePrintLine(2, status_line);
 
-        // Line 3: Detailed motion - axis and movement in mm (operator-friendly units)
-        // Example: "EXEC: X->+25.4mm" or "EXEC: A->-45.0°"
+        // Line 3: Detailed motion - axis and movement with right-aligned distance
+        // Example: "EXEC: Mv X   +25.4mm" or "EXEC: Mv A    +45.0°"
+        // Format: "EXEC: Mv" + axis + right-aligned distance
         char motion_line[21];
         char axis_char = "XYZA"[active_axis % 4];
         float delta_mm = (target_mm >= current_mm) ? (target_mm - current_mm) : (current_mm - target_mm);
         char direction = (target_mm >= current_mm) ? '+' : '-';
 
-        // Format with proper decimal places and unit
-        // For mm axes, show 1 decimal place: "EXEC: X->+25.4mm"
-        // For angle axis, show 1 decimal place: "EXEC: A->+45.0°"
-        if (active_axis == 3) {  // Angle axis
-            snprintf(motion_line, 21, "EXEC: %c->%c%5.1f%s",
-                     axis_char, direction, fabsf(delta_mm), unit);
-        } else {  // Linear axes
-            snprintf(motion_line, 21, "EXEC: %c->%c%5.1f%s",
-                     axis_char, direction, fabsf(delta_mm), unit);
-        }
+        // Build distance string with sign, value, and unit
+        // Then right-align it within the remaining 10 characters
+        char distance_str[10];
+        snprintf(distance_str, sizeof(distance_str), "%c%4.1f%s",
+                 direction, fabsf(delta_mm), unit);
+
+        // Right-align distance string: "EXEC: Mv X" (10 chars) + distance (10 chars, right-aligned)
+        snprintf(motion_line, 21, "EXEC: Mv %c%10s",
+                 axis_char, distance_str);
         lcdInterfacePrintLine(3, motion_line);
     } else {
         // Line 2: Speed profile + Status + Encoder health
