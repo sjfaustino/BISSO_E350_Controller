@@ -51,6 +51,12 @@ WebServerManager::WebServerManager(uint16_t port) : server(nullptr), ws(nullptr)
     current_status.vfd_fault_code = 0;
     current_status.vfd_threshold_amps = 0.0f;
     current_status.vfd_calibration_valid = false;
+
+    // Initialize axis metrics (PHASE 5.6)
+    current_status.axis_quality_score = 100;
+    current_status.axis_synchronized = true;
+    current_status.axis_jitter_mms = 0.0f;
+    current_status.axis_xy_error_percent = 0.0f;
 }
 
 WebServerManager::~WebServerManager() {
@@ -574,6 +580,13 @@ void WebServerManager::broadcastState() {
     vfd["stall_threshold_amps"] = current_status.vfd_threshold_amps;
     vfd["calibration_valid"] = current_status.vfd_calibration_valid;
 
+    // Axis metrics (PHASE 5.6)
+    JsonObject axis = doc["axis"].to<JsonObject>();
+    axis["quality_score"] = current_status.axis_quality_score;
+    axis["synchronized"] = current_status.axis_synchronized;
+    axis["jitter_mms"] = current_status.axis_jitter_mms;
+    axis["xy_error_percent"] = current_status.axis_xy_error_percent;
+
     size_t len = serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
     ws->textAll(json_response_buffer, len);
 }
@@ -624,4 +637,24 @@ void WebServerManager::setVFDCalibrationThreshold(float threshold_amps) {
 
 void WebServerManager::setVFDCalibrationValid(bool is_valid) {
     current_status.vfd_calibration_valid = is_valid;
+}
+
+// ============================================================================
+// AXIS METRICS SETTERS (PHASE 5.6)
+// ============================================================================
+
+void WebServerManager::setAxisMotionQuality(uint32_t quality_score) {
+    current_status.axis_quality_score = quality_score;
+}
+
+void WebServerManager::setAxisSynchronized(bool is_synchronized) {
+    current_status.axis_synchronized = is_synchronized;
+}
+
+void WebServerManager::setAxisJitterAmplitude(float jitter_mms) {
+    current_status.axis_jitter_mms = jitter_mms;
+}
+
+void WebServerManager::setXYVelocityError(float error_percent) {
+    current_status.axis_xy_error_percent = error_percent;
 }

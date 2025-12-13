@@ -19,6 +19,7 @@
 #include "safety.h"
 #include "altivar31_modbus.h"  // PHASE 5.5: VFD current monitoring
 #include "vfd_current_calibration.h"  // PHASE 5.5: Current calibration
+#include "axis_synchronization.h"  // PHASE 5.6: Axis validation
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -81,7 +82,22 @@ void taskTelemetryFunction(void* parameter) {
     webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
     webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
 
-    // 4. Web Telemetry Broadcast
+    // 4. PHASE 5.6: Axis Synchronization Validation
+    // Update axis metrics and validate motion quality
+    if (motionIsMoving()) {
+        // Get current axis velocities (estimated from encoder speeds)
+        float x_vel = fabsf(motionGetVelocityMMPerSec(0));
+        float y_vel = fabsf(motionGetVelocityMMPerSec(1));
+        float z_vel = fabsf(motionGetVelocityMMPerSec(2));
+
+        // Current feedrate (target speed for motion)
+        float feedrate = motionGetCurrentFeedrate();
+
+        // Update synchronization metrics
+        axisSynchronizationUpdate(x_vel, y_vel, z_vel, feedrate);
+    }
+
+    // 5. Web Telemetry Broadcast
     // Push real-time state to the Web UI via WebSockets.
 
     // Use the Motion State Accessors to get physical units (MM)
@@ -103,6 +119,15 @@ void taskTelemetryFunction(void* parameter) {
     }
 
     webServer.setSystemStatus(status);
+
+    // Push axis metrics to web server (PHASE 5.6)
+    const axis_metrics_t* axis_metrics = axisSynchronizationGetMetrics();
+    if (axis_metrics) {
+        webServer.setAxisMotionQuality(axis_metrics->motion_quality_score);
+        webServer.setAxisSynchronized(axis_metrics->axes_synchronized);
+        webServer.setAxisJitterAmplitude(axis_metrics->jitter_amplitude_mms);
+        webServer.setXYVelocityError(axis_metrics->xy_velocity_error_percent);
+    }
 
     // Trigger the broadcast to all connected clients
     webServer.broadcastState();
