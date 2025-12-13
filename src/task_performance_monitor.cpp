@@ -13,6 +13,20 @@
 // Maximum tasks to track
 #define MAX_TRACKED_TASKS 16
 
+// Tracking enablement flags (PHASE 5.2: Selective tracking)
+// Skip low-priority tasks by default to reduce memory footprint
+static bool task_tracking_enabled[MAX_TRACKED_TASKS] = {
+    true,   // PERF_TASK_ID_SAFETY (critical)
+    true,   // PERF_TASK_ID_MOTION (critical)
+    true,   // PERF_TASK_ID_ENCODER (critical)
+    true,   // PERF_TASK_ID_PLC_COMM (important)
+    true,   // PERF_TASK_ID_I2C_MGR (important)
+    false,  // PERF_TASK_ID_CLI (low priority)
+    true,   // PERF_TASK_ID_FAULT_LOG (important)
+    false,  // PERF_TASK_ID_MONITOR (system task)
+    false   // PERF_TASK_ID_LCD (UI task)
+};
+
 // Per-task performance metrics
 static task_performance_t task_metrics[MAX_TRACKED_TASKS];
 static int active_tasks = 0;
@@ -40,8 +54,13 @@ static const char* task_names[] = {
     "LCD"
 };
 
-// Helper: Get or create metrics entry for task
+// Helper: Get or create metrics entry for task (PHASE 5.2: Lazy-load with selective tracking)
 static task_performance_t* getOrCreateMetrics(uint32_t task_id) {
+    // Check if this task is enabled for tracking
+    if (task_id >= MAX_TRACKED_TASKS || !task_tracking_enabled[task_id]) {
+        return NULL;  // Skip tracking for disabled tasks
+    }
+
     // Search for existing
     for (int i = 0; i < active_tasks; i++) {
         if (task_metrics[i].task_id == task_id) {
@@ -49,7 +68,7 @@ static task_performance_t* getOrCreateMetrics(uint32_t task_id) {
         }
     }
 
-    // Create new if space available
+    // Create new if space available (lazy-load on first use)
     if (active_tasks < MAX_TRACKED_TASKS) {
         task_performance_t* metrics = &task_metrics[active_tasks];
         memset(metrics, 0, sizeof(*metrics));
@@ -74,7 +93,17 @@ void perfMonitorInit() {
     memset(&system_metrics, 0, sizeof(system_metrics));
     active_tasks = 0;
 
-    logInfo("[PERF_MONITOR] Initialized");
+    logInfo("[PERF_MONITOR] Initialized (lazy-load, selective tracking enabled)");
+}
+
+void perfMonitorSetTaskTracking(uint32_t task_id, bool enable) {
+    if (task_id >= MAX_TRACKED_TASKS) return;
+    task_tracking_enabled[task_id] = enable;
+}
+
+bool perfMonitorIsTaskTracked(uint32_t task_id) {
+    if (task_id >= MAX_TRACKED_TASKS) return false;
+    return task_tracking_enabled[task_id];
 }
 
 void perfMonitorTaskStart(uint32_t task_id) {

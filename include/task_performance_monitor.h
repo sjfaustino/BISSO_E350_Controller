@@ -64,6 +64,20 @@ typedef struct {
 void perfMonitorInit();
 
 /**
+ * PHASE 5.2: Enable or disable tracking for a specific task
+ * @param task_id Task identifier
+ * @param enable true to track, false to skip
+ */
+void perfMonitorSetTaskTracking(uint32_t task_id, bool enable);
+
+/**
+ * PHASE 5.2: Check if task tracking is enabled
+ * @param task_id Task identifier
+ * @return true if tracking enabled for this task
+ */
+bool perfMonitorIsTaskTracked(uint32_t task_id);
+
+/**
  * Record task execution start (call at beginning of task iteration)
  * @param task_id Unique identifier for the task
  */

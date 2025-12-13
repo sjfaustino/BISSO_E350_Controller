@@ -32,6 +32,7 @@
 #include "task_performance_monitor.h"  // PHASE 5.1: Task performance metrics
 #include "api_ota_updater.h"  // PHASE 5.1: OTA firmware updates
 #include "system_telemetry.h"  // PHASE 5.1: System telemetry
+#include "firmware_selftest.h"  // PHASE 5.2: Comprehensive self-test suite
 #include "safety.h"
 #include "firmware_version.h"
 #include "encoder_motion_integration.h"
@@ -61,72 +62,65 @@ void cmd_diag_scheduler_main(int argc, char** argv);
 // SELF-TEST COMMAND IMPLEMENTATION
 // ============================================================================
 void cmd_selftest(int argc, char** argv) {
-    Serial.println("\n=== SYSTEM SELF-TEST SEQUENCE ===");
-    bool overall_pass = true;
+    // PHASE 5.2: Enhanced self-test with sub-commands
+    if (argc > 1 && strcmp(argv[1], "help") == 0) {
+        Serial.println("\n[SELFTEST] === Self-Test Suite ===");
+        Serial.println("Usage: selftest [command] [options]");
+        Serial.println("  (no args)     Run comprehensive test suite");
+        Serial.println("  quick         Quick health check (fast tests only)");
+        Serial.println("  memory        Memory subsystem tests");
+        Serial.println("  i2c           I2C bus and device tests");
+        Serial.println("  storage       SPIFFS and NVS tests");
+        Serial.println("  motion        Motion system tests");
+        Serial.println("  spindle       Spindle monitor tests");
+        Serial.println("  safety        Safety system tests");
+        Serial.println("  network       Network and WiFi tests");
+        Serial.println("  watchdog      Watchdog timer tests");
+        Serial.println("  list          List all available tests");
+        Serial.println("  help          Show this message");
+        return;
+    }
 
-    // 1. I2C Bus Validation
-    Serial.println("[TEST] 1. Checking I2C Devices...");
+    if (argc > 1 && strcmp(argv[1], "list") == 0) {
+        selftestListTests();
+        return;
+    }
 
-    // Ensure these constants match plc_iface.h
-    const uint8_t addresses[] = {
-        ADDR_I73_INPUT,
-        ADDR_Q73_OUTPUT,
-        BOARD_INPUT_I2C_ADDR
-    };
-    const char* names[] = {
-        "I73 INPUT (0x21)",
-        "Q73 OUTPUT (0x22)",
-        "BOARD_INPUTS (0x24)"
-    };
+    if (argc > 1 && strcmp(argv[1], "quick") == 0) {
+        Serial.println("\n[SELFTEST] === Quick Health Check ===");
+        bool healthy = selftestQuickCheck();
+        Serial.println(healthy ? "[OK] Quick checks passed\n" : "[FAIL] Quick checks failed\n");
+        return;
+    }
 
-    // Check 3 devices
-    for(int i=0; i<3; i++) {
-        uint8_t dummy;
-        // Simple read to ping the device
-        i2c_result_t res = i2cReadWithRetry(addresses[i], &dummy, 1);
+    // Parse category flags
+    uint8_t categories = SELFTEST_CAT_ALL;
 
-        if(res == I2C_RESULT_OK) {
-            Serial.printf("  [PASS] %s: OK\n", names[i]);
-        } else {
-            Serial.printf("  [FAIL] %s: ERROR (%s)\n", names[i], i2cResultToString(res));
-            overall_pass = false;
+    if (argc > 1) {
+        categories = 0;
+        for (int i = 1; i < argc; i++) {
+            if (strcmp(argv[i], "memory") == 0) categories |= SELFTEST_CAT_MEMORY;
+            else if (strcmp(argv[i], "i2c") == 0) categories |= SELFTEST_CAT_I2C;
+            else if (strcmp(argv[i], "storage") == 0) categories |= SELFTEST_CAT_STORAGE;
+            else if (strcmp(argv[i], "motion") == 0) categories |= SELFTEST_CAT_MOTION;
+            else if (strcmp(argv[i], "spindle") == 0) categories |= SELFTEST_CAT_SPINDLE;
+            else if (strcmp(argv[i], "safety") == 0) categories |= SELFTEST_CAT_SAFETY;
+            else if (strcmp(argv[i], "network") == 0) categories |= SELFTEST_CAT_NETWORK;
+            else if (strcmp(argv[i], "watchdog") == 0) categories |= SELFTEST_CAT_WATCHDOG;
         }
     }
 
-    // 2. Encoder Validation
-    Serial.println("[TEST] 2. Checking Encoder Communication...");
-    uint32_t age = wj66GetAxisAge(0); // Check Axis 0 (X)
-    encoder_status_t enc_status = wj66GetStatus();
-    
-    if(age < 500 && enc_status == ENCODER_OK) {
-        Serial.printf("  [PASS] Encoder Link OK (Last update: %lu ms ago)\n", (unsigned long)age);
-    } else {
-        Serial.printf("  [FAIL] Encoder Timeout/Error (Age: %lu ms, Status: %d)\n", (unsigned long)age, enc_status);
-        overall_pass = false;
-    }
+    // Run comprehensive test suite
+    selftest_suite_t suite = selftestRunSuite(categories, true);
 
-    // 3. Configuration Integrity
-    Serial.println("[TEST] 3. Checking Configuration...");
-    if(configValidate(false)) {
-        Serial.println("  [PASS] Config Schema Valid");
-    } else {
-        Serial.println("  [FAIL] Config Schema Invalid");
-        overall_pass = false;
-    }
+    // Print detailed results
+    selftestPrintResults(&suite);
 
-    // 4. Memory Health
-    Serial.println("[TEST] 4. Checking System Resources...");
-    memoryMonitorUpdate();
-    uint32_t free_heap = memoryMonitorGetFreeHeap();
-    if(free_heap > MEMORY_CRITICAL_THRESHOLD_BYTES) {
-        Serial.printf("  [PASS] Heap OK (%lu bytes free)\n", (unsigned long)free_heap);
-    } else {
-        Serial.printf("  [FAIL] Low Memory (%lu bytes < %d)\n", (unsigned long)free_heap, MEMORY_CRITICAL_THRESHOLD_BYTES);
-        overall_pass = false;
-    }
+    // Print summary
+    Serial.println(selftestGetSummary(&suite));
 
-    Serial.println("---------------------------------");
-    Serial.println(overall_pass ? "[RESULT] SELF-TEST PASSED" : "[RESULT] SELF-TEST FAILED");
+    // Free results
+    selftestFreeResults(&suite);
 }
 
 // ============================================================================

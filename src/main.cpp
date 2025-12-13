@@ -15,6 +15,7 @@
 #include "system_constants.h"
 #include "task_manager.h"
 #include "task_performance_monitor.h"  // PHASE 5.1: Task performance monitoring
+#include "config_validator_schema.h"  // PHASE 5.2: Configuration schema validation
 #include "timeout_manager.h"
 #include "watchdog_manager.h"
 #include "web_server.h"
@@ -41,7 +42,7 @@ bool init_fault_logging_wrapper() { faultLoggingInit(); return true; }
 bool init_watchdog_wrapper() { watchdogInit(); return true; }
 bool init_timeout_wrapper() { timeoutManagerInit(); return true; }
 bool init_config_wrapper() { configUnifiedInit(); return true; }
-bool init_schema_wrapper() { configSchemaVersioningInit(); return !configIsMigrationNeeded(); }
+bool init_schema_wrapper() { configSchemaVersioningInit(); configSchemaInit(); return !configIsMigrationNeeded(); }
 bool init_calib_wrapper() { loadAllCalibration(); encoderCalibrationInit(); return true; }
 
 // UPDATED: Using correct init function

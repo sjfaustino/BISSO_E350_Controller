@@ -18,6 +18,7 @@
 #include "task_performance_monitor.h"  // PHASE 5.1: Task performance metrics
 #include "api_ota_updater.h"  // PHASE 5.1: OTA firmware updates
 #include "system_telemetry.h"  // PHASE 5.1: Comprehensive system telemetry
+#include "api_endpoints.h"  // PHASE 5.2: API endpoint discovery
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -105,6 +106,9 @@ void WebServerManager::init() {
 
     // PHASE 5.1: Initialize system telemetry
     telemetryInit();
+
+    // PHASE 5.2: Initialize API endpoint registry
+    apiEndpointsInit();
 
     server = new AsyncWebServer(port);
     ws = new AsyncWebSocket("/ws");
@@ -311,7 +315,64 @@ void WebServerManager::setupRoutes() {
         free(compact_buffer);
     });
 
-    // 8. DELEGATE FILE MANAGEMENT
+    // 8. API Endpoint Discovery (Unprotected for auto-discovery) - PHASE 5.2
+    server->on("/api/endpoints", HTTP_GET, [this](AsyncWebServerRequest *request){
+        char* endpoints_buffer = (char*)malloc(4096);
+        if (!endpoints_buffer) {
+            request->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            return;
+        }
+
+        size_t endpoints_size = apiEndpointsExportJSON(endpoints_buffer, 4096);
+        if (endpoints_size == 0) {
+            free(endpoints_buffer);
+            request->send(500, "application/json", "{\"error\":\"Failed to export endpoints\"}");
+            return;
+        }
+
+        request->send(200, "application/json", endpoints_buffer);
+        free(endpoints_buffer);
+    });
+
+    // 9. API Health Check (Protected, Rate Limited) - PHASE 5.2
+    server->on("/api/health", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        // PHASE 5.2: Rate limiting check
+        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        // Build health check response
+        char health_buffer[512];
+        system_telemetry_t t = telemetryGetSnapshot();
+
+        // Determine overall health
+        const char* health_status = "healthy";
+        if (t.health_status == HEALTH_CRITICAL) health_status = "critical";
+        else if (t.health_status == HEALTH_WARNING) health_status = "warning";
+
+        snprintf(health_buffer, sizeof(health_buffer),
+            "{\"status\":\"%s\",\"checks\":{"
+            "\"memory\":\"%s\","
+            "\"tasks\":\"%s\","
+            "\"storage\":\"%s\","
+            "\"network\":\"%s\","
+            "\"safety\":\"%s\"},"
+            "\"timestamp\":%lu}",
+            health_status,
+            t.free_heap_bytes > 20000 ? "ok" : "warning",
+            t.slowest_task_time_us < 50000 ? "ok" : "warning",
+            "ok",
+            t.wifi_connected ? "ok" : "warning",
+            t.estop_active ? "critical" : (t.alarm_active ? "warning" : "ok"),
+            (unsigned long)millis());
+
+        request->send(200, "application/json", health_buffer);
+    });
+
+    // 10. DELEGATE FILE MANAGEMENT
     // Registers /api/files (GET, DELETE) and /api/upload (POST)
     apiRegisterFileRoutes(server, http_username, http_password);
 
