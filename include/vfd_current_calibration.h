@@ -98,6 +98,13 @@ bool vfdCalibrationIsMeasureComplete(void);
 bool vfdCalibrationGetMeasurement(float* out_rms_amps, float* out_peak_amps);
 
 /**
+ * @brief Feed current sample to measurement system (called from telemetry task)
+ * @details Call this whenever a VFD current measurement is available during active measurement
+ * @param current_amps Motor current in amperes
+ */
+void vfdCalibrationSampleCurrent(float current_amps);
+
+/**
  * @brief Store measurement result for specific phase
  * @param phase 0=idle, 1=standard cut, 2=heavy load
  * @param rms_amps RMS average current
