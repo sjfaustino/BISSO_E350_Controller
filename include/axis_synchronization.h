@@ -181,6 +181,22 @@ const all_axes_metrics_t* axisSynchronizationGetAllMetrics(void);
 const axis_metrics_t* axisSynchronizationGetAxisMetrics(uint8_t axis);
 
 // ============================================================================
+// THREAD SAFETY (For multi-task access)
+// ============================================================================
+
+/**
+ * @brief Lock axis metrics for safe concurrent access
+ * @details Call before reading metrics from multiple tasks
+ */
+void axisSynchronizationLock(void);
+
+/**
+ * @brief Unlock axis metrics
+ * @details Call after finished reading metrics
+ */
+void axisSynchronizationUnlock(void);
+
+// ============================================================================
 // SPECIFIC VALIDATIONS (For active axis only)
 // ============================================================================
 

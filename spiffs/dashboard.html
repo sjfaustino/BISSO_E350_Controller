@@ -1185,6 +1185,130 @@
                 </div>
             </div>
 
+            <!-- Axis Motion Quality (PHASE 5.6) -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>X Axis Motion Quality</h2>
+                    <button class="card-toggle" data-card="axis-x" aria-label="Toggle X axis quality details">−</button>
+                </div>
+                <div class="card-content">
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <div class="card-value" id="axis-x-quality" style="font-size: 36px; color: var(--color-optimal);">--</div>
+                            <div class="card-subtext">Quality Score</div>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="axis-x-quality-bar" style="width: 0%; background: linear-gradient(90deg, var(--color-optimal), var(--color-warning));"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <div class="card-subtext">Jitter Amplitude</div>
+                            <div style="font-size: 18px; font-weight: 600;" id="axis-x-jitter">-- mm/s</div>
+                        </div>
+                        <div>
+                            <div class="card-subtext">Stalled</div>
+                            <div style="font-size: 18px; font-weight: 600;" id="axis-x-stalled">✓ OK</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                        <div class="card-subtext">VFD/Encoder Error</div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                            <div style="flex: 1;">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="axis-x-vfd-error-bar" style="width: 0%; background: linear-gradient(90deg, var(--color-optimal), var(--color-critical));"></div>
+                                </div>
+                            </div>
+                            <div style="min-width: 40px; text-align: right; font-weight: 600;" id="axis-x-vfd-error">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Y Axis Motion Quality</h2>
+                    <button class="card-toggle" data-card="axis-y" aria-label="Toggle Y axis quality details">−</button>
+                </div>
+                <div class="card-content">
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <div class="card-value" id="axis-y-quality" style="font-size: 36px; color: var(--color-optimal);">--</div>
+                            <div class="card-subtext">Quality Score</div>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="axis-y-quality-bar" style="width: 0%; background: linear-gradient(90deg, var(--color-optimal), var(--color-warning));"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <div class="card-subtext">Jitter Amplitude</div>
+                            <div style="font-size: 18px; font-weight: 600;" id="axis-y-jitter">-- mm/s</div>
+                        </div>
+                        <div>
+                            <div class="card-subtext">Stalled</div>
+                            <div style="font-size: 18px; font-weight: 600;" id="axis-y-stalled">✓ OK</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                        <div class="card-subtext">VFD/Encoder Error</div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                            <div style="flex: 1;">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="axis-y-vfd-error-bar" style="width: 0%; background: linear-gradient(90deg, var(--color-optimal), var(--color-critical));"></div>
+                                </div>
+                            </div>
+                            <div style="min-width: 40px; text-align: right; font-weight: 600;" id="axis-y-vfd-error">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Z Axis Motion Quality</h2>
+                    <button class="card-toggle" data-card="axis-z" aria-label="Toggle Z axis quality details">−</button>
+                </div>
+                <div class="card-content">
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <div class="card-value" id="axis-z-quality" style="font-size: 36px; color: var(--color-optimal);">--</div>
+                            <div class="card-subtext">Quality Score</div>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="axis-z-quality-bar" style="width: 0%; background: linear-gradient(90deg, var(--color-optimal), var(--color-warning));"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <div class="card-subtext">Jitter Amplitude</div>
+                            <div style="font-size: 18px; font-weight: 600;" id="axis-z-jitter">-- mm/s</div>
+                        </div>
+                        <div>
+                            <div class="card-subtext">Stalled</div>
+                            <div style="font-size: 18px; font-weight: 600;" id="axis-z-stalled">✓ OK</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                        <div class="card-subtext">VFD/Encoder Error</div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                            <div style="flex: 1;">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="axis-z-vfd-error-bar" style="width: 0%; background: linear-gradient(90deg, var(--color-optimal), var(--color-critical));"></div>
+                                </div>
+                            </div>
+                            <div style="min-width: 40px; text-align: right; font-weight: 600;" id="axis-z-vfd-error">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Advanced Task Performance -->
             <div class="chart-container">
                 <div class="card-header">
@@ -1361,6 +1485,13 @@
             1: { health: 0, variance: 0, drift: 0, quality: 0, calib_age: 0 },
             2: { health: 0, variance: 0, drift: 0, quality: 0, calib_age: 0 },
             3: { health: 0, variance: 0, drift: 0, quality: 0, calib_age: 0 }
+        };
+
+        // Axis motion quality data cache (PHASE 5.6)
+        let axisData = {
+            0: { quality_score: 0, jitter_mms: 0, stalled: false, vfd_error_percent: 0, prev_quality: 0 },
+            1: { quality_score: 0, jitter_mms: 0, stalled: false, vfd_error_percent: 0, prev_quality: 0 },
+            2: { quality_score: 0, jitter_mms: 0, stalled: false, vfd_error_percent: 0, prev_quality: 0 }
         };
 
         const AXIS_NAMES = ['X', 'Y', 'Z', 'A'];
@@ -1825,6 +1956,22 @@
                 renderEncoderCharts();
             }
 
+            // PHASE 5.6: Axis Motion Quality Metrics (Per-axis validation)
+            if (data.axis) {
+                const axisMap = { 0: 'x', 1: 'y', 2: 'z' };
+                for (let i = 0; i < 3; i++) {
+                    const axisKey = axisMap[i];
+                    const axisMetrics = data.axis[axisKey];
+                    if (axisMetrics) {
+                        axisData[i].quality_score = axisMetrics.quality || 0;
+                        axisData[i].jitter_mms = axisMetrics.jitter_mms || 0;
+                        axisData[i].stalled = axisMetrics.stalled || false;
+                        axisData[i].vfd_error_percent = axisMetrics.vfd_error_percent || 0;
+                        updateAxisDisplay(i);
+                    }
+                }
+            }
+
             // Load State
             const loadStates = ['Normal', 'Elevated', 'High', 'Critical'];
             const loadState = data.load_state || 0;
@@ -1903,6 +2050,83 @@
             document.getElementById('enc-quality').textContent = enc.quality + '%';
             document.getElementById('enc-calib').textContent = enc.calib_age + ' hours';
             document.getElementById('encoder-details-panel').style.display = 'block';
+        }
+
+        // ===== AXIS MOTION QUALITY UPDATE (PHASE 5.6) =====
+        function updateAxisDisplay(axisIndex) {
+            const axis = axisData[axisIndex];
+            const axisChar = AXIS_NAMES[axisIndex];
+            const prefix = `axis-${axisChar.toLowerCase()}`;
+
+            // Quality score display (0-100, with color coding)
+            const qualityEl = document.getElementById(`${prefix}-quality`);
+            const qualityBarEl = document.getElementById(`${prefix}-quality-bar`);
+
+            qualityEl.textContent = axis.quality_score;
+            qualityBarEl.style.width = axis.quality_score + '%';
+
+            // Color coding for quality
+            if (axis.quality_score >= 80) {
+                qualityEl.style.color = 'var(--color-optimal)';
+                qualityBarEl.style.background = 'linear-gradient(90deg, var(--color-optimal), #10b981)';
+            } else if (axis.quality_score >= 60) {
+                qualityEl.style.color = 'var(--color-normal)';
+                qualityBarEl.style.background = 'linear-gradient(90deg, var(--color-normal), var(--color-warning))';
+            } else if (axis.quality_score >= 40) {
+                qualityEl.style.color = 'var(--color-warning)';
+                qualityBarEl.style.background = 'linear-gradient(90deg, var(--color-warning), var(--color-critical))';
+            } else {
+                qualityEl.style.color = 'var(--color-critical)';
+                qualityBarEl.style.background = 'linear-gradient(90deg, var(--color-critical), #7f1d1d)';
+            }
+
+            // Jitter amplitude
+            const jitterEl = document.getElementById(`${prefix}-jitter`);
+            jitterEl.textContent = axis.jitter_mms.toFixed(3) + ' mm/s';
+            if (axis.jitter_mms > 0.5) {
+                jitterEl.style.color = 'var(--color-warning)';
+            } else {
+                jitterEl.style.color = 'inherit';
+            }
+
+            // Stalled status
+            const stalledEl = document.getElementById(`${prefix}-stalled`);
+            if (axis.stalled) {
+                stalledEl.textContent = '⚠️ STALLED';
+                stalledEl.style.color = 'var(--color-critical)';
+            } else {
+                stalledEl.textContent = '✓ OK';
+                stalledEl.style.color = 'var(--color-optimal)';
+            }
+
+            // VFD/Encoder error
+            const errorEl = document.getElementById(`${prefix}-vfd-error`);
+            const errorBarEl = document.getElementById(`${prefix}-vfd-error-bar`);
+
+            errorEl.textContent = axis.vfd_error_percent.toFixed(1) + '%';
+            errorBarEl.style.width = Math.min(100, axis.vfd_error_percent) + '%';
+
+            // Color based on error threshold (15% is target)
+            if (axis.vfd_error_percent <= 15) {
+                errorEl.style.color = 'var(--color-optimal)';
+                errorBarEl.style.background = 'linear-gradient(90deg, var(--color-optimal), var(--color-normal))';
+            } else if (axis.vfd_error_percent <= 25) {
+                errorEl.style.color = 'var(--color-warning)';
+                errorBarEl.style.background = 'linear-gradient(90deg, var(--color-normal), var(--color-warning))';
+            } else {
+                errorEl.style.color = 'var(--color-critical)';
+                errorBarEl.style.background = 'linear-gradient(90deg, var(--color-warning), var(--color-critical))';
+            }
+
+            // Trigger alerts on degradation
+            if (axis.quality_score < axis.prev_quality && axis.prev_quality > 0) {
+                addAlert(`Axis ${axisChar} quality degraded: ${axis.prev_quality} → ${axis.quality_score}`, 'warning');
+            }
+            if (axis.stalled && !axisData[axisIndex].prev_stalled) {
+                addAlert(`Axis ${axisChar} STALLED - Check mechanics and encoders`, 'critical');
+            }
+            axisData[axisIndex].prev_stalled = axis.stalled;
+            axisData[axisIndex].prev_quality = axis.quality_score;
         }
 
         // ===== CONTROL COMMANDS =====

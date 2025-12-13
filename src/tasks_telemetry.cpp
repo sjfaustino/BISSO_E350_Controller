@@ -89,13 +89,9 @@ void taskTelemetryFunction(void* parameter) {
     float y_vel = fabsf(motionGetVelocityMMPerSec(1));
     float z_vel = fabsf(motionGetVelocityMMPerSec(2));
 
-    // Determine active axis (which one is moving, or last one commanded)
-    // NOTE: This assumes motion controller tracks which axis is currently active
-    // For now, we use a simple heuristic: non-zero velocity = active
-    uint8_t active_axis = 255;  // No active axis
-    if (x_vel > 0.01f) active_axis = 0;
-    else if (y_vel > 0.01f) active_axis = 1;
-    else if (z_vel > 0.01f) active_axis = 2;
+    // BUGFIX: Use motion controller's active axis instead of velocity heuristic
+    // motionGetActiveAxis() returns 0-2 for active axis, 255 if none
+    uint8_t active_axis = motionGetActiveAxis();
 
     // Current feedrate (target speed for active axis)
     float feedrate = motionGetCurrentFeedrate();
@@ -104,7 +100,8 @@ void taskTelemetryFunction(void* parameter) {
     // Update per-axis synchronization metrics
     axisSynchronizationUpdate(active_axis, x_vel, y_vel, z_vel, vfd_freq, feedrate);
 
-    // Push axis metrics to web server
+    // Push axis metrics to web server (BUGFIX: with mutex protection)
+    axisSynchronizationLock();
     const all_axes_metrics_t* all_metrics = axisSynchronizationGetAllMetrics();
     if (all_metrics) {
         for (int axis = 0; axis < 3; axis++) {
@@ -117,6 +114,7 @@ void taskTelemetryFunction(void* parameter) {
             }
         }
     }
+    axisSynchronizationUnlock();
 
     // 5. Web Telemetry Broadcast
     // Push real-time state to the Web UI via WebSockets.

@@ -16,10 +16,16 @@
 #include <Arduino.h>
 #include <math.h>
 #include <string.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 // ============================================================================
 // MODULE STATE (Per-axis tracking with VFD multiplexing)
 // ============================================================================
+
+// BUGFIX: Race condition protection for axis metrics access
+// Used by telemetry task (writer) and web server (reader)
+static SemaphoreHandle_t axis_metrics_mutex = NULL;
 
 static all_axes_metrics_t all_axes = {
     .x_axis = {
@@ -80,6 +86,14 @@ void axisSynchronizationInit(void) {
     memset(&x_jitter, 0, sizeof(x_jitter));
     memset(&y_jitter, 0, sizeof(y_jitter));
     memset(&z_jitter, 0, sizeof(z_jitter));
+
+    // BUGFIX: Create mutex for thread-safe access
+    if (axis_metrics_mutex == NULL) {
+        axis_metrics_mutex = xSemaphoreCreateMutex();
+        if (axis_metrics_mutex == NULL) {
+            Serial.println("[AXIS_SYNC] [ERR] Failed to create metrics mutex");
+        }
+    }
 
     axisSynchronizationLoadConfig();
 }
@@ -178,6 +192,14 @@ void axisSynchronizationUpdate(uint8_t active_axis,
                                float vfd_frequency_hz, float commanded_feedrate_mms) {
     uint32_t now_ms = millis();
 
+    // BUGFIX: Acquire mutex before updating shared state
+    if (axis_metrics_mutex != NULL) {
+        if (xSemaphoreTake(axis_metrics_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+            // Mutex timeout - skip this update to avoid deadlock
+            return;
+        }
+    }
+
     // Update active axis tracker
     if (active_axis != all_axes.active_axis) {
         // Axis changed - reset duration counter
@@ -204,6 +226,8 @@ void axisSynchronizationUpdate(uint8_t active_axis,
                                (active_axis == 1) ? &all_axes.y_axis :
                                &all_axes.z_axis;
 
+        // BUGFIX: Save old timestamp BEFORE updating to new one
+        uint32_t old_update_ms = active->last_update_ms;
         active->vfd_frequency_hz = vfd_frequency_hz;
         active->commanded_feedrate_mms = commanded_feedrate_mms;
         active->last_update_ms = now_ms;
@@ -212,7 +236,11 @@ void axisSynchronizationUpdate(uint8_t active_axis,
         active->is_moving = (active->current_velocity_mms > 0.1f);
 
         if (active->is_moving) {
-            active->active_duration_ms += (now_ms - active->last_update_ms);
+            // Calculate duration using old timestamp (will be non-zero now)
+            uint32_t delta_ms = (now_ms - old_update_ms);
+            if (delta_ms > 0 && delta_ms < 10000) {  // Sanity check: ignore if > 10s (overflow)
+                active->active_duration_ms += delta_ms;
+            }
 
             // Check for stall: commanded but not moving
             if (commanded_feedrate_mms > 0.1f && active->current_velocity_mms < sync_config.encoder_stall_threshold_mms) {
@@ -257,6 +285,11 @@ void axisSynchronizationUpdate(uint8_t active_axis,
 
         active->quality_score = (score > 0) ? score : 0;
     }
+
+    // BUGFIX: Release mutex when done
+    if (axis_metrics_mutex != NULL) {
+        xSemaphoreGive(axis_metrics_mutex);
+    }
 }
 
 bool axisSynchronizationIsValid(void) {
@@ -278,14 +311,31 @@ uint32_t axisSynchronizationGetQualityScore(uint8_t axis) {
 }
 
 const all_axes_metrics_t* axisSynchronizationGetAllMetrics(void) {
+    // BUGFIX: Note - caller must be aware this returns pointer to shared state
+    // Caller should hold mutex if concurrent access is happening
     return &all_axes;
 }
 
 const axis_metrics_t* axisSynchronizationGetAxisMetrics(uint8_t axis) {
     if (axis >= 3) return NULL;
+    // BUGFIX: Note - returns pointer to shared state
+    // Caller should hold mutex if concurrent access is happening
     return (axis == 0) ? &all_axes.x_axis :
            (axis == 1) ? &all_axes.y_axis :
            &all_axes.z_axis;
+}
+
+// BUGFIX: Provide safe mutex lock/unlock functions for callers
+void axisSynchronizationLock(void) {
+    if (axis_metrics_mutex != NULL) {
+        xSemaphoreTake(axis_metrics_mutex, portMAX_DELAY);
+    }
+}
+
+void axisSynchronizationUnlock(void) {
+    if (axis_metrics_mutex != NULL) {
+        xSemaphoreGive(axis_metrics_mutex);
+    }
 }
 
 // ============================================================================
@@ -296,29 +346,52 @@ static float axisSynchronizationGetVFDEncoderErrorForAxis(uint8_t axis) {
     const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
     if (!metrics) return 100.0f;
 
-    // If VFD not running, no error
-    if (metrics->vfd_frequency_hz < 0.5f) {
-        return 0.0f;
-    }
+    // ========================================================================
+    // VFD/ENCODER CORRELATION CALCULATION (PHASE 5.6 BUGFIX)
+    // ========================================================================
+    // Calculate error as percentage mismatch between VFD and encoder feedback
+    // VFD frequency (Hz) should correlate with encoder velocity (mm/s)
+    // Rough estimate: 1 Hz ≈ 10-20 mm/s depending on pulley/gear ratio
+    // For now, use 1 Hz ≈ 15 mm/s as baseline (user can calibrate)
+    // ========================================================================
 
-    // If axis not moving but VFD running, critical error
-    if (metrics->current_velocity_mms < 0.1f && metrics->vfd_frequency_hz > 5.0f) {
+    // Case 1: VFD not running
+    if (metrics->vfd_frequency_hz < 0.5f) {
+        // VFD idle - encoder should also be idle
+        if (metrics->current_velocity_mms < 0.1f) {
+            return 0.0f;  // Both idle - perfect correlation
+        }
+        // VFD idle but encoder moving - major problem (slipping belt/coupling)
         return 100.0f;
     }
 
-    // If both idle, no error
+    // Case 2: VFD running but encoder not moving much
+    if (metrics->vfd_frequency_hz > 5.0f && metrics->current_velocity_mms < 1.0f) {
+        // Motor spinning fast but no mechanical motion - drive failure
+        // (slip, broken coupling, jam, etc.)
+        return 100.0f;
+    }
+
+    // Case 3: Both idle
     if (metrics->current_velocity_mms < 0.1f && metrics->vfd_frequency_hz < 0.5f) {
         return 0.0f;
     }
 
-    // Both moving: estimate error
-    // Rough conversion: VFD frequency -> expected velocity (depends on drive ratio)
-    // For now, simple heuristic: if both moving, low error; if mismatch, high error
-    if (metrics->vfd_frequency_hz > 1.0f && metrics->current_velocity_mms > 1.0f) {
-        return 5.0f;  // Both moving well
-    }
+    // Case 4: Both moving - calculate actual correlation error
+    // Expected velocity from VFD frequency (baseline: 1 Hz = 15 mm/s)
+    // This is a rough estimate - user can calibrate by observing ratio
+    #define VFD_FREQUENCY_TO_VELOCITY_RATIO 15.0f  // mm/s per Hz
 
-    return 50.0f;  // Partial mismatch
+    float expected_velocity_mms = metrics->vfd_frequency_hz * VFD_FREQUENCY_TO_VELOCITY_RATIO;
+    float actual_velocity_mms = metrics->current_velocity_mms;
+
+    // Percentage error: |expected - actual| / expected * 100
+    float velocity_error = fabsf(expected_velocity_mms - actual_velocity_mms) / expected_velocity_mms * 100.0f;
+
+    // Cap at reasonable limits (0-100%)
+    if (velocity_error > 100.0f) velocity_error = 100.0f;
+
+    return velocity_error;
 }
 
 bool axisSynchronizationCheckVFDEncoderCorrelation(void) {

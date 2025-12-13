@@ -41,6 +41,7 @@
 #include "input_validation.h"
 #include "board_inputs.h"
 #include "system_constants.h"
+#include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion quality diagnostics
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -922,6 +923,96 @@ void cmd_ota_main(int argc, char** argv) {
 // SYSTEM TELEMETRY (PHASE 5.1)
 // ============================================================================
 
+// ============================================================================
+// PHASE 5.6: AXIS MOTION QUALITY DIAGNOSTICS
+// ============================================================================
+
+void cmd_axis_status(int argc, char** argv) {
+    Serial.println("\n[AXIS] === Motion Quality Status (All Axes) ===");
+    axisSynchronizationPrintSummary();
+}
+
+void cmd_axis_detail(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[AXIS] [ERR] Usage: axis detail [X|Y|Z]");
+        return;
+    }
+
+    uint8_t axis = 255;
+    if (strcmp(argv[1], "X") == 0 || strcmp(argv[1], "x") == 0) axis = 0;
+    else if (strcmp(argv[1], "Y") == 0 || strcmp(argv[1], "y") == 0) axis = 1;
+    else if (strcmp(argv[1], "Z") == 0 || strcmp(argv[1], "z") == 0) axis = 2;
+
+    if (axis >= 3) {
+        Serial.printf("[AXIS] [ERR] Invalid axis: %s (use X, Y, or Z)\n", argv[1]);
+        return;
+    }
+
+    Serial.printf("\n[AXIS] === Axis %c Detailed Diagnostics ===\n", 'X' + axis);
+    axisSynchronizationPrintAxisDiagnostics(axis);
+}
+
+void cmd_axis_reset(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[AXIS] [ERR] Usage: axis reset [X|Y|Z|all]");
+        return;
+    }
+
+    if (strcmp(argv[1], "all") == 0) {
+        for (uint8_t i = 0; i < 3; i++) {
+            axisSynchronizationResetAxis(i);
+        }
+        Serial.println("[AXIS] [OK] Reset metrics for all axes");
+    } else {
+        uint8_t axis = 255;
+        if (strcmp(argv[1], "X") == 0 || strcmp(argv[1], "x") == 0) axis = 0;
+        else if (strcmp(argv[1], "Y") == 0 || strcmp(argv[1], "y") == 0) axis = 1;
+        else if (strcmp(argv[1], "Z") == 0 || strcmp(argv[1], "z") == 0) axis = 2;
+
+        if (axis >= 3) {
+            Serial.printf("[AXIS] [ERR] Invalid axis: %s (use X, Y, Z, or all)\n", argv[1]);
+            return;
+        }
+
+        axisSynchronizationResetAxis(axis);
+        Serial.printf("[AXIS] [OK] Reset metrics for axis %c\n", 'X' + axis);
+    }
+}
+
+void cmd_axis_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[AXIS] === Per-Axis Motion Quality Monitoring (PHASE 5.6) ===");
+        Serial.println("Usage: axis [status | detail | reset] [args]");
+        Serial.println("");
+        Serial.println("  status          Show all axes quality summary");
+        Serial.println("  detail X|Y|Z    Show detailed diagnostics for specific axis");
+        Serial.println("  reset X|Y|Z|all Reset quality metrics for axis/all axes");
+        Serial.println("");
+        Serial.println("Metrics Reported:");
+        Serial.println("  Quality Score   0-100 (100 = perfect motion)");
+        Serial.println("  Jitter          Peak-to-peak velocity variation (mm/s)");
+        Serial.println("  Stalled         Motor commanded but not moving");
+        Serial.println("  VFD Error       Encoder vs VFD frequency mismatch (%)");
+        Serial.println("");
+        Serial.println("Quality Thresholds:");
+        Serial.println("  >= 80  Excellent motion");
+        Serial.println("  60-80  Good motion");
+        Serial.println("  40-60  Fair motion (degradation detected)");
+        Serial.println("  < 40   Poor motion (maintenance needed)");
+        return;
+    }
+
+    if (strcmp(argv[1], "status") == 0) {
+        cmd_axis_status(argc, argv);
+    } else if (strcmp(argv[1], "detail") == 0) {
+        cmd_axis_detail(argc, argv);
+    } else if (strcmp(argv[1], "reset") == 0) {
+        cmd_axis_reset(argc, argv);
+    } else {
+        Serial.printf("[AXIS] [ERR] Unknown sub-command: %s\n", argv[1]);
+    }
+}
+
 void cmd_telemetry_summary(int argc, char** argv) {
     telemetryPrintSummary();
 }
@@ -963,6 +1054,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("metrics", "Task performance monitoring", cmd_metrics_main);
     cliRegisterCommand("ota", "OTA firmware update management", cmd_ota_main);
     cliRegisterCommand("telemetry", "System telemetry and health", cmd_telemetry_main);
+    cliRegisterCommand("axis", "Per-axis motion quality diagnostics", cmd_axis_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);

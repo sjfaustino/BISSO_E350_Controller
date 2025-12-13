@@ -17,6 +17,7 @@
 #include "safety_state_machine.h"
 #include "altivar31_modbus.h"  // PHASE 5.5: VFD current-based stall detection
 #include "vfd_current_calibration.h"  // PHASE 5.5: VFD current calibration
+#include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion validation
 #include <string.h>
 
 static safety_system_data_t safety_state; 
@@ -141,6 +142,56 @@ void safetyUpdate() {
                     last_thermal_warn = now;
                     logWarn("[SAFETY] [WARN] VFD Thermal Warning: %d%% (>%ld°C)",
                             thermal_state, (long)temp_warn);
+                }
+            }
+        }
+    }
+
+    // PHASE 5.6: Axis Motion Quality Validation
+    // Monitor per-axis synchronization quality and trigger alarms on degradation
+    static uint32_t last_axis_quality_check = 0;
+    if ((uint32_t)(now - last_axis_quality_check) > 500) {  // Check every 500ms
+        last_axis_quality_check = now;
+
+        // Check each axis quality score (0-100)
+        for (uint8_t axis = 0; axis < 3; axis++) {
+            const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
+            if (metrics) {
+                // Trigger alarm if quality drops critically low (below 25%)
+                if (metrics->quality_score < 25 && metrics->is_moving && !alarm_active) {
+                    char axis_char = 'X' + axis;
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "AXIS %c QUALITY CRITICAL: %lu%%",
+                             axis_char, (unsigned long)metrics->quality_score);
+                    logError("[SAFETY] [FAIL] %s", msg);
+                    faultLogEntry(FAULT_ERROR, FAULT_MOTION_DEGRADED, axis, 0,
+                                 "Axis motion quality critical");
+                    safetyTriggerAlarm(msg);
+                    break;  // Only trigger one alarm per check cycle
+                }
+
+                // Detect axis stall from quality metrics
+                if (metrics->stalled && metrics->is_moving && !alarm_active) {
+                    char axis_char = 'X' + axis;
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "AXIS %c STALL (Quality: %lu%%)",
+                             axis_char, (unsigned long)metrics->quality_score);
+                    logError("[SAFETY] [FAIL] %s", msg);
+                    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
+                                 "Axis motion stall detected via quality metrics");
+                    safetyTriggerAlarm(msg);
+                    break;
+                }
+
+                // Log warning if quality is degraded (below 50%)
+                if (metrics->quality_score < 50 && metrics->is_moving) {
+                    static uint32_t last_quality_warn[3] = {0, 0, 0};
+                    if ((uint32_t)(now - last_quality_warn[axis]) > 3000) {  // Warn every 3s max
+                        last_quality_warn[axis] = now;
+                        char axis_char = 'X' + axis;
+                        logWarn("[SAFETY] [WARN] AXIS %c motion quality degraded: %lu%%",
+                               axis_char, (unsigned long)metrics->quality_score);
+                    }
                 }
             }
         }
