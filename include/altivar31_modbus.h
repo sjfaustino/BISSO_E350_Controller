@@ -188,6 +188,24 @@ bool altivar31IsRunning(void);
 const altivar31_state_t* altivar31GetState(void);
 
 // ============================================================================
+// MOTION VALIDATION (PHASE 5.5)
+// ============================================================================
+
+/**
+ * @brief Check if VFD is running (output frequency > 0)
+ * @return true if motor is running, false if idle/stopped
+ */
+bool altivar31IsMotorRunning(void);
+
+/**
+ * @brief Detect frequency loss during motion (potential stall)
+ * @details Returns true if frequency suddenly drops to near-zero during active motion
+ * @param previous_freq_hz Last known frequency in Hz
+ * @return true if frequency loss detected (freq dropped >80% in one cycle)
+ */
+bool altivar31DetectFrequencyLoss(float previous_freq_hz);
+
+// ============================================================================
 // ERROR HANDLING & DIAGNOSTICS
 // ============================================================================
 

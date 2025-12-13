@@ -84,6 +84,29 @@ void safetyUpdate() {
         }
     }
 
+    // PHASE 5.5: VFD Frequency Control Validation
+    // Detect frequency loss during active motion (potential VFD/motor fault)
+    if (motionIsMoving()) {
+        static float last_frequency_hz = 0.0f;
+        float current_freq = altivar31GetFrequencyHz();
+
+        // Check for sudden frequency loss (>80% drop in one cycle)
+        if (altivar31DetectFrequencyLoss(last_frequency_hz)) {
+            logError("[SAFETY] [FAIL] VFD Frequency Loss: %.1f Hz -> %.1f Hz (>80% drop)",
+                     last_frequency_hz, current_freq);
+
+            if (!alarm_active) {
+                safety_state.current_fault = SAFETY_STALLED;
+                char msg[64];
+                snprintf(msg, sizeof(msg), "VFD FREQ LOSS %.1f->%.1f Hz", last_frequency_hz, current_freq);
+                faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, 0, 0, "VFD frequency loss detected");
+                safetyTriggerAlarm(msg);
+            }
+        }
+
+        last_frequency_hz = current_freq;
+    }
+
     // PHASE 5.5: VFD Thermal Monitoring
     // Monitor motor/VFD heatsink temperature with warning and critical thresholds
     static uint32_t last_thermal_check = 0;

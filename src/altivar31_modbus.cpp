@@ -358,6 +358,26 @@ void altivar31ResetErrorCounters(void) {
     altivar31_state.consecutive_errors = 0;
 }
 
+// ============================================================================
+// MOTION VALIDATION (PHASE 5.5)
+// ============================================================================
+
+bool altivar31IsMotorRunning(void) {
+    return altivar31_state.frequency_hz > 0.5f;  // Threshold: >0.5 Hz
+}
+
+bool altivar31DetectFrequencyLoss(float previous_freq_hz) {
+    float current_freq = altivar31_state.frequency_hz;
+
+    // Detect frequency drop >80% in one sample (potential stall)
+    // Only meaningful if previous frequency was significant
+    if (previous_freq_hz > 1.0f && current_freq < (previous_freq_hz * 0.2f)) {
+        return true;  // Frequency collapsed
+    }
+
+    return false;
+}
+
 void altivar31PrintDiagnostics(void) {
     Serial.println("\n[ALTIVAR31] === VFD Diagnostics ===");
     Serial.printf("Slave Address:       %u\n", altivar31_state.slave_address);
