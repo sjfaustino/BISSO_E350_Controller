@@ -33,6 +33,8 @@ static TaskHandle_t task_i2c_manager = NULL;
 static TaskHandle_t task_cli = NULL;
 static TaskHandle_t task_fault_log = NULL;
 static TaskHandle_t task_monitor = NULL;
+static TaskHandle_t task_telemetry = NULL;  // PHASE 5.4: Background telemetry
+static TaskHandle_t task_lcd_formatter = NULL;  // PHASE 5.4: LCD formatting
 static TaskHandle_t task_lcd = NULL;
 
 static QueueHandle_t queue_motion = NULL;
@@ -43,7 +45,9 @@ static QueueHandle_t queue_fault = NULL;
 static QueueHandle_t queue_display = NULL;
 
 static SemaphoreHandle_t mutex_config = NULL;
-static SemaphoreHandle_t mutex_i2c = NULL;
+static SemaphoreHandle_t mutex_i2c = NULL;  // Kept for backwards compatibility
+static SemaphoreHandle_t mutex_i2c_board = NULL;  // PHASE 5.4: Board inputs
+static SemaphoreHandle_t mutex_i2c_plc = NULL;    // PHASE 5.4: PLC interface
 static SemaphoreHandle_t mutex_motion = NULL;
 
 task_stats_t task_stats[] = {
@@ -55,6 +59,8 @@ task_stats_t task_stats[] = {
   {NULL, "CLI", TASK_PRIORITY_CLI, 0, 0, 0, 0, 0},
   {NULL, "Fault_Log", TASK_PRIORITY_FAULT_LOG, 0, 0, 0, 0, 0},
   {NULL, "Monitor", TASK_PRIORITY_MONITOR, 0, 0, 0, 0, 0},
+  {NULL, "Telemetry", TASK_PRIORITY_TELEMETRY, 0, 0, 0, 0, 0},  // PHASE 5.4
+  {NULL, "LCD_Formatter", TASK_PRIORITY_LCD_FORMAT, 0, 0, 0, 0, 0},  // PHASE 5.4
   {NULL, "LCD", TASK_PRIORITY_LCD, 0, 0, 0, 0, 0},
 };
 
@@ -85,10 +91,12 @@ void taskManagerInit() {
   
   // Create Mutexes
   mutex_config = xSemaphoreCreateMutex();
-  mutex_i2c = xSemaphoreCreateMutex();
+  mutex_i2c = xSemaphoreCreateMutex();  // Kept for backwards compatibility
+  mutex_i2c_board = xSemaphoreCreateMutex();  // PHASE 5.4: Board inputs
+  mutex_i2c_plc = xSemaphoreCreateMutex();    // PHASE 5.4: PLC interface
   mutex_motion = xSemaphoreCreateMutex();
-  
-  if (!mutex_config || !mutex_i2c || !mutex_motion) {
+
+  if (!mutex_config || !mutex_i2c || !mutex_i2c_board || !mutex_i2c_plc || !mutex_motion) {
     Serial.println("[TASKS] [FAIL] Mutex creation failed!");
     // faultLogError(FAULT_BOOT_FAILED, "Mutex creation failed");
   }
@@ -97,7 +105,7 @@ void taskManagerInit() {
 
 void taskManagerStart() {
   Serial.println("[TASKS] Starting scheduler...");
-  
+
   taskSafetyCreate();
   taskMotionCreate();
   taskEncoderCreate();
@@ -106,8 +114,10 @@ void taskManagerStart() {
   taskCliCreate();
   taskFaultLogCreate();
   taskMonitorCreate();
+  taskTelemetryCreate();  // PHASE 5.4: Background telemetry on Core 0
+  taskLcdFormatterCreate();  // PHASE 5.4: LCD formatting on Core 0
   taskLcdCreate();
-  
+
   Serial.println("[TASKS] [OK] All tasks active");
 }
 
@@ -123,7 +133,9 @@ QueueHandle_t taskGetFaultQueue() { return queue_fault; }
 QueueHandle_t taskGetDisplayQueue() { return queue_display; }
 
 SemaphoreHandle_t taskGetConfigMutex() { return mutex_config; }
-SemaphoreHandle_t taskGetI2cMutex() { return mutex_i2c; }
+SemaphoreHandle_t taskGetI2cMutex() { return mutex_i2c; }  // Kept for backwards compatibility
+SemaphoreHandle_t taskGetI2cBoardMutex() { return mutex_i2c_board; }  // PHASE 5.4: Board inputs
+SemaphoreHandle_t taskGetI2cPlcMutex() { return mutex_i2c_plc; }      // PHASE 5.4: PLC interface
 SemaphoreHandle_t taskGetMotionMutex() { return mutex_motion; }
 
 // NEW: Direct Notification for low-latency wakeups
@@ -183,8 +195,14 @@ void taskFaultLogCreate() {
 void taskMonitorCreate() {
   if(xTaskCreatePinnedToCore(taskMonitorFunction, "Monitor", TASK_STACK_MONITOR, NULL, TASK_PRIORITY_MONITOR, &task_monitor, CORE_1) == pdPASS) task_stats[7].handle = task_monitor;
 }
+void taskTelemetryCreate() {  // PHASE 5.4: Background telemetry on Core 0
+  if(xTaskCreatePinnedToCore(taskTelemetryFunction, "Telemetry", TASK_STACK_TELEMETRY, NULL, TASK_PRIORITY_TELEMETRY, &task_telemetry, CORE_0) == pdPASS) task_stats[8].handle = task_telemetry;
+}
+void taskLcdFormatterCreate() {  // PHASE 5.4: LCD formatting on Core 0
+  if(xTaskCreatePinnedToCore(taskLcdFormatterFunction, "LCD_Formatter", TASK_STACK_LCD_FORMAT, NULL, TASK_PRIORITY_LCD_FORMAT, &task_lcd_formatter, CORE_0) == pdPASS) task_stats[9].handle = task_lcd_formatter;
+}
 void taskLcdCreate() {
-  if(xTaskCreatePinnedToCore(taskLcdFunction, "LCD", TASK_STACK_LCD, NULL, TASK_PRIORITY_LCD, &task_lcd, CORE_1) == pdPASS) task_stats[8].handle = task_lcd;
+  if(xTaskCreatePinnedToCore(taskLcdFunction, "LCD", TASK_STACK_LCD, NULL, TASK_PRIORITY_LCD, &task_lcd, CORE_1) == pdPASS) task_stats[10].handle = task_lcd;
 }
 
 // ============================================================================

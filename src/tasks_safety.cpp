@@ -27,13 +27,13 @@ void taskSafetyFunction(void* parameter) {
   watchdogTaskAdd("Safety");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Safety");
   
-  // PHASE 2.5: Use adaptive timeout for initialization
+  // PHASE 5.4: Use dedicated board input mutex for initialization
   uint32_t init_timeout = taskGetAdaptiveI2cTimeout();
-  if (taskLockMutex(taskGetI2cMutex(), init_timeout)) {
+  if (taskLockMutex(taskGetI2cBoardMutex(), init_timeout)) {
       boardInputsInit();
-      taskUnlockMutex(taskGetI2cMutex());
+      taskUnlockMutex(taskGetI2cBoardMutex());
   } else {
-      logError("[SAFETY] [FAIL] Failed to acquire I2C mutex for init!");
+      logError("[SAFETY] [FAIL] Failed to acquire board I2C mutex for init!");
   }
 
   while (1) {
@@ -43,14 +43,13 @@ void taskSafetyFunction(void* parameter) {
     safetyUpdate();
     
     // 2. Poll Physical Buttons
-    // PHASE 2.5: Use adaptive I2C timeout based on system load
-    // At low CPU: 50ms, at high CPU: 500ms
-    // Prevents spurious failures under high load while keeping latency low during idle
+    // PHASE 5.4: Use dedicated board input mutex instead of generic I2C mutex
+    // Prevents button polling from blocking PLC communication
     uint32_t button_timeout = taskGetAdaptiveI2cTimeout();
-    if (taskLockMutex(taskGetI2cMutex(), button_timeout)) {
+    if (taskLockMutex(taskGetI2cBoardMutex(), button_timeout)) {
 
         button_state_t btns = boardInputsUpdate();
-        taskUnlockMutex(taskGetI2cMutex()); 
+        taskUnlockMutex(taskGetI2cBoardMutex()); 
         
         if (btns.connection_ok) {
             // E-STOP

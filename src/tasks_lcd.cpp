@@ -1,6 +1,6 @@
 /**
  * @file tasks_lcd.cpp
- * @brief LCD Update Task
+ * @brief LCD Update Task (PHASE 5.4: Uses pre-formatted strings from Core 0 formatter)
  */
 
 #include "task_manager.h"
@@ -22,6 +22,8 @@
 #include "calibration.h"        // For converting counts to mm/degrees
 // PHASE 5.0: Spindle current monitoring
 #include "spindle_current_monitor.h"
+// PHASE 5.4: Pre-formatted LCD strings from background formatter
+#include "lcd_formatter.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <string.h>
