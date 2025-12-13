@@ -16,6 +16,7 @@
 #include "string_safety.h"    // Safe string operations
 #include "api_rate_limiter.h"  // PHASE 5.1: Rate limiting
 #include "task_performance_monitor.h"  // PHASE 5.1: Task performance metrics
+#include "api_ota_updater.h"  // PHASE 5.1: OTA firmware updates
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -97,6 +98,9 @@ void WebServerManager::init() {
 
     // PHASE 5.1: Initialize API rate limiting
     apiRateLimiterInit();
+
+    // PHASE 5.1: Initialize OTA updater
+    otaUpdaterInit();
 
     server = new AsyncWebServer(port);
     ws = new AsyncWebSocket("/ws");
@@ -237,7 +241,30 @@ void WebServerManager::setupRoutes() {
         free(metrics_buffer);
     });
 
-    // 6. DELEGATE FILE MANAGEMENT
+    // 6. API OTA Firmware Update (Protected, Large Upload) - PHASE 5.1
+    server->on("/api/update/status", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        char* status_buffer = (char*)malloc(512);
+        if (!status_buffer) {
+            request->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            return;
+        }
+
+        size_t status_size = otaUpdaterExportJSON(status_buffer, 512);
+        request->send(200, "application/json", status_buffer);
+        free(status_buffer);
+    });
+
+    server->on("/api/update", HTTP_POST,
+        [](AsyncWebServerRequest *request){ request->send(202, "application/json", "{\"status\":\"Upload in progress...\"}"); },
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            this->handleFirmwareUpload(request, data, len, index, total);
+        }
+    ).setAuthentication(http_username, http_password);
+
+    // 7. DELEGATE FILE MANAGEMENT
     // Registers /api/files (GET, DELETE) and /api/upload (POST)
     apiRegisterFileRoutes(server, http_username, http_password);
 
@@ -281,6 +308,39 @@ void WebServerManager::handleJogBody(AsyncWebServerRequest *request, uint8_t *da
     else if (strcmp(direction, "A+") == 0) motionMoveRelative(0, 0, 0, distance, speed);
     else if (strcmp(direction, "A-") == 0) motionMoveRelative(0, 0, 0, -distance, speed);
     else if (strcmp(direction, "STOP") == 0) motionStop();
+}
+
+void WebServerManager::handleFirmwareUpload(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    // PHASE 5.1: Handle firmware upload for OTA update
+
+    // First chunk - start the update
+    if (index == 0) {
+        Serial.printf("[WEB] [OTA] Starting firmware upload: %zu bytes\n", total);
+
+        if (!otaUpdaterStartUpdate(total, "firmware.bin")) {
+            request->send(400, "application/json", "{\"error\":\"Failed to start OTA update\"}");
+            return;
+        }
+    }
+
+    // Receive and write chunk
+    if (!otaUpdaterReceiveChunk(data, len)) {
+        request->send(400, "application/json", "{\"error\":\"Failed to write firmware chunk\"}");
+        otaUpdaterCancel();
+        return;
+    }
+
+    // Last chunk - finalize update
+    if (index + len >= total) {
+        Serial.println("[WEB] [OTA] Firmware upload complete, finalizing...");
+
+        if (otaUpdaterFinalize()) {
+            // Response will be sent after reboot timer expires
+            request->send(200, "application/json", "{\"status\":\"Firmware installed. Rebooting...\"}");
+        } else {
+            request->send(400, "application/json", "{\"error\":\"Firmware validation failed\"}");
+        }
+    }
 }
 
 void WebServerManager::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {

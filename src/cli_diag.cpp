@@ -30,6 +30,7 @@
 #include "web_server.h"       // PHASE 5.1: Web credential management
 #include "api_rate_limiter.h"  // PHASE 5.1: API rate limiting
 #include "task_performance_monitor.h"  // PHASE 5.1: Task performance metrics
+#include "api_ota_updater.h"  // PHASE 5.1: OTA firmware updates
 #include "safety.h"
 #include "firmware_version.h"
 #include "encoder_motion_integration.h"
@@ -890,6 +891,39 @@ void cmd_metrics_main(int argc, char** argv) {
 }
 
 // ============================================================================
+// OTA FIRMWARE UPDATE (PHASE 5.1)
+// ============================================================================
+
+void cmd_ota_status(int argc, char** argv) {
+    otaUpdaterPrintDiagnostics();
+}
+
+void cmd_ota_cancel(int argc, char** argv) {
+    otaUpdaterCancel();
+    Serial.println("[OTA] [OK] OTA update cancelled");
+}
+
+void cmd_ota_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[OTA] === Firmware Update Management ===");
+        Serial.println("Usage: ota [status | cancel]");
+        Serial.println("  status: Show OTA update status");
+        Serial.println("  cancel: Cancel current OTA operation");
+        Serial.println("");
+        Serial.println("NOTE: Binary upload via /api/update endpoint");
+        return;
+    }
+
+    if (strcmp(argv[1], "status") == 0) {
+        cmd_ota_status(argc, argv);
+    } else if (strcmp(argv[1], "cancel") == 0) {
+        cmd_ota_cancel(argc, argv);
+    } else {
+        Serial.printf("[OTA] [ERR] Unknown sub-command: %s\n", argv[1]);
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
@@ -899,6 +933,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("web", "Web server configuration", cmd_web_main);
     cliRegisterCommand("api", "API rate limiter diagnostics", cmd_api_ratelimit_main);
     cliRegisterCommand("metrics", "Task performance monitoring", cmd_metrics_main);
+    cliRegisterCommand("ota", "OTA firmware update management", cmd_ota_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);

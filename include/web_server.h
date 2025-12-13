@@ -54,6 +54,7 @@ private:
     // Handlers
     void setupRoutes();
     void handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
+    void handleFirmwareUpload(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
     void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 
     // File Manager Handlers
