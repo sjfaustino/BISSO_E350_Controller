@@ -1093,6 +1093,98 @@
                 </div>
             </div>
 
+            <!-- VFD Motor Current (PHASE 5.5) -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>VFD Motor Current</h2>
+                    <button class="card-toggle" data-card="vfd-current" aria-label="Toggle VFD motor current details">−</button>
+                </div>
+                <div class="card-content">
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <div style="flex: 1;">
+                            <div class="card-value" id="vfd-current-amps" style="font-size: 28px; color: var(--chart-spindle);">--</div>
+                            <div class="card-subtext">Motor Current (Amps)</div>
+                        </div>
+                        <div style="flex: 1; text-align: center;">
+                            <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; margin: auto;">
+                                <canvas id="vfd-current-gauge" width="100" height="100"></canvas>
+                            </div>
+                            <div class="card-subtext" id="vfd-current-status">Normal</div>
+                        </div>
+                    </div>
+                    <div class="progress-bar" style="margin-top: 15px;">
+                        <div class="progress-fill" id="vfd-current-bar" style="width: 0%; background: var(--chart-spindle);"></div>
+                    </div>
+                    <div class="card-subtext">Stall Threshold: <span id="vfd-stall-threshold">--</span> A</div>
+                </div>
+            </div>
+
+            <!-- VFD Status & Thermal (PHASE 5.5) -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>VFD Status & Thermal</h2>
+                    <button class="card-toggle" data-card="vfd-status" aria-label="Toggle VFD status details">−</button>
+                </div>
+                <div class="card-content">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <div class="card-label">Motor Status</div>
+                            <div class="card-value" id="vfd-motor-status" style="color: var(--color-optimal); font-size: 20px;">IDLE</div>
+                            <div class="card-subtext">Output Freq: <span id="vfd-frequency">--</span> Hz</div>
+                        </div>
+                        <div>
+                            <div class="card-label">Thermal State</div>
+                            <div class="card-value" id="vfd-thermal-percent" style="color: var(--color-optimal); font-size: 20px;">--</div>
+                            <div class="card-subtext">Heatsink: <span id="vfd-thermal-status">Normal</span></div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                        <div class="card-label">Fault Code</div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                            <div class="status-dot" id="vfd-fault-dot" style="background: var(--color-optimal);"></div>
+                            <span id="vfd-fault-code">OK (0x0000)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VFD Calibration Status (PHASE 5.5) -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>VFD Calibration & Thresholds</h2>
+                    <button class="card-toggle" data-card="vfd-calib" aria-label="Toggle VFD calibration details">−</button>
+                </div>
+                <div class="card-content">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <div class="card-label">Calibration</div>
+                            <div class="card-value" id="vfd-calib-status" style="color: var(--color-warning); font-size: 18px;">NOT CALIBRATED</div>
+                        </div>
+                        <div>
+                            <div class="card-label">Stall Margin</div>
+                            <div class="card-value" style="font-size: 18px;"><span id="vfd-stall-margin">20</span>%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div class="card-label">Baseline Measurements</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; font-size: 13px;">
+                            <div>
+                                <span class="card-subtext">Idle:</span>
+                                <div id="vfd-idle-baseline">-- / -- A</div>
+                            </div>
+                            <div>
+                                <span class="card-subtext">Standard Cut:</span>
+                                <div id="vfd-std-baseline">-- / -- A</div>
+                            </div>
+                            <div>
+                                <span class="card-subtext">Heavy Load:</span>
+                                <div id="vfd-heavy-baseline">-- / -- A</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Advanced Task Performance -->
             <div class="chart-container">
                 <div class="card-header">
@@ -1592,6 +1684,93 @@
             } else {
                 spindleBar.classList.remove('critical');
                 document.getElementById('spindle-detail').textContent = 'Operating normally';
+            }
+
+            // PHASE 5.5: VFD Motor Current & Thermal (New)
+            if (data.vfd) {
+                const vfdCurrent = data.vfd.current_amps || 0;
+                const vfdFreq = data.vfd.frequency_hz || 0;
+                const vfdThermal = data.vfd.thermal_percent || 0;
+                const vfdFault = data.vfd.fault_code || 0;
+                const vfdThreshold = data.vfd.stall_threshold || 0;
+
+                // Motor Current
+                document.getElementById('vfd-current-amps').textContent = vfdCurrent.toFixed(1);
+                const currentPercent = vfdThreshold > 0 ? Math.min(100, (vfdCurrent / vfdThreshold) * 100) : 0;
+                document.getElementById('vfd-current-bar').style.width = currentPercent + '%';
+
+                // Current status color
+                let currentStatus = 'Normal';
+                let currentColor = 'var(--color-optimal)';
+                if (currentPercent > 90) {
+                    currentStatus = 'CRITICAL';
+                    currentColor = 'var(--color-critical)';
+                } else if (currentPercent > 70) {
+                    currentStatus = 'WARNING';
+                    currentColor = 'var(--color-warning)';
+                }
+                document.getElementById('vfd-current-status').textContent = currentStatus;
+                document.getElementById('vfd-current-amps').style.color = currentColor;
+
+                // Stall Threshold
+                if (vfdThreshold > 0) {
+                    document.getElementById('vfd-stall-threshold').textContent = vfdThreshold.toFixed(1);
+                }
+
+                // Motor Status & Frequency
+                const motorStatus = vfdFreq > 0.5 ? 'RUNNING' : 'IDLE';
+                const motorColor = vfdFreq > 0.5 ? 'var(--color-optimal)' : 'var(--text-muted)';
+                document.getElementById('vfd-motor-status').textContent = motorStatus;
+                document.getElementById('vfd-motor-status').style.color = motorColor;
+                document.getElementById('vfd-frequency').textContent = vfdFreq.toFixed(1);
+
+                // Thermal State
+                document.getElementById('vfd-thermal-percent').textContent = vfdThermal + '%';
+                let thermalStatus = 'Normal';
+                let thermalColor = 'var(--color-optimal)';
+                if (vfdThermal > 126) {  // >140% scaled
+                    thermalStatus = 'CRITICAL';
+                    thermalColor = 'var(--color-critical)';
+                } else if (vfdThermal > 110) {  // >130% scaled
+                    thermalStatus = 'WARNING';
+                    thermalColor = 'var(--color-warning)';
+                }
+                document.getElementById('vfd-thermal-status').textContent = thermalStatus;
+                document.getElementById('vfd-thermal-percent').style.color = thermalColor;
+
+                // Fault Code
+                const isFaulted = vfdFault !== 0;
+                const faultColor = isFaulted ? 'var(--color-critical)' : 'var(--color-optimal)';
+                document.getElementById('vfd-fault-dot').style.background = faultColor;
+                document.getElementById('vfd-fault-code').textContent = (isFaulted ? '⚠️ ' : '✓ ') + 'Code 0x' + vfdFault.toString(16).padStart(4, '0').toUpperCase();
+
+                if (isFaulted) {
+                    addAlert('VFD Fault Code: 0x' + vfdFault.toString(16), 'warning');
+                }
+            }
+
+            // Calibration Status
+            if (data.vfd?.calibration) {
+                const calib = data.vfd.calibration;
+                const calibStatus = calib.is_calibrated ? '✓ CALIBRATED' : '✗ NOT CALIBRATED';
+                const calibColor = calib.is_calibrated ? 'var(--color-optimal)' : 'var(--color-warning)';
+                document.getElementById('vfd-calib-status').textContent = calibStatus;
+                document.getElementById('vfd-calib-status').style.color = calibColor;
+
+                if (calib.stall_margin) {
+                    document.getElementById('vfd-stall-margin').textContent = calib.stall_margin;
+                }
+
+                if (calib.is_calibrated) {
+                    document.getElementById('vfd-idle-baseline').textContent =
+                        calib.idle_rms?.toFixed(1) + ' / ' + calib.idle_peak?.toFixed(1) + ' A';
+                    document.getElementById('vfd-std-baseline').textContent =
+                        calib.standard_rms?.toFixed(1) + ' / ' + calib.standard_peak?.toFixed(1) + ' A';
+                    if (calib.heavy_rms && calib.heavy_rms > 0) {
+                        document.getElementById('vfd-heavy-baseline').textContent =
+                            calib.heavy_rms.toFixed(1) + ' / ' + calib.heavy_peak?.toFixed(1) + ' A';
+                    }
+                }
             }
 
             // Network
