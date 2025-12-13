@@ -40,8 +40,9 @@ void safetyInit() {
 
 void safetyUpdate() {
   uint32_t now = millis();
-  
-  if (now - last_stall_check > SAFETY_STALL_CHECK_INTERVAL_MS) {
+
+  // PHASE 5.1: Wraparound-safe timeout comparison
+  if ((uint32_t)(now - last_stall_check) > SAFETY_STALL_CHECK_INTERVAL_MS) {
     last_stall_check = now;
     
     uint32_t stall_limit_ms = (uint32_t)configGetInt(KEY_STALL_TIMEOUT, SAFETY_MAX_STALL_TIME_MS);
@@ -63,7 +64,8 @@ void safetyUpdate() {
   }
   
   if (alarm_active) {
-    safety_state.fault_duration_ms = millis() - alarm_trigger_time;
+    // PHASE 5.1: Wraparound-safe duration calculation
+    safety_state.fault_duration_ms = (uint32_t)(millis() - alarm_trigger_time);
   }
 }
 
@@ -95,12 +97,13 @@ void safetyTriggerAlarm(const char* reason) {
 
 void safetyResetAlarm() {
   if (!alarm_active) return;
-  
+
   alarm_active = false;
   digitalWrite(SAFETY_ALARM_PIN, LOW);
   safety_state.current_fault = SAFETY_OK;
-  safety_state.fault_duration_ms = millis() - alarm_trigger_time;
-  
+  // PHASE 5.1: Wraparound-safe duration calculation
+  safety_state.fault_duration_ms = (uint32_t)(millis() - alarm_trigger_time);
+
   Serial.printf("[SAFETY] [OK] Alarm reset (Duration: %lu ms)\n", (unsigned long)safety_state.fault_duration_ms);
 }
 

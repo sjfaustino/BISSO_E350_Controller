@@ -49,7 +49,9 @@ timeout_handle_t* timeoutStart(timeout_type_t type) {
 
 bool timeoutCheck(timeout_handle_t* handle) {
   if (!handle || !handle->active) return false;
-  if (millis() - handle->start_time >= handle->timeout_ms) {
+  // PHASE 5.1: Use wraparound-safe timeout comparison
+  // Pattern: (uint32_t)(now - start) handles millis() rollover correctly
+  if ((uint32_t)(millis() - handle->start_time) >= handle->timeout_ms) {
     handle->triggered = true;
     return true;
   }
@@ -66,12 +68,14 @@ void timeoutStop(timeout_handle_t* handle) {
 }
 
 uint32_t timeoutElapsed(timeout_handle_t* handle) {
-    return (handle && handle->active) ? (millis() - handle->start_time) : 0;
+    // PHASE 5.1: Use wraparound-safe calculation
+    return (handle && handle->active) ? (uint32_t)(millis() - handle->start_time) : 0;
 }
 
 uint32_t timeoutRemaining(timeout_handle_t* handle) {
     if (!handle || !handle->active) return 0;
-    uint32_t el = millis() - handle->start_time;
+    // PHASE 5.1: Use wraparound-safe calculation
+    uint32_t el = (uint32_t)(millis() - handle->start_time);
     return (el >= handle->timeout_ms) ? 0 : (handle->timeout_ms - el);
 }
 

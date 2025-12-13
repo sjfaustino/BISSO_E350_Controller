@@ -88,4 +88,9 @@ bool emergencyStopIsActive();
 bool emergencyStopRequestRecovery();
 void emergencyStopClearRecovery();
 
+// PHASE 5.1: Ring buffer fallback diagnostics
+uint32_t faultGetRingBufferDropCount();
+uint8_t faultGetRingBufferEntryCount();
+const fault_entry_t* faultGetRingBufferEntry(uint8_t index);
+
 #endif

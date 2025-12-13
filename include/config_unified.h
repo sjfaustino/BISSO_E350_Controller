@@ -53,4 +53,25 @@ int configGetKeyCount();
 void configUnifiedDiagnostics();
 void configUnifiedPrintAll();
 
+// PHASE 5.1: Validated configuration getters with bounds checking
+/**
+ * Get integer with validation and bounds checking
+ * @param key Configuration key
+ * @param default_val Default if not found
+ * @param min_val Minimum allowed value (or -1 to skip)
+ * @param max_val Maximum allowed value (or -1 to skip)
+ * @return Validated integer value
+ */
+int32_t configGetIntValidated(const char* key, int32_t default_val, int32_t min_val, int32_t max_val);
+
+/**
+ * Get float with validation and bounds checking
+ * @param key Configuration key
+ * @param default_val Default if not found
+ * @param min_val Minimum allowed value (or negative to skip)
+ * @param max_val Maximum allowed value (or negative to skip)
+ * @return Validated float value
+ */
+float configGetFloatValidated(const char* key, float default_val, float min_val, float max_val);
+
 #endif

@@ -115,7 +115,8 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 
     switch (current_state) {
         case MOTION_WAIT_CONSENSO:
-            if (millis() - state_entry_ms > MOTION_CONSENSO_TIMEOUT_MS) {
+            // PHASE 5.1: Wraparound-safe timeout comparison
+            if ((uint32_t)(millis() - state_entry_ms) > MOTION_CONSENSO_TIMEOUT_MS) {
                 faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, id, 0, "Consensus Timeout");
                 portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_ERROR;
@@ -152,9 +153,9 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
                 portEXIT_CRITICAL(&motionSpinlock);
             }
             else {
-                // FIX: Configurable Timeout
+                // FIX: Configurable Timeout (PHASE 5.1: Wraparound-safe)
                 uint32_t timeout = configGetInt(KEY_STOP_TIMEOUT, 5000);
-                if (millis() - state_entry_ms > timeout) {
+                if ((uint32_t)(millis() - state_entry_ms) > timeout) {
                     logWarning("[AXIS %d] Stop Settlement Timeout", id);
                     portENTER_CRITICAL(&motionSpinlock);
                     state = MOTION_IDLE;
@@ -168,7 +169,8 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
         case MOTION_HOMING_APPROACH_FINE:
             {
                 bool hit = elboI73GetInput(AXIS_TO_I73_BIT[id]);
-                if (millis() - state_entry_ms > 45000) {
+                // PHASE 5.1: Wraparound-safe timeout comparison
+                if ((uint32_t)(millis() - state_entry_ms) > 45000) {
                     portENTER_CRITICAL(&motionSpinlock);
                     state = MOTION_ERROR;
                     portEXIT_CRITICAL(&motionSpinlock);
@@ -198,7 +200,8 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 
         case MOTION_HOMING_BACKOFF:
             if (!elboI73GetInput(AXIS_TO_I73_BIT[id])) {
-                if (millis() - state_entry_ms > 1000) {
+                // PHASE 5.1: Wraparound-safe timeout comparison
+                if ((uint32_t)(millis() - state_entry_ms) > 1000) {
                     motionSetPLCAxisDirection(255, false, false);
                     int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0);
                     motionSetPLCSpeedProfile((speed_profile_t)slow_prof);
@@ -212,7 +215,8 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
             break;
 
         case MOTION_HOMING_SETTLE:
-            if (millis() - state_entry_ms > HOMING_SETTLE_MS) {
+            // PHASE 5.1: Wraparound-safe timeout comparison
+            if ((uint32_t)(millis() - state_entry_ms) > HOMING_SETTLE_MS) {
                 wj66SetZero(id);
                 position = 0;
                 target_position = 0;
@@ -226,7 +230,8 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
 
         case MOTION_DWELL:
             // Non-blocking dwell - just wait for timer to expire
-            if (millis() >= dwell_end_ms) {
+            // PHASE 5.1: Wraparound-safe timeout comparison
+            if ((uint32_t)(millis() - dwell_end_ms) >= 0) {
                 portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_IDLE;
                 m_state.active_axis = 255;
@@ -271,8 +276,8 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
                 break;
             }
 
-            // Check for timeout
-            if (wait_pin_timeout_ms > 0 && millis() - state_entry_ms >= wait_pin_timeout_ms) {
+            // Check for timeout (PHASE 5.1: Wraparound-safe)
+            if (wait_pin_timeout_ms > 0 && (uint32_t)(millis() - state_entry_ms) >= wait_pin_timeout_ms) {
                 portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_ERROR;
                 portEXIT_CRITICAL(&motionSpinlock);

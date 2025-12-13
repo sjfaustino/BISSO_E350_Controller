@@ -8,14 +8,46 @@
 #include <Preferences.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>     
+#include <time.h>
 
 static Preferences fault_prefs;
-static bool estop_active = false; 
+static bool estop_active = false;
 static bool estop_recovery_requested = false;
 static uint32_t last_fault_id = 0;
 
 #define FAULT_LOG_NAMESPACE "bisso_faults"
+
+// PHASE 5.1: Ring buffer fallback for queue overflow
+#define FAULT_RING_BUFFER_SIZE 8
+static struct {
+    fault_entry_t entries[FAULT_RING_BUFFER_SIZE];
+    uint8_t head;
+    uint8_t count;
+    uint32_t total_dropped;
+} fault_ring_buffer = {.head = 0, .count = 0, .total_dropped = 0};
+
+// PHASE 5.1: Add fault to ring buffer fallback
+static void faultAddToRingBuffer(const fault_entry_t* entry) {
+    if (!entry) return;
+
+    uint8_t idx = (fault_ring_buffer.head + fault_ring_buffer.count) % FAULT_RING_BUFFER_SIZE;
+    memcpy(&fault_ring_buffer.entries[idx], entry, sizeof(fault_entry_t));
+
+    if (fault_ring_buffer.count < FAULT_RING_BUFFER_SIZE) {
+        fault_ring_buffer.count++;
+    } else {
+        // Buffer full - overwrite oldest entry
+        fault_ring_buffer.head = (fault_ring_buffer.head + 1) % FAULT_RING_BUFFER_SIZE;
+    }
+
+    fault_ring_buffer.total_dropped++;
+
+    // Log critical faults even when ring buffer is used
+    if (entry->severity == FAULT_CRITICAL) {
+        logError("[FAULT] [CRITICAL] Added to ring buffer (total buffered: %lu)",
+                (unsigned long)fault_ring_buffer.total_dropped);
+    }
+}
 
 void faultLoggingInit() {
   logInfo("[FAULT] Initializing...");
@@ -111,7 +143,9 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, i
   payload->message[63] = '\0';
 
   if (!taskSendMessage(taskGetFaultQueue(), &msg)) {
-      Serial.println("[FAULT_RT] [WARN] Queue Full! Log dropped.");
+      // PHASE 5.1: Use ring buffer fallback when queue is full
+      Serial.println("[FAULT_RT] [WARN] Queue Full! Using ring buffer fallback.");
+      faultAddToRingBuffer(payload);
   }
 
   if (severity == FAULT_CRITICAL) {
@@ -261,4 +295,21 @@ bool emergencyStopRequestRecovery() {
 
 void emergencyStopClearRecovery() {
     estop_recovery_requested = false;
+}
+
+// PHASE 5.1: Ring buffer diagnostics functions
+uint32_t faultGetRingBufferDropCount() {
+    return fault_ring_buffer.total_dropped;
+}
+
+uint8_t faultGetRingBufferEntryCount() {
+    return fault_ring_buffer.count;
+}
+
+const fault_entry_t* faultGetRingBufferEntry(uint8_t index) {
+    if (index >= fault_ring_buffer.count) {
+        return NULL;
+    }
+    uint8_t actual_idx = (fault_ring_buffer.head + index) % FAULT_RING_BUFFER_SIZE;
+    return &fault_ring_buffer.entries[actual_idx];
 }

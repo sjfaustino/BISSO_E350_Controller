@@ -389,7 +389,8 @@ void configSetString(const char* key, const char* value) {
 
 void configUnifiedFlush() {
     if (!config_dirty) return;
-    if (millis() - last_nvs_save > NVS_CONFIG_SAVE_INTERVAL_MS) {
+    // PHASE 5.1: Wraparound-safe timeout comparison
+    if ((uint32_t)(millis() - last_nvs_save) > NVS_CONFIG_SAVE_INTERVAL_MS) {
         configUnifiedSave();
         config_dirty = false;
     }
@@ -440,11 +441,54 @@ void configUnifiedDiagnostics() {
   Serial.println("==========================\n");
 }
 
+// PHASE 5.1: Validated getters with bounds checking
+int32_t configGetIntValidated(const char* key, int32_t default_val, int32_t min_val, int32_t max_val) {
+    if (!key) return default_val;
+
+    int32_t value = configGetInt(key, default_val);
+
+    // Apply validation bounds
+    if (min_val >= 0 && value < min_val) {
+        logWarning("[CONFIG] Value %ld below minimum %ld for key '%s', using minimum",
+                  (long)value, (long)min_val, key);
+        return min_val;
+    }
+
+    if (max_val >= 0 && value > max_val) {
+        logWarning("[CONFIG] Value %ld exceeds maximum %ld for key '%s', using maximum",
+                  (long)value, (long)max_val, key);
+        return max_val;
+    }
+
+    return value;
+}
+
+float configGetFloatValidated(const char* key, float default_val, float min_val, float max_val) {
+    if (!key) return default_val;
+
+    float value = configGetFloat(key, default_val);
+
+    // Apply validation bounds
+    if (min_val >= 0.0f && value < min_val) {
+        logWarning("[CONFIG] Value %.2f below minimum %.2f for key '%s', using minimum",
+                  (double)value, (double)min_val, key);
+        return min_val;
+    }
+
+    if (max_val >= 0.0f && value > max_val) {
+        logWarning("[CONFIG] Value %.2f exceeds maximum %.2f for key '%s', using maximum",
+                  (double)value, (double)max_val, key);
+        return max_val;
+    }
+
+    return value;
+}
+
 // Added for CLI 'config dump' command
 void configUnifiedPrintAll() {
     for (int i = 0; i < config_count; i++) {
         if (!config_table[i].is_set) continue;
-        
+
         // Pad key for alignment
         Serial.printf("%-30s | ", config_table[i].key);
         
