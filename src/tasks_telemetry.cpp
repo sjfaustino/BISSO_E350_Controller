@@ -82,19 +82,40 @@ void taskTelemetryFunction(void* parameter) {
     webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
     webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
 
-    // 4. PHASE 5.6: Axis Synchronization Validation
-    // Update axis metrics and validate motion quality
-    if (motionIsMoving()) {
-        // Get current axis velocities (estimated from encoder speeds)
-        float x_vel = fabsf(motionGetVelocityMMPerSec(0));
-        float y_vel = fabsf(motionGetVelocityMMPerSec(1));
-        float z_vel = fabsf(motionGetVelocityMMPerSec(2));
+    // 4. PHASE 5.6: Axis Synchronization Validation (Per-axis multiplexed VFD)
+    // Update axis metrics for active axis only
+    // Get current axis velocities
+    float x_vel = fabsf(motionGetVelocityMMPerSec(0));
+    float y_vel = fabsf(motionGetVelocityMMPerSec(1));
+    float z_vel = fabsf(motionGetVelocityMMPerSec(2));
 
-        // Current feedrate (target speed for motion)
-        float feedrate = motionGetCurrentFeedrate();
+    // Determine active axis (which one is moving, or last one commanded)
+    // NOTE: This assumes motion controller tracks which axis is currently active
+    // For now, we use a simple heuristic: non-zero velocity = active
+    uint8_t active_axis = 255;  // No active axis
+    if (x_vel > 0.01f) active_axis = 0;
+    else if (y_vel > 0.01f) active_axis = 1;
+    else if (z_vel > 0.01f) active_axis = 2;
 
-        // Update synchronization metrics
-        axisSynchronizationUpdate(x_vel, y_vel, z_vel, feedrate);
+    // Current feedrate (target speed for active axis)
+    float feedrate = motionGetCurrentFeedrate();
+    float vfd_freq = altivar31GetFrequencyHz();
+
+    // Update per-axis synchronization metrics
+    axisSynchronizationUpdate(active_axis, x_vel, y_vel, z_vel, vfd_freq, feedrate);
+
+    // Push axis metrics to web server
+    const all_axes_metrics_t* all_metrics = axisSynchronizationGetAllMetrics();
+    if (all_metrics) {
+        for (int axis = 0; axis < 3; axis++) {
+            const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
+            if (metrics) {
+                webServer.setAxisQualityScore(axis, metrics->quality_score);
+                webServer.setAxisJitterAmplitude(axis, metrics->velocity_jitter_mms);
+                webServer.setAxisStalled(axis, metrics->stalled);
+                webServer.setAxisVFDError(axis, metrics->vfd_encoder_error_percent);
+            }
+        }
     }
 
     // 5. Web Telemetry Broadcast
@@ -120,16 +141,7 @@ void taskTelemetryFunction(void* parameter) {
 
     webServer.setSystemStatus(status);
 
-    // Push axis metrics to web server (PHASE 5.6)
-    const axis_metrics_t* axis_metrics = axisSynchronizationGetMetrics();
-    if (axis_metrics) {
-        webServer.setAxisMotionQuality(axis_metrics->motion_quality_score);
-        webServer.setAxisSynchronized(axis_metrics->axes_synchronized);
-        webServer.setAxisJitterAmplitude(axis_metrics->jitter_amplitude_mms);
-        webServer.setXYVelocityError(axis_metrics->xy_velocity_error_percent);
-    }
-
-    // Trigger the broadcast to all connected clients
+    // Trigger the broadcast to all connected clients (with VFD and axis metrics)
     webServer.broadcastState();
 
     watchdogFeed("Telemetry");

@@ -1,8 +1,10 @@
 /**
  * @file axis_synchronization.cpp
- * @brief Multi-Axis Synchronization & Validation System Implementation (PHASE 5.6)
+ * @brief Per-Axis Motion Validation System Implementation (PHASE 5.6)
  * @project BISSO E350 Controller
- * @details Real-time validation of motion consistency across XYZ axes
+ * @details Real-time validation of individual axis motion quality
+ *          Multiplexed single VFD across X/Y/Z axes with contactor selection
+ *          Validates VFD/encoder correlation and detects mechanical degradation
  */
 
 #include "axis_synchronization.h"
@@ -16,43 +18,52 @@
 #include <string.h>
 
 // ============================================================================
-// MODULE STATE
+// MODULE STATE (Per-axis tracking with VFD multiplexing)
 // ============================================================================
 
-static axis_metrics_t current_metrics = {
-    .x_velocity_mms = 0.0f,
-    .y_velocity_mms = 0.0f,
-    .z_velocity_mms = 0.0f,
-    .vfd_frequency_hz = 0.0f,
-    .expected_frequency_hz = 0.0f,
-    .xy_velocity_error_percent = 0.0f,
-    .vfd_encoder_correlation = 0.0f,
-    .axes_synchronized = true,
-    .jitter_amplitude_mms = 0.0f,
-    .jitter_spike_count = 0,
-    .jitter_detected = false,
-    .spindle_load_percent = 0.0f,
-    .motion_quality_score = 100,
-    .last_update_ms = 0,
-    .synchronized_duration_ms = 0,
-    .desync_count = 0
+static all_axes_metrics_t all_axes = {
+    .x_axis = {
+        .current_velocity_mms = 0.0f,
+        .vfd_frequency_hz = 0.0f,
+        .commanded_feedrate_mms = 0.0f,
+        .velocity_jitter_mms = 0.0f,
+        .vfd_encoder_error_percent = 0.0f,
+        .is_moving = false,
+        .stalled = false,
+        .jitter_elevated = false,
+        .quality_score = 100,
+        .good_motion_samples = 0,
+        .bad_motion_samples = 0,
+        .stall_count = 0,
+        .last_update_ms = 0,
+        .active_duration_ms = 0,
+        .max_jitter_recorded_mms = 0.0f
+    },
+    .y_axis = {0},  // Same initialization as X
+    .z_axis = {0},  // Same initialization as X
+    .active_axis = 255  // No axis active initially
 };
+
+// Initialize Y and Z to match X
+static void initializeAllAxes(void) {
+    all_axes.y_axis = all_axes.x_axis;
+    all_axes.z_axis = all_axes.x_axis;
+}
 
 static axis_sync_config_t sync_config = {
-    .xy_velocity_tolerance_percent = 5.0f,
-    .vfd_encoder_tolerance_percent = 10.0f,
-    .jitter_threshold_mms = 0.5f,
-    .jitter_window_ms = 500,
-    .min_synchronized_ms = 2000,
-    .max_desync_events = 3
+    .vfd_encoder_tolerance_percent = 15.0f,      // Max VFD/encoder mismatch
+    .encoder_stall_threshold_mms = 0.1f,         // Min velocity to not be stalled
+    .jitter_threshold_mms = 0.5f,                // Jitter alert threshold
+    .jitter_window_ms = 500,                     // 500ms rolling window
+    .good_samples_for_quality = 10,              // Samples for "good" rating
+    .bad_samples_for_alert = 3                   // Bad samples before alert
 };
 
-// Jitter tracking (rolling window)
+// Jitter tracking per axis (rolling window)
 typedef struct {
     float velocity_history[50];     // 50 velocity samples @ 100Hz = 500ms window
     uint32_t history_index;
-    uint32_t last_spike_ms;
-    float max_jitter_mms;
+    float current_jitter_mms;
 } jitter_tracker_t;
 
 static jitter_tracker_t x_jitter = {0};
@@ -64,8 +75,8 @@ static jitter_tracker_t z_jitter = {0};
 // ============================================================================
 
 void axisSynchronizationInit(void) {
-    Serial.println("[AXIS_SYNC] Initializing axis synchronization system");
-    memset(&current_metrics, 0, sizeof(current_metrics));
+    Serial.println("[AXIS_SYNC] Initializing per-axis motion validation");
+    initializeAllAxes();
     memset(&x_jitter, 0, sizeof(x_jitter));
     memset(&y_jitter, 0, sizeof(y_jitter));
     memset(&z_jitter, 0, sizeof(z_jitter));
@@ -74,25 +85,25 @@ void axisSynchronizationInit(void) {
 }
 
 bool axisSynchronizationLoadConfig(void) {
-    int32_t xy_tol = configGetInt("axis_xy_tol", 500);  // 5.0% * 100
-    int32_t vfd_tol = configGetInt("axis_vfd_tol", 1000);  // 10.0% * 100
+    int32_t vfd_tol = configGetInt("axis_vfd_tol", 1500);  // 15.0% * 100
+    int32_t stall_thr = configGetInt("axis_stall_thr", 10);  // 0.1 mm/s * 100
     int32_t jitter_thr = configGetInt("axis_jitter_thr", 50);  // 0.5 mm/s * 100
 
-    sync_config.xy_velocity_tolerance_percent = xy_tol / 100.0f;
     sync_config.vfd_encoder_tolerance_percent = vfd_tol / 100.0f;
+    sync_config.encoder_stall_threshold_mms = stall_thr / 100.0f;
     sync_config.jitter_threshold_mms = jitter_thr / 100.0f;
 
-    Serial.printf("[AXIS_SYNC] Loaded config: XY_tol=%.1f%%, VFD_tol=%.1f%%, Jitter_thr=%.2f mm/s\n",
-                  sync_config.xy_velocity_tolerance_percent,
+    Serial.printf("[AXIS_SYNC] Loaded config: VFD_tol=%.1f%%, Stall_thr=%.2f mm/s, Jitter_thr=%.2f mm/s\n",
                   sync_config.vfd_encoder_tolerance_percent,
+                  sync_config.encoder_stall_threshold_mms,
                   sync_config.jitter_threshold_mms);
 
     return true;
 }
 
 void axisSynchronizationSaveConfig(void) {
-    configSetInt("axis_xy_tol", (int32_t)(sync_config.xy_velocity_tolerance_percent * 100.0f));
     configSetInt("axis_vfd_tol", (int32_t)(sync_config.vfd_encoder_tolerance_percent * 100.0f));
+    configSetInt("axis_stall_thr", (int32_t)(sync_config.encoder_stall_threshold_mms * 100.0f));
     configSetInt("axis_jitter_thr", (int32_t)(sync_config.jitter_threshold_mms * 100.0f));
     configUnifiedFlush();
     configUnifiedSave();
@@ -101,12 +112,12 @@ void axisSynchronizationSaveConfig(void) {
 }
 
 void axisSynchronizationResetDefaults(void) {
-    sync_config.xy_velocity_tolerance_percent = 5.0f;
-    sync_config.vfd_encoder_tolerance_percent = 10.0f;
+    sync_config.vfd_encoder_tolerance_percent = 15.0f;
+    sync_config.encoder_stall_threshold_mms = 0.1f;
     sync_config.jitter_threshold_mms = 0.5f;
     sync_config.jitter_window_ms = 500;
-    sync_config.min_synchronized_ms = 2000;
-    sync_config.max_desync_events = 3;
+    sync_config.good_samples_for_quality = 10;
+    sync_config.bad_samples_for_alert = 3;
 
     axisSynchronizationSaveConfig();
 }
@@ -119,16 +130,16 @@ const axis_sync_config_t* axisSynchronizationGetConfig(void) {
     return &sync_config;
 }
 
-void axisSynchronizationSetXYTolerance(float tolerance_percent) {
-    if (tolerance_percent >= 0.0f && tolerance_percent <= 20.0f) {
-        sync_config.xy_velocity_tolerance_percent = tolerance_percent;
+void axisSynchronizationSetVFDEncoderTolerance(float tolerance_percent) {
+    if (tolerance_percent >= 0.0f && tolerance_percent <= 50.0f) {
+        sync_config.vfd_encoder_tolerance_percent = tolerance_percent;
         axisSynchronizationSaveConfig();
     }
 }
 
-void axisSynchronizationSetVFDEncoderTolerance(float tolerance_percent) {
-    if (tolerance_percent >= 0.0f && tolerance_percent <= 50.0f) {
-        sync_config.vfd_encoder_tolerance_percent = tolerance_percent;
+void axisSynchronizationSetStallThreshold(float threshold_mms) {
+    if (threshold_mms >= 0.0f && threshold_mms <= 2.0f) {
+        sync_config.encoder_stall_threshold_mms = threshold_mms;
         axisSynchronizationSaveConfig();
     }
 }
@@ -155,219 +166,281 @@ static void updateJitterTracker(jitter_tracker_t* tracker, float velocity_mms) {
         if (tracker->velocity_history[i] > max_vel) max_vel = tracker->velocity_history[i];
     }
 
-    float new_jitter = fabs(max_vel - min_vel);
-    if (new_jitter > tracker->max_jitter_mms) {
-        tracker->max_jitter_mms = new_jitter;
-        tracker->last_spike_ms = millis();
-    }
-}
-
-static float calculateJitterAmplitude(void) {
-    float avg_jitter = (x_jitter.max_jitter_mms + y_jitter.max_jitter_mms + z_jitter.max_jitter_mms) / 3.0f;
-    return avg_jitter;
+    tracker->current_jitter_mms = fabs(max_vel - min_vel);
 }
 
 // ============================================================================
-// REAL-TIME VALIDATION
+// REAL-TIME VALIDATION (Per-axis model with VFD multiplexing)
 // ============================================================================
 
-void axisSynchronizationUpdate(float x_velocity_mms, float y_velocity_mms,
-                               float z_velocity_mms, float current_feedrate_mms) {
+void axisSynchronizationUpdate(uint8_t active_axis,
+                               float x_velocity_mms, float y_velocity_mms, float z_velocity_mms,
+                               float vfd_frequency_hz, float commanded_feedrate_mms) {
     uint32_t now_ms = millis();
 
-    // Update velocity metrics
-    current_metrics.x_velocity_mms = x_velocity_mms;
-    current_metrics.y_velocity_mms = y_velocity_mms;
-    current_metrics.z_velocity_mms = z_velocity_mms;
-
-    // Update VFD feedback
-    current_metrics.vfd_frequency_hz = altivar31GetFrequencyHz();
-    current_metrics.expected_frequency_hz = altivar31GetFrequencyHz();  // Expected based on feedrate
-
-    // Track jitter
-    updateJitterTracker(&x_jitter, x_velocity_mms);
-    updateJitterTracker(&y_jitter, y_velocity_mms);
-    updateJitterTracker(&z_jitter, z_velocity_mms);
-    current_metrics.jitter_amplitude_mms = calculateJitterAmplitude();
-
-    // Validate synchronization
-    bool xy_sync = axisSynchronizationCheckXYMatch();
-    bool vfd_sync = axisSynchronizationCheckVFDEncoderCorrelation();
-    bool jitter_ok = !axisSynchronizationDetectJitter();
-
-    // Update synchronization status
-    bool was_synchronized = current_metrics.axes_synchronized;
-    current_metrics.axes_synchronized = xy_sync && vfd_sync;
-
-    if (current_metrics.axes_synchronized) {
-        current_metrics.synchronized_duration_ms += (now_ms - current_metrics.last_update_ms);
-    } else {
-        if (was_synchronized) {
-            current_metrics.desync_count++;
-        }
-        current_metrics.synchronized_duration_ms = 0;
+    // Update active axis tracker
+    if (active_axis != all_axes.active_axis) {
+        // Axis changed - reset duration counter
+        all_axes.active_axis = active_axis;
     }
 
-    // Calculate motion quality score (0-100)
-    uint32_t score = 100;
-    if (!xy_sync) score -= 30;
-    if (!vfd_sync) score -= 25;
-    if (!jitter_ok) score -= 20;
-    if (current_metrics.synchronized_duration_ms < sync_config.min_synchronized_ms) score -= 10;
+    // Update all axis velocities
+    all_axes.x_axis.current_velocity_mms = fabsf(x_velocity_mms);
+    all_axes.y_axis.current_velocity_mms = fabsf(y_velocity_mms);
+    all_axes.z_axis.current_velocity_mms = fabsf(z_velocity_mms);
 
-    current_metrics.motion_quality_score = (score > 0) ? score : 0;
-    current_metrics.last_update_ms = now_ms;
+    // Track jitter for all axes
+    updateJitterTracker(&x_jitter, all_axes.x_axis.current_velocity_mms);
+    updateJitterTracker(&y_jitter, all_axes.y_axis.current_velocity_mms);
+    updateJitterTracker(&z_jitter, all_axes.z_axis.current_velocity_mms);
+
+    all_axes.x_axis.velocity_jitter_mms = x_jitter.current_jitter_mms;
+    all_axes.y_axis.velocity_jitter_mms = y_jitter.current_jitter_mms;
+    all_axes.z_axis.velocity_jitter_mms = z_jitter.current_jitter_mms;
+
+    // Only validate active axis against VFD metrics
+    if (active_axis < 3) {
+        axis_metrics_t* active = (active_axis == 0) ? &all_axes.x_axis :
+                               (active_axis == 1) ? &all_axes.y_axis :
+                               &all_axes.z_axis;
+
+        active->vfd_frequency_hz = vfd_frequency_hz;
+        active->commanded_feedrate_mms = commanded_feedrate_mms;
+        active->last_update_ms = now_ms;
+
+        // Determine if axis is moving
+        active->is_moving = (active->current_velocity_mms > 0.1f);
+
+        if (active->is_moving) {
+            active->active_duration_ms += (now_ms - active->last_update_ms);
+
+            // Check for stall: commanded but not moving
+            if (commanded_feedrate_mms > 0.1f && active->current_velocity_mms < sync_config.encoder_stall_threshold_mms) {
+                active->stalled = true;
+                active->stall_count++;
+                active->bad_motion_samples++;
+                active->good_motion_samples = 0;
+            } else {
+                active->stalled = false;
+
+                // Check VFD/encoder correlation
+                float error = axisSynchronizationGetVFDEncoderErrorForAxis(active_axis);
+                active->vfd_encoder_error_percent = error;
+
+                if (error <= sync_config.vfd_encoder_tolerance_percent) {
+                    active->good_motion_samples++;
+                    active->bad_motion_samples = 0;
+                } else {
+                    active->bad_motion_samples++;
+                    active->good_motion_samples = 0;
+                }
+            }
+
+            // Check jitter
+            active->jitter_elevated = (active->velocity_jitter_mms > sync_config.jitter_threshold_mms);
+            if (active->velocity_jitter_mms > active->max_jitter_recorded_mms) {
+                active->max_jitter_recorded_mms = active->velocity_jitter_mms;
+            }
+        } else {
+            active->active_duration_ms = 0;
+            active->good_motion_samples = 0;
+            active->bad_motion_samples = 0;
+            active->stalled = false;
+        }
+
+        // Calculate quality score
+        uint32_t score = 100;
+        if (active->stalled) score -= 40;
+        if (active->vfd_encoder_error_percent > sync_config.vfd_encoder_tolerance_percent) score -= 25;
+        if (active->jitter_elevated) score -= 15;
+        if (active->bad_motion_samples >= sync_config.bad_samples_for_alert) score -= 10;
+
+        active->quality_score = (score > 0) ? score : 0;
+    }
 }
 
 bool axisSynchronizationIsValid(void) {
-    return current_metrics.axes_synchronized &&
-           current_metrics.motion_quality_score >= 70;
+    if (all_axes.active_axis >= 3) return true;  // No axis active, skip validation
+
+    axis_metrics_t* active = (all_axes.active_axis == 0) ? &all_axes.x_axis :
+                           (all_axes.active_axis == 1) ? &all_axes.y_axis :
+                           &all_axes.z_axis;
+
+    return !active->stalled && active->quality_score >= 70;
 }
 
-uint32_t axisSynchronizationGetQualityScore(void) {
-    return current_metrics.motion_quality_score;
+uint32_t axisSynchronizationGetQualityScore(uint8_t axis) {
+    if (axis >= 3) return 0;
+    const axis_metrics_t* metrics = (axis == 0) ? &all_axes.x_axis :
+                                   (axis == 1) ? &all_axes.y_axis :
+                                   &all_axes.z_axis;
+    return metrics->quality_score;
 }
 
-const axis_metrics_t* axisSynchronizationGetMetrics(void) {
-    return &current_metrics;
+const all_axes_metrics_t* axisSynchronizationGetAllMetrics(void) {
+    return &all_axes;
+}
+
+const axis_metrics_t* axisSynchronizationGetAxisMetrics(uint8_t axis) {
+    if (axis >= 3) return NULL;
+    return (axis == 0) ? &all_axes.x_axis :
+           (axis == 1) ? &all_axes.y_axis :
+           &all_axes.z_axis;
 }
 
 // ============================================================================
-// SPECIFIC VALIDATIONS
+// SPECIFIC VALIDATIONS (Per-axis)
 // ============================================================================
 
-bool axisSynchronizationCheckXYMatch(void) {
-    // Only check if both axes are moving
-    if (current_metrics.x_velocity_mms < 0.1f && current_metrics.y_velocity_mms < 0.1f) {
-        current_metrics.xy_velocity_error_percent = 0.0f;
-        return true;
+static float axisSynchronizationGetVFDEncoderErrorForAxis(uint8_t axis) {
+    const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
+    if (!metrics) return 100.0f;
+
+    // If VFD not running, no error
+    if (metrics->vfd_frequency_hz < 0.5f) {
+        return 0.0f;
     }
 
-    // Calculate max velocity for reference
-    float max_vel = fabs(current_metrics.x_velocity_mms);
-    if (fabs(current_metrics.y_velocity_mms) > max_vel) {
-        max_vel = fabs(current_metrics.y_velocity_mms);
+    // If axis not moving but VFD running, critical error
+    if (metrics->current_velocity_mms < 0.1f && metrics->vfd_frequency_hz > 5.0f) {
+        return 100.0f;
     }
 
-    if (max_vel < 0.1f) return true;
+    // If both idle, no error
+    if (metrics->current_velocity_mms < 0.1f && metrics->vfd_frequency_hz < 0.5f) {
+        return 0.0f;
+    }
 
-    // Calculate error percentage
-    float error = fabs(current_metrics.x_velocity_mms - current_metrics.y_velocity_mms);
-    current_metrics.xy_velocity_error_percent = (error / max_vel) * 100.0f;
+    // Both moving: estimate error
+    // Rough conversion: VFD frequency -> expected velocity (depends on drive ratio)
+    // For now, simple heuristic: if both moving, low error; if mismatch, high error
+    if (metrics->vfd_frequency_hz > 1.0f && metrics->current_velocity_mms > 1.0f) {
+        return 5.0f;  // Both moving well
+    }
 
-    return current_metrics.xy_velocity_error_percent <= sync_config.xy_velocity_tolerance_percent;
+    return 50.0f;  // Partial mismatch
 }
 
 bool axisSynchronizationCheckVFDEncoderCorrelation(void) {
-    // If VFD isn't running, skip correlation check
-    if (current_metrics.vfd_frequency_hz < 0.5f) {
-        current_metrics.vfd_encoder_correlation = 100.0f;
-        return true;
-    }
-
-    // If axes aren't moving, check that VFD is also idle
-    float max_encoder_vel = fabs(current_metrics.x_velocity_mms);
-    if (fabs(current_metrics.y_velocity_mms) > max_encoder_vel) {
-        max_encoder_vel = fabs(current_metrics.y_velocity_mms);
-    }
-
-    if (max_encoder_vel < 0.1f && current_metrics.vfd_frequency_hz < 0.5f) {
-        current_metrics.vfd_encoder_correlation = 100.0f;
-        return true;
-    }
-
-    // Check correlation: if VFD running, encoders should show motion
-    if (current_metrics.vfd_frequency_hz > 5.0f && max_encoder_vel < 1.0f) {
-        // Motor spinning fast but no mechanical motion = problem
-        current_metrics.vfd_encoder_correlation = 0.0f;
-        return false;
-    }
-
-    // Simple correlation: if both moving, give high score
-    if (current_metrics.vfd_frequency_hz > 1.0f && max_encoder_vel > 1.0f) {
-        current_metrics.vfd_encoder_correlation = 95.0f;
-        return true;
-    }
-
-    current_metrics.vfd_encoder_correlation = 50.0f;
-    return false;
+    if (all_axes.active_axis >= 3) return true;
+    return axisSynchronizationGetVFDEncoderErrorForAxis(all_axes.active_axis)
+           <= sync_config.vfd_encoder_tolerance_percent;
 }
 
 bool axisSynchronizationDetectJitter(void) {
-    current_metrics.jitter_detected = current_metrics.jitter_amplitude_mms > sync_config.jitter_threshold_mms;
-    return current_metrics.jitter_detected;
+    if (all_axes.active_axis >= 3) return false;
+    const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(all_axes.active_axis);
+    return metrics ? (metrics->velocity_jitter_mms > sync_config.jitter_threshold_mms) : false;
 }
 
-float axisSynchronizationGetAxisError(uint8_t axis) {
-    switch (axis) {
-        case 0: return fabs(current_metrics.x_velocity_mms);
-        case 1: return fabs(current_metrics.y_velocity_mms);
-        case 2: return fabs(current_metrics.z_velocity_mms);
-        default: return 0.0f;
-    }
+bool axisSynchronizationDetectStall(void) {
+    if (all_axes.active_axis >= 3) return false;
+    const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(all_axes.active_axis);
+    return metrics ? metrics->stalled : false;
+}
+
+float axisSynchronizationGetVFDEncoderError(void) {
+    if (all_axes.active_axis >= 3) return 0.0f;
+    return axisSynchronizationGetVFDEncoderErrorForAxis(all_axes.active_axis);
 }
 
 // ============================================================================
-// DIAGNOSTICS & REPORTING
+// DIAGNOSTICS & REPORTING (Per-axis)
 // ============================================================================
 
-const char* axisSynchronizationGetStatusString(void) {
-    if (current_metrics.motion_quality_score >= 90) return "EXCELLENT";
-    if (current_metrics.motion_quality_score >= 70) return "GOOD";
-    if (current_metrics.motion_quality_score >= 50) return "FAIR";
+const char* axisSynchronizationGetStatusString(uint8_t axis) {
+    uint32_t score = axisSynchronizationGetQualityScore(axis);
+    if (score >= 90) return "EXCELLENT";
+    if (score >= 70) return "GOOD";
+    if (score >= 50) return "FAIR";
     return "POOR";
 }
 
 void axisSynchronizationPrintSummary(void) {
-    Serial.println("\n[AXIS_SYNC] === Motion Quality Summary ===");
-    Serial.printf("Status:              %s (%u/100)\n",
-                  axisSynchronizationGetStatusString(),
-                  current_metrics.motion_quality_score);
-    Serial.printf("Synchronized:        %s\n", current_metrics.axes_synchronized ? "YES" : "NO");
-    Serial.printf("XY Velocity Error:   %.1f%%\n", current_metrics.xy_velocity_error_percent);
-    Serial.printf("VFD/Encoder Corr:    %.0f%%\n", current_metrics.vfd_encoder_correlation);
-    Serial.printf("Jitter Amplitude:    %.2f mm/s%s\n",
-                  current_metrics.jitter_amplitude_mms,
-                  current_metrics.jitter_detected ? " (ELEVATED)" : "");
-    Serial.printf("Sync Duration:       %lu ms\n", (unsigned long)current_metrics.synchronized_duration_ms);
-    Serial.printf("Desync Events:       %lu\n", (unsigned long)current_metrics.desync_count);
+    Serial.println("\n[AXIS_SYNC] === Per-Axis Motion Quality Summary ===");
+    Serial.println("Active Axis: X                    Y                    Z");
+
+    Serial.print("Status:      ");
+    Serial.printf("%-20s %-20s %-20s\n",
+                  axisSynchronizationGetStatusString(0),
+                  axisSynchronizationGetStatusString(1),
+                  axisSynchronizationGetStatusString(2));
+
+    Serial.print("Quality:     ");
+    Serial.printf("%-20u %-20u %-20u\n",
+                  all_axes.x_axis.quality_score,
+                  all_axes.y_axis.quality_score,
+                  all_axes.z_axis.quality_score);
+
+    Serial.print("Velocity:    ");
+    Serial.printf("%-20.2f %-20.2f %-20.2f mm/s\n",
+                  all_axes.x_axis.current_velocity_mms,
+                  all_axes.y_axis.current_velocity_mms,
+                  all_axes.z_axis.current_velocity_mms);
+
+    Serial.print("Jitter:      ");
+    Serial.printf("%-20.3f %-20.3f %-20.3f mm/s\n",
+                  all_axes.x_axis.velocity_jitter_mms,
+                  all_axes.y_axis.velocity_jitter_mms,
+                  all_axes.z_axis.velocity_jitter_mms);
+
+    Serial.print("Stalled:     ");
+    Serial.printf("%-20s %-20s %-20s\n",
+                  all_axes.x_axis.stalled ? "YES" : "NO",
+                  all_axes.y_axis.stalled ? "YES" : "NO",
+                  all_axes.z_axis.stalled ? "YES" : "NO");
+
     Serial.println();
 }
 
-void axisSynchronizationPrintDiagnostics(void) {
-    Serial.println("\n[AXIS_SYNC] === Detailed Axis Diagnostics ===");
-    Serial.printf("X Velocity:          %.2f mm/s\n", current_metrics.x_velocity_mms);
-    Serial.printf("Y Velocity:          %.2f mm/s\n", current_metrics.y_velocity_mms);
-    Serial.printf("Z Velocity:          %.2f mm/s\n", current_metrics.z_velocity_mms);
-    Serial.printf("VFD Frequency:       %.1f Hz\n", current_metrics.vfd_frequency_hz);
+void axisSynchronizationPrintAxisDiagnostics(uint8_t axis) {
+    if (axis >= 3) {
+        Serial.println("[AXIS_SYNC] Invalid axis (0=X, 1=Y, 2=Z)");
+        return;
+    }
 
-    Serial.println("\n[Synchronization]");
-    Serial.printf("XY Error:            %.1f%% (tolerance: %.1f%%)\n",
-                  current_metrics.xy_velocity_error_percent,
-                  sync_config.xy_velocity_tolerance_percent);
-    Serial.printf("VFD/Encoder:         %.0f%% (tolerance: %.1f%%)\n",
-                  current_metrics.vfd_encoder_correlation,
+    const char* axis_name = (axis == 0) ? "X" : (axis == 1) ? "Y" : "Z";
+    const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
+
+    Serial.printf("\n[AXIS_SYNC] === Axis %s Diagnostics ===\n", axis_name);
+    Serial.printf("Status:                  %s (%u/100)\n",
+                  axisSynchronizationGetStatusString(axis),
+                  metrics->quality_score);
+    Serial.printf("Current Velocity:        %.2f mm/s\n", metrics->current_velocity_mms);
+    Serial.printf("Commanded Feedrate:      %.2f mm/s\n", metrics->commanded_feedrate_mms);
+    Serial.printf("Is Moving:               %s\n", metrics->is_moving ? "YES" : "NO");
+    Serial.printf("Stalled:                 %s (count: %lu)\n",
+                  metrics->stalled ? "YES" : "NO", (unsigned long)metrics->stall_count);
+
+    Serial.println("\n[VFD/Encoder Correlation]");
+    Serial.printf("VFD Frequency:           %.1f Hz\n", metrics->vfd_frequency_hz);
+    Serial.printf("Error:                   %.1f%% (tolerance: %.1f%%)\n",
+                  metrics->vfd_encoder_error_percent,
                   sync_config.vfd_encoder_tolerance_percent);
 
-    Serial.println("\n[Jitter Analysis]");
-    Serial.printf("X Jitter:            %.3f mm/s\n", x_jitter.max_jitter_mms);
-    Serial.printf("Y Jitter:            %.3f mm/s\n", y_jitter.max_jitter_mms);
-    Serial.printf("Z Jitter:            %.3f mm/s\n", z_jitter.max_jitter_mms);
-    Serial.printf("Average Jitter:      %.3f mm/s (threshold: %.2f mm/s)\n",
-                  current_metrics.jitter_amplitude_mms,
+    Serial.println("\n[Jitter & Wear]");
+    Serial.printf("Current Jitter:          %.3f mm/s\n", metrics->velocity_jitter_mms);
+    Serial.printf("Max Jitter Recorded:     %.3f mm/s (wear trend indicator)\n",
+                  metrics->max_jitter_recorded_mms);
+    Serial.printf("Jitter Elevated:         %s (threshold: %.2f mm/s)\n",
+                  metrics->jitter_elevated ? "YES" : "NO",
                   sync_config.jitter_threshold_mms);
 
-    Serial.println("\n[Configuration]");
-    Serial.printf("XY Tolerance:        %.1f%%\n", sync_config.xy_velocity_tolerance_percent);
-    Serial.printf("VFD/Encoder Tol:     %.1f%%\n", sync_config.vfd_encoder_tolerance_percent);
-    Serial.printf("Jitter Threshold:    %.2f mm/s\n", sync_config.jitter_threshold_mms);
+    Serial.println("\n[Sampling History]");
+    Serial.printf("Good Samples:            %lu\n", (unsigned long)metrics->good_motion_samples);
+    Serial.printf("Bad Samples:             %lu\n", (unsigned long)metrics->bad_motion_samples);
+    Serial.printf("Active Duration:         %lu ms\n", (unsigned long)metrics->active_duration_ms);
+
     Serial.println();
 }
 
-void axisSynchronizationReset(void) {
-    memset(&x_jitter, 0, sizeof(x_jitter));
-    memset(&y_jitter, 0, sizeof(y_jitter));
-    memset(&z_jitter, 0, sizeof(z_jitter));
-    current_metrics.synchronized_duration_ms = 0;
-    current_metrics.desync_count = 0;
+void axisSynchronizationResetAxis(uint8_t axis) {
+    if (axis >= 3) return;
+    axis_metrics_t* metrics = (axis == 0) ? &all_axes.x_axis :
+                             (axis == 1) ? &all_axes.y_axis :
+                             &all_axes.z_axis;
+    metrics->good_motion_samples = 0;
+    metrics->bad_motion_samples = 0;
+    metrics->active_duration_ms = 0;
+    metrics->stall_count = 0;
 }

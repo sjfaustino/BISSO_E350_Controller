@@ -52,11 +52,13 @@ WebServerManager::WebServerManager(uint16_t port) : server(nullptr), ws(nullptr)
     current_status.vfd_threshold_amps = 0.0f;
     current_status.vfd_calibration_valid = false;
 
-    // Initialize axis metrics (PHASE 5.6)
-    current_status.axis_quality_score = 100;
-    current_status.axis_synchronized = true;
-    current_status.axis_jitter_mms = 0.0f;
-    current_status.axis_xy_error_percent = 0.0f;
+    // Initialize axis metrics (PHASE 5.6) - per-axis
+    for (int i = 0; i < 3; i++) {
+        current_status.axis_metrics[i].quality_score = 100;
+        current_status.axis_metrics[i].jitter_mms = 0.0f;
+        current_status.axis_metrics[i].stalled = false;
+        current_status.axis_metrics[i].vfd_error_percent = 0.0f;
+    }
 }
 
 WebServerManager::~WebServerManager() {
@@ -580,12 +582,25 @@ void WebServerManager::broadcastState() {
     vfd["stall_threshold_amps"] = current_status.vfd_threshold_amps;
     vfd["calibration_valid"] = current_status.vfd_calibration_valid;
 
-    // Axis metrics (PHASE 5.6)
+    // Axis metrics (PHASE 5.6) - per-axis
     JsonObject axis = doc["axis"].to<JsonObject>();
-    axis["quality_score"] = current_status.axis_quality_score;
-    axis["synchronized"] = current_status.axis_synchronized;
-    axis["jitter_mms"] = current_status.axis_jitter_mms;
-    axis["xy_error_percent"] = current_status.axis_xy_error_percent;
+    JsonObject x_metrics = axis["x"].to<JsonObject>();
+    x_metrics["quality"] = current_status.axis_metrics[0].quality_score;
+    x_metrics["jitter_mms"] = current_status.axis_metrics[0].jitter_mms;
+    x_metrics["stalled"] = current_status.axis_metrics[0].stalled;
+    x_metrics["vfd_error_percent"] = current_status.axis_metrics[0].vfd_error_percent;
+
+    JsonObject y_metrics = axis["y"].to<JsonObject>();
+    y_metrics["quality"] = current_status.axis_metrics[1].quality_score;
+    y_metrics["jitter_mms"] = current_status.axis_metrics[1].jitter_mms;
+    y_metrics["stalled"] = current_status.axis_metrics[1].stalled;
+    y_metrics["vfd_error_percent"] = current_status.axis_metrics[1].vfd_error_percent;
+
+    JsonObject z_metrics = axis["z"].to<JsonObject>();
+    z_metrics["quality"] = current_status.axis_metrics[2].quality_score;
+    z_metrics["jitter_mms"] = current_status.axis_metrics[2].jitter_mms;
+    z_metrics["stalled"] = current_status.axis_metrics[2].stalled;
+    z_metrics["vfd_error_percent"] = current_status.axis_metrics[2].vfd_error_percent;
 
     size_t len = serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
     ws->textAll(json_response_buffer, len);
@@ -640,21 +655,29 @@ void WebServerManager::setVFDCalibrationValid(bool is_valid) {
 }
 
 // ============================================================================
-// AXIS METRICS SETTERS (PHASE 5.6)
+// AXIS METRICS SETTERS (PHASE 5.6) - Per-axis
 // ============================================================================
 
-void WebServerManager::setAxisMotionQuality(uint32_t quality_score) {
-    current_status.axis_quality_score = quality_score;
+void WebServerManager::setAxisQualityScore(uint8_t axis, uint32_t quality_score) {
+    if (axis < 3) {
+        current_status.axis_metrics[axis].quality_score = quality_score;
+    }
 }
 
-void WebServerManager::setAxisSynchronized(bool is_synchronized) {
-    current_status.axis_synchronized = is_synchronized;
+void WebServerManager::setAxisJitterAmplitude(uint8_t axis, float jitter_mms) {
+    if (axis < 3) {
+        current_status.axis_metrics[axis].jitter_mms = jitter_mms;
+    }
 }
 
-void WebServerManager::setAxisJitterAmplitude(float jitter_mms) {
-    current_status.axis_jitter_mms = jitter_mms;
+void WebServerManager::setAxisStalled(uint8_t axis, bool is_stalled) {
+    if (axis < 3) {
+        current_status.axis_metrics[axis].stalled = is_stalled;
+    }
 }
 
-void WebServerManager::setXYVelocityError(float error_percent) {
-    current_status.axis_xy_error_percent = error_percent;
+void WebServerManager::setAxisVFDError(uint8_t axis, float error_percent) {
+    if (axis < 3) {
+        current_status.axis_metrics[axis].vfd_error_percent = error_percent;
+    }
 }

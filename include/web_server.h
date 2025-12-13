@@ -39,11 +39,11 @@ public:
     void setVFDCalibrationThreshold(float threshold_amps);
     void setVFDCalibrationValid(bool is_valid);
 
-    // Axis Metrics (PHASE 5.6: Motion synchronization)
-    void setAxisMotionQuality(uint32_t quality_score);
-    void setAxisSynchronized(bool is_synchronized);
-    void setAxisJitterAmplitude(float jitter_mms);
-    void setXYVelocityError(float error_percent);
+    // Axis Metrics (PHASE 5.6: Per-axis motion validation)
+    void setAxisQualityScore(uint8_t axis, uint32_t quality_score);
+    void setAxisJitterAmplitude(uint8_t axis, float jitter_mms);
+    void setAxisStalled(uint8_t axis, bool is_stalled);
+    void setAxisVFDError(uint8_t axis, float error_percent);
 
     // Push state to all connected WebSocket clients
     void broadcastState();
@@ -72,11 +72,13 @@ private:
         float vfd_threshold_amps;
         bool vfd_calibration_valid;
 
-        // Axis metrics (PHASE 5.6)
-        uint32_t axis_quality_score;
-        bool axis_synchronized;
-        float axis_jitter_mms;
-        float axis_xy_error_percent;
+        // Axis metrics (PHASE 5.6) - per-axis
+        struct {
+            uint32_t quality_score;
+            float jitter_mms;
+            bool stalled;
+            float vfd_error_percent;
+        } axis_metrics[3];  // 0=X, 1=Y, 2=Z
     } current_status;
 
     // Handlers
