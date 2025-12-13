@@ -429,6 +429,126 @@ void cmd_vfd_calib_current(int argc, char** argv) {
     }
 }
 
+// ============================================================================
+// VFD CONFIGURATION & STALL RESPONSE CUSTOMIZATION (PHASE 5.5)
+// ============================================================================
+
+/**
+ * @brief VFD configuration command handler
+ * Customize stall detection thresholds, margins, and thermal limits
+ */
+void cmd_vfd_config(int argc, char** argv) {
+    if (argc < 2 || strcmp(argv[1], "help") == 0) {
+        Serial.println("[VFDCFG] === VFD Configuration ===");
+        Serial.println("Commands:");
+        Serial.println("  vfd config margin <percent>      - Set stall margin (default 20%)");
+        Serial.println("  vfd config timeout <ms>          - Set stall timeout (default 2000ms)");
+        Serial.println("  vfd config temp warn <°C>        - Set temperature warning threshold");
+        Serial.println("  vfd config temp crit <°C>        - Set temperature critical threshold");
+        Serial.println("  vfd config enable <on|off>       - Enable/disable VFD stall detection");
+        Serial.println("  vfd config show                  - Display current settings");
+        return;
+    }
+
+    if (strcmp(argv[1], "margin") == 0) {
+        if (argc < 3) {
+            Serial.println("[VFDCFG] Usage: vfd config margin <percent>");
+            return;
+        }
+        float margin = atof(argv[2]);
+        if (margin < 5.0f || margin > 100.0f) {
+            Serial.println("[VFDCFG] ERROR: Margin must be between 5% and 100%");
+            return;
+        }
+        configSetInt(KEY_VFD_STALL_MARGIN, (int32_t)margin);
+        configUnifiedFlush();
+        configUnifiedSave();
+        Serial.printf("[VFDCFG] Stall margin set to %.0f%%\n", margin);
+
+    } else if (strcmp(argv[1], "timeout") == 0) {
+        if (argc < 3) {
+            Serial.println("[VFDCFG] Usage: vfd config timeout <milliseconds>");
+            return;
+        }
+        uint32_t timeout_ms = (uint32_t)atoi(argv[2]);
+        if (timeout_ms < 100 || timeout_ms > 60000) {
+            Serial.println("[VFDCFG] ERROR: Timeout must be between 100ms and 60000ms");
+            return;
+        }
+        configSetInt(KEY_STALL_TIMEOUT, (int32_t)timeout_ms);
+        configUnifiedFlush();
+        configUnifiedSave();
+        Serial.printf("[VFDCFG] Stall timeout set to %lu ms\n", (unsigned long)timeout_ms);
+
+    } else if (strcmp(argv[1], "temp") == 0) {
+        if (argc < 4) {
+            Serial.println("[VFDCFG] Usage: vfd config temp [warn|crit] <°C>");
+            return;
+        }
+
+        int32_t temp = (int32_t)atoi(argv[3]);
+        if (temp < 0 || temp > 150) {
+            Serial.println("[VFDCFG] ERROR: Temperature must be between 0°C and 150°C");
+            return;
+        }
+
+        if (strcmp(argv[2], "warn") == 0) {
+            configSetInt(KEY_VFD_TEMP_WARN, temp);
+            Serial.printf("[VFDCFG] Temperature warning threshold set to %ld°C\n", (long)temp);
+        } else if (strcmp(argv[2], "crit") == 0) {
+            configSetInt(KEY_VFD_TEMP_CRIT, temp);
+            Serial.printf("[VFDCFG] Temperature critical threshold set to %ld°C\n", (long)temp);
+        } else {
+            Serial.println("[VFDCFG] ERROR: Use 'warn' or 'crit'");
+            return;
+        }
+        configUnifiedFlush();
+        configUnifiedSave();
+
+    } else if (strcmp(argv[1], "enable") == 0) {
+        if (argc < 3) {
+            Serial.println("[VFDCFG] Usage: vfd config enable [on|off]");
+            return;
+        }
+
+        bool enable = (strcmp(argv[2], "on") == 0) || (strcmp(argv[2], "1") == 0);
+        configSetInt("vfd_stall_detect", enable ? 1 : 0);
+        configUnifiedFlush();
+        configUnifiedSave();
+        Serial.printf("[VFDCFG] VFD stall detection %s\n", enable ? "ENABLED" : "DISABLED");
+
+    } else if (strcmp(argv[1], "show") == 0) {
+        Serial.println("\n[VFDCFG] === Current VFD Configuration ===");
+
+        float margin = configGetFloat(KEY_VFD_STALL_MARGIN, 20.0f);
+        Serial.printf("Stall Margin:        %.0f%%\n", margin);
+
+        int32_t timeout = configGetInt(KEY_STALL_TIMEOUT, 2000);
+        Serial.printf("Stall Timeout:       %ld ms\n", (long)timeout);
+
+        int32_t temp_warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
+        int32_t temp_crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
+        Serial.printf("Temperature Warn:    %ld°C\n", (long)temp_warn);
+        Serial.printf("Temperature Crit:    %ld°C\n", (long)temp_crit);
+
+        int32_t enabled = configGetInt("vfd_stall_detect", 1);
+        Serial.printf("VFD Stall Detect:    %s\n", enabled ? "ENABLED" : "DISABLED");
+
+        // Show calibration status
+        const vfd_calibration_data_t* calib = vfdCalibrationGetData();
+        if (calib->is_calibrated) {
+            Serial.printf("Stall Threshold:     %.2f A (margin: %.0f%%)\n",
+                          calib->stall_threshold_amps, calib->stall_margin_percent);
+        } else {
+            Serial.println("Stall Threshold:     NOT CALIBRATED");
+        }
+        Serial.println();
+
+    } else {
+        Serial.println("[VFDCFG] Unknown subcommand. Use 'help' for usage.");
+    }
+}
+
 void cliRegisterCalibCommands() {
   cliRegisterCommand("calib", "Start automatic distance calibration (calib axis distance)", cmd_encoder_calib);
   cliRegisterCommand("calibrate speed", "Auto-detect and save profile speeds (calibrate speed X FAST 500)", cmd_auto_calibrate_speed);
@@ -437,4 +557,5 @@ void cliRegisterCalibCommands() {
   cliRegisterCommand("calibrate ppmm end", "Signal manual move end (calculate PPM)", cmd_calib_ppmm_end);
   cliRegisterCommand("calibrate ppmm X reset", "Reset PPM calibration to default (e.g., calibrate ppmm X reset)", cmd_calib_ppmm_reset);
   cliRegisterCommand("calibrate vfd current", "VFD motor current calibration workflow (calibrate vfd current start)", cmd_vfd_calib_current);
+  cliRegisterCommand("vfd config", "Configure VFD stall detection and thermal limits (vfd config help)", cmd_vfd_config);
 }
