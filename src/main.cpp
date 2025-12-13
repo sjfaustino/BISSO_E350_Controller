@@ -14,6 +14,7 @@
 #include "serial_logger.h" 
 #include "system_constants.h"
 #include "task_manager.h"
+#include "task_performance_monitor.h"  // PHASE 5.1: Task performance monitoring
 #include "timeout_manager.h"
 #include "watchdog_manager.h"
 #include "web_server.h"
@@ -88,6 +89,7 @@ void setup() {
   }
 
   taskManagerInit();
+  perfMonitorInit();  // PHASE 5.1: Initialize performance monitoring
   taskManagerStart();
   logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
 }

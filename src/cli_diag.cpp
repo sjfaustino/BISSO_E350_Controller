@@ -29,6 +29,7 @@
 #include "config_keys.h"
 #include "web_server.h"       // PHASE 5.1: Web credential management
 #include "api_rate_limiter.h"  // PHASE 5.1: API rate limiting
+#include "task_performance_monitor.h"  // PHASE 5.1: Task performance metrics
 #include "safety.h"
 #include "firmware_version.h"
 #include "encoder_motion_integration.h"
@@ -851,6 +852,44 @@ void cmd_api_ratelimit_main(int argc, char** argv) {
 }
 
 // ============================================================================
+// TASK PERFORMANCE MONITORING (PHASE 5.1)
+// ============================================================================
+
+void cmd_metrics_summary(int argc, char** argv) {
+    perfMonitorPrintSummary();
+}
+
+void cmd_metrics_detail(int argc, char** argv) {
+    perfMonitorPrintDiagnostics();
+}
+
+void cmd_metrics_reset(int argc, char** argv) {
+    perfMonitorReset();
+    Serial.println("[METRICS] [OK] Performance metrics reset");
+}
+
+void cmd_metrics_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[METRICS] === Task Performance Monitoring ===");
+        Serial.println("Usage: metrics [summary | detail | reset]");
+        Serial.println("  summary: Show quick performance summary");
+        Serial.println("  detail:  Show detailed task diagnostics");
+        Serial.println("  reset:   Clear all collected metrics");
+        return;
+    }
+
+    if (strcmp(argv[1], "summary") == 0) {
+        cmd_metrics_summary(argc, argv);
+    } else if (strcmp(argv[1], "detail") == 0) {
+        cmd_metrics_detail(argc, argv);
+    } else if (strcmp(argv[1], "reset") == 0) {
+        cmd_metrics_reset(argc, argv);
+    } else {
+        Serial.printf("[METRICS] [ERR] Unknown sub-command: %s\n", argv[1]);
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
@@ -859,6 +898,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("spindle", "Spindle current monitoring", cmd_spindle_main);
     cliRegisterCommand("web", "Web server configuration", cmd_web_main);
     cliRegisterCommand("api", "API rate limiter diagnostics", cmd_api_ratelimit_main);
+    cliRegisterCommand("metrics", "Task performance monitoring", cmd_metrics_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);

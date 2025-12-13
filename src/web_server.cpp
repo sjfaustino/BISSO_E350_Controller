@@ -15,6 +15,7 @@
 #include "config_keys.h"      // Configuration keys
 #include "string_safety.h"    // Safe string operations
 #include "api_rate_limiter.h"  // PHASE 5.1: Rate limiting
+#include "task_performance_monitor.h"  // PHASE 5.1: Task performance metrics
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -208,7 +209,35 @@ void WebServerManager::setupRoutes() {
         request->send(200, "application/json", response);
     });
 
-    // 5. DELEGATE FILE MANAGEMENT
+    // 5. API Task Performance Metrics (Protected, Rate Limited) - PHASE 5.1
+    server->on("/api/metrics", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        // PHASE 5.1: Rate limiting check
+        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        // Export performance metrics as JSON
+        char* metrics_buffer = (char*)malloc(2048);
+        if (!metrics_buffer) {
+            request->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            return;
+        }
+
+        size_t metrics_size = perfMonitorExportJSON(metrics_buffer, 2048);
+        if (metrics_size == 0) {
+            free(metrics_buffer);
+            request->send(500, "application/json", "{\"error\":\"Failed to export metrics\"}");
+            return;
+        }
+
+        request->send(200, "application/json", metrics_buffer);
+        free(metrics_buffer);
+    });
+
+    // 6. DELEGATE FILE MANAGEMENT
     // Registers /api/files (GET, DELETE) and /api/upload (POST)
     apiRegisterFileRoutes(server, http_username, http_password);
 
