@@ -28,6 +28,7 @@
 #include "config_validator.h"
 #include "config_keys.h"
 #include "web_server.h"       // PHASE 5.1: Web credential management
+#include "api_rate_limiter.h"  // PHASE 5.1: API rate limiting
 #include "safety.h"
 #include "firmware_version.h"
 #include "encoder_motion_integration.h"
@@ -747,6 +748,35 @@ void cmd_web_main(int argc, char** argv) {
 }
 
 // ============================================================================
+// API RATE LIMITER (PHASE 5.1)
+// ============================================================================
+void cmd_api_ratelimit_diag(int argc, char** argv) {
+    apiRateLimiterDiagnostics();
+}
+
+void cmd_api_ratelimit_reset(int argc, char** argv) {
+    apiRateLimiterReset();
+    Serial.println("[OK] API rate limiter reset");
+}
+
+void cmd_api_ratelimit_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[API] Usage: api [diag | reset]");
+        Serial.println("  diag:   Show rate limiter diagnostics");
+        Serial.println("  reset:  Reset all rate limit counters");
+        return;
+    }
+
+    if (strcmp(argv[1], "diag") == 0) {
+        cmd_api_ratelimit_diag(argc, argv);
+    } else if (strcmp(argv[1], "reset") == 0) {
+        cmd_api_ratelimit_reset(argc, argv);
+    } else {
+        Serial.printf("[API] [ERR] Unknown sub-command: %s\n", argv[1]);
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
@@ -754,6 +784,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("encoder", "Encoder management", cmd_encoder_main);
     cliRegisterCommand("spindle", "Spindle current monitoring", cmd_spindle_main);
     cliRegisterCommand("web", "Web server configuration", cmd_web_main);
+    cliRegisterCommand("api", "API rate limiter diagnostics", cmd_api_ratelimit_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);

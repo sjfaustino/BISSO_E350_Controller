@@ -14,6 +14,7 @@
 #include "config_unified.h"   // NVS configuration
 #include "config_keys.h"      // Configuration keys
 #include "string_safety.h"    // Safe string operations
+#include "api_rate_limiter.h"  // PHASE 5.1: Rate limiting
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -93,6 +94,9 @@ void WebServerManager::init() {
     // Load credentials from NVS (PHASE 5.1)
     loadCredentials();
 
+    // PHASE 5.1: Initialize API rate limiting
+    apiRateLimiterInit();
+
     server = new AsyncWebServer(port);
     ws = new AsyncWebSocket("/ws");
 
@@ -122,39 +126,51 @@ void WebServerManager::setupRoutes() {
     // 1. Static Files (Protected)
     server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setAuthentication(http_username, http_password);
 
-    // 2. API Status (Protected)
+    // 2. API Status (Protected, Rate Limited)
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request){
         if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
-        
+
+        // PHASE 5.1: Rate limiting check
+        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
         JsonDocument doc;
         // Use the new read-only accessors for thread safety
-        doc["status"] = motionStateToString(motionGetState(0)); 
+        doc["status"] = motionStateToString(motionGetState(0));
         doc["x_pos"] = motionGetPositionMM(0);
         doc["y_pos"] = motionGetPositionMM(1);
         doc["z_pos"] = motionGetPositionMM(2);
         doc["a_pos"] = motionGetPositionMM(3);
-        
+
         // Use cached uptime/status from the Monitor Task updates
-        doc["uptime"] = current_status.uptime_sec; 
+        doc["uptime"] = current_status.uptime_sec;
         // Or if real-time needed: doc["uptime"] = taskGetUptime();
-        
+
         String response;
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
 
-    // 3. API Jog (Protected)
-    server->on("/api/jog", HTTP_POST, 
-        [](AsyncWebServerRequest *request){ request->send(200); }, 
+    // 3. API Jog (Protected, Rate Limited)
+    server->on("/api/jog", HTTP_POST,
+        [](AsyncWebServerRequest *request){ request->send(200); },
         NULL,
         [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             this->handleJogBody(request, data, len, index, total);
         }
     ).setAuthentication(http_username, http_password);
-    
-    // 4. API Spindle Telemetry (Protected) - PHASE 5.1
+
+    // 4. API Spindle Telemetry (Protected, Rate Limited) - PHASE 5.1
     server->on("/api/spindle", HTTP_GET, [this](AsyncWebServerRequest *request){
         if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        // PHASE 5.1: Rate limiting check
+        if (!apiRateLimiterCheck(API_ENDPOINT_SPINDLE, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
 
         JsonDocument doc;
 
@@ -204,18 +220,24 @@ void WebServerManager::setupRoutes() {
 // --- Handlers ---
 
 void WebServerManager::handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    // PHASE 5.1: Rate limiting check
+    if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) {
+        request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+        return;
+    }
+
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, data, len);
-    
+
     if (error) {
         Serial.printf("[WEB] [ERR] JSON parse failed: %s\n", error.c_str());
         return;
     }
-    
+
     const char* direction = doc["direction"];
-    float distance = doc["distance"] | 10.0f;     
-    float speed = doc["speed"] | 50.0f;            
-    
+    float distance = doc["distance"] | 10.0f;
+    float speed = doc["speed"] | 50.0f;
+
     if (!direction) return;
 
     Serial.printf("[WEB] Jog: %s, %.1f mm, %.1f mm/s\n", direction, distance, speed);
