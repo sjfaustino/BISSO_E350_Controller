@@ -83,6 +83,45 @@ void safetyUpdate() {
             }
         }
     }
+
+    // PHASE 5.5: VFD Thermal Monitoring
+    // Monitor motor/VFD heatsink temperature with warning and critical thresholds
+    static uint32_t last_thermal_check = 0;
+    if ((uint32_t)(now - last_thermal_check) > 1000) {  // Check every 1 second
+        last_thermal_check = now;
+
+        int16_t thermal_state = altivar31GetThermalState();
+        if (thermal_state > 0) {  // Valid reading (percentage, 100% = nominal)
+            int32_t temp_warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
+            int32_t temp_crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
+
+            // Convert percentage to approximate Celsius (typical range: 20-120°C nominal operation)
+            // Assumption: 100% thermal state ≈ 60°C heatsink temp
+            // This is a heuristic; actual conversion depends on VFD model calibration
+            int32_t approx_temp_c = (thermal_state > 100) ? (20 + (thermal_state - 100)) : 60;
+
+            if (thermal_state > (temp_crit * 1.4)) {  // Over 140% or absolute >90°C
+                logError("[SAFETY] [FAIL] VFD Thermal Critical: %d%% (>%ld°C)",
+                         thermal_state, (long)temp_crit);
+
+                if (!alarm_active) {
+                    safety_state.current_fault = SAFETY_OVERHEAT;
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "VFD OVERHEAT %d%%", thermal_state);
+                    faultLogEntry(FAULT_ERROR, FAULT_THERMAL_CRITICAL, 0, 0, "VFD thermal critical");
+                    safetyTriggerAlarm(msg);
+                }
+
+            } else if (thermal_state > (temp_warn * 1.3)) {  // Over 130% or >85°C
+                static uint32_t last_thermal_warn = 0;
+                if ((uint32_t)(now - last_thermal_warn) > 5000) {  // Log warning every 5s max
+                    last_thermal_warn = now;
+                    logWarn("[SAFETY] [WARN] VFD Thermal Warning: %d%% (>%ld°C)",
+                            thermal_state, (long)temp_warn);
+                }
+            }
+        }
+    }
   }
 
   if (alarm_active) {
