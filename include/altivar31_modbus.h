@@ -3,17 +3,15 @@
  * @brief Altivar 31 VFD Modbus RTU Driver (PHASE 5.5)
  * @project BISSO E350 Controller
  * @details Modbus RTU interface for Schneider Altivar 31 VFD
- *          Queries motor current, frequency, status, and temperature
+ *          Provides asynchronous and synchronous queries for motor current,
+ *          frequency, status, faults, and thermal state.
  *
- * Standard Altivar 31 Modbus Registers (verify against your VFD manual):
- * - 0200: Output frequency (0.01 Hz units, INT16)
- * - 0203: Drive current (0.1 A units, INT16)
- * - 0205: Drive status (0=idle, 1=running, 2=fault, etc.)
- * - 0204: Fault code (INT16)
- * - 0210: Internal heatsink temperature (°C, INT16, if available)
- *
- * NOTE: Register addresses may vary by Altivar 31 variant/firmware version.
- *       Verify against your specific VFD manual before deployment.
+ * Register Addresses (Verified from ATV312 Programming Manual BBV51701):
+ * - 3202: Output frequency (rFr, 0.1 Hz units)
+ * - 3204: Motor current (LCr, 0.1 A units)
+ * - 3201: Status word (ETA, bit flags for running/ready/fault)
+ * - 8606: Fault code (ERRD, 0 = no fault)
+ * - 3209: Thermal state (tHd, 1% units, 100% = nominal)
  */
 
 #ifndef ALTIVAR31_MODBUS_H
@@ -29,13 +27,13 @@ extern "C" {
 // ============================================================================
 // MODBUS REGISTER ADDRESSES (Decimal)
 // ============================================================================
-// Verify these against your specific Altivar 31 manual
+// Verified against Altivar 31/312 Programming Manual BBV51701
 
-#define ALTIVAR31_REG_OUTPUT_FREQ       0x0200   // Output frequency (0.01 Hz units)
-#define ALTIVAR31_REG_FAULT_CODE        0x0204   // Fault code
-#define ALTIVAR31_REG_DRIVE_STATUS      0x0205   // Drive operating status
-#define ALTIVAR31_REG_DRIVE_CURRENT     0x0203   // Motor current (0.1 A units)
-#define ALTIVAR31_REG_TEMPERATURE       0x0210   // Heatsink temperature (°C, if available)
+#define ALTIVAR31_REG_OUTPUT_FREQ       3202    // rFr: Output frequency (0.1 Hz units)
+#define ALTIVAR31_REG_DRIVE_CURRENT     3204    // LCr: Motor current (0.1 A units)
+#define ALTIVAR31_REG_DRIVE_STATUS      3201    // ETA: Status word (bit flags)
+#define ALTIVAR31_REG_FAULT_CODE        8606    // ERRD: Fault code
+#define ALTIVAR31_REG_THERMAL_STATE     3209    // tHd: Drive heatsink thermal state (1% units)
 
 // Drive status values
 #define ALTIVAR31_STATUS_IDLE           0
@@ -49,19 +47,18 @@ extern "C" {
 
 typedef struct {
     uint8_t slave_address;              // Modbus slave ID (1-247, typically 1)
-    uint32_t baud_rate;                 // Baud rate in bps (9600 typical)
+    uint32_t baud_rate;                 // Baud rate in bps (19200 typical)
 
     // Real-time measurements
-    uint16_t output_frequency_raw;      // Raw register value (0.01 Hz units)
-    float output_frequency_hz;          // Output frequency in Hz
+    int16_t frequency_raw;              // Raw register value (0.1 Hz units)
+    float frequency_hz;                 // Output frequency in Hz
 
-    uint16_t drive_current_raw;         // Raw register value (0.1 A units)
-    float drive_current_amps;           // Motor current in amperes (RMS)
+    int16_t current_raw;                // Raw register value (0.1 A units)
+    float current_amps;                 // Motor current in amperes
 
-    uint16_t drive_status;              // Operating status
+    uint16_t status_word;               // Operating status (bit flags)
     uint16_t fault_code;                // Fault code (0 = no fault)
-
-    int16_t heatsink_temp_c;            // Heatsink temperature (°C)
+    int16_t thermal_state;              // Thermal state (1% units, 100% = nominal)
 
     // Statistics
     uint32_t last_read_time_ms;         // Timestamp of last successful read
@@ -69,10 +66,6 @@ typedef struct {
     uint32_t read_count;                // Successful reads
     uint32_t error_count;               // Read errors
     uint32_t consecutive_errors;        // Consecutive communication failures
-
-    // Peak/average tracking
-    float current_peak_amps;            // Peak current seen
-    float current_average_amps;         // Moving average
 
 } altivar31_state_t;
 
@@ -89,54 +82,124 @@ typedef struct {
 bool altivar31ModbusInit(uint8_t slave_address, uint32_t baud_rate);
 
 // ============================================================================
-// SYNCHRONOUS QUERIES (Blocking)
+// ASYNCHRONOUS QUERIES (Non-blocking, 2-phase pattern)
 // ============================================================================
 
 /**
- * @brief Query current from Altivar 31 (blocking)
- * @return Motor current in amperes, or -1.0 on error
+ * @brief Initiate asynchronous read of motor current
+ * @details Call this first, then call altivar31ModbusReceiveResponse() to get result
+ * @return true if request sent, false on error
  */
-float altivar31ReadCurrent(void);
+bool altivar31ModbusReadCurrent(void);
 
 /**
- * @brief Query output frequency from Altivar 31 (blocking)
- * @return Output frequency in Hz, or -1.0 on error
+ * @brief Initiate asynchronous read of output frequency
+ * @return true if request sent, false on error
  */
-float altivar31ReadFrequency(void);
+bool altivar31ModbusReadFrequency(void);
 
 /**
- * @brief Query drive status (blocking)
- * @return Status code (0=idle, 1=running, 2=fault, etc.), or -1 on error
+ * @brief Initiate asynchronous read of drive status word
+ * @return true if request sent, false on error
  */
-int16_t altivar31ReadStatus(void);
+bool altivar31ModbusReadStatus(void);
 
 /**
- * @brief Query fault code (blocking)
- * @return Fault code (0 = no fault), or -1 on error
+ * @brief Initiate asynchronous read of fault code
+ * @return true if request sent, false on error
  */
-int16_t altivar31ReadFaultCode(void);
+bool altivar31ModbusReadFaultCode(void);
 
 /**
- * @brief Query heatsink temperature (blocking)
- * @return Temperature in °C, or -999 on error or if register unavailable
+ * @brief Initiate asynchronous read of thermal state
+ * @return true if request sent, false on error
  */
-int16_t altivar31ReadTemperature(void);
+bool altivar31ModbusReadThermalState(void);
+
+/**
+ * @brief Receive response from asynchronous Modbus query
+ * @details Call after sending a read request; updates internal state on success
+ * @return true if response received and parsed, false if still waiting or error
+ */
+bool altivar31ModbusReceiveResponse(void);
 
 // ============================================================================
-// STATE ACCESS
+// DATA ACCESSORS (Cached, non-blocking)
 // ============================================================================
 
 /**
- * @brief Get current VFD state snapshot (cached, non-blocking)
+ * @brief Get motor current in amperes (most recent measurement)
+ * @return Motor current in amps
+ */
+float altivar31GetCurrentAmps(void);
+
+/**
+ * @brief Get motor current raw register value
+ * @return Raw value (0.1 A per unit)
+ */
+int16_t altivar31GetCurrentRaw(void);
+
+/**
+ * @brief Get output frequency in Hz (most recent measurement)
+ * @return Frequency in Hz
+ */
+float altivar31GetFrequencyHz(void);
+
+/**
+ * @brief Get output frequency raw register value
+ * @return Raw value (0.1 Hz per unit)
+ */
+int16_t altivar31GetFrequencyRaw(void);
+
+/**
+ * @brief Get drive status word
+ * @return Status word (bit flags)
+ */
+uint16_t altivar31GetStatusWord(void);
+
+/**
+ * @brief Get fault code (0 = no fault)
+ * @return Fault code from VFD
+ */
+uint16_t altivar31GetFaultCode(void);
+
+/**
+ * @brief Get thermal state
+ * @return Percentage (100% = nominal, >118% triggers thermal fault)
+ */
+int16_t altivar31GetThermalState(void);
+
+/**
+ * @brief Check if VFD is in fault state
+ * @return true if fault code != 0
+ */
+bool altivar31IsFaulted(void);
+
+/**
+ * @brief Check if motor is running
+ * @return true if running bit (bit 3) is set in status word
+ */
+bool altivar31IsRunning(void);
+
+/**
+ * @brief Get complete VFD state snapshot
  * @return Pointer to current state structure
  */
 const altivar31_state_t* altivar31GetState(void);
 
+// ============================================================================
+// ERROR HANDLING & DIAGNOSTICS
+// ============================================================================
+
 /**
- * @brief Get last error message
- * @return Error description or NULL
+ * @brief Reset error counters
  */
-const char* altivar31GetLastError(void);
+void altivar31ResetErrorCounters(void);
+
+/**
+ * @brief Print VFD diagnostics to serial console
+ */
+void altivar31PrintDiagnostics(void);
 
 #ifdef __cplusplus
 }
