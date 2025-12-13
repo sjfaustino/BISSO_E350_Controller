@@ -18,6 +18,9 @@
 #include "motion_state.h" // Provides motionGetPositionMM, motionIsMoving
 #include "safety.h"       // <-- CRITICAL FIX: Provides safetyIsAlarmed()
 #include "system_telemetry.h"  // PHASE 5.1: System telemetry
+#include "encoder_diagnostics.h"  // PHASE 5.3: Encoder health monitoring
+#include "load_manager.h"  // PHASE 5.3: Graceful degradation under load
+#include "dashboard_metrics.h"  // PHASE 5.3: Web UI dashboard metrics
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -79,7 +82,13 @@ void taskMonitorFunction(void* parameter) {
     // Collect comprehensive system metrics for API and diagnostics
     telemetryUpdate();
 
-    // 6. Web Telemetry Broadcast
+    // 6. Update Phase 5.3 Modules
+    // Advanced encoder diagnostics, load management, and dashboard metrics
+    encoderDiagnosticsUpdate();
+    loadManagerUpdate();
+    dashboardMetricsUpdate();
+
+    // 7. Web Telemetry Broadcast
     // Push real-time state to the Web UI via WebSockets.
 
     // Use the Motion State Accessors to get physical units (MM)
@@ -105,7 +114,7 @@ void taskMonitorFunction(void* parameter) {
     // Trigger the broadcast to all connected clients
     webServer.broadcastState();
 
-    // 6. Watchdog & Sleep
+    // 8. Watchdog & Sleep
     watchdogFeed("Monitor");
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_MONITOR));
   }

@@ -19,6 +19,9 @@
 #include "api_ota_updater.h"  // PHASE 5.1: OTA firmware updates
 #include "system_telemetry.h"  // PHASE 5.1: Comprehensive system telemetry
 #include "api_endpoints.h"  // PHASE 5.2: API endpoint discovery
+#include "encoder_diagnostics.h"  // PHASE 5.3: Encoder health monitoring
+#include "load_manager.h"  // PHASE 5.3: Graceful degradation under load
+#include "dashboard_metrics.h"  // PHASE 5.3: Web UI dashboard metrics
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -372,7 +375,89 @@ void WebServerManager::setupRoutes() {
         request->send(200, "application/json", health_buffer);
     });
 
-    // 10. DELEGATE FILE MANAGEMENT
+    // 10. PHASE 5.3: API Encoder Diagnostics (Protected, Rate Limited)
+    server->on("/api/encoder/diagnostics", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        // PHASE 5.3: Rate limiting check
+        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        char* diag_buffer = (char*)malloc(2048);
+        if (!diag_buffer) {
+            request->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            return;
+        }
+
+        size_t diag_size = encoderDiagnosticsExportJSON(diag_buffer, 2048);
+        if (diag_size == 0) {
+            free(diag_buffer);
+            request->send(500, "application/json", "{\"error\":\"Failed to export encoder diagnostics\"}");
+            return;
+        }
+
+        request->send(200, "application/json", diag_buffer);
+        free(diag_buffer);
+    });
+
+    // 11. PHASE 5.3: API Load Status (Protected, Rate Limited)
+    server->on("/api/load", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        // PHASE 5.3: Rate limiting check
+        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        char load_buffer[512];
+        load_status_t load_status = loadManagerGetStatus();
+
+        const char* state_str = "NORMAL";
+        if (load_status.current_state == LOAD_STATE_ELEVATED) state_str = "ELEVATED";
+        else if (load_status.current_state == LOAD_STATE_HIGH) state_str = "HIGH";
+        else if (load_status.current_state == LOAD_STATE_CRITICAL) state_str = "CRITICAL";
+
+        snprintf(load_buffer, sizeof(load_buffer),
+            "{\"state\":\"%s\",\"cpu_percent\":%d,\"uptime_seconds\":%lu,"
+            "\"critical_timeout_countdown\":%d,\"has_warnings\":%s}",
+            state_str, load_status.current_cpu_percent, load_status.uptime_seconds,
+            load_status.critical_countdown_seconds,
+            load_status.has_warnings ? "true" : "false");
+
+        request->send(200, "application/json", load_buffer);
+    });
+
+    // 12. PHASE 5.3: API Dashboard Metrics (Protected, for Web UI)
+    server->on("/api/dashboard/metrics", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        // PHASE 5.3: Rate limiting check (less strict for dashboard updates)
+        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        char* metrics_buffer = (char*)malloc(512);
+        if (!metrics_buffer) {
+            request->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            return;
+        }
+
+        size_t metrics_size = dashboardMetricsExportJSON(metrics_buffer, 512);
+        if (metrics_size == 0) {
+            free(metrics_buffer);
+            request->send(500, "application/json", "{\"error\":\"Failed to export dashboard metrics\"}");
+            return;
+        }
+
+        request->send(200, "application/json", metrics_buffer);
+        free(metrics_buffer);
+    });
+
+    // 13. DELEGATE FILE MANAGEMENT
     // Registers /api/files (GET, DELETE) and /api/upload (POST)
     apiRegisterFileRoutes(server, http_username, http_password);
 

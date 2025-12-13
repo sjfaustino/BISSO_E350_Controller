@@ -20,6 +20,9 @@
 #include "watchdog_manager.h"
 #include "web_server.h"
 #include "network_manager.h"
+#include "encoder_diagnostics.h"  // PHASE 5.3: Advanced encoder diagnostics
+#include "load_manager.h"  // PHASE 5.3: Graceful degradation under load
+#include "dashboard_metrics.h"  // PHASE 5.3: Web UI dashboard metrics
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -55,6 +58,11 @@ bool init_cli_wrapper() { cliInit(); return true; }
 bool init_inputs_wrapper() { boardInputsInit(); return true; }
 bool init_network_wrapper() { networkManager.init(); webServer.init(); webServer.begin(); return true; }
 
+// PHASE 5.3: Initialize advanced diagnostics and load management
+bool init_encoder_diag_wrapper() { encoderDiagnosticsInit(); return true; }
+bool init_load_mgr_wrapper() { loadManagerInit(); return true; }
+bool init_dashboard_wrapper() { dashboardMetricsInit(); return true; }
+
 #define BOOT_INIT(name, func, code) \
   do { if (func()) { logInfo("[BOOT] Init %s [OK]", name); bootMarkInitialized(name); } \
        else { logError("[BOOT] Init %s [FAIL]", name); bootMarkFailed(name, "Init failed", code); } } while (0)
@@ -82,6 +90,9 @@ void setup() {
   BOOT_INIT("Motion", init_motion_wrapper, BOOT_ERROR_MOTION);
   BOOT_INIT("CLI", init_cli_wrapper, BOOT_ERROR_CLI);
   BOOT_INIT("Network", init_network_wrapper, (boot_status_code_t)13);
+  BOOT_INIT("Encoder Diag", init_encoder_diag_wrapper, (boot_status_code_t)15);
+  BOOT_INIT("Load Manager", init_load_mgr_wrapper, (boot_status_code_t)16);
+  BOOT_INIT("Dashboard", init_dashboard_wrapper, (boot_status_code_t)17);
 
   logInfo("[BOOT] Validating system health...");
   if (!bootValidateAllSystems()) {
