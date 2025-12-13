@@ -31,6 +31,19 @@
 #define KEY_SPINDLE_THRESHOLD "spindl_thr"// Overcurrent threshold in integer amperes (30 = 30A)
 #define KEY_SPINDLE_POLL_MS "spindl_poll" // Poll interval in milliseconds (default 1000)
 
+// --- VFD CURRENT CALIBRATION (PHASE 5.5) ---
+#define KEY_VFD_IDLE_RMS "vfd_idle_rms"           // Idle baseline RMS current (amps × 100)
+#define KEY_VFD_IDLE_PEAK "vfd_idle_pk"           // Idle baseline peak current (amps × 100)
+#define KEY_VFD_STD_CUT_RMS "vfd_std_rms"         // Standard cut RMS current (amps × 100)
+#define KEY_VFD_STD_CUT_PEAK "vfd_std_pk"         // Standard cut peak current (amps × 100)
+#define KEY_VFD_HEAVY_RMS "vfd_heavy_rms"         // Heavy load RMS current (amps × 100)
+#define KEY_VFD_HEAVY_PEAK "vfd_heavy_pk"         // Heavy load peak current (amps × 100)
+#define KEY_VFD_STALL_THR "vfd_stall_thr"         // Stall threshold current (amps × 100)
+#define KEY_VFD_STALL_MARGIN "vfd_stall_marg"     // Stall margin percent (20 = 20%)
+#define KEY_VFD_CALIB_VALID "vfd_calib_ok"        // Calibration valid flag (1=yes, 0=no)
+#define KEY_VFD_TEMP_WARN "vfd_temp_warn"         // Temperature warning threshold (°C, default 85)
+#define KEY_VFD_TEMP_CRIT "vfd_temp_crit"         // Temperature critical threshold (°C, default 90)
+
 // --- PREDEFINED POSITIONS (G30) ---
 #define KEY_POS_SAFE_X "pos_safe_x"       // Safe position X coordinate in mm
 #define KEY_POS_SAFE_Y "pos_safe_y"       // Safe position Y coordinate in mm
