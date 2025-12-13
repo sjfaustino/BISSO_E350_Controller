@@ -430,6 +430,134 @@ void cmd_vfd_calib_current(int argc, char** argv) {
 }
 
 // ============================================================================
+// VFD DIAGNOSTICS (PHASE 5.5)
+// ============================================================================
+
+/**
+ * @brief VFD diagnostics command handler
+ * Display real-time VFD telemetry and health information
+ */
+void cmd_vfd_diagnostics(int argc, char** argv) {
+    if (argc < 2 || strcmp(argv[1], "help") == 0) {
+        Serial.println("[VFDDIAG] === VFD Diagnostics ===");
+        Serial.println("Commands:");
+        Serial.println("  vfd diagnostics status    - Show real-time VFD status");
+        Serial.println("  vfd diagnostics thermal   - Show thermal monitoring details");
+        Serial.println("  vfd diagnostics current   - Show motor current measurements");
+        Serial.println("  vfd diagnostics frequency - Show output frequency data");
+        Serial.println("  vfd diagnostics full      - Comprehensive VFD report");
+        Serial.println("  vfd diagnostics calib     - Show calibration details");
+        return;
+    }
+
+    // Real-time status snapshot
+    if (strcmp(argv[1], "status") == 0) {
+        Serial.println("\n[VFDDIAG] === VFD Real-Time Status ===");
+        altivar31PrintDiagnostics();
+
+    } else if (strcmp(argv[1], "thermal") == 0) {
+        Serial.println("\n[VFDDIAG] === Thermal Monitoring ===");
+        int16_t thermal = altivar31GetThermalState();
+        int32_t warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
+        int32_t crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
+
+        Serial.printf("Thermal State:       %d%% (nominal: 100%%)\n", thermal);
+        Serial.printf("Warning Threshold:   >%ld°C (%ld%% state)\n", (long)warn, (long)(warn * 1.3));
+        Serial.printf("Critical Threshold:  >%ld°C (%ld%% state)\n", (long)crit, (long)(crit * 1.4));
+
+        if (thermal > (crit * 1.4)) {
+            Serial.println("Status:              🔴 CRITICAL - Emergency stop required!");
+        } else if (thermal > (warn * 1.3)) {
+            Serial.println("Status:              🟡 WARNING - Monitor closely");
+        } else {
+            Serial.println("Status:              🟢 NORMAL");
+        }
+        Serial.println();
+
+    } else if (strcmp(argv[1], "current") == 0) {
+        Serial.println("\n[VFDDIAG] === Motor Current Measurements ===");
+        float current = altivar31GetCurrentAmps();
+        int16_t raw = altivar31GetCurrentRaw();
+
+        Serial.printf("Motor Current:       %.2f A (raw: %d)\n", current, raw);
+
+        if (vfdCalibrationIsValid()) {
+            const vfd_calibration_data_t* calib = vfdCalibrationGetData();
+            Serial.printf("\nCalibrated Baselines:\n");
+            Serial.printf("  Idle (no cut):       %.2f A (RMS) / %.2f A (peak)\n",
+                          calib->idle_rms_amps, calib->idle_peak_amps);
+            Serial.printf("  Standard Cut:        %.2f A (RMS) / %.2f A (peak)\n",
+                          calib->standard_cut_rms_amps, calib->standard_cut_peak_amps);
+            if (calib->heavy_cut_rms_amps > 0.0f) {
+                Serial.printf("  Heavy Load:          %.2f A (RMS) / %.2f A (peak)\n",
+                              calib->heavy_cut_rms_amps, calib->heavy_cut_peak_amps);
+            }
+            Serial.printf("\nStall Detection:\n");
+            Serial.printf("  Threshold:           %.2f A\n", calib->stall_threshold_amps);
+            Serial.printf("  Current vs Threshold: %.2f A / %.2f A = %.0f%%\n",
+                          current, calib->stall_threshold_amps,
+                          (calib->stall_threshold_amps > 0) ? (current / calib->stall_threshold_amps * 100.0f) : 0.0f);
+
+            if (vfdCalibrationIsStall(current)) {
+                Serial.println("  Status:              🔴 STALL DETECTED!");
+            } else {
+                Serial.println("  Status:              🟢 Normal");
+            }
+        } else {
+            Serial.println("  Calibration Status:  NOT CALIBRATED");
+        }
+        Serial.println();
+
+    } else if (strcmp(argv[1], "frequency") == 0) {
+        Serial.println("\n[VFDDIAG] === Output Frequency ===");
+        float freq = altivar31GetFrequencyHz();
+        int16_t raw = altivar31GetFrequencyRaw();
+
+        Serial.printf("Output Frequency:    %.1f Hz (raw: %d, 0.1Hz/unit)\n", freq, raw);
+        Serial.printf("Status:              %s\n",
+                      freq > 0.0f ? "RUNNING" : "IDLE/STOPPED");
+        Serial.println();
+
+    } else if (strcmp(argv[1], "calib") == 0) {
+        Serial.println("\n[VFDDIAG] === Calibration Details ===");
+        vfdCalibrationPrintSummary();
+
+    } else if (strcmp(argv[1], "full") == 0) {
+        Serial.println("\n[VFDDIAG] === Comprehensive VFD Report ===");
+        Serial.println("\n--- Status ---");
+        altivar31PrintDiagnostics();
+
+        Serial.println("\n--- Current Measurements ---");
+        float current = altivar31GetCurrentAmps();
+        int32_t raw = altivar31GetCurrentRaw();
+        Serial.printf("Motor Current:       %.2f A (raw: %ld)\n", current, (long)raw);
+
+        Serial.println("\n--- Thermal State ---");
+        int16_t thermal = altivar31GetThermalState();
+        int32_t warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
+        int32_t crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
+        Serial.printf("Thermal State:       %d%% (warn: %ld%%, crit: %ld%%)\n",
+                      thermal, (long)(warn * 1.3), (long)(crit * 1.4));
+
+        Serial.println("\n--- Frequency ---");
+        float freq = altivar31GetFrequencyHz();
+        Serial.printf("Output Frequency:    %.1f Hz\n", freq);
+
+        Serial.println("\n--- Calibration ---");
+        vfdCalibrationPrintSummary();
+
+        Serial.println("\n--- Configuration ---");
+        float margin = configGetFloat(KEY_VFD_STALL_MARGIN, 20.0f);
+        int32_t timeout = configGetInt(KEY_STALL_TIMEOUT, 2000);
+        Serial.printf("Stall Margin:        %.0f%%\n", margin);
+        Serial.printf("Stall Timeout:       %ld ms\n", (long)timeout);
+
+    } else {
+        Serial.println("[VFDDIAG] Unknown subcommand. Use 'help' for usage.");
+    }
+}
+
+// ============================================================================
 // VFD CONFIGURATION & STALL RESPONSE CUSTOMIZATION (PHASE 5.5)
 // ============================================================================
 
@@ -557,5 +685,6 @@ void cliRegisterCalibCommands() {
   cliRegisterCommand("calibrate ppmm end", "Signal manual move end (calculate PPM)", cmd_calib_ppmm_end);
   cliRegisterCommand("calibrate ppmm X reset", "Reset PPM calibration to default (e.g., calibrate ppmm X reset)", cmd_calib_ppmm_reset);
   cliRegisterCommand("calibrate vfd current", "VFD motor current calibration workflow (calibrate vfd current start)", cmd_vfd_calib_current);
+  cliRegisterCommand("vfd diagnostics", "VFD telemetry and health diagnostics (vfd diagnostics help)", cmd_vfd_diagnostics);
   cliRegisterCommand("vfd config", "Configure VFD stall detection and thermal limits (vfd config help)", cmd_vfd_config);
 }
