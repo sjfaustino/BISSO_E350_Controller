@@ -22,6 +22,8 @@
 #include "encoder_diagnostics.h"  // PHASE 5.3: Encoder health monitoring
 #include "load_manager.h"  // PHASE 5.3: Graceful degradation under load
 #include "dashboard_metrics.h"  // PHASE 5.3: Web UI dashboard metrics
+#include "altivar31_modbus.h"  // PHASE 5.5: VFD current monitoring
+#include "vfd_current_calibration.h"  // PHASE 5.5: Current calibration
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -41,6 +43,14 @@ WebServerManager::WebServerManager(uint16_t port) : server(nullptr), ws(nullptr)
     safe_strcpy(current_status.status, sizeof(current_status.status), "INITIALIZING");
     // Initialize default safe positions if needed
     current_status.z_pos = 0.0f;
+
+    // Initialize VFD fields (PHASE 5.5)
+    current_status.vfd_current_amps = 0.0f;
+    current_status.vfd_frequency_hz = 0.0f;
+    current_status.vfd_thermal_percent = 0;
+    current_status.vfd_fault_code = 0;
+    current_status.vfd_threshold_amps = 0.0f;
+    current_status.vfd_calibration_valid = false;
 }
 
 WebServerManager::~WebServerManager() {
@@ -550,11 +560,20 @@ void WebServerManager::broadcastState() {
 
     JsonDocument doc;
     doc["status"] = current_status.status;
-    doc["x"] = current_status.x_pos; 
+    doc["x"] = current_status.x_pos;
     doc["y"] = current_status.y_pos;
     doc["z"] = current_status.z_pos;
     doc["a"] = current_status.a_pos;
-    
+
+    // VFD telemetry (PHASE 5.5)
+    JsonObject vfd = doc["vfd"].to<JsonObject>();
+    vfd["current_amps"] = current_status.vfd_current_amps;
+    vfd["frequency_hz"] = current_status.vfd_frequency_hz;
+    vfd["thermal_percent"] = current_status.vfd_thermal_percent;
+    vfd["fault_code"] = current_status.vfd_fault_code;
+    vfd["stall_threshold_amps"] = current_status.vfd_threshold_amps;
+    vfd["calibration_valid"] = current_status.vfd_calibration_valid;
+
     size_t len = serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
     ws->textAll(json_response_buffer, len);
 }
@@ -577,4 +596,32 @@ void WebServerManager::setAxisPosition(char axis, float position) {
 
 void WebServerManager::setSystemUptime(uint32_t seconds) {
     current_status.uptime_sec = seconds;
+}
+
+// ============================================================================
+// VFD TELEMETRY SETTERS (PHASE 5.5)
+// ============================================================================
+
+void WebServerManager::setVFDCurrent(float current_amps) {
+    current_status.vfd_current_amps = current_amps;
+}
+
+void WebServerManager::setVFDFrequency(float frequency_hz) {
+    current_status.vfd_frequency_hz = frequency_hz;
+}
+
+void WebServerManager::setVFDThermalState(int16_t thermal_percent) {
+    current_status.vfd_thermal_percent = thermal_percent;
+}
+
+void WebServerManager::setVFDFaultCode(uint16_t fault_code) {
+    current_status.vfd_fault_code = fault_code;
+}
+
+void WebServerManager::setVFDCalibrationThreshold(float threshold_amps) {
+    current_status.vfd_threshold_amps = threshold_amps;
+}
+
+void WebServerManager::setVFDCalibrationValid(bool is_valid) {
+    current_status.vfd_calibration_valid = is_valid;
 }

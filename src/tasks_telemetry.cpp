@@ -73,6 +73,14 @@ void taskTelemetryFunction(void* parameter) {
         }
     }
 
+    // Push VFD telemetry to web UI (PHASE 5.5k)
+    webServer.setVFDCurrent(altivar31GetCurrentAmps());
+    webServer.setVFDFrequency(altivar31GetFrequencyHz());
+    webServer.setVFDThermalState(altivar31GetThermalState());
+    webServer.setVFDFaultCode(altivar31GetFaultCode());
+    webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
+    webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
+
     // 4. Web Telemetry Broadcast
     // Push real-time state to the Web UI via WebSockets.
 

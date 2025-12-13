@@ -31,6 +31,14 @@ public:
     void setAxisPosition(char axis, float position);
     void setSystemUptime(uint32_t seconds);
 
+    // VFD Telemetry (PHASE 5.5: VFD current-based monitoring)
+    void setVFDCurrent(float current_amps);
+    void setVFDFrequency(float frequency_hz);
+    void setVFDThermalState(int16_t thermal_percent);
+    void setVFDFaultCode(uint16_t fault_code);
+    void setVFDCalibrationThreshold(float threshold_amps);
+    void setVFDCalibrationValid(bool is_valid);
+
     // Push state to all connected WebSocket clients
     void broadcastState();
 
@@ -49,6 +57,14 @@ private:
         char status[32];
         float x_pos, y_pos, z_pos, a_pos;
         uint32_t uptime_sec;
+
+        // VFD telemetry (PHASE 5.5)
+        float vfd_current_amps;
+        float vfd_frequency_hz;
+        int16_t vfd_thermal_percent;
+        uint16_t vfd_fault_code;
+        float vfd_threshold_amps;
+        bool vfd_calibration_valid;
     } current_status;
 
     // Handlers
