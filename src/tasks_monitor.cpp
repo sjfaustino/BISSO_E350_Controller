@@ -17,6 +17,7 @@
 #include "motion.h"
 #include "motion_state.h" // Provides motionGetPositionMM, motionIsMoving
 #include "safety.h"       // <-- CRITICAL FIX: Provides safetyIsAlarmed()
+#include "system_telemetry.h"  // PHASE 5.1: System telemetry
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -73,8 +74,12 @@ void taskMonitorFunction(void* parameter) {
             }
         }
     }
-    
-    // 5. Web Telemetry Broadcast
+
+    // 5. Update System Telemetry (PHASE 5.1)
+    // Collect comprehensive system metrics for API and diagnostics
+    telemetryUpdate();
+
+    // 6. Web Telemetry Broadcast
     // Push real-time state to the Web UI via WebSockets.
 
     // Use the Motion State Accessors to get physical units (MM)

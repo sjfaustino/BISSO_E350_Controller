@@ -17,6 +17,7 @@
 #include "api_rate_limiter.h"  // PHASE 5.1: Rate limiting
 #include "task_performance_monitor.h"  // PHASE 5.1: Task performance metrics
 #include "api_ota_updater.h"  // PHASE 5.1: OTA firmware updates
+#include "system_telemetry.h"  // PHASE 5.1: Comprehensive system telemetry
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -101,6 +102,9 @@ void WebServerManager::init() {
 
     // PHASE 5.1: Initialize OTA updater
     otaUpdaterInit();
+
+    // PHASE 5.1: Initialize system telemetry
+    telemetryInit();
 
     server = new AsyncWebServer(port);
     ws = new AsyncWebSocket("/ws");
@@ -264,7 +268,50 @@ void WebServerManager::setupRoutes() {
         }
     ).setAuthentication(http_username, http_password);
 
-    // 7. DELEGATE FILE MANAGEMENT
+    // 7. API Comprehensive System Telemetry (Protected, Rate Limited) - PHASE 5.1
+    server->on("/api/telemetry", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        // PHASE 5.1: Rate limiting check
+        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        // Export comprehensive telemetry as JSON
+        char* telemetry_buffer = (char*)malloc(3072);
+        if (!telemetry_buffer) {
+            request->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            return;
+        }
+
+        size_t telemetry_size = telemetryExportJSON(telemetry_buffer, 3072);
+        if (telemetry_size == 0) {
+            free(telemetry_buffer);
+            request->send(500, "application/json", "{\"error\":\"Failed to export telemetry\"}");
+            return;
+        }
+
+        request->send(200, "application/json", telemetry_buffer);
+        free(telemetry_buffer);
+    });
+
+    // Lightweight telemetry for high-frequency polling
+    server->on("/api/telemetry/compact", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) return request->requestAuthentication();
+
+        char* compact_buffer = (char*)malloc(512);
+        if (!compact_buffer) {
+            request->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            return;
+        }
+
+        size_t compact_size = telemetryExportCompactJSON(compact_buffer, 512);
+        request->send(200, "application/json", compact_buffer);
+        free(compact_buffer);
+    });
+
+    // 8. DELEGATE FILE MANAGEMENT
     // Registers /api/files (GET, DELETE) and /api/upload (POST)
     apiRegisterFileRoutes(server, http_username, http_password);
 

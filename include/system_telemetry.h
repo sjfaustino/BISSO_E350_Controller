@@ -1,0 +1,151 @@
+/**
+ * @file system_telemetry.h
+ * @brief Comprehensive System Telemetry and Health Metrics (PHASE 5.1)
+ * @details Aggregates all system metrics into unified telemetry dashboard
+ * @project BISSO E350 Controller
+ */
+
+#ifndef SYSTEM_TELEMETRY_H
+#define SYSTEM_TELEMETRY_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * System health status
+ */
+typedef enum {
+    HEALTH_UNKNOWN = 0,
+    HEALTH_CRITICAL = 1,    // System is in fault state
+    HEALTH_WARNING = 2,     // High resource usage or slow tasks
+    HEALTH_NORMAL = 3,      // All systems operating normally
+    HEALTH_OPTIMAL = 4      // All systems within optimal ranges
+} system_health_t;
+
+/**
+ * Comprehensive telemetry snapshot
+ */
+typedef struct {
+    // System Status
+    system_health_t health_status;
+    uint32_t uptime_seconds;
+    uint32_t boot_failures;  // Number of boot attempts before success
+
+    // CPU & Memory
+    uint8_t cpu_usage_percent;
+    uint32_t free_heap_bytes;
+    uint32_t heap_fragmentation_percent;
+    uint32_t stack_used_bytes;
+
+    // Motion System
+    bool motion_enabled;
+    bool motion_moving;
+    float axis_x_mm;
+    float axis_y_mm;
+    float axis_z_mm;
+    float axis_a_mm;
+    uint32_t steps_executed;
+    uint32_t motion_errors;
+
+    // Spindle
+    bool spindle_enabled;
+    float spindle_current_amps;
+    float spindle_current_peak_amps;
+    uint32_t spindle_errors;
+    bool spindle_overcurrent;
+    bool spindle_fault;
+
+    // Safety System
+    bool estop_active;
+    bool alarm_active;
+    uint32_t safety_events;
+    uint32_t faults_logged;
+    uint32_t critical_faults;
+
+    // Task Metrics
+    uint8_t slowest_task_id;      // Task with longest execution time
+    uint32_t slowest_task_time_us;
+    uint32_t total_task_underruns; // Times tasks missed deadline
+
+    // Network
+    bool wifi_connected;
+    uint8_t wifi_signal_strength;  // 0-100 RSSI percentage
+    uint32_t http_requests_served;
+    uint32_t http_errors;
+
+    // Configuration
+    uint32_t config_version;
+    bool config_is_default;
+    uint32_t config_changes_count;
+
+    // Diagnostics
+    const char* primary_fault_message;
+    uint32_t loop_cycle_count;
+    uint32_t watchdog_resets;
+} system_telemetry_t;
+
+/**
+ * Initialize telemetry collection
+ */
+void telemetryInit();
+
+/**
+ * Update telemetry snapshot with current system state
+ */
+void telemetryUpdate();
+
+/**
+ * Get current telemetry snapshot
+ * @return Telemetry structure with latest data
+ */
+system_telemetry_t telemetryGetSnapshot();
+
+/**
+ * Get system health status
+ * @return Health enum value
+ */
+system_health_t telemetryGetHealthStatus();
+
+/**
+ * Export telemetry as JSON for web API
+ * @param buffer Output buffer
+ * @param buffer_size Maximum buffer size
+ * @return Number of bytes written, 0 on error
+ */
+size_t telemetryExportJSON(char* buffer, size_t buffer_size);
+
+/**
+ * Export compact telemetry (subset of fields) for lightweight clients
+ * @param buffer Output buffer
+ * @param buffer_size Maximum buffer size
+ * @return Number of bytes written
+ */
+size_t telemetryExportCompactJSON(char* buffer, size_t buffer_size);
+
+/**
+ * Print human-readable telemetry summary
+ */
+void telemetryPrintSummary();
+
+/**
+ * Print detailed telemetry with all fields
+ */
+void telemetryPrintDetailed();
+
+/**
+ * Get health status as human-readable string
+ * @param status Health enum
+ * @return String description
+ */
+const char* telemetryGetHealthStatusString(system_health_t status);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // SYSTEM_TELEMETRY_H

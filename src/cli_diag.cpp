@@ -31,6 +31,7 @@
 #include "api_rate_limiter.h"  // PHASE 5.1: API rate limiting
 #include "task_performance_monitor.h"  // PHASE 5.1: Task performance metrics
 #include "api_ota_updater.h"  // PHASE 5.1: OTA firmware updates
+#include "system_telemetry.h"  // PHASE 5.1: System telemetry
 #include "safety.h"
 #include "firmware_version.h"
 #include "encoder_motion_integration.h"
@@ -924,6 +925,39 @@ void cmd_ota_main(int argc, char** argv) {
 }
 
 // ============================================================================
+// SYSTEM TELEMETRY (PHASE 5.1)
+// ============================================================================
+
+void cmd_telemetry_summary(int argc, char** argv) {
+    telemetryPrintSummary();
+}
+
+void cmd_telemetry_detail(int argc, char** argv) {
+    telemetryPrintDetailed();
+}
+
+void cmd_telemetry_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[TELEMETRY] === Comprehensive System Telemetry ===");
+        Serial.println("Usage: telemetry [summary | detail]");
+        Serial.println("  summary: Show brief telemetry snapshot");
+        Serial.println("  detail:  Show complete telemetry data");
+        Serial.println("");
+        Serial.println("Web API: GET /api/telemetry (comprehensive)");
+        Serial.println("         GET /api/telemetry/compact (lightweight)");
+        return;
+    }
+
+    if (strcmp(argv[1], "summary") == 0) {
+        cmd_telemetry_summary(argc, argv);
+    } else if (strcmp(argv[1], "detail") == 0) {
+        cmd_telemetry_detail(argc, argv);
+    } else {
+        Serial.printf("[TELEMETRY] [ERR] Unknown sub-command: %s\n", argv[1]);
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
@@ -934,6 +968,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("api", "API rate limiter diagnostics", cmd_api_ratelimit_main);
     cliRegisterCommand("metrics", "Task performance monitoring", cmd_metrics_main);
     cliRegisterCommand("ota", "OTA firmware update management", cmd_ota_main);
+    cliRegisterCommand("telemetry", "System telemetry and health", cmd_telemetry_main);
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
