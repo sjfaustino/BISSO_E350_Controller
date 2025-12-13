@@ -75,4 +75,7 @@ void cmd_config_main(int argc, char** argv);        // 'config' command
 // --- Network (cli_wifi.cpp) ---
 void cmd_wifi_main(int argc, char** argv);          // 'wifi' command
 
+// --- VFD Calibration (cli_calib.cpp) - PHASE 5.5 ---
+void cmd_vfd_calib_current(int argc, char** argv);  // 'calibrate vfd current' command
+
 #endif // CLI_H

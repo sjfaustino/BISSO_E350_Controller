@@ -5,11 +5,13 @@
 #include "input_validation.h"
 #include "system_constants.h"
 #include "hardware_config.h"
-#include "motion.h" 
-#include "fault_logging.h" 
+#include "motion.h"
+#include "fault_logging.h"
 #include "encoder_comm_stats.h"
 #include "encoder_motion_integration.h"
-#include "system_utilities.h" 
+#include "system_utilities.h"
+#include "vfd_current_calibration.h"
+#include "altivar31_modbus.h"
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
@@ -276,11 +278,163 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
 // ============================================================================
 // REGISTRATION FUNCTION
 // ============================================================================
+// ============================================================================
+// VFD CURRENT CALIBRATION (PHASE 5.5)
+// ============================================================================
+
+// CLI state machine for VFD calibration workflow
+typedef enum {
+    VFD_CALIB_IDLE,
+    VFD_CALIB_MEASURING_IDLE,
+    VFD_CALIB_CONFIRM_IDLE,
+    VFD_CALIB_MEASURING_STD,
+    VFD_CALIB_CONFIRM_STD,
+    VFD_CALIB_MEASURING_HEAVY,
+    VFD_CALIB_CONFIRM_HEAVY,
+    VFD_CALIB_COMPLETE
+} vfd_calib_state_t;
+
+static vfd_calib_state_t vfd_calib_state = VFD_CALIB_IDLE;
+static uint32_t vfd_calib_start_time = 0;
+static const uint32_t MEASUREMENT_DURATION_MS = 10000;  // 10 seconds per phase
+
+/**
+ * @brief VFD current calibration command handler
+ * Interactive three-phase workflow for operator calibration
+ */
+void cmd_vfd_calib_current(int argc, char** argv) {
+    // Help text
+    if (argc < 2 || strcmp(argv[1], "help") == 0) {
+        Serial.println("[VFDCAL] === VFD Current Calibration ===");
+        Serial.println("Commands:");
+        Serial.println("  calibrate vfd current start     - Start calibration workflow");
+        Serial.println("  calibrate vfd current status    - Show current status");
+        Serial.println("  calibrate vfd current confirm   - Confirm measurement and continue");
+        Serial.println("  calibrate vfd current abort     - Abort calibration");
+        Serial.println("  calibrate vfd current reset     - Reset all calibration data");
+        Serial.println("  calibrate vfd current show      - Display current calibration values");
+        return;
+    }
+
+    // Parse subcommand
+    if (strcmp(argv[1], "start") == 0) {
+        if (vfd_calib_state != VFD_CALIB_IDLE) {
+            Serial.println("[VFDCAL] ERROR: Calibration already in progress. Use 'abort' to restart.");
+            return;
+        }
+
+        Serial.println("\n[VFDCAL] === Starting VFD Current Calibration ===");
+        Serial.println("This process measures current baselines for stall detection.");
+        Serial.println("You will be guided through three phases:\n");
+        Serial.println("1. IDLE BASELINE: Blade spinning, NO cutting (typically 5-10A)");
+        Serial.println("2. STANDARD CUT: Reference cutting speed (typically 20-25A)");
+        Serial.println("3. HEAVY LOAD: (Optional) High-speed or high-load cutting\n");
+        Serial.println("Each phase will measure for 10 seconds. Press ENTER when ready for phase 1...");
+
+        vfd_calib_state = VFD_CALIB_MEASURING_IDLE;
+        vfd_calib_start_time = millis();
+        Serial.println("[VFDCAL] Phase 1: Measuring IDLE BASELINE (10 seconds)");
+        Serial.println(">> Spin blade with NO cutting load, then wait for completion <<");
+        vfdCalibrationStartMeasure(MEASUREMENT_DURATION_MS, "Idle Baseline");
+
+    } else if (strcmp(argv[1], "confirm") == 0) {
+        float rms, peak;
+
+        if (vfd_calib_state == VFD_CALIB_MEASURING_IDLE && vfdCalibrationIsMeasureComplete()) {
+            if (vfdCalibrationGetMeasurement(&rms, &peak)) {
+                vfdCalibrationStoreMeasurement(0, rms, peak);
+                Serial.printf("[VFDCAL] Idle phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
+                Serial.println("[VFDCAL] Phase 2: Measuring STANDARD CUT (10 seconds)");
+                Serial.println(">> Perform cutting at standard reference speed, then wait <<");
+                vfd_calib_state = VFD_CALIB_MEASURING_STD;
+                vfd_calib_start_time = millis();
+                vfdCalibrationStartMeasure(MEASUREMENT_DURATION_MS, "Standard Cut");
+            }
+
+        } else if (vfd_calib_state == VFD_CALIB_MEASURING_STD && vfdCalibrationIsMeasureComplete()) {
+            if (vfdCalibrationGetMeasurement(&rms, &peak)) {
+                vfdCalibrationStoreMeasurement(1, rms, peak);
+                Serial.printf("[VFDCAL] Standard cut phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
+                Serial.println("\n[VFDCAL] Phase 3: HEAVY LOAD (Optional)");
+                Serial.println("Measure heavy-load scenario for worst-case baseline?");
+                Serial.println("  - Type 'continue' to measure heavy load (10 seconds)");
+                Serial.println("  - Type 'finish' to skip and calculate thresholds");
+                vfd_calib_state = VFD_CALIB_CONFIRM_STD;
+            }
+
+        } else if (vfd_calib_state == VFD_CALIB_MEASURING_HEAVY && vfdCalibrationIsMeasureComplete()) {
+            if (vfdCalibrationGetMeasurement(&rms, &peak)) {
+                vfdCalibrationStoreMeasurement(2, rms, peak);
+                Serial.printf("[VFDCAL] Heavy load phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
+                Serial.println("\n[VFDCAL] Calculating stall detection threshold...");
+                if (vfdCalibrationCalculateThreshold(20.0f)) {  // 20% default margin
+                    Serial.printf("[VFDCAL] Stall threshold set to: %.2f A\n", vfdCalibrationGetThreshold());
+                    vfdCalibrationPrintSummary();
+                    vfd_calib_state = VFD_CALIB_COMPLETE;
+                    Serial.println("[VFDCAL] Calibration COMPLETE and saved!");
+                }
+            }
+
+        } else {
+            Serial.println("[VFDCAL] ERROR: No measurement in progress or measurement not complete yet.");
+        }
+
+    } else if (strcmp(argv[1], "continue") == 0) {
+        if (vfd_calib_state == VFD_CALIB_CONFIRM_STD) {
+            Serial.println("[VFDCAL] Phase 3: Measuring HEAVY LOAD (10 seconds)");
+            Serial.println(">> Perform heavy-load cutting scenario, then wait <<");
+            vfd_calib_state = VFD_CALIB_MEASURING_HEAVY;
+            vfdCalibrationStartMeasure(MEASUREMENT_DURATION_MS, "Heavy Load");
+        } else {
+            Serial.println("[VFDCAL] ERROR: Not in phase confirmation state.");
+        }
+
+    } else if (strcmp(argv[1], "finish") == 0) {
+        if (vfd_calib_state == VFD_CALIB_CONFIRM_STD) {
+            Serial.println("[VFDCAL] Skipping heavy load measurement...");
+            Serial.println("[VFDCAL] Calculating stall detection threshold...");
+            if (vfdCalibrationCalculateThreshold(20.0f)) {  // 20% default margin
+                Serial.printf("[VFDCAL] Stall threshold set to: %.2f A\n", vfdCalibrationGetThreshold());
+                vfdCalibrationPrintSummary();
+                vfd_calib_state = VFD_CALIB_COMPLETE;
+                Serial.println("[VFDCAL] Calibration COMPLETE and saved!");
+            }
+        } else {
+            Serial.println("[VFDCAL] ERROR: Not in phase confirmation state.");
+        }
+
+    } else if (strcmp(argv[1], "abort") == 0) {
+        Serial.println("[VFDCAL] Calibration aborted. Use 'start' to begin again.");
+        vfd_calib_state = VFD_CALIB_IDLE;
+
+    } else if (strcmp(argv[1], "reset") == 0) {
+        Serial.println("[VFDCAL] WARNING: Resetting all VFD calibration data!");
+        vfdCalibrationReset();
+        vfd_calib_state = VFD_CALIB_IDLE;
+        Serial.println("[VFDCAL] All calibration data cleared.");
+
+    } else if (strcmp(argv[1], "status") == 0) {
+        const char* state_names[] = {
+            "IDLE", "MEASURING_IDLE", "CONFIRM_IDLE", "MEASURING_STD",
+            "CONFIRM_STD", "MEASURING_HEAVY", "CONFIRM_HEAVY", "COMPLETE"
+        };
+        Serial.printf("[VFDCAL] Current state: %s\n", state_names[vfd_calib_state]);
+        vfdCalibrationPrintSummary();
+
+    } else if (strcmp(argv[1], "show") == 0) {
+        vfdCalibrationPrintSummary();
+
+    } else {
+        Serial.println("[VFDCAL] Unknown subcommand. Use 'help' for usage.");
+    }
+}
+
 void cliRegisterCalibCommands() {
   cliRegisterCommand("calib", "Start automatic distance calibration (calib axis distance)", cmd_encoder_calib);
   cliRegisterCommand("calibrate speed", "Auto-detect and save profile speeds (calibrate speed X FAST 500)", cmd_auto_calibrate_speed);
   cliRegisterCommand("calibrate speed X reset", "Reset speed profiles to defaults (e.g., calibrate speed X reset)", cmd_encoder_reset);
-  cliRegisterCommand("calibrate ppmm", "Start manual PPM measurement (calibrate ppmm X 1000)", cmd_calib_ppmm_start); 
+  cliRegisterCommand("calibrate ppmm", "Start manual PPM measurement (calibrate ppmm X 1000)", cmd_calib_ppmm_start);
   cliRegisterCommand("calibrate ppmm end", "Signal manual move end (calculate PPM)", cmd_calib_ppmm_end);
-  cliRegisterCommand("calibrate ppmm X reset", "Reset PPM calibration to default (e.g., calibrate ppmm X reset)", cmd_calib_ppmm_reset); 
+  cliRegisterCommand("calibrate ppmm X reset", "Reset PPM calibration to default (e.g., calibrate ppmm X reset)", cmd_calib_ppmm_reset);
+  cliRegisterCommand("calibrate vfd current", "VFD motor current calibration workflow (calibrate vfd current start)", cmd_vfd_calib_current);
 }
