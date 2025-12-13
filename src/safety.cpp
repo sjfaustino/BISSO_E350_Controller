@@ -11,10 +11,12 @@
 #include "encoder_motion_integration.h"
 #include "system_constants.h"
 #include "serial_logger.h"
-#include "config_unified.h" 
+#include "config_unified.h"
 #include "config_keys.h"
 #include <Arduino.h>
 #include "safety_state_machine.h"
+#include "altivar31_modbus.h"  // PHASE 5.5: VFD current-based stall detection
+#include "vfd_current_calibration.h"  // PHASE 5.5: VFD current calibration
 #include <string.h>
 
 static safety_system_data_t safety_state; 
@@ -50,19 +52,39 @@ void safetyUpdate() {
     if (motionIsMoving()) {
         for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
             if (motionGetState(axis) == MOTION_EXECUTING) {
-                if (encoderMotionHasError(axis) && 
+                if (encoderMotionHasError(axis) &&
                     encoderMotionGetErrorDuration(axis) > stall_limit_ms) {
-                    
-                    safetyReportStall(axis); 
-                    
-                    logError("[SAFETY] [FAIL] Stall Axis %d (Dur: %lu ms > Limit: %lu ms)", 
+
+                    safetyReportStall(axis);
+
+                    logError("[SAFETY] [FAIL] Stall Axis %d (Dur: %lu ms > Limit: %lu ms)",
                              axis, (unsigned long)encoderMotionGetErrorDuration(axis), (unsigned long)stall_limit_ms);
+                }
+            }
+        }
+
+        // PHASE 5.5: Supplementary VFD current-based stall detection
+        if (vfdCalibrationIsValid()) {
+            float current_amps = altivar31GetCurrentAmps();
+            float threshold_amps = vfdCalibrationGetThreshold();
+
+            // Detect stall when current exceeds threshold (indicates mechanical resistance)
+            if (vfdCalibrationIsStall(current_amps)) {
+                logWarn("[SAFETY] [WARN] VFD Current High: %.2f A (threshold: %.2f A)",
+                        current_amps, threshold_amps);
+
+                // If encoder also indicates stall (or we haven't detected it yet), trigger alarm
+                // This provides supplementary detection if encoder is degraded
+                if (!alarm_active) {
+                    safetyReportStall(0);  // Report as Z-axis stall (spindle)
+                    logError("[SAFETY] [FAIL] Motor Stall (VFD Current: %.2f A > %.2f A)",
+                             current_amps, threshold_amps);
                 }
             }
         }
     }
   }
-  
+
   if (alarm_active) {
     // PHASE 5.1: Wraparound-safe duration calculation
     safety_state.fault_duration_ms = (uint32_t)(millis() - alarm_trigger_time);
