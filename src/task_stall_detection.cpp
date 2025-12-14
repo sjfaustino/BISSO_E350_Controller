@@ -7,6 +7,9 @@
  * a full watchdog timeout.
  */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 #include "task_stall_detection.h"
 #include "watchdog_manager.h"
 #include "fault_logging.h"
@@ -46,7 +49,6 @@ uint8_t taskStallDetectionUpdate() {
   // Use watchdog's internal tracking to detect tasks that haven't fed
 
   uint8_t stall_count = 0;
-  uint32_t now = millis();
 
   // We can't directly access watchdog_tick_t array from here,
   // so we rely on watchdogGetStatus() which tracks missed feeds.
@@ -148,3 +150,5 @@ void taskStallCheckForStalls() {
     // The watchdog timeout itself will trigger system reset
   }
 }
+
+#pragma GCC diagnostic pop

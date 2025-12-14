@@ -17,14 +17,13 @@ extern "C" {
 #endif
 
 /**
- * HTTP methods
+ * HTTP methods - Use WebRequestMethod from ESPAsyncWebServer
+ * HTTP_GET = 0x01
+ * HTTP_POST = 0x02
+ * HTTP_PUT = 0x04
+ * HTTP_DELETE = 0x08
  */
-typedef enum {
-    HTTP_GET = 0x01,
-    HTTP_POST = 0x02,
-    HTTP_PUT = 0x04,
-    HTTP_DELETE = 0x08
-} http_method_t;
+typedef uint16_t http_method_t;
 
 /**
  * API endpoint descriptor

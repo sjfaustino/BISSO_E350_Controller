@@ -285,7 +285,7 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        size_t status_size = otaUpdaterExportJSON(status_buffer, 512);
+        otaUpdaterExportJSON(status_buffer, 512);
         request->send(200, "application/json", status_buffer);
         free(status_buffer);
     });
@@ -336,7 +336,7 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        size_t compact_size = telemetryExportCompactJSON(compact_buffer, 512);
+        telemetryExportCompactJSON(compact_buffer, 512);
         request->send(200, "application/json", compact_buffer);
         free(compact_buffer);
     });
@@ -474,11 +474,11 @@ void WebServerManager::setupRoutes() {
         else if (load_status.current_state == LOAD_STATE_CRITICAL) state_str = "CRITICAL";
 
         snprintf(load_buffer, sizeof(load_buffer),
-            "{\"state\":\"%s\",\"cpu_percent\":%d,\"uptime_seconds\":%lu,"
-            "\"critical_timeout_countdown\":%d,\"has_warnings\":%s}",
-            state_str, load_status.current_cpu_percent, load_status.uptime_seconds,
-            load_status.critical_countdown_seconds,
-            load_status.has_warnings ? "true" : "false");
+            "{\"state\":\"%s\",\"cpu_percent\":%d,\"time_in_state_ms\":%lu,"
+            "\"state_changed\":%s,\"emergency_estop\":%s}",
+            state_str, load_status.current_cpu_percent, (unsigned long)load_status.time_in_state_ms,
+            load_status.state_changed ? "true" : "false",
+            load_status.emergency_estop_initiated ? "true" : "false");
 
         request->send(200, "application/json", load_buffer);
     });
@@ -526,7 +526,7 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        AsyncWebParameter* categoryParam = request->getParam("category");
+        const AsyncWebParameter* categoryParam = request->getParam("category");
         if (!categoryParam) {
             request->send(400, "application/json", "{\"error\":\"Missing category parameter\"}");
             return;
@@ -541,7 +541,7 @@ void WebServerManager::setupRoutes() {
         }
 
         char response[512];
-        size_t size = serializeJson(doc, response, sizeof(response));
+        serializeJson(doc, response, sizeof(response));
         request->send(200, "application/json", response);
     });
 
@@ -629,7 +629,7 @@ void WebServerManager::setupRoutes() {
             return request->requestAuthentication();
         }
 
-        AsyncWebParameter* categoryParam = request->getParam("category");
+        const AsyncWebParameter* categoryParam = request->getParam("category");
         if (!categoryParam) {
             request->send(400, "application/json", "{\"error\":\"Missing category parameter\"}");
             return;
@@ -644,7 +644,7 @@ void WebServerManager::setupRoutes() {
         }
 
         char response[512];
-        size_t size = serializeJson(doc, response, sizeof(response));
+        serializeJson(doc, response, sizeof(response));
         request->send(200, "application/json", response);
     });
 

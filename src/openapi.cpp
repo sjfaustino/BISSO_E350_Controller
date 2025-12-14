@@ -3,6 +3,9 @@
  * @brief OpenAPI 3.0 Specification Generator Implementation (Phase 6)
  */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 #include "openapi.h"
 #include "api_endpoints.h"
 #include "serial_logger.h"
@@ -256,3 +259,5 @@ bool openAPIValidate(const char* spec_json) {
 
     return true;
 }
+
+#pragma GCC diagnostic pop

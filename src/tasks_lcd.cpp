@@ -58,9 +58,8 @@ void taskLcdFunction(void* parameter) {
     safety_fsm_state_t fsm_state = safetyGetState();
     safety_fault_t current_fault_code = safetyGetCurrentFault();
 
-    // PHASE 3.1: Get speed profile and encoder health for display
-    uint8_t speed_profile = elboGetSpeedProfile();
-    // speed_profile: 0=turtle, 1=slow, 2=fast, other=unknown
+    // PHASE 3.1: Get encoder health for display
+    // Note: speed profile available via elboGetSpeedProfile() (0=turtle, 1=slow, 2=fast)
 
     // Check encoder health across all axes
     char enc_status[4] = "OK";

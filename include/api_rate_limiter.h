@@ -54,6 +54,7 @@ void apiRateLimiterDiagnostics();
 #define API_ENDPOINT_STATUS 0x2A5B1234   // /api/status
 #define API_ENDPOINT_JOG 0x3C7D5678       // /api/jog
 #define API_ENDPOINT_SPINDLE 0x4E9FA9BC  // /api/spindle
+#define API_ENDPOINT_CONFIG 0x7D2E6FA0   // /api/config/*
 #define API_ENDPOINT_FILES 0x5F0B2DEF     // /api/files
 #define API_ENDPOINT_UPDATE 0x6B1C4521    // /api/update (OTA)
 
