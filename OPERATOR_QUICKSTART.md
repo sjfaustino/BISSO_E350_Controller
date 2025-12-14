@@ -49,63 +49,196 @@
 
 ### Hardware Architecture
 
-The BISSO E350 is a **stone bridge saw with multiplexed motion control**:
+The BISSO E350 is a **stone bridge saw with multiplexed motion control and independent spindle drive**:
 
-- **Single Altivar 31 Variable Frequency Drive (VFD)**: Controls frequency from 0-105 Hz for all three axes
+#### Axis Motion System (Automated Control)
+- **Schneider Altivar 31 VFD**: Controls axis motor frequency from 0-105 Hz
+  - Controlled automatically by ESP32 controller via PLC relay (r1)
+  - Drives up to 105 Hz for axis motion (X, Y, Z movements)
 - **Three 3-Phase AC Induction Motors**: One for each axis (X, Y, Z)
 - **PLC Contactor System**: Selects which motor receives VFD power (only ONE axis moves at a time)
-- **Controller Firmware**: ESP32-based embedded system that signals the PLC via GPIO pins
-- **Encoder Feedback**: WJ66 optical encoders on each axis provide position verification (100 pulses per mm typical calibration)
+- **Controller Firmware**: ESP32-based embedded system that signals the PLC via GPIO pins to control which axis is active
+
+#### Spindle Cutting System (Manual Control)
+- **Spindle VFD**: Separate variable frequency drive controlling spindle motor
+  - **NOT controlled by the PLC or controller firmware**
+  - **Operator controls spindle speed manually** using control knob/dial on spindle VFD
+  - Spindle speed is independent of axis motion speed
+- **Spindle Motor**: 3-phase AC motor driving the cutting wheel
+
+#### Shared Components
+- **Encoder Feedback**: WJ66 optical encoders on each axis (X, Y, Z) provide position verification (100 pulses per mm typical calibration)
+  - Encoders feedback to controller for motion quality monitoring ONLY
+  - Do NOT directly control spindle
 - **Web Dashboard**: Real-time monitoring at `http://<controller-ip>/` (default: http://192.168.1.100/)
+  - Shows axis motion status and quality
+  - Does NOT show spindle VFD status (it's independent)
+
+#### Key Operating Principle
+⚠️ **IMPORTANT**: The Altivar 31 VFD controls **AXIS MOTORS ONLY**. The spindle has its own separate VFD and is controlled manually by the operator. These two systems operate completely independently:
+- You can move axes WITHOUT the spindle running
+- You can run the spindle WITHOUT moving axes
+- You can move axes AND run spindle simultaneously
 
 ### Key Specifications
 
 | Component | Specification |
 |-----------|--------------|
-| **VFD Model** | Schneider Altivar 31 |
-| **VFD Frequency Range** | 0-105 Hz (hardware capability) |
-| **Max Output Frequency** | 105 Hz (tFr setting) |
-| **High Speed Setting** | 105 Hz (HSP setting) |
-| **Recommended Stone Cutting** | 5-20 Hz (safe speed for precision) |
+| **Axis VFD Model** | Schneider Altivar 31 |
+| **Axis VFD Frequency Range** | 0-105 Hz (hardware capability for axis motors) |
+| **Max Output Frequency (Axes)** | 105 Hz (tFr setting) |
+| **High Speed Setting (Axes)** | 105 Hz (HSP setting) |
+| **Recommended Stone Cutting (Axes)** | 5-20 Hz (safe speed for precision) |
+| **Spindle Control** | Manual knob/dial on spindle VFD (independent from axis control) |
 | **Baseline Velocity** | 1 Hz VFD = 15 mm/s at motor shaft |
 | **Encoder Resolution** | 100 PPR (pulses per revolution) |
 | **Default Calibration** | 100 pulses/mm (adjustable per axis) |
 | **Contactor Switching** | <50 ms per axis change |
 | **Safety Response Time** | <100 ms for emergency stop |
 
-### VFD Parameter Configuration
+### Axis VFD Parameter Configuration
 
-The Altivar 31 VFD is pre-configured with the following parameters for optimal operation:
+The Schneider Altivar 31 VFD (which controls axis motors ONLY) is pre-configured with the following parameters for optimal operation:
 
 | Parameter | Setting | Purpose |
 |-----------|---------|---------|
-| **ACC** | 0.6 sec | Motor acceleration ramp time (smooth speed-up) |
-| **DEC** | 0.4 sec | Motor deceleration ramp time (smooth speed-down) |
+| **ACC** | 0.6 sec | Motor acceleration ramp time (smooth speed-up for axis motion) |
+| **DEC** | 0.4 sec | Motor deceleration ramp time (smooth speed-down for axis motion) |
 | **LSP** | 1 Hz | Low speed limit (prevents uncontrolled creeping) |
-| **HSP** | 105 Hz | High speed limit (maximum frequency available) |
+| **HSP** | 105 Hz | High speed limit (maximum frequency available for axes) |
 | **iTH** | 3.5 A | Motor thermal protection current threshold |
 | **UFr** | 20/30 | Voltage boost (improves torque at low speeds) |
 | **FLG** | 0/30 | Frequency loop gain (encoder feedback stability) |
 | **slp** | 0 | Slip compensation (disabled for optimal encoder accuracy) |
 | **Vns** | 380 V | Nominal motor voltage (3-phase supply) |
 | **FrS** | 50 Hz | Nominal motor frequency (European motor standard) |
-| **tFr** | 105 Hz | Maximum output frequency (hardware limit) |
+| **tFr** | 105 Hz | Maximum output frequency (hardware limit for axis control) |
+| **r1** | Run Relay | Controls whether Altivar 31 can output frequency to axis motors |
 
-**⚠️ IMPORTANT - Safe Operating Speeds for Different Applications**:
+⚠️ **NOTE**: These parameters control AXIS MOTOR speed ONLY. The spindle has a separate VFD with independent parameters controlled manually by the operator.
 
-| Application | Recommended Speed | VFD Frequency | Notes |
+**⚠️ IMPORTANT - Safe Operating Speeds for AXIS MOTION**:
+
+| Application | Recommended Speed | Axis VFD Frequency | Notes |
 |-------------|-------------------|----------------|-------|
-| **Precision Stone Cutting** | Slow | 5-20 Hz | ✅ **DEFAULT MODE** - Best quality cuts, most control |
-| **Standard Stone Cutting** | Medium | 20-40 Hz | Normal production speed, balance of speed and precision |
-| **Fast Material Removal** | Fast | 40-70 Hz | ⚠️ Use only for non-stone materials or rough operations |
-| **Polishing/Finishing** | Variable | 10-30 Hz | Slower speeds for fine surface finishing |
-| **Positioning (No Cut)** | Fast | 60-105 Hz | ✅ SAFE - Moving blank without cutting wheel spinning |
+| **Precision Stone Cutting** | Slow | 5-20 Hz | ✅ **DEFAULT MODE** - Axes move slowly for precise cuts |
+| **Standard Stone Cutting** | Medium | 20-40 Hz | Normal production speed for axis motion |
+| **Fast Material Removal** | Fast | 40-70 Hz | ⚠️ Use only for non-stone materials or rough axis operations |
+| **Polishing/Finishing** | Variable | 10-30 Hz | Slower axis speeds for fine surface finishing |
+| **Positioning (No Cut)** | Fast | 60-105 Hz | ✅ SAFE - Moving blank without cutting (spindle independent) |
 
-**DO NOT:**
-- ❌ Run stone cutting operations above 40 Hz without explicit authorization
-- ❌ Use maximum frequency (105 Hz) with cutting wheel engaged
-- ❌ Attempt to change VFD settings without supervisor approval
-- ❌ Run continuous operation above 50 Hz for more than 10 minutes (thermal stress)
+**DO NOT (Axis Motion)**:
+- ❌ Run stone cutting operations with axes above 40 Hz without explicit authorization
+- ❌ Use maximum frequency (105 Hz) for axes while cutting wheel is spinning
+- ❌ Attempt to change axis VFD settings without supervisor approval
+- ❌ Run continuous axis operation above 50 Hz for more than 10 minutes (thermal stress on axis motors)
+
+---
+
+## Spindle Operation (Independent Manual Control)
+
+### Important: Spindle Is Controlled Separately
+
+The spindle motor (cutting wheel) is controlled by a **separate VFD** that is **NOT connected to the controller**. This means:
+
+✅ **Spindle VFD is completely independent** from the axis control system
+✅ **Operator controls spindle speed manually** using the control knob/dial on the spindle VFD
+✅ **Spindle can run while axes are stationary**
+✅ **Axes can move while spindle is off**
+✅ **Spindle and axes can operate simultaneously**
+
+### Spindle Speed Control Procedure
+
+**Step 1: Locate Spindle VFD**
+- Find the spindle VFD control panel (usually mounted near the cutting wheel)
+- Locate the speed control knob/dial labeled "Frequency" or "Speed" or "Hz"
+
+**Step 2: Set Spindle Speed**
+1. Before operating, determine required spindle speed based on material
+   - Granite cutting: 50-80 Hz typical
+   - Marble cutting: 60-100 Hz typical
+   - Engineered stone: 40-70 Hz typical
+2. Turn the spindle VFD speed control knob to desired frequency
+3. Listen for spindle motor to start and stabilize
+4. Verify cutting wheel is spinning at desired speed
+
+**Step 3: Monitor Spindle During Operation**
+- Listen for any unusual sounds (grinding, squealing indicates problem)
+- Feel for excessive vibration (smooth operation expected)
+- Monitor cutting wheel temperature visually if possible
+
+**Step 4: Stop Spindle**
+1. Turn spindle VFD speed control knob to 0 Hz
+2. Wait for cutting wheel to come to complete stop (5-10 seconds)
+3. Do NOT attempt to manually stop the wheel
+
+### Spindle Safety Guidelines
+
+⚠️ **CRITICAL SAFETY WARNINGS**:
+
+- ❌ **NEVER** touch the cutting wheel while it is spinning
+- ❌ **NEVER** place hands near the stone/blade interface during cutting
+- ❌ **NEVER** reach across a spinning cutting wheel
+- ❌ **NEVER** operate spindle without proper eye protection (flying stone debris hazard)
+- ❌ **NEVER** increase spindle speed beyond equipment specifications (check saw documentation)
+- ✅ **ALWAYS** wear proper hearing protection (spindle noise can exceed 95 dB)
+- ✅ **ALWAYS** ensure stone blank is firmly secured before starting spindle
+- ✅ **ALWAYS** verify axes are in safe position before starting spindle
+
+### Axis Motion and Spindle Operation Together
+
+Since spindle and axis motion are completely independent, you can:
+
+**Scenario 1: Position stone, then cut**
+```
+1. Set spindle speed to 0 Hz (spindle off)
+2. Use axis controls to position stone blank
+3. When position is correct, start spindle by turning speed knob up
+4. Begin axis motion for cutting while spindle runs
+```
+
+**Scenario 2: Make precise cuts**
+```
+1. Spindle running at 75 Hz (cutting wheel spinning)
+2. Manually control axis motion using controller buttons
+3. Axes move under controller command, spindle independent
+4. When cut is complete, stop axes first, then stop spindle
+```
+
+**Scenario 3: Rapid positioning**
+```
+1. Spindle off (0 Hz)
+2. Use axis controls at high speed (60-100 Hz) to move blank quickly
+3. No thermal concern since spindle is off
+4. Stop axes, then turn on spindle for cutting
+```
+
+### Troubleshooting Spindle Issues
+
+**Problem: Spindle won't start**
+- Check spindle VFD power switch is ON
+- Verify speed control knob is not at 0 Hz
+- Check that main 3-phase power is available
+- Turn knob slowly to increase speed gradually
+
+**Problem: Spindle makes grinding noise**
+- STOP immediately - turn speed knob to 0
+- Check for stone debris in cutting wheel housing
+- Check that stone blank is properly secured
+- Verify cutting wheel is not damaged
+- Contact maintenance if noise persists
+
+**Problem: Spindle speed won't increase**
+- Verify spindle VFD is in "run" mode (not "stop" mode)
+- Check spindle VFD for fault indicator lights
+- Try resetting spindle VFD (turn off/on)
+- Check mechanical load - is cutting wheel jammed?
+
+**Problem: Spindle stops during operation**
+- Verify cooling vents on spindle VFD are not blocked
+- Check if spindle VFD has thermal protection engaged (overheating)
+- Allow spindle VFD to cool for 10-15 minutes
+- Verify stone blank is not overloading the spindle
 
 ---
 
@@ -123,10 +256,16 @@ Complete this checklist every morning before operation:
   - Ensure water circulation hose (if wet cutting) is connected
   - Check that stone blank is properly positioned in fixture
 
-□ VFD Cooling System
-  - Verify VFD cooling fan spins freely (no grinding noise)
+□ Axis VFD Cooling System (Altivar 31)
+  - Verify axis VFD cooling fan spins freely (no grinding noise)
   - Check air intake vents are not blocked by dust
   - Ensure room temperature is below 35°C (fan capacity limit)
+
+□ Spindle VFD Status (Manual Control)
+  - Verify spindle VFD power switch is in ON position
+  - Check spindle speed control knob is at 0 Hz (off position)
+  - Look for any red fault indicator lights on spindle VFD
+  - Verify spindle control panel is accessible to operator
 
 □ Electrical Connections
   - Visually inspect main power connector for corrosion or loose pins
@@ -626,28 +765,31 @@ After moving an axis, check the **Diagnostics** tab to see the quality of that m
 - DO NOT USE for precision cutting
 - Must troubleshoot and repair before operation
 
-### VFD Speed Control Procedure
+### Axis VFD Speed Control Procedure
 
-The VFD frequency controls how fast the motors move. Different stone cutting applications require different speeds. This section shows how to select and monitor appropriate speeds.
+The **Axis VFD (Altivar 31)** frequency controls how fast the X, Y, and Z axis motors move. Different stone cutting applications require different axis speeds. This section shows how to select and monitor appropriate speeds for axis motion.
 
-#### Understanding VFD Frequency and Axis Speed
+⚠️ **REMINDER**: This section covers AXIS MOTOR control ONLY. The spindle has a separate manual control (see [Spindle Operation](#spindle-operation-independent-manual-control) section).
 
-The relationship between VFD frequency and actual axis movement:
+#### Understanding Axis VFD Frequency and Speed
+
+The relationship between Altivar 31 VFD frequency and actual axis movement:
 
 ```
-VFD Frequency = Motor Speed Control
+Axis VFD Frequency = Axis Motor Speed Control
 ↓
-1 Hz VFD = 15 mm/s at motor shaft (baseline)
+1 Hz axis VFD = 15 mm/s at motor shaft (baseline)
 ↓
 Actual axis speed depends on motor gearbox ratio
 ↓
-Example: 10 Hz VFD ≈ 150 mm/s (about 9 m/min) depending on transmission
+Example: 10 Hz axis VFD ≈ 150 mm/s (about 9 m/min) depending on transmission
 ```
 
-**What This Means**:
-- Increasing VFD frequency makes axes move faster
-- Decreasing VFD frequency makes axes move slower
+**What This Means** (for axes only, spindle is independent):
+- Increasing axis VFD frequency makes axes move faster
+- Decreasing axis VFD frequency makes axes move slower
 - The relationship is approximately linear
+- Spindle speed is NOT affected by axis VFD changes
 
 #### Safe Speed Selection for Stone Cutting
 
