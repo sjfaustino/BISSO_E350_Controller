@@ -1,0 +1,417 @@
+/**
+ * @file api_config.cpp
+ * @brief Configuration API Implementation
+ * @project BISSO E350 Controller
+ */
+
+#include "api_config.h"
+#include "config_unified.h"
+#include "config_keys.h"
+#include "string_safety.h"
+#include "serial_logger.h"
+#include <Arduino.h>
+#include <string.h>
+#include <stdio.h>
+
+// Configuration defaults (matching Altivar 31 + system constraints)
+static const motion_config_t default_motion = {
+    .soft_limit_low_mm = {0, 0, 0},
+    .soft_limit_high_mm = {500, 500, 500}
+};
+
+static const vfd_config_t default_vfd = {
+    .min_speed_hz = 1,      // LSP (Altivar 31 minimum)
+    .max_speed_hz = 105,    // HSP (Altivar 31 maximum)
+    .acc_time_ms = 600,     // 0.6 seconds
+    .dec_time_ms = 400      // 0.4 seconds
+};
+
+static const encoder_config_t default_encoder = {
+    .ppm = {100, 100, 100},
+    .calibrated = {0, 0, 0}
+};
+
+// Current configuration in RAM
+static motion_config_t current_motion;
+static vfd_config_t current_vfd;
+static encoder_config_t current_encoder;
+
+/**
+ * @brief Initialize API
+ */
+void apiConfigInit(void)
+{
+    LOG_I("[API_CONFIG] Initializing");
+    apiConfigLoad();
+    LOG_I("[API_CONFIG] Ready");
+}
+
+/**
+ * @brief Load configuration from NVS
+ */
+bool apiConfigLoad(void)
+{
+    // Load motion config
+    current_motion.soft_limit_low_mm[0] = configGetInt(KEY_SOFT_LIMIT_X_LOW, 0);
+    current_motion.soft_limit_high_mm[0] = configGetInt(KEY_SOFT_LIMIT_X_HIGH, 500);
+    current_motion.soft_limit_low_mm[1] = configGetInt(KEY_SOFT_LIMIT_Y_LOW, 0);
+    current_motion.soft_limit_high_mm[1] = configGetInt(KEY_SOFT_LIMIT_Y_HIGH, 500);
+    current_motion.soft_limit_low_mm[2] = configGetInt(KEY_SOFT_LIMIT_Z_LOW, 0);
+    current_motion.soft_limit_high_mm[2] = configGetInt(KEY_SOFT_LIMIT_Z_HIGH, 500);
+
+    // Load VFD config
+    current_vfd.min_speed_hz = configGetInt(KEY_VFD_MIN_SPEED_HZ, 1);
+    current_vfd.max_speed_hz = configGetInt(KEY_VFD_MAX_SPEED_HZ, 105);
+    current_vfd.acc_time_ms = configGetInt(KEY_VFD_ACC_TIME_MS, 600);
+    current_vfd.dec_time_ms = configGetInt(KEY_VFD_DEC_TIME_MS, 400);
+
+    // Load encoder config
+    current_encoder.ppm[0] = configGetInt(KEY_ENCODER_X_PPM, 100);
+    current_encoder.ppm[1] = configGetInt(KEY_ENCODER_Y_PPM, 100);
+    current_encoder.ppm[2] = configGetInt(KEY_ENCODER_Z_PPM, 100);
+    current_encoder.calibrated[0] = configGetInt(KEY_ENCODER_X_CAL, 0);
+    current_encoder.calibrated[1] = configGetInt(KEY_ENCODER_Y_CAL, 0);
+    current_encoder.calibrated[2] = configGetInt(KEY_ENCODER_Z_CAL, 0);
+
+    LOG_I("[API_CONFIG] Configuration loaded from NVS");
+    return true;
+}
+
+/**
+ * @brief Save configuration to NVS
+ */
+bool apiConfigSave(void)
+{
+    // Save motion config
+    configSetInt(KEY_SOFT_LIMIT_X_LOW, current_motion.soft_limit_low_mm[0]);
+    configSetInt(KEY_SOFT_LIMIT_X_HIGH, current_motion.soft_limit_high_mm[0]);
+    configSetInt(KEY_SOFT_LIMIT_Y_LOW, current_motion.soft_limit_low_mm[1]);
+    configSetInt(KEY_SOFT_LIMIT_Y_HIGH, current_motion.soft_limit_high_mm[1]);
+    configSetInt(KEY_SOFT_LIMIT_Z_LOW, current_motion.soft_limit_low_mm[2]);
+    configSetInt(KEY_SOFT_LIMIT_Z_HIGH, current_motion.soft_limit_high_mm[2]);
+
+    // Save VFD config
+    configSetInt(KEY_VFD_MIN_SPEED_HZ, current_vfd.min_speed_hz);
+    configSetInt(KEY_VFD_MAX_SPEED_HZ, current_vfd.max_speed_hz);
+    configSetInt(KEY_VFD_ACC_TIME_MS, current_vfd.acc_time_ms);
+    configSetInt(KEY_VFD_DEC_TIME_MS, current_vfd.dec_time_ms);
+
+    // Save encoder config
+    configSetInt(KEY_ENCODER_X_PPM, current_encoder.ppm[0]);
+    configSetInt(KEY_ENCODER_Y_PPM, current_encoder.ppm[1]);
+    configSetInt(KEY_ENCODER_Z_PPM, current_encoder.ppm[2]);
+    configSetInt(KEY_ENCODER_X_CAL, current_encoder.calibrated[0]);
+    configSetInt(KEY_ENCODER_Y_CAL, current_encoder.calibrated[1]);
+    configSetInt(KEY_ENCODER_Z_CAL, current_encoder.calibrated[2]);
+
+    LOG_I("[API_CONFIG] Configuration saved to NVS");
+    return true;
+}
+
+/**
+ * @brief Reset configuration to defaults
+ */
+bool apiConfigReset(void)
+{
+    current_motion = default_motion;
+    current_vfd = default_vfd;
+    current_encoder = default_encoder;
+
+    LOG_W("[API_CONFIG] Configuration reset to defaults");
+    return apiConfigSave();
+}
+
+/**
+ * @brief Validate soft limit configuration
+ */
+static bool validateSoftLimit(const char* key, JsonVariant value, char* error_msg, size_t error_msg_len)
+{
+    if (!value.is<uint16_t>()) {
+        snprintf(error_msg, error_msg_len, "Soft limit must be numeric (0-1000 mm)");
+        return false;
+    }
+
+    uint16_t val = value.as<uint16_t>();
+    if (val > 1000) {
+        snprintf(error_msg, error_msg_len, "Soft limit cannot exceed 1000 mm");
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Validate VFD speed configuration
+ */
+static bool validateVfdSpeed(const char* key, JsonVariant value, char* error_msg, size_t error_msg_len)
+{
+    if (!value.is<uint16_t>()) {
+        snprintf(error_msg, error_msg_len, "Speed must be numeric (1-105 Hz)");
+        return false;
+    }
+
+    uint16_t val = value.as<uint16_t>();
+    if (val < 1 || val > 105) {
+        snprintf(error_msg, error_msg_len, "Speed must be between 1 and 105 Hz");
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Validate encoder PPM
+ */
+static bool validateEncoderPpm(const char* key, JsonVariant value, char* error_msg, size_t error_msg_len)
+{
+    if (!value.is<uint16_t>()) {
+        snprintf(error_msg, error_msg_len, "PPM must be numeric (50-200)");
+        return false;
+    }
+
+    uint16_t val = value.as<uint16_t>();
+    if (val < 50 || val > 200) {
+        snprintf(error_msg, error_msg_len, "PPM must be between 50 and 200");
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Validate configuration change
+ */
+bool apiConfigValidate(config_category_t category, const char* key, JsonVariant value,
+                       char* error_msg, size_t error_msg_len)
+{
+    if (!key || !error_msg) return false;
+
+    memset(error_msg, 0, error_msg_len);
+
+    switch (category) {
+        case CONFIG_CATEGORY_MOTION:
+            if (strstr(key, "soft_limit")) {
+                return validateSoftLimit(key, value, error_msg, error_msg_len);
+            }
+            break;
+
+        case CONFIG_CATEGORY_VFD:
+            if (strstr(key, "speed_hz")) {
+                return validateVfdSpeed(key, value, error_msg, error_msg_len);
+            }
+            break;
+
+        case CONFIG_CATEGORY_ENCODER:
+            if (strstr(key, "ppm")) {
+                return validateEncoderPpm(key, value, error_msg, error_msg_len);
+            }
+            break;
+
+        default:
+            snprintf(error_msg, error_msg_len, "Unknown configuration category");
+            return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Set configuration value
+ */
+bool apiConfigSet(config_category_t category, const char* key, JsonVariant value)
+{
+    char error_msg[256];
+
+    // Validate first
+    if (!apiConfigValidate(category, key, value, error_msg, sizeof(error_msg))) {
+        LOG_W("[API_CONFIG] Validation failed for %s: %s", key, error_msg);
+        return false;
+    }
+
+    // Apply based on category
+    switch (category) {
+        case CONFIG_CATEGORY_MOTION:
+            if (strcmp(key, "soft_limit_x_low") == 0) {
+                current_motion.soft_limit_low_mm[0] = value.as<uint16_t>();
+            } else if (strcmp(key, "soft_limit_x_high") == 0) {
+                current_motion.soft_limit_high_mm[0] = value.as<uint16_t>();
+            } else if (strcmp(key, "soft_limit_y_low") == 0) {
+                current_motion.soft_limit_low_mm[1] = value.as<uint16_t>();
+            } else if (strcmp(key, "soft_limit_y_high") == 0) {
+                current_motion.soft_limit_high_mm[1] = value.as<uint16_t>();
+            } else if (strcmp(key, "soft_limit_z_low") == 0) {
+                current_motion.soft_limit_low_mm[2] = value.as<uint16_t>();
+            } else if (strcmp(key, "soft_limit_z_high") == 0) {
+                current_motion.soft_limit_high_mm[2] = value.as<uint16_t>();
+            }
+            break;
+
+        case CONFIG_CATEGORY_VFD:
+            if (strcmp(key, "min_speed_hz") == 0) {
+                current_vfd.min_speed_hz = value.as<uint16_t>();
+            } else if (strcmp(key, "max_speed_hz") == 0) {
+                current_vfd.max_speed_hz = value.as<uint16_t>();
+            } else if (strcmp(key, "acc_time_ms") == 0) {
+                current_vfd.acc_time_ms = value.as<uint16_t>();
+            } else if (strcmp(key, "dec_time_ms") == 0) {
+                current_vfd.dec_time_ms = value.as<uint16_t>();
+            }
+            break;
+
+        case CONFIG_CATEGORY_ENCODER:
+            if (strstr(key, "ppm_x")) {
+                current_encoder.ppm[0] = value.as<uint16_t>();
+            } else if (strstr(key, "ppm_y")) {
+                current_encoder.ppm[1] = value.as<uint16_t>();
+            } else if (strstr(key, "ppm_z")) {
+                current_encoder.ppm[2] = value.as<uint16_t>();
+            }
+            break;
+
+        default:
+            return false;
+    }
+
+    LOG_I("[API_CONFIG] Configuration updated: %s", key);
+    return true;
+}
+
+/**
+ * @brief Get configuration as JSON
+ */
+bool apiConfigGet(config_category_t category, JsonDocument& json_doc)
+{
+    JsonObject obj = json_doc.to<JsonObject>();
+
+    switch (category) {
+        case CONFIG_CATEGORY_MOTION: {
+            obj["soft_limit_x_low"] = current_motion.soft_limit_low_mm[0];
+            obj["soft_limit_x_high"] = current_motion.soft_limit_high_mm[0];
+            obj["soft_limit_y_low"] = current_motion.soft_limit_low_mm[1];
+            obj["soft_limit_y_high"] = current_motion.soft_limit_high_mm[1];
+            obj["soft_limit_z_low"] = current_motion.soft_limit_low_mm[2];
+            obj["soft_limit_z_high"] = current_motion.soft_limit_high_mm[2];
+            break;
+        }
+
+        case CONFIG_CATEGORY_VFD: {
+            obj["min_speed_hz"] = current_vfd.min_speed_hz;
+            obj["max_speed_hz"] = current_vfd.max_speed_hz;
+            obj["acc_time_ms"] = current_vfd.acc_time_ms;
+            obj["dec_time_ms"] = current_vfd.dec_time_ms;
+            break;
+        }
+
+        case CONFIG_CATEGORY_ENCODER: {
+            JsonArray ppm = obj.createNestedArray("ppm");
+            ppm.add(current_encoder.ppm[0]);
+            ppm.add(current_encoder.ppm[1]);
+            ppm.add(current_encoder.ppm[2]);
+            JsonArray cal = obj.createNestedArray("calibrated");
+            cal.add(current_encoder.calibrated[0]);
+            cal.add(current_encoder.calibrated[1]);
+            cal.add(current_encoder.calibrated[2]);
+            break;
+        }
+
+        default:
+            return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Get configuration schema
+ */
+bool apiConfigGetSchema(config_category_t category, JsonDocument& json_doc)
+{
+    JsonObject obj = json_doc.to<JsonObject>();
+
+    switch (category) {
+        case CONFIG_CATEGORY_MOTION: {
+            obj["soft_limit_x_low"]["type"] = "integer";
+            obj["soft_limit_x_low"]["min"] = 0;
+            obj["soft_limit_x_low"]["max"] = 1000;
+            obj["soft_limit_x_low"]["unit"] = "mm";
+            // Similar for other axes...
+            break;
+        }
+
+        case CONFIG_CATEGORY_VFD: {
+            obj["min_speed_hz"]["type"] = "integer";
+            obj["min_speed_hz"]["min"] = 1;
+            obj["min_speed_hz"]["max"] = 105;
+            obj["max_speed_hz"]["type"] = "integer";
+            obj["max_speed_hz"]["min"] = 1;
+            obj["max_speed_hz"]["max"] = 105;
+            break;
+        }
+
+        case CONFIG_CATEGORY_ENCODER: {
+            obj["ppm"]["type"] = "array";
+            obj["ppm"]["element_type"] = "integer";
+            obj["ppm"]["min"] = 50;
+            obj["ppm"]["max"] = 200;
+            break;
+        }
+
+        default:
+            return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Trigger encoder calibration
+ */
+bool apiConfigCalibrateEncoder(uint8_t axis, uint16_t ppm)
+{
+    if (axis > 2) return false;
+    if (ppm < 50 || ppm > 200) return false;
+
+    current_encoder.ppm[axis] = ppm;
+    current_encoder.calibrated[axis] = 1;
+
+    LOG_I("[API_CONFIG] Encoder %c calibrated: %u PPM", 'X' + axis, ppm);
+    return true;
+}
+
+/**
+ * @brief Export configuration as JSON
+ */
+size_t apiConfigExportJSON(char* buffer, size_t buffer_size)
+{
+    if (!buffer || buffer_size < 256) return 0;
+
+    StaticJsonDocument<1024> doc;
+
+    JsonObject motion = doc.createNestedObject("motion");
+    motion["soft_limit_x_low"] = current_motion.soft_limit_low_mm[0];
+    motion["soft_limit_x_high"] = current_motion.soft_limit_high_mm[0];
+
+    JsonObject vfd = doc.createNestedObject("vfd");
+    vfd["min_speed_hz"] = current_vfd.min_speed_hz;
+    vfd["max_speed_hz"] = current_vfd.max_speed_hz;
+
+    return serializeJson(doc, buffer, buffer_size);
+}
+
+/**
+ * @brief Print configuration to serial
+ */
+void apiConfigPrint(void)
+{
+    LOG_I("[API_CONFIG] ============ Configuration Summary ============");
+    LOG_I("[API_CONFIG] Motion: X[%u-%u] Y[%u-%u] Z[%u-%u] mm",
+        current_motion.soft_limit_low_mm[0], current_motion.soft_limit_high_mm[0],
+        current_motion.soft_limit_low_mm[1], current_motion.soft_limit_high_mm[1],
+        current_motion.soft_limit_low_mm[2], current_motion.soft_limit_high_mm[2]);
+    LOG_I("[API_CONFIG] VFD: %u-%u Hz, ACC=%ums, DEC=%ums",
+        current_vfd.min_speed_hz, current_vfd.max_speed_hz,
+        current_vfd.acc_time_ms, current_vfd.dec_time_ms);
+    LOG_I("[API_CONFIG] Encoder: X=%u Y=%u Z=%u PPM",
+        current_encoder.ppm[0], current_encoder.ppm[1], current_encoder.ppm[2]);
+    LOG_I("[API_CONFIG] ================================================");
+}
