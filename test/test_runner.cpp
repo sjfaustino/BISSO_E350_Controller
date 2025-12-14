@@ -18,6 +18,7 @@ extern void run_motion_control_tests(void);
 extern void run_safety_system_tests(void);
 extern void run_encoder_validation_tests(void);
 extern void run_configuration_tests(void);
+extern void run_api_config_tests(void);
 
 /**
  * @brief setUp() - called before each test
@@ -95,6 +96,9 @@ int main(int argc, char* argv[])
 
     UnityPrint("\nRunning Configuration Tests...\n");
     run_configuration_tests();
+
+    UnityPrint("\nRunning API Configuration Tests...\n");
+    run_api_config_tests();
 
     // Finish and report
     return UnityEnd();
