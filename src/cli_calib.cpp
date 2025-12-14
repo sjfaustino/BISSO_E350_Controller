@@ -12,6 +12,8 @@
 #include "system_utilities.h"
 #include "vfd_current_calibration.h"
 #include "altivar31_modbus.h"
+#include "config_unified.h"
+#include "config_keys.h"
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>

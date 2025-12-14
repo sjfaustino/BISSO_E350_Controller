@@ -110,34 +110,24 @@ bool configMigrationApplyDefaults(uint8_t to_version) {
       continue;
     }
 
-    // Check if key already exists (don't overwrite)
-    if (configHasKey(key)) {
-      last_migration_stats.keys_validated++;
-      continue;
-    }
-
     // Apply default value based on type
-    bool success = false;
-
     if (strcmp(default_values[i].type, "int32") == 0) {
       int32_t val = atoi(default_values[i].value);
-      success = configSetInt32(key, val);
-    } else if (strcmp(default_values[i].type, "float") == 0) {
-      float val = atof(default_values[i].value);
-      success = configSetFloat(key, val);
-    } else if (strcmp(default_values[i].type, "string") == 0) {
-      success = configSetString(key, default_values[i].value);
-    }
-
-    if (success) {
+      configSetInt(key, val);
       applied++;
       last_migration_stats.keys_initialized++;
       logInfo("[MIGRATION] Applied default: %s = %s", key, default_values[i].value);
-    } else {
-      logWarning("[MIGRATION] Failed to apply default: %s", key);
-      if (default_values[i].required) {
-        last_migration_stats.errors++;
-      }
+    } else if (strcmp(default_values[i].type, "float") == 0) {
+      float val = atof(default_values[i].value);
+      configSetFloat(key, val);
+      applied++;
+      last_migration_stats.keys_initialized++;
+      logInfo("[MIGRATION] Applied default: %s = %s", key, default_values[i].value);
+    } else if (strcmp(default_values[i].type, "string") == 0) {
+      configSetString(key, default_values[i].value);
+      applied++;
+      last_migration_stats.keys_initialized++;
+      logInfo("[MIGRATION] Applied default: %s = %s", key, default_values[i].value);
     }
   }
 
@@ -169,7 +159,12 @@ bool configMigrationValidate() {
       continue;
     }
 
-    if (!configHasKey(key)) {
+    // Try to get the key to verify it exists (use default check)
+    const char* str_val = configGetString(key, "");
+    int32_t int_val = configGetInt(key, -999999);
+    float float_val = configGetFloat(key, -999999.0f);
+
+    if (strcmp(str_val, "") == 0 && int_val == -999999 && float_val == -999999.0f) {
       logError("[MIGRATION] Required key missing: %s", key);
       invalid++;
     } else {
@@ -212,10 +207,11 @@ void configMigrationShowReport() {
 // INTEGRATION HELPERS
 // ============================================================================
 
-// These functions should be called from config_unified to check key existence
-// Stubbed here - actual implementation in config_unified
-extern bool configHasKey(const char* key);
-extern bool configSetInt32(const char* key, int32_t value);
-extern bool configSetFloat(const char* key, float value);
-extern bool configSetString(const char* key, const char* value);
-extern void configUnifiedSave();
+// Note: config_unified.h provides the following functions:
+// - int32_t configGetInt(const char* key, int32_t default_val)
+// - float configGetFloat(const char* key, float default_val)
+// - const char* configGetString(const char* key, const char* default_val)
+// - void configSetInt(const char* key, int32_t value)
+// - void configSetFloat(const char* key, float value)
+// - void configSetString(const char* key, const char* value)
+// - void configUnifiedSave()

@@ -3,8 +3,9 @@
 #include "config_unified.h"
 #include "config_schema_versioning.h"
 #include "config_validator.h"
-#include <stdlib.h> 
-#include <string.h> 
+#include "config_keys.h"
+#include <stdlib.h>
+#include <string.h>
 
 // Helper from config_schema_versioning.cpp
 extern const char* configGetKeyType(const char* key);
@@ -20,6 +21,8 @@ void cmd_config_schema_show(int argc, char** argv);
 void cmd_config_migrate(int argc, char** argv);
 void cmd_config_rollback(int argc, char** argv);
 void cmd_config_validate(int argc, char** argv);
+void cmd_config_export(int argc, char** argv);
+void cmd_config_import(int argc, char** argv);
 
 // PHASE 5.1: Config backup/restore declarations
 extern void cmd_config_backup(int argc, char** argv);

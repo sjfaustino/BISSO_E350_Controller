@@ -51,8 +51,40 @@ static all_axes_metrics_t all_axes = {
         .active_duration_ms = 0,
         .max_jitter_recorded_mms = 0.0f
     },
-    .y_axis = {0},  // Same initialization as X
-    .z_axis = {0},  // Same initialization as X
+    .y_axis = {
+        .current_velocity_mms = 0.0f,
+        .vfd_frequency_hz = 0.0f,
+        .commanded_feedrate_mms = 0.0f,
+        .velocity_jitter_mms = 0.0f,
+        .vfd_encoder_error_percent = 0.0f,
+        .is_moving = false,
+        .stalled = false,
+        .jitter_elevated = false,
+        .quality_score = 100,
+        .good_motion_samples = 0,
+        .bad_motion_samples = 0,
+        .stall_count = 0,
+        .last_update_ms = 0,
+        .active_duration_ms = 0,
+        .max_jitter_recorded_mms = 0.0f
+    },
+    .z_axis = {
+        .current_velocity_mms = 0.0f,
+        .vfd_frequency_hz = 0.0f,
+        .commanded_feedrate_mms = 0.0f,
+        .velocity_jitter_mms = 0.0f,
+        .vfd_encoder_error_percent = 0.0f,
+        .is_moving = false,
+        .stalled = false,
+        .jitter_elevated = false,
+        .quality_score = 100,
+        .good_motion_samples = 0,
+        .bad_motion_samples = 0,
+        .stall_count = 0,
+        .last_update_ms = 0,
+        .active_duration_ms = 0,
+        .max_jitter_recorded_mms = 0.0f
+    },
     .active_axis = 255  // No axis active initially
 };
 
@@ -78,9 +110,21 @@ typedef struct {
     float current_jitter_mms;
 } jitter_tracker_t;
 
-static jitter_tracker_t x_jitter = {0};
-static jitter_tracker_t y_jitter = {0};
-static jitter_tracker_t z_jitter = {0};
+static jitter_tracker_t x_jitter = {
+    .velocity_history = {0},
+    .history_index = 0,
+    .current_jitter_mms = 0.0f
+};
+static jitter_tracker_t y_jitter = {
+    .velocity_history = {0},
+    .history_index = 0,
+    .current_jitter_mms = 0.0f
+};
+static jitter_tracker_t z_jitter = {
+    .velocity_history = {0},
+    .history_index = 0,
+    .current_jitter_mms = 0.0f
+};
 
 // ============================================================================
 // INITIALIZATION & PERSISTENCE
