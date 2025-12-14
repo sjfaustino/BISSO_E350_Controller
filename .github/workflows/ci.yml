@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for better analysis
 
@@ -34,7 +34,7 @@ jobs:
           pip install platformio
 
       - name: Create PlatformIO Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.platformio
           key: ${{ runner.os }}-platformio-${{ hashFiles('**/platformio.ini') }}
@@ -116,7 +116,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: C/C++ Linting (Future)
         run: |
