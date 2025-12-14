@@ -96,6 +96,19 @@ const SettingsModule = {
             this.saveSettings();
         });
 
+        // Mock mode toggle button
+        const mockModeBtn = document.getElementById('toggle-mock-mode-btn');
+        if (mockModeBtn) {
+            mockModeBtn.addEventListener('click', () => {
+                if (window.MockMode) {
+                    MockMode.toggle();
+                    this.updateMockModeUI();
+                }
+            });
+            // Initial UI update
+            this.updateMockModeUI();
+        }
+
         // Select menus
         document.getElementById('history-retention')?.addEventListener('change', (e) => {
             this.settings.historyRetention = parseInt(e.target.value);
@@ -686,6 +699,24 @@ const SettingsModule = {
         if (status) {
             status.textContent = '✗ ' + message;
             status.className = 'card-status error';
+        }
+    },
+
+    updateMockModeUI() {
+        const btn = document.getElementById('toggle-mock-mode-btn');
+        const statusText = document.getElementById('mock-status-text');
+        if (!btn || !statusText) return;
+
+        if (window.MockMode?.enabled) {
+            btn.textContent = 'Disable Mock Mode';
+            btn.classList.add('active');
+            statusText.textContent = '✓ Status: Mock Mode Active';
+            statusText.style.color = 'var(--color-optimal)';
+        } else {
+            btn.textContent = 'Enable Mock Mode';
+            btn.classList.remove('active');
+            statusText.textContent = '✗ Status: Offline (Click to enable)';
+            statusText.style.color = 'var(--text-secondary)';
         }
     },
 
