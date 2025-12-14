@@ -46,8 +46,8 @@ void lcdInterfaceInit() {
   lcd_state.last_update = millis();
   lcd_state.update_count = 0;
 
-  // Uses centralized pin constants
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
+  // FIX: Wire.begin() is called by PLC init, so don't call it again to avoid I2C deadlock
+  // Just probe for LCD presence on the already-initialized I2C bus
   Wire.beginTransmission(LCD_I2C_ADDR);
   if (Wire.endTransmission() == 0) {
     lcd_state.i2c_found = true;
