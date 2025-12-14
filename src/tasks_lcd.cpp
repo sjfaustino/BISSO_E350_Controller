@@ -60,16 +60,16 @@ void taskLcdFunction(void* parameter) {
 
     // PHASE 3.1: Get speed profile and encoder health for display
     uint8_t speed_profile = elboGetSpeedProfile();
-    char speed_char = (speed_profile <= 2) ? ('1' + speed_profile) : '?';
+    // speed_profile: 0=turtle, 1=slow, 2=fast, other=unknown
 
     // Check encoder health across all axes
     char enc_status[4] = "OK";
     for (int axis = 0; axis < MOTION_AXES; axis++) {
       const encoder_deviation_t* dev = encoderGetDeviationData(axis);
-      if (dev && dev->status == DEVIATION_WARNING) {
+      if (dev && dev->status == AXIS_DEVIATION_WARNING) {
         snprintf(enc_status, sizeof(enc_status), "WN");
         break;
-      } else if (dev && dev->status == DEVIATION_ERROR) {
+      } else if (dev && dev->status == AXIS_DEVIATION_ERROR) {
         snprintf(enc_status, sizeof(enc_status), "ER");
         break;
       }

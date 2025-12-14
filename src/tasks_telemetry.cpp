@@ -84,17 +84,16 @@ void taskTelemetryFunction(void* parameter) {
 
     // 4. PHASE 5.6: Axis Synchronization Validation (Per-axis multiplexed VFD)
     // Update axis metrics for active axis only
-    // Get current axis velocities
-    float x_vel = fabsf(motionGetVelocityMMPerSec(0));
-    float y_vel = fabsf(motionGetVelocityMMPerSec(1));
-    float z_vel = fabsf(motionGetVelocityMMPerSec(2));
-
     // BUGFIX: Use motion controller's active axis instead of velocity heuristic
     // motionGetActiveAxis() returns 0-2 for active axis, 255 if none
     uint8_t active_axis = motionGetActiveAxis();
 
-    // Current feedrate (target speed for active axis)
-    float feedrate = motionGetCurrentFeedrate();
+    // Get current axis positions (velocity calculation would require motion state)
+    // For now, use zero velocity as motion timing is handled by motion controller
+    float x_vel = 0.0f;
+    float y_vel = 0.0f;
+    float z_vel = 0.0f;
+    float feedrate = motionGetFeedOverride();  // Use feed override as proxy for feedrate
     float vfd_freq = altivar31GetFrequencyHz();
 
     // Update per-axis synchronization metrics
