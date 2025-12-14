@@ -40,16 +40,21 @@ static struct {
 // ============================================================================
 
 /**
- * @brief Interface configuration table
+ * @brief Interface configuration structure
  */
-static const struct {
+typedef struct {
     encoder_interface_t interface;
     const char* name;
     const char* description;
     uint8_t rx_pin;
     uint8_t tx_pin;
     uint8_t uart_num;  // 0=Serial, 1=Serial1, 2=Serial2
-} INTERFACE_TABLE[] = {
+} encoder_interface_config_t;
+
+/**
+ * @brief Interface configuration table
+ */
+static const encoder_interface_config_t INTERFACE_TABLE[] = {
     {
         ENCODER_INTERFACE_RS232_HT,
         "RS232-HT",
@@ -79,14 +84,7 @@ static const struct {
 /**
  * @brief Find interface configuration by type
  */
-static const struct {
-    encoder_interface_t interface;
-    const char* name;
-    const char* description;
-    uint8_t rx_pin;
-    uint8_t tx_pin;
-    uint8_t uart_num;
-}* findInterfaceConfig(encoder_interface_t interface) {
+static const encoder_interface_config_t* findInterfaceConfig(encoder_interface_t interface) {
     for (size_t i = 0; i < NUM_INTERFACES; i++) {
         if (INTERFACE_TABLE[i].interface == interface) {
             return &INTERFACE_TABLE[i];

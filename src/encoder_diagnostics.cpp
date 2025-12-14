@@ -24,7 +24,12 @@ typedef struct {
     uint32_t last_measurement_ms;
 } drift_tracker_t;
 
-static drift_tracker_t drift_trackers[4] = {0};
+static drift_tracker_t drift_trackers[4] = {
+    {.accumulated_drift_mm = 0.0f, .measurement_count = 0, .last_measurement_ms = 0},
+    {.accumulated_drift_mm = 0.0f, .measurement_count = 0, .last_measurement_ms = 0},
+    {.accumulated_drift_mm = 0.0f, .measurement_count = 0, .last_measurement_ms = 0},
+    {.accumulated_drift_mm = 0.0f, .measurement_count = 0, .last_measurement_ms = 0}
+};
 
 const char* encoderDiagnosticsGetHealthString(encoder_health_t health) {
     switch (health) {
@@ -58,7 +63,8 @@ void encoderDiagnosticsInit() {
     for (int i = 0; i < 4; i++) {
         diagnostics[i].axis_id = i;
         diagnostics[i].signal_quality = 100;  // Optimistic initial value
-        diagnostics[i].min_runtime_us = 0xFFFFFFFF;
+        diagnostics[i].read_count = 0;
+        diagnostics[i].error_count = 0;
         last_position[i] = (uint32_t)(motionGetPositionMM(i) * 100);  // Store as 0.01mm units
         drift_trackers[i].measurement_count = 0;
         drift_trackers[i].accumulated_drift_mm = 0.0f;
@@ -82,7 +88,7 @@ void encoderDiagnosticsUpdate() {
         uint32_t current_pos_units = (uint32_t)(current_pos * 100);
 
         // Encoder-based position (if available)
-        uint32_t encoder_pos_units = (uint32_t)(wj66GetAxisPosition(axis) * 100);
+        uint32_t encoder_pos_units = (uint32_t)(wj66GetPosition(axis) * 100);
 
         // Calculate variance (difference between encoder position and expected motion)
         int32_t variance_units = (int32_t)(encoder_pos_units - current_pos_units);
@@ -115,7 +121,7 @@ void encoderDiagnosticsUpdate() {
         }
 
         // Update error tracking
-        encoder_status_t status = wj66GetAxisStatus(axis);
+        encoder_status_t status = wj66GetStatus();
         if (status != ENCODER_OK) {
             diag->signal_errors++;
             diag->last_error_ms = now;
@@ -203,7 +209,7 @@ uint8_t encoderDiagnosticsAnalyzeSignal(uint8_t axis_id, uint32_t duration_ms) {
     uint32_t read_count = 0;
 
     while (millis() - start_time < duration_ms) {
-        encoder_status_t status = wj66GetAxisStatus(axis_id);
+        encoder_status_t status = wj66GetStatus();
         if (status != ENCODER_OK) {
             error_count++;
         }

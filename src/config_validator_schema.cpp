@@ -310,7 +310,12 @@ const config_descriptor_t* configGetAllDescriptors(int* count) {
 }
 
 config_validation_result_t configValidateValue(const char* key, const char* value) {
-    config_validation_result_t result = {0};
+    config_validation_result_t result = {
+        .is_valid = false,
+        .error_message = NULL,
+        .was_clamped = false,
+        .clamped_to = NULL
+    };
 
     if (!key || !value) {
         result.is_valid = false;

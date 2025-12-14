@@ -55,7 +55,12 @@ static struct {
     uint8_t addresses[8];
     float response_times[8];
     uint32_t timestamp_ms;
-} baseline = {0};
+} baseline = {
+    .device_count = 0,
+    .addresses = {0},
+    .response_times = {0.0f},
+    .timestamp_ms = 0
+};
 
 // ============================================================================
 // HELPER: Format output as table or JSON

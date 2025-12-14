@@ -16,15 +16,14 @@
 #define CONFIG_KEY_LEN 32
 #define CONFIG_VALUE_LEN 64
 
-typedef enum {
-    CONFIG_INT32,
-    CONFIG_FLOAT,
-    CONFIG_STRING
-} config_type_t;
+// Note: config_type_t is defined in config_validator_schema.h
+// to avoid duplication, config_unified uses string-based storage
+// The validation schema provides the type information
 
 typedef struct {
     char key[CONFIG_KEY_LEN];
-    config_type_t type;
+    // Type information kept as string value internally
+    // Actual type checking done via config_validator_schema
     union {
         int32_t int_val;
         float float_val;

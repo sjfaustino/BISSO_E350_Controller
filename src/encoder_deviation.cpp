@@ -8,6 +8,7 @@
 #include "serial_logger.h"
 #include "fault_logging.h"
 #include "system_constants.h"
+#include "motion.h"
 #include <math.h>
 
 // ============================================================================

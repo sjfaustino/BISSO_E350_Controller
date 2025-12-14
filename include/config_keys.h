@@ -86,6 +86,11 @@
 // --- WEB SERVER CREDENTIALS ---
 #define KEY_WEB_USERNAME "web_user"      // Web server username
 #define KEY_WEB_PASSWORD "web_pass"      // Web server password
+#define KEY_WEB_PORT "web_port"          // Web server port (default 80)
 #define KEY_WEB_PW_CHANGED "web_pw_chg"  // Flag: password changed from default (1=changed, 0=default)
+
+// --- WIFI CREDENTIALS ---
+#define KEY_WIFI_SSID "wifi_ssid"        // WiFi network name (SSID)
+#define KEY_WIFI_PASSWORD "wifi_pass"    // WiFi network password
 
 #endif

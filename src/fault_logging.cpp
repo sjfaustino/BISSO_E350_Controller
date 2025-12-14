@@ -24,7 +24,12 @@ static struct {
     uint8_t head;
     uint8_t count;
     uint32_t total_dropped;
-} fault_ring_buffer = {.head = 0, .count = 0, .total_dropped = 0};
+} fault_ring_buffer = {
+    .entries = {0},
+    .head = 0,
+    .count = 0,
+    .total_dropped = 0
+};
 
 // PHASE 5.1: Add fault to ring buffer fallback
 static void faultAddToRingBuffer(const fault_entry_t* entry) {
