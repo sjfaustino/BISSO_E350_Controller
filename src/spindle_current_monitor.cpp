@@ -240,10 +240,8 @@ void spindleMonitorTriggerShutdown(void) {
     monitor_state.last_shutdown_current_amps = monitor_state.current_amps;
 
     // Log to fault history
-    faultLog(FAULT_SPINDLE_OVERCURRENT,
-             "Spindle overcurrent: %.1f A > %.1f A threshold",
-             monitor_state.current_amps,
-             monitor_state.overcurrent_threshold_amps);
+    faultLogError(FAULT_SPINDLE_OVERCURRENT,
+             "Spindle overcurrent - triggering emergency shutdown");
 
     // Trigger safety shutdown
     Serial.printf("[SPINDLE] OVERCURRENT SHUTDOWN! Current: %.1f A (Threshold: %.1f A)\n",

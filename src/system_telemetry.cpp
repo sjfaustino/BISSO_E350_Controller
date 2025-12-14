@@ -14,6 +14,7 @@
 #include "task_manager.h"
 #include "task_performance_monitor.h"
 #include "config_unified.h"
+#include "config_keys.h"
 #include "system_constants.h"
 #include <string.h>
 #include <stdio.h>
@@ -40,7 +41,7 @@ static system_health_t calculateHealthStatus() {
     uint8_t cpu = taskGetCpuUsage();
     uint32_t free_heap = memoryMonitorGetFreeHeap();
 
-    if (safetyIsAlarmed() || safetyIsEstopActive()) {
+    if (safetyIsAlarmed() || emergencyStopIsActive()) {
         return HEALTH_CRITICAL;
     }
 
@@ -82,7 +83,7 @@ void telemetryUpdate() {
     telemetry_cache.stack_used_bytes = (TASK_STACK_BOOT * 4) - (uxTaskGetStackHighWaterMark(NULL) * 4);
 
     // Motion System
-    telemetry_cache.motion_enabled = (motionGetState(0) != MOTION_FAULT);
+    telemetry_cache.motion_enabled = (motionGetState(0) != MOTION_ERROR);
     telemetry_cache.motion_moving = motionIsMoving();
     telemetry_cache.axis_x_mm = motionGetPositionMM(0);
     telemetry_cache.axis_y_mm = motionGetPositionMM(1);
@@ -101,10 +102,10 @@ void telemetryUpdate() {
     }
 
     // Safety System
-    telemetry_cache.estop_active = safetyIsEstopActive();
+    telemetry_cache.estop_active = emergencyStopIsActive();
     telemetry_cache.alarm_active = safetyIsAlarmed();
-    telemetry_cache.faults_logged = faultGetLogCount();
-    telemetry_cache.critical_faults = faultGetCriticalCount();
+    telemetry_cache.faults_logged = faultGetRingBufferEntryCount();
+    telemetry_cache.critical_faults = 0;  // TODO: Count critical faults in ring buffer
 
     // Task Metrics
     int task_count = 0;
