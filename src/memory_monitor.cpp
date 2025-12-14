@@ -71,3 +71,11 @@ uint8_t memoryMonitorGetUsagePercent() {
   uint32_t used = total_heap_size - ESP.getFreeHeap();
   return (uint8_t)((used * 100) / total_heap_size);
 }
+
+uint32_t memoryMonitorGetTotalHeap() {
+  return total_heap_size;
+}
+
+uint32_t memoryMonitorGetLargestFreeBlock() {
+  return mem_stats.largest_block;
+}

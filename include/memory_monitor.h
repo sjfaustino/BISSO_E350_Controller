@@ -73,4 +73,16 @@ void memoryMonitorResetMinimum();
  */
 uint8_t memoryMonitorGetUsagePercent();
 
+/**
+ * @brief Get total heap size
+ * @return Total heap size in bytes
+ */
+uint32_t memoryMonitorGetTotalHeap();
+
+/**
+ * @brief Get largest contiguous free memory block
+ * @return Largest free block size in bytes
+ */
+uint32_t memoryMonitorGetLargestFreeBlock();
+
 #endif
