@@ -265,7 +265,7 @@ bool altivar31ModbusReceiveResponse(void) {
         return false;  // No data available or timeout
     }
 
-    if (rx_len <= 0) {
+    if (rx_len == 0) {
         if ((now - modbus_request_time_ms) > 200) {
             altivar31_state.consecutive_errors++;
             altivar31_state.error_count++;

@@ -213,7 +213,7 @@ bool jxk10ModbusReceiveResponse(void) {
         rx_len = 0;
     }
 
-    if (rx_len <= 0) {
+    if (rx_len == 0) {
         if ((now - modbus_request_time_ms) > 200) {
             jxk10_state.consecutive_errors++;
             jxk10_state.error_count++;
@@ -262,7 +262,7 @@ bool jxk10ModbusReadStatus(void) {
         rx_len = 0;
     }
 
-    if (rx_len <= 0) {
+    if (rx_len == 0) {
         return false;
     }
 

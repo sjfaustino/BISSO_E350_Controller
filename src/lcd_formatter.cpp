@@ -85,16 +85,7 @@ void lcdFormatterUpdate() {
 
     // Format line 1: Status or second position line
     if (motionIsMoving()) {
-        uint8_t active_axis = motionGetActiveAxis();
-        float current_mm = motionGetPositionMM(active_axis);
-        int32_t target_counts = motionGetTarget(active_axis);
-
-        float target_mm = 0.0f;
-        if (active_axis == 0) target_mm = (float)target_counts / (machineCal.X.pulses_per_mm > 0 ? machineCal.X.pulses_per_mm : 1000);
-        else if (active_axis == 1) target_mm = (float)target_counts / (machineCal.Y.pulses_per_mm > 0 ? machineCal.Y.pulses_per_mm : 1000);
-        else if (active_axis == 2) target_mm = (float)target_counts / (machineCal.Z.pulses_per_mm > 0 ? machineCal.Z.pulses_per_mm : 1000);
-        else if (active_axis == 3) target_mm = (float)target_counts / (machineCal.A.pulses_per_degree > 0 ? machineCal.A.pulses_per_degree : 1000);
-
+        // Active axis info available but using static Z/A display for now
         snprintf(temp_buffer.line1, 21, "Z:%6.1f A:%6.1f", z_mm, 0.0f);
     } else {
         snprintf(temp_buffer.line1, 21, "Z:%6.1f A:%6.1f", z_mm, 0.0f);
