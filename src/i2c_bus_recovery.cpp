@@ -117,9 +117,10 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t* data, uint8_t len
       if (backoff_ms > retry_config.max_backoff_ms) backoff_ms = retry_config.max_backoff_ms;
     }
     
-    Wire.beginTransmission(address);
     if (read) {
-      Wire.requestFrom(address, len);
+      // FIX: requestFrom() must NOT be called after beginTransmission()
+      // Use requestFrom() directly for read operations
+      Wire.requestFrom(address, len, true);  // true = send STOP after read
       if (Wire.available() >= len) {
         for (uint8_t i = 0; i < len; i++) data[i] = Wire.read();
         result = I2C_RESULT_OK;
@@ -127,6 +128,8 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t* data, uint8_t len
         return result;
       }
     } else {
+      // Write operation: beginTransmission -> write -> endTransmission
+      Wire.beginTransmission(address);
       Wire.write(data, len);
       uint8_t error = Wire.endTransmission(true);
       if (error == 0) {
