@@ -1,0 +1,256 @@
+<div class="logs-page">
+    <div class="card-grid">
+        <!-- Log Filters Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Log Filters</h2>
+            </div>
+            <div class="card-content">
+                <div class="filter-group">
+                    <label for="log-level-filter">Level:</label>
+                    <select id="log-level-filter" class="form-control">
+                        <option value="">All Levels</option>
+                        <option value="INFO">Info</option>
+                        <option value="WARN">Warning</option>
+                        <option value="ERROR">Error</option>
+                        <option value="CRITICAL">Critical</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="log-source-filter">Source:</label>
+                    <select id="log-source-filter" class="form-control">
+                        <option value="">All Sources</option>
+                        <option value="motion">Motion</option>
+                        <option value="vfd">VFD</option>
+                        <option value="encoder">Encoder</option>
+                        <option value="safety">Safety</option>
+                        <option value="system">System</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="log-search">Search:</label>
+                    <input type="text" id="log-search" class="form-control" placeholder="Search logs...">
+                </div>
+
+                <div class="filter-buttons">
+                    <button class="btn btn-primary" id="filter-apply-btn">Apply Filters</button>
+                    <button class="btn btn-secondary" id="filter-clear-btn">Clear All</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Statistics Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Log Statistics</h2>
+            </div>
+            <div class="card-content">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Total Events</div>
+                        <div class="stat-value" id="stat-total">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Critical</div>
+                        <div class="stat-value critical" id="stat-critical">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Errors</div>
+                        <div class="stat-value error" id="stat-error">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Warnings</div>
+                        <div class="stat-value warning" id="stat-warning">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-Time Log Tail Card -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <h2>Event Log</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary btn-sm" id="export-csv-btn">Export CSV</button>
+                    <button class="btn btn-secondary btn-sm" id="export-json-btn">Export JSON</button>
+                    <button class="btn btn-secondary btn-sm" id="clear-logs-btn">Clear Logs</button>
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="log-container" id="log-container">
+                    <div class="log-entry log-info">
+                        <span class="log-time">2025-12-14 00:00:00</span>
+                        <span class="log-level">INFO</span>
+                        <span class="log-source">system</span>
+                        <span class="log-message">System initialized</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.logs-page .filter-group {
+    margin-bottom: var(--space-md);
+}
+
+.logs-page .filter-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: var(--space-xs);
+    font-size: var(--font-size-sm);
+}
+
+.logs-page .form-control {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--bg-secondary);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+}
+
+.logs-page .form-control:focus {
+    outline: none;
+    border-color: var(--color-normal);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.logs-page .filter-buttons {
+    display: flex;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.logs-page .btn-sm {
+    padding: 6px 12px;
+    font-size: var(--font-size-sm);
+}
+
+.logs-page .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-md);
+}
+
+.logs-page .stat-item {
+    text-align: center;
+    padding: var(--space-md);
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.logs-page .stat-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xs);
+}
+
+.logs-page .stat-value {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--color-normal);
+}
+
+.logs-page .stat-value.critical {
+    color: var(--color-critical);
+}
+
+.logs-page .stat-value.error {
+    color: var(--color-critical);
+}
+
+.logs-page .stat-value.warning {
+    color: var(--color-warning);
+}
+
+.logs-page .log-container {
+    max-height: 500px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    padding: var(--space-md);
+}
+
+.logs-page .log-entry {
+    display: grid;
+    grid-template-columns: 140px 70px 80px 1fr;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    margin: 2px 0;
+    border-left: 3px solid transparent;
+    border-radius: 2px;
+    word-wrap: break-word;
+}
+
+.logs-page .log-entry.log-info {
+    border-left-color: var(--color-normal);
+    color: var(--color-normal);
+}
+
+.logs-page .log-entry.log-warn {
+    border-left-color: var(--color-warning);
+    color: var(--color-warning);
+}
+
+.logs-page .log-entry.log-error {
+    border-left-color: var(--color-critical);
+    color: var(--color-critical);
+}
+
+.logs-page .log-entry.log-critical {
+    border-left-color: var(--color-critical);
+    color: var(--color-critical);
+    font-weight: 600;
+}
+
+.logs-page .log-time {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.logs-page .log-level {
+    font-weight: 600;
+    text-align: center;
+}
+
+.logs-page .log-source {
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.logs-page .log-message {
+    word-break: break-word;
+}
+
+@media (max-width: 768px) {
+    .logs-page .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .logs-page .log-entry {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
+
+    .logs-page .log-time,
+    .logs-page .log-level,
+    .logs-page .log-source {
+        display: inline;
+    }
+
+    .logs-page .log-time::after,
+    .logs-page .log-level::after,
+    .logs-page .log-source::after {
+        content: ' | ';
+        color: var(--text-secondary);
+    }
+}
+</style>

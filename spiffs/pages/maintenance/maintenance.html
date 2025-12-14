@@ -1,0 +1,278 @@
+<div class="maintenance-page">
+    <div class="card-grid">
+        <!-- Wear Prediction Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Wear Prediction</h2>
+            </div>
+            <div class="card-content">
+                <div class="axes-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">X Axis Wear</div>
+                        <div class="metric-value" id="wear-x-percent">0%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="wear-x-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                        </div>
+                        <div class="metric-detail" id="wear-x-days">Est. 3650 days</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Y Axis Wear</div>
+                        <div class="metric-value" id="wear-y-percent">0%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="wear-y-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                        </div>
+                        <div class="metric-detail" id="wear-y-days">Est. 3650 days</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Z Axis Wear</div>
+                        <div class="metric-value" id="wear-z-percent">0%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="wear-z-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                        </div>
+                        <div class="metric-detail" id="wear-z-days">Est. 3650 days</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Component Lifetime Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Component Lifetime</h2>
+            </div>
+            <div class="card-content">
+                <div class="component-list">
+                    <div class="component-item">
+                        <div class="component-name">Stepper Motors</div>
+                        <div class="component-hours">
+                            <span id="motor-hours">0</span> / 50000 hrs
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="motor-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                        </div>
+                    </div>
+                    <div class="component-item">
+                        <div class="component-name">VFD Capacitors</div>
+                        <div class="component-hours">
+                            <span id="vfd-hours">0</span> / 100000 hrs
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="vfd-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                        </div>
+                    </div>
+                    <div class="component-item">
+                        <div class="component-name">Encoder Bearings</div>
+                        <div class="component-hours">
+                            <span id="encoder-hours">0</span> / 30000 hrs
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="encoder-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service History Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Service History</h2>
+            </div>
+            <div class="card-content">
+                <div class="service-history-list" id="service-history">
+                    <div class="service-entry">
+                        <div class="service-date">2025-12-14</div>
+                        <div class="service-text">System initialized</div>
+                        <div class="service-quality">Quality: 100%</div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="log-service-btn">Log Service Event</button>
+            </div>
+        </div>
+
+        <!-- Maintenance Calendar Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Maintenance Calendar</h2>
+            </div>
+            <div class="card-content">
+                <div class="maintenance-schedule">
+                    <div class="schedule-item">
+                        <div class="schedule-priority warning">⚠</div>
+                        <div class="schedule-info">
+                            <div class="schedule-task">Next: Stepper Motor Inspection</div>
+                            <div class="schedule-date" id="next-motor-service">Est. 2029-12-14</div>
+                        </div>
+                    </div>
+                    <div class="schedule-item">
+                        <div class="schedule-priority normal">ℹ</div>
+                        <div class="schedule-info">
+                            <div class="schedule-task">VFD Capacitor Replacement</div>
+                            <div class="schedule-date" id="next-vfd-service">Est. 2032-12-14</div>
+                        </div>
+                    </div>
+                    <div class="schedule-item">
+                        <div class="schedule-priority normal">ℹ</div>
+                        <div class="schedule-info">
+                            <div class="schedule-task">Encoder Bearing Inspection</div>
+                            <div class="schedule-date" id="next-encoder-service">Est. 2029-06-14</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Uptime Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>System Uptime</h2>
+            </div>
+            <div class="card-content">
+                <div class="uptime-display">
+                    <div class="uptime-stat">
+                        <div class="uptime-label">Total Hours</div>
+                        <div class="uptime-value" id="total-hours">0</div>
+                    </div>
+                    <div class="uptime-stat">
+                        <div class="uptime-label">Operating Days</div>
+                        <div class="uptime-value" id="operating-days">0</div>
+                    </div>
+                    <div class="uptime-stat">
+                        <div class="uptime-label">Last Service</div>
+                        <div class="uptime-value" id="last-service">Today</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.maintenance-page .component-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.maintenance-page .component-item {
+    padding: var(--space-md);
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.maintenance-page .component-name {
+    font-weight: 600;
+    margin-bottom: var(--space-xs);
+}
+
+.maintenance-page .component-hours {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-sm);
+}
+
+.maintenance-page .service-history-list {
+    margin-bottom: var(--space-lg);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.maintenance-page .service-entry {
+    padding: var(--space-md);
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    margin-bottom: var(--space-sm);
+    border-left: 3px solid var(--color-normal);
+}
+
+.maintenance-page .service-date {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+}
+
+.maintenance-page .service-text {
+    margin: var(--space-xs) 0;
+    color: var(--text-primary);
+}
+
+.maintenance-page .service-quality {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.maintenance-page .maintenance-schedule {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.maintenance-page .schedule-item {
+    display: flex;
+    gap: var(--space-md);
+    align-items: flex-start;
+    padding: var(--space-md);
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.maintenance-page .schedule-priority {
+    font-size: 20px;
+    min-width: 24px;
+}
+
+.maintenance-page .schedule-priority.warning {
+    color: var(--color-warning);
+}
+
+.maintenance-page .schedule-priority.normal {
+    color: var(--color-normal);
+}
+
+.maintenance-page .schedule-info {
+    flex: 1;
+}
+
+.maintenance-page .schedule-task {
+    font-weight: 600;
+}
+
+.maintenance-page .schedule-date {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.maintenance-page .uptime-display {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+    text-align: center;
+}
+
+.maintenance-page .uptime-stat {
+    padding: var(--space-md);
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.maintenance-page .uptime-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xs);
+}
+
+.maintenance-page .uptime-value {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--color-normal);
+}
+
+@media (max-width: 768px) {
+    .maintenance-page .uptime-display {
+        grid-template-columns: 1fr;
+    }
+
+    .maintenance-page .axes-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
