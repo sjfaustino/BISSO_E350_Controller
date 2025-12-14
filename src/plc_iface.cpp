@@ -52,10 +52,14 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char* context) {
 
 void elboInit() {
     logInfo("[PLC] Initializing I2C Bus...");
-    
+
+    // Initialize Wire I2C bus (only called once at startup)
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
+    delay(10); // Allow bus to settle
+
     // Reset Outputs (Safe State: All OFF)
     q73_shadow_register = 0x00;
-    
+
     if (plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Init Q73")) {
         logInfo("[PLC] Q73 Output Board OK (Addr 0x%02X)", ADDR_Q73_OUTPUT);
     } else {
