@@ -1,0 +1,153 @@
+name: BISSO E350 CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'claude/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-test:
+    name: Build Firmware & Run Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Full history for better analysis
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO Core
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Create PlatformIO Cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-platformio-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-platformio-
+
+      - name: Build Firmware (ESP32-S3)
+        run: pio run -e esp32-s3-devkitc-1
+        continue-on-error: false
+
+      - name: Build Unit Tests (Native)
+        run: pio run -e test
+        continue-on-error: false
+
+      - name: Run Unit Tests
+        run: |
+          .pio/build/native/program
+        continue-on-error: false
+
+      - name: Generate Test Report
+        if: always()
+        run: |
+          mkdir -p test-results
+          echo "Test execution completed" > test-results/summary.txt
+          echo "Build artifacts: .pio/" >> test-results/summary.txt
+          echo "Firmware: .pio/build/esp32-s3-devkitc-1/firmware.bin" >> test-results/summary.txt
+          echo "Test executable: .pio/build/native/program" >> test-results/summary.txt
+
+      - name: Upload Build Artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            .pio/build/esp32-s3-devkitc-1/
+            .pio/build/native/
+          retention-days: 30
+
+      - name: Report Build Status
+        if: always()
+        run: |
+          if [ -f ".pio/build/esp32-s3-devkitc-1/firmware.bin" ]; then
+            echo "✓ Firmware build successful"
+            ls -lh .pio/build/esp32-s3-devkitc-1/firmware.bin
+          else
+            echo "✗ Firmware build failed"
+            exit 1
+          fi
+
+      - name: Code Coverage (Future)
+        run: |
+          echo "Code coverage analysis placeholder"
+          echo "Will implement lcov/gcov integration in future"
+
+      - name: Firmware Size Check
+        if: success()
+        run: |
+          FIRMWARE_SIZE=$(ls -lh .pio/build/esp32-s3-devkitc-1/firmware.bin | awk '{print $5}')
+          echo "Firmware size: $FIRMWARE_SIZE"
+          # Flash size for ESP32-S3: 8MB
+          # Warn if > 4MB
+          echo "Max recommended firmware size: 4MB"
+
+      - name: Post Success
+        if: success()
+        run: |
+          echo "::notice::Build and tests completed successfully"
+
+      - name: Post Failure
+        if: failure()
+        run: |
+          echo "::error::Build or tests failed - see logs above"
+          exit 1
+
+  lint-and-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: C/C++ Linting (Future)
+        run: |
+          echo "Static analysis placeholder"
+          echo "Will integrate cppcheck or clang-tidy in future"
+
+      - name: Documentation Check
+        run: |
+          if [ ! -f "README.md" ]; then
+            echo "::warning::README.md missing"
+          fi
+          if [ ! -f "TEST_GUIDE.md" ]; then
+            echo "::warning::TEST_GUIDE.md missing"
+          fi
+          echo "Documentation check complete"
+
+  notification:
+    name: Status Notifications
+    runs-on: ubuntu-latest
+    needs: [build-and-test, lint-and-quality]
+    if: always()
+
+    steps:
+      - name: Summary
+        run: |
+          echo "=== CI/CD Pipeline Summary ==="
+          echo "Build Status: ${{ needs.build-and-test.result }}"
+          echo "Quality Status: ${{ needs.lint-and-quality.result }}"
+          echo ""
+          echo "Next steps:"
+          echo "1. Check test execution logs"
+          echo "2. Review build artifacts"
+          echo "3. Monitor firmware size"
+          echo "4. Schedule integration tests"

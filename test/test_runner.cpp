@@ -1,0 +1,101 @@
+/**
+ * @file test/test_runner.cpp
+ * @brief Main test runner for BISSO E350 unit tests
+ *
+ * This file serves as the entry point for all unit tests. It initializes
+ * the Unity framework and runs all test suites.
+ */
+
+#include <unity.h>
+#include <cstdio>
+#include <cstdlib>
+
+/**
+ * @brief Forward declarations for test suite functions
+ * Each test file implements these to register its tests
+ */
+extern void run_motion_control_tests(void);
+extern void run_safety_system_tests(void);
+extern void run_encoder_validation_tests(void);
+extern void run_configuration_tests(void);
+
+/**
+ * @brief setUp() - called before each test
+ * Required by Unity framework
+ */
+void setUp(void)
+{
+    // Called before each individual test
+    // Override in specific test files if needed
+}
+
+/**
+ * @brief tearDown() - called after each test
+ * Required by Unity framework
+ */
+void tearDown(void)
+{
+    // Called after each individual test
+    // Override in specific test files if needed
+}
+
+/**
+ * @brief suiteSetUp() - called once at start of all tests
+ * Optional, but useful for global initialization
+ */
+void suiteSetUp(void)
+{
+    UnityPrint("\n");
+    UnityPrint("========================================\n");
+    UnityPrint("BISSO E350 Unit Test Suite\n");
+    UnityPrint("========================================\n");
+    UnityPrint("Initializing test framework...\n\n");
+}
+
+/**
+ * @brief suiteTearDown() - called once at end of all tests
+ * Optional, but useful for global cleanup and reporting
+ */
+int suiteTearDown(int num_failures)
+{
+    UnityPrint("\n");
+    UnityPrint("========================================\n");
+    if (num_failures == 0) {
+        UnityPrint("✓ ALL TESTS PASSED\n");
+    } else {
+        UnityPrint("✗ TESTS FAILED: ");
+        UnityPrintNumber(num_failures);
+        UnityPrint(" failures\n");
+    }
+    UnityPrint("========================================\n\n");
+
+    return (num_failures == 0) ? 0 : 1;  // Return exit code
+}
+
+/**
+ * @brief main() - Test runner entry point
+ *
+ * This is the executable that gets compiled and run for testing.
+ * It initializes Unity and executes all registered tests.
+ */
+int main(int argc, char* argv[])
+{
+    // Initialize Unity
+    UnityBegin(argv[0]);
+
+    // Run test suites
+    UnityPrint("Running Motion Control Tests...\n");
+    run_motion_control_tests();
+
+    UnityPrint("\nRunning Safety System Tests...\n");
+    run_safety_system_tests();
+
+    UnityPrint("\nRunning Encoder Validation Tests...\n");
+    run_encoder_validation_tests();
+
+    UnityPrint("\nRunning Configuration Tests...\n");
+    run_configuration_tests();
+
+    // Finish and report
+    return UnityEnd();
+}
