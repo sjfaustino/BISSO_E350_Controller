@@ -3,11 +3,11 @@
  * Tracks wear, service history, and component lifetime
  */
 const MaintenanceModule = {
-    // Component lifetimes in hours (typical industrial ratings)
+    // Component lifetimes for stone bridge saw
     componentLifetimes: {
-        motors: 50000,      // Stepper motors
-        vfd: 100000,        // VFD capacitors
-        encoders: 30000     // Encoder bearings
+        motors: 40000,      // 3-phase AC motors - typical continuous duty
+        vfd: 120000,        // Altivar 31 VFD - limited by capacitors
+        contactors: 500000  // PLC contactor switching operations
     },
 
     // Wear thresholds (jitter amplitude in mm/s indicates wear)
@@ -67,7 +67,10 @@ const MaintenanceModule = {
         // Update component lifetime based on operating hours
         const motorPercent = (totalHours / this.componentLifetimes.motors) * 100;
         const vfdPercent = (totalHours / this.componentLifetimes.vfd) * 100;
-        const encoderPercent = (totalHours / this.componentLifetimes.encoders) * 100;
+
+        // Estimate contactor operations: roughly 10 switches per hour average
+        const estimatedContactorOps = totalHours * 10;
+        const contactorPercent = (estimatedContactorOps / this.componentLifetimes.contactors) * 100;
 
         document.getElementById('motor-hours').textContent = totalHours.toString();
         document.getElementById('motor-bar').style.width = Math.min(100, motorPercent) + '%';
@@ -79,27 +82,45 @@ const MaintenanceModule = {
         document.getElementById('vfd-bar').style.background =
             this.getWearColor(Math.min(100, vfdPercent));
 
-        document.getElementById('encoder-hours').textContent = totalHours.toString();
-        document.getElementById('encoder-bar').style.width = Math.min(100, encoderPercent) + '%';
-        document.getElementById('encoder-bar').style.background =
-            this.getWearColor(Math.min(100, encoderPercent));
+        document.getElementById('contactor-ops').textContent = Math.floor(estimatedContactorOps).toString();
+        document.getElementById('contactor-bar').style.width = Math.min(100, contactorPercent) + '%';
+        document.getElementById('contactor-bar').style.background =
+            this.getWearColor(Math.min(100, contactorPercent));
 
         // Update maintenance calendar
-        const motorServiceDays = Math.max(0,
-            this.componentLifetimes.motors - totalHours) / 24;
-        const vfdServiceDays = Math.max(0,
-            this.componentLifetimes.vfd - totalHours) / 24;
-        const encoderServiceDays = Math.max(0,
-            this.componentLifetimes.encoders - totalHours) / 24;
+        // Motor bearing lubrication: every 1000 hours
+        const motorLubricationIntervalHours = 1000;
+        const lastMotorLubricationHours = Math.floor(totalHours / motorLubricationIntervalHours) * motorLubricationIntervalHours;
+        const nextMotorLubricationHours = lastMotorLubricationHours + motorLubricationIntervalHours;
+        const hoursUntilMotorService = Math.max(0, nextMotorLubricationHours - totalHours);
+        const motorDate = new Date(now.getTime() + (hoursUntilMotorService * 60 * 60 * 1000));
 
-        const motorDate = new Date(now.getTime() + motorServiceDays * 24 * 60 * 60 * 1000);
-        const vfdDate = new Date(now.getTime() + vfdServiceDays * 24 * 60 * 60 * 1000);
-        const encoderDate = new Date(now.getTime() + encoderServiceDays * 24 * 60 * 60 * 1000);
+        // VFD cooling maintenance: every 2000 hours
+        const vfdMaintenanceIntervalHours = 2000;
+        const lastVfdMaintenanceHours = Math.floor(totalHours / vfdMaintenanceIntervalHours) * vfdMaintenanceIntervalHours;
+        const nextVfdMaintenanceHours = lastVfdMaintenanceHours + vfdMaintenanceIntervalHours;
+        const hoursUntilVfdService = Math.max(0, nextVfdMaintenanceHours - totalHours);
+        const vfdDate = new Date(now.getTime() + (hoursUntilVfdService * 60 * 60 * 1000));
+
+        // Contactor inspection: every 100,000 operations or 5 years
+        const contactorInspectionOps = 100000;
+        const hoursUntilContactorService = Math.max(0,
+            (contactorInspectionOps - estimatedContactorOps) / 10);
+        const contactorDate = new Date(now.getTime() + (hoursUntilContactorService * 60 * 60 * 1000));
+
+        // Encoder calibration: every 6 months
+        const encoderCalibrationMs = 6 * 30 * 24 * 60 * 60 * 1000;
+        const lastEncoderCalibration = localStorage.getItem('lastEncoderCalibration');
+        const lastCalibrationTime = lastEncoderCalibration ? new Date(lastEncoderCalibration).getTime() : now.getTime();
+        const nextEncoderCalibrationTime = lastCalibrationTime + encoderCalibrationMs;
+        const encoderDate = new Date(Math.max(nextEncoderCalibrationTime, now.getTime()));
 
         document.getElementById('next-motor-service').textContent =
             `Est. ${motorDate.toISOString().split('T')[0]}`;
         document.getElementById('next-vfd-service').textContent =
             `Est. ${vfdDate.toISOString().split('T')[0]}`;
+        document.getElementById('next-contactor-service').textContent =
+            `Est. ${contactorDate.toISOString().split('T')[0]}`;
         document.getElementById('next-encoder-service').textContent =
             `Est. ${encoderDate.toISOString().split('T')[0]}`;
 
