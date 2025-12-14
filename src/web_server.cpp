@@ -25,6 +25,7 @@
 #include "altivar31_modbus.h"  // PHASE 5.5: VFD current monitoring
 #include "vfd_current_calibration.h"  // PHASE 5.5: Current calibration
 #include "api_config.h"  // PHASE 5.6: Configuration API for web settings
+#include "openapi.h"  // PHASE 6: OpenAPI/Swagger specification generation
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -357,6 +358,36 @@ void WebServerManager::setupRoutes() {
 
         request->send(200, "application/json", endpoints_buffer);
         free(endpoints_buffer);
+    });
+
+    // 8.5. OpenAPI Specification (Unprotected for Swagger UI) - PHASE 6
+    server->on("/api/openapi.json", HTTP_GET, [this](AsyncWebServerRequest *request){
+        char* openapi_buffer = (char*)malloc(8192);
+        if (!openapi_buffer) {
+            request->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            return;
+        }
+
+        size_t openapi_size = openAPIGenerateJSON(openapi_buffer, 8192);
+        if (openapi_size == 0) {
+            free(openapi_buffer);
+            request->send(500, "application/json", "{\"error\":\"Failed to generate OpenAPI spec\"}");
+            return;
+        }
+
+        if (!openAPIValidate(openapi_buffer)) {
+            free(openapi_buffer);
+            request->send(500, "application/json", "{\"error\":\"Generated invalid OpenAPI spec\"}");
+            return;
+        }
+
+        request->send(200, "application/json", openapi_buffer);
+        free(openapi_buffer);
+    });
+
+    // 8.6. Swagger UI Documentation (Unprotected for discovery) - PHASE 6
+    server->on("/api/docs", HTTP_GET, [this](AsyncWebServerRequest *request){
+        request->send(SPIFFS, "/pages/swagger-ui.html", "text/html");
     });
 
     // 9. API Health Check (Protected, Rate Limited) - PHASE 5.2

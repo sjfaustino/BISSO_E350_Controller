@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BISSO E350 Controller - API Documentation</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui.css">
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *,
+        *:before,
+        *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            background: #fafafa;
+            font-family: sans-serif;
+        }
+        .topbar {
+            background: #2a3f5f;
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .topbar h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 500;
+        }
+        .topbar p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            color: #b3b3b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>BISSO E350 Controller API</h1>
+        <p>Interactive API documentation with live testing</p>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui-bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui-standalone-preset.js"></script>
+    <script>
+        // Initialize Swagger UI
+        const ui = SwaggerUIBundle({
+            // Load OpenAPI spec from /api/openapi.json
+            url: "/api/openapi.json",
+            dom_id: '#swagger-ui',
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+            ],
+            layout: "BaseLayout",
+            defaultModelsExpandDepth: 1,
+            defaultModelExpandDepth: 1,
+            deepLinking: true,
+            // Enable request interceptor for authentication
+            requestInterceptor: (request) => {
+                // Add custom headers if needed
+                return request;
+            },
+            // Response interceptor for debugging
+            responseInterceptor: (response) => {
+                return response;
+            }
+        });
+
+        // Make UI available globally for debugging
+        window.ui = ui;
+    </script>
+</body>
+</html>
