@@ -41,9 +41,9 @@ static encoder_config_t current_encoder;
  */
 void apiConfigInit(void)
 {
-    LOG_I("[API_CONFIG] Initializing");
+    logInfo("[API_CONFIG] Initializing");
     apiConfigLoad();
-    LOG_I("[API_CONFIG] Ready");
+    logInfo("[API_CONFIG] Ready");
 }
 
 /**
@@ -52,28 +52,30 @@ void apiConfigInit(void)
 bool apiConfigLoad(void)
 {
     // Load motion config
-    current_motion.soft_limit_low_mm[0] = configGetInt(KEY_SOFT_LIMIT_X_LOW, 0);
-    current_motion.soft_limit_high_mm[0] = configGetInt(KEY_SOFT_LIMIT_X_HIGH, 500);
-    current_motion.soft_limit_low_mm[1] = configGetInt(KEY_SOFT_LIMIT_Y_LOW, 0);
-    current_motion.soft_limit_high_mm[1] = configGetInt(KEY_SOFT_LIMIT_Y_HIGH, 500);
-    current_motion.soft_limit_low_mm[2] = configGetInt(KEY_SOFT_LIMIT_Z_LOW, 0);
-    current_motion.soft_limit_high_mm[2] = configGetInt(KEY_SOFT_LIMIT_Z_HIGH, 500);
+    current_motion.soft_limit_low_mm[0] = configGetInt(KEY_X_LIMIT_MIN, 0);
+    current_motion.soft_limit_high_mm[0] = configGetInt(KEY_X_LIMIT_MAX, 500);
+    current_motion.soft_limit_low_mm[1] = configGetInt(KEY_Y_LIMIT_MIN, 0);
+    current_motion.soft_limit_high_mm[1] = configGetInt(KEY_Y_LIMIT_MAX, 500);
+    current_motion.soft_limit_low_mm[2] = configGetInt(KEY_Z_LIMIT_MIN, 0);
+    current_motion.soft_limit_high_mm[2] = configGetInt(KEY_Z_LIMIT_MAX, 500);
 
-    // Load VFD config
-    current_vfd.min_speed_hz = configGetInt(KEY_VFD_MIN_SPEED_HZ, 1);
-    current_vfd.max_speed_hz = configGetInt(KEY_VFD_MAX_SPEED_HZ, 105);
-    current_vfd.acc_time_ms = configGetInt(KEY_VFD_ACC_TIME_MS, 600);
-    current_vfd.dec_time_ms = configGetInt(KEY_VFD_DEC_TIME_MS, 400);
+    // Load VFD config (using idle RMS as proxy for min speed characteristics)
+    // Note: VFD has fixed acceleration/deceleration timings via Modbus, not configurable here
+    current_vfd.min_speed_hz = 1;      // Altivar31 minimum (LSP)
+    current_vfd.max_speed_hz = 105;    // Altivar31 maximum (HSP)
+    current_vfd.acc_time_ms = 600;     // Fixed in VFD configuration
+    current_vfd.dec_time_ms = 400;     // Fixed in VFD configuration
 
     // Load encoder config
-    current_encoder.ppm[0] = configGetInt(KEY_ENCODER_X_PPM, 100);
-    current_encoder.ppm[1] = configGetInt(KEY_ENCODER_Y_PPM, 100);
-    current_encoder.ppm[2] = configGetInt(KEY_ENCODER_Z_PPM, 100);
-    current_encoder.calibrated[0] = configGetInt(KEY_ENCODER_X_CAL, 0);
-    current_encoder.calibrated[1] = configGetInt(KEY_ENCODER_Y_CAL, 0);
-    current_encoder.calibrated[2] = configGetInt(KEY_ENCODER_Z_CAL, 0);
+    current_encoder.ppm[0] = configGetInt(KEY_PPM_X, 100);
+    current_encoder.ppm[1] = configGetInt(KEY_PPM_Y, 100);
+    current_encoder.ppm[2] = configGetInt(KEY_PPM_Z, 100);
+    // Calibration flags are runtime-only, not persisted
+    current_encoder.calibrated[0] = 0;
+    current_encoder.calibrated[1] = 0;
+    current_encoder.calibrated[2] = 0;
 
-    LOG_I("[API_CONFIG] Configuration loaded from NVS");
+    logInfo("[API_CONFIG] Configuration loaded from NVS");
     return true;
 }
 
@@ -83,28 +85,22 @@ bool apiConfigLoad(void)
 bool apiConfigSave(void)
 {
     // Save motion config
-    configSetInt(KEY_SOFT_LIMIT_X_LOW, current_motion.soft_limit_low_mm[0]);
-    configSetInt(KEY_SOFT_LIMIT_X_HIGH, current_motion.soft_limit_high_mm[0]);
-    configSetInt(KEY_SOFT_LIMIT_Y_LOW, current_motion.soft_limit_low_mm[1]);
-    configSetInt(KEY_SOFT_LIMIT_Y_HIGH, current_motion.soft_limit_high_mm[1]);
-    configSetInt(KEY_SOFT_LIMIT_Z_LOW, current_motion.soft_limit_low_mm[2]);
-    configSetInt(KEY_SOFT_LIMIT_Z_HIGH, current_motion.soft_limit_high_mm[2]);
+    configSetInt(KEY_X_LIMIT_MIN, current_motion.soft_limit_low_mm[0]);
+    configSetInt(KEY_X_LIMIT_MAX, current_motion.soft_limit_high_mm[0]);
+    configSetInt(KEY_Y_LIMIT_MIN, current_motion.soft_limit_low_mm[1]);
+    configSetInt(KEY_Y_LIMIT_MAX, current_motion.soft_limit_high_mm[1]);
+    configSetInt(KEY_Z_LIMIT_MIN, current_motion.soft_limit_low_mm[2]);
+    configSetInt(KEY_Z_LIMIT_MAX, current_motion.soft_limit_high_mm[2]);
 
-    // Save VFD config
-    configSetInt(KEY_VFD_MIN_SPEED_HZ, current_vfd.min_speed_hz);
-    configSetInt(KEY_VFD_MAX_SPEED_HZ, current_vfd.max_speed_hz);
-    configSetInt(KEY_VFD_ACC_TIME_MS, current_vfd.acc_time_ms);
-    configSetInt(KEY_VFD_DEC_TIME_MS, current_vfd.dec_time_ms);
+    // VFD config - speeds and timings are fixed in Altivar31 and set via Modbus
+    // No need to save these as they are hardware constants
 
-    // Save encoder config
-    configSetInt(KEY_ENCODER_X_PPM, current_encoder.ppm[0]);
-    configSetInt(KEY_ENCODER_Y_PPM, current_encoder.ppm[1]);
-    configSetInt(KEY_ENCODER_Z_PPM, current_encoder.ppm[2]);
-    configSetInt(KEY_ENCODER_X_CAL, current_encoder.calibrated[0]);
-    configSetInt(KEY_ENCODER_Y_CAL, current_encoder.calibrated[1]);
-    configSetInt(KEY_ENCODER_Z_CAL, current_encoder.calibrated[2]);
+    // Save encoder config (PPM only, calibration flags are runtime-only)
+    configSetInt(KEY_PPM_X, current_encoder.ppm[0]);
+    configSetInt(KEY_PPM_Y, current_encoder.ppm[1]);
+    configSetInt(KEY_PPM_Z, current_encoder.ppm[2]);
 
-    LOG_I("[API_CONFIG] Configuration saved to NVS");
+    logInfo("[API_CONFIG] Configuration saved to NVS");
     return true;
 }
 
@@ -117,7 +113,7 @@ bool apiConfigReset(void)
     current_vfd = default_vfd;
     current_encoder = default_encoder;
 
-    LOG_W("[API_CONFIG] Configuration reset to defaults");
+    logWarning("[API_CONFIG] Configuration reset to defaults");
     return apiConfigSave();
 }
 
@@ -224,7 +220,7 @@ bool apiConfigSet(config_category_t category, const char* key, JsonVariant value
 
     // Validate first
     if (!apiConfigValidate(category, key, value, error_msg, sizeof(error_msg))) {
-        LOG_W("[API_CONFIG] Validation failed for %s: %s", key, error_msg);
+        logWarning("[API_CONFIG] Validation failed for %s: %s", key, error_msg);
         return false;
     }
 
@@ -272,7 +268,7 @@ bool apiConfigSet(config_category_t category, const char* key, JsonVariant value
             return false;
     }
 
-    LOG_I("[API_CONFIG] Configuration updated: %s", key);
+    logInfo("[API_CONFIG] Configuration updated: %s", key);
     return true;
 }
 
@@ -374,7 +370,7 @@ bool apiConfigCalibrateEncoder(uint8_t axis, uint16_t ppm)
     current_encoder.ppm[axis] = ppm;
     current_encoder.calibrated[axis] = 1;
 
-    LOG_I("[API_CONFIG] Encoder %c calibrated: %u PPM", 'X' + axis, ppm);
+    logInfo("[API_CONFIG] Encoder %c calibrated: %u PPM", 'X' + axis, ppm);
     return true;
 }
 
@@ -403,15 +399,15 @@ size_t apiConfigExportJSON(char* buffer, size_t buffer_size)
  */
 void apiConfigPrint(void)
 {
-    LOG_I("[API_CONFIG] ============ Configuration Summary ============");
-    LOG_I("[API_CONFIG] Motion: X[%u-%u] Y[%u-%u] Z[%u-%u] mm",
+    logInfo("[API_CONFIG] ============ Configuration Summary ============");
+    logInfo("[API_CONFIG] Motion: X[%u-%u] Y[%u-%u] Z[%u-%u] mm",
         current_motion.soft_limit_low_mm[0], current_motion.soft_limit_high_mm[0],
         current_motion.soft_limit_low_mm[1], current_motion.soft_limit_high_mm[1],
         current_motion.soft_limit_low_mm[2], current_motion.soft_limit_high_mm[2]);
-    LOG_I("[API_CONFIG] VFD: %u-%u Hz, ACC=%ums, DEC=%ums",
+    logInfo("[API_CONFIG] VFD: %u-%u Hz, ACC=%ums, DEC=%ums",
         current_vfd.min_speed_hz, current_vfd.max_speed_hz,
         current_vfd.acc_time_ms, current_vfd.dec_time_ms);
-    LOG_I("[API_CONFIG] Encoder: X=%u Y=%u Z=%u PPM",
+    logInfo("[API_CONFIG] Encoder: X=%u Y=%u Z=%u PPM",
         current_encoder.ppm[0], current_encoder.ppm[1], current_encoder.ppm[2]);
-    LOG_I("[API_CONFIG] ================================================");
+    logInfo("[API_CONFIG] ================================================");
 }

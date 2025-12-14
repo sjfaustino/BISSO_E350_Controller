@@ -253,8 +253,17 @@ bool altivar31ModbusReceiveResponse(void) {
 
     // Attempt to receive response
     uint8_t rx_data[32];
+    uint8_t rx_len = sizeof(rx_data);
     memset(rx_data, 0, sizeof(rx_data));
-    int rx_len = encoderHalReceive(rx_data, sizeof(rx_data));
+
+    if (!encoderHalReceive(rx_data, &rx_len)) {
+        if ((now - modbus_request_time_ms) > 200) {
+            altivar31_state.consecutive_errors++;
+            altivar31_state.error_count++;
+            altivar31_state.last_error_time_ms = now;
+        }
+        return false;  // No data available or timeout
+    }
 
     if (rx_len <= 0) {
         if ((now - modbus_request_time_ms) > 200) {

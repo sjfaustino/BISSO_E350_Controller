@@ -102,7 +102,7 @@ static const api_endpoint_t api_endpoints[] = {
     },
     {
         .path = "/api/files",
-        .methods = HTTP_GET | HTTP_DELETE,
+        .methods = (http_method_t)(HTTP_GET | HTTP_DELETE),
         .description = "File management (list and delete)",
         .requires_auth = true,
         .rate_limited = true,
