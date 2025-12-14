@@ -53,7 +53,8 @@ The BISSO E350 is a **stone bridge saw with multiplexed motion control and indep
 
 #### Axis Motion System (Automated Control)
 - **Schneider Altivar 31 VFD**: Controls axis motor frequency from 0-105 Hz
-  - Controlled automatically by ESP32 controller via Modbus RTU communication
+  - Frequency control: Handled by PLC relay signals and hardware configuration
+  - Modbus RTU monitoring: ESP32 reads VFD status/telemetry (frequency, current, thermal state, fault codes)
   - Error state feedback: VFD error relay (r1) inputs to PLC, allowing ESP32 to detect VFD faults
   - Drives up to 105 Hz for axis motion (X, Y, Z movements)
 - **Three 3-Phase AC Induction Motors**: One for each axis (X, Y, Z)
