@@ -41,8 +41,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-platformio-
 
-      - name: Build Firmware (ESP32-S3)
-        run: pio run -e esp32-s3-devkitc-1
+      - name: Build Firmware (ESP32 WROOM-32E)
+        run: pio run -e esp32dev
         continue-on-error: false
 
       - name: Build Unit Tests (Native)
@@ -60,25 +60,25 @@ jobs:
           mkdir -p test-results
           echo "Test execution completed" > test-results/summary.txt
           echo "Build artifacts: .pio/" >> test-results/summary.txt
-          echo "Firmware: .pio/build/esp32-s3-devkitc-1/firmware.bin" >> test-results/summary.txt
+          echo "Firmware: .pio/build/esp32dev/firmware.bin" >> test-results/summary.txt
           echo "Test executable: .pio/build/native/program" >> test-results/summary.txt
 
       - name: Upload Build Artifacts
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: |
-            .pio/build/esp32-s3-devkitc-1/
+            .pio/build/esp32dev/
             .pio/build/native/
           retention-days: 30
 
       - name: Report Build Status
         if: always()
         run: |
-          if [ -f ".pio/build/esp32-s3-devkitc-1/firmware.bin" ]; then
+          if [ -f ".pio/build/esp32dev/firmware.bin" ]; then
             echo "✓ Firmware build successful"
-            ls -lh .pio/build/esp32-s3-devkitc-1/firmware.bin
+            ls -lh .pio/build/esp32dev/firmware.bin
           else
             echo "✗ Firmware build failed"
             exit 1
@@ -92,11 +92,11 @@ jobs:
       - name: Firmware Size Check
         if: success()
         run: |
-          FIRMWARE_SIZE=$(ls -lh .pio/build/esp32-s3-devkitc-1/firmware.bin | awk '{print $5}')
+          FIRMWARE_SIZE=$(ls -lh .pio/build/esp32dev/firmware.bin | awk '{print $5}')
           echo "Firmware size: $FIRMWARE_SIZE"
-          # Flash size for ESP32-S3: 8MB
-          # Warn if > 4MB
-          echo "Max recommended firmware size: 4MB"
+          # Flash size for ESP32-WROOM-32E: 4MB
+          # Warn if > 1.5MB (reserves space for OTA and SPIFFS)
+          echo "Max recommended firmware size: 1.5MB"
 
       - name: Post Success
         if: success()
