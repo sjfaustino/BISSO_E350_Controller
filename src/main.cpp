@@ -52,6 +52,7 @@ bool init_calib_wrapper() { loadAllCalibration(); encoderCalibrationInit(); retu
 // UPDATED: Using correct init function
 bool init_plc_wrapper() { elboInit(); return true; }
 
+bool init_lcd_wrapper() { lcdInterfaceInit(); return true; }
 bool init_enc_wrapper() { wj66Init(); return true; }
 bool init_safety_wrapper() { safetyInit(); return true; }
 bool init_motion_wrapper() { motionInit(); return true; }
@@ -88,6 +89,7 @@ void setup() {
   BOOT_INIT("Config", init_config_wrapper, BOOT_ERROR_CONFIG);
   BOOT_INIT("Schema", init_schema_wrapper, BOOT_ERROR_SCHEMA);
   BOOT_INIT("PLC", init_plc_wrapper, BOOT_ERROR_PLC_IFACE);
+  BOOT_INIT("LCD", init_lcd_wrapper, (boot_status_code_t)19);
   BOOT_INIT("Inputs", init_inputs_wrapper, (boot_status_code_t)14);
   BOOT_INIT("Encoder", init_enc_wrapper, BOOT_ERROR_ENCODER);
   BOOT_INIT("Safety", init_safety_wrapper, BOOT_ERROR_SAFETY);
