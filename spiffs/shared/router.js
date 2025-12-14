@@ -44,9 +44,46 @@ class Router {
             const container = document.getElementById('page-container');
 
             // Load HTML
-            const htmlResponse = await fetch(route.file);
-            if (!htmlResponse.ok) throw new Error(`Failed to load ${route.file}`);
-            const html = await htmlResponse.text();
+            let html;
+            try {
+                const htmlResponse = await fetch(route.file);
+                if (!htmlResponse.ok) throw new Error(`HTTP ${htmlResponse.status}`);
+                html = await htmlResponse.text();
+            } catch (fetchError) {
+                console.warn(`[ROUTER] Failed to fetch ${route.file}:`, fetchError.message);
+
+                // If fetch fails, check if we're in mock mode or offline
+                if (window.MockMode?.enabled || !navigator.onLine) {
+                    // Provide fallback content for offline mode
+                    html = `
+                        <div style="padding: 40px 20px; text-align: center;">
+                            <h2>📡 Offline Mode</h2>
+                            <p style="color: var(--text-secondary); margin: 20px 0;">
+                                Cannot load page content while offline.
+                            </p>
+                            <div style="background: var(--bg-secondary); padding: 20px; border-radius: 8px; margin: 20px 0;">
+                                <p style="margin: 10px 0; font-size: 14px;">
+                                    <strong>Mock Mode:</strong>
+                                    ${window.MockMode?.enabled ? '✓ Active' : '✗ Disabled'}
+                                </p>
+                                <p style="margin: 10px 0; font-size: 14px;">
+                                    <strong>Network:</strong>
+                                    ${navigator.onLine ? '✓ Online' : '✗ Offline'}
+                                </p>
+                            </div>
+                            <p style="color: var(--text-secondary); margin-top: 20px; font-size: 14px;">
+                                Enable mock mode with <strong>M</strong> key to preview dashboard with simulated data.
+                            </p>
+                        </div>
+                    `;
+                    container.innerHTML = html;
+                    this.isLoading = false;
+                    return;
+                }
+
+                throw fetchError;
+            }
+
             container.innerHTML = html;
 
             // Load CSS if exists
@@ -80,6 +117,16 @@ class Router {
 
         } catch (error) {
             console.error('[ROUTER] Navigation error:', error);
+            const container = document.getElementById('page-container');
+            container.innerHTML = `
+                <div style="padding: 40px 20px; text-align: center; color: var(--color-critical);">
+                    <h2>❌ Error Loading Page</h2>
+                    <p>${error.message}</p>
+                    <p style="font-size: 14px; margin-top: 20px;">
+                        Make sure the device is online or enable <strong>Mock Mode</strong> (press <strong>M</strong>)
+                    </p>
+                </div>
+            `;
             this.isLoading = false;
         }
     }

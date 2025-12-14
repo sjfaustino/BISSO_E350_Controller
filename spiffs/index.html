@@ -160,9 +160,20 @@
          */
         class App {
             static init() {
+                // Enable mock mode first if requested
+                if (window.__mockModeRequested && window.MockMode) {
+                    MockMode.enable();
+                }
+
                 this.setupEventListeners();
                 this.updateStatus();
                 this.initMobileMenu();
+
+                // Initialize router after everything else is ready
+                if (window.Router) {
+                    Router.init();
+                }
+
                 console.log('[APP] Initialized');
             }
 

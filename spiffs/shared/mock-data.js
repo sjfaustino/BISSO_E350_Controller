@@ -163,26 +163,46 @@ class MockWebSocket {
      */
     start() {
         console.log('[MockWebSocket] Starting mock data stream');
-        this.updateInterval = setInterval(() => {
-            const state = this.dataGenerator.generateState();
 
-            // Emit as if it were a real WebSocket message
-            const event = new CustomEvent('message', {
-                detail: {
-                    data: JSON.stringify({
-                        type: 'state_update',
-                        data: state
-                    })
-                }
-            });
+        // Send initial state immediately
+        const initialState = this.dataGenerator.generateState();
+        const initialEvent = new CustomEvent('message', {
+            detail: {
+                data: JSON.stringify({
+                    type: 'state_update',
+                    data: initialState
+                })
+            }
+        });
 
+        // Emit on next tick to ensure listeners are registered
+        setTimeout(() => {
             this.listeners.message.forEach(listener => {
-                listener.call(this, event);
+                listener.call(this, initialEvent);
             });
-        }, this.updateRate);
 
-        // Emit connection event
-        window.dispatchEvent(new Event('ws-connected'));
+            // Emit connection event after initial state
+            window.dispatchEvent(new Event('ws-connected'));
+
+            // Start regular updates
+            this.updateInterval = setInterval(() => {
+                const state = this.dataGenerator.generateState();
+
+                // Emit as if it were a real WebSocket message
+                const event = new CustomEvent('message', {
+                    detail: {
+                        data: JSON.stringify({
+                            type: 'state_update',
+                            data: state
+                        })
+                    }
+                });
+
+                this.listeners.message.forEach(listener => {
+                    listener.call(this, event);
+                });
+            }, this.updateRate);
+        }, 0);
     }
 
     /**
@@ -309,12 +329,10 @@ window.MockMode = {
     }
 };
 
-// Check for mock mode in URL
+// Check for mock mode in URL and enable synchronously if requested
 if (window.location.search.includes('mock=true')) {
-    // Enable mock mode on page load
-    window.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => MockMode.enable(), 500);
-    });
+    // Mark that mock mode should be enabled
+    window.__mockModeRequested = true;
 }
 
 // Expose global shortcut: press 'M' key to toggle mock mode
