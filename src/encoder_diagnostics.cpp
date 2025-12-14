@@ -84,7 +84,7 @@ void encoderDiagnosticsUpdate() {
         // Encoder-based position (if available)
         uint32_t encoder_pos_units = (uint32_t)(wj66GetAxisPosition(axis) * 100);
 
-        // Calculate variance (difference between stepper and encoder)
+        // Calculate variance (difference between encoder position and expected motion)
         int32_t variance_units = (int32_t)(encoder_pos_units - current_pos_units);
         float variance_mm = variance_units / 100.0f;
 

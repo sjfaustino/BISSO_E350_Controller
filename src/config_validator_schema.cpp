@@ -71,8 +71,8 @@ static const config_descriptor_t config_schema[] = {
         .float_min = 10.0f,
         .float_max = 1000.0f,
         .default_value = "100.0",
-        .description = "X-axis stepper steps per millimeter",
-        .unit = "steps/mm",
+        .description = "X-axis encoder pulses per millimeter",
+        .unit = "pulses/mm",
         .critical = true
     },
     {
@@ -81,8 +81,8 @@ static const config_descriptor_t config_schema[] = {
         .float_min = 10.0f,
         .float_max = 1000.0f,
         .default_value = "100.0",
-        .description = "Y-axis stepper steps per millimeter",
-        .unit = "steps/mm",
+        .description = "Y-axis encoder pulses per millimeter",
+        .unit = "pulses/mm",
         .critical = true
     },
     {
@@ -91,8 +91,8 @@ static const config_descriptor_t config_schema[] = {
         .float_min = 10.0f,
         .float_max = 1000.0f,
         .default_value = "100.0",
-        .description = "Z-axis stepper steps per millimeter",
-        .unit = "steps/mm",
+        .description = "Z-axis encoder pulses per millimeter",
+        .unit = "pulses/mm",
         .critical = true
     },
     {
@@ -101,8 +101,8 @@ static const config_descriptor_t config_schema[] = {
         .float_min = 10.0f,
         .float_max = 1000.0f,
         .default_value = "100.0",
-        .description = "A-axis stepper steps per degree (or mm for linear)",
-        .unit = "steps/unit",
+        .description = "A-axis encoder pulses per degree (or mm for linear)",
+        .unit = "pulses/unit",
         .critical = true
     },
     {

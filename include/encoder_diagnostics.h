@@ -86,7 +86,7 @@ encoder_health_t encoderDiagnosticsGetHealth(uint8_t axis_id);
 
 /**
  * Run calibration verification test
- * Moves axis small distance and compares encoder vs stepper count
+ * Moves axis small distance and compares encoder reading vs expected motion
  * @param axis_id Axis to test
  * @param distance_mm Distance to move (typically 10mm)
  * @return true if calibration acceptable
