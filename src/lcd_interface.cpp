@@ -7,11 +7,15 @@
 
 #include "lcd_interface.h"
 #include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include <string.h>
 #include <stdio.h>
-#include "system_constants.h" 
-#include "encoder_calibration.h" 
+#include "system_constants.h"
+#include "encoder_calibration.h"
 #include "plc_iface.h" 
+
+// Global I2C LCD instance (will be initialized in lcdInterfaceInit)
+static LiquidCrystal_I2C* lcd_i2c = nullptr;
 
 struct {
   lcd_mode_t mode;
@@ -33,47 +37,61 @@ struct {
 
 void lcdInterfaceInit() {
   Serial.println("[LCD] Initializing...");
-  
+
   for (int i = 0; i < LCD_ROWS; i++) {
     memset(lcd_state.display[i], 0, LCD_COLS + 1);
     lcd_state.display_dirty[i] = true;
   }
-  
+
   lcd_state.last_update = millis();
   lcd_state.update_count = 0;
-  
+
   // Uses centralized pin constants
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
   Wire.beginTransmission(LCD_I2C_ADDR);
   if (Wire.endTransmission() == 0) {
-    lcd_state.mode = LCD_MODE_I2C;
     lcd_state.i2c_found = true;
-    Serial.printf("[LCD] [OK] I2C Found at 0x%02X\n", LCD_I2C_ADDR);
+
+    // Initialize LiquidCrystal_I2C (20x4 display)
+    lcd_i2c = new LiquidCrystal_I2C(LCD_I2C_ADDR, LCD_COLS, LCD_ROWS);
+    if (lcd_i2c) {
+      lcd_i2c->init();
+      lcd_i2c->backlight();
+      lcd_i2c->clear();
+      lcd_state.mode = LCD_MODE_I2C;
+      Serial.printf("[LCD] [OK] I2C LCD Initialized at 0x%02X (20x4)\n", LCD_I2C_ADDR);
+    } else {
+      lcd_state.mode = LCD_MODE_SERIAL;
+      Serial.println("[LCD] [ERR] Failed to allocate LiquidCrystal_I2C, using Serial");
+    }
   } else {
     lcd_state.mode = LCD_MODE_SERIAL;
     Serial.println("[LCD] [WARN] I2C Not Found, using Serial simulation");
   }
-  
+
   Serial.println("[LCD] [OK] Ready");
 }
 
 void lcdInterfaceUpdate() {
   uint32_t now = millis();
   if (now - lcd_state.last_update < LCD_REFRESH_INTERVAL_MS) return;
-  
+
   lcd_state.last_update = now;
   lcd_state.update_count++;
-  
+
   switch(lcd_state.mode) {
     case LCD_MODE_I2C:
-      for (int i = 0; i < LCD_ROWS; i++) {
-        if (lcd_state.display_dirty[i]) {
-          // Actual I2C LiquidCrystal calls would go here
-          lcd_state.display_dirty[i] = false;
+      if (lcd_i2c) {
+        for (int i = 0; i < LCD_ROWS; i++) {
+          if (lcd_state.display_dirty[i]) {
+            lcd_i2c->setCursor(0, i);
+            lcd_i2c->print(lcd_state.display[i]);
+            lcd_state.display_dirty[i] = false;
+          }
         }
       }
       break;
-      
+
     case LCD_MODE_SERIAL:
       for (int i = 0; i < LCD_ROWS; i++) {
         if (lcd_state.display_dirty[i]) {
@@ -82,8 +100,9 @@ void lcdInterfaceUpdate() {
         }
       }
       break;
-      
-    case LCD_MODE_NONE: break;
+
+    case LCD_MODE_NONE:
+      break;
   }
 }
 
@@ -133,11 +152,21 @@ void lcdInterfaceClear() {
     lcd_state.display[i][LCD_COLS] = '\0';
     lcd_state.display_dirty[i] = true;
   }
+  if (lcd_i2c) {
+    lcd_i2c->clear();
+  }
   Serial.println("[LCD] [OK] Cleared");
 }
 
 void lcdInterfaceBacklight(bool on) {
   lcd_state.backlight_on = on;
+  if (lcd_i2c) {
+    if (on) {
+      lcd_i2c->backlight();
+    } else {
+      lcd_i2c->noBacklight();
+    }
+  }
   Serial.printf("[LCD] Backlight: %s\n", on ? "ON" : "OFF");
 }
 
