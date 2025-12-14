@@ -54,11 +54,61 @@ class Router {
                 fetchFailed = true;
                 console.warn(`[ROUTER] Failed to fetch ${route.file}:`, fetchError.message);
 
-                // If mock mode is enabled, create a minimal container and load the JS module
-                // The module will populate content using mock data
+                // If mock mode is enabled, create minimal HTML with basic structure
+                // The JS module will populate it with mock data
                 if (window.MockMode?.enabled) {
-                    console.log('[ROUTER] Mock mode enabled, loading module without HTML');
-                    html = `<div id="mock-page-content" style="padding: 20px;">Loading ${page} with mock data...</div>`;
+                    console.log('[ROUTER] Mock mode enabled, generating fallback structure for:', page);
+
+                    // Generate page-specific fallback structures
+                    if (page === 'dashboard') {
+                        html = `
+                            <div class="dashboard-page">
+                                <div style="padding: 20px 0;">
+                                    <h1>📊 Dashboard (Mock Mode)</h1>
+                                    <p style="color: var(--text-secondary); font-size: 14px;">Simulated data - press M to disable</p>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
+                                    <div class="card">
+                                        <div class="card-header"><h3>Status</h3></div>
+                                        <div class="card-content">
+                                            <div id="motion-status">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="card">
+                                        <div class="card-header"><h3>CPU</h3></div>
+                                        <div class="card-content">
+                                            <div id="cpu-value" style="font-size: 24px;">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="card">
+                                        <div class="card-header"><h3>Memory</h3></div>
+                                        <div class="card-content">
+                                            <div id="memory-value" style="font-size: 24px;">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="card">
+                                        <div class="card-header"><h3>VFD</h3></div>
+                                        <div class="card-content">
+                                            <div id="vfd-status">--</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="charts-section" style="margin-top: 30px;"></div>
+                            </div>
+                        `;
+                    } else {
+                        // Generic fallback for other pages
+                        html = `
+                            <div style="padding: 40px 20px; text-align: center;">
+                                <h2>📄 ${page.charAt(0).toUpperCase() + page.slice(1)} Page</h2>
+                                <p style="color: var(--text-secondary); margin: 20px 0;">
+                                    Mock mode - loading with simulated data...
+                                </p>
+                            </div>
+                        `;
+                    }
                     // Don't return - continue to load the JS module below
                 } else if (!navigator.onLine) {
                     // Offline but mock mode not enabled - show helpful message
