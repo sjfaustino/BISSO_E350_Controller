@@ -65,8 +65,6 @@ static jxk10_state_t jxk10_state = {
 
 // Modbus request/response buffer
 static uint8_t modbus_tx_buffer[32];
-static uint8_t modbus_rx_buffer[32];
-static uint32_t modbus_rx_length = 0;
 static uint32_t modbus_request_time_ms = 0;
 
 /**

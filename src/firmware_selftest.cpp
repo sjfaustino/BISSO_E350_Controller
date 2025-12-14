@@ -308,7 +308,6 @@ selftest_result_t selftestRunTest(const char* test_name, bool verbose) {
 
     for (int i = 0; i < test_definition_count; i++) {
         if (strcmp(test_definitions[i].name, test_name) == 0) {
-            uint32_t start = millis();
             test_definitions[i].test_func();
             if (test_ctx.current_test > 0) {
                 result = test_ctx.results[test_ctx.current_test - 1];

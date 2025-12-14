@@ -450,7 +450,6 @@ void cmd_i2c_monitor(int argc, char** argv) {
     Serial.println("[I2C] (Press Ctrl+C to stop)");
 
     uint32_t start_time = millis();
-    uint32_t last_error_time = 0;
 
     while (millis() - start_time < duration_sec * 1000) {
         // Test each known device
@@ -472,7 +471,6 @@ void cmd_i2c_monitor(int argc, char** argv) {
                 if (with_alerts) {
                     Serial.printf("[ALERT] Device 0x%02X not responding!\n", addr);
                 }
-                last_error_time = millis();
             }
         }
 

@@ -231,7 +231,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
         case MOTION_DWELL:
             // Non-blocking dwell - just wait for timer to expire
             // PHASE 5.1: Wraparound-safe timeout comparison
-            if ((uint32_t)(millis() - dwell_end_ms) >= 0) {
+            if ((int32_t)(millis() - dwell_end_ms) >= 0) {
                 portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_IDLE;
                 m_state.active_axis = 255;
@@ -281,7 +281,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
                 portENTER_CRITICAL(&motionSpinlock);
                 state = MOTION_ERROR;
                 portEXIT_CRITICAL(&motionSpinlock);
-                faultLogEntry(FAULT_WARNING, FAULT_TIMEOUT, id, 0, "Pin wait timeout");
+                faultLogEntry(FAULT_WARNING, FAULT_MOTION_TIMEOUT, id, 0, "Pin wait timeout");
                 logWarning("[MOTION] Pin %d wait timeout", wait_pin_id);
             }
             break;
@@ -349,16 +349,15 @@ void motionUpdate() {
         if ((uint32_t)(now - last_timeout_warning_ms) >= 5000) {  // Log once per 5 seconds
             logWarning("[MOTION] Mutex timeout (%lums): Skipped %lu times, backoff level %u",
                       (unsigned long)timeout_ms, (unsigned long)consecutive_skips, backoff_level);
-            faultLog(FAULT_MOTION_TIMEOUT,
-                    "Motion mutex timeout: %lu consecutive failures, backoff level %u",
-                    (unsigned long)consecutive_skips, backoff_level);
+            faultLogWarning(FAULT_MOTION_TIMEOUT,
+                    "Motion mutex timeout: %lu consecutive failures, backoff level %u");
             last_timeout_warning_ms = now;
         }
 
         // Escalate to emergency stop if critical timeout threshold reached
         if (consecutive_skips >= 20) {
             logError("[MOTION] CRITICAL: Motion mutex timeout escalation!");
-            faultLog(FAULT_MOTION_TIMEOUT, "Motion mutex critical failure - escalating to emergency stop");
+            faultLogCritical(FAULT_MOTION_TIMEOUT, "Motion mutex critical failure - escalating to emergency stop");
             motionEmergencyStop();
             consecutive_skips = 0;
             backoff_level = 0;

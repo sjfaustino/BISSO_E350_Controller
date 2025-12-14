@@ -71,7 +71,7 @@ void safetyUpdate() {
 
             // Detect stall when current exceeds threshold (indicates mechanical resistance)
             if (vfdCalibrationIsStall(current_amps)) {
-                logWarn("[SAFETY] [WARN] VFD Current High: %.2f A (threshold: %.2f A)",
+                logWarning("[SAFETY] [WARN] VFD Current High: %.2f A (threshold: %.2f A)",
                         current_amps, threshold_amps);
 
                 // If encoder also indicates stall (or we haven't detected it yet), trigger alarm
@@ -129,10 +129,10 @@ void safetyUpdate() {
                          thermal_state, (long)temp_crit);
 
                 if (!alarm_active) {
-                    safety_state.current_fault = SAFETY_OVERHEAT;
+                    safety_state.current_fault = SAFETY_THERMAL;
                     char msg[64];
                     snprintf(msg, sizeof(msg), "VFD OVERHEAT %d%%", thermal_state);
-                    faultLogEntry(FAULT_ERROR, FAULT_THERMAL_CRITICAL, 0, 0, "VFD thermal critical");
+                    faultLogEntry(FAULT_ERROR, FAULT_TEMPERATURE_HIGH, 0, 0, "VFD thermal critical");
                     safetyTriggerAlarm(msg);
                 }
 
@@ -140,7 +140,7 @@ void safetyUpdate() {
                 static uint32_t last_thermal_warn = 0;
                 if ((uint32_t)(now - last_thermal_warn) > 5000) {  // Log warning every 5s max
                     last_thermal_warn = now;
-                    logWarn("[SAFETY] [WARN] VFD Thermal Warning: %d%% (>%ld°C)",
+                    logWarning("[SAFETY] [WARN] VFD Thermal Warning: %d%% (>%ld°C)",
                             thermal_state, (long)temp_warn);
                 }
             }
@@ -164,7 +164,7 @@ void safetyUpdate() {
                     snprintf(msg, sizeof(msg), "AXIS %c QUALITY CRITICAL: %lu%%",
                              axis_char, (unsigned long)metrics->quality_score);
                     logError("[SAFETY] [FAIL] %s", msg);
-                    faultLogEntry(FAULT_ERROR, FAULT_MOTION_DEGRADED, axis, 0,
+                    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
                                  "Axis motion quality critical");
                     safetyTriggerAlarm(msg);
                     break;  // Only trigger one alarm per check cycle
@@ -189,7 +189,7 @@ void safetyUpdate() {
                     if ((uint32_t)(now - last_quality_warn[axis]) > 3000) {  // Warn every 3s max
                         last_quality_warn[axis] = now;
                         char axis_char = 'X' + axis;
-                        logWarn("[SAFETY] [WARN] AXIS %c motion quality degraded: %lu%%",
+                        logWarning("[SAFETY] [WARN] AXIS %c motion quality degraded: %lu%%",
                                axis_char, (unsigned long)metrics->quality_score);
                     }
                 }

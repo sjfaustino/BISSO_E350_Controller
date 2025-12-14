@@ -43,11 +43,6 @@ void lcdFormatterInit() {
 
 void lcdFormatterUpdate() {
     // Read motion state (avoid extensive I/O here)
-    int32_t x_pos = motionGetPosition(0);
-    int32_t y_pos = motionGetPosition(1);
-    int32_t z_pos = motionGetPosition(2);
-    int32_t a_pos = motionGetPosition(3);
-
     float x_mm = motionGetPositionMM(0);
     float y_mm = motionGetPositionMM(1);
     float z_mm = motionGetPositionMM(2);
