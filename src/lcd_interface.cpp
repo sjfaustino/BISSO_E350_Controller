@@ -96,7 +96,11 @@ void lcdInterfaceUpdate() {
         for (int i = 0; i < LCD_ROWS; i++) {
           if (lcd_state.display_dirty[i]) {
             lcd_i2c->setCursor(0, i);
-            lcd_i2c->print(lcd_state.display[i]);
+            // Print with explicit 20-character padding to clear old text
+            // Format: %-20s pads with spaces on the right
+            char padded_line[LCD_COLS + 1];
+            snprintf(padded_line, sizeof(padded_line), "%-20s", lcd_state.display[i]);
+            lcd_i2c->print(padded_line);
             lcd_state.display_dirty[i] = false;
           }
         }
