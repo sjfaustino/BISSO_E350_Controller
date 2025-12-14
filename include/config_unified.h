@@ -12,18 +12,21 @@
 
 // Configuration Constants
 // Increased to 128 to hold G54-G59 offsets (24 keys) + defaults
-#define CONFIG_MAX_KEYS 128 
+#define CONFIG_MAX_KEYS 128
 #define CONFIG_KEY_LEN 32
 #define CONFIG_VALUE_LEN 64
 
-// Note: config_type_t is defined in config_validator_schema.h
-// to avoid duplication, config_unified uses string-based storage
-// The validation schema provides the type information
+// Storage type enum (internal use in config_unified.cpp)
+// Different from config_validator_schema.h's config_type_t (used for validation)
+typedef enum {
+    CONFIG_INT32,
+    CONFIG_FLOAT,
+    CONFIG_STRING
+} config_storage_type_t;
 
 typedef struct {
     char key[CONFIG_KEY_LEN];
-    // Type information kept as string value internally
-    // Actual type checking done via config_validator_schema
+    config_storage_type_t type;  // Storage type (int/float/string)
     union {
         int32_t int_val;
         float float_val;
