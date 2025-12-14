@@ -208,7 +208,10 @@ bool jxk10ModbusReceiveResponse(void) {
     // Attempt to receive response
     uint8_t rx_data[32];
     memset(rx_data, 0, sizeof(rx_data));
-    int rx_len = encoderHalReceive(rx_data, sizeof(rx_data));
+    uint8_t rx_len = sizeof(rx_data);
+    if (!encoderHalReceive(rx_data, &rx_len)) {
+        rx_len = 0;
+    }
 
     if (rx_len <= 0) {
         if ((now - modbus_request_time_ms) > 200) {
@@ -254,7 +257,10 @@ bool jxk10ModbusReadStatus(void) {
 
     uint8_t rx_data[32];
     memset(rx_data, 0, sizeof(rx_data));
-    int rx_len = encoderHalReceive(rx_data, sizeof(rx_data));
+    uint8_t rx_len = sizeof(rx_data);
+    if (!encoderHalReceive(rx_data, &rx_len)) {
+        rx_len = 0;
+    }
 
     if (rx_len <= 0) {
         return false;
@@ -315,7 +321,10 @@ bool jxk10ModbusSetSlaveAddress(uint8_t new_address) {
     // Attempt to receive response
     uint8_t rx_data[32];
     memset(rx_data, 0, sizeof(rx_data));
-    int rx_len = encoderHalReceive(rx_data, sizeof(rx_data));
+    uint8_t rx_len = sizeof(rx_data);
+    if (!encoderHalReceive(rx_data, &rx_len)) {
+        rx_len = 0;
+    }
 
     if (rx_len < 8) {
         jxk10_state.error_count++;
@@ -349,7 +358,10 @@ bool jxk10ModbusSetSlaveAddress(uint8_t new_address) {
     delay(100);
 
     memset(rx_data, 0, sizeof(rx_data));
-    rx_len = encoderHalReceive(rx_data, sizeof(rx_data));
+    rx_len = sizeof(rx_data);
+    if (!encoderHalReceive(rx_data, &rx_len)) {
+        rx_len = 0;
+    }
 
     if (rx_len < 8) {
         jxk10_state.error_count++;

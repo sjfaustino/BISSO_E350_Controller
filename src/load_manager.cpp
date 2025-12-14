@@ -140,13 +140,13 @@ void loadManagerUpdate() {
 
         if (time_in_critical > CRITICAL_LOAD_TIMEOUT_MS && !load_state.emergency_triggered) {
             load_state.emergency_triggered = true;
-            logCritical("[LOAD_MGR] CRITICAL: Emergency E-STOP triggered after 30 seconds at max load");
+            logError("[LOAD_MGR] CRITICAL: Emergency E-STOP triggered after 30 seconds at max load");
             Serial.println("[LOAD_MGR] [CRITICAL] INITIATING EMERGENCY E-STOP DUE TO SYSTEM OVERLOAD");
 
             // This is safe - safetyEmergencyStop will be called
             // The safety system will handle the E-STOP
             // (Implementation depends on your safety module API)
-            logCritical("[LOAD_MGR] System overload detected - manual intervention required");
+            logError("[LOAD_MGR] System overload detected - manual intervention required");
         }
     }
 

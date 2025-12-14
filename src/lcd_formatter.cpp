@@ -23,23 +23,21 @@
 #include <freertos/semphr.h>
 
 // Static buffer to hold pre-formatted LCD strings
-static lcd_format_buffer_t format_buffer = {
-    .line0 = "",
-    .line1 = "",
-    .line2 = "",
-    .line3 = "",
-    .last_update_ms = 0
-};
+static lcd_format_buffer_t format_buffer;
+
+void initFormatBuffer() {
+    memset(&format_buffer, 0, sizeof(format_buffer));
+}
 
 // Mutex to protect the buffer from concurrent access
 static SemaphoreHandle_t format_mutex = NULL;
 
 void lcdFormatterInit() {
+    initFormatBuffer();
     format_mutex = xSemaphoreCreateMutex();
     if (!format_mutex) {
         logError("[LCD_FORMATTER] Failed to create mutex");
     }
-    memset(&format_buffer, 0, sizeof(format_buffer));
     logInfo("[LCD_FORMATTER] [OK] Initialized on Core 0");
 }
 
@@ -65,10 +63,10 @@ void lcdFormatterUpdate() {
     char enc_status[4] = "OK";
     for (int axis = 0; axis < 4; axis++) {
         const encoder_deviation_t* dev = encoderGetDeviationData(axis);
-        if (dev && dev->status == DEVIATION_WARNING) {
+        if (dev && dev->status == AXIS_DEVIATION_WARNING) {
             snprintf(enc_status, sizeof(enc_status), "WN");
             break;
-        } else if (dev && dev->status == DEVIATION_ERROR) {
+        } else if (dev && dev->status == AXIS_DEVIATION_ERROR) {
             snprintf(enc_status, sizeof(enc_status), "ER");
             break;
         }
@@ -97,7 +95,6 @@ void lcdFormatterUpdate() {
         else if (active_axis == 2) target_mm = (float)target_counts / (machineCal.Z.pulses_per_mm > 0 ? machineCal.Z.pulses_per_mm : 1000);
         else if (active_axis == 3) target_mm = (float)target_counts / (machineCal.A.pulses_per_degree > 0 ? machineCal.A.pulses_per_degree : 1000);
 
-        const char* axis_name = (active_axis <= 3) ? "XYZA"[active_axis] + 0 : '?';
         snprintf(temp_buffer.line1, 21, "Z:%6.1f A:%6.1f", z_mm, 0.0f);
     } else {
         snprintf(temp_buffer.line1, 21, "Z:%6.1f A:%6.1f", z_mm, 0.0f);
