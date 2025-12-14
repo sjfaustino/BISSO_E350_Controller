@@ -51,7 +51,7 @@
 
 The BISSO E350 is a **stone bridge saw with multiplexed motion control**:
 
-- **Single Altivar 31 Variable Frequency Drive (VFD)**: Controls frequency from 0-50 Hz for all three axes
+- **Single Altivar 31 Variable Frequency Drive (VFD)**: Controls frequency from 0-105 Hz for all three axes
 - **Three 3-Phase AC Induction Motors**: One for each axis (X, Y, Z)
 - **PLC Contactor System**: Selects which motor receives VFD power (only ONE axis moves at a time)
 - **Controller Firmware**: ESP32-based embedded system that signals the PLC via GPIO pins
@@ -63,13 +63,49 @@ The BISSO E350 is a **stone bridge saw with multiplexed motion control**:
 | Component | Specification |
 |-----------|--------------|
 | **VFD Model** | Schneider Altivar 31 |
-| **VFD Frequency Range** | 0-50 Hz (motor speed control) |
-| **Max Frequency** | 50 Hz = ~750 mm/s at 1 Hz = 15 mm/s baseline |
+| **VFD Frequency Range** | 0-105 Hz (hardware capability) |
+| **Max Output Frequency** | 105 Hz (tFr setting) |
+| **High Speed Setting** | 105 Hz (HSP setting) |
+| **Recommended Stone Cutting** | 5-20 Hz (safe speed for precision) |
+| **Baseline Velocity** | 1 Hz VFD = 15 mm/s at motor shaft |
 | **Encoder Resolution** | 100 PPR (pulses per revolution) |
 | **Default Calibration** | 100 pulses/mm (adjustable per axis) |
-| **Max Safe Speed** | 600 mm/min (0.4 Hz VFD) for stone cutting |
 | **Contactor Switching** | <50 ms per axis change |
 | **Safety Response Time** | <100 ms for emergency stop |
+
+### VFD Parameter Configuration
+
+The Altivar 31 VFD is pre-configured with the following parameters for optimal operation:
+
+| Parameter | Setting | Purpose |
+|-----------|---------|---------|
+| **ACC** | 0.6 sec | Motor acceleration ramp time (smooth speed-up) |
+| **DEC** | 0.4 sec | Motor deceleration ramp time (smooth speed-down) |
+| **LSP** | 1 Hz | Low speed limit (prevents uncontrolled creeping) |
+| **HSP** | 105 Hz | High speed limit (maximum frequency available) |
+| **iTH** | 3.5 A | Motor thermal protection current threshold |
+| **UFr** | 20/30 | Voltage boost (improves torque at low speeds) |
+| **FLG** | 0/30 | Frequency loop gain (encoder feedback stability) |
+| **slp** | 0 | Slip compensation (disabled for optimal encoder accuracy) |
+| **Vns** | 380 V | Nominal motor voltage (3-phase supply) |
+| **FrS** | 50 Hz | Nominal motor frequency (European motor standard) |
+| **tFr** | 105 Hz | Maximum output frequency (hardware limit) |
+
+**⚠️ IMPORTANT - Safe Operating Speeds for Different Applications**:
+
+| Application | Recommended Speed | VFD Frequency | Notes |
+|-------------|-------------------|----------------|-------|
+| **Precision Stone Cutting** | Slow | 5-20 Hz | ✅ **DEFAULT MODE** - Best quality cuts, most control |
+| **Standard Stone Cutting** | Medium | 20-40 Hz | Normal production speed, balance of speed and precision |
+| **Fast Material Removal** | Fast | 40-70 Hz | ⚠️ Use only for non-stone materials or rough operations |
+| **Polishing/Finishing** | Variable | 10-30 Hz | Slower speeds for fine surface finishing |
+| **Positioning (No Cut)** | Fast | 60-105 Hz | ✅ SAFE - Moving blank without cutting wheel spinning |
+
+**DO NOT:**
+- ❌ Run stone cutting operations above 40 Hz without explicit authorization
+- ❌ Use maximum frequency (105 Hz) with cutting wheel engaged
+- ❌ Attempt to change VFD settings without supervisor approval
+- ❌ Run continuous operation above 50 Hz for more than 10 minutes (thermal stress)
 
 ---
 
@@ -590,6 +626,144 @@ After moving an axis, check the **Diagnostics** tab to see the quality of that m
 - DO NOT USE for precision cutting
 - Must troubleshoot and repair before operation
 
+### VFD Speed Control Procedure
+
+The VFD frequency controls how fast the motors move. Different stone cutting applications require different speeds. This section shows how to select and monitor appropriate speeds.
+
+#### Understanding VFD Frequency and Axis Speed
+
+The relationship between VFD frequency and actual axis movement:
+
+```
+VFD Frequency = Motor Speed Control
+↓
+1 Hz VFD = 15 mm/s at motor shaft (baseline)
+↓
+Actual axis speed depends on motor gearbox ratio
+↓
+Example: 10 Hz VFD ≈ 150 mm/s (about 9 m/min) depending on transmission
+```
+
+**What This Means**:
+- Increasing VFD frequency makes axes move faster
+- Decreasing VFD frequency makes axes move slower
+- The relationship is approximately linear
+
+#### Safe Speed Selection for Stone Cutting
+
+**Before Any Cutting Operation**:
+
+1. **Determine Material Type**:
+   - Granite, marble, limestone → Use **5-20 Hz** (precision range)
+   - Engineered stone → Use **15-35 Hz** (standard range)
+   - Non-stone materials → Use **20-50 Hz** (fast range)
+
+2. **Determine Operation Type**:
+   - Detailed trim cuts → Use **5-10 Hz** (slow, most control)
+   - Standard production cuts → Use **10-20 Hz** (recommended default)
+   - Rough material removal → Use **20-40 Hz** (acceptable)
+   - Axis positioning (no cut) → Use **60-105 Hz** (safe when blade off)
+
+3. **Default Recommendation**:
+   - **For First-Time Operations: Always start at 10 Hz**
+   - Monitor results and quality score
+   - Adjust incrementally if needed (±2-3 Hz)
+
+#### Using Serial Console to Set Speed
+
+You can set a target frequency using the serial console:
+
+```bash
+# Set VFD frequency to 15 Hz
+motion speed 15
+
+# Expected output:
+[VFD] Setting frequency to 15.0 Hz
+[VFD] Ramp time: 0.6 seconds
+[MOTION] Frequency set, ready to operate
+
+# Set to slow precision speed
+motion speed 8
+
+# Expected output:
+[VFD] Setting frequency to 8.0 Hz
+[MOTION] Frequency set, ready to operate
+
+# Set to fast positioning (no cut)
+motion speed 80
+
+# Expected output:
+[VFD] Setting frequency to 80.0 Hz (positioning mode)
+[MOTION] Frequency set, ready to operate
+```
+
+#### Monitoring Speed During Operation
+
+**Real-Time Speed Monitoring**:
+
+1. Open **Diagnostics** tab in web dashboard
+2. Look at **VFD Diagnostics** section, "Frequency" field
+3. Verify frequency matches what you set
+
+**Example: Monitoring a 10 Hz Cut**:
+
+```
+Before Cut:
+  Frequency: 0.0 Hz          ← Motor idle
+  Current Output: 0.0 A      ← No load
+  Thermal Status: 30°C       ← Cool
+
+During Cut:
+  Frequency: 10.0 Hz         ← Running at target speed
+  Current Output: 5.0 A      ← Normal load on motor
+  Thermal Status: 45°C       ← Warming up (normal)
+  Quality Score: 98%         ← Excellent motion
+
+After Cut:
+  Frequency: 0.0 Hz          ← Motor stopped
+  Current Output: 0.0 A      ← No load
+  Thermal Status: 40°C       ← Cooling down
+```
+
+#### Speed Adjustment Guidelines
+
+**If Cut Quality Is Poor (Quality Score < 85%)**:
+
+Try **reducing speed by 2-3 Hz**:
+- 15 Hz cut has poor quality → Try 12 Hz
+- 20 Hz cut shows jitter → Try 17 Hz
+- Slower speeds give better control and precision
+
+**If Cut Is Too Slow (Production Falling Behind)**:
+
+Try **increasing speed by 3-5 Hz**:
+- 10 Hz cut is too slow → Try 13-15 Hz
+- 15 Hz cut acceptable but slow → Try 18-20 Hz
+- Always verify quality score remains above 80%
+
+**If VFD Is Getting Hot (Temperature > 75°C)**:
+
+**Reduce speed immediately**:
+- Current speed 50 Hz → Reduce to 35 Hz
+- Wait 5-10 minutes for cooling
+- Resume cutting at reduced speed
+- If thermal stress continues, stop operation
+
+#### Speed Ramp Behavior
+
+The VFD is configured with acceleration and deceleration ramps:
+
+- **Acceleration Ramp**: 0.6 seconds to reach target frequency
+- **Deceleration Ramp**: 0.4 seconds to stop from full speed
+
+**What This Means**:
+- Motor accelerates smoothly (no sudden jerks)
+- Motor decelerates smoothly (no sudden stops)
+- Stone receives consistent pressure during cuts
+- Protects mechanical components from shock loads
+
+**You Don't Need to Do Anything** - these ramps are automatic and controlled by the VFD.
+
 ---
 
 ## Web Interface Operation
@@ -649,6 +823,58 @@ SPACE bar            → Emergency stop (halts all motion immediately)
 - Troubleshoot motion problems
 
 **Green = Good, Red = Problem**
+
+#### Monitoring VFD Frequency During Operation
+
+The **VFD Diagnostics** section in the Diagnostics tab shows real-time frequency and performance:
+
+**During Stone Cutting Operations, Verify**:
+
+```
+Current Output:        2.5-10.0 A              ← Normal load on motor
+Frequency:             5.0-20.0 Hz             ← Precision cutting range
+Thermal Status:        35-65°C                 ← Normal operating temperature
+Fault Code:            0x0000                  ← No faults
+```
+
+**Frequency Interpretation**:
+
+- **0.0 Hz** = Motor stopped (idle)
+- **1-5 Hz** = Slow creep movement (calibration, positioning)
+- **5-20 Hz** = Precision stone cutting (default safe range)
+- **20-40 Hz** = Standard cutting speed (acceptable)
+- **40-70 Hz** = Fast material removal (use only for non-stone)
+- **70-105 Hz** = Rapid axis positioning without cutting wheel
+
+**If Frequency Exceeds Safe Range**:
+
+1. **Check Dashboard** - Is cutting wheel still engaged?
+   - If YES → Reduce speed immediately (may damage stone)
+   - If NO → OK for positioning at high speed
+
+2. **Reduce Frequency**:
+   - Use Motion tab jog controls (smaller step sizes)
+   - Or use Serial Console: `motion speed 15` (set to 15 Hz)
+
+3. **Monitor Thermal Status**:
+   - If temperature approaching 80°C, reduce speed
+   - If reaching 90°C, stop operation and allow cooling
+
+**Example: Safe Speed Selection for Precision Cut**
+
+```
+Task: Cut marble stone slab (precision required)
+↓
+Set VFD Frequency: 10 Hz (mid-range of safe 5-20 Hz)
+↓
+Monitor Quality Score: Should stay 95%+
+↓
+Monitor Jitter: Should stay < 0.5 mm/s
+↓
+Monitor Temperature: Should stay 40-60°C
+↓
+If quality drops below 80%, reduce to 8 Hz
+```
 
 ### Logs Tab (📋)
 
