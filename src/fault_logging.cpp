@@ -10,6 +10,9 @@
 #include <string.h>
 #include <time.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+
 static Preferences fault_prefs;
 static bool estop_active = false;
 static bool estop_recovery_requested = false;
@@ -318,3 +321,5 @@ const fault_entry_t* faultGetRingBufferEntry(uint8_t index) {
     uint8_t actual_idx = (fault_ring_buffer.head + index) % FAULT_RING_BUFFER_SIZE;
     return &fault_ring_buffer.entries[actual_idx];
 }
+
+#pragma GCC diagnostic pop

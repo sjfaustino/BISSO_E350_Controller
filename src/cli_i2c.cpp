@@ -344,10 +344,10 @@ void cmd_i2c_test(int argc, char** argv) {
         } else if (verbose) {
             char addr_str[8];
             snprintf(addr_str, sizeof(addr_str), "0x%02X", addr);
-            char read_result[12];
+            char read_result[20];
             snprintf(read_result, sizeof(read_result), "%s (%lu ms)",
                 read_res == I2C_RESULT_OK ? "OK" : "FAIL", (unsigned long)read_time);
-            char write_result[12];
+            char write_result[20];
             snprintf(write_result, sizeof(write_result), "%s (%lu ms)",
                 write_res == I2C_RESULT_OK ? "OK" : "FAIL", (unsigned long)write_time);
             char stab[12];

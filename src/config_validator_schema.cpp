@@ -13,6 +13,8 @@
 
 // Configuration schema descriptors
 // Central definition of all valid configuration parameters
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 static const config_descriptor_t config_schema[] = {
     // === NETWORK ===
     {
@@ -286,6 +288,7 @@ static const config_descriptor_t config_schema[] = {
         .critical = false
     },
 };
+#pragma GCC diagnostic pop
 
 static const int schema_count = sizeof(config_schema) / sizeof(config_descriptor_t);
 

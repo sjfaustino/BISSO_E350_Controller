@@ -119,11 +119,6 @@ void safetyUpdate() {
             int32_t temp_warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
             int32_t temp_crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
 
-            // Convert percentage to approximate Celsius (typical range: 20-120°C nominal operation)
-            // Assumption: 100% thermal state ≈ 60°C heatsink temp
-            // This is a heuristic; actual conversion depends on VFD model calibration
-            int32_t approx_temp_c = (thermal_state > 100) ? (20 + (thermal_state - 100)) : 60;
-
             if (thermal_state > (temp_crit * 1.4)) {  // Over 140% or absolute >90°C
                 logError("[SAFETY] [FAIL] VFD Thermal Critical: %d%% (>%ld°C)",
                          thermal_state, (long)temp_crit);

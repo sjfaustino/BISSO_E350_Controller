@@ -3,6 +3,9 @@
  * @brief Firmware Self-Test Suite Implementation (PHASE 5.2)
  */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+
 #include "firmware_selftest.h"
 #include "memory_monitor.h"
 #include "motion.h"
@@ -410,3 +413,5 @@ bool selftestQuickCheck() {
     selftestFreeResults(&suite);
     return all_quick_pass;
 }
+
+#pragma GCC diagnostic pop
