@@ -345,6 +345,58 @@
                 </div>
             </div>
         </div>
+
+        <!-- Configuration Import/Export Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Configuration Management</h2>
+            </div>
+            <div class="card-content">
+                <div style="margin-bottom: 20px;">
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Configuration Presets</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <select id="preset-select" class="form-control">
+                            <option value="">-- Select a preset --</option>
+                            <option value="aluminum">Aluminum Cutting</option>
+                            <option value="steel">Steel Cutting</option>
+                            <option value="plastic">Plastic Cutting</option>
+                            <option value="wood">Wood Cutting</option>
+                            <option value="engraving">Engraving</option>
+                        </select>
+                        <button class="btn btn-primary" id="load-preset-btn">Load Preset</button>
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Export Configuration</h3>
+                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
+                        Download current configuration as JSON file for backup or sharing
+                    </p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button class="btn btn-secondary" id="export-all-btn">Export All Settings</button>
+                        <button class="btn btn-ghost" id="export-motion-btn">Export Motion Only</button>
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Import Configuration</h3>
+                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
+                        Upload a previously saved configuration file to restore settings
+                    </p>
+                    <button class="btn btn-secondary" id="import-config-btn" style="width: 100%; margin-bottom: 10px;">Choose File & Import</button>
+                    <div id="import-status" style="font-size: var(--font-size-sm); display: none; padding: 10px; background: var(--bg-secondary); border-radius: 4px; margin-top: 10px;"></div>
+                </div>
+
+                <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Comparison</h3>
+                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
+                        Compare current settings with a backup file before importing
+                    </p>
+                    <button class="btn btn-ghost" id="compare-config-btn">Compare with File</button>
+                    <div id="comparison-result" style="font-size: var(--font-size-sm); display: none; margin-top: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 4px; max-height: 200px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 

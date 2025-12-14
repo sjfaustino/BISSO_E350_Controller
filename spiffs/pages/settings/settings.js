@@ -24,6 +24,7 @@ const SettingsModule = {
         console.log('[Settings] Initializing');
         this.loadSettings();
         this.setupEventListeners();
+        this.setupConfigManagement();
         this.updateDisplay();
         this.loadConfiguration();
         window.addEventListener('state-changed', () => this.updateSystemInfo());
@@ -686,6 +687,268 @@ const SettingsModule = {
             status.textContent = '✗ ' + message;
             status.className = 'card-status error';
         }
+    },
+
+    // Configuration Import/Export
+    setupConfigManagement() {
+        // Preset loader
+        const loadPresetBtn = document.getElementById('load-preset-btn');
+        if (loadPresetBtn) {
+            loadPresetBtn.addEventListener('click', () => this.loadPreset());
+        }
+
+        // Export buttons
+        const exportAllBtn = document.getElementById('export-all-btn');
+        if (exportAllBtn) {
+            exportAllBtn.addEventListener('click', () => this.exportConfiguration('all'));
+        }
+
+        const exportMotionBtn = document.getElementById('export-motion-btn');
+        if (exportMotionBtn) {
+            exportMotionBtn.addEventListener('click', () => this.exportConfiguration('motion'));
+        }
+
+        // Import button
+        const importBtn = document.getElementById('import-config-btn');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => this.importConfiguration());
+        }
+
+        // Compare button
+        const compareBtn = document.getElementById('compare-config-btn');
+        if (compareBtn) {
+            compareBtn.addEventListener('click', () => this.compareConfiguration());
+        }
+    },
+
+    getPresets() {
+        return {
+            aluminum: {
+                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
+                vfd: { min_speed: 20, max_speed: 85, acc_time: 600, dec_time: 400 },
+                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
+            },
+            steel: {
+                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
+                vfd: { min_speed: 10, max_speed: 50, acc_time: 800, dec_time: 600 },
+                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
+            },
+            plastic: {
+                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
+                vfd: { min_speed: 30, max_speed: 105, acc_time: 400, dec_time: 300 },
+                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
+            },
+            wood: {
+                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
+                vfd: { min_speed: 25, max_speed: 95, acc_time: 500, dec_time: 350 },
+                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
+            },
+            engraving: {
+                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
+                vfd: { min_speed: 40, max_speed: 105, acc_time: 300, dec_time: 200 },
+                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
+            }
+        };
+    },
+
+    loadPreset() {
+        const select = document.getElementById('preset-select');
+        if (!select || !select.value) {
+            AlertManager.add('Please select a preset', 'warning', 2000);
+            return;
+        }
+
+        const presets = this.getPresets();
+        const preset = presets[select.value];
+
+        if (preset) {
+            // Apply preset values to form fields
+            if (preset.motion) {
+                document.getElementById('x-limit-low').value = preset.motion.x_min;
+                document.getElementById('x-limit-high').value = preset.motion.x_max;
+                document.getElementById('y-limit-low').value = preset.motion.y_min;
+                document.getElementById('y-limit-high').value = preset.motion.y_max;
+                document.getElementById('z-limit-low').value = preset.motion.z_min;
+                document.getElementById('z-limit-high').value = preset.motion.z_max;
+            }
+
+            if (preset.vfd) {
+                document.getElementById('vfd-min-speed').value = preset.vfd.min_speed;
+                document.getElementById('vfd-max-speed').value = preset.vfd.max_speed;
+                document.getElementById('vfd-acc-time').value = preset.vfd.acc_time;
+                document.getElementById('vfd-dec-time').value = preset.vfd.dec_time;
+                document.getElementById('vfd-min-display').textContent = preset.vfd.min_speed;
+                document.getElementById('vfd-max-display').textContent = preset.vfd.max_speed;
+                document.getElementById('vfd-acc-display').textContent = preset.vfd.acc_time;
+                document.getElementById('vfd-dec-display').textContent = preset.vfd.dec_time;
+            }
+
+            AlertManager.add(`Preset '${select.value}' loaded. Review and save changes.`, 'success', 3000);
+        }
+    },
+
+    exportConfiguration(type) {
+        const config = {
+            timestamp: new Date().toISOString(),
+            firmware_version: '3.1.0',
+            type: type,
+            data: {}
+        };
+
+        if (type === 'all' || type === 'motion') {
+            config.data.motion = {
+                x_min: document.getElementById('x-limit-low').value || 0,
+                x_max: document.getElementById('x-limit-high').value || 500,
+                y_min: document.getElementById('y-limit-low').value || 0,
+                y_max: document.getElementById('y-limit-high').value || 500,
+                z_min: document.getElementById('z-limit-low').value || 0,
+                z_max: document.getElementById('z-limit-high').value || 100
+            };
+        }
+
+        if (type === 'all') {
+            config.data.vfd = {
+                min_speed: document.getElementById('vfd-min-speed').value || 1,
+                max_speed: document.getElementById('vfd-max-speed').value || 105,
+                acc_time: document.getElementById('vfd-acc-time').value || 600,
+                dec_time: document.getElementById('vfd-dec-time').value || 400
+            };
+
+            config.data.encoder = {
+                x_ppm: document.getElementById('x-encoder-ppm').value || 100,
+                y_ppm: document.getElementById('y-encoder-ppm').value || 100,
+                z_ppm: document.getElementById('z-encoder-ppm').value || 100,
+                a_ppm: 50
+            };
+        }
+
+        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `config-${type}-${Date.now()}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        AlertManager.add(`Configuration exported as ${a.download}`, 'success', 3000);
+    },
+
+    importConfiguration() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const config = JSON.parse(event.target.result);
+                        this.applyConfiguration(config);
+                    } catch (err) {
+                        AlertManager.add('Invalid configuration file', 'critical', 3000);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+        input.click();
+    },
+
+    applyConfiguration(config) {
+        if (!config || !config.data) {
+            AlertManager.add('Invalid configuration format', 'critical', 3000);
+            return;
+        }
+
+        if (config.data.motion) {
+            document.getElementById('x-limit-low').value = config.data.motion.x_min;
+            document.getElementById('x-limit-high').value = config.data.motion.x_max;
+            document.getElementById('y-limit-low').value = config.data.motion.y_min;
+            document.getElementById('y-limit-high').value = config.data.motion.y_max;
+            document.getElementById('z-limit-low').value = config.data.motion.z_min;
+            document.getElementById('z-limit-high').value = config.data.motion.z_max;
+        }
+
+        if (config.data.vfd) {
+            document.getElementById('vfd-min-speed').value = config.data.vfd.min_speed;
+            document.getElementById('vfd-max-speed').value = config.data.vfd.max_speed;
+            document.getElementById('vfd-acc-time').value = config.data.vfd.acc_time;
+            document.getElementById('vfd-dec-time').value = config.data.vfd.dec_time;
+        }
+
+        if (config.data.encoder) {
+            document.getElementById('x-encoder-ppm').value = config.data.encoder.x_ppm;
+            document.getElementById('y-encoder-ppm').value = config.data.encoder.y_ppm;
+            document.getElementById('z-encoder-ppm').value = config.data.encoder.z_ppm;
+        }
+
+        AlertManager.add('Configuration loaded. Review changes and save.', 'success', 3000);
+
+        const statusDiv = document.getElementById('import-status');
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = `✓ Loaded configuration from ${new Date().toLocaleString()}`;
+        }
+    },
+
+    compareConfiguration() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const fileConfig = JSON.parse(event.target.result);
+                        const currentConfig = this.getCurrentConfiguration();
+                        this.displayComparison(fileConfig, currentConfig);
+                    } catch (err) {
+                        AlertManager.add('Invalid file for comparison', 'critical', 3000);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+        input.click();
+    },
+
+    getCurrentConfiguration() {
+        return {
+            motion: {
+                x_min: document.getElementById('x-limit-low').value || 0,
+                x_max: document.getElementById('x-limit-high').value || 500,
+                y_min: document.getElementById('y-limit-low').value || 0,
+                y_max: document.getElementById('y-limit-high').value || 500
+            },
+            vfd: {
+                min_speed: document.getElementById('vfd-min-speed').value || 1,
+                max_speed: document.getElementById('vfd-max-speed').value || 105
+            }
+        };
+    },
+
+    displayComparison(fileConfig, currentConfig) {
+        const resultDiv = document.getElementById('comparison-result');
+        if (!resultDiv) return;
+
+        let html = '<strong>Configuration Comparison:</strong><br>';
+
+        if (fileConfig.data && fileConfig.data.motion && currentConfig.motion) {
+            html += '<br><strong>Motion Settings:</strong><br>';
+            Object.keys(fileConfig.data.motion).forEach(key => {
+                const fileVal = fileConfig.data.motion[key];
+                const currVal = currentConfig.motion[key];
+                const match = fileVal === currVal;
+                const color = match ? 'green' : 'orange';
+                html += `<span style="color: ${color};">${key}: ${currVal} → ${fileVal}</span><br>`;
+            });
+        }
+
+        resultDiv.innerHTML = html;
+        resultDiv.style.display = 'block';
     },
 
     cleanup() {

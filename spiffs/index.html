@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="css/cards.css">
     <link rel="stylesheet" href="css/charts.css">
     <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/mobile-menu.css">
 
     <style>
         /* Quick styles for alerts container */
@@ -101,6 +102,11 @@
     <!-- Header -->
     <header role="banner">
         <div style="display: flex; align-items: center; gap: var(--space-md);">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
             <h1>⚙️ BISSO E350</h1>
             <div class="status-indicator" aria-label="System connection status">
                 <div class="status-dot online" id="status-dot"></div>
@@ -110,11 +116,13 @@
     </header>
 
     <!-- Navigation -->
-    <nav role="navigation" aria-label="Main navigation">
+    <nav role="navigation" aria-label="Main navigation" id="main-nav">
         <ul>
             <li><a href="#dashboard" class="nav-item active" data-icon="📊"><span>Dashboard</span></a></li>
             <li><a href="#motion" class="nav-item" data-icon="🎮"><span>Motion</span></a></li>
             <li><a href="#diagnostics" class="nav-item" data-icon="🔍"><span>Diagnostics</span></a></li>
+            <li><a href="#network" class="nav-item" data-icon="🌐"><span>Network</span></a></li>
+            <li><a href="#system" class="nav-item" data-icon="ℹ️"><span>System</span></a></li>
             <li><a href="#maintenance" class="nav-item" data-icon="🔧"><span>Maintenance</span></a></li>
             <li><a href="#logs" class="nav-item" data-icon="📋"><span>Logs</span></a></li>
             <li><a href="#settings" class="nav-item" data-icon="⚙️"><span>Settings</span></a></li>
@@ -133,7 +141,7 @@
 
     <!-- Footer -->
     <footer>
-        <p>BISSO E350 Dashboard v3.0 | Last Update: <span id="last-update">--</span> | Latency: <span id="latency">-- ms</span></p>
+        <p>BISSO E350 Dashboard v3.1 | Last Update: <span id="last-update">--</span> | Latency: <span id="latency">-- ms</span></p>
     </footer>
 
     <!-- Shared Modules -->
@@ -152,6 +160,7 @@
             static init() {
                 this.setupEventListeners();
                 this.updateStatus();
+                this.initMobileMenu();
                 console.log('[APP] Initialized');
             }
 
@@ -195,6 +204,35 @@
                         const next = themes[(index + 1) % themes.length];
                         ThemeManager.applyTheme(next);
                         AlertManager.add(`Theme: ${next}`, 'info', 2000);
+                    }
+                });
+            }
+
+            static initMobileMenu() {
+                const toggle = document.getElementById('mobile-menu-toggle');
+                const nav = document.getElementById('main-nav');
+
+                if (!toggle || !nav) return;
+
+                toggle.addEventListener('click', () => {
+                    const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', !isExpanded);
+                    nav.classList.toggle('open');
+                });
+
+                // Close menu when nav item clicked
+                nav.querySelectorAll('.nav-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        toggle.setAttribute('aria-expanded', 'false');
+                        nav.classList.remove('open');
+                    });
+                });
+
+                // Close menu on Escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        toggle.setAttribute('aria-expanded', 'false');
+                        nav.classList.remove('open');
                     }
                 });
             }

@@ -1,0 +1,149 @@
+/**
+ * Mobile Menu Styles
+ * Provides responsive hamburger menu for mobile devices
+ */
+
+/* Hamburger Menu Button */
+.mobile-menu-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: space-around;
+    width: 30px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.mobile-menu-toggle span {
+    width: 100%;
+    height: 2px;
+    background: var(--text-primary);
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-toggle[aria-expanded="true"] span:nth-child(1) {
+    transform: rotate(-45deg) translate(-8px, 8px);
+}
+
+.mobile-menu-toggle[aria-expanded="true"] span:nth-child(2) {
+    opacity: 0;
+}
+
+.mobile-menu-toggle[aria-expanded="true"] span:nth-child(3) {
+    transform: rotate(45deg) translate(-8px, -8px);
+}
+
+/* Show hamburger menu on tablets */
+@media (max-width: 991px) {
+    .mobile-menu-toggle {
+        display: flex;
+    }
+}
+
+/* Mobile Menu - Dropdown style */
+@media (max-width: 991px) {
+    nav {
+        position: static;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+    }
+
+    nav.open {
+        max-height: 500px;
+    }
+
+    nav ul {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    nav li {
+        width: 100%;
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+    }
+
+    .nav-item span {
+        display: inline;
+    }
+
+    .nav-item::before {
+        content: attr(data-icon);
+        margin-right: var(--space-xs);
+    }
+}
+
+/* Mobile Navigation - Hide labels on very small screens */
+@media (max-width: 767px) {
+    nav.open {
+        max-height: 400px;
+    }
+
+    .nav-item {
+        padding: var(--space-md);
+        font-size: var(--font-size-base);
+    }
+
+    .nav-item span {
+        display: inline;
+    }
+}
+
+/* Small mobile - Stack navigation items */
+@media (max-width: 479px) {
+    nav.open {
+        max-height: 350px;
+    }
+
+    .nav-item {
+        padding: var(--space-sm) var(--space-md);
+        font-size: 12px;
+    }
+
+    .mobile-menu-toggle {
+        width: 28px;
+        height: 22px;
+    }
+
+    .mobile-menu-toggle span {
+        height: 2px;
+    }
+}
+
+/* Landscape orientation */
+@media (max-height: 500px) and (orientation: landscape) {
+    nav.open {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+
+    .nav-item {
+        padding: var(--space-sm);
+        font-size: 12px;
+    }
+}
+
+/* Touch device improvements */
+@media (hover: none) and (pointer: coarse) {
+    .mobile-menu-toggle {
+        min-height: 48px;
+        min-width: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .mobile-menu-toggle:active {
+        opacity: 0.7;
+    }
+}

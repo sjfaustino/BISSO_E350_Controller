@@ -4,11 +4,46 @@
 const MotionModule = {
     stepSize: 10,
     isMoving: false,
+    positionViz: null,
 
     init() {
         console.log('[Motion] Initializing');
+        this.setupPositionVisualization();
         this.setupEventListeners();
         window.addEventListener('state-changed', () => this.onStateChanged());
+    },
+
+    setupPositionVisualization() {
+        // Initialize position visualization canvas
+        const canvas = document.getElementById('position-canvas');
+        if (canvas) {
+            // Set canvas size
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width || 600;
+            canvas.height = rect.height || 350;
+
+            // Create visualizer with configuration
+            this.positionViz = new PositionVisualizer('position-canvas', {
+                x_min: -100,
+                x_max: 500,
+                y_min: -100,
+                y_max: 500,
+                z_min: 0,
+                z_max: 100,
+                showGrid: true,
+                showLimits: true,
+                showTrail: true
+            });
+
+            // Clear trail button
+            const clearBtn = document.getElementById('clear-trail');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    this.positionViz.clearTrail();
+                    AlertManager.add('Position trail cleared', 'info', 1500);
+                });
+            }
+        }
     },
 
     setupEventListeners() {
@@ -97,10 +132,20 @@ const MotionModule = {
         const state = AppState.data;
 
         if (state.motion) {
-            document.getElementById('pos-x').textContent = (state.motion.position?.x || 0).toFixed(2) + ' mm';
-            document.getElementById('pos-y').textContent = (state.motion.position?.y || 0).toFixed(2) + ' mm';
-            document.getElementById('pos-z').textContent = (state.motion.position?.z || 0).toFixed(2) + ' mm';
-            document.getElementById('pos-a').textContent = (state.motion.position?.a || 0).toFixed(2) + ' °';
+            const x = state.motion.position?.x || 0;
+            const y = state.motion.position?.y || 0;
+            const z = state.motion.position?.z || 0;
+            const a = state.motion.position?.a || 0;
+
+            document.getElementById('pos-x').textContent = x.toFixed(2) + ' mm';
+            document.getElementById('pos-y').textContent = y.toFixed(2) + ' mm';
+            document.getElementById('pos-z').textContent = z.toFixed(2) + ' mm';
+            document.getElementById('pos-a').textContent = a.toFixed(2) + ' °';
+
+            // Update position visualization
+            if (this.positionViz) {
+                this.positionViz.updatePosition(x, y, z, a);
+            }
 
             this.isMoving = state.motion.moving || false;
         }
@@ -108,6 +153,10 @@ const MotionModule = {
 
     cleanup() {
         console.log('[Motion] Cleaning up');
+        if (this.positionViz) {
+            this.positionViz.destroy();
+            this.positionViz = null;
+        }
     }
 };
 

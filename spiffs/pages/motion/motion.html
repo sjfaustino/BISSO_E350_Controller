@@ -2,6 +2,18 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
+                <h2>Real-Time Position Visualization</h2>
+                <button class="btn btn-sm" id="clear-trail" title="Clear position trail">Clear Trail</button>
+            </div>
+            <div class="card-content" style="padding: 0; display: flex; justify-content: center; align-items: center; min-height: 350px;">
+                <canvas id="position-canvas" style="width: 100%; max-width: 100%; border: 1px solid var(--border-color); border-radius: var(--radius-md);"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
                 <h2>XY Jog Controls</h2>
             </div>
             <div class="card-content">
