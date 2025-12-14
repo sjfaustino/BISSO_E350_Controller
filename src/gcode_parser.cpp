@@ -15,6 +15,7 @@
 #include "lcd_sleep.h"    // PHASE 4.0: M255 LCD sleep support
 #include "plc_iface.h"    // PHASE 4.0: M226 pin state reading
 #include "board_inputs.h"  // PHASE 4.0: M226 board input reading
+#include "hardware_config.h"  // For MachineCalibration in handleM114()
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -245,7 +246,6 @@ void GCodeParser::pushMove(float x, float y, float z, float a) {
 
 void GCodeParser::handleG90() { distanceMode = G_MODE_ABSOLUTE; }
 void GCodeParser::handleG91() { distanceMode = G_MODE_RELATIVE; }
-void GCodeParser::handleG92(const char* line) { logWarning("[GCODE] G92 not supported, use G10 L20"); }
 
 // PHASE 3.2: M117 - Display message on LCD
 void GCodeParser::handleM117(const char* line) {
@@ -280,8 +280,7 @@ void GCodeParser::handleM114() {
     int32_t a_counts = motionGetPosition(3);
     float a_deg = 0.0f;
 
-    // Get calibration data for A axis (from hardware_config.h extern)
-    extern MachineCalibration machineCal;
+    // Get calibration data for A axis (from hardware_config.h)
     if (machineCal.A.pulses_per_degree > 0) {
         a_deg = a_counts / machineCal.A.pulses_per_degree;
     } else {

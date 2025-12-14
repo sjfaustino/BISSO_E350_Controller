@@ -16,10 +16,10 @@
 // ============================================================================
 
 static encoder_deviation_t deviation_data[MOTION_AXES] = {
-    {AXIS_OK, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {AXIS_OK, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {AXIS_OK, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {AXIS_OK, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+    {AXIS_OK, 0, 0, 0, 0, 0, 0, 0, 0},
+    {AXIS_OK, 0, 0, 0, 0, 0, 0, 0, 0},
+    {AXIS_OK, 0, 0, 0, 0, 0, 0, 0, 0},
+    {AXIS_OK, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
 // ============================================================================
@@ -93,7 +93,7 @@ void encoderDeviationUpdate(uint8_t axis, int32_t expected_pos, int32_t actual_p
                 // Sustained deviation - escalate to error
                 dev->status = AXIS_DEVIATION_ERROR;
                 dev->alarm_count++;
-                faultLogEntry(FAULT_ERROR, FAULT_ENCODER_DEVIATION, axis, dev->deviation_counts,
+                faultLogEntry(FAULT_ERROR, FAULT_ENCODER_SPIKE, axis, dev->deviation_counts,
                     "Sustained encoder deviation: %ld counts", (long)dev->deviation_counts);
                 logError("[ENCODER_DEV] Axis %d: SUSTAINED DEVIATION ALARM", axis);
             }
