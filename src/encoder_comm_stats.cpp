@@ -1,9 +1,12 @@
 #include "encoder_comm_stats.h"
 #include "fault_logging.h"
 
-// ESP32-S3 Pins
-#define ENCODER_SERIAL_RX 14
-#define ENCODER_SERIAL_TX 33
+// ESP32-WROOM-32E Pin Configuration
+// For KC868-A16: Configure encoder serial pins via KCS config
+// Default: UART1 on GPIO9 (RX) / GPIO10 (TX) if not remapped
+// Alternative: Any GPIO pair can be remapped via serial port config
+#define ENCODER_SERIAL_RX 9      // GPIO9 (default UART1 RX)
+#define ENCODER_SERIAL_TX 10     // GPIO10 (default UART1 TX)
 
 // Fully initialize struct to prevent missing field warnings
 static encoder_stats_t stats = {0, 0, 0, 0, 0, 0, 9600, 0, 0.0f, 0};
