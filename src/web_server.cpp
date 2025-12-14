@@ -24,6 +24,7 @@
 #include "dashboard_metrics.h"  // PHASE 5.3: Web UI dashboard metrics
 #include "altivar31_modbus.h"  // PHASE 5.5: VFD current monitoring
 #include "vfd_current_calibration.h"  // PHASE 5.5: Current calibration
+#include "api_config.h"  // PHASE 5.6: Configuration API for web settings
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -157,6 +158,9 @@ void WebServerManager::handleClient() {
 }
 
 void WebServerManager::setupRoutes() {
+    // PHASE 5.6: Initialize configuration API
+    apiConfigInit();
+
     // 1. Static Files (Protected)
     server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setAuthentication(http_username, http_password);
 
@@ -478,6 +482,180 @@ void WebServerManager::setupRoutes() {
     // 13. DELEGATE FILE MANAGEMENT
     // Registers /api/files (GET, DELETE) and /api/upload (POST)
     apiRegisterFileRoutes(server, http_username, http_password);
+
+    // 14. PHASE 5.6: CONFIGURATION API (Protected, Rate Limited)
+    // GET /api/config/get?category=<N> - Retrieve configuration by category
+    server->on("/api/config/get", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        AsyncWebParameter* categoryParam = request->getParam("category");
+        if (!categoryParam) {
+            request->send(400, "application/json", "{\"error\":\"Missing category parameter\"}");
+            return;
+        }
+
+        int category = atoi(categoryParam->value().c_str());
+        StaticJsonDocument<512> doc;
+
+        if (!apiConfigGet((config_category_t)category, doc)) {
+            request->send(400, "application/json", "{\"error\":\"Invalid category\"}");
+            return;
+        }
+
+        char response[512];
+        size_t size = serializeJson(doc, response, sizeof(response));
+        request->send(200, "application/json", response);
+    });
+
+    // POST /api/config/set - Set configuration value
+    server->on("/api/config/set", HTTP_POST, nullptr, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        StaticJsonDocument<256> doc;
+        DeserializationError error = deserializeJson(doc, data, len);
+
+        if (error) {
+            request->send(400, "application/json", "{\"error\":\"JSON parse failed\"}");
+            return;
+        }
+
+        int category = doc["category"] | -1;
+        const char* key = doc["key"];
+        JsonVariant value = doc["value"];
+
+        if (category < 0 || !key) {
+            request->send(400, "application/json", "{\"error\":\"Missing required fields\"}");
+            return;
+        }
+
+        if (!apiConfigSet((config_category_t)category, key, value)) {
+            request->send(400, "application/json", "{\"error\":\"Failed to set configuration\"}");
+            return;
+        }
+
+        if (!apiConfigSave()) {
+            request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
+            return;
+        }
+
+        request->send(200, "application/json", "{\"success\":true}");
+    });
+
+    // POST /api/config/validate - Validate configuration change
+    server->on("/api/config/validate", HTTP_POST, nullptr, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        StaticJsonDocument<256> doc;
+        DeserializationError error = deserializeJson(doc, data, len);
+
+        if (error) {
+            request->send(400, "application/json", "{\"error\":\"JSON parse failed\"}");
+            return;
+        }
+
+        int category = doc["category"] | -1;
+        const char* key = doc["key"];
+        JsonVariant value = doc["value"];
+
+        if (category < 0 || !key) {
+            request->send(400, "application/json", "{\"error\":\"Missing required fields\"}");
+            return;
+        }
+
+        char error_msg[256];
+        if (!apiConfigValidate((config_category_t)category, key, value, error_msg, sizeof(error_msg))) {
+            StaticJsonDocument<128> response;
+            response["valid"] = false;
+            response["error"] = error_msg;
+            char response_str[256];
+            serializeJson(response, response_str, sizeof(response_str));
+            request->send(200, "application/json", response_str);
+            return;
+        }
+
+        request->send(200, "application/json", "{\"valid\":true}");
+    });
+
+    // GET /api/config/schema?category=<N> - Get configuration schema
+    server->on("/api/config/schema", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        AsyncWebParameter* categoryParam = request->getParam("category");
+        if (!categoryParam) {
+            request->send(400, "application/json", "{\"error\":\"Missing category parameter\"}");
+            return;
+        }
+
+        int category = atoi(categoryParam->value().c_str());
+        StaticJsonDocument<512> doc;
+
+        if (!apiConfigGetSchema((config_category_t)category, doc)) {
+            request->send(400, "application/json", "{\"error\":\"Invalid category\"}");
+            return;
+        }
+
+        char response[512];
+        size_t size = serializeJson(doc, response, sizeof(response));
+        request->send(200, "application/json", response);
+    });
+
+    // POST /api/encoder/calibrate - Calibrate encoder axis
+    server->on("/api/encoder/calibrate", HTTP_POST, nullptr, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        StaticJsonDocument<128> doc;
+        DeserializationError error = deserializeJson(doc, data, len);
+
+        if (error) {
+            request->send(400, "application/json", "{\"error\":\"JSON parse failed\"}");
+            return;
+        }
+
+        int axis = doc["axis"] | -1;
+        int ppm = doc["ppm"] | 0;
+
+        if (axis < 0 || axis > 2 || ppm < 50 || ppm > 200) {
+            request->send(400, "application/json", "{\"error\":\"Invalid axis or PPM value\"}");
+            return;
+        }
+
+        if (!apiConfigCalibrateEncoder((uint8_t)axis, (uint16_t)ppm)) {
+            request->send(400, "application/json", "{\"error\":\"Failed to calibrate encoder\"}");
+            return;
+        }
+
+        if (!apiConfigSave()) {
+            request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
+            return;
+        }
+
+        request->send(200, "application/json", "{\"success\":true}");
+    });
 
     server->onNotFound([](AsyncWebServerRequest *request){
         request->send(404, "text/plain", "Not Found");

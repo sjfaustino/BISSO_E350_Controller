@@ -25,6 +25,7 @@ const SettingsModule = {
         this.loadSettings();
         this.setupEventListeners();
         this.updateDisplay();
+        this.loadConfiguration();
         window.addEventListener('state-changed', () => this.updateSystemInfo());
     },
 
@@ -119,6 +120,85 @@ const SettingsModule = {
 
         document.getElementById('factory-reset-btn')?.addEventListener('click', () => {
             this.factoryReset();
+        });
+
+        // Motion control listeners
+        document.getElementById('save-motion-btn')?.addEventListener('click', () => {
+            this.saveMotionSettings();
+        });
+
+        document.getElementById('reset-motion-btn')?.addEventListener('click', () => {
+            this.resetMotionSettings();
+        });
+
+        // Real-time input updates for motion (display feedback)
+        ['x-limit-low', 'x-limit-high', 'y-limit-low', 'y-limit-high', 'z-limit-low', 'z-limit-high'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', () => {
+                this.hideError('motion');
+            });
+        });
+
+        // VFD parameters listeners
+        document.getElementById('save-vfd-btn')?.addEventListener('click', () => {
+            this.saveVfdSettings();
+        });
+
+        document.getElementById('reset-vfd-btn')?.addEventListener('click', () => {
+            this.resetVfdSettings();
+        });
+
+        // Real-time display updates for VFD
+        document.getElementById('vfd-min-speed')?.addEventListener('input', (e) => {
+            document.getElementById('vfd-min-display').textContent = e.target.value;
+            this.hideError('vfd');
+        });
+
+        document.getElementById('vfd-max-speed')?.addEventListener('input', (e) => {
+            document.getElementById('vfd-max-display').textContent = e.target.value;
+            this.hideError('vfd');
+        });
+
+        document.getElementById('vfd-acc-time')?.addEventListener('input', (e) => {
+            document.getElementById('vfd-acc-display').textContent = e.target.value;
+            this.hideError('vfd');
+        });
+
+        document.getElementById('vfd-dec-time')?.addEventListener('input', (e) => {
+            document.getElementById('vfd-dec-display').textContent = e.target.value;
+            this.hideError('vfd');
+        });
+
+        // Encoder calibration listeners
+        document.getElementById('calibrate-x-btn')?.addEventListener('click', () => {
+            this.calibrateEncoder(0);
+        });
+
+        document.getElementById('calibrate-y-btn')?.addEventListener('click', () => {
+            this.calibrateEncoder(1);
+        });
+
+        document.getElementById('calibrate-z-btn')?.addEventListener('click', () => {
+            this.calibrateEncoder(2);
+        });
+
+        document.getElementById('reset-encoder-btn')?.addEventListener('click', () => {
+            this.resetEncoderSettings();
+        });
+
+        // Real-time display updates for encoder
+        document.getElementById('x-encoder-ppm')?.addEventListener('input', (e) => {
+            document.getElementById('x-ppm-display').textContent = e.target.value;
+            this.hideError('encoder');
+        });
+
+        document.getElementById('y-encoder-ppm')?.addEventListener('input', (e) => {
+            document.getElementById('y-ppm-display').textContent = e.target.value;
+            this.hideError('encoder');
+        });
+
+        document.getElementById('z-encoder-ppm')?.addEventListener('input', (e) => {
+            document.getElementById('z-ppm-display').textContent = e.target.value;
+            this.hideError('encoder');
         });
     },
 
@@ -312,6 +392,299 @@ const SettingsModule = {
         } catch (e) {
             console.warn('[Settings] Failed to save settings:', e);
             AlertManager.add('Failed to save settings (storage full)', 'warning');
+        }
+    },
+
+    // =====================================================================
+    // CONFIGURATION MANAGEMENT
+    // =====================================================================
+
+    loadConfiguration() {
+        console.log('[Settings] Loading configuration');
+        Promise.all([
+            this.loadMotionConfig(),
+            this.loadVfdConfig(),
+            this.loadEncoderConfig()
+        ]).catch(err => {
+            console.error('[Settings] Failed to load configuration:', err);
+        });
+    },
+
+    loadMotionConfig() {
+        return fetch('/api/config/get?category=0')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.config) {
+                    const cfg = data.config;
+                    document.getElementById('x-limit-low').value = cfg.soft_limit_low_mm[0];
+                    document.getElementById('x-limit-high').value = cfg.soft_limit_high_mm[0];
+                    document.getElementById('y-limit-low').value = cfg.soft_limit_low_mm[1];
+                    document.getElementById('y-limit-high').value = cfg.soft_limit_high_mm[1];
+                    document.getElementById('z-limit-low').value = cfg.soft_limit_low_mm[2];
+                    document.getElementById('z-limit-high').value = cfg.soft_limit_high_mm[2];
+                    this.setStatusLoaded('motion');
+                }
+            })
+            .catch(err => {
+                console.error('[Settings] Motion config load failed:', err);
+                this.setStatusError('motion', 'Failed to load motion settings');
+            });
+    },
+
+    loadVfdConfig() {
+        return fetch('/api/config/get?category=1')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.config) {
+                    const cfg = data.config;
+                    document.getElementById('vfd-min-speed').value = cfg.min_speed_hz;
+                    document.getElementById('vfd-min-display').textContent = cfg.min_speed_hz;
+                    document.getElementById('vfd-max-speed').value = cfg.max_speed_hz;
+                    document.getElementById('vfd-max-display').textContent = cfg.max_speed_hz;
+                    document.getElementById('vfd-acc-time').value = cfg.acc_time_ms;
+                    document.getElementById('vfd-acc-display').textContent = cfg.acc_time_ms;
+                    document.getElementById('vfd-dec-time').value = cfg.dec_time_ms;
+                    document.getElementById('vfd-dec-display').textContent = cfg.dec_time_ms;
+                    this.setStatusLoaded('vfd');
+                }
+            })
+            .catch(err => {
+                console.error('[Settings] VFD config load failed:', err);
+                this.setStatusError('vfd', 'Failed to load VFD settings');
+            });
+    },
+
+    loadEncoderConfig() {
+        return fetch('/api/config/get?category=2')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.config) {
+                    const cfg = data.config;
+                    document.getElementById('x-encoder-ppm').value = cfg.ppm[0];
+                    document.getElementById('x-ppm-display').textContent = cfg.ppm[0];
+                    document.getElementById('y-encoder-ppm').value = cfg.ppm[1];
+                    document.getElementById('y-ppm-display').textContent = cfg.ppm[1];
+                    document.getElementById('z-encoder-ppm').value = cfg.ppm[2];
+                    document.getElementById('z-ppm-display').textContent = cfg.ppm[2];
+                    this.setStatusLoaded('encoder');
+                }
+            })
+            .catch(err => {
+                console.error('[Settings] Encoder config load failed:', err);
+                this.setStatusError('encoder', 'Failed to load encoder settings');
+            });
+    },
+
+    saveMotionSettings() {
+        console.log('[Settings] Saving motion settings');
+        const x_low = parseInt(document.getElementById('x-limit-low').value);
+        const x_high = parseInt(document.getElementById('x-limit-high').value);
+        const y_low = parseInt(document.getElementById('y-limit-low').value);
+        const y_high = parseInt(document.getElementById('y-limit-high').value);
+        const z_low = parseInt(document.getElementById('z-limit-low').value);
+        const z_high = parseInt(document.getElementById('z-limit-high').value);
+
+        // Validate before saving
+        if (x_low >= x_high || y_low >= y_high || z_low >= z_high) {
+            this.showError('motion', 'Lower limit must be less than upper limit');
+            return;
+        }
+
+        const updates = [
+            this.setConfig(0, 'soft_limit_low_mm[0]', x_low),
+            this.setConfig(0, 'soft_limit_high_mm[0]', x_high),
+            this.setConfig(0, 'soft_limit_low_mm[1]', y_low),
+            this.setConfig(0, 'soft_limit_high_mm[1]', y_high),
+            this.setConfig(0, 'soft_limit_low_mm[2]', z_low),
+            this.setConfig(0, 'soft_limit_high_mm[2]', z_high)
+        ];
+
+        Promise.all(updates)
+            .then(() => {
+                AlertManager.add('Motion settings saved successfully', 'success', 2000);
+                this.setStatusLoaded('motion');
+            })
+            .catch(err => {
+                console.error('[Settings] Motion save failed:', err);
+                this.showError('motion', 'Failed to save motion settings');
+                this.setStatusError('motion', 'Save failed');
+            });
+    },
+
+    resetMotionSettings() {
+        if (!confirm('Reset motion settings to defaults?')) return;
+        const defaults = { low: 0, high: 500 };
+        const updates = [
+            this.setConfig(0, 'soft_limit_low_mm[0]', defaults.low),
+            this.setConfig(0, 'soft_limit_high_mm[0]', defaults.high),
+            this.setConfig(0, 'soft_limit_low_mm[1]', defaults.low),
+            this.setConfig(0, 'soft_limit_high_mm[1]', defaults.high),
+            this.setConfig(0, 'soft_limit_low_mm[2]', defaults.low),
+            this.setConfig(0, 'soft_limit_high_mm[2]', defaults.high)
+        ];
+
+        Promise.all(updates)
+            .then(() => this.loadMotionConfig())
+            .then(() => AlertManager.add('Motion settings reset to defaults', 'success', 2000))
+            .catch(err => {
+                console.error('[Settings] Motion reset failed:', err);
+                this.showError('motion', 'Failed to reset motion settings');
+            });
+    },
+
+    saveVfdSettings() {
+        console.log('[Settings] Saving VFD settings');
+        const min_hz = parseInt(document.getElementById('vfd-min-speed').value);
+        const max_hz = parseInt(document.getElementById('vfd-max-speed').value);
+        const acc_ms = parseInt(document.getElementById('vfd-acc-time').value);
+        const dec_ms = parseInt(document.getElementById('vfd-dec-time').value);
+
+        // Validate
+        if (min_hz >= max_hz) {
+            this.showError('vfd', 'Min speed must be less than max speed');
+            return;
+        }
+        if (min_hz < 1 || max_hz > 105) {
+            this.showError('vfd', 'Speed must be between 1 and 105 Hz');
+            return;
+        }
+        if (acc_ms < 200 || dec_ms < 200) {
+            this.showError('vfd', 'Ramp time must be at least 200 ms');
+            return;
+        }
+
+        const updates = [
+            this.setConfig(1, 'min_speed_hz', min_hz),
+            this.setConfig(1, 'max_speed_hz', max_hz),
+            this.setConfig(1, 'acc_time_ms', acc_ms),
+            this.setConfig(1, 'dec_time_ms', dec_ms)
+        ];
+
+        Promise.all(updates)
+            .then(() => {
+                AlertManager.add('VFD settings saved successfully', 'success', 2000);
+                this.setStatusLoaded('vfd');
+            })
+            .catch(err => {
+                console.error('[Settings] VFD save failed:', err);
+                this.showError('vfd', 'Failed to save VFD settings');
+                this.setStatusError('vfd', 'Save failed');
+            });
+    },
+
+    resetVfdSettings() {
+        if (!confirm('Reset VFD settings to defaults?')) return;
+        const updates = [
+            this.setConfig(1, 'min_speed_hz', 1),
+            this.setConfig(1, 'max_speed_hz', 105),
+            this.setConfig(1, 'acc_time_ms', 600),
+            this.setConfig(1, 'dec_time_ms', 400)
+        ];
+
+        Promise.all(updates)
+            .then(() => this.loadVfdConfig())
+            .then(() => AlertManager.add('VFD settings reset to defaults', 'success', 2000))
+            .catch(err => {
+                console.error('[Settings] VFD reset failed:', err);
+                this.showError('vfd', 'Failed to reset VFD settings');
+            });
+    },
+
+    calibrateEncoder(axis) {
+        const axisNames = ['X', 'Y', 'Z'];
+        const ppmInput = document.getElementById(`${'xyz'[axis]}-encoder-ppm`);
+        const ppm = parseInt(ppmInput.value);
+
+        if (ppm < 50 || ppm > 200) {
+            this.showError('encoder', `PPM must be between 50 and 200`);
+            return;
+        }
+
+        console.log(`[Settings] Calibrating ${axisNames[axis]} encoder with ${ppm} PPM`);
+
+        fetch('/api/encoder/calibrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ axis, ppm })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                AlertManager.add(`${axisNames[axis]}-axis calibrated to ${ppm} PPM`, 'success', 2000);
+                this.setStatusLoaded('encoder');
+            } else {
+                this.showError('encoder', data.error || 'Calibration failed');
+                this.setStatusError('encoder', 'Calibration failed');
+            }
+        })
+        .catch(err => {
+            console.error(`[Settings] Calibration failed:`, err);
+            this.showError('encoder', 'Failed to calibrate encoder');
+            this.setStatusError('encoder', 'Error');
+        });
+    },
+
+    resetEncoderSettings() {
+        if (!confirm('Reset all encoders to default (100 PPM)?')) return;
+        const updates = [
+            this.setConfig(2, 'ppm[0]', 100),
+            this.setConfig(2, 'ppm[1]', 100),
+            this.setConfig(2, 'ppm[2]', 100)
+        ];
+
+        Promise.all(updates)
+            .then(() => this.loadEncoderConfig())
+            .then(() => AlertManager.add('Encoder settings reset to defaults', 'success', 2000))
+            .catch(err => {
+                console.error('[Settings] Encoder reset failed:', err);
+                this.showError('encoder', 'Failed to reset encoder settings');
+            });
+    },
+
+    setConfig(category, key, value) {
+        return fetch('/api/config/set', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category, key, value })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error || 'Set config failed');
+            }
+            return data;
+        });
+    },
+
+    showError(section, message) {
+        const errorDiv = document.getElementById(`${section}-error`);
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        console.warn(`[Settings] ${section} error: ${message}`);
+    },
+
+    hideError(section) {
+        const errorDiv = document.getElementById(`${section}-error`);
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+    },
+
+    setStatusLoaded(section) {
+        const status = document.getElementById(`${section}-status`);
+        if (status) {
+            status.textContent = '✓ Loaded';
+            status.className = 'card-status loaded';
+        }
+    },
+
+    setStatusError(section, message) {
+        const status = document.getElementById(`${section}-status`);
+        if (status) {
+            status.textContent = '✗ ' + message;
+            status.className = 'card-status error';
         }
     },
 

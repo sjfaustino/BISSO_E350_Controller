@@ -139,6 +139,158 @@
             </div>
         </div>
 
+        <!-- Motion Control Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Motion Control</h2>
+                <span class="card-status" id="motion-status"></span>
+            </div>
+            <div class="card-content">
+                <div class="axis-group">
+                    <h3>X-Axis Soft Limits (mm)</h3>
+                    <div class="setting-group">
+                        <label for="x-limit-low">Lower Limit:</label>
+                        <input type="number" id="x-limit-low" min="0" max="1000" class="form-control">
+                    </div>
+                    <div class="setting-group">
+                        <label for="x-limit-high">Upper Limit:</label>
+                        <input type="number" id="x-limit-high" min="0" max="1000" class="form-control">
+                    </div>
+                </div>
+
+                <div class="axis-group">
+                    <h3>Y-Axis Soft Limits (mm)</h3>
+                    <div class="setting-group">
+                        <label for="y-limit-low">Lower Limit:</label>
+                        <input type="number" id="y-limit-low" min="0" max="1000" class="form-control">
+                    </div>
+                    <div class="setting-group">
+                        <label for="y-limit-high">Upper Limit:</label>
+                        <input type="number" id="y-limit-high" min="0" max="1000" class="form-control">
+                    </div>
+                </div>
+
+                <div class="axis-group">
+                    <h3>Z-Axis Soft Limits (mm)</h3>
+                    <div class="setting-group">
+                        <label for="z-limit-low">Lower Limit:</label>
+                        <input type="number" id="z-limit-low" min="0" max="1000" class="form-control">
+                    </div>
+                    <div class="setting-group">
+                        <label for="z-limit-high">Upper Limit:</label>
+                        <input type="number" id="z-limit-high" min="0" max="1000" class="form-control">
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <button class="btn btn-primary" id="save-motion-btn">Save Motion Settings</button>
+                    <button class="btn btn-secondary" id="reset-motion-btn">Reset to Defaults</button>
+                </div>
+                <div id="motion-error" class="error-message" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- VFD Parameters Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>VFD Parameters</h2>
+                <span class="card-status" id="vfd-status"></span>
+            </div>
+            <div class="card-content">
+                <div class="setting-group">
+                    <label for="vfd-min-speed">Minimum Speed (Hz):</label>
+                    <div class="input-with-value">
+                        <input type="number" id="vfd-min-speed" min="1" max="105" class="form-control">
+                        <span class="input-value"><span id="vfd-min-display">1</span> Hz</span>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="vfd-max-speed">Maximum Speed (Hz):</label>
+                    <div class="input-with-value">
+                        <input type="number" id="vfd-max-speed" min="1" max="105" class="form-control">
+                        <span class="input-value"><span id="vfd-max-display">105</span> Hz</span>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="vfd-acc-time">Acceleration Time (ms):</label>
+                    <div class="input-with-value">
+                        <input type="number" id="vfd-acc-time" min="200" max="2000" step="50" class="form-control">
+                        <span class="input-value"><span id="vfd-acc-display">600</span> ms</span>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="vfd-dec-time">Deceleration Time (ms):</label>
+                    <div class="input-with-value">
+                        <input type="number" id="vfd-dec-time" min="200" max="2000" step="50" class="form-control">
+                        <span class="input-value"><span id="vfd-dec-display">400</span> ms</span>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <button class="btn btn-primary" id="save-vfd-btn">Save VFD Settings</button>
+                    <button class="btn btn-secondary" id="reset-vfd-btn">Reset to Defaults</button>
+                </div>
+                <div id="vfd-error" class="error-message" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- Encoder Calibration Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Encoder Calibration</h2>
+                <span class="card-status" id="encoder-status"></span>
+            </div>
+            <div class="card-content">
+                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                    Pulses Per Millimeter (PPM) - typically 50-200 depending on encoder gearing
+                </p>
+
+                <div class="encoder-group">
+                    <h3>X-Axis Encoder</h3>
+                    <div class="setting-group">
+                        <label for="x-encoder-ppm">PPM Value:</label>
+                        <div class="input-with-value">
+                            <input type="number" id="x-encoder-ppm" min="50" max="200" class="form-control">
+                            <span class="input-value"><span id="x-ppm-display">100</span> PPM</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-small btn-primary" id="calibrate-x-btn">Calibrate X</button>
+                </div>
+
+                <div class="encoder-group">
+                    <h3>Y-Axis Encoder</h3>
+                    <div class="setting-group">
+                        <label for="y-encoder-ppm">PPM Value:</label>
+                        <div class="input-with-value">
+                            <input type="number" id="y-encoder-ppm" min="50" max="200" class="form-control">
+                            <span class="input-value"><span id="y-ppm-display">100</span> PPM</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-small btn-primary" id="calibrate-y-btn">Calibrate Y</button>
+                </div>
+
+                <div class="encoder-group">
+                    <h3>Z-Axis Encoder</h3>
+                    <div class="setting-group">
+                        <label for="z-encoder-ppm">PPM Value:</label>
+                        <div class="input-with-value">
+                            <input type="number" id="z-encoder-ppm" min="50" max="200" class="form-control">
+                            <span class="input-value"><span id="z-ppm-display">100</span> PPM</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-small btn-primary" id="calibrate-z-btn">Calibrate Z</button>
+                </div>
+
+                <div class="setting-group" style="margin-top: var(--space-lg);">
+                    <button class="btn btn-secondary" id="reset-encoder-btn">Reset All to Defaults</button>
+                </div>
+                <div id="encoder-error" class="error-message" style="display:none;"></div>
+            </div>
+        </div>
+
         <!-- System Settings Card -->
         <div class="card">
             <div class="card-header">
@@ -416,6 +568,60 @@
 
 .settings-page .btn-danger:hover {
     opacity: 0.9;
+}
+
+/* Configuration sections styling */
+.settings-page .axis-group,
+.settings-page .encoder-group {
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--bg-secondary);
+}
+
+.settings-page .axis-group:last-child,
+.settings-page .encoder-group:last-child {
+    border-bottom: none;
+}
+
+.settings-page .axis-group h3,
+.settings-page .encoder-group h3 {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    margin-bottom: var(--space-md);
+    color: var(--text-primary);
+}
+
+.settings-page .card-status {
+    font-size: var(--font-size-sm);
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.settings-page .card-status.loaded {
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--color-optimal);
+}
+
+.settings-page .card-status.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-critical);
+}
+
+.settings-page .error-message {
+    margin-top: var(--space-md);
+    padding: var(--space-md);
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 4px;
+    color: var(--color-critical);
+    font-size: var(--font-size-sm);
+}
+
+.settings-page .btn-small {
+    padding: 6px 12px;
+    font-size: var(--font-size-sm);
 }
 
 @media (max-width: 768px) {
