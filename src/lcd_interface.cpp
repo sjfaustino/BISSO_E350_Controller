@@ -53,11 +53,22 @@ void lcdInterfaceInit() {
     lcd_state.i2c_found = true;
 
     // Initialize LiquidCrystal_I2C (20x4 display)
+    // Standard pin mapping: RS=0, RW=1, E=2, BL=3 (most common PCF8574 backpack)
     lcd_i2c = new LiquidCrystal_I2C(LCD_I2C_ADDR, LCD_COLS, LCD_ROWS);
     if (lcd_i2c) {
+      // Extended initialization with delays for reliable startup
       lcd_i2c->init();
+      delay(50);  // Wait for LCD to stabilize after init
       lcd_i2c->backlight();
+      delay(10);
+      lcd_i2c->home();  // Move cursor to home position
       lcd_i2c->clear();
+      delay(10);
+
+      // Write test pattern to verify LCD is responding
+      lcd_i2c->setCursor(0, 0);
+      lcd_i2c->print("LCD Init OK");
+
       lcd_state.mode = LCD_MODE_I2C;
       Serial.printf("[LCD] [OK] I2C LCD Initialized at 0x%02X (20x4)\n", LCD_I2C_ADDR);
     } else {
