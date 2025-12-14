@@ -47,15 +47,7 @@ static vfd_calibration_data_t calib_data = {
     .calibration_count = 0
 };
 
-static measure_state_t measure_state = {
-    .active = false,
-    .start_time_ms = 0,
-    .duration_ms = 0,
-    .phase_name = "",
-    .current_sum = 0.0f,
-    .current_max = 0.0f,
-    .sample_count = 0
-};
+static measure_state_t measure_state = {};  // Initialize to zero/default values
 
 // ============================================================================
 // INITIALIZATION & PERSISTENCE
