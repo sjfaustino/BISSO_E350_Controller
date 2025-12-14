@@ -69,7 +69,9 @@ The BISSO E350 is a **stone bridge saw with multiplexed motion control and indep
 - **Spindle Motor**: 3-phase AC motor driving the cutting wheel
 
 #### Shared Components
-- **Encoder Feedback**: WJ66 optical encoders on each axis (X, Y, Z) provide position verification (100 pulses per mm typical calibration)
+- **Encoder Feedback**: WJ66 optical encoders on all four axes (X, Y, Z, A) provide position verification
+  - X, Y, Z encoders: Track motorized axis positions (100 pulses per mm typical calibration)
+  - A axis encoder: Non-motorized axis, but optical encoder monitors blade/cutting wheel angle position
   - Encoders feedback to controller for motion quality monitoring ONLY
   - Do NOT directly control spindle
 - **Web Dashboard**: Real-time monitoring at `http://<controller-ip>/` (default: http://192.168.1.100/)
@@ -276,9 +278,10 @@ Complete this checklist every morning before operation:
   - Confirm emergency stop button is easily accessible and red
 
 □ Encoder Verification
-  - Check all three encoder cables (X, Y, Z) for damage
-  - Verify encoder LED indicators are visible (small green light)
+  - Check all four encoder cables (X, Y, Z, A) for damage and secure connections
+  - Verify encoder LED indicators are visible (small green light on each unit)
   - Look for dust accumulation on encoder lenses (clean with soft brush if needed)
+  - Verify A axis encoder (non-motorized) is detecting blade position
 
 □ Contactor Switches
   - Listen for any audible clicking from the PLC enclosure
