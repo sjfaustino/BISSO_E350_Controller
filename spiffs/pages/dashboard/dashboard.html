@@ -1,0 +1,256 @@
+<div class="dashboard">
+    <!-- System Status Cards -->
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>System Health</h2>
+                <button class="card-toggle" data-toggle="health">−</button>
+            </div>
+            <div class="card-content">
+                <div class="card-value" id="health-value">--</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="health-bar" style="width: 100%"></div>
+                </div>
+                <div class="card-subtext" id="health-detail">Initializing...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>CPU Usage</h2>
+                <button class="card-toggle" data-toggle="cpu">−</button>
+            </div>
+            <div class="card-content">
+                <div class="card-value" id="cpu-value">--%</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="cpu-bar"></div>
+                </div>
+                <div class="card-subtext">Avg: <span id="cpu-avg">--</span>% | Max: <span id="cpu-max">--</span>%</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Memory Free</h2>
+                <button class="card-toggle" data-toggle="memory">−</button>
+            </div>
+            <div class="card-content">
+                <div class="card-value" id="mem-value">-- KB</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="mem-bar" style="width: 100%"></div>
+                </div>
+                <div class="card-subtext">Min: <span id="mem-min">--</span> KB</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Trends Chart -->
+    <div class="chart-container">
+        <div class="card-header">
+            <h2>System Trends</h2>
+            <button class="card-toggle" data-toggle="trends">−</button>
+        </div>
+        <div class="card-content">
+            <div class="time-range-selector" role="group">
+                <button class="time-btn active" data-range="1">1m</button>
+                <button class="time-btn" data-range="5">5m</button>
+                <button class="time-btn" data-range="60">1h</button>
+                <button class="time-btn" data-range="1440">24h</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="trendsChart"></canvas>
+            </div>
+            <div class="chart-legend">
+                <div class="chart-legend-item">
+                    <div class="chart-legend-color" style="background: var(--chart-cpu)"></div>
+                    <span>CPU %</span>
+                </div>
+                <div class="chart-legend-item">
+                    <div class="chart-legend-color" style="background: var(--chart-mem)"></div>
+                    <span>Memory (KB/1000)</span>
+                </div>
+                <div class="chart-legend-item">
+                    <div class="chart-legend-color" style="background: var(--chart-spindle)"></div>
+                    <span>Spindle (A/10)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Axis Motion Quality Cards -->
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>X Axis Quality</h2>
+                <button class="card-toggle" data-toggle="axis-x">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <div class="card-value" id="axis-x-quality" style="font-size: 36px;">--</div>
+                        <div class="card-subtext">Quality</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="axis-x-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <div class="card-label">Jitter</div>
+                        <div id="axis-x-jitter">-- mm/s</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Stalled</div>
+                        <div id="axis-x-stalled">✓ OK</div>
+                    </div>
+                </div>
+                <div class="card-divider"></div>
+                <div>
+                    <div class="card-label">VFD Error</div>
+                    <div id="axis-x-error">--%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Y Axis Quality</h2>
+                <button class="card-toggle" data-toggle="axis-y">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <div class="card-value" id="axis-y-quality" style="font-size: 36px;">--</div>
+                        <div class="card-subtext">Quality</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="axis-y-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <div class="card-label">Jitter</div>
+                        <div id="axis-y-jitter">-- mm/s</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Stalled</div>
+                        <div id="axis-y-stalled">✓ OK</div>
+                    </div>
+                </div>
+                <div class="card-divider"></div>
+                <div>
+                    <div class="card-label">VFD Error</div>
+                    <div id="axis-y-error">--%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Z Axis Quality</h2>
+                <button class="card-toggle" data-toggle="axis-z">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <div class="card-value" id="axis-z-quality" style="font-size: 36px;">--</div>
+                        <div class="card-subtext">Quality</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="axis-z-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <div class="card-label">Jitter</div>
+                        <div id="axis-z-jitter">-- mm/s</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Stalled</div>
+                        <div id="axis-z-stalled">✓ OK</div>
+                    </div>
+                </div>
+                <div class="card-divider"></div>
+                <div>
+                    <div class="card-label">VFD Error</div>
+                    <div id="axis-z-error">--%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Motion Status -->
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>Motion Status</h2>
+                <button class="card-toggle" data-toggle="motion">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div class="card-label">Status</div>
+                        <div class="card-value" id="motion-status" style="font-size: 18px;">--</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Safety</div>
+                        <div class="card-value" id="safety-status" style="font-size: 18px;">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>VFD Status</h2>
+                <button class="card-toggle" data-toggle="vfd">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div class="card-label">Motor Status</div>
+                        <div class="card-value" id="vfd-status" style="font-size: 18px;">IDLE</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Frequency</div>
+                        <div class="card-value" id="vfd-freq" style="font-size: 18px;">--</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <div class="card-label">Current Draw</div>
+                    <div class="card-value" id="vfd-current" style="font-size: 18px;">-- A</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Network Status</h2>
+                <button class="card-toggle" data-toggle="network">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div class="card-label">WiFi Signal</div>
+                        <div class="card-value" id="wifi-signal" style="font-size: 18px;">--%</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Connection</div>
+                        <div class="card-value" id="wifi-status" style="font-size: 14px;">--</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="wifi-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

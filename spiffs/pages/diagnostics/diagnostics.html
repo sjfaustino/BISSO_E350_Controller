@@ -1,0 +1,110 @@
+<div class="diagnostics-page">
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>Axis X Diagnostics</h2>
+            </div>
+            <div class="card-content">
+                <div class="metric-card">
+                    <div class="metric-label">Quality Score</div>
+                    <div class="metric-value" id="diag-x-quality">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Active Duration</div>
+                    <div class="metric-value" id="diag-x-active">-- ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Stall Count</div>
+                    <div class="metric-value" id="diag-x-stalls">--</div>
+                </div>
+                <div class="metric-card warning">
+                    <div class="metric-label">Jitter Amplitude</div>
+                    <div class="metric-value" id="diag-x-jitter">-- mm/s</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Axis Y Diagnostics</h2>
+            </div>
+            <div class="card-content">
+                <div class="metric-card">
+                    <div class="metric-label">Quality Score</div>
+                    <div class="metric-value" id="diag-y-quality">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Active Duration</div>
+                    <div class="metric-value" id="diag-y-active">-- ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Stall Count</div>
+                    <div class="metric-value" id="diag-y-stalls">--</div>
+                </div>
+                <div class="metric-card warning">
+                    <div class="metric-label">Jitter Amplitude</div>
+                    <div class="metric-value" id="diag-y-jitter">-- mm/s</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Axis Z Diagnostics</h2>
+            </div>
+            <div class="card-content">
+                <div class="metric-card">
+                    <div class="metric-label">Quality Score</div>
+                    <div class="metric-value" id="diag-z-quality">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Active Duration</div>
+                    <div class="metric-value" id="diag-z-active">-- ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Stall Count</div>
+                    <div class="metric-value" id="diag-z-stalls">--</div>
+                </div>
+                <div class="metric-card warning">
+                    <div class="metric-label">Jitter Amplitude</div>
+                    <div class="metric-value" id="diag-z-jitter">-- mm/s</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>Encoder Health</h2>
+            </div>
+            <div class="card-content" id="encoder-health">
+                <p>Loading encoder data...</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>VFD Diagnostics</h2>
+            </div>
+            <div class="card-content">
+                <div class="metric-card">
+                    <div class="metric-label">Current Draw</div>
+                    <div class="metric-value" id="diag-vfd-current">-- A</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Frequency</div>
+                    <div class="metric-value" id="diag-vfd-freq">-- Hz</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Thermal State</div>
+                    <div class="metric-value" id="diag-vfd-thermal">--%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Fault Code</div>
+                    <div class="metric-value" id="diag-vfd-fault">0x0000</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
