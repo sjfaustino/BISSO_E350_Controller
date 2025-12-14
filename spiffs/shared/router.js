@@ -45,16 +45,23 @@ class Router {
 
             // Load HTML
             let html;
+            let fetchFailed = false;
             try {
                 const htmlResponse = await fetch(route.file);
                 if (!htmlResponse.ok) throw new Error(`HTTP ${htmlResponse.status}`);
                 html = await htmlResponse.text();
             } catch (fetchError) {
+                fetchFailed = true;
                 console.warn(`[ROUTER] Failed to fetch ${route.file}:`, fetchError.message);
 
-                // If fetch fails, check if we're in mock mode or offline
-                if (window.MockMode?.enabled || !navigator.onLine) {
-                    // Provide fallback content for offline mode
+                // If mock mode is enabled, create a minimal container and load the JS module
+                // The module will populate content using mock data
+                if (window.MockMode?.enabled) {
+                    console.log('[ROUTER] Mock mode enabled, loading module without HTML');
+                    html = `<div id="mock-page-content" style="padding: 20px;">Loading ${page} with mock data...</div>`;
+                    // Don't return - continue to load the JS module below
+                } else if (!navigator.onLine) {
+                    // Offline but mock mode not enabled - show helpful message
                     html = `
                         <div style="padding: 40px 20px; text-align: center;">
                             <h2>📡 Offline Mode</h2>
@@ -64,11 +71,11 @@ class Router {
                             <div style="background: var(--bg-secondary); padding: 20px; border-radius: 8px; margin: 20px 0;">
                                 <p style="margin: 10px 0; font-size: 14px;">
                                     <strong>Mock Mode:</strong>
-                                    ${window.MockMode?.enabled ? '✓ Active' : '✗ Disabled'}
+                                    ✗ Disabled
                                 </p>
                                 <p style="margin: 10px 0; font-size: 14px;">
                                     <strong>Network:</strong>
-                                    ${navigator.onLine ? '✓ Online' : '✗ Offline'}
+                                    ✗ Offline
                                 </p>
                             </div>
                             <p style="color: var(--text-secondary); margin-top: 20px; font-size: 14px;">
@@ -79,20 +86,22 @@ class Router {
                     container.innerHTML = html;
                     this.isLoading = false;
                     return;
+                } else {
+                    throw fetchError;
                 }
-
-                throw fetchError;
             }
 
             container.innerHTML = html;
 
-            // Load CSS if exists
-            const cssFile = route.file.replace('.html', '.css');
-            this.loadCSS(cssFile).catch(() => {
-                // CSS not found, that's okay
-            });
+            // Load CSS if exists (but don't fail if it doesn't)
+            if (!fetchFailed) {
+                const cssFile = route.file.replace('.html', '.css');
+                this.loadCSS(cssFile).catch(() => {
+                    // CSS not found, that's okay
+                });
+            }
 
-            // Load JS
+            // Load JS module (this is what populates the page content)
             const script = document.createElement('script');
             script.src = route.js;
             script.onload = () => {
@@ -111,6 +120,19 @@ class Router {
             };
             script.onerror = () => {
                 console.error(`[ROUTER] Failed to load ${route.js}`);
+
+                // If JS also fails and we're offline, show error
+                if (fetchFailed && !navigator.onLine) {
+                    container.innerHTML = `
+                        <div style="padding: 40px 20px; text-align: center; color: var(--color-critical);">
+                            <h2>❌ Error Loading Page</h2>
+                            <p>Could not load page module and content is not available offline.</p>
+                            <p style="font-size: 14px; margin-top: 20px;">
+                                Enable <strong>Mock Mode</strong> (press <strong>M</strong>) to use simulated data.
+                            </p>
+                        </div>
+                    `;
+                }
                 this.isLoading = false;
             };
             document.body.appendChild(script);
@@ -158,11 +180,4 @@ class Router {
     static go(page) {
         window.location.hash = '#' + page;
     }
-}
-
-// Auto-init on load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => Router.init());
-} else {
-    Router.init();
 }
