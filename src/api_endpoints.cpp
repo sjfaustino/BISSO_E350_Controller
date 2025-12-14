@@ -118,6 +118,78 @@ static const api_endpoint_t api_endpoints[] = {
         .rate_limit_info = "10 requests/min",
         .response_type = "application/json"
     },
+    {
+        .path = "/api/config/get",
+        .methods = HTTP_GET,
+        .description = "Get configuration for category (motion, VFD, encoder, safety, thermal)",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "50 requests/min",
+        .response_type = "application/json"
+    },
+    {
+        .path = "/api/config/set",
+        .methods = HTTP_POST,
+        .description = "Set configuration value with validation",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "30 requests/min",
+        .response_type = "application/json"
+    },
+    {
+        .path = "/api/config/validate",
+        .methods = HTTP_POST,
+        .description = "Validate configuration change (pre-flight check)",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "50 requests/min",
+        .response_type = "application/json"
+    },
+    {
+        .path = "/api/config/schema",
+        .methods = HTTP_GET,
+        .description = "Get configuration schema for client-side validation",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "50 requests/min",
+        .response_type = "application/json"
+    },
+    {
+        .path = "/api/encoder/calibrate",
+        .methods = HTTP_POST,
+        .description = "Calibrate encoder for specified axis",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "20 requests/min",
+        .response_type = "application/json"
+    },
+    {
+        .path = "/api/encoder/diagnostics",
+        .methods = HTTP_GET,
+        .description = "Get encoder diagnostics (jitter, deviation, calibration)",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "50 requests/min",
+        .response_type = "application/json"
+    },
+    {
+        .path = "/api/dashboard/metrics",
+        .methods = HTTP_GET,
+        .description = "Get dashboard metrics (optimized for web interface)",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "50 requests/min",
+        .response_type = "application/json"
+    },
+    {
+        .path = "/api/load",
+        .methods = HTTP_GET,
+        .description = "Get system load information (CPU, memory, heap)",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "50 requests/min",
+        .response_type = "application/json"
+    },
 };
 
 static const int endpoint_count = sizeof(api_endpoints) / sizeof(api_endpoint_t);
