@@ -12,31 +12,17 @@ NetworkManager::NetworkManager() : telnetServer(nullptr), clientConnected(false)
 void NetworkManager::init() {
     Serial.println("[NET] Initializing Network Stack...");
 
-    // 1. WiFi Provisioning (Async Manager)
-    AsyncWebServer* provServer = new AsyncWebServer(80);
-    DNSServer* dns = new DNSServer();
-    
-    // FIX: Correct class name is AsyncWiFiManager (not ESPAsyncWiFiManager)
-    AsyncWiFiManager wm(provServer, dns);
-    
-    // Config: Set timeout to 3 minutes (180s)
-    // Note: setClass() is not supported in the Async version, so it was removed.
-    wm.setConfigPortalTimeout(180); 
-    
-    // SSID and Password for the Configuration Access Point
-    bool res = wm.autoConnect("BISSO_SETUP", "setup1234"); 
+    // 1. WiFi Initialization (Non-blocking to allow boot to continue)
+    // Try to connect to saved network without blocking
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(); // Uses credentials from previous autoConnect()
 
-    if(!res) {
-        Serial.println("[NET] [FAIL] WiFi connection failed. Starting Offline Mode.");
-        // We continue boot even without WiFi to allow local Motion control
-    } else {
-        Serial.print("[NET] [OK] WiFi Connected. IP: ");
-        Serial.println(WiFi.localIP());
-    }
-    
-    // Clean up provisioning resources
-    delete provServer;
-    delete dns;
+    // Don't wait for connection - boot continues
+    // WiFi will connect in background during networkManager.update() calls
+    Serial.println("[NET] [OK] WiFi initialization queued (non-blocking)");
+
+    // NOTE: AsyncWiFiManager with autoConnect() was BLOCKING boot sequence
+    // Removed to allow taskManagerStart() to execute immediately
 
     // 2. OTA Setup
     ArduinoOTA.setHostname("bisso-e350");
