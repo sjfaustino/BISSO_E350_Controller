@@ -83,6 +83,8 @@ int suiteTearDown(int num_failures)
  */
 int main(int argc, char* argv[])
 {
+    (void)argc;  // Suppress unused parameter warning
+
     // Initialize Unity
     UnityBegin(argv[0]);
 
