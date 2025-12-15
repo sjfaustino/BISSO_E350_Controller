@@ -132,8 +132,8 @@ static inline void TEST_ASSERT_IN_RANGE_MESSAGE(
     if (value < min || value > max) {
         char buffer[256];
         snprintf(buffer, sizeof(buffer),
-                "Value %ld not in range [%ld, %ld] - %s",
-                value, min, max, message);
+                "Value %d not in range [%d, %d] - %s",
+                (int)value, (int)min, (int)max, message);
         UNITY_TEST_FAIL(__LINE__, buffer);
     }
 }
@@ -150,8 +150,18 @@ static inline void TEST_ASSERT_IN_RANGE_MESSAGE(
         snprintf(log_buf, sizeof(log_buf), format, ##__VA_ARGS__); \
         UnityPrint("[TEST] "); \
         UnityPrint(log_buf); \
-        UnityPrintChar('\n'); \
+        UnityPrint("\n"); \
     } while(0)
+
+/**
+ * @brief Assert that two strings are NOT equal
+ * Unity doesn't provide this macro, so we define it here
+ *
+ * @param expected Expected string (should not match actual)
+ * @param actual Actual string
+ */
+#define TEST_ASSERT_NOT_EQUAL_STRING(expected, actual) \
+    TEST_ASSERT_FALSE_MESSAGE(strcmp((expected), (actual)) == 0, "Strings should not be equal")
 
 /**
  * @brief Assert that a bitfield has specific flags set
