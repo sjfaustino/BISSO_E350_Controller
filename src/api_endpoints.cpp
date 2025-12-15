@@ -216,12 +216,27 @@ const api_endpoint_t* apiEndpointsFind(const char* path) {
 
 static const char* methodToString(http_method_t method) {
     static char result[64];
+    size_t offset = 0;
     result[0] = '\0';
 
-    if (method & HTTP_GET) strcat(result, "GET ");
-    if (method & HTTP_POST) strcat(result, "POST ");
-    if (method & HTTP_PUT) strcat(result, "PUT ");
-    if (method & HTTP_DELETE) strcat(result, "DELETE");
+    // SECURITY FIX: Use snprintf() instead of unsafe strcat() to prevent buffer overflow
+    if (method & HTTP_GET) {
+        offset += snprintf(result + offset, sizeof(result) - offset, "GET ");
+    }
+    if (method & HTTP_POST) {
+        offset += snprintf(result + offset, sizeof(result) - offset, "POST ");
+    }
+    if (method & HTTP_PUT) {
+        offset += snprintf(result + offset, sizeof(result) - offset, "PUT ");
+    }
+    if (method & HTTP_DELETE) {
+        offset += snprintf(result + offset, sizeof(result) - offset, "DELETE");
+    }
+
+    // Remove trailing space if present
+    if (offset > 0 && result[offset - 1] == ' ') {
+        result[offset - 1] = '\0';
+    }
 
     return result;
 }
