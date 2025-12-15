@@ -62,6 +62,11 @@ public:
     uint8_t wait_pin_state;             // State to wait for (0 or 1)
     uint32_t wait_pin_timeout_ms;       // Timeout (0 = no timeout)
 
+    // Velocity tracking (for encoder deviation detection)
+    float current_velocity_mm_s;        // Current velocity in mm/s
+    int32_t prev_position;              // Previous position (for velocity calculation)
+    uint32_t prev_update_ms;            // Previous update timestamp
+
 private:
     bool _error_logged; 
 };
@@ -76,7 +81,8 @@ void motionUpdate();
 
 bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
 bool motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s);
-bool motionHome(uint8_t axis); 
+bool motionHome(uint8_t axis);
+bool motionSetPosition(float x, float y, float z, float a);  // Set position without moving (for G92) 
 
 bool motionStop();
 bool motionPause();
@@ -103,7 +109,8 @@ void motionDiagnostics();
 // --- ACCESSORS ---
 int32_t motionGetPosition(uint8_t axis);
 int32_t motionGetTarget(uint8_t axis);
-float motionGetPositionMM(uint8_t axis); 
+float motionGetPositionMM(uint8_t axis);
+float motionGetVelocity(uint8_t axis);       // Get current velocity in mm/s 
 motion_state_t motionGetState(uint8_t axis);
 bool motionIsMoving();
 bool motionIsStalled(uint8_t axis);

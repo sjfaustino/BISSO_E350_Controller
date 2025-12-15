@@ -71,6 +71,9 @@ Axis::Axis() {
     wait_pin_type = 0;
     wait_pin_state = 0;
     wait_pin_timeout_ms = 0;
+    current_velocity_mm_s = 0.0f;
+    prev_position = 0;
+    prev_update_ms = 0;
 }
 
 void Axis::init(uint8_t axis_id) {
@@ -100,6 +103,26 @@ bool Axis::checkSoftLimits(bool strict_mode) {
 }
 
 void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
+    // Calculate velocity (differentiate position over time)
+    uint32_t current_time_ms = millis();
+    if (prev_update_ms > 0) {
+        uint32_t dt_ms = current_time_ms - prev_update_ms;
+        if (dt_ms > 0) {
+            int32_t delta_pos = current_pos - prev_position;
+            // Convert counts/ms to mm/s
+            // velocity = (delta_counts / dt_ms) * (1000 ms/s) * (1 mm / ppm counts)
+            float ppm = encoderCalibGetPPM(id);  // pulses per mm
+            if (ppm > 0.0f) {
+                current_velocity_mm_s = ((float)delta_pos / (float)dt_ms) * 1000.0f / ppm;
+            } else {
+                current_velocity_mm_s = 0.0f;
+            }
+        }
+    }
+
+    // Update tracking variables
+    prev_position = current_pos;
+    prev_update_ms = current_time_ms;
     position = current_pos;
 
     // CRITICAL FIX: Use spinlock to protect state reads/writes
@@ -435,13 +458,20 @@ float motionGetPositionMM(uint8_t axis) {
     if (axis >= MOTION_AXES) return 0.0f;
     int32_t counts = axes[axis].position;
     float scale = 1.0f;
-    
+
     if (axis == 0) scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
     else if (axis == 1) scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
     else if (axis == 2) scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR;
     else if (axis == 3) scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR_DEG;
-    
+
     return (float)counts / scale;
+}
+
+float motionGetVelocity(uint8_t axis) {
+    if (axis >= MOTION_AXES) return 0.0f;
+
+    // Return current velocity in mm/s (calculated in updateState)
+    return axes[axis].current_velocity_mm_s;
 }
 
 bool motionIsMoving() {
@@ -605,6 +635,45 @@ bool motionMoveRelative(float dx, float dy, float dz, float da, float speed_mm_s
     float cur_z = motionGetPositionMM(2);
     float cur_a = motionGetPositionMM(3);
     return motionMoveAbsolute(cur_x + dx, cur_y + dy, cur_z + dz, cur_a + da, speed_mm_s);
+}
+
+bool motionSetPosition(float x, float y, float z, float a) {
+    // G92 - Set current position without moving
+    // This is used for calibration and work offset setting
+    // IMPORTANT: Only call when axes are idle
+
+    if (!taskLockMutex(taskGetMotionMutex(), 100)) {
+        logError("[MOTION] Cannot set position - mutex locked");
+        return false;
+    }
+
+    // Check if any axis is currently moving
+    if (m_state.active_axis != 255) {
+        taskUnlockMutex(taskGetMotionMutex());
+        logError("[MOTION] Cannot set position - axis %d is active", m_state.active_axis);
+        return false;
+    }
+
+    // Convert mm to counts for each axis
+    float positions[] = {x, y, z, a};
+    float scales[] = {
+        (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR,
+        (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR,
+        (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : (float)MOTION_POSITION_SCALE_FACTOR,
+        (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : (float)MOTION_POSITION_SCALE_FACTOR_DEG
+    };
+
+    // Set positions for all axes
+    for (uint8_t i = 0; i < MOTION_AXES; i++) {
+        int32_t new_pos = (int32_t)(positions[i] * scales[i]);
+        axes[i].position = new_pos;
+        axes[i].target_position = new_pos;
+        logInfo("[MOTION] Axis %d position set to %.3f mm (%ld counts)",
+                i, positions[i], (long)new_pos);
+    }
+
+    taskUnlockMutex(taskGetMotionMutex());
+    return true;
 }
 
 void motionSetFeedOverride(float factor) { motionPlanner.setFeedOverride(factor); }

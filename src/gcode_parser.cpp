@@ -467,10 +467,27 @@ void GCodeParser::handleG28(const char* line) {
     logInfo("[GCODE] G28 Homing: X=%d Y=%d Z=%d A=%d",
             home_x, home_y, home_z, home_a);
 
-    // TODO: Implement actual homing sequence
-    // This requires limit switch inputs and homing algorithm
-    // For now, just set position to 0 (home position)
-    Serial.println("[G28] Homing not yet implemented - requires limit switches");
+    // Execute homing sequence for each specified axis
+    // Note: Only one axis can home at a time due to single VFD constraint
+    // Homing will execute sequentially, waiting for each axis to complete
+    if (home_x && !motionHome(0)) {
+        logError("[GCODE] G28 X homing failed - axis busy or error");
+        return;
+    }
+    if (home_y && !motionHome(1)) {
+        logError("[GCODE] G28 Y homing failed - axis busy or error");
+        return;
+    }
+    if (home_z && !motionHome(2)) {
+        logError("[GCODE] G28 Z homing failed - axis busy or error");
+        return;
+    }
+    if (home_a && !motionHome(3)) {
+        logError("[GCODE] G28 A homing failed - axis busy or error");
+        return;
+    }
+
+    logInfo("[GCODE] G28 Homing sequence initiated");
 }
 
 // PHASE 5.1: G30 - Go to Predefined Position
@@ -559,17 +576,16 @@ void GCodeParser::handleG92(const char* line) {
         return;
     }
 
-    // Convert back to machine counts and set in motion system
-    // Note: This is a simplified implementation
-    // In a real system, you'd need access to motionSetPosition or similar
-    // For now, we log the intended position
-
     logInfo("[GCODE] G92 Set Position - X:%.1f Y:%.1f Z:%.1f A:%.1f",
             curM[0], curM[1], curM[2], curM[3]);
 
-    // TODO: Implement motionSetPosition(x, y, z, a) in motion control module
-    // This would set the absolute position without moving
-    Serial.println("[G92] Position set (requires motionSetPosition API)");
+    // Set the position without moving
+    if (!motionSetPosition(curM[0], curM[1], curM[2], curM[3])) {
+        logError("[GCODE] G92 failed - axis busy or error");
+        return;
+    }
+
+    logInfo("[GCODE] G92 Position set successfully");
 }
 
 // PHASE 5.1: M0/M1 - Program Stop / Pause
@@ -603,11 +619,16 @@ void GCodeParser::handleM0_M1(const char* line) {
     Serial.println("[PAUSE] Program paused - press resume to continue");
     lcdMessageSet("PAUSED: Resume?", 0);  // Stay until operator resumes
 
-    // TODO: Implement pause handler in motion control
-    // Should:
-    // 1. Stop current motion
-    // 2. Hold position
-    // 3. Wait for resume command
+    // Pause motion control
+    if (!motionPause()) {
+        logError("[GCODE] Failed to pause motion");
+        return;
+    }
+
+    logInfo("[GCODE] Motion paused - waiting for operator to resume");
+
+    // Note: Resume is handled by operator pressing physical resume button
+    // or sending resume command via CLI/web interface which calls motionResume()
 }
 
 bool GCodeParser::parseCode(const char* line, char code, float& value) {

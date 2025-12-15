@@ -26,7 +26,7 @@ void taskMotionFunction(void* parameter) {
     for (int axis = 0; axis < MOTION_AXES; axis++) {
       int32_t expected_pos = motionGetTarget(axis);
       int32_t actual_pos = motionGetPosition(axis);
-      float velocity_mm_s = motionGetPositionMM(axis); // TODO: Get actual velocity from motion state
+      float velocity_mm_s = motionGetVelocity(axis); // Get actual velocity from motion state
 
       encoderDeviationUpdate(axis, expected_pos, actual_pos, velocity_mm_s);
     }
