@@ -9,15 +9,32 @@
 
 void taskEncoderFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
-  
-  logInfo("[ENCODER_TASK] [OK] Started on core 1");
-  watchdogTaskAdd("Encoder");
-  watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Encoder"); 
 
+  logInfo("[ENCODER_TASK] [OK] Started on core 1");
+
+  // Diagnostic: Measure stack high water mark
+  UBaseType_t stack_hwm_initial = uxTaskGetStackHighWaterMark(NULL);
+  logInfo("[ENCODER_TASK] Initial stack HWM: %u bytes", (unsigned int)stack_hwm_initial * 4);
+
+  watchdogTaskAdd("Encoder");
+  watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Encoder");
+
+  uint32_t loop_count = 0;
   while (1) {
     // Encoder operations (20ms = 50 Hz)
     wj66Update();
-    encoderMotionUpdate(); 
+    encoderMotionUpdate();
+
+    // Periodic stack monitoring (every 100 cycles = 2 seconds)
+    loop_count++;
+    if (loop_count % 100 == 0) {
+      UBaseType_t stack_hwm = uxTaskGetStackHighWaterMark(NULL);
+      uint32_t stack_used = (TASK_STACK_ENCODER - (stack_hwm * 4));
+      if (stack_used > (TASK_STACK_ENCODER - 512)) {
+        logWarning("[ENCODER_TASK] HIGH stack usage: %lu / %d bytes (HWM: %u)",
+                   (unsigned long)stack_used, TASK_STACK_ENCODER, (unsigned int)stack_hwm * 4);
+      }
+    }
 
     watchdogFeed("Encoder");
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_ENCODER));
