@@ -28,7 +28,7 @@
 // TASK STACK SIZES
 // ============================================================================
 
-#define TASK_STACK_SAFETY        2048
+#define TASK_STACK_SAFETY        4096  // Increased from 2048 - was overflowing (only 144 bytes free)
 #define TASK_STACK_MOTION        2048
 #define TASK_STACK_ENCODER       5120
 #define TASK_STACK_PLC_COMM      2048

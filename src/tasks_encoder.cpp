@@ -29,10 +29,12 @@ void taskEncoderFunction(void* parameter) {
     loop_count++;
     if (loop_count % 100 == 0) {
       UBaseType_t stack_hwm = uxTaskGetStackHighWaterMark(NULL);
-      uint32_t stack_used = (TASK_STACK_ENCODER - (stack_hwm * 4));
-      if (stack_used > (TASK_STACK_ENCODER - 512)) {
-        logWarning("[ENCODER_TASK] HIGH stack usage: %lu / %d bytes (HWM: %u)",
-                   (unsigned long)stack_used, TASK_STACK_ENCODER, (unsigned int)stack_hwm * 4);
+      uint32_t stack_hwm_bytes = stack_hwm * sizeof(StackType_t);
+      uint32_t stack_used = TASK_STACK_ENCODER - stack_hwm_bytes;
+      // Only warn if less than 512 bytes free
+      if (stack_hwm_bytes < 512) {
+        logWarning("[ENCODER_TASK] HIGH stack usage: %lu / %d bytes (Free: %u)",
+                   (unsigned long)stack_used, TASK_STACK_ENCODER, (unsigned int)stack_hwm_bytes);
       }
     }
 

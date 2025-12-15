@@ -7,6 +7,7 @@
 
 #include "motion_buffer.h"
 #include "serial_logger.h"
+#include "task_manager.h"  // For taskGetMotionMutex()
 #include <string.h>
 
 MotionBuffer motionBuffer;
@@ -19,9 +20,17 @@ MotionBuffer::MotionBuffer() {
 }
 
 void MotionBuffer::init() {
+    // CRITICAL FIX: Initialize mutex early to prevent race condition during emergency stop at boot
     if (buffer_mutex == NULL) {
-        logWarning("[BUFFER] Warning: mutex not set. Call setMutex() first!");
+        // Get the motion mutex from task manager (will be available after taskManagerInit)
+        buffer_mutex = taskGetMotionMutex();
+        if (buffer_mutex == NULL) {
+            logError("[BUFFER] ERROR: Cannot get motion mutex - task manager not initialized!");
+        } else {
+            logInfo("[BUFFER] Mutex initialized from task manager");
+        }
     }
+
     head = 0;
     tail = 0;
     count = 0;
