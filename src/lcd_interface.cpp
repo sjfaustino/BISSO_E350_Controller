@@ -83,6 +83,17 @@ void lcdInterfaceInit() {
   Serial.println("[LCD] [OK] Ready");
 }
 
+void lcdInterfaceCleanup() {
+  // Clean up allocated LCD resources
+  if (lcd_i2c) {
+    lcd_i2c->noBacklight();
+    lcd_i2c->clear();
+    delete lcd_i2c;
+    lcd_i2c = nullptr;
+  }
+  lcd_state.mode = LCD_MODE_NONE;
+}
+
 void lcdInterfaceUpdate() {
   uint32_t now = millis();
   if (now - lcd_state.last_update < LCD_REFRESH_INTERVAL_MS) return;

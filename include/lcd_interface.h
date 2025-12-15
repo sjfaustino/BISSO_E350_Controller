@@ -17,6 +17,7 @@ typedef enum {
 } lcd_mode_t;
 
 void lcdInterfaceInit();
+void lcdInterfaceCleanup();  // Clean up allocated resources
 void lcdInterfaceUpdate();
 void lcdInterfacePrintLine(uint8_t line, const char* text);
 void lcdInterfaceSetMode(lcd_mode_t mode);

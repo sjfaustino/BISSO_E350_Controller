@@ -17,9 +17,10 @@
 class NetworkManager {
 public:
     NetworkManager();
+    ~NetworkManager();  // Destructor to clean up allocated resources
     void init();
     void update();
-    
+
     // Send text to connected Telnet client (for log mirroring)
     void telnetPrint(const char* str);
     void telnetPrintln(const char* str);

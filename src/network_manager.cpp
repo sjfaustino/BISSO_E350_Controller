@@ -9,6 +9,18 @@ NetworkManager networkManager;
 
 NetworkManager::NetworkManager() : telnetServer(nullptr), clientConnected(false) {}
 
+NetworkManager::~NetworkManager() {
+    // Clean up allocated resources
+    if (telnetServer) {
+        telnetServer->stop();
+        delete telnetServer;
+        telnetServer = nullptr;
+    }
+    if (telnetClient) {
+        telnetClient.stop();
+    }
+}
+
 void NetworkManager::init() {
     Serial.println("[NET] Initializing Network Stack...");
 
