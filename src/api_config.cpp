@@ -299,11 +299,11 @@ bool apiConfigGet(config_category_t category, JsonDocument& json_doc)
         }
 
         case CONFIG_CATEGORY_ENCODER: {
-            JsonArray ppm = obj.createNestedArray("ppm");
+            JsonArray ppm = obj["ppm"].to<JsonArray>();
             ppm.add(current_encoder.ppm[0]);
             ppm.add(current_encoder.ppm[1]);
             ppm.add(current_encoder.ppm[2]);
-            JsonArray cal = obj.createNestedArray("calibrated");
+            JsonArray cal = obj["calibrated"].to<JsonArray>();
             cal.add(current_encoder.calibrated[0]);
             cal.add(current_encoder.calibrated[1]);
             cal.add(current_encoder.calibrated[2]);
@@ -381,13 +381,13 @@ size_t apiConfigExportJSON(char* buffer, size_t buffer_size)
 {
     if (!buffer || buffer_size < 256) return 0;
 
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
 
-    JsonObject motion = doc.createNestedObject("motion");
+    JsonObject motion = doc["motion"].to<JsonObject>();
     motion["soft_limit_x_low"] = current_motion.soft_limit_low_mm[0];
     motion["soft_limit_x_high"] = current_motion.soft_limit_high_mm[0];
 
-    JsonObject vfd = doc.createNestedObject("vfd");
+    JsonObject vfd = doc["vfd"].to<JsonObject>();
     vfd["min_speed_hz"] = current_vfd.min_speed_hz;
     vfd["max_speed_hz"] = current_vfd.max_speed_hz;
 

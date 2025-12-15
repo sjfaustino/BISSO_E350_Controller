@@ -533,7 +533,7 @@ void WebServerManager::setupRoutes() {
         }
 
         int category = atoi(categoryParam->value().c_str());
-        StaticJsonDocument<512> doc;
+        JsonDocument doc;
 
         if (!apiConfigGet((config_category_t)category, doc)) {
             request->send(400, "application/json", "{\"error\":\"Invalid category\"}");
@@ -556,7 +556,7 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        StaticJsonDocument<256> doc;
+        JsonDocument doc;
         DeserializationError error = deserializeJson(doc, data, len);
 
         if (error) {
@@ -592,7 +592,7 @@ void WebServerManager::setupRoutes() {
             return request->requestAuthentication();
         }
 
-        StaticJsonDocument<256> doc;
+        JsonDocument doc;
         DeserializationError error = deserializeJson(doc, data, len);
 
         if (error) {
@@ -611,7 +611,7 @@ void WebServerManager::setupRoutes() {
 
         char error_msg[256];
         if (!apiConfigValidate((config_category_t)category, key, value, error_msg, sizeof(error_msg))) {
-            StaticJsonDocument<128> response;
+            JsonDocument response;
             response["valid"] = false;
             response["error"] = error_msg;
             char response_str[256];
@@ -636,7 +636,7 @@ void WebServerManager::setupRoutes() {
         }
 
         int category = atoi(categoryParam->value().c_str());
-        StaticJsonDocument<512> doc;
+        JsonDocument doc;
 
         if (!apiConfigGetSchema((config_category_t)category, doc)) {
             request->send(400, "application/json", "{\"error\":\"Invalid category\"}");
@@ -659,7 +659,7 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        StaticJsonDocument<128> doc;
+        JsonDocument doc;
         DeserializationError error = deserializeJson(doc, data, len);
 
         if (error) {
