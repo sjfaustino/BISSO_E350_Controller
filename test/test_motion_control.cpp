@@ -400,8 +400,9 @@ void test_motion_quality_score_calculation(void)
     }
 
     float quality = motion_mock_get_quality_score(&motion);
-    TEST_ASSERT_GREATER_THAN_DOUBLE(0.0, quality);
-    TEST_ASSERT_LESS_THAN_DOUBLE(100.0, quality);
+    // Verify quality score is in valid range [0, 100]
+    TEST_ASSERT_TRUE(quality >= 0.0f);
+    TEST_ASSERT_TRUE(quality <= 100.0f);
 }
 
 /**
