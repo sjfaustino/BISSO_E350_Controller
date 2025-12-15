@@ -26,7 +26,7 @@ static plc_mock_state_t plc;
 static vfd_mock_state_t vfd;
 static encoder_mock_state_t encoder;
 
-void setUp(void)
+static void setUp(void)
 {
     motion = motion_mock_init();
     plc = plc_mock_init();
@@ -35,7 +35,7 @@ void setUp(void)
     encoder_mock_calibrate(&encoder, 100);  // 100 PPM
 }
 
-void tearDown(void)
+static void tearDown(void)
 {
     // Reset for next test
 }

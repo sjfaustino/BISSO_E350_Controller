@@ -119,13 +119,13 @@ static config_t config_create_default(void)
 static config_test_fixture_t fixture;
 static config_t config;
 
-void setUp(void)
+static void setUp(void)
 {
     test_init_config_fixture(&fixture);
     config = config_create_default();
 }
 
-void tearDown(void)
+static void tearDown(void)
 {
     // Reset for next test
 }

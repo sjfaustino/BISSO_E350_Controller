@@ -45,7 +45,7 @@ static motion_config_t motion_config;
 static vfd_config_t vfd_config;
 static encoder_config_t encoder_config;
 
-void setUp(void)
+static void setUp(void)
 {
     // Initialize with defaults
     motion_config.soft_limit_low_mm[0] = 0;
@@ -68,7 +68,7 @@ void setUp(void)
     encoder_config.calibrated[2] = 1;
 }
 
-void tearDown(void)
+static void tearDown(void)
 {
     // Cleanup
 }

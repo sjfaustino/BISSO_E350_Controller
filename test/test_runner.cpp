@@ -26,7 +26,7 @@ extern void run_openapi_tests(void);
  * @brief setUp() - called before each test
  * Required by Unity framework
  */
-void setUp(void)
+static void setUp(void)
 {
     // Called before each individual test
     // Override in specific test files if needed
@@ -36,7 +36,7 @@ void setUp(void)
  * @brief tearDown() - called after each test
  * Required by Unity framework
  */
-void tearDown(void)
+static void tearDown(void)
 {
     // Called after each individual test
     // Override in specific test files if needed

@@ -24,14 +24,14 @@ static motion_mock_state_t motion;
 static vfd_mock_state_t vfd;
 static plc_mock_state_t plc;
 
-void setUp(void)
+static void setUp(void)
 {
     motion = motion_mock_init();
     vfd = vfd_mock_init();
     plc = plc_mock_init();
 }
 
-void tearDown(void)
+static void tearDown(void)
 {
     // Reset for next test
 }

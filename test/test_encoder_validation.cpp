@@ -23,13 +23,13 @@
 static encoder_mock_state_t encoder;
 static vfd_mock_state_t vfd;
 
-void setUp(void)
+static void setUp(void)
 {
     encoder = encoder_mock_init();
     vfd = vfd_mock_init();
 }
 
-void tearDown(void)
+static void tearDown(void)
 {
     // Reset for next test
 }
