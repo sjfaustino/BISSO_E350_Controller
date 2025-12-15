@@ -88,6 +88,11 @@ void setup() {
   BOOT_INIT("Watchdog", init_watchdog_wrapper, BOOT_ERROR_WATCHDOG);
   BOOT_INIT("Config", init_config_wrapper, BOOT_ERROR_CONFIG);
   BOOT_INIT("Schema", init_schema_wrapper, BOOT_ERROR_SCHEMA);
+
+  // CRITICAL: Initialize task manager BEFORE Motion to create mutexes/queues
+  // Motion buffer needs mutex during init, so this must come first
+  taskManagerInit();
+
   BOOT_INIT("PLC", init_plc_wrapper, BOOT_ERROR_PLC_IFACE);
   BOOT_INIT("LCD", init_lcd_wrapper, (boot_status_code_t)19);
   BOOT_INIT("Inputs", init_inputs_wrapper, (boot_status_code_t)14);
@@ -107,7 +112,7 @@ void setup() {
     return;
   }
 
-  taskManagerInit();
+  // taskManagerInit() already called earlier (before Motion init)
   perfMonitorInit();  // PHASE 5.1: Initialize performance monitoring
   taskManagerStart();
   logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
