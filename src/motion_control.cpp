@@ -372,8 +372,13 @@ void motionUpdate() {
         if ((uint32_t)(now - last_timeout_warning_ms) >= 5000) {  // Log once per 5 seconds
             logWarning("[MOTION] Mutex timeout (%lums): Skipped %lu times, backoff level %u",
                       (unsigned long)timeout_ms, (unsigned long)consecutive_skips, backoff_level);
-            faultLogWarning(FAULT_MOTION_TIMEOUT,
-                    "Motion mutex timeout: %lu consecutive failures, backoff level %u");
+
+            // Format fault message with actual values (faultLogWarning doesn't support printf-style formatting)
+            char fault_msg[128];
+            snprintf(fault_msg, sizeof(fault_msg),
+                    "Motion mutex timeout: %lu consecutive failures, backoff level %u",
+                    (unsigned long)consecutive_skips, backoff_level);
+            faultLogWarning(FAULT_MOTION_TIMEOUT, fault_msg);
             last_timeout_warning_ms = now;
         }
 
