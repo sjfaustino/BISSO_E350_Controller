@@ -111,7 +111,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos) {
             int32_t delta_pos = current_pos - prev_position;
             // Convert counts/ms to mm/s
             // velocity = (delta_counts / dt_ms) * (1000 ms/s) * (1 mm / ppm counts)
-            float ppm = encoderCalibGetPPM(id);  // pulses per mm
+            float ppm = encoderCalibrationGetPPM(id);  // pulses per mm
             if (ppm > 0.0f) {
                 current_velocity_mm_s = ((float)delta_pos / (float)dt_ms) * 1000.0f / ppm;
             } else {
