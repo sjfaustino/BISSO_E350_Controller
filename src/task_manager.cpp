@@ -118,6 +118,30 @@ void taskManagerStart() {
   taskLcdFormatterCreate();  // PHASE 5.4: LCD formatting on Core 0
   taskLcdCreate();
 
+  // CRITICAL: Validate that all critical tasks were created successfully
+  bool critical_failure = false;
+  if (task_safety == NULL) {
+    logError("[TASKS] CRITICAL FAILURE: Safety task not created - SYSTEM UNSAFE!");
+    critical_failure = true;
+  }
+  if (task_motion == NULL) {
+    logError("[TASKS] CRITICAL FAILURE: Motion task not created - CANNOT OPERATE!");
+    critical_failure = true;
+  }
+  if (task_encoder == NULL) {
+    logError("[TASKS] CRITICAL FAILURE: Encoder task not created - NO POSITION FEEDBACK!");
+    critical_failure = true;
+  }
+
+  if (critical_failure) {
+    logError("[TASKS] HALTING SYSTEM - Critical task creation failed!");
+    logError("[TASKS] Possible causes: Insufficient heap memory, stack size too large");
+    logError("[TASKS] Available heap: %u bytes", ESP.getFreeHeap());
+    while (1) {
+      delay(1000);  // Halt system in infinite loop - DO NOT START SCHEDULER
+    }
+  }
+
   Serial.println("[TASKS] [OK] All tasks active");
 }
 
@@ -172,37 +196,92 @@ task_stats_t* taskGetStatsArray() { return task_stats; }
 // ============================================================================
 
 void taskSafetyCreate() {
-  if(xTaskCreatePinnedToCore(taskSafetyFunction, "Safety", TASK_STACK_SAFETY, NULL, TASK_PRIORITY_SAFETY, &task_safety, CORE_1) == pdPASS) task_stats[0].handle = task_safety;
+  if(xTaskCreatePinnedToCore(taskSafetyFunction, "Safety", TASK_STACK_SAFETY, NULL, TASK_PRIORITY_SAFETY, &task_safety, CORE_1) == pdPASS) {
+    task_stats[0].handle = task_safety;
+  } else {
+    logError("[TASK] CRITICAL: Failed to create Safety task - SYSTEM UNSAFE!");
+    task_safety = NULL;
+  }
 }
 void taskMotionCreate() {
-  if(xTaskCreatePinnedToCore(taskMotionFunction, "Motion", TASK_STACK_MOTION, NULL, TASK_PRIORITY_MOTION, &task_motion, CORE_1) == pdPASS) task_stats[1].handle = task_motion;
+  if(xTaskCreatePinnedToCore(taskMotionFunction, "Motion", TASK_STACK_MOTION, NULL, TASK_PRIORITY_MOTION, &task_motion, CORE_1) == pdPASS) {
+    task_stats[1].handle = task_motion;
+  } else {
+    logError("[TASK] CRITICAL: Failed to create Motion task!");
+    task_motion = NULL;
+  }
 }
 void taskEncoderCreate() {
-  if(xTaskCreatePinnedToCore(taskEncoderFunction, "Encoder", TASK_STACK_ENCODER, NULL, TASK_PRIORITY_ENCODER, &task_encoder, CORE_1) == pdPASS) task_stats[2].handle = task_encoder;
+  if(xTaskCreatePinnedToCore(taskEncoderFunction, "Encoder", TASK_STACK_ENCODER, NULL, TASK_PRIORITY_ENCODER, &task_encoder, CORE_1) == pdPASS) {
+    task_stats[2].handle = task_encoder;
+  } else {
+    logError("[TASK] CRITICAL: Failed to create Encoder task!");
+    task_encoder = NULL;
+  }
 }
 void taskPlcCommCreate() {
-  if(xTaskCreatePinnedToCore(taskPlcCommFunction, "PLC_Comm", TASK_STACK_PLC_COMM, NULL, TASK_PRIORITY_PLC_COMM, &task_plc_comm, CORE_1) == pdPASS) task_stats[3].handle = task_plc_comm;
+  if(xTaskCreatePinnedToCore(taskPlcCommFunction, "PLC_Comm", TASK_STACK_PLC_COMM, NULL, TASK_PRIORITY_PLC_COMM, &task_plc_comm, CORE_1) == pdPASS) {
+    task_stats[3].handle = task_plc_comm;
+  } else {
+    logError("[TASK] ERROR: Failed to create PLC_Comm task!");
+    task_plc_comm = NULL;
+  }
 }
 void taskI2cManagerCreate() {
-  if(xTaskCreatePinnedToCore(taskI2cManagerFunction, "I2C_Manager", TASK_STACK_I2C_MANAGER, NULL, TASK_PRIORITY_I2C_MANAGER, &task_i2c_manager, CORE_1) == pdPASS) task_stats[4].handle = task_i2c_manager;
+  if(xTaskCreatePinnedToCore(taskI2cManagerFunction, "I2C_Manager", TASK_STACK_I2C_MANAGER, NULL, TASK_PRIORITY_I2C_MANAGER, &task_i2c_manager, CORE_1) == pdPASS) {
+    task_stats[4].handle = task_i2c_manager;
+  } else {
+    logError("[TASK] ERROR: Failed to create I2C_Manager task!");
+    task_i2c_manager = NULL;
+  }
 }
 void taskCliCreate() {
-  if(xTaskCreatePinnedToCore(taskCliFunction, "CLI", TASK_STACK_CLI, NULL, TASK_PRIORITY_CLI, &task_cli, CORE_0) == pdPASS) task_stats[5].handle = task_cli;
+  if(xTaskCreatePinnedToCore(taskCliFunction, "CLI", TASK_STACK_CLI, NULL, TASK_PRIORITY_CLI, &task_cli, CORE_0) == pdPASS) {
+    task_stats[5].handle = task_cli;
+  } else {
+    logWarning("[TASK] WARNING: Failed to create CLI task - command interface unavailable");
+    task_cli = NULL;
+  }
 }
 void taskFaultLogCreate() {
-  if(xTaskCreatePinnedToCore(taskFaultLogFunction, "Fault_Log", TASK_STACK_FAULT_LOG, NULL, TASK_PRIORITY_FAULT_LOG, &task_fault_log, CORE_0) == pdPASS) task_stats[6].handle = task_fault_log;
+  if(xTaskCreatePinnedToCore(taskFaultLogFunction, "Fault_Log", TASK_STACK_FAULT_LOG, NULL, TASK_PRIORITY_FAULT_LOG, &task_fault_log, CORE_0) == pdPASS) {
+    task_stats[6].handle = task_fault_log;
+  } else {
+    logError("[TASK] ERROR: Failed to create Fault_Log task - faults not logged!");
+    task_fault_log = NULL;
+  }
 }
 void taskMonitorCreate() {
-  if(xTaskCreatePinnedToCore(taskMonitorFunction, "Monitor", TASK_STACK_MONITOR, NULL, TASK_PRIORITY_MONITOR, &task_monitor, CORE_1) == pdPASS) task_stats[7].handle = task_monitor;
+  if(xTaskCreatePinnedToCore(taskMonitorFunction, "Monitor", TASK_STACK_MONITOR, NULL, TASK_PRIORITY_MONITOR, &task_monitor, CORE_1) == pdPASS) {
+    task_stats[7].handle = task_monitor;
+  } else {
+    logWarning("[TASK] WARNING: Failed to create Monitor task - diagnostics unavailable");
+    task_monitor = NULL;
+  }
 }
 void taskTelemetryCreate() {  // PHASE 5.4: Background telemetry on Core 0
-  if(xTaskCreatePinnedToCore(taskTelemetryFunction, "Telemetry", TASK_STACK_TELEMETRY, NULL, TASK_PRIORITY_TELEMETRY, &task_telemetry, CORE_0) == pdPASS) task_stats[8].handle = task_telemetry;
+  if(xTaskCreatePinnedToCore(taskTelemetryFunction, "Telemetry", TASK_STACK_TELEMETRY, NULL, TASK_PRIORITY_TELEMETRY, &task_telemetry, CORE_0) == pdPASS) {
+    task_stats[8].handle = task_telemetry;
+  } else {
+    logWarning("[TASK] WARNING: Failed to create Telemetry task - metrics unavailable");
+    task_telemetry = NULL;
+  }
 }
 void taskLcdFormatterCreate() {  // PHASE 5.4: LCD formatting on Core 0
-  if(xTaskCreatePinnedToCore(taskLcdFormatterFunction, "LCD_Formatter", TASK_STACK_LCD_FORMAT, NULL, TASK_PRIORITY_LCD_FORMAT, &task_lcd_formatter, CORE_0) == pdPASS) task_stats[9].handle = task_lcd_formatter;
+  if(xTaskCreatePinnedToCore(taskLcdFormatterFunction, "LCD_Formatter", TASK_STACK_LCD_FORMAT, NULL, TASK_PRIORITY_LCD_FORMAT, &task_lcd_formatter, CORE_0) == pdPASS) {
+    task_stats[9].handle = task_lcd_formatter;
+  } else {
+    logWarning("[TASK] WARNING: Failed to create LCD_Formatter task - display degraded");
+    task_lcd_formatter = NULL;
+  }
 }
 void taskLcdCreate() {
-  if(xTaskCreatePinnedToCore(taskLcdFunction, "LCD", TASK_STACK_LCD, NULL, TASK_PRIORITY_LCD, &task_lcd, CORE_1) == pdPASS) task_stats[10].handle = task_lcd;
+  if(xTaskCreatePinnedToCore(taskLcdFunction, "LCD", TASK_STACK_LCD, NULL, TASK_PRIORITY_LCD, &task_lcd, CORE_1) == pdPASS) {
+    task_stats[10].handle = task_lcd;
+  } else {
+    logWarning("[TASK] WARNING: Failed to create LCD task - no display");
+    task_lcd = NULL;
+  }
 }
 
 // ============================================================================
