@@ -104,7 +104,7 @@ axis_t plc_mock_get_active_axis(plc_mock_state_t* plc)
     }
 
     // During settling, return previous axis as "active"
-    return plc->previous_axis;
+    return (axis_t)plc->previous_axis;
 }
 
 uint8_t plc_mock_is_axis_selected(plc_mock_state_t* plc, axis_t axis)
@@ -156,7 +156,7 @@ void plc_mock_get_status(plc_mock_state_t* plc, char* buffer, size_t buffer_size
     const char* settled_str = plc_mock_is_settled(plc) ? "settled" : "switching";
 
     snprintf(buffer, buffer_size,
-        "PLC[%s] Active:%s Motor:%s Time:%ums Ops:%lu %s",
+        "PLC[%s] Active:%s Motor:%s Time:%ums Ops:%u %s",
         error_str,
         active_name,
         plc->motor_run_relay ? "RUN" : "STOP",

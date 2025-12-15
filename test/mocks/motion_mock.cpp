@@ -194,7 +194,7 @@ void motion_mock_clear_e_stop(motion_mock_state_t* motion)
 
 void motion_mock_set_soft_limits(
     motion_mock_state_t* motion,
-    uint8_t axis,
+    uint8_t axis __attribute__((unused)),
     int32_t low_steps,
     int32_t high_steps)
 {
@@ -263,7 +263,7 @@ void motion_mock_get_diagnostics(motion_mock_state_t* motion, char* buffer, size
         : "UNKNOWN";
 
     snprintf(buffer, buffer_size,
-        "MOTION[%s] Axis:%u Stall:%s Quality:%.0f%% Vel_Dev:%.1f%% Moves:%lu/%lu",
+        "MOTION[%s] Axis:%u Stall:%s Quality:%.0f%% Vel_Dev:%.1f%% Moves:%u/%u",
         state_str,
         motion->active_axis,
         stall_str,

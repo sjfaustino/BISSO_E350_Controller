@@ -186,12 +186,13 @@ void encoder_mock_get_status(encoder_mock_state_t* encoder, char* buffer, size_t
     const char* moving_str = encoder->is_moving ? "MOVING" : "IDLE";
 
     snprintf(buffer, buffer_size,
-        "ENC[%s] PPM:%u Pos:%.1fmm Vel:%.1fmm/s Jitter:%.2fmm/s Dev:%.1f%% %s",
+        "ENC[%s] PPM:%u Pos:%.1fmm Vel:%.1fmm/s Jitter:%.2fmm/s Dev:%.1f%% %s %s",
         err_str,
         encoder->ppm,
         encoder->position_mm,
         encoder->velocity_mms,
         encoder->jitter_amplitude,
         encoder->deviation_percent,
-        moving_str);
+        moving_str,
+        cal_str);
 }

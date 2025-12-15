@@ -10,6 +10,7 @@
 #define MOTION_MOCK_H
 
 #include <cstdint>
+#include <cstddef>
 
 /**
  * @brief Motion state enumeration

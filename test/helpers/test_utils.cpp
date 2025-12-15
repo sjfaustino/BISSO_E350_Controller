@@ -77,11 +77,11 @@ void test_print_failure(const char* assertion, const char* expected, const char*
 {
     UnityPrint("ASSERTION FAILED: ");
     UnityPrint(assertion);
-    UnityPrintChar('\n');
+    UnityPrint("\n");
     UnityPrint("  Expected: ");
     UnityPrint(expected);
-    UnityPrintChar('\n');
+    UnityPrint("\n");
     UnityPrint("  Actual: ");
     UnityPrint(actual);
-    UnityPrintChar('\n');
+    UnityPrint("\n");
 }

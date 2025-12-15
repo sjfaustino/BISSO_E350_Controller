@@ -69,9 +69,9 @@ typedef struct {
  * @param expected Expected value
  * @param actual Actual value
  * @param tolerance Allowable difference
- * @param line_num Line number for error reporting
+ * @param message Custom message for test failure
  */
-static inline void TEST_ASSERT_FLOAT_WITHIN_MESSAGE(
+static inline void test_assert_float_within_message(
     float tolerance,
     float expected,
     float actual,

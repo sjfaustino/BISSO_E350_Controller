@@ -10,6 +10,7 @@
 #define PLC_MOCK_H
 
 #include <cstdint>
+#include <cstddef>
 
 /**
  * @brief Axis enumeration
