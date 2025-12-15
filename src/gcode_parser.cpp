@@ -464,30 +464,40 @@ void GCodeParser::handleG28(const char* line) {
         home_x = home_y = home_z = home_a = true;
     }
 
-    logInfo("[GCODE] G28 Homing: X=%d Y=%d Z=%d A=%d",
+    // IMPORTANT: A axis has no motor - only manual positioning with encoder feedback
+    if (home_a) {
+        logWarning("[GCODE] G28 A homing skipped - A axis is manual (no motor)");
+        logWarning("[GCODE] Operator: Manually position A axis to zero and confirm");
+        home_a = false;  // Cannot auto-home A axis
+    }
+
+    logInfo("[GCODE] G28 Homing: X=%d Y=%d Z=%d A=%d(manual)",
             home_x, home_y, home_z, home_a);
 
-    // Execute homing sequence for each specified axis
-    // Note: Only one axis can home at a time due to single VFD constraint
-    // Homing will execute sequentially, waiting for each axis to complete
-    if (home_x && !motionHome(0)) {
-        logError("[GCODE] G28 X homing failed - axis busy or error");
-        return;
-    }
-    if (home_y && !motionHome(1)) {
-        logError("[GCODE] G28 Y homing failed - axis busy or error");
-        return;
-    }
+    // Execute homing sequence in SAFE ORDER: Z → Y → X
+    // CRITICAL SAFETY: Always home Z first to lift tool/blade before moving X/Y
+    // This prevents crashes into workpiece or fixture
+    // Only one axis can home at a time due to single VFD motor constraint
+
+    // 1. Home Z first (lift to safe height)
     if (home_z && !motionHome(2)) {
         logError("[GCODE] G28 Z homing failed - axis busy or error");
         return;
     }
-    if (home_a && !motionHome(3)) {
-        logError("[GCODE] G28 A homing failed - axis busy or error");
+
+    // 2. Home Y second (after Z is safe)
+    if (home_y && !motionHome(1)) {
+        logError("[GCODE] G28 Y homing failed - axis busy or error");
         return;
     }
 
-    logInfo("[GCODE] G28 Homing sequence initiated");
+    // 3. Home X last
+    if (home_x && !motionHome(0)) {
+        logError("[GCODE] G28 X homing failed - axis busy or error");
+        return;
+    }
+
+    logInfo("[GCODE] G28 Homing sequence completed successfully");
 }
 
 // PHASE 5.1: G30 - Go to Predefined Position
