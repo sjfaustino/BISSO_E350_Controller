@@ -120,7 +120,7 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t* data, uint8_t len
     if (read) {
       // FIX: requestFrom() must NOT be called after beginTransmission()
       // Use requestFrom() directly for read operations
-      Wire.requestFrom((uint8_t)address, (size_t)len, (uint8_t)1);  // 1 = send STOP after read
+      Wire.requestFrom((uint8_t)address, (size_t)len, true);  // true = send STOP after read
       if (Wire.available() >= len) {
         for (uint8_t i = 0; i < len; i++) data[i] = Wire.read();
         result = I2C_RESULT_OK;
