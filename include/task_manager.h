@@ -30,7 +30,7 @@
 
 #define TASK_STACK_SAFETY        2048
 #define TASK_STACK_MOTION        2048
-#define TASK_STACK_ENCODER       1024
+#define TASK_STACK_ENCODER       3072
 #define TASK_STACK_PLC_COMM      1024
 #define TASK_STACK_I2C_MANAGER   1024
 #define TASK_STACK_CLI           2048
