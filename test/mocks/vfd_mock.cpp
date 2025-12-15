@@ -56,7 +56,7 @@ void vfd_mock_advance_time(vfd_mock_state_t* vfd, uint32_t time_ms)
 {
     if (!vfd || vfd->has_fault) return;
 
-    float time_sec = time_ms / 1000.0f;
+    // Remove unused time_sec variable - time_ms is used directly
     float current_freq = (float)vfd->frequency_hz;
     float target_freq = (float)vfd->target_frequency_hz;
 
@@ -167,8 +167,9 @@ void vfd_mock_get_status(vfd_mock_state_t* vfd, char* buffer, size_t buffer_size
     const char* running_str = vfd->is_running ? "RUN" : "STOP";
 
     snprintf(buffer, buffer_size,
-        "VFD[%s] Freq:%uHz Target:%uHz Current:%.1fA Temp:%.0fC",
+        "VFD[%s|%s] Freq:%uHz Target:%uHz Current:%.1fA Temp:%.0fC",
         fault_str,
+        running_str,  // Include running status in output
         vfd->frequency_hz,
         vfd->target_frequency_hz,
         vfd->motor_current_amps,
