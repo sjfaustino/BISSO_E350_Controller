@@ -31,14 +31,14 @@
 #define TASK_STACK_SAFETY        2048
 #define TASK_STACK_MOTION        2048
 #define TASK_STACK_ENCODER       5120
-#define TASK_STACK_PLC_COMM      1024
-#define TASK_STACK_I2C_MANAGER   1024
+#define TASK_STACK_PLC_COMM      2048
+#define TASK_STACK_I2C_MANAGER   2048
 #define TASK_STACK_CLI           2048
-#define TASK_STACK_FAULT_LOG     1024
-#define TASK_STACK_MONITOR       1024
-#define TASK_STACK_TELEMETRY     1536  // PHASE 5.4: Background telemetry collection
-#define TASK_STACK_LCD_FORMAT    1024  // PHASE 5.4: LCD string formatting
-#define TASK_STACK_LCD           1024
+#define TASK_STACK_FAULT_LOG     2048
+#define TASK_STACK_MONITOR       2048
+#define TASK_STACK_TELEMETRY     2048  // PHASE 5.4: Background telemetry collection
+#define TASK_STACK_LCD_FORMAT    2048  // PHASE 5.4: LCD string formatting
+#define TASK_STACK_LCD           2048
 #define TASK_STACK_BOOT          2048
 
 // ============================================================================
