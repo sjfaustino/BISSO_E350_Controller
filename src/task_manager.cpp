@@ -74,32 +74,93 @@ static uint32_t boot_time_ms = 0;
 void taskManagerInit() {
   Serial.println("[TASKS] Initializing FreeRTOS manager...");
   boot_time_ms = millis();
-  
-  // Create Queues
-  queue_motion = xQueueCreate(QUEUE_LEN_MOTION, QUEUE_ITEM_SIZE);
-  queue_safety = xQueueCreate(QUEUE_LEN_SAFETY, QUEUE_ITEM_SIZE);
-  queue_encoder = xQueueCreate(QUEUE_LEN_ENCODER, QUEUE_ITEM_SIZE);
-  queue_plc = xQueueCreate(QUEUE_LEN_PLC, QUEUE_ITEM_SIZE);
-  queue_fault = xQueueCreate(QUEUE_LEN_FAULT, QUEUE_ITEM_SIZE); // Size 96 for async logs
-  queue_display = xQueueCreate(QUEUE_LEN_DISPLAY, QUEUE_ITEM_SIZE);
-  
-  if (!queue_motion || !queue_safety || !queue_encoder || 
-      !queue_plc || !queue_fault || !queue_display) {
-    Serial.println("[TASKS] [FAIL] Queue creation failed!");
-    // faultLogError(FAULT_BOOT_FAILED, "Task queue creation failed"); // Avoid circular dependency if fault log relies on queue
-  }
-  
-  // Create Mutexes
-  mutex_config = xSemaphoreCreateMutex();
-  mutex_i2c = xSemaphoreCreateMutex();  // Kept for backwards compatibility
-  mutex_i2c_board = xSemaphoreCreateMutex();  // PHASE 5.4: Board inputs
-  mutex_i2c_plc = xSemaphoreCreateMutex();    // PHASE 5.4: PLC interface
-  mutex_motion = xSemaphoreCreateMutex();
 
-  if (!mutex_config || !mutex_i2c || !mutex_i2c_board || !mutex_i2c_plc || !mutex_motion) {
-    Serial.println("[TASKS] [FAIL] Mutex creation failed!");
-    // faultLogError(FAULT_BOOT_FAILED, "Mutex creation failed");
+  // Create Queues with individual error checking
+  bool queue_failure = false;
+
+  queue_motion = xQueueCreate(QUEUE_LEN_MOTION, QUEUE_ITEM_SIZE);
+  if (!queue_motion) {
+    Serial.println("[TASKS] [FAIL] Motion queue creation failed!");
+    queue_failure = true;
   }
+
+  queue_safety = xQueueCreate(QUEUE_LEN_SAFETY, QUEUE_ITEM_SIZE);
+  if (!queue_safety) {
+    Serial.println("[TASKS] [FAIL] Safety queue creation failed!");
+    queue_failure = true;
+  }
+
+  queue_encoder = xQueueCreate(QUEUE_LEN_ENCODER, QUEUE_ITEM_SIZE);
+  if (!queue_encoder) {
+    Serial.println("[TASKS] [FAIL] Encoder queue creation failed!");
+    queue_failure = true;
+  }
+
+  queue_plc = xQueueCreate(QUEUE_LEN_PLC, QUEUE_ITEM_SIZE);
+  if (!queue_plc) {
+    Serial.println("[TASKS] [FAIL] PLC queue creation failed!");
+    queue_failure = true;
+  }
+
+  queue_fault = xQueueCreate(QUEUE_LEN_FAULT, QUEUE_ITEM_SIZE);
+  if (!queue_fault) {
+    Serial.println("[TASKS] [FAIL] Fault queue creation failed!");
+    queue_failure = true;
+  }
+
+  queue_display = xQueueCreate(QUEUE_LEN_DISPLAY, QUEUE_ITEM_SIZE);
+  if (!queue_display) {
+    Serial.println("[TASKS] [FAIL] Display queue creation failed!");
+    queue_failure = true;
+  }
+
+  // Create Mutexes with individual error checking
+  bool mutex_failure = false;
+
+  mutex_config = xSemaphoreCreateMutex();
+  if (!mutex_config) {
+    Serial.println("[TASKS] [FAIL] Config mutex creation failed!");
+    mutex_failure = true;
+  }
+
+  mutex_i2c = xSemaphoreCreateMutex();
+  if (!mutex_i2c) {
+    Serial.println("[TASKS] [FAIL] I2C mutex creation failed!");
+    mutex_failure = true;
+  }
+
+  mutex_i2c_board = xSemaphoreCreateMutex();
+  if (!mutex_i2c_board) {
+    Serial.println("[TASKS] [FAIL] I2C Board mutex creation failed!");
+    mutex_failure = true;
+  }
+
+  mutex_i2c_plc = xSemaphoreCreateMutex();
+  if (!mutex_i2c_plc) {
+    Serial.println("[TASKS] [FAIL] I2C PLC mutex creation failed!");
+    mutex_failure = true;
+  }
+
+  mutex_motion = xSemaphoreCreateMutex();
+  if (!mutex_motion) {
+    Serial.println("[TASKS] [FAIL] Motion mutex creation failed!");
+    mutex_failure = true;
+  }
+
+  // CRITICAL: Halt system if any queue or mutex creation failed
+  if (queue_failure || mutex_failure) {
+    Serial.println("[TASKS] CRITICAL FAILURE: FreeRTOS primitives creation failed!");
+    Serial.print("[TASKS] Available heap: ");
+    Serial.print(ESP.getFreeHeap());
+    Serial.println(" bytes");
+    Serial.println("[TASKS] This usually indicates insufficient memory.");
+    Serial.println("[TASKS] HALTING SYSTEM - Cannot operate safely without primitives!");
+
+    while (1) {
+      delay(1000);  // Halt system - DO NOT CONTINUE
+    }
+  }
+
   Serial.println("[TASKS] [OK] Primitives created");
 }
 
