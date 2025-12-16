@@ -104,8 +104,21 @@ void lcdInterfaceUpdate() {
   switch(lcd_state.mode) {
     case LCD_MODE_I2C:
       if (lcd_i2c) {
-        for (int i = 0; i < LCD_ROWS; i++) {
+        // CRITICAL FIX: Protect I2C operations with error detection
+        // If I2C fails (Error 263 = hardware not responding), fall back to serial
+        bool i2c_error = false;
+        for (int i = 0; i < LCD_ROWS && !i2c_error; i++) {
           if (lcd_state.display_dirty[i]) {
+            // Check I2C bus health before operation
+            Wire.beginTransmission(LCD_I2C_ADDR);
+            if (Wire.endTransmission() != 0) {
+              // I2C device not responding - fall back to serial mode
+              Serial.println("[LCD] [ERROR] I2C LCD not responding - switching to Serial mode");
+              lcd_state.mode = LCD_MODE_SERIAL;
+              i2c_error = true;
+              break;
+            }
+
             lcd_i2c->setCursor(0, i);
             // Print with explicit 20-character padding to clear old text
             // Format: %-20s pads with spaces on the right

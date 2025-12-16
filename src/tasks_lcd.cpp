@@ -47,6 +47,9 @@ void taskLcdFunction(void* parameter) {
   lcdMessageInit();
 
   while (1) {
+    // CRITICAL FIX: Feed watchdog EARLY to prevent timeout if operations block
+    watchdogFeed("LCD");
+
     // Display positions (lines 0-1)
     int32_t x_pos = motionGetPosition(0);
     int32_t y_pos = motionGetPosition(1);
@@ -167,6 +170,7 @@ void taskLcdFunction(void* parameter) {
     }
 
     lcdInterfaceUpdate();
+    // Feed watchdog again at end of loop (defense in depth)
     watchdogFeed("LCD");
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_LCD));
   }

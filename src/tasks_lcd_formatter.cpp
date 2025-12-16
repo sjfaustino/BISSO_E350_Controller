@@ -23,10 +23,14 @@ void taskLcdFormatterFunction(void* parameter) {
   lcdFormatterInit();
 
   while (1) {
+    // CRITICAL FIX: Feed watchdog EARLY to prevent timeout if operations block
+    watchdogFeed("LCD_Formatter");
+
     // Format all LCD strings with current motion state
     // This heavy snprintf work happens on Core 0, freeing Core 1 for motion control
     lcdFormatterUpdate();
 
+    // Feed watchdog again at end of loop (defense in depth)
     watchdogFeed("LCD_Formatter");
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_LCD_FORMAT));
   }
