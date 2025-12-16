@@ -20,6 +20,10 @@ static uint32_t last_fault_id = 0;
 
 #define FAULT_LOG_NAMESPACE "bisso_faults"
 
+// Maximum number of fault entries to keep in NVS (prevents storage from filling up)
+// Each fault uses 6 NVS keys, so 50 faults = 300 keys
+#define MAX_FAULT_ENTRIES_NVS 50
+
 // PHASE 5.1: Ring buffer fallback for queue overflow
 #define FAULT_RING_BUFFER_SIZE 8
 static struct {
@@ -61,18 +65,62 @@ void faultLoggingInit() {
   logInfo("[FAULT] Initializing...");
 
   if (!fault_prefs.begin(FAULT_LOG_NAMESPACE, false)) {
-    logError("[FAULT] [FAIL] NVS init failed!");
-    return;
+    logError("[FAULT] [FAIL] NVS init failed! Attempting recovery...");
+
+    // CRITICAL FIX: If NVS init fails (likely ESP_ERR_NVS_NO_FREE_PAGES),
+    // try to clear the namespace and restart
+    if (fault_prefs.begin(FAULT_LOG_NAMESPACE, false)) {
+      logWarning("[FAULT] Clearing NVS to recover from storage full error...");
+      fault_prefs.clear();
+      fault_prefs.end();
+
+      // Try again after clear
+      if (!fault_prefs.begin(FAULT_LOG_NAMESPACE, false)) {
+        logError("[FAULT] [FAIL] NVS recovery failed! Fault logging disabled.");
+        return;
+      }
+      logInfo("[FAULT] NVS recovery successful");
+    } else {
+      logError("[FAULT] [FAIL] Cannot access NVS. Fault logging disabled.");
+      return;
+    }
   }
 
   last_fault_id = fault_prefs.getUInt("last_id", 0);
   uint32_t boot_count = fault_prefs.getUInt("boot_count", 0);
   fault_prefs.putUInt("boot_count", boot_count + 1);
 
+  // CRITICAL FIX: Auto-cleanup if too many faults accumulated
+  if (last_fault_id > MAX_FAULT_ENTRIES_NVS) {
+    logWarning("[FAULT] Too many fault entries (%lu), cleaning up oldest faults...",
+               (unsigned long)last_fault_id);
+
+    // Delete oldest faults (keep only last MAX_FAULT_ENTRIES_NVS)
+    uint32_t faults_to_delete = last_fault_id - MAX_FAULT_ENTRIES_NVS;
+    for (uint32_t i = 1; i <= faults_to_delete; i++) {
+      char key[32];
+      snprintf(key, sizeof(key), "fault_%lu_sev", (unsigned long)i);
+      fault_prefs.remove(key);
+      snprintf(key, sizeof(key), "fault_%lu_code", (unsigned long)i);
+      fault_prefs.remove(key);
+      snprintf(key, sizeof(key), "fault_%lu_axis", (unsigned long)i);
+      fault_prefs.remove(key);
+      snprintf(key, sizeof(key), "fault_%lu_val", (unsigned long)i);
+      fault_prefs.remove(key);
+      snprintf(key, sizeof(key), "fault_%lu_msg", (unsigned long)i);
+      fault_prefs.remove(key);
+      snprintf(key, sizeof(key), "fault_%lu_ts", (unsigned long)i);
+      fault_prefs.remove(key);
+    }
+
+    logInfo("[FAULT] Deleted %lu oldest fault entries", (unsigned long)faults_to_delete);
+  }
+
   // PHASE 2.5: Initialize rate limiter to prevent duplicate fault log flooding
   logRateLimiterInit();
 
-  logInfo("[FAULT] [OK] Ready. Boot count: %u", boot_count + 1);
+  logInfo("[FAULT] [OK] Ready. Boot count: %u, Faults in NVS: %lu",
+          boot_count + 1, (unsigned long)last_fault_id);
 }
 
 const char* faultCodeToString(fault_code_t code) {
@@ -163,27 +211,48 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, i
 
 void faultLogToNVS(const fault_entry_t* entry) {
   if (!entry) return;
+
+  // CRITICAL FIX: Auto-rotate faults if we hit the limit
+  // This prevents NVS from filling up over many boot cycles
+  if (last_fault_id >= MAX_FAULT_ENTRIES_NVS) {
+    // Delete the oldest fault entry (fault ID 1, or first after rotation)
+    uint32_t oldest_id = last_fault_id - MAX_FAULT_ENTRIES_NVS + 1;
+    char key[32];
+    snprintf(key, sizeof(key), "fault_%lu_sev", (unsigned long)oldest_id);
+    fault_prefs.remove(key);
+    snprintf(key, sizeof(key), "fault_%lu_code", (unsigned long)oldest_id);
+    fault_prefs.remove(key);
+    snprintf(key, sizeof(key), "fault_%lu_axis", (unsigned long)oldest_id);
+    fault_prefs.remove(key);
+    snprintf(key, sizeof(key), "fault_%lu_val", (unsigned long)oldest_id);
+    fault_prefs.remove(key);
+    snprintf(key, sizeof(key), "fault_%lu_msg", (unsigned long)oldest_id);
+    fault_prefs.remove(key);
+    snprintf(key, sizeof(key), "fault_%lu_ts", (unsigned long)oldest_id);
+    fault_prefs.remove(key);
+  }
+
   last_fault_id++;
   char key[32];
-  
+
   snprintf(key, sizeof(key), "fault_%lu_sev", (unsigned long)last_fault_id);
   fault_prefs.putUChar(key, (uint8_t)entry->severity);
-  
+
   snprintf(key, sizeof(key), "fault_%lu_code", (unsigned long)last_fault_id);
   fault_prefs.putUChar(key, (uint8_t)entry->code);
-  
+
   snprintf(key, sizeof(key), "fault_%lu_axis", (unsigned long)last_fault_id);
   fault_prefs.putInt(key, entry->axis);
-  
+
   snprintf(key, sizeof(key), "fault_%lu_val", (unsigned long)last_fault_id);
   fault_prefs.putInt(key, entry->value);
-  
+
   snprintf(key, sizeof(key), "fault_%lu_msg", (unsigned long)last_fault_id);
-  fault_prefs.putString(key, entry->message); 
-  
+  fault_prefs.putString(key, entry->message);
+
   snprintf(key, sizeof(key), "fault_%lu_ts", (unsigned long)last_fault_id);
   fault_prefs.putULong(key, entry->timestamp);
-  
+
   fault_prefs.putUInt("last_id", last_fault_id);
 }
 
