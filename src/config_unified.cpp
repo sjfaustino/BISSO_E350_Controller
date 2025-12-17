@@ -255,7 +255,12 @@ int32_t configGetInt(const char* key, int32_t default_val) {
   if (idx >= 0 && config_table[idx].type == CONFIG_INT32 && config_table[idx].is_set) {
     return config_table[idx].value.int_val;
   }
-  return prefs.getInt(key, default_val);
+  // CRITICAL FIX: Check if key exists before calling getInt()
+  // Prevents ESP32 Preferences library from logging ERROR messages for missing keys
+  if (prefs.isKey(key)) {
+    return prefs.getInt(key, default_val);
+  }
+  return default_val;
 }
 
 float configGetFloat(const char* key, float default_val) {
@@ -264,7 +269,13 @@ float configGetFloat(const char* key, float default_val) {
   if (idx >= 0 && config_table[idx].type == CONFIG_FLOAT && config_table[idx].is_set) {
     return config_table[idx].value.float_val;
   }
-  return prefs.getFloat(key, default_val);
+  // CRITICAL FIX: Check if key exists before calling getFloat()
+  // This prevents ESP32 Preferences library from logging ERROR messages
+  // when loading WCS offsets (g54_x, g54_y, etc.) that don't exist yet
+  if (prefs.isKey(key)) {
+    return prefs.getFloat(key, default_val);
+  }
+  return default_val;
 }
 
 const char* configGetString(const char* key, const char* default_val) {
