@@ -97,23 +97,41 @@ void faultLoggingInit() {
 
     // Delete oldest faults (keep only last MAX_FAULT_ENTRIES_NVS)
     uint32_t faults_to_delete = last_fault_id - MAX_FAULT_ENTRIES_NVS;
+    uint32_t actually_deleted = 0;
+
     for (uint32_t i = 1; i <= faults_to_delete; i++) {
       char key[32];
+
+      // Only delete if key exists (avoid blocking on NOT_FOUND errors)
       snprintf(key, sizeof(key), "fault_%lu_sev", (unsigned long)i);
-      fault_prefs.remove(key);
+      if (fault_prefs.isKey(key)) {
+        fault_prefs.remove(key);
+        actually_deleted++;
+      }
+
       snprintf(key, sizeof(key), "fault_%lu_code", (unsigned long)i);
-      fault_prefs.remove(key);
+      if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
       snprintf(key, sizeof(key), "fault_%lu_axis", (unsigned long)i);
-      fault_prefs.remove(key);
+      if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
       snprintf(key, sizeof(key), "fault_%lu_val", (unsigned long)i);
-      fault_prefs.remove(key);
+      if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
       snprintf(key, sizeof(key), "fault_%lu_msg", (unsigned long)i);
-      fault_prefs.remove(key);
+      if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
       snprintf(key, sizeof(key), "fault_%lu_ts", (unsigned long)i);
-      fault_prefs.remove(key);
+      if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
+      // Feed watchdog periodically to prevent timeout during cleanup
+      if (i % 10 == 0) {
+        delay(1);  // Yield to other tasks
+      }
     }
 
-    logInfo("[FAULT] Deleted %lu oldest fault entries", (unsigned long)faults_to_delete);
+    logInfo("[FAULT] Deleted %lu oldest fault entries (attempted %lu)",
+            (unsigned long)actually_deleted, (unsigned long)faults_to_delete);
   }
 
   // PHASE 2.5: Initialize rate limiter to prevent duplicate fault log flooding
@@ -218,18 +236,25 @@ void faultLogToNVS(const fault_entry_t* entry) {
     // Delete the oldest fault entry (fault ID 1, or first after rotation)
     uint32_t oldest_id = last_fault_id - MAX_FAULT_ENTRIES_NVS + 1;
     char key[32];
+
+    // Only delete if key exists (avoid blocking on NOT_FOUND errors)
     snprintf(key, sizeof(key), "fault_%lu_sev", (unsigned long)oldest_id);
-    fault_prefs.remove(key);
+    if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
     snprintf(key, sizeof(key), "fault_%lu_code", (unsigned long)oldest_id);
-    fault_prefs.remove(key);
+    if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
     snprintf(key, sizeof(key), "fault_%lu_axis", (unsigned long)oldest_id);
-    fault_prefs.remove(key);
+    if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
     snprintf(key, sizeof(key), "fault_%lu_val", (unsigned long)oldest_id);
-    fault_prefs.remove(key);
+    if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
     snprintf(key, sizeof(key), "fault_%lu_msg", (unsigned long)oldest_id);
-    fault_prefs.remove(key);
+    if (fault_prefs.isKey(key)) fault_prefs.remove(key);
+
     snprintf(key, sizeof(key), "fault_%lu_ts", (unsigned long)oldest_id);
-    fault_prefs.remove(key);
+    if (fault_prefs.isKey(key)) fault_prefs.remove(key);
   }
 
   last_fault_id++;
