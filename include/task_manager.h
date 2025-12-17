@@ -29,7 +29,7 @@
 // ============================================================================
 
 #define TASK_STACK_SAFETY        4096  // Increased from 2048 - was overflowing (only 144 bytes free)
-#define TASK_STACK_MOTION        2048
+#define TASK_STACK_MOTION        4096  // Increased from 2048 - was near overflow (only 192 bytes free)
 #define TASK_STACK_ENCODER       5120
 #define TASK_STACK_PLC_COMM      2048
 #define TASK_STACK_I2C_MANAGER   2048

@@ -19,13 +19,18 @@ static Preferences wdt_prefs;
 // FIX: Fully initialized struct to suppress -Wmissing-field-initializers
 static watchdog_stats_t wdt_stats = {0, 0, 0, 0, 0, 0, 0, RESET_REASON_UNKNOWN, 0, 0};
 
-// FIX: Fully initialized array of structs
-static watchdog_tick_t wdt_tasks[10] = {
+// FIX: Increased from 10 to 15 to accommodate all system tasks
+// Current task count: Safety, Motion, Encoder, CLI, Fault_Log, PLC,
+// I2C_Manager, Monitor, Telemetry, LCD_Formatter, LCD = 11 tasks
+static watchdog_tick_t wdt_tasks[15] = {
     {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
     {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
     {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
     {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
-    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0}
+    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
+    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
+    {NULL, 0, 0, 0, false, 0}, {NULL, 0, 0, 0, false, 0},
+    {NULL, 0, 0, 0, false, 0}
 };
 
 static int wdt_task_count = 0;
@@ -117,7 +122,7 @@ void watchdogInit() {
 
 void watchdogTaskAdd(const char* task_name) {
   if (!wdt_initialized) return;
-  if (wdt_task_count >= 10) {
+  if (wdt_task_count >= 15) {  // Increased from 10 to 15
     logError("[WDT] Too many tasks registered!");
     return;
   }
