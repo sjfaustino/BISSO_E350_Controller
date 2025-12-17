@@ -202,10 +202,10 @@ void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
     float sa = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : def_ang;
 
     snprintf(line1, LCD_COLS + 1, "X %7.1f  Y %7.1f", x_counts/sx, y_counts/sy);
-    
-    // FIX: Removed " DEG" suffix to fit within 20 chars and prevent truncation warning.
-    // Length: "Z " (2) + Val (7) + " A " (3) + Val (7) = 19 chars (Fits in 20)
-    snprintf(line2, LCD_COLS + 1, "Z %7.1f A %7.1f", z_counts/sz, a_counts/sa);
+
+    // FIX: Added extra space before "A" to align vertically with "Y"
+    // Length: "Z " (2) + Val (7) + "  A " (4) + Val (7) = 20 chars
+    snprintf(line2, LCD_COLS + 1, "Z %7.1f  A %7.1f", z_counts/sz, a_counts/sa);
     
     lcdInterfacePrintLine(0, line1);
     lcdInterfacePrintLine(1, line2);
