@@ -172,9 +172,21 @@ void lcdInterfaceUpdate() {
 
 void lcdInterfacePrintLine(uint8_t line, const char* text) {
   if (line >= LCD_ROWS || text == NULL) return;
-  strncpy(lcd_state.display[line], text, LCD_COLS);
-  lcd_state.display[line][LCD_COLS] = '\0';
-  lcd_state.display_dirty[line] = true;
+
+  // CRITICAL FIX: Only mark line as dirty if content actually changed
+  // This prevents serial output spam when LCD is in serial mode
+  char new_line[LCD_COLS + 1];
+  strncpy(new_line, text, LCD_COLS);
+  new_line[LCD_COLS] = '\0';
+
+  // Compare new content with existing content
+  if (strcmp(lcd_state.display[line], new_line) != 0) {
+    // Content changed - update and mark dirty
+    strncpy(lcd_state.display[line], new_line, LCD_COLS);
+    lcd_state.display[line][LCD_COLS] = '\0';
+    lcd_state.display_dirty[line] = true;
+  }
+  // else: Content unchanged - don't mark dirty, no serial spam
 }
 
 void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts, int32_t a_counts) {
