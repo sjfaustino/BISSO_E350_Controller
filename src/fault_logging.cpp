@@ -132,6 +132,15 @@ void faultLoggingInit() {
 
     logInfo("[FAULT] Deleted %lu oldest fault entries (attempted %lu)",
             (unsigned long)actually_deleted, (unsigned long)faults_to_delete);
+
+    // CRITICAL FIX: If no faults were deleted, old faults are already gone
+    // Reset last_fault_id to prevent it from growing forever
+    if (actually_deleted == 0) {
+      logWarning("[FAULT] Old faults already deleted - resetting ID counter to prevent infinite growth");
+      last_fault_id = MAX_FAULT_ENTRIES_NVS;
+      fault_prefs.putUInt("last_id", last_fault_id);
+      logInfo("[FAULT] Reset fault ID counter to %u", MAX_FAULT_ENTRIES_NVS);
+    }
   }
 
   // PHASE 2.5: Initialize rate limiter to prevent duplicate fault log flooding
