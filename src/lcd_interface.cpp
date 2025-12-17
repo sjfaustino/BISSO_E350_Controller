@@ -12,7 +12,8 @@
 #include <stdio.h>
 #include "system_constants.h"
 #include "encoder_calibration.h"
-#include "plc_iface.h" 
+#include "plc_iface.h"
+#include "task_manager.h" 
 
 // Global I2C LCD instance (will be initialized in lcdInterfaceInit)
 static LiquidCrystal_I2C* lcd_i2c = nullptr;
@@ -48,6 +49,17 @@ void lcdInterfaceInit() {
 
   // FIX: Wire.begin() is called by PLC init, so don't call it again to avoid I2C deadlock
   // Just probe for LCD presence on the already-initialized I2C bus
+
+  // CRITICAL FIX: Acquire LCD mutex if available (during boot, mutex may not exist yet)
+  SemaphoreHandle_t lcd_mutex = taskGetLcdMutex();
+  bool mutex_locked = false;
+  if (lcd_mutex != NULL) {
+    mutex_locked = taskLockMutex(lcd_mutex, 1000);  // 1s timeout for init
+    if (!mutex_locked) {
+      Serial.println("[LCD] [WARN] Could not acquire mutex for init");
+    }
+  }
+
   Wire.beginTransmission(LCD_I2C_ADDR);
   if (Wire.endTransmission() == 0) {
     lcd_state.i2c_found = true;
@@ -80,6 +92,11 @@ void lcdInterfaceInit() {
     Serial.println("[LCD] [WARN] I2C Not Found, using Serial simulation");
   }
 
+  // Release mutex if we locked it
+  if (mutex_locked) {
+    taskUnlockMutex(lcd_mutex);
+  }
+
   Serial.println("[LCD] [OK] Ready");
 }
 
@@ -104,29 +121,37 @@ void lcdInterfaceUpdate() {
   switch(lcd_state.mode) {
     case LCD_MODE_I2C:
       if (lcd_i2c) {
-        // CRITICAL FIX: Protect I2C operations with error detection
-        // If I2C fails (Error 263 = hardware not responding), fall back to serial
-        bool i2c_error = false;
-        for (int i = 0; i < LCD_ROWS && !i2c_error; i++) {
-          if (lcd_state.display_dirty[i]) {
-            // Check I2C bus health before operation
-            Wire.beginTransmission(LCD_I2C_ADDR);
-            if (Wire.endTransmission() != 0) {
-              // I2C device not responding - fall back to serial mode
-              Serial.println("[LCD] [ERROR] I2C LCD not responding - switching to Serial mode");
-              lcd_state.mode = LCD_MODE_SERIAL;
-              i2c_error = true;
-              break;
-            }
+        // CRITICAL FIX: Acquire LCD mutex to prevent I2C bus contention
+        // Timeout: 100ms is reasonable for LCD updates (non-critical operation)
+        if (taskLockMutex(taskGetLcdMutex(), 100)) {
+          // CRITICAL FIX: Protect I2C operations with error detection
+          // If I2C fails (Error 263 = hardware not responding), fall back to serial
+          bool i2c_error = false;
+          for (int i = 0; i < LCD_ROWS && !i2c_error; i++) {
+            if (lcd_state.display_dirty[i]) {
+              // Check I2C bus health before operation
+              Wire.beginTransmission(LCD_I2C_ADDR);
+              if (Wire.endTransmission() != 0) {
+                // I2C device not responding - fall back to serial mode
+                Serial.println("[LCD] [ERROR] I2C LCD not responding - switching to Serial mode");
+                lcd_state.mode = LCD_MODE_SERIAL;
+                i2c_error = true;
+                break;
+              }
 
-            lcd_i2c->setCursor(0, i);
-            // Print with explicit 20-character padding to clear old text
-            // Format: %-20s pads with spaces on the right
-            char padded_line[LCD_COLS + 1];
-            snprintf(padded_line, sizeof(padded_line), "%-20s", lcd_state.display[i]);
-            lcd_i2c->print(padded_line);
-            lcd_state.display_dirty[i] = false;
+              lcd_i2c->setCursor(0, i);
+              // Print with explicit 20-character padding to clear old text
+              // Format: %-20s pads with spaces on the right
+              char padded_line[LCD_COLS + 1];
+              snprintf(padded_line, sizeof(padded_line), "%-20s", lcd_state.display[i]);
+              lcd_i2c->print(padded_line);
+              lcd_state.display_dirty[i] = false;
+            }
           }
+          taskUnlockMutex(taskGetLcdMutex());
+        } else {
+          // Mutex timeout - skip this update cycle (LCD is non-critical)
+          Serial.println("[LCD] [WARN] LCD mutex timeout - skipping update");
         }
       }
       break;

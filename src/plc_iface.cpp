@@ -30,17 +30,28 @@ static portMUX_TYPE plc_spinlock = portMUX_INITIALIZER_UNLOCKED;
 // ============================================================================
 
 static bool plcWriteI2C(uint8_t address, uint8_t data, const char* context) {
+    // CRITICAL FIX: Acquire PLC I2C mutex to prevent bus contention
+    // Timeout: 200ms (PLC operations are time-sensitive but not critical)
+    if (!taskLockMutex(taskGetI2cPlcMutex(), 200)) {
+        logWarning("[PLC] PLC I2C mutex timeout - skipping write: %s", context);
+        return false;
+    }
+
     uint8_t error = 0;
     for (int i = 0; i < I2C_RETRIES; i++) {
         Wire.beginTransmission(address);
         Wire.write(data);
         error = Wire.endTransmission();
-        
-        if (error == 0) return true; // Success
-        
-        vTaskDelay(pdMS_TO_TICKS(1)); 
+
+        if (error == 0) {
+            taskUnlockMutex(taskGetI2cPlcMutex());
+            return true; // Success
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 
+    taskUnlockMutex(taskGetI2cPlcMutex());
     logError("[PLC] I2C Write Failed (Addr 0x%02X, Err %d): %s", address, error, context);
     faultLogEntry(FAULT_ERROR, FAULT_I2C_ERROR, -1, address, context);
     return false;
@@ -161,14 +172,22 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
 // ============================================================================
 
 bool elboI73GetInput(uint8_t bit, bool* success) {
+    // CRITICAL FIX: Acquire PLC I2C mutex to prevent bus contention
+    // Timeout: 200ms (PLC operations are time-sensitive but not critical)
+    if (!taskLockMutex(taskGetI2cPlcMutex(), 200)) {
+        logWarning("[PLC] PLC I2C mutex timeout - using cached input");
+        if (success) *success = false;
+        return (i73_input_shadow & (1 << bit));
+    }
+
     uint8_t count = Wire.requestFrom((uint8_t)ADDR_I73_INPUT, (uint8_t)1);
-    
+
     if (count == 1) {
         i73_input_shadow = Wire.read();
         if (success) *success = true;
     } else {
         if (success) *success = false;
-        
+
         // Throttled logging
         static uint32_t last_log = 0;
         if (millis() - last_log > 2000) {
@@ -176,7 +195,9 @@ bool elboI73GetInput(uint8_t bit, bool* success) {
             last_log = millis();
         }
     }
-    
+
+    taskUnlockMutex(taskGetI2cPlcMutex());
+
     // Check bit state (Returns cached value on failure)
     return (i73_input_shadow & (1 << bit));
 }
@@ -185,8 +206,14 @@ void elboDiagnostics() {
     Serial.println("\n[PLC] === IO Diagnostics ===");
     Serial.printf("Output Register: 0x%02X\n", q73_shadow_register);
     Serial.printf("Input Register:  0x%02X\n", i73_input_shadow);
-    
-    Wire.beginTransmission(ADDR_Q73_OUTPUT);
-    uint8_t err = Wire.endTransmission();
-    Serial.printf("Q73 (0x%02X) Status: %s\n", ADDR_Q73_OUTPUT, (err == 0) ? "OK" : "ERROR");
+
+    // CRITICAL FIX: Acquire PLC I2C mutex for diagnostics
+    if (taskLockMutex(taskGetI2cPlcMutex(), 500)) {
+        Wire.beginTransmission(ADDR_Q73_OUTPUT);
+        uint8_t err = Wire.endTransmission();
+        Serial.printf("Q73 (0x%02X) Status: %s\n", ADDR_Q73_OUTPUT, (err == 0) ? "OK" : "ERROR");
+        taskUnlockMutex(taskGetI2cPlcMutex());
+    } else {
+        Serial.println("Q73: Could not acquire I2C mutex for diagnostics");
+    }
 }

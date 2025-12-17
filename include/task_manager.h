@@ -187,6 +187,7 @@ SemaphoreHandle_t taskGetConfigMutex();
 SemaphoreHandle_t taskGetI2cMutex();  // DEPRECATED: Use separate board/PLC mutexes
 SemaphoreHandle_t taskGetI2cBoardMutex();  // PHASE 5.4: Board inputs (buttons, etc.)
 SemaphoreHandle_t taskGetI2cPlcMutex();    // PHASE 5.4: PLC interface (speed, CONSENSO)
+SemaphoreHandle_t taskGetLcdMutex();       // LCD display (0x27)
 SemaphoreHandle_t taskGetMotionMutex();
 bool taskLockMutex(SemaphoreHandle_t mutex, uint32_t timeout_ms);
 void taskUnlockMutex(SemaphoreHandle_t mutex);

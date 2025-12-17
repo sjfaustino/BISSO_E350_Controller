@@ -48,6 +48,7 @@ static SemaphoreHandle_t mutex_config = NULL;
 static SemaphoreHandle_t mutex_i2c = NULL;  // Kept for backwards compatibility
 static SemaphoreHandle_t mutex_i2c_board = NULL;  // PHASE 5.4: Board inputs
 static SemaphoreHandle_t mutex_i2c_plc = NULL;    // PHASE 5.4: PLC interface
+static SemaphoreHandle_t mutex_lcd = NULL;        // LCD display (0x27)
 static SemaphoreHandle_t mutex_motion = NULL;
 
 task_stats_t task_stats[] = {
@@ -141,6 +142,12 @@ void taskManagerInit() {
     mutex_failure = true;
   }
 
+  mutex_lcd = xSemaphoreCreateMutex();
+  if (!mutex_lcd) {
+    Serial.println("[TASKS] [FAIL] LCD mutex creation failed!");
+    mutex_failure = true;
+  }
+
   mutex_motion = xSemaphoreCreateMutex();
   if (!mutex_motion) {
     Serial.println("[TASKS] [FAIL] Motion mutex creation failed!");
@@ -221,6 +228,7 @@ SemaphoreHandle_t taskGetConfigMutex() { return mutex_config; }
 SemaphoreHandle_t taskGetI2cMutex() { return mutex_i2c; }  // Kept for backwards compatibility
 SemaphoreHandle_t taskGetI2cBoardMutex() { return mutex_i2c_board; }  // PHASE 5.4: Board inputs
 SemaphoreHandle_t taskGetI2cPlcMutex() { return mutex_i2c_plc; }      // PHASE 5.4: PLC interface
+SemaphoreHandle_t taskGetLcdMutex() { return mutex_lcd; }              // LCD display (0x27)
 SemaphoreHandle_t taskGetMotionMutex() { return mutex_motion; }
 
 // NEW: Direct Notification for low-latency wakeups
