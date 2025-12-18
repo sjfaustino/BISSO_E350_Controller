@@ -6,6 +6,7 @@
 class Router {
     static routes = {
         'dashboard': { file: 'pages/dashboard/dashboard.html', js: 'pages/dashboard/dashboard.js' },
+        'gcode': { file: 'pages/gcode/gcode.html', js: 'pages/gcode/gcode.js' },
         'motion': { file: 'pages/motion/motion.html', js: 'pages/motion/motion.js' },
         'diagnostics': { file: 'pages/diagnostics/diagnostics.html', js: 'pages/diagnostics/diagnostics.js' },
         'maintenance': { file: 'pages/maintenance/maintenance.html', js: 'pages/maintenance/maintenance.js' },

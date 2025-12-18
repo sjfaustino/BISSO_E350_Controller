@@ -26,6 +26,8 @@
 #include "vfd_current_calibration.h"  // PHASE 5.5: Current calibration
 #include "api_config.h"  // PHASE 5.6: Configuration API for web settings
 #include "openapi.h"  // PHASE 6: OpenAPI/Swagger specification generation
+#include "gcode_parser.h"  // PHASE 1: G-code execution
+#include "fault_logging.h"  // PHASE 1: Alarm and E-stop management
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
@@ -686,6 +688,115 @@ void WebServerManager::setupRoutes() {
         }
 
         request->send(200, "application/json", "{\"success\":true}");
+    });
+
+    // POST /api/gcode - Execute G-code command
+    server->on("/api/gcode", HTTP_POST, nullptr, nullptr, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) {  // Reuse jog rate limit
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, data, len);
+
+        if (error) {
+            request->send(400, "application/json", "{\"error\":\"JSON parse failed\"}");
+            return;
+        }
+
+        const char* command = doc["command"];
+        if (!command || strlen(command) == 0) {
+            request->send(400, "application/json", "{\"error\":\"Missing or empty command\"}");
+            return;
+        }
+
+        // Execute G-code command
+        bool success = gcodeParser.processCommand(command);
+
+        JsonDocument response;
+        response["success"] = success;
+        response["command"] = command;
+
+        char response_buffer[256];
+        serializeJson(response, response_buffer, sizeof(response_buffer));
+        request->send(success ? 200 : 400, "application/json", response_buffer);
+    });
+
+    // GET /api/alarms - Get active alarms and fault history
+    server->on("/api/alarms", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+            request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+            return;
+        }
+
+        JsonDocument doc;
+
+        // E-stop status
+        doc["estop_active"] = emergencyStopIsActive();
+
+        // Fault ring buffer (recent faults)
+        JsonArray faults = doc["faults"].to<JsonArray>();
+        uint8_t count = faultGetRingBufferEntryCount();
+
+        for (uint8_t i = 0; i < count && i < 10; i++) {  // Max 10 recent faults
+            const fault_entry_t* entry = faultGetRingBufferEntry(i);
+            if (entry) {
+                JsonObject fault = faults.add<JsonObject>();
+                fault["timestamp"] = entry->timestamp;
+                fault["severity"] = faultSeverityToString(entry->severity);
+                fault["code"] = faultCodeToString(entry->code);
+                fault["axis"] = entry->axis;
+                fault["value"] = entry->value;
+                fault["message"] = entry->message;
+            }
+        }
+
+        // Fault statistics
+        fault_stats_t stats = faultGetStats();
+        doc["stats"]["total"] = stats.total_faults;
+        doc["stats"]["encoder"] = stats.encoder_faults;
+        doc["stats"]["motion"] = stats.motion_faults;
+        doc["stats"]["safety"] = stats.safety_faults;
+
+        char response[2048];
+        serializeJson(doc, response, sizeof(response));
+        request->send(200, "application/json", response);
+    });
+
+    // POST /api/estop/trigger - Trigger emergency stop
+    server->on("/api/estop/trigger", HTTP_POST, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        emergencyStopSetActive(true);
+        request->send(200, "application/json", "{\"success\":true,\"estop_active\":true}");
+    });
+
+    // POST /api/estop/reset - Request E-stop recovery
+    server->on("/api/estop/reset", HTTP_POST, [this](AsyncWebServerRequest *request){
+        if(!request->authenticate(http_username, http_password)) {
+            return request->requestAuthentication();
+        }
+
+        bool success = emergencyStopRequestRecovery();
+
+        JsonDocument doc;
+        doc["success"] = success;
+        doc["estop_active"] = emergencyStopIsActive();
+
+        char response[128];
+        serializeJson(doc, response, sizeof(response));
+        request->send(success ? 200 : 400, "application/json", response);
     });
 
     server->onNotFound([](AsyncWebServerRequest *request){

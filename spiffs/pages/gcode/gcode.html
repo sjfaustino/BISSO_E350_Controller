@@ -1,0 +1,173 @@
+<div class="gcode-page">
+    <!-- G-code Editor Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2>G-code Command Input</h2>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-sm btn-ghost" id="clear-editor" title="Clear editor">Clear</button>
+                <button class="btn btn-sm btn-ghost" id="load-examples" title="Load example G-code">Examples</button>
+            </div>
+        </div>
+        <div class="card-content">
+            <div class="gcode-editor-container">
+                <div class="line-numbers" id="line-numbers"></div>
+                <textarea
+                    id="gcode-input"
+                    class="gcode-editor"
+                    placeholder="Enter G-code commands here...&#10;Example:&#10;G0 X10 Y20 F100&#10;G1 Z5 F50&#10;M117 Hello World"
+                    spellcheck="false"
+                ></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="send-command">
+                    <span>▶️ Execute Command</span>
+                </button>
+                <button class="btn btn-secondary" id="send-all">
+                    <span>▶️▶️ Execute All Lines</span>
+                </button>
+                <button class="btn btn-warning" id="pause-execution">
+                    <span>⏸️ Pause</span>
+                </button>
+                <button class="btn btn-danger" id="stop-execution">
+                    <span>⏹️ Stop</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+        <!-- Parser State Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Parser State</h2>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px 20px; align-items: center;">
+                    <span class="metric-label">Distance Mode:</span>
+                    <span class="metric-value" id="distance-mode">G90 (Absolute)</span>
+
+                    <span class="metric-label">Work Coordinate:</span>
+                    <span class="metric-value" id="work-coordinate">G54</span>
+
+                    <span class="metric-label">Feed Rate:</span>
+                    <span class="metric-value" id="feed-rate">-- mm/min</span>
+
+                    <span class="metric-label">Motion State:</span>
+                    <span class="metric-value" id="motion-state">Idle</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Commands Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Quick Commands</h2>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button class="btn btn-ghost btn-sm" data-quick="G28">🏠 Home All</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="M114">📍 Get Position</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="M115">ℹ️ Firmware Info</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="G90">📐 Absolute Mode</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="G91">📐 Relative Mode</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="G92 X0 Y0 Z0 A0">🎯 Zero Position</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Execution Log Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2>Execution Log</h2>
+            <button class="btn btn-sm btn-ghost" id="clear-log">Clear Log</button>
+        </div>
+        <div class="card-content">
+            <div id="execution-log" class="execution-log"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.gcode-editor-container {
+    display: flex;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.line-numbers {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    padding: 10px 8px;
+    text-align: right;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    user-select: none;
+    border-right: 1px solid var(--border-color);
+    min-width: 40px;
+}
+
+.gcode-editor {
+    flex: 1;
+    min-height: 200px;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+}
+
+.gcode-editor:focus {
+    background: var(--bg-primary);
+}
+
+.execution-log {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 10px;
+}
+
+.log-entry {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry.success {
+    color: var(--color-optimal);
+}
+
+.log-entry.error {
+    color: var(--color-critical);
+}
+
+.log-entry.info {
+    color: var(--text-muted);
+}
+
+.log-timestamp {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-right: 8px;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+</style>

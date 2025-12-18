@@ -7,6 +7,7 @@ const DashboardModule = {
     currentTimeRange: 300000, // 5 minutes
     chart: null,
     graphs: {}, // Store GraphVisualizer instances
+    lastTelemetry: null, // Store last telemetry for VFD/spindle data
 
     init() {
         console.log('[Dashboard] Initializing');
@@ -131,6 +132,9 @@ const DashboardModule = {
 
     onStateChanged() {
         const state = AppState.data;
+
+        // Store last telemetry for VFD/spindle data
+        this.lastTelemetry = state;
 
         // System metrics
         if (state.system) {
@@ -342,8 +346,43 @@ const DashboardModule = {
             const spindleStats = this.graphs.spindle?.getStats('Current');
             if (spindleStats) {
                 document.getElementById('spindle-current').textContent = spindle.toFixed(2) + ' A';
-                document.getElementById('spindle-stat-avg').textContent = spindleStats.avg.toFixed(2) + ' A';
-                document.getElementById('spindle-stat-max').textContent = spindleStats.max.toFixed(2) + ' A';
+
+                // Update spindle card progress bar and additional metrics
+                const spindleBar = document.getElementById('spindle-bar');
+                const spindleFreq = document.getElementById('spindle-freq');
+                const spindleThermal = document.getElementById('spindle-thermal');
+
+                if (spindleBar) {
+                    // Progress bar shows current as percentage of threshold (assume 30A max)
+                    const threshold = 30.0;
+                    const percent = Math.min((spindle / threshold) * 100, 100);
+                    spindleBar.style.width = percent + '%';
+
+                    // Color based on load
+                    if (percent > 80) {
+                        spindleBar.style.background = 'var(--color-critical)';
+                    } else if (percent > 60) {
+                        spindleBar.style.background = 'var(--color-warning)';
+                    } else {
+                        spindleBar.style.background = 'var(--color-optimal)';
+                    }
+                }
+
+                // Update frequency and thermal from last telemetry
+                if (this.lastTelemetry && this.lastTelemetry.vfd) {
+                    if (spindleFreq) {
+                        spindleFreq.textContent = this.lastTelemetry.vfd.frequency_hz.toFixed(1) + ' Hz';
+                    }
+                    if (spindleThermal) {
+                        spindleThermal.textContent = (this.lastTelemetry.vfd.thermal_percent || 0) + '%';
+                    }
+                }
+
+                // Legacy stat fields (if they exist)
+                const statAvg = document.getElementById('spindle-stat-avg');
+                const statMax = document.getElementById('spindle-stat-max');
+                if (statAvg) statAvg.textContent = spindleStats.avg.toFixed(2) + ' A';
+                if (statMax) statMax.textContent = spindleStats.max.toFixed(2) + ' A';
             }
         }
 

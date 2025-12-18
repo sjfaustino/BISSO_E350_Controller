@@ -42,6 +42,24 @@
                 <div class="card-subtext">Min: <span id="mem-min">--</span> KB</div>
             </div>
         </div>
+
+        <!-- Spindle Monitor Card (Read-Only) -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Spindle (VFD)</h2>
+                <button class="card-toggle" data-toggle="spindle">−</button>
+            </div>
+            <div class="card-content">
+                <div class="card-value" id="spindle-current">-- A</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="spindle-bar" style="width: 0%"></div>
+                </div>
+                <div class="card-subtext">
+                    Frequency: <span id="spindle-freq">-- Hz</span> |
+                    Thermal: <span id="spindle-thermal">--%</span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- System Trends Chart -->
