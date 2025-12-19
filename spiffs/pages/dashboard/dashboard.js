@@ -348,12 +348,16 @@ const DashboardModule = {
             const cpu = this.history.cpu[this.history.cpu.length - 1];
             this.graphs.cpu?.addDataPoint('CPU', cpu);
 
-            // Update CPU stats
+            // Update CPU stats (only if elements exist)
             const cpuStats = this.graphs.cpu?.getStats('CPU');
             if (cpuStats) {
-                document.getElementById('cpu-current').textContent = cpu.toFixed(1) + '%';
-                document.getElementById('cpu-stat-avg').textContent = cpuStats.avg.toFixed(1) + '%';
-                document.getElementById('cpu-stat-max').textContent = cpuStats.max.toFixed(1) + '%';
+                const cpuCurrentEl = document.getElementById('cpu-current');
+                const cpuAvgEl = document.getElementById('cpu-stat-avg');
+                const cpuMaxEl = document.getElementById('cpu-stat-max');
+
+                if (cpuCurrentEl) cpuCurrentEl.textContent = cpu.toFixed(1) + '%';
+                if (cpuAvgEl) cpuAvgEl.textContent = cpuStats.avg.toFixed(1) + '%';
+                if (cpuMaxEl) cpuMaxEl.textContent = cpuStats.max.toFixed(1) + '%';
             }
         }
 
@@ -363,9 +367,13 @@ const DashboardModule = {
 
             const memStats = this.graphs.memory?.getStats('Memory');
             if (memStats) {
-                document.getElementById('mem-current').textContent = mem.toFixed(0) + ' KB';
-                document.getElementById('mem-stat-avg').textContent = memStats.avg.toFixed(0) + ' KB';
-                document.getElementById('mem-stat-max').textContent = memStats.max.toFixed(0) + ' KB';
+                const memCurrentEl = document.getElementById('mem-current');
+                const memAvgEl = document.getElementById('mem-stat-avg');
+                const memMaxEl = document.getElementById('mem-stat-max');
+
+                if (memCurrentEl) memCurrentEl.textContent = mem.toFixed(0) + ' KB';
+                if (memAvgEl) memAvgEl.textContent = memStats.avg.toFixed(0) + ' KB';
+                if (memMaxEl) memMaxEl.textContent = memStats.max.toFixed(0) + ' KB';
             }
         }
 
@@ -375,7 +383,8 @@ const DashboardModule = {
 
             const spindleStats = this.graphs.spindle?.getStats('Current');
             if (spindleStats) {
-                document.getElementById('spindle-current').textContent = spindle.toFixed(2) + ' A';
+                const spindleCurrentEl = document.getElementById('spindle-current');
+                if (spindleCurrentEl) spindleCurrentEl.textContent = spindle.toFixed(2) + ' A';
 
                 // Update spindle card progress bar and additional metrics
                 const spindleBar = document.getElementById('spindle-bar');
@@ -422,9 +431,13 @@ const DashboardModule = {
 
             const tempStats = this.graphs.temperature?.getStats('Temp');
             if (tempStats) {
-                document.getElementById('temp-current').textContent = temp.toFixed(1) + ' °C';
-                document.getElementById('temp-stat-avg').textContent = tempStats.avg.toFixed(1) + ' °C';
-                document.getElementById('temp-stat-max').textContent = tempStats.max.toFixed(1) + ' °C';
+                const tempCurrentEl = document.getElementById('temp-current');
+                const tempAvgEl = document.getElementById('temp-stat-avg');
+                const tempMaxEl = document.getElementById('temp-stat-max');
+
+                if (tempCurrentEl) tempCurrentEl.textContent = temp.toFixed(1) + ' °C';
+                if (tempAvgEl) tempAvgEl.textContent = tempStats.avg.toFixed(1) + ' °C';
+                if (tempMaxEl) tempMaxEl.textContent = tempStats.max.toFixed(1) + ' °C';
             }
         }
 
@@ -434,9 +447,13 @@ const DashboardModule = {
 
             const latencyStats = this.graphs.latency?.getStats('Latency');
             if (latencyStats) {
-                document.getElementById('latency-current').textContent = latency.toFixed(0) + ' ms';
-                document.getElementById('latency-stat-avg').textContent = latencyStats.avg.toFixed(0) + ' ms';
-                document.getElementById('latency-stat-max').textContent = latencyStats.max.toFixed(0) + ' ms';
+                const latencyCurrentEl = document.getElementById('latency-current');
+                const latencyAvgEl = document.getElementById('latency-stat-avg');
+                const latencyMaxEl = document.getElementById('latency-stat-max');
+
+                if (latencyCurrentEl) latencyCurrentEl.textContent = latency.toFixed(0) + ' ms';
+                if (latencyAvgEl) latencyAvgEl.textContent = latencyStats.avg.toFixed(0) + ' ms';
+                if (latencyMaxEl) latencyMaxEl.textContent = latencyStats.max.toFixed(0) + ' ms';
             }
         }
 
