@@ -3,6 +3,8 @@
  * @brief Client-side router for page navigation
  */
 
+console.log('[ROUTER] router.js loading...');
+
 class Router {
     static routes = {
         'dashboard': { file: 'pages/dashboard/dashboard.html', js: 'pages/dashboard/dashboard.js' },
@@ -302,3 +304,5 @@ class Router {
         window.location.hash = '#' + page;
     }
 }
+
+console.log('[ROUTER] Router class defined, typeof Router:', typeof Router);

@@ -173,8 +173,12 @@
                 this.initMobileMenu();
 
                 // Initialize router after everything else is ready
+                console.log('[APP] Checking Router, typeof window.Router:', typeof window.Router);
                 if (window.Router) {
+                    console.log('[APP] Calling Router.init()');
                     Router.init();
+                } else {
+                    console.error('[APP] Router is not defined!');
                 }
 
                 console.log('[APP] Initialized');
