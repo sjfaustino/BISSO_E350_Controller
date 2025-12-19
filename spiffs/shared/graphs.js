@@ -6,8 +6,14 @@
 class GraphVisualizer {
     constructor(canvasId, options = {}) {
         this.canvas = document.getElementById(canvasId);
+
+        // Initialize series first so the object is never in a broken state
+        this.series = new Map();
+
         if (!this.canvas) {
             console.error(`[Graph] Canvas element '${canvasId}' not found`);
+            // Don't return - initialize enough so methods don't crash
+            this.isDisabled = true;
             return;
         }
 
@@ -30,8 +36,8 @@ class GraphVisualizer {
             ...options
         };
 
-        // Data storage
-        this.series = new Map(); // { seriesName: [{ time, value }, ...] }
+        // Data storage - already initialized above
+        // this.series = new Map(); // Moved to top
         this.colors = {
             bg: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary') || '#ffffff',
             grid: getComputedStyle(document.documentElement).getPropertyValue('--border-color') || '#e5e7eb',
@@ -174,6 +180,9 @@ class GraphVisualizer {
     }
 
     draw() {
+        // Skip if canvas not available
+        if (this.isDisabled || !this.canvas || !this.ctx) return;
+
         // Clear canvas
         this.ctx.fillStyle = this.colors.bg;
         this.ctx.fillRect(0, 0, this.width, this.height);
