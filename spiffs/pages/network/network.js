@@ -1,7 +1,8 @@
 /**
  * Network & Connectivity Dashboard Module
+ * Note: Use window.NetworkModule to avoid "already declared" errors when navigating
  */
-const NetworkModule = {
+window.NetworkModule = window.NetworkModule || {
     latencyHistory: [],
     maxHistoryLength: 100,
     reconnectCount: 0,
@@ -71,27 +72,35 @@ const NetworkModule = {
         const ssid = 'BISSO-Lab-5GHz';
         const signal = Math.round(Math.random() * 30 + 40); // -75 to -45 dBm
 
-        document.getElementById('wifi-status').textContent = wifiStatus;
-        document.getElementById('wifi-ssid').textContent = ssid;
-        document.getElementById('signal-dbm').textContent = signal + ' dBm';
+        const wifiStatusEl = document.getElementById('wifi-status');
+        const wifiSsidEl = document.getElementById('wifi-ssid');
+        const signalDbmEl = document.getElementById('signal-dbm');
+
+        if (wifiStatusEl) wifiStatusEl.textContent = wifiStatus;
+        if (wifiSsidEl) wifiSsidEl.textContent = ssid;
+        if (signalDbmEl) signalDbmEl.textContent = signal + ' dBm';
 
         // Calculate quality percentage (0-100)
         const quality = Math.max(0, Math.min(100, (signal + 100) * 2));
-        document.getElementById('signal-bar').style.width = quality + '%';
+        const signalBarEl = document.getElementById('signal-bar');
+        if (signalBarEl) signalBarEl.style.width = quality + '%';
 
         const qualityText = quality > 75 ? 'Excellent' : quality > 50 ? 'Good' : quality > 25 ? 'Fair' : 'Poor';
-        document.getElementById('signal-quality').textContent = qualityText;
+        const signalQualityEl = document.getElementById('signal-quality');
+        if (signalQualityEl) signalQualityEl.textContent = qualityText;
 
         // Color code the bar
         const bar = document.getElementById('signal-bar');
-        if (quality > 75) {
-            bar.style.background = 'var(--color-optimal)';
-        } else if (quality > 50) {
-            bar.style.background = 'var(--color-normal)';
-        } else if (quality > 25) {
-            bar.style.background = 'var(--color-warning)';
-        } else {
-            bar.style.background = 'var(--color-critical)';
+        if (bar) {
+            if (quality > 75) {
+                bar.style.background = 'var(--color-optimal)';
+            } else if (quality > 50) {
+                bar.style.background = 'var(--color-normal)';
+            } else if (quality > 25) {
+                bar.style.background = 'var(--color-warning)';
+            } else {
+                bar.style.background = 'var(--color-critical)';
+            }
         }
     },
 
@@ -103,13 +112,18 @@ const NetworkModule = {
             this.latencyHistory.shift();
         }
 
-        document.getElementById('latency-ms').textContent = latency + ' ms';
+        const latencyMsEl = document.getElementById('latency-ms');
+        if (latencyMsEl) latencyMsEl.textContent = latency + ' ms';
 
         if (this.latencyHistory.length > 0) {
             const min = Math.min(...this.latencyHistory);
             const max = Math.max(...this.latencyHistory);
-            document.getElementById('latency-min').textContent = min + ' ms';
-            document.getElementById('latency-max').textContent = max + ' ms';
+
+            const latencyMinEl = document.getElementById('latency-min');
+            const latencyMaxEl = document.getElementById('latency-max');
+
+            if (latencyMinEl) latencyMinEl.textContent = min + ' ms';
+            if (latencyMaxEl) latencyMaxEl.textContent = max + ' ms';
         }
     },
 
@@ -119,9 +133,13 @@ const NetworkModule = {
         const vfdLatency = Math.round(Math.random() * 20 + 10); // 10-30ms
         const lastRead = new Date().toLocaleTimeString();
 
-        document.getElementById('modbus-status').textContent = modbusStatus;
-        document.getElementById('vfd-latency').textContent = vfdLatency + ' ms';
-        document.getElementById('modbus-last-read').textContent = lastRead;
+        const modbusStatusEl = document.getElementById('modbus-status');
+        const vfdLatencyEl = document.getElementById('vfd-latency');
+        const modbusLastReadEl = document.getElementById('modbus-last-read');
+
+        if (modbusStatusEl) modbusStatusEl.textContent = modbusStatus;
+        if (vfdLatencyEl) vfdLatencyEl.textContent = vfdLatency + ' ms';
+        if (modbusLastReadEl) modbusLastReadEl.textContent = lastRead;
     },
 
     updateUptimeInfo() {
@@ -131,13 +149,20 @@ const NetworkModule = {
         const uptimeHours = Math.floor(uptimeMs / (1000 * 60 * 60));
         const uptimeMins = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
 
-        document.getElementById('device-uptime').textContent = uptimeHours + ' h';
-        document.getElementById('connection-duration').textContent = uptimeMins + ' m';
-        document.getElementById('reconnect-count').textContent = this.reconnectCount;
+        const deviceUptimeEl = document.getElementById('device-uptime');
+        const connectionDurationEl = document.getElementById('connection-duration');
+        const reconnectCountEl = document.getElementById('reconnect-count');
+
+        if (deviceUptimeEl) deviceUptimeEl.textContent = uptimeHours + ' h';
+        if (connectionDurationEl) connectionDurationEl.textContent = uptimeMins + ' m';
+        if (reconnectCountEl) reconnectCountEl.textContent = this.reconnectCount;
 
         // IP and MAC (static for now)
-        document.getElementById('ip-address').textContent = '192.168.1.100';
-        document.getElementById('mac-address').textContent = 'AA:BB:CC:DD:EE:FF';
+        const ipAddressEl = document.getElementById('ip-address');
+        const macAddressEl = document.getElementById('mac-address');
+
+        if (ipAddressEl) ipAddressEl.textContent = '192.168.1.100';
+        if (macAddressEl) macAddressEl.textContent = 'AA:BB:CC:DD:EE:FF';
 
         // Packet statistics
         const packetsSent = Math.floor(Math.random() * 5000);
@@ -145,14 +170,20 @@ const NetworkModule = {
         const errors = Math.floor(Math.random() * 10);
         const lossRate = packetsReceived > 0 ? ((1 - packetsReceived / packetsSent) * 100).toFixed(2) : 0;
 
-        document.getElementById('packets-sent').textContent = packetsSent;
-        document.getElementById('packets-received').textContent = packetsReceived;
-        document.getElementById('error-count').textContent = errors;
-        document.getElementById('loss-rate').textContent = lossRate + '%';
+        const packetsSentEl = document.getElementById('packets-sent');
+        const packetsReceivedEl = document.getElementById('packets-received');
+        const errorCountEl = document.getElementById('error-count');
+        const lossRateEl = document.getElementById('loss-rate');
+
+        if (packetsSentEl) packetsSentEl.textContent = packetsSent;
+        if (packetsReceivedEl) packetsReceivedEl.textContent = packetsReceived;
+        if (errorCountEl) errorCountEl.textContent = errors;
+        if (lossRateEl) lossRateEl.textContent = lossRate + '%';
 
         // Data received (KB)
         const dataKB = Math.floor(Math.random() * 1000 + 100);
-        document.getElementById('data-received').textContent = dataKB + ' KB';
+        const dataReceivedEl = document.getElementById('data-received');
+        if (dataReceivedEl) dataReceivedEl.textContent = dataKB + ' KB';
     },
 
     startLatencyMonitoring() {
