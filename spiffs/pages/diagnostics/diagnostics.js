@@ -1,7 +1,8 @@
 /**
  * Diagnostics Page Module
+ * Note: Use window.DiagnosticsModule to avoid "already declared" errors when navigating
  */
-const DiagnosticsModule = {
+window.DiagnosticsModule = window.DiagnosticsModule || {
     init() {
         console.log('[Diagnostics] Initializing');
         window.addEventListener('state-changed', () => this.onStateChanged());

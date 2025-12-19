@@ -1,8 +1,9 @@
 /**
  * Logs Page Module
  * Tracks fault and operation history with filtering and export
+ * Note: Use window.LogsModule to avoid "already declared" errors when navigating
  */
-const LogsModule = {
+window.LogsModule = window.LogsModule || {
     // In-memory log buffer (max 10000 entries)
     logs: [],
     maxLogs: 10000,

@@ -1,7 +1,8 @@
 /**
  * Motion Control Page Module
+ * Note: Use window.MotionModule to avoid "already declared" errors when navigating
  */
-const MotionModule = {
+window.MotionModule = window.MotionModule || {
     stepSize: 10,
     isMoving: false,
     positionViz: null,

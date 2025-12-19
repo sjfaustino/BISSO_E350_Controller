@@ -1,8 +1,9 @@
 /**
  * Maintenance Page Module
  * Tracks wear, service history, and component lifetime
+ * Note: Use window.MaintenanceModule to avoid "already declared" errors when navigating
  */
-const MaintenanceModule = {
+window.MaintenanceModule = window.MaintenanceModule || {
     // Component lifetimes for stone bridge saw
     componentLifetimes: {
         motors: 40000,      // 3-phase AC motors - typical continuous duty

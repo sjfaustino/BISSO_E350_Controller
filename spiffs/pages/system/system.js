@@ -1,7 +1,8 @@
 /**
  * System Information Panel Module
+ * Note: Use window.SystemModule to avoid "already declared" errors when navigating
  */
-const SystemModule = {
+window.SystemModule = window.SystemModule || {
     systemStartTime: Date.now(),
     resetCount: 2,
 

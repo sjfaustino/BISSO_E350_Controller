@@ -1,8 +1,9 @@
 /**
  * Settings Page Module
  * Manages user preferences, alerts, and system configuration
+ * Note: Use window.SettingsModule to avoid "already declared" errors when navigating
  */
-const SettingsModule = {
+window.SettingsModule = window.SettingsModule || {
     // Default settings
     defaults: {
         theme: 'light',
