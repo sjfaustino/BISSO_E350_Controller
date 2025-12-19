@@ -290,6 +290,11 @@ window.MockMode = {
         }
 
         AlertManager.add('Mock data mode enabled (offline preview)', 'info', 3000);
+
+        // Trigger router to reload the current page now that mock mode is active
+        if (window.Router) {
+            Router.navigate();
+        }
     },
 
     /**
@@ -315,6 +320,11 @@ window.MockMode = {
         }
 
         AlertManager.add('Mock data mode disabled', 'info', 2000);
+
+        // Trigger router to reload the page back to normal mode
+        if (window.Router) {
+            Router.navigate();
+        }
     },
 
     /**
