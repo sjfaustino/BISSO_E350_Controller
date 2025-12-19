@@ -7,12 +7,13 @@ class GraphVisualizer {
     constructor(canvasId, options = {}) {
         this.canvas = document.getElementById(canvasId);
 
-        // Initialize series first so the object is never in a broken state
+        // Initialize essential properties BEFORE canvas check to prevent broken objects
         this.series = new Map();
+        this.seriesColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
         if (!this.canvas) {
             console.error(`[Graph] Canvas element '${canvasId}' not found`);
-            // Don't return - initialize enough so methods don't crash
+            // Don't return - object is initialized enough that methods won't crash
             this.isDisabled = true;
             return;
         }
