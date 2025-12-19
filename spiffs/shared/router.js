@@ -104,13 +104,172 @@ class Router {
                             <div id="charts-section" style="margin-top: 30px;"></div>
                         </div>
                     `;
+                } else if (page === 'gcode') {
+                    html = `
+                        <div class="gcode-page">
+                            <div class="card">
+                                <div class="card-header"><h2>G-code Command Input (File Mode)</h2></div>
+                                <div class="card-content">
+                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">G-code execution requires connection to the ESP32 device. This interface is view-only in file mode.</p>
+                                    <textarea id="gcode-input" placeholder="Enter G-code commands..." style="width: 100%; min-height: 150px; padding: 10px; font-family: monospace; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px;" readonly></textarea>
+                                    <div style="margin-top: 10px;">
+                                        <button class="btn btn-primary" disabled>▶️ Execute Command (Requires Device)</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header"><h2>Parser State</h2></div>
+                                <div class="card-content">
+                                    <div id="distance-mode">Distance Mode: G90 (Absolute)</div>
+                                    <div id="work-coordinate">Work Coordinate: G54</div>
+                                    <div id="feed-rate">Feed Rate: -- mm/min</div>
+                                    <div id="motion-state">Motion State: Idle</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (page === 'motion') {
+                    html = `
+                        <div class="motion-page">
+                            <div class="card">
+                                <div class="card-header"><h2>Motion Control (File Mode)</h2></div>
+                                <div class="card-content">
+                                    <p style="color: var(--text-secondary);">Motion control requires connection to the ESP32 device. View-only in file mode.</p>
+                                    <div style="margin-top: 20px;">
+                                        <h3>Current Position</h3>
+                                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;">
+                                            <div class="position-display">
+                                                <div style="color: var(--text-secondary); font-size: 12px;">X Axis</div>
+                                                <div id="pos-x" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
+                                            </div>
+                                            <div class="position-display">
+                                                <div style="color: var(--text-secondary); font-size: 12px;">Y Axis</div>
+                                                <div id="pos-y" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
+                                            </div>
+                                            <div class="position-display">
+                                                <div style="color: var(--text-secondary); font-size: 12px;">Z Axis</div>
+                                                <div id="pos-z" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
+                                            </div>
+                                            <div class="position-display">
+                                                <div style="color: var(--text-secondary); font-size: 12px;">A Axis</div>
+                                                <div id="pos-a" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (page === 'diagnostics') {
+                    html = `
+                        <div class="diagnostics-page">
+                            <div class="card">
+                                <div class="card-header"><h2>System Diagnostics (File Mode)</h2></div>
+                                <div class="card-content">
+                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Live diagnostics require connection to the ESP32 device.</p>
+                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                        <h3>Status</h3>
+                                        <div id="system-status">System: Offline (File Mode)</div>
+                                        <div id="motion-system">Motion: Not Connected</div>
+                                        <div id="vfd-system">VFD: Not Connected</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (page === 'network') {
+                    html = `
+                        <div class="network-page">
+                            <div class="card">
+                                <div class="card-header"><h2>Network Status (File Mode)</h2></div>
+                                <div class="card-content">
+                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Network information requires connection to the ESP32 device.</p>
+                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                        <div id="wifi-status">WiFi: Not Connected</div>
+                                        <div id="wifi-ssid">SSID: --</div>
+                                        <div id="signal-dbm">Signal: -- dBm</div>
+                                        <div id="signal-quality">Quality: --</div>
+                                        <div id="latency-ms" style="margin-top: 10px;">Latency: -- ms</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (page === 'system') {
+                    html = `
+                        <div class="system-page">
+                            <div class="card">
+                                <div class="card-header"><h2>System Information (File Mode)</h2></div>
+                                <div class="card-content">
+                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">System information requires connection to the ESP32 device.</p>
+                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                        <h3>Device Info</h3>
+                                        <div>Firmware: Not Connected</div>
+                                        <div>Hardware: ESP32-WROOM-32E</div>
+                                        <div>Uptime: --</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (page === 'maintenance') {
+                    html = `
+                        <div class="maintenance-page">
+                            <div class="card">
+                                <div class="card-header"><h2>Maintenance (File Mode)</h2></div>
+                                <div class="card-content">
+                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Maintenance tracking requires connection to the ESP32 device.</p>
+                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                        <h3>Component Status</h3>
+                                        <div>Motor Hours: --</div>
+                                        <div>VFD Runtime: --</div>
+                                        <div>Last Service: --</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (page === 'logs') {
+                    html = `
+                        <div class="logs-page">
+                            <div class="card">
+                                <div class="card-header"><h2>System Logs (File Mode)</h2></div>
+                                <div class="card-content">
+                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Log viewing requires connection to the ESP32 device.</p>
+                                    <div id="log-container" style="padding: 20px; background: var(--bg-secondary); border-radius: 4px; font-family: monospace; max-height: 400px; overflow-y: auto;">
+                                        <div>No logs available in file mode</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (page === 'settings') {
+                    html = `
+                        <div class="settings-page">
+                            <div class="card">
+                                <div class="card-header"><h2>Settings (File Mode)</h2></div>
+                                <div class="card-content">
+                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Settings configuration requires connection to the ESP32 device.</p>
+                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                        <h3>Display Settings</h3>
+                                        <div style="margin: 10px 0;">
+                                            <label>Theme: <select disabled><option>Light</option></select></label>
+                                        </div>
+                                        <div style="margin: 10px 0;">
+                                            <label>Font Size: <input type="range" disabled /></label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
                 } else {
-                    // Generic fallback for other pages
+                    // Generic fallback for any other pages
                     html = `
                         <div style="padding: 40px 20px; text-align: center;">
                             <h2>📄 ${page.charAt(0).toUpperCase() + page.slice(1)} Page</h2>
                             <p style="color: var(--text-secondary); margin: 20px 0;">
-                                ${isFileProtocol ? 'File mode' : 'Mock mode'} - loading with simulated data...
+                                ${isFileProtocol ? 'File mode' : 'Mock mode'} - This page requires connection to the ESP32 device.
                             </p>
                         </div>
                     `;
@@ -168,13 +327,166 @@ class Router {
                                 <div id="charts-section" style="margin-top: 30px;"></div>
                             </div>
                         `;
+                    } else if (page === 'gcode') {
+                        html = `
+                            <div class="gcode-page">
+                                <div class="card">
+                                    <div class="card-header"><h2>G-code Command Input (Mock Mode)</h2></div>
+                                    <div class="card-content">
+                                        <p style="color: var(--text-secondary); margin-bottom: 15px;">Mock mode - interface view-only.</p>
+                                        <textarea id="gcode-input" placeholder="Enter G-code commands..." style="width: 100%; min-height: 150px; padding: 10px; font-family: monospace; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px;" readonly></textarea>
+                                        <div style="margin-top: 10px;">
+                                            <button class="btn btn-primary" disabled>▶️ Execute Command (Mock Mode)</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card">
+                                    <div class="card-header"><h2>Parser State</h2></div>
+                                    <div class="card-content">
+                                        <div id="distance-mode">Distance Mode: G90 (Absolute)</div>
+                                        <div id="work-coordinate">Work Coordinate: G54</div>
+                                        <div id="feed-rate">Feed Rate: -- mm/min</div>
+                                        <div id="motion-state">Motion State: Idle</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (page === 'motion') {
+                        html = `
+                            <div class="motion-page">
+                                <div class="card">
+                                    <div class="card-header"><h2>Motion Control (Mock Mode)</h2></div>
+                                    <div class="card-content">
+                                        <p style="color: var(--text-secondary);">Mock mode - view-only.</p>
+                                        <div style="margin-top: 20px;">
+                                            <h3>Current Position</h3>
+                                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;">
+                                                <div class="position-display">
+                                                    <div style="color: var(--text-secondary); font-size: 12px;">X Axis</div>
+                                                    <div id="pos-x" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
+                                                </div>
+                                                <div class="position-display">
+                                                    <div style="color: var(--text-secondary); font-size: 12px;">Y Axis</div>
+                                                    <div id="pos-y" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
+                                                </div>
+                                                <div class="position-display">
+                                                    <div style="color: var(--text-secondary); font-size: 12px;">Z Axis</div>
+                                                    <div id="pos-z" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
+                                                </div>
+                                                <div class="position-display">
+                                                    <div style="color: var(--text-secondary); font-size: 12px;">A Axis</div>
+                                                    <div id="pos-a" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (page === 'diagnostics') {
+                        html = `
+                            <div class="diagnostics-page">
+                                <div class="card">
+                                    <div class="card-header"><h2>System Diagnostics (Mock Mode)</h2></div>
+                                    <div class="card-content">
+                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                            <h3>Status</h3>
+                                            <div id="system-status">System: Mock Mode</div>
+                                            <div id="motion-system">Motion: Simulated</div>
+                                            <div id="vfd-system">VFD: Simulated</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (page === 'network') {
+                        html = `
+                            <div class="network-page">
+                                <div class="card">
+                                    <div class="card-header"><h2>Network Status (Mock Mode)</h2></div>
+                                    <div class="card-content">
+                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                            <div id="wifi-status">WiFi: Simulated</div>
+                                            <div id="wifi-ssid">SSID: --</div>
+                                            <div id="signal-dbm">Signal: -- dBm</div>
+                                            <div id="signal-quality">Quality: --</div>
+                                            <div id="latency-ms" style="margin-top: 10px;">Latency: -- ms</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (page === 'system') {
+                        html = `
+                            <div class="system-page">
+                                <div class="card">
+                                    <div class="card-header"><h2>System Information (Mock Mode)</h2></div>
+                                    <div class="card-content">
+                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                            <h3>Device Info</h3>
+                                            <div>Firmware: Simulated</div>
+                                            <div>Hardware: ESP32-WROOM-32E</div>
+                                            <div>Uptime: --</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (page === 'maintenance') {
+                        html = `
+                            <div class="maintenance-page">
+                                <div class="card">
+                                    <div class="card-header"><h2>Maintenance (Mock Mode)</h2></div>
+                                    <div class="card-content">
+                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                            <h3>Component Status</h3>
+                                            <div>Motor Hours: --</div>
+                                            <div>VFD Runtime: --</div>
+                                            <div>Last Service: --</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (page === 'logs') {
+                        html = `
+                            <div class="logs-page">
+                                <div class="card">
+                                    <div class="card-header"><h2>System Logs (Mock Mode)</h2></div>
+                                    <div class="card-content">
+                                        <div id="log-container" style="padding: 20px; background: var(--bg-secondary); border-radius: 4px; font-family: monospace; max-height: 400px; overflow-y: auto;">
+                                            <div>Mock mode - no logs available</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (page === 'settings') {
+                        html = `
+                            <div class="settings-page">
+                                <div class="card">
+                                    <div class="card-header"><h2>Settings (Mock Mode)</h2></div>
+                                    <div class="card-content">
+                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
+                                            <h3>Display Settings</h3>
+                                            <div style="margin: 10px 0;">
+                                                <label>Theme: <select disabled><option>Light</option></select></label>
+                                            </div>
+                                            <div style="margin: 10px 0;">
+                                                <label>Font Size: <input type="range" disabled /></label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
                     } else {
-                        // Generic fallback for other pages
+                        // Generic fallback for any other pages
                         html = `
                             <div style="padding: 40px 20px; text-align: center;">
                                 <h2>📄 ${page.charAt(0).toUpperCase() + page.slice(1)} Page</h2>
                                 <p style="color: var(--text-secondary); margin: 20px 0;">
-                                    Mock mode - loading with simulated data...
+                                    Mock mode - This page requires connection to the ESP32 device.
                                 </p>
                             </div>
                         `;
