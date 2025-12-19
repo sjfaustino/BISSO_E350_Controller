@@ -9,6 +9,8 @@ class Router {
         'gcode': { file: 'pages/gcode/gcode.html', js: 'pages/gcode/gcode.js' },
         'motion': { file: 'pages/motion/motion.html', js: 'pages/motion/motion.js' },
         'diagnostics': { file: 'pages/diagnostics/diagnostics.html', js: 'pages/diagnostics/diagnostics.js' },
+        'network': { file: 'pages/network/network.html', js: 'pages/network/network.js' },
+        'system': { file: 'pages/system/system.html', js: 'pages/system/system.js' },
         'maintenance': { file: 'pages/maintenance/maintenance.html', js: 'pages/maintenance/maintenance.js' },
         'logs': { file: 'pages/logs/logs.html', js: 'pages/logs/logs.js' },
         'settings': { file: 'pages/settings/settings.html', js: 'pages/settings/settings.js' }
@@ -19,11 +21,13 @@ class Router {
     static isLoading = false;
 
     static init() {
+        console.log('[ROUTER] Initializing router');
         window.addEventListener('hashchange', () => this.navigate());
         this.navigate();
     }
 
     static async navigate(page = null) {
+        console.log('[ROUTER] Navigate called, page:', page, 'isLoading:', this.isLoading);
         page = page || window.location.hash.slice(1) || 'dashboard';
 
         if (!this.routes[page]) {
