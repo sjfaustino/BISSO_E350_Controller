@@ -260,7 +260,7 @@ window.MockMode = {
     /**
      * Enable mock mode
      */
-    enable() {
+    enable(triggerNavigate = true) {
         if (this.enabled) return;
 
         console.log('[MockMode] Enabling mock data mode');
@@ -291,8 +291,10 @@ window.MockMode = {
 
         AlertManager.add('Mock data mode enabled (offline preview)', 'info', 3000);
 
-        // Trigger router to reload the current page now that mock mode is active
-        if (window.Router) {
+        // Only trigger navigation if explicitly requested (not during initial page load)
+        // During page load, Router.init() will handle navigation
+        if (triggerNavigate && window.Router && window.Router.currentPage !== null) {
+            console.log('[MockMode] Triggering router navigation');
             Router.navigate();
         }
     },

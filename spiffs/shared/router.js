@@ -205,7 +205,9 @@ class Router {
                 }
             }
 
+            console.log('[ROUTER] Setting page content, HTML length:', html?.length || 0);
             container.innerHTML = html;
+            console.log('[ROUTER] Page content set successfully');
 
             // Load CSS if exists (but don't fail if it doesn't)
             if (!fetchFailed) {

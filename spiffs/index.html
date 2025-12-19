@@ -162,9 +162,10 @@
          */
         class App {
             static init() {
-                // Enable mock mode first if requested
+                // Enable mock mode first if requested (without triggering navigation)
+                // Router.init() will handle the initial navigation
                 if (window.__mockModeRequested && window.MockMode) {
-                    MockMode.enable();
+                    MockMode.enable(false);  // false = don't trigger navigation yet
                 }
 
                 this.setupEventListeners();
