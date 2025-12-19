@@ -11,18 +11,7 @@ class GraphVisualizer {
         this.series = new Map();
         this.seriesColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-        if (!this.canvas) {
-            console.error(`[Graph] Canvas element '${canvasId}' not found`);
-            // Don't return - object is initialized enough that methods won't crash
-            this.isDisabled = true;
-            return;
-        }
-
-        this.ctx = this.canvas.getContext('2d');
-        this.width = this.canvas.width;
-        this.height = this.canvas.height;
-
-        // Configuration
+        // Configuration - initialize early so methods don't crash
         this.config = {
             title: options.title || 'Graph',
             timeWindow: options.timeWindow || 300000, // 5 minutes in ms
@@ -36,6 +25,17 @@ class GraphVisualizer {
             showLegend: options.showLegend !== false,
             ...options
         };
+
+        if (!this.canvas) {
+            console.error(`[Graph] Canvas element '${canvasId}' not found`);
+            // Don't return - object is initialized enough that methods won't crash
+            this.isDisabled = true;
+            return;
+        }
+
+        this.ctx = this.canvas.getContext('2d');
+        this.width = this.canvas.width;
+        this.height = this.canvas.height;
 
         // Data storage - already initialized above
         // this.series = new Map(); // Moved to top
