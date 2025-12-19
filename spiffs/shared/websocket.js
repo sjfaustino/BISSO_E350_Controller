@@ -98,9 +98,11 @@ class SharedWebSocket {
     }
 }
 
-// Auto-connect on load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => SharedWebSocket.connect());
-} else {
-    SharedWebSocket.connect();
+// Auto-connect on load (skip for file:// protocol - mock mode will handle it)
+if (window.location.protocol !== 'file:') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => SharedWebSocket.connect());
+    } else {
+        SharedWebSocket.connect();
+    }
 }

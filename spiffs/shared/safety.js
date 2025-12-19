@@ -76,6 +76,15 @@ class SafetyManager {
 
     static async checkAlarms() {
         try {
+            // Skip API calls in file:// mode or mock mode - no real device to check
+            if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+                // In mock mode, assume no alarms for simplicity
+                this.estopActive = false;
+                this.updateEstopButton();
+                this.hideAlarm();
+                return;
+            }
+
             const response = await fetch('/api/alarms', {
                 headers: {
                     'Authorization': 'Basic ' + btoa('admin:password') // TODO: Use actual auth
@@ -175,6 +184,12 @@ class SafetyManager {
     }
 
     static async triggerEstop() {
+        // In file:// or mock mode, these are non-functional
+        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+            AlertManager.add('E-stop not available in offline mode', 'warning', 3000);
+            return;
+        }
+
         try {
             const response = await fetch('/api/estop/trigger', {
                 method: 'POST',
@@ -196,6 +211,12 @@ class SafetyManager {
     }
 
     static async resetEstop() {
+        // In file:// or mock mode, these are non-functional
+        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+            AlertManager.add('E-stop reset not available in offline mode', 'warning', 3000);
+            return;
+        }
+
         try {
             const response = await fetch('/api/estop/reset', {
                 method: 'POST',

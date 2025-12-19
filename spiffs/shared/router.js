@@ -203,7 +203,8 @@ class Router {
                 } else {
                     throw fetchError;
                 }
-            }
+                }  // Close catch block
+            }  // Close else block
 
             console.log('[ROUTER] Setting page content, HTML length:', html?.length || 0);
             container.innerHTML = html;
