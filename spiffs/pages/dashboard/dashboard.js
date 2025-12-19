@@ -141,22 +141,31 @@ const DashboardModule = {
             const cpu = state.system.cpu_percent || 0;
             const mem = state.system.free_heap_bytes || 0;
 
-            document.getElementById('cpu-value').textContent = cpu + '%';
-            const cpuBar = document.getElementById('cpu-bar');
-            cpuBar.style.width = cpu + '%';
-            cpuBar.className = 'progress-fill';
-            if (cpu > 85) cpuBar.classList.add('warning');
-            if (cpu > 95) cpuBar.classList.add('critical');
+            const cpuValueEl = document.getElementById('cpu-value');
+            if (cpuValueEl) cpuValueEl.textContent = cpu + '%';
 
-            document.getElementById('mem-value').textContent = (mem / 1024).toFixed(0) + ' KB';
+            const cpuBar = document.getElementById('cpu-bar');
+            if (cpuBar) {
+                cpuBar.style.width = cpu + '%';
+                cpuBar.className = 'progress-fill';
+                if (cpu > 85) cpuBar.classList.add('warning');
+                if (cpu > 95) cpuBar.classList.add('critical');
+            }
+
+            const memValueEl = document.getElementById('mem-value');
+            if (memValueEl) memValueEl.textContent = (mem / 1024).toFixed(0) + ' KB';
+
             const memBar = document.getElementById('mem-bar');
-            memBar.style.width = Math.min(100, (mem / 50000) * 100) + '%';
+            if (memBar) {
+                memBar.style.width = Math.min(100, (mem / 50000) * 100) + '%';
+            }
         }
 
         // Motion status
         if (state.motion) {
             const status = state.motion.moving ? '🔄 Moving' : '⏸️ Stopped';
-            document.getElementById('motion-status').textContent = status;
+            const motionStatusEl = document.getElementById('motion-status');
+            if (motionStatusEl) motionStatusEl.textContent = status;
         }
 
         // Safety status
@@ -164,22 +173,33 @@ const DashboardModule = {
             let safetyText = '✓ OK';
             if (state.safety.estop) safetyText = '🛑 E-STOP';
             else if (state.safety.alarm) safetyText = '⚠️ ALARM';
-            document.getElementById('safety-status').textContent = safetyText;
+            const safetyStatusEl = document.getElementById('safety-status');
+            if (safetyStatusEl) safetyStatusEl.textContent = safetyText;
         }
 
         // VFD status
         if (state.vfd) {
             const motorStatus = state.vfd.frequency_hz > 0.5 ? 'RUNNING' : 'IDLE';
-            document.getElementById('vfd-status').textContent = motorStatus;
-            document.getElementById('vfd-freq').textContent = state.vfd.frequency_hz.toFixed(1) + ' Hz';
-            document.getElementById('vfd-current').textContent = state.vfd.current_amps.toFixed(1) + ' A';
+            const vfdStatusEl = document.getElementById('vfd-status');
+            if (vfdStatusEl) vfdStatusEl.textContent = motorStatus;
+
+            const vfdFreqEl = document.getElementById('vfd-freq');
+            if (vfdFreqEl) vfdFreqEl.textContent = state.vfd.frequency_hz.toFixed(1) + ' Hz';
+
+            const vfdCurrentEl = document.getElementById('vfd-current');
+            if (vfdCurrentEl) vfdCurrentEl.textContent = state.vfd.current_amps.toFixed(1) + ' A';
         }
 
         // Network status
         if (state.network) {
-            document.getElementById('wifi-signal').textContent = state.network.signal_percent + '%';
-            document.getElementById('wifi-bar').style.width = state.network.signal_percent + '%';
-            document.getElementById('wifi-status').textContent = state.network.wifi_connected ? '✓ Connected' : '✗ Disconnected';
+            const wifiSignalEl = document.getElementById('wifi-signal');
+            if (wifiSignalEl) wifiSignalEl.textContent = state.network.signal_percent + '%';
+
+            const wifiBarEl = document.getElementById('wifi-bar');
+            if (wifiBarEl) wifiBarEl.style.width = state.network.signal_percent + '%';
+
+            const wifiStatusEl = document.getElementById('wifi-status');
+            if (wifiStatusEl) wifiStatusEl.textContent = state.network.wifi_connected ? '✓ Connected' : '✗ Disconnected';
         }
 
         // Axis metrics
@@ -239,18 +259,28 @@ const DashboardModule = {
         if (!metrics) return;
 
         const prefix = `axis-${axis}`;
-        document.getElementById(`${prefix}-quality`).textContent = metrics.quality || 0;
-        document.getElementById(`${prefix}-bar`).style.width = (metrics.quality || 0) + '%';
-        document.getElementById(`${prefix}-jitter`).textContent = (metrics.jitter_mms || 0).toFixed(3) + ' mm/s';
-        document.getElementById(`${prefix}-error`).textContent = (metrics.vfd_error_percent || 0).toFixed(1) + '%';
+
+        const qualityEl = document.getElementById(`${prefix}-quality`);
+        if (qualityEl) qualityEl.textContent = metrics.quality || 0;
+
+        const barEl = document.getElementById(`${prefix}-bar`);
+        if (barEl) barEl.style.width = (metrics.quality || 0) + '%';
+
+        const jitterEl = document.getElementById(`${prefix}-jitter`);
+        if (jitterEl) jitterEl.textContent = (metrics.jitter_mms || 0).toFixed(3) + ' mm/s';
+
+        const errorEl = document.getElementById(`${prefix}-error`);
+        if (errorEl) errorEl.textContent = (metrics.vfd_error_percent || 0).toFixed(1) + '%';
 
         const stalledEl = document.getElementById(`${prefix}-stalled`);
-        if (metrics.stalled) {
-            stalledEl.textContent = '⚠️ STALLED';
-            stalledEl.style.color = 'var(--color-critical)';
-        } else {
-            stalledEl.textContent = '✓ OK';
-            stalledEl.style.color = 'var(--color-optimal)';
+        if (stalledEl) {
+            if (metrics.stalled) {
+                stalledEl.textContent = '⚠️ STALLED';
+                stalledEl.style.color = 'var(--color-critical)';
+            } else {
+                stalledEl.textContent = '✓ OK';
+                stalledEl.style.color = 'var(--color-optimal)';
+            }
         }
     },
 
