@@ -305,4 +305,8 @@ class Router {
     }
 }
 
+// Expose Router globally
+window.Router = Router;
+
 console.log('[ROUTER] Router class defined, typeof Router:', typeof Router);
+console.log('[ROUTER] Router attached to window, typeof window.Router:', typeof window.Router);
