@@ -1,7 +1,8 @@
 /**
  * Dashboard Page Module
+ * Note: Use window.DashboardModule to avoid "already declared" errors when navigating
  */
-const DashboardModule = {
+window.DashboardModule = window.DashboardModule || {
     history: { cpu: [], memory: [], spindle: [], temperature: [], latency: [], motion: [], timestamps: [] },
     maxHistory: 300,
     currentTimeRange: 300000, // 5 minutes
@@ -462,8 +463,11 @@ const DashboardModule = {
             this.graphs.motion?.addDataPoint('Quality', motion.quality || 80);
             this.graphs.motion?.addDataPoint('Jitter', motion.jitter || 0.5);
 
-            document.getElementById('motion-quality').textContent = (motion.quality || 80).toFixed(0) + '%';
-            document.getElementById('motion-jitter').textContent = (motion.jitter || 0.5).toFixed(2) + ' mm/s';
+            const motionQualityEl = document.getElementById('motion-quality');
+            const motionJitterEl = document.getElementById('motion-jitter');
+
+            if (motionQualityEl) motionQualityEl.textContent = (motion.quality || 80).toFixed(0) + '%';
+            if (motionJitterEl) motionJitterEl.textContent = (motion.jitter || 0.5).toFixed(2) + ' mm/s';
         }
     },
 
