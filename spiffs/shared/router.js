@@ -32,7 +32,10 @@ class Router {
             return;
         }
 
-        if (this.isLoading) return;
+        if (this.isLoading) {
+            console.log('[ROUTER] Already loading, skipping duplicate navigate request');
+            return;
+        }
         this.isLoading = true;
 
         try {
@@ -44,21 +47,81 @@ class Router {
             const route = this.routes[page];
             const container = document.getElementById('page-container');
 
+            // Detect file:// protocol - fetch will fail, so skip it and use direct script loading
+            const isFileProtocol = window.location.protocol === 'file:';
+
             // Load HTML
             let html;
             let fetchFailed = false;
-            try {
-                const htmlResponse = await fetch(route.file);
-                if (!htmlResponse.ok) throw new Error(`HTTP ${htmlResponse.status}`);
-                html = await htmlResponse.text();
-            } catch (fetchError) {
-                fetchFailed = true;
-                console.warn(`[ROUTER] Failed to fetch ${route.file}:`, fetchError.message);
 
-                // If mock mode is enabled, create minimal HTML with basic structure
+            // Skip fetch if file:// protocol or mock mode is enabled
+            if (isFileProtocol || window.MockMode?.enabled) {
+                fetchFailed = true;
+                console.log(`[ROUTER] ${isFileProtocol ? 'File protocol detected' : 'Mock mode enabled'} - using fallback HTML for:`, page);
+
+                // Generate fallback HTML structure for file:// or mock mode
+                if (page === 'dashboard') {
+                    html = `
+                        <div class="dashboard-page">
+                            <div style="padding: 20px 0;">
+                                <h1>📊 Dashboard ${isFileProtocol ? '(File Mode)' : '(Mock Mode)'}</h1>
+                                <p style="color: var(--text-secondary); font-size: 14px;">Simulated data${isFileProtocol ? '' : ' - press M to disable'}</p>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
+                                <div class="card">
+                                    <div class="card-header"><h3>Status</h3></div>
+                                    <div class="card-content">
+                                        <div id="motion-status">--</div>
+                                    </div>
+                                </div>
+                                <div class="card">
+                                    <div class="card-header"><h3>CPU</h3></div>
+                                    <div class="card-content">
+                                        <div id="cpu-value" style="font-size: 24px;">--</div>
+                                    </div>
+                                </div>
+                                <div class="card">
+                                    <div class="card-header"><h3>Memory</h3></div>
+                                    <div class="card-content">
+                                        <div id="memory-value" style="font-size: 24px;">--</div>
+                                    </div>
+                                </div>
+                                <div class="card">
+                                    <div class="card-header"><h3>VFD</h3></div>
+                                    <div class="card-content">
+                                        <div id="vfd-status">--</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="charts-section" style="margin-top: 30px;"></div>
+                        </div>
+                    `;
+                } else {
+                    // Generic fallback for other pages
+                    html = `
+                        <div style="padding: 40px 20px; text-align: center;">
+                            <h2>📄 ${page.charAt(0).toUpperCase() + page.slice(1)} Page</h2>
+                            <p style="color: var(--text-secondary); margin: 20px 0;">
+                                ${isFileProtocol ? 'File mode' : 'Mock mode'} - loading with simulated data...
+                            </p>
+                        </div>
+                    `;
+                }
+            } else {
+                try {
+                    const htmlResponse = await fetch(route.file);
+                    if (!htmlResponse.ok) throw new Error(`HTTP ${htmlResponse.status}`);
+                    html = await htmlResponse.text();
+                } catch (fetchError) {
+                    fetchFailed = true;
+                    console.warn(`[ROUTER] Failed to fetch ${route.file}:`, fetchError.message);
+
+                // If mock mode is enabled after fetch failed, create minimal HTML with basic structure
                 // The JS module will populate it with mock data
                 if (window.MockMode?.enabled) {
-                    console.log('[ROUTER] Mock mode enabled, generating fallback structure for:', page);
+                    console.log('[ROUTER] Mock mode enabled after fetch failure, generating fallback structure for:', page);
 
                     // Generate page-specific fallback structures
                     if (page === 'dashboard') {

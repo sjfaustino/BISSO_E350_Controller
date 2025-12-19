@@ -345,6 +345,12 @@ if (window.location.search.includes('mock=true')) {
     window.__mockModeRequested = true;
 }
 
+// Auto-enable mock mode when loading from file:// protocol
+if (window.location.protocol === 'file:') {
+    console.log('[MockMode] File protocol detected - auto-enabling mock mode');
+    window.__mockModeRequested = true;
+}
+
 // Expose global shortcut: press 'M' key to toggle mock mode
 window.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey) {
