@@ -417,7 +417,8 @@ window.MockMode = {
         }
 
         // Pre-populate with historical data for graphs
-        this.generateHistoricalData();
+        // Delay slightly to ensure generator is fully initialized
+        setTimeout(() => this.generateHistoricalData(), 100);
 
         // Show indicator
         const statusDot = document.getElementById('status-dot');
@@ -472,7 +473,7 @@ window.MockMode = {
      * Creates 60 data points spanning the last minute
      */
     generateHistoricalData() {
-        if (!this.mockWs || !this.mockWs.generator) {
+        if (!this.mockWs || !this.mockWs.dataGenerator) {
             console.warn('[MockMode] Cannot generate historical data - mock WebSocket not ready');
             return;
         }
@@ -480,7 +481,7 @@ window.MockMode = {
         console.log('[MockMode] Generating historical data for charts...');
 
         // Temporarily adjust start time to simulate past data
-        const originalStartTime = this.mockWs.generator.startTime;
+        const originalStartTime = this.mockWs.dataGenerator.startTime;
         const now = Date.now();
         const historyDuration = 60000; // 60 seconds of history
         const dataPoints = 60; // One per second
@@ -490,10 +491,10 @@ window.MockMode = {
         for (let i = 0; i < dataPoints; i++) {
             // Set generator to simulate past time
             const timeOffset = historyDuration - (i * interval);
-            this.mockWs.generator.startTime = now - timeOffset;
+            this.mockWs.dataGenerator.startTime = now - timeOffset;
 
             // Generate state for this point in time
-            const state = this.mockWs.generator.generateState();
+            const state = this.mockWs.dataGenerator.generateState();
 
             // Dispatch to AppState (will trigger state-changed event)
             if (window.AppState) {
@@ -502,7 +503,7 @@ window.MockMode = {
         }
 
         // Restore original start time
-        this.mockWs.generator.startTime = originalStartTime;
+        this.mockWs.dataGenerator.startTime = originalStartTime;
 
         console.log(`[MockMode] Generated ${dataPoints} historical data points`);
     },
