@@ -15,6 +15,9 @@
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="stylesheet" href="css/mobile-menu.css">
 
+    <!-- UI Enhancements -->
+    <link rel="stylesheet" href="shared/enhancements.css">
+
     <style>
         /* Quick styles for alerts container */
         .alerts {
@@ -146,6 +149,11 @@
     </footer>
 
     <!-- Shared Modules -->
+    <!-- Core utilities (load first) -->
+    <script src="shared/utils.js"></script>
+    <script src="shared/toast.js"></script>
+
+    <!-- Application scripts -->
     <script src="shared/websocket.js"></script>
     <script src="shared/state.js"></script>
     <script src="shared/alerts.js"></script>

@@ -1,12 +1,18 @@
 /**
  * Mock Data Generator for Offline Development
  * Simulates realistic device data for UI testing and visualization
+ * Enhanced with work cycles, load patterns, and occasional issues
  */
 
 class MockDataGenerator {
     constructor() {
         this.startTime = Date.now();
         this.cycleTime = 0;
+        this.workCycle = 0; // 0-100% through a work cycle
+        this.temperature = 35; // Thermal mass simulation
+        this.spindleSpeed = 0; // Smooth ramping
+        this.alarmState = null;
+        this.alarmTime = 0;
     }
 
     /**
@@ -15,123 +21,221 @@ class MockDataGenerator {
     generateState() {
         this.cycleTime = (Date.now() - this.startTime) / 1000;
 
+        // Work cycle: 0-30s cutting, 30-40s idle, repeat
+        const cyclePhase = this.cycleTime % 40;
+        this.workCycle = cyclePhase < 30 ? (cyclePhase / 30) * 100 : 0;
+        const isCutting = cyclePhase < 30;
+
         return {
-            system: this.generateSystemMetrics(),
-            motion: this.generateMotionStatus(),
+            system: this.generateSystemMetrics(isCutting),
+            motion: this.generateMotionStatus(isCutting),
             safety: this.generateSafetyStatus(),
-            vfd: this.generateVFDStatus(),
+            vfd: this.generateVFDStatus(isCutting),
             network: this.generateNetworkStatus(),
-            axis: this.generateAxisMetrics()
+            axis: this.generateAxisMetrics(isCutting)
         };
     }
 
     /**
      * System metrics (CPU, memory, temperature)
      */
-    generateSystemMetrics() {
-        // Simulate varying CPU usage with some noise
-        const baseCpu = 30 + Math.sin(this.cycleTime * 0.5) * 15;
-        const cpuNoise = (Math.random() - 0.5) * 5;
+    generateSystemMetrics(isCutting) {
+        // CPU load varies with cutting activity
+        const baseCpu = isCutting ? 60 : 20;
+        const cpuVariance = isCutting ? 15 : 5;
+        const cpuNoise = (Math.random() - 0.5) * cpuVariance;
+        const cpuLoad = Math.max(5, Math.min(95, baseCpu + Math.sin(this.cycleTime * 0.5) * 10 + cpuNoise));
 
-        // Memory usage varies slightly
-        const baseMemory = 200000 + Math.sin(this.cycleTime * 0.3) * 30000;
-        const memoryNoise = (Math.random() - 0.5) * 5000;
+        // Memory usage with gradual growth
+        const baseMemory = 180000 + (this.cycleTime * 100); // Slow leak simulation
+        const memoryNoise = (Math.random() - 0.5) * 8000;
+        const freeHeap = Math.max(100000, Math.min(350000, baseMemory + memoryNoise));
 
-        // Temperature increases under load, has thermal mass
-        const baseTemp = 35 + Math.sin(this.cycleTime * 0.2) * 8;
-        const tempNoise = (Math.random() - 0.5) * 2;
+        // Temperature with thermal mass - heats up during cutting, cools during idle
+        const targetTemp = isCutting ? 55 : 38;
+        const tempRate = 0.05; // Thermal response rate
+        this.temperature += (targetTemp - this.temperature) * tempRate + (Math.random() - 0.5) * 0.5;
+        this.temperature = Math.max(25, Math.min(75, this.temperature));
 
         return {
-            cpu_percent: Math.max(5, Math.min(95, baseCpu + cpuNoise)),
-            free_heap_bytes: Math.max(100000, baseMemory + memoryNoise),
-            temperature: Math.max(25, Math.min(75, baseTemp + tempNoise)),
-            uptime_seconds: this.cycleTime
+            cpu_percent: cpuLoad,
+            free_heap_bytes: freeHeap,
+            temperature: this.temperature,
+            uptime_ms: this.cycleTime * 1000,
+            fw_version: '3.1.0',
+            hw_version: 'E350 Rev A'
         };
     }
 
     /**
-     * Motion status (moving/stopped, quality)
+     * Motion status (moving/stopped, quality, position)
      */
-    generateMotionStatus() {
-        // Alternate between moving and stopped every 15 seconds
-        const moving = Math.floor(this.cycleTime / 15) % 2 === 0;
+    generateMotionStatus(isCutting) {
+        // Simulate realistic cutting patterns
+        const quality = isCutting
+            ? 80 + Math.sin(this.cycleTime * 2) * 10 + (Math.random() - 0.5) * 5
+            : 95 + (Math.random() - 0.5) * 3;
+
+        const jitter = isCutting
+            ? 0.3 + (Math.random() - 0.5) * 0.2
+            : 0.05 + (Math.random() - 0.5) * 0.03;
 
         return {
-            moving: moving,
-            status: moving ? 'cutting' : 'idle'
+            moving: isCutting,
+            status: isCutting ? 'cutting' : 'idle',
+            quality: Math.max(0, Math.min(100, quality)),
+            jitter: Math.max(0, jitter),
+            feed_rate: isCutting ? 100 + (Math.random() - 0.5) * 20 : 0
         };
     }
 
     /**
-     * Safety status (e-stop, alarms)
+     * Safety status (e-stop, alarms) - occasionally triggers warnings
      */
     generateSafetyStatus() {
+        // Trigger occasional warnings for testing (5% chance every 10 seconds)
+        if (!this.alarmState && Math.floor(this.cycleTime) % 10 === 0 && Math.random() < 0.05) {
+            const warnings = [
+                { code: 'WARN_01', message: 'High vibration detected on Y axis', severity: 'warning' },
+                { code: 'WARN_02', message: 'Spindle temperature elevated', severity: 'warning' },
+                { code: 'INFO_01', message: 'Maintenance due in 10 hours', severity: 'info' }
+            ];
+            this.alarmState = warnings[Math.floor(Math.random() * warnings.length)];
+            this.alarmTime = this.cycleTime;
+        }
+
+        // Clear alarm after 15 seconds
+        if (this.alarmState && (this.cycleTime - this.alarmTime) > 15) {
+            this.alarmState = null;
+        }
+
         return {
             estop: false,
-            alarm: false,
+            alarm: this.alarmState !== null,
+            alarm_code: this.alarmState?.code || null,
+            alarm_message: this.alarmState?.message || null,
+            alarm_severity: this.alarmState?.severity || null,
             door_open: false,
-            status: 'OK'
+            status: this.alarmState ? this.alarmState.severity.toUpperCase() : 'OK'
         };
     }
 
     /**
-     * VFD/Spindle status
+     * VFD/Spindle status with realistic ramping
      */
-    generateVFDStatus() {
-        // Spindle ramps up/down smoothly
-        const baseFreq = Math.sin(this.cycleTime * 0.3) > 0.5
-            ? 15000 + Math.sin(this.cycleTime * 0.5) * 3000
-            : 500;
+    generateVFDStatus(isCutting) {
+        // Smooth spindle ramp up/down
+        const targetSpeed = isCutting ? 15000 + Math.sin(this.workCycle * 0.1) * 2000 : 0;
+        const rampRate = 50; // Hz per update
+
+        if (this.spindleSpeed < targetSpeed) {
+            this.spindleSpeed = Math.min(targetSpeed, this.spindleSpeed + rampRate);
+        } else if (this.spindleSpeed > targetSpeed) {
+            this.spindleSpeed = Math.max(targetSpeed, this.spindleSpeed - rampRate);
+        }
+
+        // Current and voltage vary with load
+        const loadFactor = this.spindleSpeed / 18000;
+        const current = loadFactor * 10 + (Math.random() - 0.5) * 1;
+        const voltage = 380 + (Math.random() - 0.5) * 8;
+        const vfdTemp = 40 + (loadFactor * 25) + (Math.random() - 0.5) * 3;
 
         return {
-            frequency_hz: Math.max(0, baseFreq + (Math.random() - 0.5) * 1000),
-            current_amps: Math.max(0, Math.sin(this.cycleTime * 0.3) * 8 + (Math.random() - 0.5) * 1),
-            voltage: 380 + (Math.random() - 0.5) * 5,
-            temperature: 45 + Math.sin(this.cycleTime * 0.2) * 10,
-            error_count: 0
+            frequency_hz: this.spindleSpeed + (Math.random() - 0.5) * 100,
+            rpm: (this.spindleSpeed * 2) / 60, // Simplified conversion
+            current_amps: Math.max(0, current),
+            voltage: voltage,
+            power_kw: (voltage * current) / 1000,
+            temperature: vfdTemp,
+            error_count: 0,
+            running: this.spindleSpeed > 500
         };
     }
 
     /**
-     * Network connectivity status
+     * Network connectivity status with realistic latency
      */
     generateNetworkStatus() {
+        // Latency varies slightly with system load
+        const baseLatency = 18;
+        const latencySpike = Math.random() < 0.1 ? Math.random() * 30 : 0; // Occasional spike
+        const latency = baseLatency + (Math.random() - 0.5) * 5 + latencySpike;
+
+        // Signal strength with minor fluctuation
+        const signal = -45 + Math.sin(this.cycleTime * 0.1) * 3 + (Math.random() - 0.5) * 2;
+
         return {
             wifi_connected: true,
-            signal_percent: 85 + (Math.random() - 0.5) * 10,
-            signal_dbm: -45 + (Math.random() - 0.5) * 5,
-            latency: 20 + (Math.random() - 0.5) * 15,
+            signal_percent: Math.max(0, Math.min(100, (signal + 100) * 2)),
+            rssi: Math.floor(signal),
+            latency_ms: Math.max(5, latency),
             ip_address: '192.168.1.100',
-            mac_address: 'AA:BB:CC:DD:EE:FF'
+            mac_address: 'AA:BB:CC:DD:EE:FF',
+            packets_sent: Math.floor(this.cycleTime * 10),
+            packets_received: Math.floor(this.cycleTime * 9.8),
+            packet_loss: 0.2
         };
     }
 
     /**
      * Axis metrics (X, Y, Z positions, quality, jitter)
+     * Simulates realistic cutting paths
      */
-    generateAxisMetrics() {
-        // Simulate smooth motion along all axes
-        const xPos = 100 + Math.sin(this.cycleTime * 0.3) * 150;
-        const yPos = 150 + Math.cos(this.cycleTime * 0.25) * 100;
-        const zPos = 20 + Math.sin(this.cycleTime * 0.4) * 15;
-        const aPos = (this.cycleTime * 30) % 360;
+    generateAxisMetrics(isCutting) {
+        let xPos, yPos, zPos, aPos;
 
-        const generateAxis = (pos, axisName) => ({
-            position_mm: pos + (Math.random() - 0.5) * 2,
-            velocity_mms: Math.sin(this.cycleTime * 0.3) * 50,
-            quality: 85 + (Math.random() - 0.5) * 20,
-            jitter_mms: (Math.random() - 0.5) * 0.5,
-            vfd_error_percent: Math.random() * 2,
+        if (isCutting) {
+            // Simulate a rectangular cutting pattern
+            const pathProgress = (this.workCycle / 100) * 4; // 0-4 for 4 sides
+            const side = Math.floor(pathProgress);
+            const sideProgress = pathProgress - side;
+
+            switch(side) {
+                case 0: // Moving right
+                    xPos = 50 + sideProgress * 200;
+                    yPos = 50;
+                    zPos = 10;
+                    break;
+                case 1: // Moving up
+                    xPos = 250;
+                    yPos = 50 + sideProgress * 150;
+                    zPos = 10;
+                    break;
+                case 2: // Moving left
+                    xPos = 250 - sideProgress * 200;
+                    yPos = 200;
+                    zPos = 10;
+                    break;
+                default: // Moving down
+                    xPos = 50;
+                    yPos = 200 - sideProgress * 150;
+                    zPos = 10;
+            }
+            aPos = (this.cycleTime * 20) % 360; // Slow rotation during cut
+        } else {
+            // Return to home position when idle
+            xPos = 50;
+            yPos = 50;
+            zPos = 50; // Raised
+            aPos = 0;
+        }
+
+        const generateAxis = (pos, targetPos, moving) => ({
+            position_mm: pos + (Math.random() - 0.5) * (moving ? 0.3 : 0.05),
+            target_position_mm: targetPos,
+            velocity_mms: moving ? 50 + (Math.random() - 0.5) * 10 : 0,
+            quality: moving ? 82 + (Math.random() - 0.5) * 8 : 95,
+            jitter_mms: moving ? 0.25 + (Math.random() - 0.5) * 0.15 : 0.05,
             stalled: false,
-            target_position_mm: pos,
-            pid_error: (Math.random() - 0.5) * 0.1
+            following_error: (Math.random() - 0.5) * 0.08,
+            load_percent: moving ? 45 + (Math.random() - 0.5) * 15 : 5
         });
 
         return {
-            x: generateAxis(xPos, 'X'),
-            y: generateAxis(yPos, 'Y'),
-            z: generateAxis(zPos, 'Z'),
-            a: generateAxis(aPos, 'A')
+            x: generateAxis(xPos, xPos, isCutting),
+            y: generateAxis(yPos, yPos, isCutting),
+            z: generateAxis(zPos, zPos, false), // Z doesn't move in this pattern
+            a: generateAxis(aPos, aPos, isCutting)
         };
     }
 
@@ -141,6 +245,10 @@ class MockDataGenerator {
     reset() {
         this.startTime = Date.now();
         this.cycleTime = 0;
+        this.workCycle = 0;
+        this.temperature = 35;
+        this.spindleSpeed = 0;
+        this.alarmState = null;
     }
 }
 
