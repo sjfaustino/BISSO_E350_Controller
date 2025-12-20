@@ -2,8 +2,19 @@
  * @file plc_iface.cpp
  * @brief Hardware Abstraction Layer for ELBO PLC (Gemini v3.5.21)
  * @details Implements robust I2C drivers with error checking.
- *          CRITICAL FIX: Added spinlock protection for shadow register access
+ *          CRITICAL FIX: Added MUTEX protection for shadow register access
  *          to prevent race conditions when multiple tasks modify the relay states.
+ *
+ *          ARCHITECTURE: Spinlock vs Mutex Decision (Gemini Audit Compliant)
+ *          - Shadow registers: Protected by MUTEX (not spinlock)
+ *          - I2C operations: NEVER called inside mutex (copy-before-release pattern)
+ *          - Why mutex, not spinlock:
+ *            1. Shadow registers accessed from tasks, not ISRs
+ *            2. Mutexes allow proper task scheduling (no interrupt disable)
+ *            3. I2C (milliseconds) must NEVER be in critical section
+ *
+ *          Pattern: Lock mutex → Modify shadow → Copy → Release mutex → I2C call
+ *          Result: I2C operations happen OUTSIDE mutex protection ✓
  */
 
 #include "plc_iface.h"
