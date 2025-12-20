@@ -11,11 +11,13 @@ window.DashboardModule = window.DashboardModule || {
     lastTelemetry: null, // Store last telemetry for VFD/spindle data
     stateChangeHandler: null, // Store bound event handler for cleanup
     updateInterval: null, // Store interval ID for cleanup
+    historicalDataLoaded: false, // Track if historical data has been bulk-loaded
 
     init() {
         console.log('[Dashboard] Initializing');
         this.setupEventListeners();
         this.initializeGraphs();
+        this.historicalDataLoaded = false; // Reset on init
 
         // Store bound handler so we can remove it later
         this.stateChangeHandler = () => this.onStateChanged();
@@ -467,6 +469,31 @@ window.DashboardModule = window.DashboardModule || {
     updateGraphs() {
         // Detect if we're using MiniChart (single-arg addDataPoint) or GraphVisualizer (two-arg)
         const isMiniChart = this.graphs.cpu && this.graphs.cpu.constructor.name === 'MiniChart';
+
+        // If using MiniCharts and we have historical data that hasn't been loaded yet, bulk-load it
+        if (isMiniChart && !this.historicalDataLoaded && this.history.cpu.length > 1) {
+            console.log('[Dashboard] Bulk-loading', this.history.cpu.length, 'historical data points to charts');
+
+            // Bulk load all historical data points
+            for (let i = 0; i < this.history.cpu.length; i++) {
+                if (this.history.cpu[i] !== undefined) {
+                    this.graphs.cpu?.addDataPoint(this.history.cpu[i]);
+                }
+                if (this.history.memory[i] !== undefined) {
+                    this.graphs.memory?.addDataPoint(this.history.memory[i]);
+                }
+                if (this.history.spindle[i] !== undefined) {
+                    this.graphs.spindle?.addDataPoint(this.history.spindle[i]);
+                }
+                if (this.history.temperature[i] !== undefined) {
+                    this.graphs.temperature?.addDataPoint(this.history.temperature[i]);
+                }
+            }
+
+            this.historicalDataLoaded = true;
+            console.log('[Dashboard] Historical data bulk-load complete');
+            return; // Don't add the last point again
+        }
 
         // Add data points to graphs from history
         if (this.history.cpu.length > 0) {

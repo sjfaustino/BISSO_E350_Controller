@@ -247,18 +247,43 @@ class Router {
                     html = `
                         <div class="settings-page">
                             <div class="card">
-                                <div class="card-header"><h2>Settings (File Mode)</h2></div>
+                                <div class="card-header"><h2>⚙️ Display & Theme Settings</h2></div>
                                 <div class="card-content">
-                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Settings configuration requires connection to the ESP32 device.</p>
-                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                        <h3>Display Settings</h3>
-                                        <div style="margin: 10px 0;">
-                                            <label>Theme: <select disabled><option>Light</option></select></label>
-                                        </div>
-                                        <div style="margin: 10px 0;">
-                                            <label>Font Size: <input type="range" disabled /></label>
+                                    <div class="setting-group">
+                                        <label>Theme:</label>
+                                        <div class="theme-selector" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;">
+                                            <button class="theme-option" data-theme="light" title="Light Theme" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); cursor: pointer;">
+                                                <div class="theme-preview light" style="width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid var(--border-color);"></div>
+                                                <span style="font-size: 12px;">Light</span>
+                                            </button>
+                                            <button class="theme-option" data-theme="dark" title="Dark Theme" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); cursor: pointer;">
+                                                <div class="theme-preview dark" style="width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid var(--border-color);"></div>
+                                                <span style="font-size: 12px;">Dark</span>
+                                            </button>
+                                            <button class="theme-option" data-theme="high-contrast" title="High Contrast" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); cursor: pointer;">
+                                                <div class="theme-preview high-contrast" style="width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #000000 0%, #ffffff 100%); border: 1px solid var(--border-color);"></div>
+                                                <span style="font-size: 12px;">High Contrast</span>
+                                            </button>
+                                            <button class="theme-option" data-theme="colorblind" title="Colorblind Mode" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); cursor: pointer;">
+                                                <div class="theme-preview colorblind" style="width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #0173b2 0%, #de8f05 100%); border: 1px solid var(--border-color);"></div>
+                                                <span style="font-size: 12px;">Colorblind</span>
+                                            </button>
                                         </div>
                                     </div>
+                                    <div class="setting-group" style="margin-top: 20px;">
+                                        <label>Font Size: <span id="font-size-display">100</span>%</label>
+                                        <div class="slider-container" style="margin: 10px 0;">
+                                            <input type="range" id="font-size-slider" min="80" max="120" value="100" class="slider" style="width: 100%;">
+                                            <div class="slider-labels" style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-top: 5px;">
+                                                <span>Smaller</span>
+                                                <span>Normal</span>
+                                                <span>Larger</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p style="color: var(--text-secondary); margin-top: 20px; font-size: 14px;">
+                                        💡 Tip: Press <strong>T</strong> key to quickly cycle through themes
+                                    </p>
                                 </div>
                             </div>
                         </div>
