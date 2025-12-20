@@ -426,12 +426,75 @@ The Gemini AI audit improvement roadmap has been **100% addressed**:
 ✅ **ISR-Unsafe Logging:** Not applicable - no ISRs in codebase
 ⚠️ **Ghost Task RAM Waste:** Confirmed - recommend removal (saves 2KB)
 
+---
+
+## Future Improvements: Gemini 3-Step Roadmap
+
+Gemini AI provided a comprehensive 3-step improvement roadmap beyond critical fixes. See **[GEMINI_IMPROVEMENT_ROADMAP.md](docs/GEMINI_IMPROVEMENT_ROADMAP.md)** for detailed analysis.
+
+### High Priority Optimizations
+
+**NVS Flash Wear Prevention (Step 1.3):**
+- **Issue:** No cooldown on fault logging to NVS (flash wear risk)
+- **Scenario:** Flickering sensor → 1000 faults/sec → 7000 NVS writes/sec → flash burned in minutes
+- **Fix:** Add 1-second cooldown per fault type
+- **Impact:** Extends flash lifetime from months to years
+- **Priority:** ✅ **High** - Implement to prevent flash wear
+
+### Medium Priority Optimizations
+
+**Interrupt-Based Safety (Step 2.2):**
+- **Current:** Poll board inputs every 5ms (8% CPU overhead)
+- **Proposed:** Use I/O expander INT pin to wake task on button press
+- **Savings:** ~8% CPU, lower latency (10μs vs 5ms)
+- **Requires:** Hardware support (INT pin wired to ESP32 GPIO)
+- **Priority:** ⚠️ **Medium** - If hardware supports
+
+### Low Priority Optimizations
+
+**Defensive ISR Check (Step 1.1):**
+- **Add:** `if (xPortInIsrContext()) return;` to logging functions
+- **Benefit:** Future-proofs if timer ISR added later
+- **Cost:** 1-2μs overhead per log call (negligible)
+- **Priority:** ⚠️ **Low** - Defensive programming
+
+**Direct JSON Streaming (Step 3.1):**
+- **Current:** StaticJsonDocument → buffer → HTTP (512 bytes intermediate)
+- **Proposed:** StaticJsonDocument → stream directly to HTTP
+- **Savings:** 512 bytes RAM, 200-500 μs per request
+- **Priority:** ⚠️ **Low** - Micro-optimization
+
+### Not Recommended
+
+**Split I2C Buses (Step 2.1):**
+- **Status:** VFD already on separate bus (RS485/Modbus, not I2C)
+- **Current:** Separate I2C mutexes provide logical isolation
+- **Assessment:** Current architecture adequate
+- **Priority:** ❌ **Not recommended** - Marginal benefit vs complexity
+
+**Revise Task Priorities (Step 3.2):**
+- **Gemini:** Motion priority 20 (highest), Safety priority 18
+- **Current:** Safety priority 24 (highest), Motion priority 22
+- **Rationale:** Safety should supervise Motion, not be preempted by it
+- **Assessment:** Current priorities correct for safety-critical system
+- **Priority:** ❌ **No change** - Current architecture is correct
+
+---
+
+## Status Summary
+
 The firmware is now:
 - ✅ Production-ready for long-term operation
 - ✅ Watchdog-safe (no infinite hangs)
 - ✅ Memory-stable (no heap fragmentation)
 - ✅ Well-documented (architectural rationale)
 - ✅ Maintainable (consistent patterns throughout)
+- ⚠️ **Optimization opportunities** documented (see GEMINI_IMPROVEMENT_ROADMAP.md)
+
+**Next Steps:**
+1. ✅ Implement NVS cooldown (high priority - flash wear prevention)
+2. ⚠️ Evaluate interrupt-based safety (if hardware supports)
+3. ⚠️ Consider low-priority optimizations as needed
 
 **Last Updated:** 2025-01-XX
 **Maintained by:** BISSO Development Team
