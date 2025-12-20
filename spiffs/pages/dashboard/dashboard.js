@@ -55,6 +55,15 @@ window.DashboardModule = window.DashboardModule || {
     },
 
     initializeGraphs() {
+        // Check if we're in file:// or mock mode - use MiniChart as fallback
+        const useMiniCharts = (window.location.protocol === 'file:' || window.MockMode?.enabled) && window.MiniChart;
+
+        if (useMiniCharts) {
+            console.log('[Dashboard] Using MiniChart for file:// or mock mode');
+            this.initializeMiniCharts();
+            return;
+        }
+
         // CPU Graph
         try {
             this.graphs.cpu = new GraphVisualizer('cpu-graph', {
@@ -129,6 +138,108 @@ window.DashboardModule = window.DashboardModule || {
         } catch (e) { console.warn('Motion graph init failed:', e); }
 
         console.log('[Dashboard] Graphs initialized');
+    },
+
+    initializeMiniCharts() {
+        // Create container structure for mini charts
+        const chartsSection = document.getElementById('charts-section');
+        if (!chartsSection) {
+            console.warn('[Dashboard] Charts section not found');
+            return;
+        }
+
+        chartsSection.innerHTML = `
+            <h2 style="margin-bottom: 20px;">📊 Real-time Metrics</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <div class="card">
+                    <div class="card-header"><h3>CPU Usage</h3></div>
+                    <div class="card-content">
+                        <div id="mini-cpu-chart"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3>Memory</h3></div>
+                    <div class="card-content">
+                        <div id="mini-memory-chart"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3>Spindle Current</h3></div>
+                    <div class="card-content">
+                        <div id="mini-spindle-chart"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3>Temperature</h3></div>
+                    <div class="card-content">
+                        <div id="mini-temperature-chart"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Initialize MiniChart instances
+        try {
+            this.graphs.cpu = new MiniChart('mini-cpu-chart', {
+                width: 300,
+                height: 120,
+                maxDataPoints: 60,
+                lineColor: '#10b981',
+                fillColor: 'rgba(16, 185, 129, 0.1)',
+                min: 0,
+                max: 100,
+                unit: '%',
+                showGrid: true,
+                showValues: true
+            });
+        } catch (e) { console.warn('Mini CPU chart init failed:', e); }
+
+        try {
+            this.graphs.memory = new MiniChart('mini-memory-chart', {
+                width: 300,
+                height: 120,
+                maxDataPoints: 60,
+                lineColor: '#3b82f6',
+                fillColor: 'rgba(59, 130, 246, 0.1)',
+                min: 0,
+                max: 'auto',
+                unit: ' KB',
+                showGrid: true,
+                showValues: true
+            });
+        } catch (e) { console.warn('Mini Memory chart init failed:', e); }
+
+        try {
+            this.graphs.spindle = new MiniChart('mini-spindle-chart', {
+                width: 300,
+                height: 120,
+                maxDataPoints: 60,
+                lineColor: '#f59e0b',
+                fillColor: 'rgba(245, 158, 11, 0.1)',
+                min: 0,
+                max: 20,
+                unit: ' A',
+                showGrid: true,
+                showValues: true
+            });
+        } catch (e) { console.warn('Mini Spindle chart init failed:', e); }
+
+        try {
+            this.graphs.temperature = new MiniChart('mini-temperature-chart', {
+                width: 300,
+                height: 120,
+                maxDataPoints: 60,
+                lineColor: '#ef4444',
+                fillColor: 'rgba(239, 68, 68, 0.1)',
+                min: 20,
+                max: 80,
+                unit: ' °C',
+                showGrid: true,
+                showValues: true
+            });
+        } catch (e) { console.warn('Mini Temperature chart init failed:', e); }
+
+        console.log('[Dashboard] MiniCharts initialized');
     },
 
     onStateChanged() {
@@ -344,105 +455,137 @@ window.DashboardModule = window.DashboardModule || {
     },
 
     updateGraphs() {
+        // Detect if we're using MiniChart (single-arg addDataPoint) or GraphVisualizer (two-arg)
+        const isMiniChart = this.graphs.cpu && this.graphs.cpu.constructor.name === 'MiniChart';
+
         // Add data points to graphs from history
         if (this.history.cpu.length > 0) {
             const cpu = this.history.cpu[this.history.cpu.length - 1];
-            this.graphs.cpu?.addDataPoint('CPU', cpu);
 
-            // Update CPU stats (only if elements exist)
-            const cpuStats = this.graphs.cpu?.getStats('CPU');
-            if (cpuStats) {
-                const cpuCurrentEl = document.getElementById('cpu-current');
-                const cpuAvgEl = document.getElementById('cpu-stat-avg');
-                const cpuMaxEl = document.getElementById('cpu-stat-max');
+            // MiniChart uses addDataPoint(value), GraphVisualizer uses addDataPoint(series, value)
+            if (isMiniChart) {
+                this.graphs.cpu?.addDataPoint(cpu);
+            } else {
+                this.graphs.cpu?.addDataPoint('CPU', cpu);
+            }
 
-                if (cpuCurrentEl) cpuCurrentEl.textContent = cpu.toFixed(1) + '%';
-                if (cpuAvgEl) cpuAvgEl.textContent = cpuStats.avg.toFixed(1) + '%';
-                if (cpuMaxEl) cpuMaxEl.textContent = cpuStats.max.toFixed(1) + '%';
+            // Update CPU stats (only if elements exist and using GraphVisualizer)
+            if (!isMiniChart) {
+                const cpuStats = this.graphs.cpu?.getStats('CPU');
+                if (cpuStats) {
+                    const cpuCurrentEl = document.getElementById('cpu-current');
+                    const cpuAvgEl = document.getElementById('cpu-stat-avg');
+                    const cpuMaxEl = document.getElementById('cpu-stat-max');
+
+                    if (cpuCurrentEl) cpuCurrentEl.textContent = cpu.toFixed(1) + '%';
+                    if (cpuAvgEl) cpuAvgEl.textContent = cpuStats.avg.toFixed(1) + '%';
+                    if (cpuMaxEl) cpuMaxEl.textContent = cpuStats.max.toFixed(1) + '%';
+                }
             }
         }
 
         if (this.history.memory.length > 0) {
             const mem = this.history.memory[this.history.memory.length - 1];
-            this.graphs.memory?.addDataPoint('Memory', mem);
 
-            const memStats = this.graphs.memory?.getStats('Memory');
-            if (memStats) {
-                const memCurrentEl = document.getElementById('mem-current');
-                const memAvgEl = document.getElementById('mem-stat-avg');
-                const memMaxEl = document.getElementById('mem-stat-max');
+            if (isMiniChart) {
+                this.graphs.memory?.addDataPoint(mem);
+            } else {
+                this.graphs.memory?.addDataPoint('Memory', mem);
+            }
 
-                if (memCurrentEl) memCurrentEl.textContent = mem.toFixed(0) + ' KB';
-                if (memAvgEl) memAvgEl.textContent = memStats.avg.toFixed(0) + ' KB';
-                if (memMaxEl) memMaxEl.textContent = memStats.max.toFixed(0) + ' KB';
+            if (!isMiniChart) {
+                const memStats = this.graphs.memory?.getStats('Memory');
+                if (memStats) {
+                    const memCurrentEl = document.getElementById('mem-current');
+                    const memAvgEl = document.getElementById('mem-stat-avg');
+                    const memMaxEl = document.getElementById('mem-stat-max');
+
+                    if (memCurrentEl) memCurrentEl.textContent = mem.toFixed(0) + ' KB';
+                    if (memAvgEl) memAvgEl.textContent = memStats.avg.toFixed(0) + ' KB';
+                    if (memMaxEl) memMaxEl.textContent = memStats.max.toFixed(0) + ' KB';
+                }
             }
         }
 
         if (this.history.spindle.length > 0) {
             const spindle = this.history.spindle[this.history.spindle.length - 1];
-            this.graphs.spindle?.addDataPoint('Current', spindle);
 
-            const spindleStats = this.graphs.spindle?.getStats('Current');
-            if (spindleStats) {
-                const spindleCurrentEl = document.getElementById('spindle-current');
-                if (spindleCurrentEl) spindleCurrentEl.textContent = spindle.toFixed(2) + ' A';
+            if (isMiniChart) {
+                this.graphs.spindle?.addDataPoint(spindle);
+            } else {
+                this.graphs.spindle?.addDataPoint('Current', spindle);
+            }
 
-                // Update spindle card progress bar and additional metrics
-                const spindleBar = document.getElementById('spindle-bar');
-                const spindleFreq = document.getElementById('spindle-freq');
-                const spindleThermal = document.getElementById('spindle-thermal');
+            if (!isMiniChart) {
+                const spindleStats = this.graphs.spindle?.getStats('Current');
+                if (spindleStats) {
+                    const spindleCurrentEl = document.getElementById('spindle-current');
+                    if (spindleCurrentEl) spindleCurrentEl.textContent = spindle.toFixed(2) + ' A';
 
-                if (spindleBar) {
-                    // Progress bar shows current as percentage of threshold (assume 30A max)
-                    const threshold = 30.0;
-                    const percent = Math.min((spindle / threshold) * 100, 100);
-                    spindleBar.style.width = percent + '%';
+                    // Update spindle card progress bar and additional metrics
+                    const spindleBar = document.getElementById('spindle-bar');
+                    const spindleFreq = document.getElementById('spindle-freq');
+                    const spindleThermal = document.getElementById('spindle-thermal');
 
-                    // Color based on load
-                    if (percent > 80) {
-                        spindleBar.style.background = 'var(--color-critical)';
-                    } else if (percent > 60) {
-                        spindleBar.style.background = 'var(--color-warning)';
-                    } else {
-                        spindleBar.style.background = 'var(--color-optimal)';
+                    if (spindleBar) {
+                        // Progress bar shows current as percentage of threshold (assume 30A max)
+                        const threshold = 30.0;
+                        const percent = Math.min((spindle / threshold) * 100, 100);
+                        spindleBar.style.width = percent + '%';
+
+                        // Color based on load
+                        if (percent > 80) {
+                            spindleBar.style.background = 'var(--color-critical)';
+                        } else if (percent > 60) {
+                            spindleBar.style.background = 'var(--color-warning)';
+                        } else {
+                            spindleBar.style.background = 'var(--color-optimal)';
+                        }
                     }
+
+                    // Update frequency and thermal from last telemetry
+                    if (this.lastTelemetry && this.lastTelemetry.vfd) {
+                        if (spindleFreq) {
+                            spindleFreq.textContent = this.lastTelemetry.vfd.frequency_hz.toFixed(1) + ' Hz';
+                        }
+                        if (spindleThermal) {
+                            spindleThermal.textContent = (this.lastTelemetry.vfd.thermal_percent || 0) + '%';
+                        }
+                    }
+
+                    // Legacy stat fields (if they exist)
+                    const statAvg = document.getElementById('spindle-stat-avg');
+                    const statMax = document.getElementById('spindle-stat-max');
+                    if (statAvg) statAvg.textContent = spindleStats.avg.toFixed(2) + ' A';
+                    if (statMax) statMax.textContent = spindleStats.max.toFixed(2) + ' A';
                 }
-
-                // Update frequency and thermal from last telemetry
-                if (this.lastTelemetry && this.lastTelemetry.vfd) {
-                    if (spindleFreq) {
-                        spindleFreq.textContent = this.lastTelemetry.vfd.frequency_hz.toFixed(1) + ' Hz';
-                    }
-                    if (spindleThermal) {
-                        spindleThermal.textContent = (this.lastTelemetry.vfd.thermal_percent || 0) + '%';
-                    }
-                }
-
-                // Legacy stat fields (if they exist)
-                const statAvg = document.getElementById('spindle-stat-avg');
-                const statMax = document.getElementById('spindle-stat-max');
-                if (statAvg) statAvg.textContent = spindleStats.avg.toFixed(2) + ' A';
-                if (statMax) statMax.textContent = spindleStats.max.toFixed(2) + ' A';
             }
         }
 
         if (this.history.temperature.length > 0) {
             const temp = this.history.temperature[this.history.temperature.length - 1];
-            this.graphs.temperature?.addDataPoint('Temp', temp);
 
-            const tempStats = this.graphs.temperature?.getStats('Temp');
-            if (tempStats) {
-                const tempCurrentEl = document.getElementById('temp-current');
-                const tempAvgEl = document.getElementById('temp-stat-avg');
-                const tempMaxEl = document.getElementById('temp-stat-max');
+            if (isMiniChart) {
+                this.graphs.temperature?.addDataPoint(temp);
+            } else {
+                this.graphs.temperature?.addDataPoint('Temp', temp);
+            }
 
-                if (tempCurrentEl) tempCurrentEl.textContent = temp.toFixed(1) + ' °C';
-                if (tempAvgEl) tempAvgEl.textContent = tempStats.avg.toFixed(1) + ' °C';
-                if (tempMaxEl) tempMaxEl.textContent = tempStats.max.toFixed(1) + ' °C';
+            if (!isMiniChart) {
+                const tempStats = this.graphs.temperature?.getStats('Temp');
+                if (tempStats) {
+                    const tempCurrentEl = document.getElementById('temp-current');
+                    const tempAvgEl = document.getElementById('temp-stat-avg');
+                    const tempMaxEl = document.getElementById('temp-stat-max');
+
+                    if (tempCurrentEl) tempCurrentEl.textContent = temp.toFixed(1) + ' °C';
+                    if (tempAvgEl) tempAvgEl.textContent = tempStats.avg.toFixed(1) + ' °C';
+                    if (tempMaxEl) tempMaxEl.textContent = tempStats.max.toFixed(1) + ' °C';
+                }
             }
         }
 
-        if (this.history.latency.length > 0) {
+        if (this.history.latency.length > 0 && !isMiniChart) {
             const latency = this.history.latency[this.history.latency.length - 1];
             this.graphs.latency?.addDataPoint('Latency', latency);
 
@@ -458,7 +601,7 @@ window.DashboardModule = window.DashboardModule || {
             }
         }
 
-        if (this.history.motion.length > 0) {
+        if (this.history.motion.length > 0 && !isMiniChart) {
             const motion = this.history.motion[this.history.motion.length - 1];
             this.graphs.motion?.addDataPoint('Quality', motion.quality || 80);
             this.graphs.motion?.addDataPoint('Jitter', motion.jitter || 0.5);
