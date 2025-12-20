@@ -155,6 +155,40 @@
                 </div>
             </div>
         </div>
+
+        <!-- Calibration Wizards Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>🧙 Calibration Wizards</h2>
+            </div>
+            <div class="card-content">
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    Step-by-step wizards to help calibrate and optimize machine performance.
+                </p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('encoder')">
+                        <span style="font-size: 20px;">📏</span>
+                        <div style="margin-top: 8px;">Encoder Calibration</div>
+                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">10-15 min</div>
+                    </button>
+                    <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('motion')">
+                        <span style="font-size: 20px;">🎯</span>
+                        <div style="margin-top: 8px;">Motion Accuracy</div>
+                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">15-20 min</div>
+                    </button>
+                    <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('spindle')">
+                        <span style="font-size: 20px;">🔄</span>
+                        <div style="margin-top: 8px;">Spindle Alignment</div>
+                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">20-30 min</div>
+                    </button>
+                    <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('tuning')">
+                        <span style="font-size: 20px;">⚙️</span>
+                        <div style="margin-top: 8px;">Auto-Tuning</div>
+                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">10-15 min</div>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -292,5 +326,25 @@
     .maintenance-page .axes-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Wizard Button Styling */
+.wizard-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 15px !important;
+    min-height: 120px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.wizard-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.wizard-btn:active {
+    transform: translateY(0);
 }
 </style>
