@@ -177,7 +177,8 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument + char array to prevent heap fragmentation
+        StaticJsonDocument<256> doc;
         // Use the new read-only accessors for thread safety
         doc["status"] = motionStateToString(motionGetState(0));
         doc["x_pos"] = motionGetPositionMM(0);
@@ -189,8 +190,8 @@ void WebServerManager::setupRoutes() {
         doc["uptime"] = current_status.uptime_sec;
         // Or if real-time needed: doc["uptime"] = taskGetUptime();
 
-        String response;
-        serializeJson(doc, response);
+        char response[256];
+        serializeJson(doc, response, sizeof(response));
         request->send(200, "application/json", response);
     });
 
@@ -213,7 +214,8 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument + char array to prevent heap fragmentation
+        StaticJsonDocument<512> doc;
 
         // Get spindle monitor state
         const spindle_monitor_state_t* spindle_state = spindleMonitorGetState();
@@ -244,8 +246,8 @@ void WebServerManager::setupRoutes() {
             doc["overcurrent"] = spindleMonitorIsOvercurrent();
         }
 
-        String response;
-        serializeJson(doc, response);
+        char response[512];
+        serializeJson(doc, response, sizeof(response));
         request->send(200, "application/json", response);
     });
 
@@ -535,7 +537,8 @@ void WebServerManager::setupRoutes() {
         }
 
         int category = atoi(categoryParam->value().c_str());
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+        StaticJsonDocument<512> doc;
 
         if (!apiConfigGet((config_category_t)category, doc)) {
             request->send(400, "application/json", "{\"error\":\"Invalid category\"}");
@@ -558,7 +561,8 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+        StaticJsonDocument<512> doc;
         DeserializationError error = deserializeJson(doc, data, len);
 
         if (error) {
@@ -594,7 +598,8 @@ void WebServerManager::setupRoutes() {
             return request->requestAuthentication();
         }
 
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+        StaticJsonDocument<512> doc;
         DeserializationError error = deserializeJson(doc, data, len);
 
         if (error) {
@@ -613,7 +618,8 @@ void WebServerManager::setupRoutes() {
 
         char error_msg[256];
         if (!apiConfigValidate((config_category_t)category, key, value, error_msg, sizeof(error_msg))) {
-            JsonDocument response;
+            // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+            StaticJsonDocument<256> response;
             response["valid"] = false;
             response["error"] = error_msg;
             char response_str[256];
@@ -638,7 +644,8 @@ void WebServerManager::setupRoutes() {
         }
 
         int category = atoi(categoryParam->value().c_str());
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+        StaticJsonDocument<512> doc;
 
         if (!apiConfigGetSchema((config_category_t)category, doc)) {
             request->send(400, "application/json", "{\"error\":\"Invalid category\"}");
@@ -661,7 +668,8 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+        StaticJsonDocument<256> doc;
         DeserializationError error = deserializeJson(doc, data, len);
 
         if (error) {
@@ -701,7 +709,8 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+        StaticJsonDocument<256> doc;
         DeserializationError error = deserializeJson(doc, data, len);
 
         if (error) {
@@ -718,7 +727,8 @@ void WebServerManager::setupRoutes() {
         // Execute G-code command
         bool success = gcodeParser.processCommand(command);
 
-        JsonDocument response;
+        // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+        StaticJsonDocument<256> response;
         response["success"] = success;
         response["command"] = command;
 
@@ -738,7 +748,8 @@ void WebServerManager::setupRoutes() {
             return;
         }
 
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument sized for fault array + stats
+        StaticJsonDocument<2048> doc;
 
         // E-stop status
         doc["estop_active"] = emergencyStopIsActive();
@@ -790,7 +801,8 @@ void WebServerManager::setupRoutes() {
 
         bool success = emergencyStopRequestRecovery();
 
-        JsonDocument doc;
+        // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+        StaticJsonDocument<128> doc;
         doc["success"] = success;
         doc["estop_active"] = emergencyStopIsActive();
 
@@ -813,7 +825,8 @@ void WebServerManager::handleJogBody(AsyncWebServerRequest *request, uint8_t *da
         return;
     }
 
-    JsonDocument doc;
+    // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+    StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, data, len);
 
     if (error) {
@@ -886,7 +899,9 @@ void WebServerManager::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 void WebServerManager::broadcastState() {
     if (ws->count() == 0) return;
 
-    JsonDocument doc;
+    // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+    // This function is called frequently (WebSocket broadcasts), critical for stability
+    StaticJsonDocument<1024> doc;
     doc["status"] = current_status.status;
     doc["x"] = current_status.x_pos;
     doc["y"] = current_status.y_pos;

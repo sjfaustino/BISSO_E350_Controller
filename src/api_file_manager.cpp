@@ -15,20 +15,23 @@ extern void motionMoveAbsolute(float x, float y, float z, float a, float speed_m
 // --- Extracted Implementations ---
 
 void handleFileList(AsyncWebServerRequest *request) {
-    JsonDocument doc;
+    // MEMORY FIX: Use StaticJsonDocument + char array to prevent heap fragmentation
+    // Sized for ~10 files with paths up to 32 chars each
+    StaticJsonDocument<1024> doc;
     JsonArray array = doc.to<JsonArray>();
 
     File root = SPIFFS.open("/");
     File file = root.openNextFile();
     while(file){
         JsonObject obj = array.add<JsonObject>();
-        obj["name"] = String(file.name());
+        // MEMORY FIX: Use file.name() directly (returns const char*), no String conversion
+        obj["name"] = file.name();
         obj["size"] = file.size();
         file = root.openNextFile();
     }
-    
-    String response;
-    serializeJson(doc, response);
+
+    char response[1024];
+    serializeJson(doc, response, sizeof(response));
     request->send(200, "application/json", response);
 }
 
@@ -37,8 +40,9 @@ void handleFileDelete(AsyncWebServerRequest *request) {
         request->send(400, "text/plain", "Missing name param");
         return;
     }
-    
-    String path = request->getParam("name")->value();
+
+    // MEMORY FIX: Use const char* directly instead of String
+    const char* path = request->getParam("name")->value().c_str();
     if(SPIFFS.exists(path)) {
         SPIFFS.remove(path);
         request->send(200, "text/plain", "Deleted");
