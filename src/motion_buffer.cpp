@@ -99,6 +99,29 @@ int MotionBuffer::available_unsafe() {
 // ============================================================================
 // THREAD-SAFE PUBLIC API (protected by mutex)
 // ============================================================================
+//
+// ⚠️ CRITICAL ISR SAFETY WARNING (Gemini Audit Finding):
+// ========================================================
+// All public functions use xSemaphoreTake() - NOT ISR-SAFE!
+//
+// Current Architecture: ✅ SAFE
+// - Called from: taskMotionFunction() [FreeRTOS Task]
+// - Execution: Task context (100Hz loop with vTaskDelay)
+// - Safety: Mutexes are safe in task context
+//
+// Future Risk: ❌ CRASH if migrated to hardware timer ISR!
+// - If motion control switches to timer ISR, this will crash
+// - Cannot take mutexes from ISR context
+// - ESP32 will panic: "assert failed: xQueueGenericReceive"
+//
+// Migration Path (if needed):
+// 1. Keep task-based: Use deferred work pattern (ISR signals task)
+// 2. OR use pop_unsafe() inside portENTER_CRITICAL_ISR (blocks interrupts)
+// 3. OR implement lockless ring buffer (complex, error-prone)
+//
+// Recommendation: Keep current task-based architecture ✅
+// See: docs/ISR_SAFETY_MOTION_BUFFER.md for full analysis
+// ============================================================================
 
 bool MotionBuffer::push(float x, float y, float z, float a, float speed) {
     if (buffer_mutex == NULL) {
