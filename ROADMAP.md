@@ -274,6 +274,81 @@ bool got_mutex = taskLockMutex(taskGetMotionMutex(), 10);  // 10ms timeout
 
 ---
 
+### I2C Priority Inversion Prevention
+
+**Gemini Observation:** "CLI task (Low Priority) grabs I2C mutex → Safety task (High Priority) blocks → Medium priority task preempts CLI → Unbounded Priority Inversion."
+
+**Status:** ✅ **ALREADY PREVENTED - Priority Inheritance Enabled**
+
+**Verification:**
+
+Task priorities:
+- Safety: 24 (highest) - uses I2C for board inputs (E-Stop, buttons)
+- Motion: 22 - uses I2C for PLC I/O
+- CLI: 15 - uses I2C for diagnostics
+
+Mutexes created with `xSemaphoreCreateMutex()` (`task_manager.cpp:120-148`):
+- ESP32 FreeRTOS enables priority inheritance by default
+- If Safety (24) blocks on mutex held by CLI (15), CLI priority boosted to 24
+- Medium priority tasks (Monitor:12, Telemetry:11) cannot preempt boosted CLI
+- CLI completes I2C operation, releases mutex, priority restored to 15
+
+**Additional Safeguards:**
+1. ✅ Separate I2C mutexes (PLC, Board, LCD) - reduces contention
+2. ✅ All I2C operations have timeouts (10-200ms)
+3. ✅ Adaptive timeout scaling based on CPU load (50-100ms)
+
+**Action Taken:**
+- Documented priority inheritance analysis in `docs/GEMINI_FINAL_AUDIT.md`
+- Verified all mutexes use `xSemaphoreCreateMutex()` (priority inheritance)
+- Confirmed FreeRTOS priority numbers (higher = higher priority)
+- Verified Gemini's scenario cannot occur
+
+**Commit:** (this session)
+
+---
+
+### ISR-Unsafe Logging Prevention
+
+**Gemini Observation:** "logError and logInfo write to Serial.println. Serial.print on ESP32 is not ISR-safe (uses mutexes). If motion_control.cpp triggers fault from Timer ISR and calls logError, CPU will crash."
+
+**Status:** ✅ **NOT APPLICABLE - No ISRs in Codebase**
+
+**Verification:**
+
+Searched for ISR indicators:
+- `IRAM_ATTR` (ESP32 ISR attribute)
+- `attachInterrupt()` (GPIO interrupt)
+- `hw_timer_t` (Hardware timer)
+- `timerAlarmEnable()` (Timer interrupt)
+
+**Results:** ✅ No ISR handlers found in source code
+
+**Architecture:**
+- Motion control: FreeRTOS task-based (10ms vTaskDelay loop)
+- Safety monitoring: FreeRTOS task (5ms cycle)
+- All logging calls: From task context (mutex-safe)
+
+**ISR-Unsafe Operations (if called from ISR):**
+- `Serial.println()` - uses `uart_tx_mutex` (deadlock/crash)
+- `networkManager.telnetPrintln()` - TCP stack (crash)
+- `vsnprintf()` - complex libc (stack overflow)
+
+**Why Current Implementation is Safe:**
+- All tasks use FreeRTOS task context, not ISR context
+- Serial.println() safe when called from tasks (mutex OK)
+- No deferred logging queue needed (no ISRs to defer from)
+
+**Action Taken:**
+- Documented ISR analysis in `docs/GEMINI_FINAL_AUDIT.md`
+- Verified no ISR handlers in codebase
+- Confirmed task-based architecture (not timer-based)
+- Documented future-proofing (if ISR added, use deferred logging queue)
+
+**Commit:** (this session)
+
+---
+
 ## Conclusion
 
 The Gemini AI audit improvement roadmap has been **100% addressed**:
@@ -283,6 +358,8 @@ The Gemini AI audit improvement roadmap has been **100% addressed**:
 ✅ **While Loop Safety:** Complete - all loops protected
 ✅ **OpenAPI Optimization:** Documented - acceptable as-is
 ✅ **Deadlock Prevention:** Already implemented - verified safe
+✅ **Priority Inversion:** Already prevented - priority inheritance enabled
+✅ **ISR-Unsafe Logging:** Not applicable - no ISRs in codebase
 
 The firmware is now:
 - ✅ Production-ready for long-term operation
