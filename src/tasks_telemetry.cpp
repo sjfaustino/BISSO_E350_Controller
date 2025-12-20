@@ -22,6 +22,7 @@
 #include "axis_synchronization.h"  // PHASE 5.6: Axis validation
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <math.h>  // For isnan() sensor validation
 
 // External reference to the global WebServer instance
 extern WebServerManager webServer;
@@ -69,15 +70,22 @@ void taskTelemetryFunction(void* parameter) {
         float current_amps = altivar31GetCurrentAmps();
 
         // Feed current sample to calibration system if measurement is active
-        if (current_amps > 0.0f) {
+        // CRITICAL: Validate sensor data before sampling (NaN check, range check)
+        if (!isnan(current_amps) && current_amps > 0.0f && current_amps <= 100.0f) {
             vfdCalibrationSampleCurrent(current_amps);
         }
     }
 
     // Push VFD telemetry to web UI (PHASE 5.5k)
-    webServer.setVFDCurrent(altivar31GetCurrentAmps());
-    webServer.setVFDFrequency(altivar31GetFrequencyHz());
-    webServer.setVFDThermalState(altivar31GetThermalState());
+    // CRITICAL: Sanitize sensor data before sending to web UI
+    // Replace NaN/invalid values with safe defaults (0.0) to prevent UI corruption
+    float vfd_current = altivar31GetCurrentAmps();
+    float vfd_frequency = altivar31GetFrequencyHz();
+    int16_t vfd_thermal = altivar31GetThermalState();
+
+    webServer.setVFDCurrent(isnan(vfd_current) || vfd_current < 0.0f ? 0.0f : vfd_current);
+    webServer.setVFDFrequency(isnan(vfd_frequency) || vfd_frequency < 0.0f ? 0.0f : vfd_frequency);
+    webServer.setVFDThermalState((vfd_thermal < 0 || vfd_thermal > 200) ? 0 : vfd_thermal);
     webServer.setVFDFaultCode(altivar31GetFaultCode());
     webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
     webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
@@ -94,10 +102,14 @@ void taskTelemetryFunction(void* parameter) {
     float y_vel = 0.0f;
     float z_vel = 0.0f;
     float feedrate = motionGetFeedOverride();  // Use feed override as proxy for feedrate
-    float vfd_freq = altivar31GetFrequencyHz();
+
+    // CRITICAL: Sanitize VFD frequency before passing to axis synchronization
+    // Use already-validated vfd_frequency from above (lines 83, 87)
+    // If invalid, use 0.0 to prevent axis synchronization corruption
+    float vfd_freq_safe = (isnan(vfd_frequency) || vfd_frequency < 0.0f) ? 0.0f : vfd_frequency;
 
     // Update per-axis synchronization metrics
-    axisSynchronizationUpdate(active_axis, x_vel, y_vel, z_vel, vfd_freq, feedrate);
+    axisSynchronizationUpdate(active_axis, x_vel, y_vel, z_vel, vfd_freq_safe, feedrate);
 
     // Push axis metrics to web server (BUGFIX: with mutex protection)
     axisSynchronizationLock();

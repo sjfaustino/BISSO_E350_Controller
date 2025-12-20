@@ -19,6 +19,7 @@
 #include "vfd_current_calibration.h"  // PHASE 5.5: VFD current calibration
 #include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion validation
 #include <string.h>
+#include <math.h>  // For isnan() sensor validation
 
 static safety_system_data_t safety_state; 
 static bool alarm_active = false;
@@ -69,8 +70,18 @@ void safetyUpdate() {
             float current_amps = altivar31GetCurrentAmps();
             float threshold_amps = vfdCalibrationGetThreshold();
 
+            // CRITICAL: Validate sensor data before safety decisions
+            // Data freshness already checked in altivar31DetectFrequencyLoss()
+            const altivar31_state_t* vfd_state = altivar31GetState();
+            uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
+
+            // Only use VFD current data if fresh (<1s) and valid (not NaN, in range)
+            bool data_valid = (data_age_ms < 1000) &&
+                              !isnan(current_amps) &&
+                              (current_amps >= 0.0f && current_amps <= 100.0f);
+
             // Detect stall when current exceeds threshold (indicates mechanical resistance)
-            if (vfdCalibrationIsStall(current_amps)) {
+            if (data_valid && vfdCalibrationIsStall(current_amps)) {
                 logWarning("[SAFETY] [WARN] VFD Current High: %.2f A (threshold: %.2f A)",
                         current_amps, threshold_amps);
 
@@ -91,8 +102,18 @@ void safetyUpdate() {
         static float last_frequency_hz = 0.0f;
         float current_freq = altivar31GetFrequencyHz();
 
+        // CRITICAL: Validate frequency sensor data before safety decisions
+        const altivar31_state_t* vfd_state = altivar31GetState();
+        uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
+
+        // Only use frequency data if fresh (<1s) and valid (not NaN, in range 0-60Hz typical)
+        bool freq_valid = (data_age_ms < 1000) &&
+                          !isnan(current_freq) &&
+                          (current_freq >= 0.0f && current_freq <= 100.0f);
+
         // Check for sudden frequency loss (>80% drop in one cycle)
-        if (altivar31DetectFrequencyLoss(last_frequency_hz)) {
+        // altivar31DetectFrequencyLoss() already includes freshness check
+        if (freq_valid && altivar31DetectFrequencyLoss(last_frequency_hz)) {
             logError("[SAFETY] [FAIL] VFD Frequency Loss: %.1f Hz -> %.1f Hz (>80% drop)",
                      last_frequency_hz, current_freq);
 
@@ -105,7 +126,10 @@ void safetyUpdate() {
             }
         }
 
-        last_frequency_hz = current_freq;
+        // Only update last frequency if current reading is valid
+        if (freq_valid) {
+            last_frequency_hz = current_freq;
+        }
     }
 
     // PHASE 5.5: VFD Thermal Monitoring
@@ -115,7 +139,16 @@ void safetyUpdate() {
         last_thermal_check = now;
 
         int16_t thermal_state = altivar31GetThermalState();
-        if (thermal_state > 0) {  // Valid reading (percentage, 100% = nominal)
+
+        // CRITICAL: Validate thermal sensor data before safety decisions
+        const altivar31_state_t* vfd_state = altivar31GetState();
+        uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
+
+        // Valid range: 0-200% (100% = nominal, >118% typically triggers VFD fault)
+        bool thermal_valid = (data_age_ms < 1000) &&
+                             (thermal_state > 0 && thermal_state <= 200);
+
+        if (thermal_valid) {  // Valid reading (percentage, 100% = nominal)
             int32_t temp_warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
             int32_t temp_crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
 
