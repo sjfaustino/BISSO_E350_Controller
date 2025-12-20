@@ -8,6 +8,8 @@
 #include "motion_buffer.h"
 #include "serial_logger.h"
 #include "task_manager.h"  // For taskGetMotionMutex()
+#include "encoder_calibration.h"  // For machine calibration data
+#include "system_constants.h"  // For MOTION_POSITION_SCALE_FACTOR
 #include <string.h>
 
 MotionBuffer motionBuffer;
@@ -48,10 +50,17 @@ void MotionBuffer::setMutex(SemaphoreHandle_t mtx) {
 bool MotionBuffer::push_unsafe(float x, float y, float z, float a, float speed) {
     if (count >= MOTION_BUFFER_SIZE) return false;
 
-    buffer[head].x = x;
-    buffer[head].y = y;
-    buffer[head].z = z;
-    buffer[head].a = a;
+    // CRITICAL FIX: Convert from MM to encoder counts to prevent float drift
+    // All motion planning uses integer math; only convert to MM for display
+    float x_scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+    float y_scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+    float z_scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+    float a_scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG;
+
+    buffer[head].x_counts = (int32_t)(x * x_scale);
+    buffer[head].y_counts = (int32_t)(y * y_scale);
+    buffer[head].z_counts = (int32_t)(z * z_scale);
+    buffer[head].a_counts = (int32_t)(a * a_scale);
     buffer[head].speed_mm_s = speed;
 
     head = (head + 1) % MOTION_BUFFER_SIZE;

@@ -57,14 +57,26 @@ void MotionPlanner::update(Axis* axes, uint8_t& active_axis, int32_t& active_sta
 
 bool MotionPlanner::checkBufferDrain(uint8_t& active_axis) {
     if (motionBuffer.isEmpty()) return false;
-    
+
     int buffer_enabled = configGetInt(KEY_MOTION_BUFFER_ENABLE, 0);
     if (!buffer_enabled) return false;
 
     motion_cmd_t cmd;
     // Check if next move is valid before popping (Peek logic could be added here)
     if (motionBuffer.pop(&cmd)) {
-        if (!motionStartInternalMove(cmd.x, cmd.y, cmd.z, cmd.a, cmd.speed_mm_s)) {
+        // CRITICAL FIX: Convert counts back to MM only when calling motion control
+        // Motion control API still uses MM, but buffer stores counts to prevent drift
+        float x_scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+        float y_scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+        float z_scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+        float a_scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG;
+
+        float x_mm = (float)cmd.x_counts / x_scale;
+        float y_mm = (float)cmd.y_counts / y_scale;
+        float z_mm = (float)cmd.z_counts / z_scale;
+        float a_mm = (float)cmd.a_counts / a_scale;
+
+        if (!motionStartInternalMove(x_mm, y_mm, z_mm, a_mm, cmd.speed_mm_s)) {
             logError("[PLANNER] Buffered move failed to start!");
             // Retry logic or Halt could go here
         }
@@ -79,20 +91,14 @@ bool MotionPlanner::checkLookAhead(Axis* axis, uint8_t active_axis, int32_t& act
 
     motion_cmd_t nextCmd;
     if (motionBuffer.peek(&nextCmd)) {
-        float scale = 1.0f;
-        if(active_axis==0) scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
-        else if(active_axis==1) scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
-        else if(active_axis==2) scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
-        else if(active_axis==3) scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG;
+        // CRITICAL FIX: Commands now stored as int32_t counts - no float conversion!
+        // This eliminates cumulative rounding errors over long jobs
+        int32_t next_target_counts = 0;
+        if(active_axis==0) next_target_counts = nextCmd.x_counts;
+        else if(active_axis==1) next_target_counts = nextCmd.y_counts;
+        else if(active_axis==2) next_target_counts = nextCmd.z_counts;
+        else if(active_axis==3) next_target_counts = nextCmd.a_counts;
 
-        float next_target_mm = 0.0f;
-        if(active_axis==0) next_target_mm = nextCmd.x;
-        else if(active_axis==1) next_target_mm = nextCmd.y;
-        else if(active_axis==2) next_target_mm = nextCmd.z;
-        else if(active_axis==3) next_target_mm = nextCmd.a;
-
-        int32_t next_target_counts = (int32_t)(next_target_mm * scale);
-        
         if (abs(next_target_counts - axis->target_position) < 10) return false;
 
         bool current_dir = (axis->target_position > active_start_pos);

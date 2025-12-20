@@ -14,9 +14,15 @@
 
 #define MOTION_BUFFER_SIZE 32 // Power of 2 for efficiency
 
+// CRITICAL FIX: Store positions as integer counts to prevent float drift
+// Float arithmetic accumulates rounding errors over long jobs (hours/days)
+// Commands stored in encoder counts/steps, only converted to MM for display
 typedef struct {
-    float x, y, z, a;
-    float speed_mm_s;
+    int32_t x_counts;      // X position in encoder counts
+    int32_t y_counts;      // Y position in encoder counts
+    int32_t z_counts;      // Z position in encoder counts
+    int32_t a_counts;      // A position in encoder counts
+    float speed_mm_s;      // Speed (not accumulated, safe to use float)
 } motion_cmd_t;
 
 class MotionBuffer {
