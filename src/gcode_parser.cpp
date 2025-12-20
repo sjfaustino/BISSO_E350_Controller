@@ -644,8 +644,24 @@ void GCodeParser::handleM0_M1(const char* line) {
 bool GCodeParser::parseCode(const char* line, char code, float& value) {
     char* ptr = strchr((char*)line, code);
     if (ptr) {
-        value = atof(ptr + 1);
-        return true;
+        // SAFETY FIX: Use strtod instead of atof to detect parsing errors
+        // atof returns 0.0 on error (e.g., "G1 X-NaN" → moves to 0, dangerous!)
+        // strtod sets endptr to original string if no conversion occurred
+        char* endptr = NULL;
+        double parsed_value = strtod(ptr + 1, &endptr);
+
+        // Validation checks:
+        // 1. endptr must have advanced (successful parse)
+        // 2. Value must not be NaN
+        // 3. Value must not be infinity
+        if (endptr != (ptr + 1) && !isnan(parsed_value) && !isinf(parsed_value)) {
+            value = (float)parsed_value;
+            return true;
+        } else {
+            // Parsing failed - corrupt G-code
+            logError("[GCODE] Parse error: Invalid numeric value after '%c' in: %s", code, line);
+            return false;
+        }
     }
     return false;
 }

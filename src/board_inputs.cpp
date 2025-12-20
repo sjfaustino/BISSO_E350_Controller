@@ -3,6 +3,7 @@
 #include "serial_logger.h"
 #include "fault_logging.h"
 #include "hardware_config.h" // HAL for dynamic pin mapping
+#include "task_manager.h"     // THREAD SAFETY FIX: For I2C board mutex
 #include <Wire.h>
 
 static uint8_t input_cache = 0xFF; 
@@ -46,13 +47,24 @@ void boardInputsInit() {
         mask_resume = (1 << 5); // Fallback: P5 (X6)
     }
 
-    logInfo("[INPUTS] Fast Path Mapped: Estop=0x%02X, Pause=0x%02X, Resume=0x%02X", 
+    logInfo("[INPUTS] Fast Path Mapped: Estop=0x%02X, Pause=0x%02X, Resume=0x%02X",
             mask_estop, mask_pause, mask_resume);
 
     // 3. Hardware Bus Init
+    // THREAD SAFETY FIX: Protect I2C bus access with mutex
     uint8_t temp_data = 0xFF;
-    i2c_result_t result = i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &temp_data, 1);
-    
+    i2c_result_t result = I2C_RESULT_UNKNOWN_ERROR;
+    SemaphoreHandle_t i2c_mutex = taskGetI2cBoardMutex();
+
+    if (i2c_mutex && xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(100))) {
+        result = i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &temp_data, 1);
+        xSemaphoreGive(i2c_mutex);
+    } else {
+        logWarning("[INPUTS] I2C mutex not available during init (expected at boot)");
+        // During init, mutex might not be created yet - safe to call directly
+        result = i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &temp_data, 1);
+    }
+
     if (result == I2C_RESULT_OK) {
         input_cache = temp_data;
         logInfo("[INPUTS] Board detected (0x24)");
@@ -64,37 +76,61 @@ void boardInputsInit() {
 
 button_state_t boardInputsUpdate() {
     button_state_t state = {false, false, false, false};
-    i2c_result_t result = i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &input_cache, 1);
-    
+
+    // THREAD SAFETY FIX: Protect I2C bus access with mutex
+    // Multiple tasks may call this function concurrently (safety task, telemetry, etc.)
+    SemaphoreHandle_t i2c_mutex = taskGetI2cBoardMutex();
+    i2c_result_t result = I2C_RESULT_UNKNOWN_ERROR;
+
+    if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(10))) {
+        result = i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &input_cache, 1);
+        xSemaphoreGive(i2c_mutex);
+    } else {
+        // Mutex timeout - bus busy or deadlock
+        state.connection_ok = false;
+        return state;
+    }
+
     if (result != I2C_RESULT_OK) {
         state.connection_ok = false;
         return state;
     }
     state.connection_ok = true;
-    
+
     // --- FAST PATH EXECUTION ---
     // Apply cached masks. No function calls, no branches.
     // Logic:
     // E-STOP: NC (Normally Closed). Active = High (Open Circuit/Pressed)
     // Buttons: NO (Normally Open). Active = Low (Short to Ground)
-    
-    state.estop_active = (input_cache & mask_estop);       
-    state.pause_pressed = !(input_cache & mask_pause);     
-    state.resume_pressed = !(input_cache & mask_resume);   
-    
+
+    state.estop_active = (input_cache & mask_estop);
+    state.pause_pressed = !(input_cache & mask_pause);
+    state.resume_pressed = !(input_cache & mask_resume);
+
     return state;
 }
 
 void boardInputsDiagnostics() {
     Serial.println("\n[INPUTS] === Physical Inputs (0x24) ===");
-    i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &input_cache, 1);
+
+    // THREAD SAFETY FIX: Protect I2C bus access with mutex
+    SemaphoreHandle_t i2c_mutex = taskGetI2cBoardMutex();
+
+    if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(10))) {
+        i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &input_cache, 1);
+        xSemaphoreGive(i2c_mutex);
+    } else {
+        Serial.println("[INPUTS] [ERR] Mutex timeout - I2C bus busy");
+        return;
+    }
+
     Serial.printf("Raw Byte: 0x%02X\n", input_cache);
-    
+
     // Decode using current maps for diagnostics
     bool estop = (input_cache & mask_estop);
     bool pause = !(input_cache & mask_pause);
     bool resume = !(input_cache & mask_resume);
-    
+
     Serial.printf("  E-STOP (Mask 0x%02X): %s\n", mask_estop, estop ? "TRIPPED (OPEN)" : "OK (CLOSED)");
     Serial.printf("  PAUSE  (Mask 0x%02X): %s\n", mask_pause, pause ? "PRESSED" : "RELEASED");
     Serial.printf("  RESUME (Mask 0x%02X): %s\n", mask_resume, resume ? "PRESSED" : "RELEASED");

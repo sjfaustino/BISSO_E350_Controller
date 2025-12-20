@@ -13,6 +13,11 @@
 #include <Arduino.h>
 
 // Safety Constants
+// BUFFER SIZE VERIFICATION (Gemini Audit):
+// Max frame: !<11 digits>,<11 digits>,<11 digits>,<11 digits>\r = 49 bytes
+// Example:   !-2147483648,-2147483648,-2147483648,-2147483648\r
+// Buffer:    64 bytes (15 byte safety margin)
+// Conclusion: Adequate for full encoder frame ✓
 #define MAX_BYTES_PER_CYCLE 64
 #define WJ66_TIMEOUT_MS 500
 

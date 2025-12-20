@@ -390,9 +390,15 @@ const char* selftestGetSummary(const selftest_suite_t* suite) {
 }
 
 void selftestFreeResults(selftest_suite_t* suite) {
+    // MEMORY LEAK FIX (Gemini Audit):
+    // Ensures results are freed even if called multiple times
+    // Guards against double-free by setting pointer to NULL
     if (suite && suite->results) {
         free(suite->results);
         suite->results = NULL;
+        suite->total_tests = 0;
+        suite->passed_tests = 0;
+        suite->failed_tests = 0;
     }
 }
 
