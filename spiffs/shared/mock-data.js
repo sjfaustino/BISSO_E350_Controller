@@ -121,17 +121,40 @@ class MockDataGenerator {
     }
 
     /**
-     * VFD/Spindle status with realistic ramping
+     * VFD/Spindle status - PLC controls VFD with 3 discrete speed profiles
+     * We only read from the VFD, PLC does all control
      */
     generateVFDStatus(isCutting) {
-        // Smooth spindle ramp up/down
-        const targetSpeed = isCutting ? 15000 + Math.sin(this.workCycle * 0.1) * 2000 : 0;
-        const rampRate = 50; // Hz per update
+        // PLC selects from 3 discrete speed profiles
+        const SPEED_PROFILES = {
+            OFF: 0,      // Idle/stopped
+            LOW: 12000,  // Low speed cutting (soft materials)
+            MED: 15000,  // Medium speed cutting (standard)
+            HIGH: 18000  // High speed cutting (hard materials)
+        };
 
-        if (this.spindleSpeed < targetSpeed) {
-            this.spindleSpeed = Math.min(targetSpeed, this.spindleSpeed + rampRate);
-        } else if (this.spindleSpeed > targetSpeed) {
-            this.spindleSpeed = Math.max(targetSpeed, this.spindleSpeed - rampRate);
+        // Simulate PLC selecting speed profile based on work cycle
+        let targetProfile;
+        if (!isCutting) {
+            targetProfile = SPEED_PROFILES.OFF;
+        } else {
+            // Vary between profiles during cutting
+            const phase = Math.floor(this.workCycle / 25); // Change profile every ~7.5s during 30s cut
+            switch (phase % 3) {
+                case 0: targetProfile = SPEED_PROFILES.MED; break;
+                case 1: targetProfile = SPEED_PROFILES.HIGH; break;
+                case 2: targetProfile = SPEED_PROFILES.LOW; break;
+                default: targetProfile = SPEED_PROFILES.MED;
+            }
+        }
+
+        // VFD ramps internally (this is VFD behavior, not our control)
+        // Typical VFD ramp time: 2-5 seconds for full range
+        const rampRate = 200; // Hz per update cycle (~50Hz/sec)
+        if (this.spindleSpeed < targetProfile) {
+            this.spindleSpeed = Math.min(targetProfile, this.spindleSpeed + rampRate);
+        } else if (this.spindleSpeed > targetProfile) {
+            this.spindleSpeed = Math.max(targetProfile, this.spindleSpeed - rampRate);
         }
 
         // Current and voltage vary with load
@@ -141,14 +164,18 @@ class MockDataGenerator {
         const vfdTemp = 40 + (loadFactor * 25) + (Math.random() - 0.5) * 3;
 
         return {
-            frequency_hz: this.spindleSpeed + (Math.random() - 0.5) * 100,
+            frequency_hz: this.spindleSpeed + (Math.random() - 0.5) * 50, // Small fluctuation
             rpm: (this.spindleSpeed * 2) / 60, // Simplified conversion
             current_amps: Math.max(0, current),
             voltage: voltage,
             power_kw: (voltage * current) / 1000,
             temperature: vfdTemp,
             error_count: 0,
-            running: this.spindleSpeed > 500
+            running: this.spindleSpeed > 500,
+            // Additional fields showing PLC control
+            speed_profile: this.spindleSpeed === 0 ? 'OFF' :
+                          Math.abs(this.spindleSpeed - SPEED_PROFILES.LOW) < 1000 ? 'LOW' :
+                          Math.abs(this.spindleSpeed - SPEED_PROFILES.MED) < 1000 ? 'MED' : 'HIGH'
         };
     }
 
