@@ -48,7 +48,13 @@ void wj66Init() {
   if (saved_baud > 0) {
       logInfo("[WJ66] Trying saved baud: %lu...", (unsigned long)saved_baud);
       Serial1.begin(saved_baud, SERIAL_8N1, 14, 33); // Ensure pins match your board
-      while(Serial1.available()) Serial1.read(); 
+
+      // WATCHDOG SAFETY FIX: Add timeout to Serial flush loop
+      // Prevents infinite hang if Serial1 continuously receives data
+      uint32_t flush_start = millis();
+      while(Serial1.available() && (millis() - flush_start) < 100) {
+          Serial1.read();
+      } 
       
       // Attempt handshake
       uint8_t q[] = {0x01, 0x00}; // Adjust handshake packet if needed
