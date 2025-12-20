@@ -9,13 +9,23 @@ window.DashboardModule = window.DashboardModule || {
     chart: null,
     graphs: {}, // Store GraphVisualizer instances
     lastTelemetry: null, // Store last telemetry for VFD/spindle data
+    stateChangeHandler: null, // Store bound event handler for cleanup
+    updateInterval: null, // Store interval ID for cleanup
 
     init() {
         console.log('[Dashboard] Initializing');
         this.setupEventListeners();
         this.initializeGraphs();
-        this.updateMetrics();
-        window.addEventListener('state-changed', () => this.onStateChanged());
+
+        // Store bound handler so we can remove it later
+        this.stateChangeHandler = () => this.onStateChanged();
+        window.addEventListener('state-changed', this.stateChangeHandler);
+
+        // Store interval ID for cleanup
+        this.updateInterval = setInterval(() => {
+            this.onStateChanged();
+            this.updateGraphs();
+        }, 1000);
     },
 
     setupEventListeners() {
@@ -639,21 +649,30 @@ window.DashboardModule = window.DashboardModule || {
         AlertManager.add('Graph data exported', 'success', 2000);
     },
 
-    updateMetrics() {
-        setInterval(() => {
-            this.onStateChanged();
-            this.updateGraphs();
-        }, 1000);
-    },
-
     cleanup() {
         console.log('[Dashboard] Cleaning up');
+
+        // Remove event listener
+        if (this.stateChangeHandler) {
+            window.removeEventListener('state-changed', this.stateChangeHandler);
+            this.stateChangeHandler = null;
+        }
+
+        // Clear update interval
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+
         // Cleanup graphs
         Object.values(this.graphs).forEach(graph => {
             if (graph && typeof graph.destroy === 'function') {
                 graph.destroy();
             }
         });
+
+        // Clear graph references
+        this.graphs = {};
     }
 };
 
