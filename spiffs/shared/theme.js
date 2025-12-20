@@ -16,9 +16,12 @@ class ThemeManager {
     };
 
     static init() {
+        console.log('[THEME] Initializing theme manager');
         this.loadSettings();
         this.applyTheme(this.currentTheme);
+        this.setFontSize(this.settings.fontSize); // Apply saved font size
         this.setupListeners();
+        console.log('[THEME] Theme manager initialized with theme:', this.currentTheme, 'fontSize:', this.settings.fontSize);
     }
 
     static loadSettings() {
@@ -44,6 +47,10 @@ class ThemeManager {
             return;
         }
 
+        // Use data-theme attribute to match enhancements.css
+        document.documentElement.setAttribute('data-theme', themeName);
+
+        // Also set body class for backward compatibility
         document.body.className = '';
         if (themeName === 'dark') {
             document.body.classList.add('dark-theme');
@@ -56,6 +63,8 @@ class ThemeManager {
         this.currentTheme = themeName;
         this.settings.theme = themeName;
         this.saveSettings();
+
+        console.log(`[THEME] Applied theme: ${themeName}`);
     }
 
     static setFontSize(percent) {
