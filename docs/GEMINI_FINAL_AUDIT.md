@@ -906,6 +906,245 @@ void taskFaultLogger() {
 
 ---
 
+## Issue 5: Ghost Task RAM Waste
+
+### Gemini Observation
+
+**File:** `tasks_plc.cpp`
+
+**Concern:** "tasks_plc.cpp spins in a loop doing nothing but vTaskDelay and feeding the watchdog. Every task requires its own Stack (usually 2KB-4KB). On an ESP32, RAM is precious."
+
+**Gemini Recommendation:** "Delete tasks_plc.cpp. If you need periodic polling, use a FreeRTOS Software Timer (xTimerCreate), which uses almost zero RAM."
+
+---
+
+### Current Implementation Analysis
+
+**Code Review: `tasks_plc.cpp` (lines 14-32):**
+
+```cpp
+void taskPlcCommFunction(void* parameter) {
+  logInfo("[PLC_TASK] Started on Core 1");
+  watchdogTaskAdd("PLC");
+  watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "PLC");
+
+  TickType_t last_wake = xTaskGetTickCount();
+
+  while (1) {
+    // In v3.3, motion logic drives the PLC directly via elboSet... functions.
+    // We can use this task to monitor input states periodically if needed for telemetry,
+    // or just feed the watchdog.
+
+    // Optional: Periodically read inputs to keep cache fresh if not moving?
+    // For now, it just keeps the task alive.
+
+    watchdogFeed("PLC");
+    vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_PLC_COMM));  // 50ms
+  }
+}
+```
+
+**Task Does NOTHING Productive:**
+
+| Line | Operation | Purpose |
+|------|-----------|---------|
+| 15-17 | Watchdog registration | Setup only |
+| 21 | Infinite loop | Task lifetime |
+| 29 | `watchdogFeed("PLC")` | Keep watchdog happy |
+| 30 | `vTaskDelayUntil(..., 50ms)` | Sleep until next cycle |
+
+**Comments Admit It's Idle:**
+
+- Line 4: *"This task is kept for monitoring or polling if needed, but is **largely idle**"*
+- Line 22: *"In v3.3, **motion logic drives the PLC directly** via elboSet... functions"*
+- Line 27: *"For now, it **just keeps the task alive**"*
+
+---
+
+### PLC I/O Architecture - Synchronous, Not Task-Based
+
+**All PLC operations are handled synchronously by other tasks:**
+
+| Function | Called From | Task Context | Purpose |
+|----------|-------------|--------------|---------|
+| `elboSetDirection()` | motion_control.cpp | Motion task | Set axis direction |
+| `elboSetSpeedProfile()` | motion_control.cpp | Motion task | Set speed profile |
+| `elboGetSpeedProfile()` | lcd_formatter.cpp | LCD_Format task | Read current speed |
+| `elboDiagnostics()` | cli_diag.cpp | CLI task | Diagnostic output |
+
+**Evidence from `plc_iface.cpp`:**
+
+```cpp
+// plc_iface.cpp:95-122
+void elboSetDirection(uint8_t axis, bool forward) {
+    // Acquire PLC I2C mutex
+    xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(100));
+
+    // Modify shadow register
+    if (forward) q73_shadow_register |= mask;
+    else q73_shadow_register &= ~mask;
+
+    // Copy before releasing mutex
+    uint8_t register_copy = q73_shadow_register;
+    xSemaphoreGive(plc_shadow_mutex);
+
+    // I2C write happens outside mutex
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Direction");
+}
+```
+
+**Architecture:**
+
+```
+┌──────────────────────────────────────────────────────┐
+│ Motion Task (priority 22)                           │
+│ - Calls elboSetDirection() directly (synchronous)   │
+│ - Calls elboSetSpeedProfile() directly              │
+└──────────────────────────────────────────────────────┘
+         ↓ (function call, NOT task messaging)
+┌──────────────────────────────────────────────────────┐
+│ plc_iface.cpp (ELBO PLC Driver)                     │
+│ - elboSetDirection()   → I2C write (mutex-protected)│
+│ - elboSetSpeedProfile() → I2C write                 │
+│ - elboGetSpeedProfile() → Read shadow register      │
+└──────────────────────────────────────────────────────┘
+
+❌ NO NEED for separate PLC_Comm task!
+```
+
+**PLC_Comm Task is NOT in the data flow** - it's completely bypassed.
+
+---
+
+### RAM Usage Analysis
+
+**Task Stack Allocations (`task_manager.h`):**
+
+| Task | Stack Size | Status | Purpose |
+|------|------------|--------|---------|
+| Safety | 4096 bytes | ✅ Active | Safety monitoring (5ms) |
+| Motion | 4096 bytes | ✅ Active | Motion execution (10ms) |
+| Encoder | 6144 bytes | ✅ Active | Encoder reading (20ms) |
+| **PLC_Comm** | **2048 bytes** | ❌ **GHOST** | **Watchdog feed only** |
+| I2C_Manager | 2048 bytes | ✅ Active | I2C bus recovery |
+| CLI | 3072 bytes | ✅ Active | Command-line interface |
+| Fault_Log | 2048 bytes | ✅ Active | Fault logging |
+| Monitor | 2048 bytes | ✅ Active | System monitoring |
+| Telemetry | 3072 bytes | ✅ Active | Telemetry collection |
+| LCD_Format | 3072 bytes | ✅ Active | LCD string formatting |
+| LCD | 2048 bytes | ✅ Active | Display rendering |
+
+**Total Task Stack RAM:**
+- **With PLC_Comm:** 33,792 bytes (33 KB)
+- **Without PLC_Comm:** 31,744 bytes (31 KB)
+- **Waste:** 2,048 bytes (2 KB)
+
+**ESP32 RAM Budget:**
+- DRAM: ~300 KB total
+- Heap: ~250 KB available
+- Task stacks: 33 KB (11% of DRAM)
+- **PLC_Comm ghost task: 2 KB (6% of stack RAM)**
+
+---
+
+### Watchdog Concern - False Dependency
+
+**Current Code:**
+
+```cpp
+// tasks_plc.cpp:16-17
+watchdogTaskAdd("PLC");
+watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "PLC");
+
+// tasks_plc.cpp:29
+watchdogFeed("PLC");  // Every 50ms
+```
+
+**Question:** Is PLC_Comm task needed for watchdog monitoring?
+
+**Answer:** ❌ **NO** - Watchdog can be fed from any task that does actual PLC I/O.
+
+**Better Approach:**
+
+```cpp
+// motion_control.cpp (already does PLC I/O)
+void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus) {
+    elboSetDirection(axis, is_plus);  // Actual PLC I/O
+
+    // Feed watchdog here (where PLC I/O actually happens)
+    watchdogFeed("PLC");
+}
+```
+
+**Result:** Watchdog fed by task doing real work, no ghost task needed.
+
+---
+
+### Gemini's Recommendation - Software Timer Alternative
+
+**If periodic PLC polling is needed in the future:**
+
+```cpp
+// Create software timer (almost zero RAM overhead)
+TimerHandle_t plc_poll_timer;
+
+void plcPollTimerCallback(TimerHandle_t xTimer) {
+    // Periodic polling if needed
+    // elboReadInputs();  // Example: Read PLC inputs for telemetry
+    watchdogFeed("PLC");
+}
+
+void setupPLCPolling() {
+    // Create timer: 50ms period, auto-reload
+    plc_poll_timer = xTimerCreate(
+        "PLC_Poll",                      // Timer name
+        pdMS_TO_TICKS(50),               // Period (50ms)
+        pdTRUE,                          // Auto-reload
+        (void*)0,                        // Timer ID
+        plcPollTimerCallback             // Callback
+    );
+
+    xTimerStart(plc_poll_timer, 0);
+}
+```
+
+**RAM Comparison:**
+
+| Approach | RAM Usage | Notes |
+|----------|-----------|-------|
+| **Current (Ghost Task)** | 2048 bytes | Full task stack |
+| **Software Timer** | ~40 bytes | Timer control block only |
+| **Savings** | ~2000 bytes | 98% reduction |
+
+---
+
+### Status: ⚠️ **Ghost Task Confirmed - Recommended for Removal**
+
+**Summary:**
+- ❌ PLC_Comm task does NOTHING except feed watchdog every 50ms
+- ❌ All PLC I/O handled synchronously by Motion, LCD, CLI tasks
+- ❌ Wastes 2KB RAM (6% of total task stack allocation)
+- ✅ Watchdog can be fed from tasks doing actual PLC I/O
+- ✅ Software timer alternative available if periodic polling needed (40 bytes vs 2KB)
+
+**Recommendation:** **Delete `tasks_plc.cpp` and remove task creation**
+
+**Files to Modify:**
+1. `src/tasks_plc.cpp` - DELETE file
+2. `src/task_manager.cpp` - Remove task creation (lines ~292-296)
+3. `include/task_manager.h` - Remove task handle/stats declarations
+4. Move watchdog feed to actual PLC I/O functions (e.g., `plc_iface.cpp`)
+
+**Impact:**
+- Saves: 2KB RAM (immediate)
+- Simplifies: No unnecessary task in scheduler
+- Maintains: All PLC functionality (already bypasses this task)
+- Risk: None (task does nothing productive)
+
+**Priority:** Medium - Not critical, but good housekeeping for embedded systems
+
+---
+
 ## Final Status Summary
 
 | Finding | Status | Action Required |
@@ -914,8 +1153,9 @@ void taskFaultLogger() {
 | **Safety Deadlock Risk** | ✅ Already Mitigated | Document existing safeguards |
 | **I2C Priority Inversion** | ✅ Already Prevented | Priority inheritance enabled |
 | **ISR-Unsafe Logging** | ✅ Not Applicable | No ISRs in codebase |
+| **Ghost Task RAM Waste** | ⚠️ Confirmed | Recommend removal (saves 2KB) |
 
-**Overall Assessment:** All four concerns have been addressed. Current implementation is production-ready with documented optimization opportunities for future consideration.
+**Overall Assessment:** Four concerns addressed, one optimization opportunity identified (ghost task removal).
 
 ---
 
