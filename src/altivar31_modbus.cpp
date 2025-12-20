@@ -374,12 +374,26 @@ bool altivar31IsMotorRunning(void) {
 }
 
 bool altivar31DetectFrequencyLoss(float previous_freq_hz) {
+    // CRITICAL FIX: Only use fresh data for stall detection
+    // If Modbus read failed, data might be stale (retains old value) or invalid (reset to 0)
+    // Using stale data masks real stalls or triggers false alarms
+    uint32_t now = millis();
+    uint32_t data_age_ms = now - altivar31_state.last_read_time_ms;
+
+    // Data must be recent (< 1 second old) to be valid for stall detection
+    // If Modbus communication is failing, data is unreliable
+    if (data_age_ms > 1000) {
+        // Stale data - Modbus read failures
+        // Cannot reliably detect stall without fresh data
+        return false;
+    }
+
     float current_freq = altivar31_state.frequency_hz;
 
     // Detect frequency drop >80% in one sample (potential stall)
     // Only meaningful if previous frequency was significant
     if (previous_freq_hz > 1.0f && current_freq < (previous_freq_hz * 0.2f)) {
-        return true;  // Frequency collapsed
+        return true;  // Frequency collapsed - motor likely stalled
     }
 
     return false;
