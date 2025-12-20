@@ -381,7 +381,9 @@ size_t apiConfigExportJSON(char* buffer, size_t buffer_size)
 {
     if (!buffer || buffer_size < 256) return 0;
 
-    JsonDocument doc;
+    // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
+    // Sized for motion + VFD + encoder config (~30 key-value pairs)
+    StaticJsonDocument<512> doc;
 
     JsonObject motion = doc["motion"].to<JsonObject>();
     motion["soft_limit_x_low"] = current_motion.soft_limit_low_mm[0];
