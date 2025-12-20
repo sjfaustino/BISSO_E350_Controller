@@ -823,7 +823,15 @@ bool motionWaitPin(uint8_t pin_id, uint8_t pin_type, uint8_t state, uint32_t tim
 }
 
 void motionEmergencyStop() {
-    bool got_mutex = taskLockMutex(taskGetMotionMutex(), 10); 
+    // CRITICAL: Deadlock Prevention (Gemini Audit)
+    // Use 10ms timeout to prevent deadlock if Motion task holds mutex while blocked on I2C
+    // If timeout occurs, E-stop still succeeds via hardware PLC I/O (independent of mutex)
+    // See: docs/GEMINI_FINAL_AUDIT.md for complete deadlock analysis
+    bool got_mutex = taskLockMutex(taskGetMotionMutex(), 10);
+
+    // PRIMARY SAFETY: Disable all axes at hardware level (PLC I/O)
+    // This does NOT require motion_mutex - uses taskGetI2cPlcMutex() instead
+    // Ensures axes stop even if mutex unavailable
     motionSetPLCAxisDirection(255, false, false);
     
     portENTER_CRITICAL(&motionSpinlock);

@@ -239,22 +239,27 @@ bool safetyCheckMotionAllowed(uint8_t axis) {
 
 void safetyTriggerAlarm(const char* reason) {
   if (alarm_active) return;
-  
+
   alarm_active = true;
   alarm_trigger_time = millis();
   safety_state.fault_timestamp = alarm_trigger_time;
   safety_state.fault_count++;
-  
+
   safety_state.fault_history[safety_state.history_index] = safety_state.current_fault;
   safety_state.history_index = (safety_state.history_index + 1) % SAFETY_FAULT_HISTORY_SIZE;
-  
+
   snprintf(safety_state.fault_message, sizeof(safety_state.fault_message), "%s", reason);
-  
+
   digitalWrite(SAFETY_ALARM_PIN, HIGH);
-  
+
   Serial.printf("[SAFETY] [ALARM] Triggered: %s\n", reason);
   Serial.printf("[SAFETY] Fault Count: %lu\n", (unsigned long)safety_state.fault_count);
-  
+
+  // CRITICAL: Deadlock-Safe Emergency Stop (Gemini Audit)
+  // motionEmergencyStop() uses 10ms timeout to prevent deadlock
+  // If Motion task holds mutex while blocked on I2C, E-stop still succeeds
+  // via hardware PLC I/O layer (independent of motion_mutex)
+  // See: docs/GEMINI_FINAL_AUDIT.md for complete safety analysis
   motionEmergencyStop();
 }
 
