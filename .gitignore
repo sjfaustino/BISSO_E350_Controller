@@ -33,3 +33,10 @@ __pycache__/
 test-results/
 .coverage
 htmlcov/
+
+# Security - Secrets and credentials
+# NOTE: This project stores credentials in NVS (ESP32 flash), not in source files
+# If you create a secrets.h or similar for development, add it here:
+secrets.h
+credentials.h
+*_secrets.h

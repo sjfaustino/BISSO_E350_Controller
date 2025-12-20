@@ -2,6 +2,8 @@
 #include "serial_logger.h"
 #include "cli.h"
 #include "web_server.h"
+#include "config_unified.h"  // For OTA password from NVS
+#include "config_keys.h"     // For KEY_OTA_PASSWORD
 #include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
 #include <ArduinoOTA.h>
 
@@ -38,7 +40,20 @@ void NetworkManager::init() {
 
     // 2. OTA Setup
     ArduinoOTA.setHostname("bisso-e350");
-    ArduinoOTA.setPassword("admin123"); // Secure OTA
+
+    // SECURITY FIX: Load OTA password from NVS instead of hardcoding
+    // Prevents password exposure in source code and allows runtime changes
+    const char* ota_password = configGetString(KEY_OTA_PASSWORD, "bisso-ota");
+    int ota_pw_changed = configGetInt(KEY_OTA_PW_CHANGED, 0);
+
+    ArduinoOTA.setPassword(ota_password);
+
+    if (ota_pw_changed == 0) {
+        Serial.println("[OTA] [WARN] Default password in use - change recommended!");
+        Serial.println("[OTA] [WARN] Use CLI command: ota_setpass <new_password>");
+    } else {
+        Serial.println("[OTA] [OK] Custom password loaded from NVS");
+    }
 
     ArduinoOTA.onStart([]() {
         String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";

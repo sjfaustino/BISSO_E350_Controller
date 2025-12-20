@@ -93,4 +93,8 @@
 #define KEY_WIFI_SSID "wifi_ssid"        // WiFi network name (SSID)
 #define KEY_WIFI_PASSWORD "wifi_pass"    // WiFi network password
 
+// --- OTA (OVER-THE-AIR UPDATE) SECURITY ---
+#define KEY_OTA_PASSWORD "ota_pass"      // OTA update password (default: "bisso-ota")
+#define KEY_OTA_PW_CHANGED "ota_pw_chg"  // Flag: OTA password changed from default (1=changed, 0=default)
+
 #endif
