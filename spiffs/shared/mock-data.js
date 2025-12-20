@@ -416,6 +416,9 @@ window.MockMode = {
             this.mockWs = mockWs;
         }
 
+        // Pre-populate with historical data for graphs
+        this.generateHistoricalData();
+
         // Show indicator
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
@@ -462,6 +465,46 @@ window.MockMode = {
         if (window.Router) {
             Router.navigate();
         }
+    },
+
+    /**
+     * Generate historical data to pre-populate charts
+     * Creates 60 data points spanning the last minute
+     */
+    generateHistoricalData() {
+        if (!this.mockWs || !this.mockWs.generator) {
+            console.warn('[MockMode] Cannot generate historical data - mock WebSocket not ready');
+            return;
+        }
+
+        console.log('[MockMode] Generating historical data for charts...');
+
+        // Temporarily adjust start time to simulate past data
+        const originalStartTime = this.mockWs.generator.startTime;
+        const now = Date.now();
+        const historyDuration = 60000; // 60 seconds of history
+        const dataPoints = 60; // One per second
+        const interval = historyDuration / dataPoints;
+
+        // Generate and dispatch historical data points
+        for (let i = 0; i < dataPoints; i++) {
+            // Set generator to simulate past time
+            const timeOffset = historyDuration - (i * interval);
+            this.mockWs.generator.startTime = now - timeOffset;
+
+            // Generate state for this point in time
+            const state = this.mockWs.generator.generateState();
+
+            // Dispatch to AppState (will trigger state-changed event)
+            if (window.AppState) {
+                window.AppState.update(state);
+            }
+        }
+
+        // Restore original start time
+        this.mockWs.generator.startTime = originalStartTime;
+
+        console.log(`[MockMode] Generated ${dataPoints} historical data points`);
     },
 
     /**
