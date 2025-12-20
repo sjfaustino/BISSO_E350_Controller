@@ -6,6 +6,7 @@
 #include "config_keys.h"
 #include <stdlib.h>
 #include <string.h>
+#include <ArduinoJson.h>  // CRITICAL FIX: Use ArduinoJson for consistent parsing
 
 // Helper from config_schema_versioning.cpp
 extern const char* configGetKeyType(const char* key);
@@ -286,66 +287,82 @@ void cmd_config_import(int argc, char** argv) {
   Serial.println("[CONFIG] Example: {\"config\": {\"ppm_0\": 100.5, \"speed_cal_0\": 1000}}");
   Serial.println("[CONFIG] WARNING: This will overwrite current settings!");
 
-  // Simple line-by-line import (production version would use JSON parser)
-  char buffer[256];
-  int line_count = 0;
+  // CRITICAL FIX: Use ArduinoJson instead of manual string parsing
+  // Prevents buffer overflows and fragile parsing logic
+  char json_buffer[1024];
+  int buffer_pos = 0;
+  int empty_line_count = 0;
   int import_count = 0;
 
-  while (Serial.available() || line_count < 100) {
+  // Read JSON data line by line until empty line
+  while (buffer_pos < sizeof(json_buffer) - 1 && empty_line_count < 2) {
     if (!Serial.available()) {
       delay(10);
       continue;
     }
 
-    int bytes_read = Serial.readBytesUntil('\n', buffer, sizeof(buffer) - 1);
-    if (bytes_read <= 0) break;
-    buffer[bytes_read] = '\0';
-    line_count++;
-
-    // Simple parsing: look for "key": value patterns
-    // This is a simplified parser - production should use proper JSON
-    char key[64] = {0};
-    char value[128] = {0};
-
-    // Find "key": format
-    char* key_start = strchr(buffer, '"');
-    if (!key_start) continue;
-
-    key_start++;
-    char* key_end = strchr(key_start, '"');
-    if (!key_end) continue;
-
-    int key_len = key_end - key_start;
-    if (key_len > 60) continue;
-
-    strncpy(key, key_start, key_len);
-    key[key_len] = '\0';
-
-    // Find value
-    char* val_start = strchr(key_end, ':');
-    if (!val_start) continue;
-
-    val_start++;
-    // Skip whitespace
-    while (*val_start && (*val_start == ' ' || *val_start == '\t')) val_start++;
-
-    // Parse value (number or string)
-    char* val_end = val_start;
-    while (*val_end && *val_end != ',' && *val_end != '}') val_end++;
-
-    int val_len = val_end - val_start;
-    if (val_len > 0 && val_len < 126) {
-      strncpy(value, val_start, val_len);
-      value[val_len] = '\0';
-
-      // Set the configuration
-      if (strlen(key) > 0 && strlen(value) > 0) {
-        // Try parsing as float first, then int
-        float fval = atof(value);
-        configSetFloat(key, fval);
-        import_count++;
-        Serial.printf("[CONFIG] Imported: %s = %s\n", key, value);
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      if (buffer_pos == 0 || json_buffer[buffer_pos - 1] == '\n') {
+        empty_line_count++;
       }
+      if (buffer_pos < sizeof(json_buffer) - 1) {
+        json_buffer[buffer_pos++] = '\n';
+      }
+    } else {
+      empty_line_count = 0;
+      if (buffer_pos < sizeof(json_buffer) - 1) {
+        json_buffer[buffer_pos++] = c;
+      }
+    }
+  }
+  json_buffer[buffer_pos] = '\0';
+
+  // Parse JSON using ArduinoJson
+  StaticJsonDocument<1024> doc;
+  DeserializationError error = deserializeJson(doc, json_buffer);
+
+  if (error) {
+    Serial.printf("[CONFIG] [ERR] JSON parse failed: %s\n", error.c_str());
+    Serial.println("[CONFIG] [ERR] Check JSON format and try again");
+    return;
+  }
+
+  // Check for "config" object
+  JsonObject config_obj = doc["config"];
+  if (!config_obj) {
+    Serial.println("[CONFIG] [ERR] Missing 'config' object in JSON");
+    return;
+  }
+
+  // Iterate through all key-value pairs
+  for (JsonPair kv : config_obj) {
+    const char* key = kv.key().c_str();
+    const char* type = configGetKeyType(key);
+
+    if (type == NULL) {
+      Serial.printf("[CONFIG] [WARN] Skipping unknown key: %s\n", key);
+      continue;
+    }
+
+    // Set value based on type
+    if (strcmp(type, "int32") == 0) {
+      int32_t val = kv.value().as<int32_t>();
+      configSetInt(key, val);
+      Serial.printf("[CONFIG] Imported: %s = %ld (int)\n", key, (long)val);
+      import_count++;
+    }
+    else if (strcmp(type, "float") == 0) {
+      float val = kv.value().as<float>();
+      configSetFloat(key, val);
+      Serial.printf("[CONFIG] Imported: %s = %.3f (float)\n", key, val);
+      import_count++;
+    }
+    else if (strcmp(type, "string") == 0) {
+      const char* val = kv.value().as<const char*>();
+      configSetString(key, val);
+      Serial.printf("[CONFIG] Imported: %s = \"%s\" (string)\n", key, val);
+      import_count++;
     }
   }
 

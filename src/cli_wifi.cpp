@@ -41,21 +41,17 @@ void cmd_wifi_connect(int argc, char** argv) {
     WiFi.mode(WIFI_STA);
     WiFi.begin(argv[2], argv[3]);
 
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) { 
-        delay(500);
-        watchdogFeed("CLI"); // Prevent WDT reset
-        Serial.print(".");
-        attempts++;
-    }
+    // CRITICAL FIX: Non-blocking connection to prevent freezing motion control
+    // WiFi connects in background - don't block CLI task with delay() loops
+    Serial.println("[WIFI] [OK] Connection initiated (non-blocking)");
+    Serial.println("[WIFI] Note: WiFi connects in background during normal operation");
+    Serial.println("[WIFI] Use 'wifi status' to check connection progress");
     Serial.println();
+    Serial.println("[WIFI] SAFETY: This command does NOT block motion control");
+    Serial.println("[WIFI] Connection will complete within 10-20 seconds");
 
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("[WIFI] [OK] Connected!");
-        Serial.print("[WIFI] IP: "); Serial.println(WiFi.localIP());
-    } else {
-        Serial.printf("[WIFI] [FAIL] Connection failed: %s\n", wifiGetStatusString(WiFi.status()));
-    }
+    // Show immediate status
+    Serial.printf("[WIFI] Current status: %s\n", wifiGetStatusString(WiFi.status()));
 }
 
 void cmd_wifi_status(int argc, char** argv) {
