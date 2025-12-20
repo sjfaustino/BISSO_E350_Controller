@@ -441,6 +441,13 @@ window.SettingsModule = window.SettingsModule || {
 
     loadConfiguration() {
         console.log('[Settings] Loading configuration');
+
+        // Skip API calls in file:// protocol or mock mode - no real device to query
+        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+            console.log('[Settings] File/mock mode detected - skipping configuration API calls');
+            return;
+        }
+
         Promise.all([
             this.loadMotionConfig(),
             this.loadVfdConfig(),
