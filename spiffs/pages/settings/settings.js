@@ -227,26 +227,45 @@ window.SettingsModule = window.SettingsModule || {
         });
 
         // Update sliders and inputs
-        document.getElementById('font-size-slider').value = this.settings.fontSize;
-        document.getElementById('font-size-display').textContent = this.settings.fontSize;
+        const fontSizeSlider = document.getElementById('font-size-slider');
+        const fontSizeDisplay = document.getElementById('font-size-display');
 
-        document.getElementById('quality-threshold').value = this.settings.qualityThreshold;
-        document.getElementById('quality-value').textContent = this.settings.qualityThreshold;
+        if (fontSizeSlider) fontSizeSlider.value = this.settings.fontSize;
+        if (fontSizeDisplay) fontSizeDisplay.textContent = this.settings.fontSize;
 
-        document.getElementById('jitter-threshold').value = this.settings.jitterThreshold;
-        document.getElementById('jitter-value').textContent = this.settings.jitterThreshold.toFixed(1);
+        const qualityThreshold = document.getElementById('quality-threshold');
+        const qualityValue = document.getElementById('quality-value');
 
-        document.getElementById('temp-threshold').value = this.settings.tempThreshold;
-        document.getElementById('temp-value').textContent = this.settings.tempThreshold;
+        if (qualityThreshold) qualityThreshold.value = this.settings.qualityThreshold;
+        if (qualityValue) qualityValue.textContent = this.settings.qualityThreshold;
+
+        const jitterThreshold = document.getElementById('jitter-threshold');
+        const jitterValue = document.getElementById('jitter-value');
+
+        if (jitterThreshold) jitterThreshold.value = this.settings.jitterThreshold;
+        if (jitterValue) jitterValue.textContent = this.settings.jitterThreshold.toFixed(1);
+
+        const tempThreshold = document.getElementById('temp-threshold');
+        const tempValue = document.getElementById('temp-value');
+
+        if (tempThreshold) tempThreshold.value = this.settings.tempThreshold;
+        if (tempValue) tempValue.textContent = this.settings.tempThreshold;
 
         // Update checkboxes
-        document.getElementById('auto-refresh-toggle').checked = this.settings.autoRefresh;
-        document.getElementById('alert-sound-toggle').checked = this.settings.soundAlerts;
-        document.getElementById('alert-desktop-toggle').checked = this.settings.desktopAlerts;
+        const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
+        const alertSoundToggle = document.getElementById('alert-sound-toggle');
+        const alertDesktopToggle = document.getElementById('alert-desktop-toggle');
+
+        if (autoRefreshToggle) autoRefreshToggle.checked = this.settings.autoRefresh;
+        if (alertSoundToggle) alertSoundToggle.checked = this.settings.soundAlerts;
+        if (alertDesktopToggle) alertDesktopToggle.checked = this.settings.desktopAlerts;
 
         // Update selects
-        document.getElementById('history-retention').value = this.settings.historyRetention;
-        document.getElementById('chart-resolution').value = this.settings.chartResolution;
+        const historyRetention = document.getElementById('history-retention');
+        const chartResolution = document.getElementById('chart-resolution');
+
+        if (historyRetention) historyRetention.value = this.settings.historyRetention;
+        if (chartResolution) chartResolution.value = this.settings.chartResolution;
 
         // Update storage info
         this.updateStorageInfo();
@@ -264,8 +283,11 @@ window.SettingsModule = window.SettingsModule || {
             const usedKB = Math.round(used / 1024);
             const limitKB = 5120; // 5MB typical browser quota per domain
 
-            document.getElementById('storage-used').textContent = usedKB;
-            document.getElementById('storage-limit').textContent = limitKB;
+            const storageUsedEl = document.getElementById('storage-used');
+            const storageLimitEl = document.getElementById('storage-limit');
+
+            if (storageUsedEl) storageUsedEl.textContent = usedKB;
+            if (storageLimitEl) storageLimitEl.textContent = limitKB;
 
             const percent = (usedKB / limitKB) * 100;
             const fillElem = document.getElementById('storage-fill');
@@ -286,33 +308,36 @@ window.SettingsModule = window.SettingsModule || {
         const state = AppState.data;
 
         // Firmware and hardware versions (from telemetry)
-        document.getElementById('fw-version').textContent =
-            state.system?.fw_version || 'Unknown';
-        document.getElementById('hw-version').textContent =
-            state.system?.hw_version || 'E350 Rev A';
+        const fwVersionEl = document.getElementById('fw-version');
+        const hwVersionEl = document.getElementById('hw-version');
+
+        if (fwVersionEl) fwVersionEl.textContent = state.system?.fw_version || 'Unknown';
+        if (hwVersionEl) hwVersionEl.textContent = state.system?.hw_version || 'E350 Rev A';
 
         // Uptime
         const uptimeMs = state.system?.uptime_ms || 0;
         const days = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
         const hours = Math.floor((uptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
-        document.getElementById('sys-uptime').textContent =
-            `${days}d ${hours}h ${minutes}m`;
+
+        const sysUptimeEl = document.getElementById('sys-uptime');
+        if (sysUptimeEl) sysUptimeEl.textContent = `${days}d ${hours}h ${minutes}m`;
 
         // Free memory
         const freeHeap = state.system?.free_heap_bytes || 0;
-        document.getElementById('free-memory').textContent =
-            (freeHeap / 1024).toFixed(1) + ' KB';
+        const freeMemoryEl = document.getElementById('free-memory');
+        if (freeMemoryEl) freeMemoryEl.textContent = (freeHeap / 1024).toFixed(1) + ' KB';
 
         // Network signal
         const rssi = state.network?.rssi || 0;
         const strength = this.getRssiDescription(rssi);
-        document.getElementById('signal-strength').textContent = `${strength} (${rssi} dBm)`;
+        const signalStrengthEl = document.getElementById('signal-strength');
+        if (signalStrengthEl) signalStrengthEl.textContent = `${strength} (${rssi} dBm)`;
 
         // Last connection (now)
         const now = new Date();
-        document.getElementById('last-connection').textContent =
-            now.toLocaleTimeString();
+        const lastConnectionEl = document.getElementById('last-connection');
+        if (lastConnectionEl) lastConnectionEl.textContent = now.toLocaleTimeString();
     },
 
     getRssiDescription(rssi) {

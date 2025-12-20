@@ -134,9 +134,15 @@ window.LogsModule = window.LogsModule || {
 
     clearFilters() {
         this.filters = { level: '', source: '', search: '' };
-        document.getElementById('log-level-filter').value = '';
-        document.getElementById('log-source-filter').value = '';
-        document.getElementById('log-search').value = '';
+
+        const levelFilter = document.getElementById('log-level-filter');
+        const sourceFilter = document.getElementById('log-source-filter');
+        const searchInput = document.getElementById('log-search');
+
+        if (levelFilter) levelFilter.value = '';
+        if (sourceFilter) sourceFilter.value = '';
+        if (searchInput) searchInput.value = '';
+
         this.applyFilters();
     },
 
@@ -169,10 +175,15 @@ window.LogsModule = window.LogsModule || {
             warn: this.logs.filter(l => l.level === 'WARN').length
         };
 
-        document.getElementById('stat-total').textContent = stats.total.toString();
-        document.getElementById('stat-critical').textContent = stats.critical.toString();
-        document.getElementById('stat-error').textContent = stats.error.toString();
-        document.getElementById('stat-warning').textContent = stats.warn.toString();
+        const statTotalEl = document.getElementById('stat-total');
+        const statCriticalEl = document.getElementById('stat-critical');
+        const statErrorEl = document.getElementById('stat-error');
+        const statWarningEl = document.getElementById('stat-warning');
+
+        if (statTotalEl) statTotalEl.textContent = stats.total.toString();
+        if (statCriticalEl) statCriticalEl.textContent = stats.critical.toString();
+        if (statErrorEl) statErrorEl.textContent = stats.error.toString();
+        if (statWarningEl) statWarningEl.textContent = stats.warn.toString();
     },
 
     exportAsCSV() {
