@@ -18,10 +18,14 @@
 static uint8_t i73_input_shadow = 0xFF;
 static uint8_t q73_shadow_register = 0x00;
 
-// CRITICAL FIX: Spinlock to protect shadow register access
+// CRITICAL FIX: Mutex to protect shadow register access
 // Multiple tasks can call elboSetDirection(), elboSetSpeedProfile(), elboQ73SetRelay()
 // Without protection, race conditions can corrupt relay state
-static portMUX_TYPE plc_spinlock = portMUX_INITIALIZER_UNLOCKED; 
+// NOTE: Using Mutex instead of Spinlock because:
+//   1. Shadow registers are only accessed from tasks, not ISRs
+//   2. Mutexes allow proper task scheduling instead of disabling interrupts
+//   3. More efficient for multi-task synchronization
+static SemaphoreHandle_t plc_shadow_mutex = NULL; 
 
 #define I2C_RETRIES 3
 
@@ -64,6 +68,12 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char* context) {
 void elboInit() {
     logInfo("[PLC] Initializing I2C Bus...");
 
+    // Create mutex for shadow register protection
+    plc_shadow_mutex = xSemaphoreCreateMutex();
+    if (plc_shadow_mutex == NULL) {
+        logError("[PLC] [CRITICAL] Failed to create shadow register mutex!");
+    }
+
     // Initialize Wire I2C bus (only called once at startup)
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
     delay(10); // Allow bus to settle
@@ -85,10 +95,13 @@ void elboInit() {
 void elboSetDirection(uint8_t axis, bool forward) {
     if (axis >= 4) return;
 
-    // CRITICAL FIX: Use spinlock to protect shadow register modification
+    // CRITICAL FIX: Use mutex to protect shadow register modification
     // Race condition: Motion task and CLI task could both call this function,
     // causing one task's modification to overwrite the other's
-    portENTER_CRITICAL(&plc_spinlock);
+    if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        logWarning("[PLC] Failed to acquire shadow mutex for SetDirection");
+        return;
+    }
 
     // Use standard shift. Relays 0-3 are X,Y,Z,A Directions
     uint8_t mask = (1 << axis);
@@ -99,19 +112,22 @@ void elboSetDirection(uint8_t axis, bool forward) {
         q73_shadow_register &= ~mask;
     }
 
-    // Make a copy for I2C write before releasing spinlock
+    // Make a copy for I2C write before releasing mutex
     uint8_t register_copy = q73_shadow_register;
 
-    portEXIT_CRITICAL(&plc_spinlock);
+    xSemaphoreGive(plc_shadow_mutex);
 
     // Do NOT modify Enable bit here.
     plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Direction");
 }
 
 void elboSetSpeedProfile(uint8_t profile_index) {
-    // CRITICAL FIX: Use spinlock to protect shadow register modification
-    // Race condition: Motion task could be interrupted mid-operation
-    portENTER_CRITICAL(&plc_spinlock);
+    // CRITICAL FIX: Use mutex to protect shadow register modification
+    // Race condition: Motion task and other tasks could modify simultaneously
+    if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        logWarning("[PLC] Failed to acquire shadow mutex for SetSpeedProfile");
+        return;
+    }
 
     // Clear Speed bits (4, 5, 6)
     q73_shadow_register &= ~( (1<<ELBO_Q73_SPEED_1) | (1<<ELBO_Q73_SPEED_2) | (1<<ELBO_Q73_SPEED_3) );
@@ -123,10 +139,10 @@ void elboSetSpeedProfile(uint8_t profile_index) {
         default: break;
     }
 
-    // Make a copy for I2C write before releasing spinlock
+    // Make a copy for I2C write before releasing mutex
     uint8_t register_copy = q73_shadow_register;
 
-    portEXIT_CRITICAL(&plc_spinlock);
+    xSemaphoreGive(plc_shadow_mutex);
 
     plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Speed");
 }
@@ -135,8 +151,15 @@ void elboSetSpeedProfile(uint8_t profile_index) {
 // Allows LCD and diagnostics to display active speed profile
 uint8_t elboGetSpeedProfile() {
     // Read speed profile bits (4, 5, 6) from shadow register
-    // No spinlock needed for read-only operation
+    // FIXED: Now using mutex for thread-safe read operation
+    if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+        logWarning("[PLC] Failed to acquire shadow mutex for GetSpeedProfile");
+        return 0xFF;  // Return error on mutex timeout
+    }
+
     uint8_t speed_bits = (q73_shadow_register >> ELBO_Q73_SPEED_1) & 0x07;
+
+    xSemaphoreGive(plc_shadow_mutex);
 
     // Decode speed bits to profile index
     if (speed_bits & (1 << (ELBO_Q73_SPEED_1 - ELBO_Q73_SPEED_1))) return 0;  // Profile 0
@@ -149,9 +172,12 @@ uint8_t elboGetSpeedProfile() {
 void elboQ73SetRelay(uint8_t relay_bit, bool state) {
     if (relay_bit > 7) return;
 
-    // CRITICAL FIX: Use spinlock to protect shadow register modification
+    // CRITICAL FIX: Use mutex to protect shadow register modification
     // Race condition: Multiple relay commands could be lost if not protected
-    portENTER_CRITICAL(&plc_spinlock);
+    if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        logWarning("[PLC] Failed to acquire shadow mutex for SetRelay");
+        return;
+    }
 
     if (state) {
         q73_shadow_register |= (1 << relay_bit);
@@ -159,10 +185,10 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
         q73_shadow_register &= ~(1 << relay_bit);
     }
 
-    // Make a copy for I2C write before releasing spinlock
+    // Make a copy for I2C write before releasing mutex
     uint8_t register_copy = q73_shadow_register;
 
-    portEXIT_CRITICAL(&plc_spinlock);
+    xSemaphoreGive(plc_shadow_mutex);
 
     plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Relay");
 }
@@ -204,7 +230,17 @@ bool elboI73GetInput(uint8_t bit, bool* success) {
 
 void elboDiagnostics() {
     Serial.println("\n[PLC] === IO Diagnostics ===");
-    Serial.printf("Output Register: 0x%02X\n", q73_shadow_register);
+
+    // Read shadow register safely with mutex protection
+    uint8_t output_reg = 0x00;
+    if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        output_reg = q73_shadow_register;
+        xSemaphoreGive(plc_shadow_mutex);
+    } else {
+        Serial.println("Warning: Could not acquire shadow mutex for diagnostics");
+    }
+
+    Serial.printf("Output Register: 0x%02X\n", output_reg);
     Serial.printf("Input Register:  0x%02X\n", i73_input_shadow);
 
     // CRITICAL FIX: Acquire PLC I2C mutex for diagnostics
