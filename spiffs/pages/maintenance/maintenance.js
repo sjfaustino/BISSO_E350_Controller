@@ -44,8 +44,11 @@ window.MaintenanceModule = window.MaintenanceModule || {
         const totalHours = Math.floor(uptimeMs / (1000 * 60 * 60));
         const operatingDays = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
 
-        document.getElementById('total-hours').textContent = totalHours.toString();
-        document.getElementById('operating-days').textContent = operatingDays.toString();
+        const totalHoursEl = document.getElementById('total-hours');
+        const operatingDaysEl = document.getElementById('operating-days');
+
+        if (totalHoursEl) totalHoursEl.textContent = totalHours.toString();
+        if (operatingDaysEl) operatingDaysEl.textContent = operatingDays.toString();
 
         // Update wear predictions for each axis
         ['x', 'y', 'z'].forEach((axis, idx) => {
@@ -54,14 +57,16 @@ window.MaintenanceModule = window.MaintenanceModule || {
                 const wearPercent = this.calculateWearPercent(metrics.jitter_mms || 0);
                 const daysRemaining = this.estimateDaysRemaining(wearPercent);
 
-                document.getElementById(`wear-${axis}-percent`).textContent =
-                    wearPercent.toFixed(1) + '%';
-                document.getElementById(`wear-${axis}-bar`).style.width =
-                    wearPercent + '%';
-                document.getElementById(`wear-${axis}-bar`).style.background =
-                    this.getWearColor(wearPercent);
-                document.getElementById(`wear-${axis}-days`).textContent =
-                    `Est. ${Math.max(0, Math.floor(daysRemaining))} days`;
+                const wearPercentEl = document.getElementById(`wear-${axis}-percent`);
+                const wearBarEl = document.getElementById(`wear-${axis}-bar`);
+                const wearDaysEl = document.getElementById(`wear-${axis}-days`);
+
+                if (wearPercentEl) wearPercentEl.textContent = wearPercent.toFixed(1) + '%';
+                if (wearBarEl) {
+                    wearBarEl.style.width = wearPercent + '%';
+                    wearBarEl.style.background = this.getWearColor(wearPercent);
+                }
+                if (wearDaysEl) wearDaysEl.textContent = `Est. ${Math.max(0, Math.floor(daysRemaining))} days`;
             }
         });
 
@@ -73,20 +78,32 @@ window.MaintenanceModule = window.MaintenanceModule || {
         const estimatedContactorOps = totalHours * 10;
         const contactorPercent = (estimatedContactorOps / this.componentLifetimes.contactors) * 100;
 
-        document.getElementById('motor-hours').textContent = totalHours.toString();
-        document.getElementById('motor-bar').style.width = Math.min(100, motorPercent) + '%';
-        document.getElementById('motor-bar').style.background =
-            this.getWearColor(Math.min(100, motorPercent));
+        const motorHoursEl = document.getElementById('motor-hours');
+        const motorBarEl = document.getElementById('motor-bar');
 
-        document.getElementById('vfd-hours').textContent = totalHours.toString();
-        document.getElementById('vfd-bar').style.width = Math.min(100, vfdPercent) + '%';
-        document.getElementById('vfd-bar').style.background =
-            this.getWearColor(Math.min(100, vfdPercent));
+        if (motorHoursEl) motorHoursEl.textContent = totalHours.toString();
+        if (motorBarEl) {
+            motorBarEl.style.width = Math.min(100, motorPercent) + '%';
+            motorBarEl.style.background = this.getWearColor(Math.min(100, motorPercent));
+        }
 
-        document.getElementById('contactor-ops').textContent = Math.floor(estimatedContactorOps).toString();
-        document.getElementById('contactor-bar').style.width = Math.min(100, contactorPercent) + '%';
-        document.getElementById('contactor-bar').style.background =
-            this.getWearColor(Math.min(100, contactorPercent));
+        const vfdHoursEl = document.getElementById('vfd-hours');
+        const vfdBarEl = document.getElementById('vfd-bar');
+
+        if (vfdHoursEl) vfdHoursEl.textContent = totalHours.toString();
+        if (vfdBarEl) {
+            vfdBarEl.style.width = Math.min(100, vfdPercent) + '%';
+            vfdBarEl.style.background = this.getWearColor(Math.min(100, vfdPercent));
+        }
+
+        const contactorOpsEl = document.getElementById('contactor-ops');
+        const contactorBarEl = document.getElementById('contactor-bar');
+
+        if (contactorOpsEl) contactorOpsEl.textContent = Math.floor(estimatedContactorOps).toString();
+        if (contactorBarEl) {
+            contactorBarEl.style.width = Math.min(100, contactorPercent) + '%';
+            contactorBarEl.style.background = this.getWearColor(Math.min(100, contactorPercent));
+        }
 
         // Update maintenance calendar
         // Motor bearing lubrication: every 1000 hours
@@ -116,18 +133,20 @@ window.MaintenanceModule = window.MaintenanceModule || {
         const nextEncoderCalibrationTime = lastCalibrationTime + encoderCalibrationMs;
         const encoderDate = new Date(Math.max(nextEncoderCalibrationTime, now.getTime()));
 
-        document.getElementById('next-motor-service').textContent =
-            `Est. ${motorDate.toISOString().split('T')[0]}`;
-        document.getElementById('next-vfd-service').textContent =
-            `Est. ${vfdDate.toISOString().split('T')[0]}`;
-        document.getElementById('next-contactor-service').textContent =
-            `Est. ${contactorDate.toISOString().split('T')[0]}`;
-        document.getElementById('next-encoder-service').textContent =
-            `Est. ${encoderDate.toISOString().split('T')[0]}`;
+        const nextMotorServiceEl = document.getElementById('next-motor-service');
+        const nextVfdServiceEl = document.getElementById('next-vfd-service');
+        const nextContactorServiceEl = document.getElementById('next-contactor-service');
+        const nextEncoderServiceEl = document.getElementById('next-encoder-service');
+
+        if (nextMotorServiceEl) nextMotorServiceEl.textContent = `Est. ${motorDate.toISOString().split('T')[0]}`;
+        if (nextVfdServiceEl) nextVfdServiceEl.textContent = `Est. ${vfdDate.toISOString().split('T')[0]}`;
+        if (nextContactorServiceEl) nextContactorServiceEl.textContent = `Est. ${contactorDate.toISOString().split('T')[0]}`;
+        if (nextEncoderServiceEl) nextEncoderServiceEl.textContent = `Est. ${encoderDate.toISOString().split('T')[0]}`;
 
         // Update last service date
         const lastService = localStorage.getItem('lastServiceDate') || 'Today';
-        document.getElementById('last-service').textContent = lastService;
+        const lastServiceEl = document.getElementById('last-service');
+        if (lastServiceEl) lastServiceEl.textContent = lastService;
     },
 
     calculateWearPercent(jitterMms) {
@@ -159,6 +178,8 @@ window.MaintenanceModule = window.MaintenanceModule || {
     loadServiceHistory() {
         const history = JSON.parse(localStorage.getItem('serviceHistory') || '[]');
         const container = document.getElementById('service-history');
+
+        if (!container) return; // Exit if element doesn't exist in fallback HTML
 
         if (history.length === 0) {
             // Initialize with system startup
