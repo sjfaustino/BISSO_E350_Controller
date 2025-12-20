@@ -59,9 +59,13 @@ window.SystemModule = window.SystemModule || {
 
     loadSystemInfo() {
         // Load firmware version (replace with actual API call)
-        document.getElementById('fw-version').textContent = '3.1.0';
-        document.getElementById('fw-build-date').textContent = '2024-12-14';
-        document.getElementById('serial-number').textContent = 'BS-E350-001-2024';
+        const fwVersionEl = document.getElementById('fw-version');
+        const fwBuildDateEl = document.getElementById('fw-build-date');
+        const serialNumberEl = document.getElementById('serial-number');
+
+        if (fwVersionEl) fwVersionEl.textContent = '3.1.0';
+        if (fwBuildDateEl) fwBuildDateEl.textContent = '2024-12-14';
+        if (serialNumberEl) serialNumberEl.textContent = 'BS-E350-001-2024';
 
         // Load storage info
         this.updateStorageInfo();
@@ -85,14 +89,23 @@ window.SystemModule = window.SystemModule || {
         const spiffsPercent = (spiffsUsed / spiffsTotal) * 100;
 
         // Update display
-        document.getElementById('flash-bar').style.width = flashPercent + '%';
-        document.getElementById('flash-used').textContent = flashUsed.toFixed(1);
+        const flashBarEl = document.getElementById('flash-bar');
+        const flashUsedEl = document.getElementById('flash-used');
 
-        document.getElementById('ram-bar').style.width = ramPercent + '%';
-        document.getElementById('ram-used').textContent = ramUsed;
+        if (flashBarEl) flashBarEl.style.width = flashPercent + '%';
+        if (flashUsedEl) flashUsedEl.textContent = flashUsed.toFixed(1);
 
-        document.getElementById('spiffs-bar').style.width = spiffsPercent + '%';
-        document.getElementById('spiffs-used').textContent = spiffsUsed.toFixed(2);
+        const ramBarEl = document.getElementById('ram-bar');
+        const ramUsedEl = document.getElementById('ram-used');
+
+        if (ramBarEl) ramBarEl.style.width = ramPercent + '%';
+        if (ramUsedEl) ramUsedEl.textContent = ramUsed;
+
+        const spiffsBarEl = document.getElementById('spiffs-bar');
+        const spiffsUsedEl = document.getElementById('spiffs-used');
+
+        if (spiffsBarEl) spiffsBarEl.style.width = spiffsPercent + '%';
+        if (spiffsUsedEl) spiffsUsedEl.textContent = spiffsUsed.toFixed(2);
 
         // Set progress bar colors
         this.setProgressBarColor('flash-bar', flashPercent);
@@ -118,10 +131,15 @@ window.SystemModule = window.SystemModule || {
         const uptimeMs = now - this.systemStartTime;
         const uptimeHours = Math.floor(uptimeMs / (1000 * 60 * 60));
 
-        document.getElementById('system-uptime').textContent = uptimeHours + ' h';
-        document.getElementById('reset-count').textContent = this.resetCount;
-        document.getElementById('last-reset').textContent = '2024-12-01 09:15';
-        document.getElementById('last-backup').textContent = new Date().toLocaleString();
+        const systemUptimeEl = document.getElementById('system-uptime');
+        const resetCountEl = document.getElementById('reset-count');
+        const lastResetEl = document.getElementById('last-reset');
+        const lastBackupEl = document.getElementById('last-backup');
+
+        if (systemUptimeEl) systemUptimeEl.textContent = uptimeHours + ' h';
+        if (resetCountEl) resetCountEl.textContent = this.resetCount;
+        if (lastResetEl) lastResetEl.textContent = '2024-12-01 09:15';
+        if (lastBackupEl) lastBackupEl.textContent = new Date().toLocaleString();
     },
 
     startStatusUpdates() {
