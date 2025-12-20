@@ -27,19 +27,27 @@
 // ============================================================================
 // TASK STACK SIZES
 // ============================================================================
+// NOTE: Stack sizes increased to prevent Guru Meditation Errors from:
+//       - Heavy snprintf() operations (stack-intensive string formatting)
+//       - JSON serialization (ArduinoJson allocates on stack for small docs)
+//       - Deep call chains in complex state machines
 
 #define TASK_STACK_SAFETY        4096  // Increased from 2048 - was overflowing (only 144 bytes free)
 #define TASK_STACK_MOTION        4096  // Increased from 2048 - was near overflow (only 192 bytes free)
-#define TASK_STACK_ENCODER       5120
+#define TASK_STACK_ENCODER       6144  // Increased from 5120 - stack monitoring shows tight margin
 #define TASK_STACK_PLC_COMM      2048
 #define TASK_STACK_I2C_MANAGER   2048
-#define TASK_STACK_CLI           2048
+#define TASK_STACK_CLI           3072  // Increased from 2048 - CLI parses complex commands with snprintf
 #define TASK_STACK_FAULT_LOG     2048
 #define TASK_STACK_MONITOR       2048
-#define TASK_STACK_TELEMETRY     2048  // PHASE 5.4: Background telemetry collection
-#define TASK_STACK_LCD_FORMAT    2048  // PHASE 5.4: LCD string formatting
+#define TASK_STACK_TELEMETRY     3072  // Increased from 2048 - collects comprehensive system state
+#define TASK_STACK_LCD_FORMAT    3072  // Increased from 2048 - multiple snprintf calls for LCD strings
 #define TASK_STACK_LCD           2048
 #define TASK_STACK_BOOT          2048
+
+// WARNING: AsyncWebServer handlers create JsonDocument on stack!
+// If web API returns become complex, increase CONFIG_ASYNC_TCP_TASK_STACK_SIZE
+// in platformio.ini or switch to heap-allocated JsonDocuments in web_server.cpp
 
 // ============================================================================
 // TASK CORE AFFINITY
