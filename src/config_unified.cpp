@@ -57,11 +57,30 @@ static bool isCriticalKey(const char* key) {
 }
 
 // ----------------------------------------------------------------------------
-// STRING BUFFER POOL (Safety Fix)
+// STRING BUFFER POOL (Safety Fix) - PHASE 5.7: Cursor AI Enhanced Documentation
 // ----------------------------------------------------------------------------
 // Increased to 8 to prevent overwrites during complex logging/formatting.
-// WARNING: Strings returned by configGetString are valid only until 
-// the pool rotates (8 calls later). Do not store pointers long-term.
+//
+// ⚠️ **CRITICAL POINTER LIFETIME WARNING** ⚠️
+//
+// Strings returned by configGetString() use a ROTATING BUFFER POOL.
+// Pointers become INVALID after 8 subsequent calls to configGetString().
+//
+// SAFE USAGE:
+//   const char* name = configGetString(KEY_WEB_USERNAME, "admin");
+//   printf("Username: %s\n", name);  // ✅ OK - immediate use
+//
+// UNSAFE USAGE (USE-AFTER-FREE):
+//   const char* name = configGetString(KEY_WEB_USERNAME, "admin");
+//   // ... 8 more configGetString() calls ...
+//   printf("Username: %s\n", name);  // ❌ DANGER - pointer now invalid!
+//
+// SAFE ALTERNATIVES:
+//   1. Use immediately after retrieval
+//   2. Copy to local buffer: char local[256]; safe_strcpy(local, sizeof(local), name);
+//   3. Use configGetStringSafe() which copies to your buffer
+//
+// BUFFER LIFETIME: Valid for 8 configGetString() calls or until function return
 #define CONFIG_STRING_BUFFER_COUNT 8
 #define CONFIG_STRING_BUFFER_SIZE 256
 
@@ -70,10 +89,15 @@ static struct {
   uint8_t current_buffer = 0;
 } string_return_pool = {};
 
+/**
+ * @brief Gets next buffer from rotating pool
+ * @warning Returned pointer valid for only 8 more configGetString() calls!
+ * @return Pointer to buffer (will be overwritten after pool rotates)
+ */
 static char* configGetStringBuffer() {
   char* buffer = string_return_pool.buffers[string_return_pool.current_buffer];
   string_return_pool.current_buffer = (string_return_pool.current_buffer + 1) % CONFIG_STRING_BUFFER_COUNT;
-  return buffer;
+  return buffer;  // ⚠️ WARNING: Pointer lifetime limited to 8 calls
 }
 
 // ============================================================================
