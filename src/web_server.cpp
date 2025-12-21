@@ -241,6 +241,21 @@ void WebServerManager::setupRoutes() {
       .setDefaultFile("index.html")
       .setAuthentication(http_username, http_password);
 
+  // 1.1 Custom 404 Handler (Diagnostics)
+  server->onNotFound([this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    Serial.printf("[WEB] [404] %s\n", request->url().c_str());
+    
+    String message = "<h1>404 Not Found</h1>";
+    message += "<p>The requested URL was not found on this server.</p>";
+    if (!SPIFFS.exists("/index.html")) {
+       message += "<p><b>DEBUG:</b> SPIFFS might be empty or index.html missing.</p>";
+    }
+    
+    request->send(404, "text/html", message);
+  });
+
   // 2. API Status (Protected, Rate Limited)
   server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
     if (!requireAuth(request)) return;

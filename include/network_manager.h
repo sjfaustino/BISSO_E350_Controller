@@ -10,9 +10,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include <DNSServer.h>
 
 #define TELNET_PORT 23
 #define MAX_TELNET_CLIENTS 1
+#define NET_DNS_PORT 53
 
 class NetworkManager {
 public:
@@ -28,6 +30,7 @@ public:
 private:
     WiFiServer* telnetServer;
     WiFiClient telnetClient;
+    DNSServer* dnsServer;
     bool clientConnected;
 
     void handleOTA();

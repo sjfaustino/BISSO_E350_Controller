@@ -29,8 +29,11 @@ static uint32_t telnet_last_activity = 0;
 #define TELNET_LOCKOUT_DURATION_MS 60000 // 1 minute lockout
 #define TELNET_SESSION_TIMEOUT_MS 300000 // 5 minute inactivity timeout
 
-NetworkManager::NetworkManager()
-    : telnetServer(nullptr), clientConnected(false) {}
+NetworkManager::NetworkManager() {
+  telnetServer = nullptr;
+  dnsServer = nullptr;
+  clientConnected = false;
+}
 
 NetworkManager::~NetworkManager() {
   // Clean up allocated resources
@@ -38,6 +41,11 @@ NetworkManager::~NetworkManager() {
     telnetServer->stop();
     delete telnetServer;
     telnetServer = nullptr;
+  }
+  if (dnsServer) {
+    dnsServer->stop();
+    delete dnsServer;
+    dnsServer = nullptr;
   }
   if (telnetClient) {
     telnetClient.stop();
@@ -61,7 +69,12 @@ void NetworkManager::init() {
 
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(ap_ssid, ap_pass);
-    Serial.printf("[NET] AP Mode ENABLED (SSID: %s)\n", ap_ssid);
+    
+    // Captive Portal DNS: Redirect all requests to controller IP (192.168.4.1)
+    dnsServer = new DNSServer();
+    dnsServer->start(NET_DNS_PORT, "*", WiFi.softAPIP());
+    
+    Serial.printf("[NET] AP Mode ENABLED (SSID: %s, IP: %s)\n", ap_ssid, WiFi.softAPIP().toString().c_str());
   } else {
     WiFi.mode(WIFI_STA);
     Serial.println("[NET] AP Mode DISABLED (Station only)");
@@ -132,6 +145,11 @@ void NetworkManager::init() {
 void NetworkManager::update() {
   // 1. Handle OTA
   ArduinoOTA.handle();
+
+  // 1.1 Handle DNS (Captive Portal)
+  if (dnsServer) {
+    dnsServer->processNextRequest();
+  }
 
   // 2. Handle Telnet
   if (telnetServer->hasClient()) {
