@@ -65,16 +65,67 @@ void cmd_wifi_status(int argc, char** argv) {
     }
 }
 
-void cmd_wifi_main(int argc, char** argv) {
-    if (argc < 2) {
-        Serial.println("\n[WIFI] === Network Management ===");
-        Serial.println("Usage: wifi [scan | connect | status]");
-        return;
+void cmd_wifi_ap(int argc, char **argv) {
+  if (argc < 3) {
+    Serial.println("\n[WIFI] === AP Mode Management ===");
+    Serial.println("Usage:");
+    Serial.println("  wifi ap on            - Enable AP mode");
+    Serial.println("  wifi ap off           - Disable AP mode");
+    Serial.println("  wifi ap set <s|p> <v> - Set SSID(s) or Password(p)");
+    Serial.println("  wifi ap status        - Show current AP configuration");
+    return;
+  }
+
+  if (strcmp(argv[2], "on") == 0) {
+    configSetInt(KEY_WIFI_AP_EN, 1);
+    configUnifiedSave();
+    Serial.println("[WIFI] [OK] AP Mode enabled. Reboot required.");
+  } else if (strcmp(argv[2], "off") == 0) {
+    configSetInt(KEY_WIFI_AP_EN, 0);
+    configUnifiedSave();
+    Serial.println("[WIFI] [OK] AP Mode disabled. Reboot required.");
+  } else if (strcmp(argv[2], "status") == 0) {
+    int en = configGetInt(KEY_WIFI_AP_EN, 1);
+    const char *ssid = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
+    Serial.printf("[WIFI] AP Mode: %s\n", en ? "ENABLED" : "DISABLED");
+    Serial.printf("[WIFI] AP SSID: %s\n", ssid);
+  } else if (strcmp(argv[2], "set") == 0) {
+    if (argc < 5) {
+      Serial.println("[WIFI] [ERR] Usage: wifi ap set <s|p> <value>");
+      return;
     }
-    if (strcmp(argv[1], "scan") == 0) cmd_wifi_scan(argc, argv);
-    else if (strcmp(argv[1], "connect") == 0) cmd_wifi_connect(argc, argv);
-    else if (strcmp(argv[1], "status") == 0) cmd_wifi_status(argc, argv);
-    else Serial.printf("[WIFI] Error: Unknown parameter '%s'.\n", argv[1]);
+    if (strcmp(argv[3], "s") == 0) {
+      configSetString(KEY_WIFI_AP_SSID, argv[4]);
+      Serial.printf("[WIFI] [OK] AP SSID set to '%s'\n", argv[4]);
+    } else if (strcmp(argv[3], "p") == 0) {
+      if (strlen(argv[4]) < 8) {
+        Serial.println("[WIFI] [ERR] AP Password must be at least 8 chars");
+        return;
+      }
+      configSetString(KEY_WIFI_AP_PASS, argv[4]);
+      Serial.println("[WIFI] [OK] AP Password updated");
+    }
+    configUnifiedSave();
+    Serial.println("[WIFI] [WARN] Reboot required for changes to take effect");
+  }
+}
+
+void cmd_wifi_main(int argc, char **argv) {
+  if (argc < 2) {
+    Serial.println("\n[WIFI] === Network Management ===");
+    Serial.println("Usage: wifi [scan | connect | status | ap]");
+    return;
+  }
+  if (strcmp(argv[1], "scan") == 0)
+    cmd_wifi_scan(argc, argv);
+  else if (strcmp(argv[1], "connect") == 0)
+    cmd_wifi_connect(argc, argv);
+  else if (strcmp(argv[1], "status") == 0)
+    cmd_wifi_status(argc, argv);
+  else if (strcmp(argv[1], "ap") == 0)
+    cmd_wifi_ap(argc, argv);
+  else
+    Serial.printf("[WIFI] Error: Unknown parameter '%s'.\n", argv[1]);
 }
 
 // SECURITY: OTA password management command

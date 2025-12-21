@@ -16,6 +16,7 @@ window.NetworkModule = window.NetworkModule || {
 
     init() {
         console.log('[Network] Initializing');
+        this.loadWiFiConfig();
         this.updateNetworkStatus();
         this.setupEventListeners();
         this.startLatencyMonitoring();
@@ -23,6 +24,27 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     setupEventListeners() {
+        // Toggle AP settings visibility
+        const apToggle = document.getElementById('ap-enabled');
+        if (apToggle) {
+            apToggle.addEventListener('change', (e) => {
+                const fields = document.getElementById('ap-settings-fields');
+                if (fields) fields.style.display = e.target.checked ? 'block' : 'none';
+            });
+        }
+
+        // Save Station button
+        const saveStationBtn = document.getElementById('save-station-btn');
+        if (saveStationBtn) {
+            saveStationBtn.addEventListener('click', () => this.saveStationConfig());
+        }
+
+        // Save AP button
+        const saveApBtn = document.getElementById('save-ap-btn');
+        if (saveApBtn) {
+            saveApBtn.addEventListener('click', () => this.saveAPConfig());
+        }
+
         // Ping button
         const pingBtn = document.getElementById('ping-btn');
         if (pingBtn) {
@@ -287,6 +309,118 @@ Packet Loss: 0.2%
         window.URL.revokeObjectURL(url);
 
         AlertManager.add('Diagnostics exported', 'success', 2000);
+    },
+
+    loadWiFiConfig() {
+        console.log('[Network] Loading WiFi configuration');
+        if (Utils.isOfflineMode()) return;
+
+        fetch('/api/config/get?category=2')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.config) {
+                    const cfg = data.config;
+                    Utils.setValue('station-ssid', cfg.wifi_ssid || '');
+                    Utils.setValue('ap-ssid', cfg.wifi_ap_ssid || '');
+
+                    const apEn = document.getElementById('ap-enabled');
+                    if (apEn) {
+                        apEn.checked = !!cfg.wifi_ap_en;
+                        const fields = document.getElementById('ap-settings-fields');
+                        if (fields) fields.style.display = apEn.checked ? 'block' : 'none';
+                    }
+
+                    this.setStatus('station', 'Loaded', 'success');
+                    this.setStatus('ap', 'Loaded', 'success');
+                }
+            })
+            .catch(err => {
+                console.error('[Network] Failed to load WiFi config:', err);
+                this.setStatus('station', 'Load failed', 'error');
+                this.setStatus('ap', 'Load failed', 'error');
+            });
+    },
+
+    async saveStationConfig() {
+        const ssid = document.getElementById('station-ssid').value;
+        const pass = document.getElementById('station-pass').value;
+
+        if (!ssid) {
+            AlertManager.add('SSID is required', 'error');
+            return;
+        }
+
+        this.setStatus('station', 'Saving...', '');
+        try {
+            await this.setConfig('wifi_ssid', ssid);
+            if (pass) await this.setConfig('wifi_pass', pass);
+
+            AlertManager.add('Station settings saved. Reconnecting...', 'success');
+            this.setStatus('station', 'Saved', 'success');
+        } catch (err) {
+            console.error('[Network] Save station failed:', err);
+            AlertManager.add('Failed to save settings', 'error');
+            this.setStatus('station', 'Error', 'error');
+        }
+    },
+
+    async saveAPConfig() {
+        const en = document.getElementById('ap-enabled').checked ? 1 : 0;
+        const ssid = document.getElementById('ap-ssid').value;
+        const pass = document.getElementById('ap-pass').value;
+
+        if (en && !ssid) {
+            AlertManager.add('AP SSID is required when enabled', 'error');
+            return;
+        }
+        if (en && pass && pass.length < 8) {
+            AlertManager.add('AP Password must be at least 8 chars', 'error');
+            return;
+        }
+
+        this.setStatus('ap', 'Saving...', '');
+        try {
+            await this.setConfig('wifi_ap_en', en);
+            if (en) {
+                await this.setConfig('wifi_ap_ssid', ssid);
+                if (pass) await this.setConfig('wifi_ap_pass', pass);
+            }
+
+            AlertManager.add('AP settings saved. Reboot required.', 'success');
+            this.setStatus('ap', 'Saved', 'success');
+        } catch (err) {
+            console.error('[Network] Save AP failed:', err);
+            AlertManager.add('Failed to save AP settings', 'error');
+            this.setStatus('ap', 'Error', 'error');
+        }
+    },
+
+    setConfig(key, value) {
+        return fetch('/api/config/set', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category: 2, key, value })
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) throw new Error(data.error || 'Set failed');
+                return data;
+            });
+    },
+
+    togglePass(id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.type = el.type === 'password' ? 'text' : 'password';
+        }
+    },
+
+    setStatus(section, text, type) {
+        const el = document.getElementById(`${section}-config-status`);
+        if (el) {
+            el.textContent = text;
+            el.className = 'card-status ' + (type || '');
+        }
     },
 
     onStateChanged() {

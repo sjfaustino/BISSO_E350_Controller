@@ -140,6 +140,9 @@
 // --- WIFI CREDENTIALS ---
 #define KEY_WIFI_SSID "wifi_ssid"     // WiFi network name (SSID)
 #define KEY_WIFI_PASSWORD "wifi_pass" // WiFi network password
+#define KEY_WIFI_AP_EN "wifi_ap_en"   // Enable/disable AP mode (0=disable, 1=enable)
+#define KEY_WIFI_AP_SSID "wifi_ap_ssid" // AP mode SSID (default: "BISSO-E350-Setup")
+#define KEY_WIFI_AP_PASS "wifi_ap_pass" // AP mode password (default: "password")
 
 // --- OTA (OVER-THE-AIR UPDATE) SECURITY ---
 #define KEY_OTA_PASSWORD                                                       \

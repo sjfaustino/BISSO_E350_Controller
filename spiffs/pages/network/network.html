@@ -15,7 +15,8 @@
                     <div class="card-label">Signal Strength</div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <div class="progress-bar" style="flex: 1; height: 25px;">
-                            <div class="progress-fill" id="signal-bar" style="width: 75%; background: var(--color-optimal);"></div>
+                            <div class="progress-fill" id="signal-bar"
+                                style="width: 75%; background: var(--color-optimal);"></div>
                         </div>
                         <span id="signal-dbm" style="min-width: 50px;">-45 dBm</span>
                     </div>
@@ -37,7 +38,8 @@
             </div>
             <div class="card-content">
                 <div style="text-align: center;">
-                    <div class="card-value" id="latency-ms" style="font-size: 36px; color: var(--color-optimal);">-- ms</div>
+                    <div class="card-value" id="latency-ms" style="font-size: 36px; color: var(--color-optimal);">-- ms
+                    </div>
                     <div class="card-label">WebSocket Round-Trip</div>
                 </div>
 
@@ -125,7 +127,8 @@
                     </div>
                     <div>
                         <div class="card-label">Errors</div>
-                        <div class="card-value" id="error-count" style="font-size: 18px; color: var(--color-warning);">0</div>
+                        <div class="card-value" id="error-count" style="font-size: 18px; color: var(--color-warning);">0
+                        </div>
                     </div>
                     <div>
                         <div class="card-label">Loss Rate</div>
@@ -140,22 +143,94 @@
                 <h2>Network Actions</h2>
             </div>
             <div class="card-content">
-                <button class="btn btn-primary" id="reconnect-btn" style="width: 100%; margin-bottom: 10px;">Reconnect</button>
-                <button class="btn btn-secondary" id="network-test-btn" style="width: 100%; margin-bottom: 10px;">Run Diagnostics</button>
+                <button class="btn btn-primary" id="reconnect-btn"
+                    style="width: 100%; margin-bottom: 10px;">Reconnect</button>
+                <button class="btn btn-secondary" id="network-test-btn" style="width: 100%; margin-bottom: 10px;">Run
+                    Diagnostics</button>
                 <button class="btn btn-ghost" id="network-info-btn" style="width: 100%;">More Info</button>
             </div>
         </div>
     </div>
 
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>WiFi Station Settings</h2>
+                <span class="card-status" id="station-config-status"></span>
+            </div>
+            <div class="card-content">
+                <p
+                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                    Configure the network the controller connects to.
+                </p>
+                <div class="setting-group">
+                    <label for="station-ssid">SSID:</label>
+                    <input type="text" id="station-ssid" class="form-control" placeholder="Network Name">
+                </div>
+                <div class="setting-group">
+                    <label for="station-pass">Password:</label>
+                    <div style="position: relative;">
+                        <input type="password" id="station-pass" class="form-control" placeholder="••••••••">
+                        <button type="button" class="btn-toggle-pass"
+                            onclick="NetworkModule.togglePass('station-pass')">👁️</button>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <button class="btn btn-primary" id="save-station-btn" style="width: 100%;">Save & Connect</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>WiFi Access Point Settings</h2>
+                <span class="card-status" id="ap-config-status"></span>
+            </div>
+            <div class="card-content">
+                <p
+                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                    Configure the broadcasted setup network.
+                </p>
+                <div class="setting-group">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="ap-enabled">
+                        <span>Enable Access Point</span>
+                    </label>
+                </div>
+                <div id="ap-settings-fields">
+                    <div class="setting-group">
+                        <label for="ap-ssid">AP SSID:</label>
+                        <input type="text" id="ap-ssid" class="form-control" placeholder="BISSO-E350-Setup">
+                    </div>
+                    <div class="setting-group">
+                        <label for="ap-pass">AP Password:</label>
+                        <div style="position: relative;">
+                            <input type="password" id="ap-pass" class="form-control" placeholder="••••••••">
+                            <button type="button" class="btn-toggle-pass"
+                                onclick="NetworkModule.togglePass('ap-pass')">👁️</button>
+                        </div>
+                        <div class="card-subtext">Min. 8 characters</div>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <button class="btn btn-primary" id="save-ap-btn" style="width: 100%;">Save AP Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Diagnostics Modal (hidden by default) -->
-    <div id="network-diagnostics-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div id="network-diagnostics-modal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
         <div class="card" style="max-width: 500px; width: 90%;">
             <div class="card-header">
                 <h2>Network Diagnostics</h2>
-                <button id="close-diagnostics" style="background: none; border: none; cursor: pointer; font-size: 20px;">✕</button>
+                <button id="close-diagnostics"
+                    style="background: none; border: none; cursor: pointer; font-size: 20px;">✕</button>
             </div>
             <div class="card-content">
-                <div id="diagnostics-output" style="background: var(--bg-secondary); padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
+                <div id="diagnostics-output"
+                    style="background: var(--bg-secondary); padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
                     Running diagnostics...
                 </div>
                 <button class="btn btn-primary" id="export-diagnostics" style="width: 100%;">Export Report</button>
@@ -167,6 +242,67 @@
 <style>
     .network-page {
         /* Page-specific styles */
+    }
+
+    .setting-group {
+        margin-bottom: var(--space-lg);
+    }
+
+    .setting-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: var(--space-sm);
+        font-size: var(--font-size-base);
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: var(--font-size-base);
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--color-normal);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
+
+    .btn-toggle-pass {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 5px;
+    }
+
+    .card-status {
+        font-size: var(--font-size-sm);
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+    }
+
+    .card-status.success {
+        color: var(--color-optimal);
+        background: rgba(34, 197, 94, 0.1);
+    }
+
+    .card-status.error {
+        color: var(--color-critical);
+        background: rgba(239, 68, 68, 0.1);
     }
 
     .card-value {

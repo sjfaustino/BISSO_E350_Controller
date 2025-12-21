@@ -53,8 +53,21 @@ void NetworkManager::init() {
   Serial.println("[NET] Initializing Network Stack...");
 
   // 1. WiFi Initialization (Non-blocking to allow boot to continue)
+  int ap_enabled = configGetInt(KEY_WIFI_AP_EN, 1); // Phase 5.8: Configurable AP
+
+  if (ap_enabled) {
+    const char *ap_ssid = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
+    const char *ap_pass = configGetString(KEY_WIFI_AP_PASS, "password");
+
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(ap_ssid, ap_pass);
+    Serial.printf("[NET] AP Mode ENABLED (SSID: %s)\n", ap_ssid);
+  } else {
+    WiFi.mode(WIFI_STA);
+    Serial.println("[NET] AP Mode DISABLED (Station only)");
+  }
+
   // Try to connect to saved network without blocking
-  WiFi.mode(WIFI_STA);
   WiFi.begin(); // Uses credentials from previous autoConnect()
 
   // Don't wait for connection - boot continues
