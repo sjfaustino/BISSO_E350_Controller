@@ -87,8 +87,29 @@ void WebServerManager::loadCredentials() {
   http_password[CONFIG_VALUE_LEN - 1] = '\0';
 
   if (pw_changed == 0) {
-    Serial.println("[WEB] [WARN] Default credentials detected - password "
-                   "change required!");
+    // SECURITY WARNING: Default credentials in use
+    Serial.println();
+    Serial.println(
+        "╔══════════════════════════════════════════════════════════════╗");
+    Serial.println(
+        "║  ⚠️  SECURITY WARNING: DEFAULT CREDENTIALS IN USE!  ⚠️       ║");
+    Serial.println(
+        "╠══════════════════════════════════════════════════════════════╣");
+    Serial.println(
+        "║  Username: admin    Password: password                       ║");
+    Serial.println(
+        "║                                                              ║");
+    Serial.println(
+        "║  Change immediately using CLI command:                       ║");
+    Serial.println(
+        "║    web_setpass <new_password>                                ║");
+    Serial.println(
+        "║                                                              ║");
+    Serial.println(
+        "║  Password must be at least 8 characters.                     ║");
+    Serial.println(
+        "╚══════════════════════════════════════════════════════════════╝");
+    Serial.println();
     password_change_enforced = true;
   } else {
     Serial.println("[WEB] [OK] Credentials loaded from NVS");
@@ -101,11 +122,26 @@ bool WebServerManager::isPasswordChangeRequired() {
   return password_change_enforced;
 }
 
+// Minimum password length for security
+#define MIN_PASSWORD_LENGTH 8
+
 // Set new password (for CLI command)
 void WebServerManager::setPassword(const char *new_password) {
-  if (!new_password || strlen(new_password) < 4) {
-    Serial.println("[WEB] [ERR] Password must be at least 4 characters");
+  if (!new_password || strlen(new_password) < MIN_PASSWORD_LENGTH) {
+    Serial.printf("[WEB] [ERR] Password must be at least %d characters\n",
+                  MIN_PASSWORD_LENGTH);
     return;
+  }
+
+  // Check password doesn't match common weak passwords
+  const char *weak_passwords[] = {"password", "12345678", "admin123",
+                                  "qwerty12", "00000000"};
+  for (int i = 0; i < 5; i++) {
+    if (strcmp(new_password, weak_passwords[i]) == 0) {
+      Serial.println(
+          "[WEB] [ERR] Password too weak - choose a stronger password");
+      return;
+    }
   }
 
   configSetString(KEY_WEB_PASSWORD, new_password);

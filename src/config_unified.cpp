@@ -260,6 +260,9 @@ static float validateFloat(const char *key, float value) {
 }
 
 static void validateString(const char *key, char *value, size_t len) {
+  // Minimum password length for security
+  const size_t MIN_PASSWORD_LENGTH = 8;
+
   // 1. Web credentials (Non-empty, reasonable length)
   if (strcmp(key, KEY_WEB_USERNAME) == 0 ||
       strcmp(key, KEY_WEB_PASSWORD) == 0) {
@@ -273,14 +276,18 @@ static void validateString(const char *key, char *value, size_t len) {
       value[len - 1] = '\0';
       logWarning("[CONFIG] %s was empty, using default", key);
     }
-    // Enforce minimum length of 4 characters for security
-    if (strlen(value) < 4) {
-      logWarning("[CONFIG] %s too short (min 4 chars), padding", key);
-      if (strcmp(key, KEY_WEB_USERNAME) == 0) {
-        strncpy(value, "admin", len - 1);
-      } else {
-        strncpy(value, "password", len - 1);
-      }
+    // Enforce minimum length for password (not username)
+    if (strcmp(key, KEY_WEB_PASSWORD) == 0 &&
+        strlen(value) < MIN_PASSWORD_LENGTH) {
+      logWarning("[CONFIG] Password too short (min %d chars), using default",
+                 MIN_PASSWORD_LENGTH);
+      strncpy(value, "password", len - 1); // Default password is 8 chars
+      value[len - 1] = '\0';
+    }
+    // Username minimum 4 chars (less strict than password)
+    if (strcmp(key, KEY_WEB_USERNAME) == 0 && strlen(value) < 4) {
+      logWarning("[CONFIG] Username too short (min 4 chars), using default");
+      strncpy(value, "admin", len - 1);
       value[len - 1] = '\0';
     }
   }
