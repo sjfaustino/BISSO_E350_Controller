@@ -1,132 +1,269 @@
 #include "network_manager.h"
-#include "serial_logger.h"
 #include "cli.h"
+#include "config_keys.h"    // For KEY_OTA_PASSWORD
+#include "config_unified.h" // For OTA password from NVS
+#include "serial_logger.h"
 #include "web_server.h"
-#include "config_unified.h"  // For OTA password from NVS
-#include "config_keys.h"     // For KEY_OTA_PASSWORD
-#include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
 #include <ArduinoOTA.h>
+#include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
+
 
 NetworkManager networkManager;
 
-NetworkManager::NetworkManager() : telnetServer(nullptr), clientConnected(false) {}
+// Telnet authentication state
+enum TelnetAuthState {
+  TELNET_AUTH_IDLE = 0,
+  TELNET_AUTH_WAIT_USERNAME,
+  TELNET_AUTH_WAIT_PASSWORD,
+  TELNET_AUTH_AUTHENTICATED,
+  TELNET_AUTH_LOCKED_OUT
+};
+
+static TelnetAuthState telnet_auth_state = TELNET_AUTH_IDLE;
+static char telnet_username_attempt[32] = {0};
+static uint8_t telnet_failed_attempts = 0;
+static uint32_t telnet_lockout_until = 0;
+static uint32_t telnet_last_activity = 0;
+
+#define TELNET_MAX_FAILED_ATTEMPTS 3
+#define TELNET_LOCKOUT_DURATION_MS 60000 // 1 minute lockout
+#define TELNET_SESSION_TIMEOUT_MS 300000 // 5 minute inactivity timeout
+
+NetworkManager::NetworkManager()
+    : telnetServer(nullptr), clientConnected(false) {}
 
 NetworkManager::~NetworkManager() {
-    // Clean up allocated resources
-    if (telnetServer) {
-        telnetServer->stop();
-        delete telnetServer;
-        telnetServer = nullptr;
-    }
-    if (telnetClient) {
-        telnetClient.stop();
-    }
+  // Clean up allocated resources
+  if (telnetServer) {
+    telnetServer->stop();
+    delete telnetServer;
+    telnetServer = nullptr;
+  }
+  if (telnetClient) {
+    telnetClient.stop();
+  }
+}
+
+static void resetTelnetAuthState() {
+  telnet_auth_state = TELNET_AUTH_IDLE;
+  memset(telnet_username_attempt, 0, sizeof(telnet_username_attempt));
 }
 
 void NetworkManager::init() {
-    Serial.println("[NET] Initializing Network Stack...");
+  Serial.println("[NET] Initializing Network Stack...");
 
-    // 1. WiFi Initialization (Non-blocking to allow boot to continue)
-    // Try to connect to saved network without blocking
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(); // Uses credentials from previous autoConnect()
+  // 1. WiFi Initialization (Non-blocking to allow boot to continue)
+  // Try to connect to saved network without blocking
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(); // Uses credentials from previous autoConnect()
 
-    // Don't wait for connection - boot continues
-    // WiFi will connect in background during networkManager.update() calls
-    Serial.println("[NET] [OK] WiFi initialization queued (non-blocking)");
+  // Don't wait for connection - boot continues
+  // WiFi will connect in background during networkManager.update() calls
+  Serial.println("[NET] [OK] WiFi initialization queued (non-blocking)");
 
-    // NOTE: AsyncWiFiManager with autoConnect() was BLOCKING boot sequence
-    // Removed to allow taskManagerStart() to execute immediately
+  // NOTE: AsyncWiFiManager with autoConnect() was BLOCKING boot sequence
+  // Removed to allow taskManagerStart() to execute immediately
 
-    // 2. OTA Setup
-    ArduinoOTA.setHostname("bisso-e350");
+  // 2. OTA Setup
+  ArduinoOTA.setHostname("bisso-e350");
 
-    // SECURITY FIX: Load OTA password from NVS instead of hardcoding
-    // Prevents password exposure in source code and allows runtime changes
-    const char* ota_password = configGetString(KEY_OTA_PASSWORD, "bisso-ota");
-    int ota_pw_changed = configGetInt(KEY_OTA_PW_CHANGED, 0);
+  // SECURITY FIX: Load OTA password from NVS instead of hardcoding
+  // Prevents password exposure in source code and allows runtime changes
+  const char *ota_password = configGetString(KEY_OTA_PASSWORD, "bisso-ota");
+  int ota_pw_changed = configGetInt(KEY_OTA_PW_CHANGED, 0);
 
-    ArduinoOTA.setPassword(ota_password);
+  ArduinoOTA.setPassword(ota_password);
 
-    if (ota_pw_changed == 0) {
-        Serial.println("[OTA] [WARN] Default password in use - change recommended!");
-        Serial.println("[OTA] [WARN] Use CLI command: ota_setpass <new_password>");
-    } else {
-        Serial.println("[OTA] [OK] Custom password loaded from NVS");
-    }
+  if (ota_pw_changed == 0) {
+    Serial.println(
+        "[OTA] [WARN] Default password in use - change recommended!");
+    Serial.println("[OTA] [WARN] Use CLI command: ota_setpass <new_password>");
+  } else {
+    Serial.println("[OTA] [OK] Custom password loaded from NVS");
+  }
 
-    ArduinoOTA.onStart([]() {
-        String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-        Serial.println("[OTA] Start updating " + type);
-        // Safety: Stop Motion immediately
-        // motionEmergencyStop(); 
-    });
-    ArduinoOTA.onEnd([]() {
-        Serial.println("\n[OTA] End");
-    });
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
-    });
-    ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("[OTA] Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR) Serial.println("End Failed");
-    });
-    ArduinoOTA.begin();
+  ArduinoOTA.onStart([]() {
+    String type =
+        (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
+    Serial.println("[OTA] Start updating " + type);
+    // Safety: Stop Motion immediately
+    // motionEmergencyStop();
+  });
+  ArduinoOTA.onEnd([]() { Serial.println("\n[OTA] End"); });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("[OTA] Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR)
+      Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR)
+      Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR)
+      Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR)
+      Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR)
+      Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
 
-    // 3. Telnet Server
-    telnetServer = new WiFiServer(TELNET_PORT);
-    telnetServer->begin();
-    telnetServer->setNoDelay(true);
-    Serial.println("[NET] Telnet Server Started on Port 23");
+  // 3. Telnet Server
+  telnetServer = new WiFiServer(TELNET_PORT);
+  telnetServer->begin();
+  telnetServer->setNoDelay(true);
+  Serial.println(
+      "[NET] Telnet Server Started on Port 23 (Authentication Required)");
 }
 
 void NetworkManager::update() {
-    // 1. Handle OTA
-    ArduinoOTA.handle();
+  // 1. Handle OTA
+  ArduinoOTA.handle();
 
-    // 2. Handle Telnet
-    if (telnetServer->hasClient()) {
-        if (!telnetClient || !telnetClient.connected()) {
-            if (telnetClient) telnetClient.stop();
-            telnetClient = telnetServer->available();
-            clientConnected = true;
-            telnetClient.flush();
-            telnetClient.println("==================================");
-            telnetClient.println("   BISSO E350 REMOTE TERMINAL     ");
-            telnetClient.println("==================================");
-            Serial.println("[NET] Telnet Client Connected");
+  // 2. Handle Telnet
+  if (telnetServer->hasClient()) {
+    if (!telnetClient || !telnetClient.connected()) {
+      if (telnetClient)
+        telnetClient.stop();
+      telnetClient = telnetServer->available();
+      clientConnected = true;
+      telnetClient.flush();
+
+      // Reset auth state for new connection
+      resetTelnetAuthState();
+
+      // Check lockout status
+      if (telnet_auth_state == TELNET_AUTH_LOCKED_OUT &&
+          millis() < telnet_lockout_until) {
+        telnetClient.println("Connection refused: Too many failed attempts.");
+        telnetClient.println("Try again later.");
+        telnetClient.stop();
+        return;
+      }
+
+      // Clear lockout if expired
+      if (telnet_auth_state == TELNET_AUTH_LOCKED_OUT &&
+          millis() >= telnet_lockout_until) {
+        telnet_auth_state = TELNET_AUTH_IDLE;
+        telnet_failed_attempts = 0;
+      }
+
+      telnetClient.println("==================================");
+      telnetClient.println("   BISSO E350 REMOTE TERMINAL     ");
+      telnetClient.println("==================================");
+      telnetClient.println("Authentication required.");
+      telnetClient.print("Username: ");
+      telnet_auth_state = TELNET_AUTH_WAIT_USERNAME;
+      telnet_last_activity = millis();
+      Serial.println("[NET] Telnet Client Connected - Awaiting Authentication");
+    } else {
+      // Reject multiple clients (Simple 1-client implementation)
+      WiFiClient reject = telnetServer->available();
+      reject.stop();
+    }
+  }
+
+  // Check session timeout
+  if (telnetClient && telnetClient.connected() &&
+      telnet_auth_state == TELNET_AUTH_AUTHENTICATED &&
+      (millis() - telnet_last_activity) > TELNET_SESSION_TIMEOUT_MS) {
+    telnetClient.println("\r\nSession timed out due to inactivity.");
+    telnetClient.stop();
+    resetTelnetAuthState();
+    Serial.println("[NET] Telnet Session Timed Out");
+    return;
+  }
+
+  // Process Telnet Input
+  if (telnetClient && telnetClient.connected() && telnetClient.available()) {
+    String input = telnetClient.readStringUntil('\n');
+    input.trim();
+    telnet_last_activity = millis();
+
+    if (input.length() == 0)
+      return;
+
+    switch (telnet_auth_state) {
+    case TELNET_AUTH_WAIT_USERNAME:
+      strncpy(telnet_username_attempt, input.c_str(),
+              sizeof(telnet_username_attempt) - 1);
+      telnet_username_attempt[sizeof(telnet_username_attempt) - 1] = '\0';
+      telnetClient.print("Password: ");
+      telnet_auth_state = TELNET_AUTH_WAIT_PASSWORD;
+      break;
+
+    case TELNET_AUTH_WAIT_PASSWORD: {
+      // Get credentials from config
+      const char *valid_username = configGetString(KEY_WEB_USERNAME, "admin");
+      const char *valid_password =
+          configGetString(KEY_WEB_PASSWORD, "password");
+
+      if (strcmp(telnet_username_attempt, valid_username) == 0 &&
+          strcmp(input.c_str(), valid_password) == 0) {
+        // Authentication successful
+        telnet_auth_state = TELNET_AUTH_AUTHENTICATED;
+        telnet_failed_attempts = 0;
+        telnetClient.println("\r\nAuthentication successful.");
+        telnetClient.println("Type 'help' for available commands.");
+        telnetClient.print("> ");
+        Serial.printf("[NET] Telnet Auth SUCCESS for user '%s'\n",
+                      telnet_username_attempt);
+      } else {
+        // Authentication failed
+        telnet_failed_attempts++;
+        Serial.printf("[NET] [WARN] Telnet Auth FAILED (attempt %d/%d)\n",
+                      telnet_failed_attempts, TELNET_MAX_FAILED_ATTEMPTS);
+
+        if (telnet_failed_attempts >= TELNET_MAX_FAILED_ATTEMPTS) {
+          telnetClient.println(
+              "\r\nToo many failed attempts. Connection closed.");
+          telnet_auth_state = TELNET_AUTH_LOCKED_OUT;
+          telnet_lockout_until = millis() + TELNET_LOCKOUT_DURATION_MS;
+          telnetClient.stop();
+          Serial.printf("[NET] [WARN] Telnet LOCKOUT for %d seconds\n",
+                        TELNET_LOCKOUT_DURATION_MS / 1000);
         } else {
-            // Reject multiple clients (Simple 1-client implementation)
-            WiFiClient reject = telnetServer->available();
-            reject.stop();
+          telnetClient.println("\r\nInvalid credentials.");
+          telnetClient.print("Username: ");
+          telnet_auth_state = TELNET_AUTH_WAIT_USERNAME;
         }
+      }
+      break;
     }
 
-    // Process Telnet Input -> CLI
-    if (telnetClient && telnetClient.connected() && telnetClient.available()) {
-        String cmd = telnetClient.readStringUntil('\n');
-        cmd.trim();
-        if (cmd.length() > 0) {
-            Serial.printf("[NET] Remote Command: %s\n", cmd.c_str());
-            // Inject into CLI processor
-            cliProcessCommand(cmd.c_str());
-            telnetClient.print("> "); // Prompt
-        }
+    case TELNET_AUTH_AUTHENTICATED:
+      // Authenticated - process command
+      if (input.equalsIgnoreCase("logout") || input.equalsIgnoreCase("exit")) {
+        telnetClient.println("Goodbye.");
+        telnetClient.stop();
+        resetTelnetAuthState();
+        Serial.println("[NET] Telnet Client Logged Out");
+      } else {
+        Serial.printf("[NET] Remote Command: %s\n", input.c_str());
+        // Inject into CLI processor
+        cliProcessCommand(input.c_str());
+        telnetClient.print("> ");
+      }
+      break;
+
+    default:
+      // Invalid state - reset
+      resetTelnetAuthState();
+      break;
     }
+  }
 }
 
-void NetworkManager::telnetPrint(const char* str) {
-    if (telnetClient && telnetClient.connected()) {
-        telnetClient.print(str);
-    }
+void NetworkManager::telnetPrint(const char *str) {
+  if (telnetClient && telnetClient.connected() &&
+      telnet_auth_state == TELNET_AUTH_AUTHENTICATED) {
+    telnetClient.print(str);
+  }
 }
 
-void NetworkManager::telnetPrintln(const char* str) {
-    if (telnetClient && telnetClient.connected()) {
-        telnetClient.println(str);
-    }
+void NetworkManager::telnetPrintln(const char *str) {
+  if (telnetClient && telnetClient.connected() &&
+      telnet_auth_state == TELNET_AUTH_AUTHENTICATED) {
+    telnetClient.println(str);
+  }
 }
