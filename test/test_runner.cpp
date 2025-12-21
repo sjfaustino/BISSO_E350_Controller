@@ -6,9 +6,9 @@
  * the Unity framework and runs all test suites.
  */
 
-#include <unity.h>
 #include <cstdio>
 #include <cstdlib>
+#include <unity.h>
 
 /**
  * @brief Forward declarations for test suite functions
@@ -26,53 +26,49 @@ extern void run_openapi_tests(void);
  * @brief setUp() - called before each test
  * Required by Unity framework
  */
-static void setUp(void)
-{
-    // Called before each individual test
-    // Override in specific test files if needed
+void setUp(void) {
+  // Called before each individual test
+  // Override in specific test files if needed
 }
 
 /**
  * @brief tearDown() - called after each test
  * Required by Unity framework
  */
-static void tearDown(void)
-{
-    // Called after each individual test
-    // Override in specific test files if needed
+void tearDown(void) {
+  // Called after each individual test
+  // Override in specific test files if needed
 }
 
 /**
  * @brief suiteSetUp() - called once at start of all tests
  * Optional, but useful for global initialization
  */
-void suiteSetUp(void)
-{
-    UnityPrint("\n");
-    UnityPrint("========================================\n");
-    UnityPrint("BISSO E350 Unit Test Suite\n");
-    UnityPrint("========================================\n");
-    UnityPrint("Initializing test framework...\n\n");
+void suiteSetUp(void) {
+  UnityPrint("\n");
+  UnityPrint("========================================\n");
+  UnityPrint("BISSO E350 Unit Test Suite\n");
+  UnityPrint("========================================\n");
+  UnityPrint("Initializing test framework...\n\n");
 }
 
 /**
  * @brief suiteTearDown() - called once at end of all tests
  * Optional, but useful for global cleanup and reporting
  */
-int suiteTearDown(int num_failures)
-{
-    UnityPrint("\n");
-    UnityPrint("========================================\n");
-    if (num_failures == 0) {
-        UnityPrint("✓ ALL TESTS PASSED\n");
-    } else {
-        UnityPrint("✗ TESTS FAILED: ");
-        UnityPrintNumber(num_failures);
-        UnityPrint(" failures\n");
-    }
-    UnityPrint("========================================\n\n");
+int suiteTearDown(int num_failures) {
+  UnityPrint("\n");
+  UnityPrint("========================================\n");
+  if (num_failures == 0) {
+    UnityPrint("✓ ALL TESTS PASSED\n");
+  } else {
+    UnityPrint("✗ TESTS FAILED: ");
+    UnityPrintNumber(num_failures);
+    UnityPrint(" failures\n");
+  }
+  UnityPrint("========================================\n\n");
 
-    return (num_failures == 0) ? 0 : 1;  // Return exit code
+  return (num_failures == 0) ? 0 : 1; // Return exit code
 }
 
 /**
@@ -81,35 +77,34 @@ int suiteTearDown(int num_failures)
  * This is the executable that gets compiled and run for testing.
  * It initializes Unity and executes all registered tests.
  */
-int main(int argc, char* argv[])
-{
-    (void)argc;  // Suppress unused parameter warning
+int main(int argc, char *argv[]) {
+  (void)argc; // Suppress unused parameter warning
 
-    // Initialize Unity
-    UnityBegin(argv[0]);
+  // Initialize Unity
+  UnityBegin(argv[0]);
 
-    // Run test suites
-    UnityPrint("Running Motion Control Tests...\n");
-    run_motion_control_tests();
+  // Run test suites
+  UnityPrint("Running Motion Control Tests...\n");
+  run_motion_control_tests();
 
-    UnityPrint("\nRunning Safety System Tests...\n");
-    run_safety_system_tests();
+  UnityPrint("\nRunning Safety System Tests...\n");
+  run_safety_system_tests();
 
-    UnityPrint("\nRunning Encoder Validation Tests...\n");
-    run_encoder_validation_tests();
+  UnityPrint("\nRunning Encoder Validation Tests...\n");
+  run_encoder_validation_tests();
 
-    UnityPrint("\nRunning Configuration Tests...\n");
-    run_configuration_tests();
+  UnityPrint("\nRunning Configuration Tests...\n");
+  run_configuration_tests();
 
-    UnityPrint("\nRunning API Configuration Tests...\n");
-    run_api_config_tests();
+  UnityPrint("\nRunning API Configuration Tests...\n");
+  run_api_config_tests();
 
-    UnityPrint("\nRunning API Endpoints Tests...\n");
-    run_api_endpoints_tests();
+  UnityPrint("\nRunning API Endpoints Tests...\n");
+  run_api_endpoints_tests();
 
-    UnityPrint("\nRunning OpenAPI Specification Tests...\n");
-    run_openapi_tests();
+  UnityPrint("\nRunning OpenAPI Specification Tests...\n");
+  run_openapi_tests();
 
-    // Finish and report
-    return UnityEnd();
+  // Finish and report
+  return UnityEnd();
 }
