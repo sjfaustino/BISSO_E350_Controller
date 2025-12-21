@@ -6,6 +6,35 @@
 #ifndef CONFIG_KEYS_H
 #define CONFIG_KEYS_H
 
+/**
+ * ⚠️ NVS KEY LENGTH LIMIT WARNING ⚠️
+ *
+ * ESP-IDF NVS (Non-Volatile Storage) has a strict 15-character limit for key names.
+ * All keys defined in this file MUST be strictly < 15 characters to avoid silent
+ * truncation or NVS errors.
+ *
+ * Current longest keys (14 chars - at safe limit):
+ * - "home_prof_fast" (14 chars)
+ * - "home_prof_slow" (14 chars)
+ * - "vfd_stall_marg" (14 chars)
+ * - "mot_app_mode"   (12 chars) ✓
+ *
+ * When adding new keys:
+ * 1. Keep names descriptive but concise
+ * 2. Use abbreviations (e.g., "thr" for threshold, "en" for enable, "prof" for profile)
+ * 3. Verify length before committing: strlen("your_key_name") < 15
+ * 4. Test with actual NVS storage (nvs_set_* will fail silently if key too long)
+ *
+ * Example safe abbreviations:
+ * - "threshold" → "thr" or "thresh"
+ * - "enable" → "en"
+ * - "profile" → "prof"
+ * - "position" → "pos"
+ * - "calibration" → "cal"
+ * - "spindle" → "spindl"
+ * - "temperature" → "temp"
+ */
+
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"
 #define KEY_X_LIMIT_MAX "x_limit_max"

@@ -41,6 +41,40 @@ The firmware is strictly optimized for the following components:
 | **Serial (UART)** | Wayjun WJ66 DRO Reader | Input of real-time, consolidated 4-axis position data (pulses/counts) from the external optical encoders. | `encoder_wj66.cpp`, `tasks_encoder.cpp` |
 | **Non-Volatile Storage (NVS)** | Internal Flash Memory | Persistence for all **Calibration Data** (PPM, speeds) and **Fault History**. | `config_unified.cpp`, `fault_logging.cpp` |
 
+### 2.3 Security Considerations
+
+⚠️ **CRITICAL SECURITY WARNING**
+
+This controller provides a web interface for monitoring and control. **IMPORTANT SECURITY REQUIREMENTS:**
+
+#### Network Deployment
+- ✅ **SAFE:** Local network only (192.168.x.x, 10.x.x.x)
+- ⚠️ **CAUTION:** WiFi AP mode (ensure WPA2 encryption enabled)
+- ❌ **NEVER:** Expose directly to the internet without VPN
+
+#### Authentication
+- Default credentials use **HTTP Basic Auth** (base64 encoding, not encryption)
+- Credentials are transmitted in **cleartext** over the network
+- **Only safe on trusted local networks**
+- Change default passwords immediately after deployment
+
+#### Remote Access
+If remote access is required:
+- ✅ **RECOMMENDED:** Use VPN (WireGuard, OpenVPN, Tailscale)
+- ✅ **ALTERNATIVE:** Use SSH tunnel (`ssh -L 8080:192.168.1.100:80 user@gateway`)
+- ❌ **NEVER:** Port-forward web interface directly to internet
+
+#### Password Management
+- Change default **web credentials** immediately (see `config_keys.h`: `KEY_WEB_USERNAME`, `KEY_WEB_PASSWORD`)
+- Change default **OTA password** immediately (see `config_keys.h`: `KEY_OTA_PASSWORD`)
+- Store credentials securely (do not commit to version control)
+- Use strong, unique passwords (minimum 12 characters)
+
+#### Physical Safety Interlocks
+**Primary Safety:** This system relies on a **hardware emergency stop (mushroom button)** that physically cuts all power to motors. Software E-Stop is a secondary safety layer and should NOT be relied upon as the sole safety mechanism.
+
+**Failure to follow these security guidelines can result in unauthorized access to the CNC controller, potentially causing equipment damage, safety hazards, or data loss.**
+
 ***
 
 ## 3. Software Architecture (Developer Deep Dive)
