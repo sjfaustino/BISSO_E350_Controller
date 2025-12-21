@@ -62,6 +62,10 @@ void elboSetSpeedProfile(uint8_t profile_idx);
 // PHASE 3.1: Added getter to allow LCD and diagnostics to display active speed profile
 uint8_t elboGetSpeedProfile();  // Returns current speed profile (1-3)
 void elboSetDirection(uint8_t axis, bool forward);
-void elboDiagnostics(); 
+void elboDiagnostics();
+
+// PHASE 5.7: Gemini Fix - Shadow register health monitoring
+uint32_t elboGetMutexTimeoutCount();  // Returns count of shadow mutex timeouts
+bool elboIsShadowRegisterDirty();     // Returns true if shadow register is out of sync 
 
 #endif // PLC_IFACE_H

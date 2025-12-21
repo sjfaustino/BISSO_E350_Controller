@@ -36,9 +36,50 @@ static uint8_t q73_shadow_register = 0x00;
 //   1. Shadow registers are only accessed from tasks, not ISRs
 //   2. Mutexes allow proper task scheduling instead of disabling interrupts
 //   3. More efficient for multi-task synchronization
-static SemaphoreHandle_t plc_shadow_mutex = NULL; 
+static SemaphoreHandle_t plc_shadow_mutex = NULL;
+
+// PHASE 5.7: Gemini Fix - Shadow Register Dirty Flag (Mutex Timeout Handling)
+// If mutex timeout occurs, shadow register is NOT updated but hardware might be fine
+// Dirty flag tracks when shadow register is out of sync with hardware
+// Next successful I2C write will re-sync by writing the full shadow register
+static bool q73_shadow_dirty = false;
+static uint32_t q73_mutex_timeout_count = 0;
 
 #define I2C_RETRIES 3
+#define SHADOW_MUTEX_TIMEOUT_MS 100
+#define SHADOW_MUTEX_RETRIES 3
+
+// ============================================================================
+// INTERNAL HELPERS
+// ============================================================================
+
+/**
+ * @brief Safely acquire shadow register mutex with retry logic (Gemini Fix)
+ * @details Implements retry mechanism to prevent shadow register desync
+ *          If all retries fail, sets dirty flag for later recovery
+ * @return true if mutex acquired, false if all retries failed
+ */
+static bool plcAcquireShadowMutex() {
+    for (int retry = 0; retry < SHADOW_MUTEX_RETRIES; retry++) {
+        if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(SHADOW_MUTEX_TIMEOUT_MS)) == pdTRUE) {
+            return true;  // Success
+        }
+
+        // Retry after brief delay
+        if (retry < SHADOW_MUTEX_RETRIES - 1) {
+            vTaskDelay(pdMS_TO_TICKS(5));
+        }
+    }
+
+    // All retries failed - this is serious
+    q73_shadow_dirty = true;
+    q73_mutex_timeout_count++;
+
+    logError("[PLC] [CRITICAL] Shadow mutex timeout after %d retries (count: %lu)",
+             SHADOW_MUTEX_RETRIES, (unsigned long)q73_mutex_timeout_count);
+
+    return false;
+}
 
 // ============================================================================
 // INTERNAL I2C HELPER
@@ -60,6 +101,13 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char* context) {
 
         if (error == 0) {
             taskUnlockMutex(taskGetI2cPlcMutex());
+
+            // PHASE 5.7: Gemini Fix - Clear dirty flag on successful I2C write
+            // Shadow register is now in sync with hardware
+            if (address == ADDR_Q73_OUTPUT) {
+                q73_shadow_dirty = false;
+            }
+
             return true; // Success
         }
 
@@ -69,6 +117,12 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char* context) {
     taskUnlockMutex(taskGetI2cPlcMutex());
     logError("[PLC] I2C Write Failed (Addr 0x%02X, Err %d): %s", address, error, context);
     faultLogEntry(FAULT_ERROR, FAULT_I2C_ERROR, -1, address, context);
+
+    // PHASE 5.7: I2C write failed - shadow register might be out of sync
+    if (address == ADDR_Q73_OUTPUT) {
+        q73_shadow_dirty = true;
+    }
+
     return false;
 }
 
@@ -106,11 +160,12 @@ void elboInit() {
 void elboSetDirection(uint8_t axis, bool forward) {
     if (axis >= 4) return;
 
-    // CRITICAL FIX: Use mutex to protect shadow register modification
-    // Race condition: Motion task and CLI task could both call this function,
-    // causing one task's modification to overwrite the other's
-    if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-        logWarning("[PLC] Failed to acquire shadow mutex for SetDirection");
+    // PHASE 5.7: Gemini Fix - Use retry helper instead of simple timeout
+    // Prevents shadow register desynchronization on mutex timeout
+    if (!plcAcquireShadowMutex()) {
+        // All retries failed - critical error
+        // Dirty flag is set by helper, will be recovered on next successful write
+        logError("[PLC] SetDirection FAILED for axis %d (shadow register dirty)", axis);
         return;
     }
 
@@ -133,10 +188,9 @@ void elboSetDirection(uint8_t axis, bool forward) {
 }
 
 void elboSetSpeedProfile(uint8_t profile_index) {
-    // CRITICAL FIX: Use mutex to protect shadow register modification
-    // Race condition: Motion task and other tasks could modify simultaneously
-    if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-        logWarning("[PLC] Failed to acquire shadow mutex for SetSpeedProfile");
+    // PHASE 5.7: Gemini Fix - Use retry helper instead of simple timeout
+    if (!plcAcquireShadowMutex()) {
+        logError("[PLC] SetSpeedProfile FAILED for profile %d (shadow register dirty)", profile_index);
         return;
     }
 
@@ -183,10 +237,11 @@ uint8_t elboGetSpeedProfile() {
 void elboQ73SetRelay(uint8_t relay_bit, bool state) {
     if (relay_bit > 7) return;
 
-    // CRITICAL FIX: Use mutex to protect shadow register modification
-    // Race condition: Multiple relay commands could be lost if not protected
-    if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-        logWarning("[PLC] Failed to acquire shadow mutex for SetRelay");
+    // PHASE 5.7: Gemini Fix - Use retry helper instead of simple timeout
+    // CRITICAL BUG FIX: Previous code returned early on mutex timeout,
+    // leaving shadow register out of sync with hardware
+    if (!plcAcquireShadowMutex()) {
+        logError("[PLC] SetRelay FAILED for bit %d (shadow register dirty)", relay_bit);
         return;
     }
 
@@ -254,6 +309,10 @@ void elboDiagnostics() {
     Serial.printf("Output Register: 0x%02X\n", output_reg);
     Serial.printf("Input Register:  0x%02X\n", i73_input_shadow);
 
+    // PHASE 5.7: Gemini Fix - Display shadow register health
+    Serial.printf("Shadow Register Dirty: %s\n", q73_shadow_dirty ? "YES (OUT OF SYNC!)" : "No");
+    Serial.printf("Mutex Timeout Count: %lu\n", (unsigned long)q73_mutex_timeout_count);
+
     // CRITICAL FIX: Acquire PLC I2C mutex for diagnostics
     if (taskLockMutex(taskGetI2cPlcMutex(), 500)) {
         Wire.beginTransmission(ADDR_Q73_OUTPUT);
@@ -263,4 +322,13 @@ void elboDiagnostics() {
     } else {
         Serial.println("Q73: Could not acquire I2C mutex for diagnostics");
     }
+}
+
+// PHASE 5.7: Gemini Fix - Shadow Register Health Monitoring
+uint32_t elboGetMutexTimeoutCount() {
+    return q73_mutex_timeout_count;
+}
+
+bool elboIsShadowRegisterDirty() {
+    return q73_shadow_dirty;
 }

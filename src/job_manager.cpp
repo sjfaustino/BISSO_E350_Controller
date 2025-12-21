@@ -31,10 +31,14 @@ void JobManager::init() {
 void JobManager::update() {
     if (status.state != JOB_RUNNING || !file_open) return;
 
-    // FIX: Use available() instead of getCount()
-    // FIX: Use MOTION_BUFFER_SIZE instead of MOTION_BUFFER_DEPTH
+    // PHASE 5.7: Gemini Clarification - Buffer Naming Convention
+    // NOTE: motionBuffer.available() returns COUNT USED (not count free!)
+    // This is opposite of Arduino convention where available() typically means "data ready to read"
+    // Here: available() returns number of commands IN buffer (0 = empty, 32 = full)
+    // Logic: Stop reading G-Code file if buffer is almost full (only 1 slot free)
+    // Prevents buffer overflow while allowing pipeline to continue draining
     if (motionBuffer.available() >= (MOTION_BUFFER_SIZE - 1)) {
-        return; 
+        return;  // Buffer almost full - wait for motion task to consume commands
     }
 
     for (int i = 0; i < 5; i++) {

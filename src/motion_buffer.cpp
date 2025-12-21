@@ -92,6 +92,10 @@ bool MotionBuffer::isEmpty_unsafe() {
     return count == 0;
 }
 
+// PHASE 5.7: Gemini Clarification - Naming Convention
+// NOTE: available() returns COUNT USED (number of items IN buffer)
+// This is OPPOSITE of Arduino convention where available() means "data ready to read"
+// Returns: 0 = empty, MOTION_BUFFER_SIZE = full
 int MotionBuffer::available_unsafe() {
     return count;
 }
@@ -228,6 +232,11 @@ void MotionBuffer::clear() {
     xSemaphoreGive(buffer_mutex);
 }
 
+// PHASE 5.7: Gemini Clarification - Naming Convention
+// NOTE: available() returns COUNT USED (not count free!)
+// Arduino convention: available() = "data ready to read" (e.g., Serial.available())
+// This buffer: available() = "items in buffer" (0 = empty, 32 = full)
+// Use case: Job manager checks if buffer is almost full to pause G-Code reading
 int MotionBuffer::available() {
     if (buffer_mutex == NULL) {
         logWarning("[BUFFER] WARNING: available() called with uninitialized mutex");
