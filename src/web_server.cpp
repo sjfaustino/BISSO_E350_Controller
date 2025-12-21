@@ -342,16 +342,10 @@ void WebServerManager::setupRoutes() {
                if (!request->authenticate(http_username, http_password))
                  return request->requestAuthentication();
 
-               char *status_buffer = (char *)malloc(512);
-               if (!status_buffer) {
-                 request->send(500, "application/json",
-                               "{\"error\":\"Memory allocation failed\"}");
-                 return;
-               }
-
-               otaUpdaterExportJSON(status_buffer, 512);
+               // Stack allocation - 512 bytes is safe for async handlers
+               char status_buffer[512];
+               otaUpdaterExportJSON(status_buffer, sizeof(status_buffer));
                request->send(200, "application/json", status_buffer);
-               free(status_buffer);
              });
 
   server
@@ -407,16 +401,11 @@ void WebServerManager::setupRoutes() {
                if (!request->authenticate(http_username, http_password))
                  return request->requestAuthentication();
 
-               char *compact_buffer = (char *)malloc(512);
-               if (!compact_buffer) {
-                 request->send(500, "application/json",
-                               "{\"error\":\"Memory allocation failed\"}");
-                 return;
-               }
-
-               telemetryExportCompactJSON(compact_buffer, 512);
+               // Stack allocation - 512 bytes is safe for async handlers
+               char compact_buffer[512];
+               telemetryExportCompactJSON(compact_buffer,
+                                          sizeof(compact_buffer));
                request->send(200, "application/json", compact_buffer);
-               free(compact_buffer);
              });
 
   // 8. API Endpoint Discovery (Unprotected for auto-discovery) - PHASE 5.2
@@ -596,23 +585,17 @@ void WebServerManager::setupRoutes() {
           return;
         }
 
-        char *metrics_buffer = (char *)malloc(512);
-        if (!metrics_buffer) {
-          request->send(500, "application/json",
-                        "{\"error\":\"Memory allocation failed\"}");
-          return;
-        }
-
-        size_t metrics_size = dashboardMetricsExportJSON(metrics_buffer, 512);
+        // Stack allocation - 512 bytes is safe for async handlers
+        char metrics_buffer[512];
+        size_t metrics_size =
+            dashboardMetricsExportJSON(metrics_buffer, sizeof(metrics_buffer));
         if (metrics_size == 0) {
-          free(metrics_buffer);
           request->send(500, "application/json",
                         "{\"error\":\"Failed to export dashboard metrics\"}");
           return;
         }
 
         request->send(200, "application/json", metrics_buffer);
-        free(metrics_buffer);
       });
 
   // 13. DELEGATE FILE MANAGEMENT
