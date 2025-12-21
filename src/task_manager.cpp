@@ -289,12 +289,25 @@ void taskEncoderCreate() {
   }
 }
 void taskPlcCommCreate() {
-  if(xTaskCreatePinnedToCore(taskPlcCommFunction, "PLC_Comm", TASK_STACK_PLC_COMM, NULL, TASK_PRIORITY_PLC_COMM, &task_plc_comm, CORE_1) == pdPASS) {
-    task_stats[3].handle = task_plc_comm;
-  } else {
-    logError("[TASK] ERROR: Failed to create PLC_Comm task!");
-    task_plc_comm = NULL;
-  }
+  // PHASE 5.7: Ghost Task Removed (Gemini Optimization)
+  // CRITICAL: This task did NOTHING except feed watchdog every 50ms
+  // Waste: 2KB RAM (TASK_STACK_PLC_COMM = 2048 bytes)
+  // Fix: Watchdog feed moved to Motion task (Motion already uses PLC I/O)
+  // Impact: Saves 2KB RAM, reduces task switching overhead
+  // See: docs/GEMINI_IMPROVEMENT_ROADMAP.md and docs/GEMINI_FINAL_AUDIT.md
+
+  // ❌ DISABLED: Ghost task creation
+  // if(xTaskCreatePinnedToCore(taskPlcCommFunction, "PLC_Comm", TASK_STACK_PLC_COMM, NULL, TASK_PRIORITY_PLC_COMM, &task_plc_comm, CORE_1) == pdPASS) {
+  //   task_stats[3].handle = task_plc_comm;
+  // } else {
+  //   logError("[TASK] ERROR: Failed to create PLC_Comm task!");
+  //   task_plc_comm = NULL;
+  // }
+
+  // ✅ Task disabled - PLC watchdog now fed by Motion task
+  task_plc_comm = NULL;
+  task_stats[3].handle = NULL;
+  logInfo("[TASK] PLC task disabled (ghost task optimization - saves 2KB RAM)");
 }
 void taskI2cManagerCreate() {
   if(xTaskCreatePinnedToCore(taskI2cManagerFunction, "I2C_Manager", TASK_STACK_I2C_MANAGER, NULL, TASK_PRIORITY_I2C_MANAGER, &task_i2c_manager, CORE_1) == pdPASS) {

@@ -50,7 +50,12 @@ void taskMotionFunction(void* parameter) {
     }
 
     watchdogFeed("Motion");
-    
+
+    // PHASE 5.7: PLC Watchdog (Gemini Ghost Task Optimization)
+    // PLC task removed (was doing nothing except feeding watchdog)
+    // Motion task now feeds PLC watchdog since Motion uses PLC I/O heavily
+    watchdogFeed("PLC");
+
     // Hybrid Wait: Periodic + Event Driven
     TickType_t xNow = xTaskGetTickCount();
     xLastWakeTime += xPeriod;

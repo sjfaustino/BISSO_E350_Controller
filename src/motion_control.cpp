@@ -823,6 +823,11 @@ bool motionWaitPin(uint8_t pin_id, uint8_t pin_type, uint8_t state, uint32_t tim
 }
 
 void motionEmergencyStop() {
+    // PHASE 5.7: E-Stop Latency Monitoring (Gemini Recommendation)
+    // Track E-Stop response time to detect priority inversion issues
+    // Target: <50ms (ISO 13849 PLd), Warn if >50ms
+    uint32_t estop_start_us = micros();
+
     // CRITICAL: Deadlock Prevention (Gemini Audit)
     // Use 10ms timeout to prevent deadlock if Motion task holds mutex while blocked on I2C
     // If timeout occurs, E-stop still succeeds via hardware PLC I/O (independent of mutex)
@@ -833,19 +838,29 @@ void motionEmergencyStop() {
     // This does NOT require motion_mutex - uses taskGetI2cPlcMutex() instead
     // Ensures axes stop even if mutex unavailable
     motionSetPLCAxisDirection(255, false, false);
-    
+
     portENTER_CRITICAL(&motionSpinlock);
     m_state.global_enabled = false;
     for (int i = 0; i < MOTION_AXES; i++) axes[i].state = MOTION_ERROR;
     m_state.active_axis = 255;
     portEXIT_CRITICAL(&motionSpinlock);
-    
+
     motionBuffer.clear();
     autoReportDisable();  // PHASE 4.0: Disable auto-report on E-Stop
     lcdSleepWakeup();    // PHASE 4.0: Wake display on E-Stop for visibility
     if (got_mutex) taskUnlockMutex(taskGetMotionMutex());
 
-    logError("[MOTION] [CRITICAL] EMERGENCY STOP ACTIVATED");
+    // PHASE 5.7: E-Stop Latency Monitoring (Gemini Recommendation)
+    // Measure and log E-Stop response time
+    // Safety limits: IEC 61508 SIL2 (<100ms), ISO 13849 PLd (<50ms)
+    uint32_t estop_latency_us = micros() - estop_start_us;
+    if (estop_latency_us > 50000) {  // >50ms (50,000 microseconds)
+        logWarning("[MOTION] [SAFETY] E-Stop latency high: %lu us (%.1f ms) - Target: <50ms",
+                   (unsigned long)estop_latency_us, estop_latency_us / 1000.0f);
+    }
+
+    logError("[MOTION] [CRITICAL] EMERGENCY STOP ACTIVATED (Latency: %.1f ms)",
+             estop_latency_us / 1000.0f);
     faultLogError(FAULT_EMERGENCY_HALT, "E-Stop Activated");
     taskSignalMotionUpdate();
 }

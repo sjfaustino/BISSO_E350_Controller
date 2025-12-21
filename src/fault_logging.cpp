@@ -236,8 +236,32 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, i
   }
 }
 
+// PHASE 5.7: NVS Write Cooldown (Gemini Flash Wear Prevention)
+// CRITICAL FIX: Prevent flash burnout from repeated fault logging
+// Problem: Flickering sensor → 1000 faults/sec → 7000 NVS writes/sec → flash burned in minutes
+// Solution: Cooldown timer per fault type (max 1 write/second per fault code)
+// Flash endurance: 100,000 cycles → without cooldown, failure in <15 minutes
+// See: docs/GEMINI_IMPROVEMENT_ROADMAP.md for complete analysis
+#define NVS_WRITE_COOLDOWN_MS 1000  // Max 1 write per second per fault type
+static uint32_t last_nvs_write_time[FAULT_CODE_MAX] = {0};
+
 void faultLogToNVS(const fault_entry_t* entry) {
   if (!entry) return;
+
+  // ✅ GEMINI FIX: Check cooldown before writing to NVS
+  // Skip NVS write if same fault code was logged recently
+  // This prevents flash wear from repeated faults (e.g., sensor glitches)
+  uint32_t now = millis();
+  if (entry->code < FAULT_CODE_MAX) {
+    uint32_t time_since_last_write = now - last_nvs_write_time[entry->code];
+    if (time_since_last_write < NVS_WRITE_COOLDOWN_MS) {
+      // Too soon - skip NVS write to prevent flash wear
+      // Fault is still logged to RAM ring buffer for real-time monitoring
+      return;
+    }
+    // Update cooldown timestamp for this fault type
+    last_nvs_write_time[entry->code] = now;
+  }
 
   // CRITICAL FIX: Auto-rotate faults if we hit the limit
   // This prevents NVS from filling up over many boot cycles
