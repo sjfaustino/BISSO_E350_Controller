@@ -243,8 +243,7 @@ void WebServerManager::setupRoutes() {
 
   // 2. API Status (Protected, Rate Limited)
   server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!request->authenticate(http_username, http_password))
-      return request->requestAuthentication();
+    if (!requireAuth(request)) return;
 
     // PHASE 5.1: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
@@ -285,8 +284,7 @@ void WebServerManager::setupRoutes() {
 
   // 4. API Spindle Telemetry (Protected, Rate Limited) - PHASE 5.1
   server->on("/api/spindle", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!request->authenticate(http_username, http_password))
-      return request->requestAuthentication();
+    if (!requireAuth(request)) return;
 
     // PHASE 5.1: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_SPINDLE, 0)) {
@@ -335,8 +333,7 @@ void WebServerManager::setupRoutes() {
 
   // 5. API Task Performance Metrics (Protected, Rate Limited) - PHASE 5.1
   server->on("/api/metrics", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!request->authenticate(http_username, http_password))
-      return request->requestAuthentication();
+    if (!requireAuth(request)) return;
 
     // PHASE 5.1: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
@@ -360,8 +357,7 @@ void WebServerManager::setupRoutes() {
   // 6. API OTA Firmware Update (Protected, Large Upload) - PHASE 5.1
   server->on("/api/update/status", HTTP_GET,
              [this](AsyncWebServerRequest *request) {
-               if (!request->authenticate(http_username, http_password))
-                 return request->requestAuthentication();
+               if (!requireAuth(request)) return;
 
                // Stack allocation - 512 bytes is safe for async handlers
                char status_buffer[512];
@@ -386,8 +382,7 @@ void WebServerManager::setupRoutes() {
   // 7. API Comprehensive System Telemetry (Protected, Rate Limited) - PHASE 5.1
   server->on(
       "/api/telemetry", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        if (!request->authenticate(http_username, http_password))
-          return request->requestAuthentication();
+        if (!requireAuth(request)) return;
 
         // PHASE 5.1: Rate limiting check
         if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
@@ -411,8 +406,7 @@ void WebServerManager::setupRoutes() {
   // Lightweight telemetry for high-frequency polling
   server->on("/api/telemetry/compact", HTTP_GET,
              [this](AsyncWebServerRequest *request) {
-               if (!request->authenticate(http_username, http_password))
-                 return request->requestAuthentication();
+               if (!requireAuth(request)) return;
 
                // Stack allocation - 512 bytes is safe for async handlers
                char compact_buffer[512];
@@ -479,8 +473,7 @@ void WebServerManager::setupRoutes() {
 
   // 9. API Health Check (Protected, Rate Limited) - PHASE 5.2
   server->on("/api/health", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!request->authenticate(http_username, http_password))
-      return request->requestAuthentication();
+    if (!requireAuth(request)) return;
 
     // PHASE 5.2: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
@@ -521,8 +514,7 @@ void WebServerManager::setupRoutes() {
   server->on(
       "/api/encoder/diagnostics", HTTP_GET,
       [this](AsyncWebServerRequest *request) {
-        if (!request->authenticate(http_username, http_password))
-          return request->requestAuthentication();
+        if (!requireAuth(request)) return;
 
         // PHASE 5.3: Rate limiting check
         if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
@@ -545,8 +537,7 @@ void WebServerManager::setupRoutes() {
 
   // 11. PHASE 5.3: API Load Status (Protected, Rate Limited)
   server->on("/api/load", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!request->authenticate(http_username, http_password))
-      return request->requestAuthentication();
+    if (!requireAuth(request)) return;
 
     // PHASE 5.3: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
@@ -581,8 +572,7 @@ void WebServerManager::setupRoutes() {
   server->on(
       "/api/dashboard/metrics", HTTP_GET,
       [this](AsyncWebServerRequest *request) {
-        if (!request->authenticate(http_username, http_password))
-          return request->requestAuthentication();
+        if (!requireAuth(request)) return;
 
         // PHASE 5.3: Rate limiting check (less strict for dashboard updates)
         if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
@@ -612,9 +602,7 @@ void WebServerManager::setupRoutes() {
   // GET /api/config/get?category=<N> - Retrieve configuration by category
   server->on(
       "/api/config/get", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        if (!request->authenticate(http_username, http_password)) {
-          return request->requestAuthentication();
-        }
+        if (!requireAuth(request)) return;
 
         if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
           request->send(429, "application/json",
@@ -649,9 +637,7 @@ void WebServerManager::setupRoutes() {
   server->on("/api/config/set", HTTP_POST, nullptr, nullptr,
              [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
                     size_t index, size_t total) {
-               if (!request->authenticate(http_username, http_password)) {
-                 return request->requestAuthentication();
-               }
+               if (!requireAuth(request)) return;
 
                // INPUT VALIDATION: Check body size to prevent overflow
                if (!validateBodySize(len, total)) {
@@ -723,9 +709,7 @@ void WebServerManager::setupRoutes() {
   server->on("/api/config/validate", HTTP_POST, nullptr, nullptr,
              [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
                     size_t index, size_t total) {
-               if (!request->authenticate(http_username, http_password)) {
-                 return request->requestAuthentication();
-               }
+               if (!requireAuth(request)) return;
 
                // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
                // heap fragmentation
@@ -768,9 +752,7 @@ void WebServerManager::setupRoutes() {
   // GET /api/config/schema?category=<N> - Get configuration schema
   server->on(
       "/api/config/schema", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        if (!request->authenticate(http_username, http_password)) {
-          return request->requestAuthentication();
-        }
+        if (!requireAuth(request)) return;
 
         const AsyncWebParameter *categoryParam = request->getParam("category");
         if (!categoryParam) {
@@ -799,9 +781,7 @@ void WebServerManager::setupRoutes() {
   server->on("/api/encoder/calibrate", HTTP_POST, nullptr, nullptr,
              [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
                     size_t index, size_t total) {
-               if (!request->authenticate(http_username, http_password)) {
-                 return request->requestAuthentication();
-               }
+               if (!requireAuth(request)) return;
 
                if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
                  request->send(429, "application/json",
@@ -849,9 +829,7 @@ void WebServerManager::setupRoutes() {
       "/api/gcode", HTTP_POST, nullptr, nullptr,
       [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
              size_t index, size_t total) {
-        if (!request->authenticate(http_username, http_password)) {
-          return request->requestAuthentication();
-        }
+        if (!requireAuth(request)) return;
 
         if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) { // Reuse jog rate limit
           request->send(429, "application/json",
@@ -893,9 +871,7 @@ void WebServerManager::setupRoutes() {
 
   // GET /api/alarms - Get active alarms and fault history
   server->on("/api/alarms", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!request->authenticate(http_username, http_password)) {
-      return request->requestAuthentication();
-    }
+    if (!requireAuth(request)) return;
 
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
       request->send(429, "application/json",
@@ -942,9 +918,7 @@ void WebServerManager::setupRoutes() {
   // POST /api/estop/trigger - Trigger emergency stop
   server->on("/api/estop/trigger", HTTP_POST,
              [this](AsyncWebServerRequest *request) {
-               if (!request->authenticate(http_username, http_password)) {
-                 return request->requestAuthentication();
-               }
+               if (!requireAuth(request)) return;
 
                emergencyStopSetActive(true);
                request->send(200, "application/json",
@@ -954,9 +928,7 @@ void WebServerManager::setupRoutes() {
   // POST /api/estop/reset - Request E-stop recovery
   server->on("/api/estop/reset", HTTP_POST,
              [this](AsyncWebServerRequest *request) {
-               if (!request->authenticate(http_username, http_password)) {
-                 return request->requestAuthentication();
-               }
+               if (!requireAuth(request)) return;
 
                bool success = emergencyStopRequestRecovery();
 
