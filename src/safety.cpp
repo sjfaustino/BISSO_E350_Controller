@@ -20,17 +20,34 @@
 #include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion validation
 #include <string.h>
 #include <math.h>  // For isnan() sensor validation
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
-static safety_system_data_t safety_state; 
+// PHASE 5.7: Cursor AI Fix - Thread-safe safety state with mutex protection
+static safety_system_data_t safety_state;
 static bool alarm_active = false;
 static uint32_t alarm_trigger_time = 0;
 static uint32_t last_stall_check = 0;
 
+// PHASE 5.7: Cursor AI Fix - Mutex to protect safety state from race conditions
+// Multiple tasks can trigger alarms (Safety task, Motion task, Encoder task)
+// Without protection, alarm state can be corrupted
+static SemaphoreHandle_t safety_state_mutex = NULL;
+
 void safetyInit() {
   Serial.println("[SAFETY] Initializing...");
+
+  // PHASE 5.7: Cursor AI Fix - Create mutex for thread-safe safety state
+  safety_state_mutex = xSemaphoreCreateMutex();
+  if (safety_state_mutex == NULL) {
+    Serial.println("[SAFETY] [CRITICAL] Failed to create safety state mutex!");
+  } else {
+    Serial.println("[SAFETY] [OK] Safety state mutex created");
+  }
+
   pinMode(SAFETY_ALARM_PIN, OUTPUT);
   digitalWrite(SAFETY_ALARM_PIN, LOW);
-  
+
   safety_state.current_fault = SAFETY_OK;
   safety_state.fault_timestamp = 0;
   safety_state.fault_duration_ms = 0;
@@ -38,7 +55,7 @@ void safetyInit() {
   safety_state.history_index = 0;
   memset(safety_state.fault_message, 0, sizeof(safety_state.fault_message));
   memset(safety_state.fault_history, 0, sizeof(safety_state.fault_history));
-  
+
   Serial.printf("[SAFETY] [OK] Alarm Pin: GPIO %d\n", SAFETY_ALARM_PIN);
 }
 
@@ -237,8 +254,18 @@ bool safetyCheckMotionAllowed(uint8_t axis) {
   return !alarm_active && safety_state.current_fault == SAFETY_OK;
 }
 
+// PHASE 5.7: Cursor AI Fix - Thread-safe alarm trigger with mutex protection
 void safetyTriggerAlarm(const char* reason) {
-  if (alarm_active) return;
+  // CRITICAL: Acquire mutex to prevent race conditions on alarm_active
+  if (safety_state_mutex && xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+    logError("[SAFETY] [CRITICAL] Failed to acquire safety mutex in triggerAlarm!");
+    // Continue anyway - safety is critical, cannot skip alarm
+  }
+
+  if (alarm_active) {
+    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+    return;
+  }
 
   alarm_active = true;
   alarm_trigger_time = millis();
@@ -250,6 +277,9 @@ void safetyTriggerAlarm(const char* reason) {
 
   snprintf(safety_state.fault_message, sizeof(safety_state.fault_message), "%s", reason);
 
+  if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+
+  // Hardware operations outside mutex (no shared state)
   digitalWrite(SAFETY_ALARM_PIN, HIGH);
 
   Serial.printf("[SAFETY] [ALARM] Triggered: %s\n", reason);
@@ -263,16 +293,73 @@ void safetyTriggerAlarm(const char* reason) {
   motionEmergencyStop();
 }
 
+// PHASE 5.7: Cursor AI Fix - Safety Alarm Reset Validation with Thread Safety
 void safetyResetAlarm() {
-  if (!alarm_active) return;
+  // CRITICAL: Acquire mutex to prevent race conditions on alarm_active
+  if (safety_state_mutex && xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+    logError("[SAFETY] [CRITICAL] Failed to acquire safety mutex in resetAlarm!");
+    return;
+  }
 
+  if (!alarm_active) {
+    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+    Serial.println("[SAFETY] [WARNING] Alarm reset requested but no alarm is active");
+    return;
+  }
+
+  // VALIDATION 1: Verify all axes have stopped moving
+  bool any_axis_moving = false;
+  for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
+    if (motionIsMoving(axis)) {
+      any_axis_moving = true;
+      logWarning("[SAFETY] [BLOCKED] Cannot reset alarm - Axis %d still moving", axis);
+      break;
+    }
+  }
+  if (any_axis_moving) {
+    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+    logError("[SAFETY] [BLOCKED] Alarm reset denied - motion must stop first");
+    return;
+  }
+
+  // VALIDATION 2: Check encoder communication status
+  // Note: This is a basic check - full encoder validation happens in encoder task
+  bool encoder_ok = true;
+  for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
+    encoder_state_t enc_state = encoderMotionGetEncoderState(axis);
+    if (enc_state == ENCODER_ERROR || enc_state == ENCODER_TIMEOUT) {
+      encoder_ok = false;
+      logWarning("[SAFETY] [WARNING] Axis %d encoder not responding", axis);
+    }
+  }
+  if (!encoder_ok && safety_state.current_fault == SAFETY_ENCODER_ERROR) {
+    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+    logError("[SAFETY] [BLOCKED] Alarm reset denied - encoder fault not cleared");
+    return;
+  }
+
+  // VALIDATION 3: Wait minimum time after alarm trigger (prevent rapid reset)
+  #define SAFETY_MIN_ALARM_DURATION_MS 1000  // Minimum 1 second before reset allowed
+  uint32_t alarm_duration = (uint32_t)(millis() - alarm_trigger_time);
+  if (alarm_duration < SAFETY_MIN_ALARM_DURATION_MS) {
+    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+    logWarning("[SAFETY] [BLOCKED] Alarm reset too soon (%lu ms < %d ms minimum)",
+               (unsigned long)alarm_duration, SAFETY_MIN_ALARM_DURATION_MS);
+    return;
+  }
+
+  // All validations passed - safe to reset alarm
   alarm_active = false;
-  digitalWrite(SAFETY_ALARM_PIN, LOW);
   safety_state.current_fault = SAFETY_OK;
-  // PHASE 5.1: Wraparound-safe duration calculation
-  safety_state.fault_duration_ms = (uint32_t)(millis() - alarm_trigger_time);
+  safety_state.fault_duration_ms = alarm_duration;
 
-  Serial.printf("[SAFETY] [OK] Alarm reset (Duration: %lu ms)\n", (unsigned long)safety_state.fault_duration_ms);
+  if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+
+  // Hardware operations outside mutex (no shared state)
+  digitalWrite(SAFETY_ALARM_PIN, LOW);
+
+  Serial.printf("[SAFETY] [OK] Alarm reset (Duration: %lu ms, validations passed)\n",
+                (unsigned long)safety_state.fault_duration_ms);
 }
 
 void safetyReportStall(uint8_t axis) {

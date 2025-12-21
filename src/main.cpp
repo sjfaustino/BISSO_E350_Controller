@@ -47,7 +47,24 @@ bool init_watchdog_wrapper() { watchdogInit(); return true; }
 bool init_timeout_wrapper() { timeoutManagerInit(); return true; }
 bool init_config_wrapper() { configUnifiedInit(); return true; }
 bool init_schema_wrapper() { configSchemaVersioningInit(); configSchemaInit(); return !configIsMigrationNeeded(); }
-bool init_calib_wrapper() { loadAllCalibration(); encoderCalibrationInit(); return true; }
+
+// PHASE 5.7: Cursor AI Fix - Proper error checking for calibration initialization
+bool init_calib_wrapper() {
+    // Calibration is SAFETY CRITICAL - must succeed for safe operation
+    bool calib_loaded = loadAllCalibration();
+    if (!calib_loaded) {
+        logError("[BOOT] [CRITICAL] Calibration load failed - motion accuracy compromised");
+        return false;
+    }
+
+    bool calib_init = encoderCalibrationInit();
+    if (!calib_init) {
+        logError("[BOOT] [CRITICAL] Encoder calibration init failed - unsafe to operate");
+        return false;
+    }
+
+    return true;
+}
 
 // UPDATED: Using correct init function
 bool init_plc_wrapper() { elboInit(); return true; }
@@ -58,7 +75,31 @@ bool init_safety_wrapper() { safetyInit(); return true; }
 bool init_motion_wrapper() { motionInit(); return true; }
 bool init_cli_wrapper() { cliInit(); return true; }
 bool init_inputs_wrapper() { boardInputsInit(); return true; }
-bool init_network_wrapper() { networkManager.init(); webServer.init(); webServer.begin(); return true; }
+
+// PHASE 5.7: Cursor AI Fix - Proper error checking for network initialization
+bool init_network_wrapper() {
+    bool network_ok = networkManager.init();
+    if (!network_ok) {
+        logWarning("[BOOT] Network manager init failed - continuing without network");
+        // Non-critical: system can operate without network (local control via serial)
+        // Return true to allow boot to continue
+    }
+
+    bool webserver_init_ok = webServer.init();
+    if (!webserver_init_ok) {
+        logWarning("[BOOT] Web server init failed - no web interface");
+        // Non-critical: system can operate without web UI
+    }
+
+    bool webserver_begin_ok = webServer.begin();
+    if (!webserver_begin_ok) {
+        logWarning("[BOOT] Web server begin failed - no web interface");
+        // Non-critical: system can operate without web UI
+    }
+
+    // Return true even if network fails - system can still operate via serial
+    return true;
+}
 
 // PHASE 5.3: Initialize advanced diagnostics and load management
 bool init_encoder_diag_wrapper() { encoderDiagnosticsInit(); return true; }
