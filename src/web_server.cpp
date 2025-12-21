@@ -40,6 +40,35 @@ static char http_username[CONFIG_VALUE_LEN] = "admin";
 static char http_password[CONFIG_VALUE_LEN] = "password";
 static bool password_change_enforced = false;
 
+// Security Constants
+#define MAX_REQUEST_BODY_SIZE 8192  // Maximum size for POST body (8KB)
+#define MAX_CONFIG_KEY_LENGTH 64    // Maximum length for config keys
+#define MAX_CONFIG_VALUE_LENGTH 256 // Maximum length for config values
+
+/**
+ * @brief Check authentication and send 401 if failed
+ * @param request The async web request
+ * @return true if authenticated, false if authentication was requested
+ * @note Helper function to reduce code duplication
+ */
+static bool requireAuth(AsyncWebServerRequest *request) {
+  if (!request->authenticate(http_username, http_password)) {
+    request->requestAuthentication();
+    return false;
+  }
+  return true;
+}
+
+/**
+ * @brief Validate request body size
+ * @param len Current chunk length
+ * @param total Total expected body size
+ * @return true if valid, false if too large
+ */
+static bool validateBodySize(size_t len, size_t total) {
+  return total <= MAX_REQUEST_BODY_SIZE;
+}
+
 // Telemetry Buffer
 static char json_response_buffer[WEB_BUFFER_SIZE];
 
@@ -647,6 +676,13 @@ void WebServerManager::setupRoutes() {
                  return request->requestAuthentication();
                }
 
+               // INPUT VALIDATION: Check body size to prevent overflow
+               if (!validateBodySize(len, total)) {
+                 request->send(413, "application/json",
+                               "{\"error\":\"Request body too large\"}");
+                 return;
+               }
+
                if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
                  request->send(429, "application/json",
                                "{\"error\":\"Rate limit exceeded\"}");
@@ -672,6 +708,23 @@ void WebServerManager::setupRoutes() {
                  request->send(400, "application/json",
                                "{\"error\":\"Missing required fields\"}");
                  return;
+               }
+
+               // INPUT VALIDATION: Check key length
+               if (strlen(key) > MAX_CONFIG_KEY_LENGTH) {
+                 request->send(400, "application/json",
+                               "{\"error\":\"Config key too long\"}");
+                 return;
+               }
+
+               // INPUT VALIDATION: Check string value length if applicable
+               if (value.is<const char *>()) {
+                 const char *strValue = value.as<const char *>();
+                 if (strValue && strlen(strValue) > MAX_CONFIG_VALUE_LENGTH) {
+                   request->send(400, "application/json",
+                                 "{\"error\":\"Config value too long\"}");
+                   return;
+                 }
                }
 
                if (!apiConfigSet((config_category_t)category, key, value)) {
