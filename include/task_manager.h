@@ -3,26 +3,27 @@
 
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
 
 // ============================================================================
 // TASK PRIORITY LEVELS
 // ============================================================================
 
-#define TASK_PRIORITY_SAFETY      24
-#define TASK_PRIORITY_MOTION      22
-#define TASK_PRIORITY_ENCODER     20
-#define TASK_PRIORITY_PLC_COMM    18
+#define TASK_PRIORITY_SAFETY 24
+#define TASK_PRIORITY_MOTION 22
+#define TASK_PRIORITY_ENCODER 20
+#define TASK_PRIORITY_PLC_COMM 18
 #define TASK_PRIORITY_I2C_MANAGER 17
-#define TASK_PRIORITY_CLI         15
-#define TASK_PRIORITY_FAULT_LOG   14
-#define TASK_PRIORITY_MONITOR     12
-#define TASK_PRIORITY_TELEMETRY   11  // PHASE 5.4: Background telemetry on Core 0
-#define TASK_PRIORITY_LCD_FORMAT  10  // PHASE 5.4: LCD string formatting on Core 0
-#define TASK_PRIORITY_LCD         9   // PHASE 5.4: Display only, reduced priority
-#define TASK_PRIORITY_IDLE        1
+#define TASK_PRIORITY_CLI 15
+#define TASK_PRIORITY_FAULT_LOG 14
+#define TASK_PRIORITY_MONITOR 12
+#define TASK_PRIORITY_TELEMETRY 11 // PHASE 5.4: Background telemetry on Core 0
+#define TASK_PRIORITY_LCD_FORMAT                                               \
+  10                        // PHASE 5.4: LCD string formatting on Core 0
+#define TASK_PRIORITY_LCD 9 // PHASE 5.4: Display only, reduced priority
+#define TASK_PRIORITY_IDLE 1
 
 // ============================================================================
 // TASK STACK SIZES
@@ -32,18 +33,26 @@
 //       - JSON serialization (ArduinoJson allocates on stack for small docs)
 //       - Deep call chains in complex state machines
 
-#define TASK_STACK_SAFETY        4096  // Increased from 2048 - was overflowing (only 144 bytes free)
-#define TASK_STACK_MOTION        4096  // Increased from 2048 - was near overflow (only 192 bytes free)
-#define TASK_STACK_ENCODER       6144  // Increased from 5120 - stack monitoring shows tight margin
-#define TASK_STACK_PLC_COMM      2048
-#define TASK_STACK_I2C_MANAGER   2048
-#define TASK_STACK_CLI           3072  // Increased from 2048 - CLI parses complex commands with snprintf
-#define TASK_STACK_FAULT_LOG     2048
-#define TASK_STACK_MONITOR       2048
-#define TASK_STACK_TELEMETRY     3072  // Increased from 2048 - collects comprehensive system state
-#define TASK_STACK_LCD_FORMAT    3072  // Increased from 2048 - multiple snprintf calls for LCD strings
-#define TASK_STACK_LCD           2048
-#define TASK_STACK_BOOT          2048
+#define TASK_STACK_SAFETY                                                      \
+  4096 // Increased from 2048 - was overflowing (only 144 bytes free)
+#define TASK_STACK_MOTION                                                      \
+  4096 // Increased from 2048 - was near overflow (only 192 bytes free)
+#define TASK_STACK_ENCODER                                                     \
+  6144 // Increased from 5120 - stack monitoring shows tight margin
+#define TASK_STACK_PLC_COMM 2048
+#define TASK_STACK_I2C_MANAGER                                                 \
+  3072 // Increased from 2048 - handling bus recovery depth
+#define TASK_STACK_CLI                                                         \
+  3072 // Increased from 2048 - CLI parses complex commands with snprintf
+#define TASK_STACK_FAULT_LOG 2048
+#define TASK_STACK_MONITOR 2048
+#define TASK_STACK_TELEMETRY                                                   \
+  3072 // Increased from 2048 - collects comprehensive system state
+#define TASK_STACK_LCD_FORMAT                                                  \
+  3072 // Increased from 2048 - multiple snprintf calls for LCD strings
+#define TASK_STACK_LCD                                                         \
+  4096 // INCREASED from 2048 due to stack overflow in error handling
+#define TASK_STACK_BOOT 2048
 
 // WARNING: AsyncWebServer handlers create JsonDocument on stack!
 // If web API returns become complex, increase CONFIG_ASYNC_TCP_TASK_STACK_SIZE
@@ -53,27 +62,29 @@
 // TASK CORE AFFINITY
 // ============================================================================
 
-#define CORE_0                   0
-#define CORE_1                   1
-#define CORE_BOTH               -1
+#define CORE_0 0
+#define CORE_1 1
+#define CORE_BOTH -1
 
 // ============================================================================
 // TASK PERIOD/FREQUENCY (in milliseconds)
 // ============================================================================
 
-#define TASK_PERIOD_SAFETY       5
-#define TASK_PERIOD_MOTION       10
-#define TASK_PERIOD_ENCODER      20
-#define TASK_PERIOD_PLC_COMM     50
-#define TASK_PERIOD_I2C_MANAGER  50
-#define TASK_PERIOD_CLI          100
-#define TASK_PERIOD_FAULT_LOG    500
-#define TASK_PERIOD_MONITOR      1000
-#define TASK_PERIOD_TELEMETRY    1000  // PHASE 5.4: Background collection same rate as monitor
-#define TASK_PERIOD_LCD_FORMAT   20    // PHASE 5.4: Format strings same rate as display
-// PHASE 3.1: Increased from 100ms to 20ms (50Hz) to match encoder update frequency
-// Reduces position display staleness from ±100ms to ±20ms
-#define TASK_PERIOD_LCD          20
+#define TASK_PERIOD_SAFETY 5
+#define TASK_PERIOD_MOTION 10
+#define TASK_PERIOD_ENCODER 20
+#define TASK_PERIOD_PLC_COMM 50
+#define TASK_PERIOD_I2C_MANAGER 50
+#define TASK_PERIOD_CLI 100
+#define TASK_PERIOD_FAULT_LOG 500
+#define TASK_PERIOD_MONITOR 1000
+#define TASK_PERIOD_TELEMETRY                                                  \
+  1000 // PHASE 5.4: Background collection same rate as monitor
+#define TASK_PERIOD_LCD_FORMAT                                                 \
+  20 // PHASE 5.4: Format strings same rate as display
+// PHASE 3.1: Increased from 100ms to 20ms (50Hz) to match encoder update
+// frequency Reduces position display staleness from ±100ms to ±20ms
+#define TASK_PERIOD_LCD 20
 
 // ============================================================================
 // ADAPTIVE I2C TIMEOUT CONFIGURATION
@@ -83,28 +94,29 @@
 // At low CPU: 50ms (system idle, I2C operations should complete quickly)
 // At high CPU: 100ms (reduced from 500ms to prevent Safety task blocking)
 // Formula: timeout_ms = base_ms + (cpu_usage_percent * scale_factor)
-// JUSTIFICATION: Safety task should never wait >100ms for I2C (5ms cycle = 20 cycles max)
-// Under load, I2C ops complete quickly due to 100kHz bus speed. If timeout needed,
-// indicates I2C bus/device failure → better to fail fast than hang system.
-#define I2C_TIMEOUT_BASE_MS      50
-#define I2C_TIMEOUT_MAX_MS       100
-#define I2C_TIMEOUT_SCALE        0.5f
+// JUSTIFICATION: Safety task should never wait >100ms for I2C (5ms cycle = 20
+// cycles max) Under load, I2C ops complete quickly due to 100kHz bus speed. If
+// timeout needed, indicates I2C bus/device failure → better to fail fast than
+// hang system.
+#define I2C_TIMEOUT_BASE_MS 50
+#define I2C_TIMEOUT_MAX_MS 100
+#define I2C_TIMEOUT_SCALE 0.5f
 
 // ============================================================================
 // MESSAGE QUEUE DEFINITIONS
 // ============================================================================
 
-#define QUEUE_ITEM_SIZE          96
-#define QUEUE_LEN_MOTION         10
-#define QUEUE_LEN_SAFETY         20
-#define QUEUE_LEN_ENCODER        10
-#define QUEUE_LEN_PLC            10
+#define QUEUE_ITEM_SIZE 96
+#define QUEUE_LEN_MOTION 10
+#define QUEUE_LEN_SAFETY 20
+#define QUEUE_LEN_ENCODER 10
+#define QUEUE_LEN_PLC 10
 // PHASE 2 FIX: Increased from 50 to 150 to prevent loss of critical logs
 // Rationale: Under fault conditions, system can generate 20+ faults/sec.
 // With 50 items, queue fills in 2.5s and critical logs are dropped.
 // With 150 items, provides 7.5s buffer for fault processing.
-#define QUEUE_LEN_FAULT          150
-#define QUEUE_LEN_DISPLAY        10
+#define QUEUE_LEN_FAULT 150
+#define QUEUE_LEN_DISPLAY 10
 
 // ============================================================================
 // INTER-TASK COMMUNICATION TYPES
@@ -139,7 +151,7 @@ typedef struct {
 
 typedef struct {
   TaskHandle_t handle;
-  const char* name;
+  const char *name;
   UBaseType_t priority;
   uint32_t run_count;
   uint32_t total_time_ms;
@@ -149,22 +161,24 @@ typedef struct {
 } task_stats_t;
 
 int taskGetStatsCount();
-task_stats_t* taskGetStatsArray();
+task_stats_t *taskGetStatsArray();
 
 void taskManagerInit();
 void taskManagerStart();
 
-void taskSafetyFunction(void* parameter);
-void taskMotionFunction(void* parameter);
-void taskEncoderFunction(void* parameter);
-void taskPlcCommFunction(void* parameter);
-void taskI2cManagerFunction(void* parameter);
-void taskCliFunction(void* parameter);
-void taskFaultLogFunction(void* parameter);
-void taskMonitorFunction(void* parameter);
-void taskTelemetryFunction(void* parameter);  // PHASE 5.4: Background telemetry collection
-void taskLcdFormatterFunction(void* parameter);  // PHASE 5.4: LCD string formatting
-void taskLcdFunction(void* parameter);
+void taskSafetyFunction(void *parameter);
+void taskMotionFunction(void *parameter);
+void taskEncoderFunction(void *parameter);
+void taskPlcCommFunction(void *parameter);
+void taskI2cManagerFunction(void *parameter);
+void taskCliFunction(void *parameter);
+void taskFaultLogFunction(void *parameter);
+void taskMonitorFunction(void *parameter);
+void taskTelemetryFunction(
+    void *parameter); // PHASE 5.4: Background telemetry collection
+void taskLcdFormatterFunction(
+    void *parameter); // PHASE 5.4: LCD string formatting
+void taskLcdFunction(void *parameter);
 
 void taskSafetyCreate();
 void taskMotionCreate();
@@ -174,8 +188,8 @@ void taskI2cManagerCreate();
 void taskCliCreate();
 void taskFaultLogCreate();
 void taskMonitorCreate();
-void taskTelemetryCreate();  // PHASE 5.4: Background telemetry collection
-void taskLcdFormatterCreate();  // PHASE 5.4: LCD string formatting
+void taskTelemetryCreate();    // PHASE 5.4: Background telemetry collection
+void taskLcdFormatterCreate(); // PHASE 5.4: LCD string formatting
 void taskLcdCreate();
 
 QueueHandle_t taskGetMotionQueue();
@@ -185,18 +199,23 @@ QueueHandle_t taskGetPlcQueue();
 QueueHandle_t taskGetFaultQueue();
 QueueHandle_t taskGetDisplayQueue();
 
-bool taskSendMessage(QueueHandle_t queue, const queue_message_t* msg);
-bool taskReceiveMessage(QueueHandle_t queue, queue_message_t* msg, uint32_t timeout_ms);
+bool taskSendMessage(QueueHandle_t queue, const queue_message_t *msg);
+bool taskReceiveMessage(QueueHandle_t queue, queue_message_t *msg,
+                        uint32_t timeout_ms);
 
 // NEW: Direct Task Notification for high-speed signaling
-void taskSignalMotionUpdate(); 
+void taskSignalMotionUpdate();
 
 SemaphoreHandle_t taskGetConfigMutex();
-SemaphoreHandle_t taskGetI2cMutex();  // DEPRECATED: Use separate board/PLC mutexes
-SemaphoreHandle_t taskGetI2cBoardMutex();  // PHASE 5.4: Board inputs (buttons, etc.)
-SemaphoreHandle_t taskGetI2cPlcMutex();    // PHASE 5.4: PLC interface (speed, CONSENSO)
-SemaphoreHandle_t taskGetLcdMutex();       // LCD display (0x27)
+SemaphoreHandle_t
+taskGetI2cMutex(); // DEPRECATED: Use separate board/PLC mutexes
+SemaphoreHandle_t
+taskGetI2cBoardMutex(); // PHASE 5.4: Board inputs (buttons, etc.)
+SemaphoreHandle_t
+taskGetI2cPlcMutex(); // PHASE 5.4: PLC interface (speed, CONSENSO)
+SemaphoreHandle_t taskGetLcdMutex(); // LCD display (0x27)
 SemaphoreHandle_t taskGetMotionMutex();
+SemaphoreHandle_t taskGetBufferMutex(); // NEW: Separate buffer mutex
 bool taskLockMutex(SemaphoreHandle_t mutex, uint32_t timeout_ms);
 void taskUnlockMutex(SemaphoreHandle_t mutex);
 
@@ -206,7 +225,8 @@ uint8_t taskGetCpuUsage();
 uint32_t taskGetUptime();
 
 // PHASE 2.5: Adaptive I2C timeout based on CPU load
-// Returns timeout in milliseconds, scaled from base to max based on current CPU usage
+// Returns timeout in milliseconds, scaled from base to max based on current CPU
+// usage
 uint32_t taskGetAdaptiveI2cTimeout();
 
 #endif

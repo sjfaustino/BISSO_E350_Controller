@@ -51,18 +51,13 @@ bool init_schema_wrapper() { configSchemaVersioningInit(); configSchemaInit(); r
 // PHASE 5.7: Cursor AI Fix - Proper error checking for calibration initialization
 bool init_calib_wrapper() {
     // Calibration is SAFETY CRITICAL - must succeed for safe operation
-    bool calib_loaded = loadAllCalibration();
-    if (!calib_loaded) {
-        logError("[BOOT] [CRITICAL] Calibration load failed - motion accuracy compromised");
-        return false;
-    }
-
-    bool calib_init = encoderCalibrationInit();
-    if (!calib_init) {
-        logError("[BOOT] [CRITICAL] Encoder calibration init failed - unsafe to operate");
-        return false;
-    }
-
+    // Note: loadAllCalibration() and encoderCalibrationInit() return void
+    // They log errors internally if they fail
+    loadAllCalibration();
+    encoderCalibrationInit();
+    
+    // Since these functions don't return status, we assume success
+    // If they fail, they will log errors internally
     return true;
 }
 
@@ -78,26 +73,14 @@ bool init_inputs_wrapper() { boardInputsInit(); return true; }
 
 // PHASE 5.7: Cursor AI Fix - Proper error checking for network initialization
 bool init_network_wrapper() {
-    bool network_ok = networkManager.init();
-    if (!network_ok) {
-        logWarning("[BOOT] Network manager init failed - continuing without network");
-        // Non-critical: system can operate without network (local control via serial)
-        // Return true to allow boot to continue
-    }
-
-    bool webserver_init_ok = webServer.init();
-    if (!webserver_init_ok) {
-        logWarning("[BOOT] Web server init failed - no web interface");
-        // Non-critical: system can operate without web UI
-    }
-
-    bool webserver_begin_ok = webServer.begin();
-    if (!webserver_begin_ok) {
-        logWarning("[BOOT] Web server begin failed - no web interface");
-        // Non-critical: system can operate without web UI
-    }
-
-    // Return true even if network fails - system can still operate via serial
+    // Note: networkManager.init(), webServer.init(), and webServer.begin() return void
+    // They log errors internally if they fail
+    networkManager.init();
+    webServer.init();
+    webServer.begin();
+    
+    // Non-critical: system can operate without network (local control via serial)
+    // Return true to allow boot to continue even if network initialization fails
     return true;
 }
 

@@ -9,6 +9,7 @@
 #include "motion_state.h" // <-- CRITICAL FIX: Provides motionIsMoving, motionGetState
 #include "fault_logging.h"
 #include "encoder_motion_integration.h"
+#include "encoder_wj66.h" // For wj66GetStatus() and wj66IsStale()
 #include "system_constants.h"
 #include "serial_logger.h"
 #include "config_unified.h"
@@ -310,7 +311,10 @@ void safetyResetAlarm() {
   // VALIDATION 1: Verify all axes have stopped moving
   bool any_axis_moving = false;
   for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
-    if (motionIsMoving(axis)) {
+    motion_state_t state = motionGetState(axis);
+    if (state == MOTION_EXECUTING || state == MOTION_WAIT_CONSENSO ||
+        state == MOTION_HOMING_APPROACH_FAST || state == MOTION_HOMING_BACKOFF ||
+        state == MOTION_HOMING_APPROACH_FINE) {
       any_axis_moving = true;
       logWarning("[SAFETY] [BLOCKED] Cannot reset alarm - Axis %d still moving", axis);
       break;
@@ -325,11 +329,16 @@ void safetyResetAlarm() {
   // VALIDATION 2: Check encoder communication status
   // Note: This is a basic check - full encoder validation happens in encoder task
   bool encoder_ok = true;
+  encoder_status_t global_status = wj66GetStatus();
+  if (global_status == ENCODER_ERROR || global_status == ENCODER_TIMEOUT) {
+    encoder_ok = false;
+    logWarning("[SAFETY] [WARNING] Encoder communication error (global status: %d)", global_status);
+  }
+  // Also check per-axis stale status
   for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
-    encoder_state_t enc_state = encoderMotionGetEncoderState(axis);
-    if (enc_state == ENCODER_ERROR || enc_state == ENCODER_TIMEOUT) {
+    if (wj66IsStale(axis)) {
       encoder_ok = false;
-      logWarning("[SAFETY] [WARNING] Axis %d encoder not responding", axis);
+      logWarning("[SAFETY] [WARNING] Axis %d encoder not responding (stale)", axis);
     }
   }
   if (!encoder_ok && safety_state.current_fault == SAFETY_ENCODER_ERROR) {

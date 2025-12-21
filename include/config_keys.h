@@ -9,9 +9,9 @@
 /**
  * ⚠️ NVS KEY LENGTH LIMIT WARNING ⚠️
  *
- * ESP-IDF NVS (Non-Volatile Storage) has a strict 15-character limit for key names.
- * All keys defined in this file MUST be strictly < 15 characters to avoid silent
- * truncation or NVS errors.
+ * ESP-IDF NVS (Non-Volatile Storage) has a strict 15-character limit for key
+ * names. All keys defined in this file MUST be strictly < 15 characters to
+ * avoid silent truncation or NVS errors.
  *
  * Current longest keys (14 chars - at safe limit):
  * - "home_prof_fast" (14 chars)
@@ -21,9 +21,11 @@
  *
  * When adding new keys:
  * 1. Keep names descriptive but concise
- * 2. Use abbreviations (e.g., "thr" for threshold, "en" for enable, "prof" for profile)
+ * 2. Use abbreviations (e.g., "thr" for threshold, "en" for enable, "prof" for
+ * profile)
  * 3. Verify length before committing: strlen("your_key_name") < 15
- * 4. Test with actual NVS storage (nvs_set_* will fail silently if key too long)
+ * 4. Test with actual NVS storage (nvs_set_* will fail silently if key too
+ * long)
  *
  * Example safe abbreviations:
  * - "threshold" → "thr" or "thresh"
@@ -51,40 +53,54 @@
 #define KEY_PPM_Z "ppm_z"
 #define KEY_PPM_A "ppm_a"
 #define KEY_ENC_ERR_THRESHOLD "enc_thresh"
-#define KEY_ENC_INTERFACE "enc_iface"     // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)
-#define KEY_ENC_BAUD "enc_baud"           // WJ66 baud rate
+#define KEY_ENC_INTERFACE                                                      \
+  "enc_iface" // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)
+#define KEY_ENC_BAUD "enc_baud" // WJ66 baud rate
 
 // --- SPINDLE CURRENT SENSOR ---
-#define KEY_SPINDLE_ENABLED "spindl_en"   // Enable/disable spindle current monitoring (0=disable, 1=enable)
-#define KEY_SPINDLE_ADDRESS "spindl_addr" // JXK-10 Modbus slave address (1-247, default 1)
-#define KEY_SPINDLE_THRESHOLD "spindl_thr"// Overcurrent threshold in integer amperes (30 = 30A)
-#define KEY_SPINDLE_POLL_MS "spindl_poll" // Poll interval in milliseconds (default 1000)
+#define KEY_SPINDLE_ENABLED                                                    \
+  "spindl_en" // Enable/disable spindle current monitoring (0=disable, 1=enable)
+#define KEY_SPINDLE_ADDRESS                                                    \
+  "spindl_addr" // JXK-10 Modbus slave address (1-247, default 1)
+#define KEY_SPINDLE_THRESHOLD                                                  \
+  "spindl_thr" // Overcurrent threshold in integer amperes (30 = 30A)
+#define KEY_SPINDLE_POLL_MS                                                    \
+  "spindl_poll" // Poll interval in milliseconds (default 1000)
 
 // --- VFD CURRENT CALIBRATION (PHASE 5.5) ---
-#define KEY_VFD_IDLE_RMS "vfd_idle_rms"           // Idle baseline RMS current (amps × 100)
-#define KEY_VFD_IDLE_PEAK "vfd_idle_pk"           // Idle baseline peak current (amps × 100)
-#define KEY_VFD_STD_CUT_RMS "vfd_std_rms"         // Standard cut RMS current (amps × 100)
-#define KEY_VFD_STD_CUT_PEAK "vfd_std_pk"         // Standard cut peak current (amps × 100)
-#define KEY_VFD_HEAVY_RMS "vfd_heavy_rms"         // Heavy load RMS current (amps × 100)
-#define KEY_VFD_HEAVY_PEAK "vfd_heavy_pk"         // Heavy load peak current (amps × 100)
-#define KEY_VFD_STALL_THR "vfd_stall_thr"         // Stall threshold current (amps × 100)
-#define KEY_VFD_STALL_MARGIN "vfd_stall_marg"     // Stall margin percent (20 = 20%)
-#define KEY_VFD_CALIB_VALID "vfd_calib_ok"        // Calibration valid flag (1=yes, 0=no)
-#define KEY_VFD_TEMP_WARN "vfd_temp_warn"         // Temperature warning threshold (°C, default 85)
-#define KEY_VFD_TEMP_CRIT "vfd_temp_crit"         // Temperature critical threshold (°C, default 90)
+#define KEY_VFD_IDLE_RMS                                                       \
+  "vfd_idle_rms" // Idle baseline RMS current (amps × 100)
+#define KEY_VFD_IDLE_PEAK                                                      \
+  "vfd_idle_pk" // Idle baseline peak current (amps × 100)
+#define KEY_VFD_STD_CUT_RMS                                                    \
+  "vfd_std_rms" // Standard cut RMS current (amps × 100)
+#define KEY_VFD_STD_CUT_PEAK                                                   \
+  "vfd_std_pk" // Standard cut peak current (amps × 100)
+#define KEY_VFD_HEAVY_RMS "vfd_heavy_rms" // Heavy load RMS current (amps × 100)
+#define KEY_VFD_HEAVY_PEAK                                                     \
+  "vfd_heavy_pk" // Heavy load peak current (amps × 100)
+#define KEY_VFD_STALL_THR                                                      \
+  "vfd_stall_thr" // Stall threshold current (amps × 100)
+#define KEY_VFD_STALL_MARGIN "vfd_stall_marg" // Stall margin percent (20 = 20%)
+#define KEY_VFD_CALIB_VALID                                                    \
+  "vfd_calib_ok" // Calibration valid flag (1=yes, 0=no)
+#define KEY_VFD_TEMP_WARN                                                      \
+  "vfd_temp_warn" // Temperature warning threshold (°C, default 85)
+#define KEY_VFD_TEMP_CRIT                                                      \
+  "vfd_temp_crit" // Temperature critical threshold (°C, default 90)
 
 // --- PREDEFINED POSITIONS (G30) ---
-#define KEY_POS_SAFE_X "pos_safe_x"       // Safe position X coordinate in mm
-#define KEY_POS_SAFE_Y "pos_safe_y"       // Safe position Y coordinate in mm
-#define KEY_POS_SAFE_Z "pos_safe_z"       // Safe position Z coordinate in mm
-#define KEY_POS_SAFE_A "pos_safe_a"       // Safe position A coordinate in degrees
-#define KEY_POS_1_X "pos_1_x"             // Predefined position 1 X
-#define KEY_POS_1_Y "pos_1_y"             // Predefined position 1 Y
-#define KEY_POS_1_Z "pos_1_z"             // Predefined position 1 Z
-#define KEY_POS_1_A "pos_1_a"             // Predefined position 1 A
+#define KEY_POS_SAFE_X "pos_safe_x" // Safe position X coordinate in mm
+#define KEY_POS_SAFE_Y "pos_safe_y" // Safe position Y coordinate in mm
+#define KEY_POS_SAFE_Z "pos_safe_z" // Safe position Z coordinate in mm
+#define KEY_POS_SAFE_A "pos_safe_a" // Safe position A coordinate in degrees
+#define KEY_POS_1_X "pos_1_x"       // Predefined position 1 X
+#define KEY_POS_1_Y "pos_1_y"       // Predefined position 1 Y
+#define KEY_POS_1_Z "pos_1_z"       // Predefined position 1 Z
+#define KEY_POS_1_A "pos_1_a"       // Predefined position 1 A
 
 // --- HOMING ---
-#define KEY_HOME_ENABLE "home_enable"     // Enable homing (1=yes, 0=no)
+#define KEY_HOME_ENABLE "home_enable" // Enable homing (1=yes, 0=no)
 #define KEY_HOME_PROFILE_FAST "home_prof_fast"
 #define KEY_HOME_PROFILE_SLOW "home_prof_slow"
 
@@ -97,7 +113,7 @@
 // --- MOTION BEHAVIOR ---
 #define KEY_DEFAULT_SPEED "def_spd"
 #define KEY_DEFAULT_ACCEL "def_acc"
-#define KEY_X_APPROACH    "x_appr"
+#define KEY_X_APPROACH "x_appr"
 #define KEY_MOTION_APPROACH_MODE "mot_app_mode"
 #define KEY_MOTION_DEADBAND "mot_deadband"
 #define KEY_MOTION_BUFFER_ENABLE "mot_buf_en"
@@ -107,23 +123,28 @@
 // --- SAFETY ---
 #define KEY_ALARM_PIN "alarm_pin"
 #define KEY_STALL_TIMEOUT "stall_ms"
+#define KEY_BUTTONS_ENABLED                                                    \
+  "btn_en" // Enable physical button polling (1=yes, 0=no, default=1)
 
 // --- WCS OFFSETS (Generated Keys) ---
 // Base keys, suffixes will be appended (e.g. "g54_x")
 #define KEY_WCS_PREFIX "g"
 
 // --- WEB SERVER CREDENTIALS ---
-#define KEY_WEB_USERNAME "web_user"      // Web server username
-#define KEY_WEB_PASSWORD "web_pass"      // Web server password
-#define KEY_WEB_PORT "web_port"          // Web server port (default 80)
-#define KEY_WEB_PW_CHANGED "web_pw_chg"  // Flag: password changed from default (1=changed, 0=default)
+#define KEY_WEB_USERNAME "web_user" // Web server username
+#define KEY_WEB_PASSWORD "web_pass" // Web server password
+#define KEY_WEB_PORT "web_port"     // Web server port (default 80)
+#define KEY_WEB_PW_CHANGED                                                     \
+  "web_pw_chg" // Flag: password changed from default (1=changed, 0=default)
 
 // --- WIFI CREDENTIALS ---
-#define KEY_WIFI_SSID "wifi_ssid"        // WiFi network name (SSID)
-#define KEY_WIFI_PASSWORD "wifi_pass"    // WiFi network password
+#define KEY_WIFI_SSID "wifi_ssid"     // WiFi network name (SSID)
+#define KEY_WIFI_PASSWORD "wifi_pass" // WiFi network password
 
 // --- OTA (OVER-THE-AIR UPDATE) SECURITY ---
-#define KEY_OTA_PASSWORD "ota_pass"      // OTA update password (default: "bisso-ota")
-#define KEY_OTA_PW_CHANGED "ota_pw_chg"  // Flag: OTA password changed from default (1=changed, 0=default)
+#define KEY_OTA_PASSWORD                                                       \
+  "ota_pass" // OTA update password (default: "bisso-ota")
+#define KEY_OTA_PW_CHANGED                                                     \
+  "ota_pw_chg" // Flag: OTA password changed from default (1=changed, 0=default)
 
 #endif

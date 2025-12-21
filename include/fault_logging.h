@@ -35,7 +35,8 @@ typedef enum {
   FAULT_I2C_ERROR = 0x12,
   FAULT_TASK_HUNG = 0x13,
   FAULT_MOTION_TIMEOUT = 0x14,  // PHASE 5.1: Motion mutex timeout
-  FAULT_SPINDLE_OVERCURRENT = 0x15  // PHASE 5.1: Spindle overcurrent detection
+  FAULT_SPINDLE_OVERCURRENT = 0x15,  // PHASE 5.1: Spindle overcurrent detection
+  FAULT_CODE_MAX = 0x16  // Maximum fault code value (for array sizing)
 } fault_code_t;
 
 // Fault Statistics Structure (Must match usage in cli_diag.cpp)
