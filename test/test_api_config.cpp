@@ -45,7 +45,7 @@ static motion_config_t motion_config;
 static vfd_config_t vfd_config;
 static encoder_config_t encoder_config;
 
-void setUp(void) {
+static void local_setUp(void) {
   // Initialize with defaults
   motion_config.soft_limit_low_mm[0] = 0;
   motion_config.soft_limit_high_mm[0] = 500;
@@ -67,7 +67,7 @@ void setUp(void) {
   encoder_config.calibrated[2] = 1;
 }
 
-void tearDown(void) {
+static void local_tearDown(void) {
   // Cleanup
 }
 
@@ -241,7 +241,7 @@ void test_encoder_and_vfd_independent(void) {
 
 void test_all_configs_independently_valid(void) {
   // Each category should be independently valid
-  setUp(); // Reset to defaults
+  local_setUp(); // Reset to defaults
 
   // Motion config valid
   TEST_ASSERT_TRUE(motion_config.soft_limit_low_mm[0] <
@@ -316,6 +316,7 @@ void test_vfd_speeds_within_altivar31_limits(void) {
  * Must be called by test_runner.cpp
  */
 void run_api_config_tests(void) {
+  local_setUp(); // Initialize test fixtures
   RUN_TEST(test_motion_default_valid);
   RUN_TEST(test_motion_soft_limit_lower_cannot_exceed_upper);
   RUN_TEST(test_motion_soft_limits_within_range);

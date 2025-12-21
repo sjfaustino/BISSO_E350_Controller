@@ -74,14 +74,6 @@ static api_endpoint_t test_endpoints[] = {
 static const int test_endpoint_count =
     sizeof(test_endpoints) / sizeof(test_endpoints[0]);
 
-void setUp(void) {
-  // Reset test fixtures
-}
-
-void tearDown(void) {
-  // Cleanup
-}
-
 /**
  * @section Endpoint Registry Tests
  */

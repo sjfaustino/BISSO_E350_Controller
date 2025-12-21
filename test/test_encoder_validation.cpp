@@ -23,15 +23,6 @@
 static encoder_mock_state_t encoder;
 static vfd_mock_state_t vfd;
 
-void setUp(void) {
-  encoder = encoder_mock_init();
-  vfd = vfd_mock_init();
-}
-
-void tearDown(void) {
-  // Reset for next test
-}
-
 /**
  * @section Calibration Tests
  * Tests for encoder PPM (pulses per millimeter) calibration
