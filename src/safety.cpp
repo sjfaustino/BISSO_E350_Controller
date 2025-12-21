@@ -5,30 +5,43 @@
  */
 
 #include "safety.h"
-#include "motion.h"
-#include "motion_state.h" // <-- CRITICAL FIX: Provides motionIsMoving, motionGetState
-#include "fault_logging.h"
+#include "altivar31_modbus.h" // PHASE 5.5: VFD current-based stall detection
+#include "axis_synchronization.h" // PHASE 5.6: Per-axis motion validation
+#include "config_keys.h"
+#include "config_unified.h"
 #include "encoder_motion_integration.h"
 #include "encoder_wj66.h" // For wj66GetStatus() and wj66IsStale()
-#include "system_constants.h"
-#include "serial_logger.h"
-#include "config_unified.h"
-#include "config_keys.h"
-#include <Arduino.h>
+#include "fault_logging.h"
+#include "motion.h"
+#include "motion_state.h" // <-- CRITICAL FIX: Provides motionIsMoving, motionGetState
 #include "safety_state_machine.h"
-#include "altivar31_modbus.h"  // PHASE 5.5: VFD current-based stall detection
-#include "vfd_current_calibration.h"  // PHASE 5.5: VFD current calibration
-#include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion validation
-#include <string.h>
-#include <math.h>  // For isnan() sensor validation
+#include "serial_logger.h"
+#include "system_constants.h"
+#include "vfd_current_calibration.h" // PHASE 5.5: VFD current calibration
+#include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <math.h> // For isnan() sensor validation
+#include <string.h>
 
 // PHASE 5.7: Cursor AI Fix - Thread-safe safety state with mutex protection
 static safety_system_data_t safety_state;
 static bool alarm_active = false;
 static uint32_t alarm_trigger_time = 0;
 static uint32_t last_stall_check = 0;
+
+// SAFETY THRESHOLD CONSTANTS (replacing magic numbers)
+// These multipliers are applied to user-configurable temperature thresholds
+// to provide early warning (130%) and critical fault (140%) detection
+#define SAFETY_THERMAL_WARNING_MULTIPLIER                                      \
+  1.3f // Warn at 130% of warning threshold
+#define SAFETY_THERMAL_CRITICAL_MULTIPLIER                                     \
+  1.4f                                   // Fault at 140% of critical threshold
+#define SAFETY_AXIS_QUALITY_CHECK_MS 500 // Check motion quality every 500ms
+#define SAFETY_THERMAL_WARN_INTERVAL_MS                                        \
+  5000 // Log thermal warnings max every 5s
+#define SAFETY_MIN_ALARM_DURATION_MS                                           \
+  1000 // Minimum time before alarm can be reset
 
 // PHASE 5.7: Cursor AI Fix - Mutex to protect safety state from race conditions
 // Multiple tasks can trigger alarms (Safety task, Motion task, Encoder task)
@@ -66,181 +79,201 @@ void safetyUpdate() {
   // PHASE 5.1: Wraparound-safe timeout comparison
   if ((uint32_t)(now - last_stall_check) > SAFETY_STALL_CHECK_INTERVAL_MS) {
     last_stall_check = now;
-    
-    uint32_t stall_limit_ms = (uint32_t)configGetInt(KEY_STALL_TIMEOUT, SAFETY_MAX_STALL_TIME_MS);
+
+    uint32_t stall_limit_ms =
+        (uint32_t)configGetInt(KEY_STALL_TIMEOUT, SAFETY_MAX_STALL_TIME_MS);
 
     if (motionIsMoving()) {
-        for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
-            if (motionGetState(axis) == MOTION_EXECUTING) {
-                if (encoderMotionHasError(axis) &&
-                    encoderMotionGetErrorDuration(axis) > stall_limit_ms) {
+      for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
+        if (motionGetState(axis) == MOTION_EXECUTING) {
+          if (encoderMotionHasError(axis) &&
+              encoderMotionGetErrorDuration(axis) > stall_limit_ms) {
 
-                    safetyReportStall(axis);
+            safetyReportStall(axis);
 
-                    logError("[SAFETY] [FAIL] Stall Axis %d (Dur: %lu ms > Limit: %lu ms)",
-                             axis, (unsigned long)encoderMotionGetErrorDuration(axis), (unsigned long)stall_limit_ms);
-                }
-            }
+            logError(
+                "[SAFETY] [FAIL] Stall Axis %d (Dur: %lu ms > Limit: %lu ms)",
+                axis, (unsigned long)encoderMotionGetErrorDuration(axis),
+                (unsigned long)stall_limit_ms);
+          }
         }
+      }
 
-        // PHASE 5.5: Supplementary VFD current-based stall detection
-        if (vfdCalibrationIsValid()) {
-            float current_amps = altivar31GetCurrentAmps();
-            float threshold_amps = vfdCalibrationGetThreshold();
+      // PHASE 5.5: Supplementary VFD current-based stall detection
+      if (vfdCalibrationIsValid()) {
+        float current_amps = altivar31GetCurrentAmps();
+        float threshold_amps = vfdCalibrationGetThreshold();
 
-            // CRITICAL: Validate sensor data before safety decisions
-            // Data freshness already checked in altivar31DetectFrequencyLoss()
-            const altivar31_state_t* vfd_state = altivar31GetState();
-            uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
+        // CRITICAL: Validate sensor data before safety decisions
+        // Data freshness already checked in altivar31DetectFrequencyLoss()
+        const altivar31_state_t *vfd_state = altivar31GetState();
+        uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
 
-            // Only use VFD current data if fresh (<1s) and valid (not NaN, in range)
-            bool data_valid = (data_age_ms < 1000) &&
-                              !isnan(current_amps) &&
-                              (current_amps >= 0.0f && current_amps <= 100.0f);
+        // Only use VFD current data if fresh (<1s) and valid (not NaN, in
+        // range)
+        bool data_valid = (data_age_ms < 1000) && !isnan(current_amps) &&
+                          (current_amps >= 0.0f && current_amps <= 100.0f);
 
-            // Detect stall when current exceeds threshold (indicates mechanical resistance)
-            if (data_valid && vfdCalibrationIsStall(current_amps)) {
-                logWarning("[SAFETY] [WARN] VFD Current High: %.2f A (threshold: %.2f A)",
-                        current_amps, threshold_amps);
+        // Detect stall when current exceeds threshold (indicates mechanical
+        // resistance)
+        if (data_valid && vfdCalibrationIsStall(current_amps)) {
+          logWarning(
+              "[SAFETY] [WARN] VFD Current High: %.2f A (threshold: %.2f A)",
+              current_amps, threshold_amps);
 
-                // If encoder also indicates stall (or we haven't detected it yet), trigger alarm
-                // This provides supplementary detection if encoder is degraded
-                if (!alarm_active) {
-                    safetyReportStall(0);  // Report as Z-axis stall (spindle)
-                    logError("[SAFETY] [FAIL] Motor Stall (VFD Current: %.2f A > %.2f A)",
-                             current_amps, threshold_amps);
-                }
-            }
+          // If encoder also indicates stall (or we haven't detected it yet),
+          // trigger alarm This provides supplementary detection if encoder is
+          // degraded
+          if (!alarm_active) {
+            safetyReportStall(0); // Report as Z-axis stall (spindle)
+            logError(
+                "[SAFETY] [FAIL] Motor Stall (VFD Current: %.2f A > %.2f A)",
+                current_amps, threshold_amps);
+          }
         }
+      }
     }
 
     // PHASE 5.5: VFD Frequency Control Validation
     // Detect frequency loss during active motion (potential VFD/motor fault)
     if (motionIsMoving()) {
-        static float last_frequency_hz = 0.0f;
-        float current_freq = altivar31GetFrequencyHz();
+      static float last_frequency_hz = 0.0f;
+      float current_freq = altivar31GetFrequencyHz();
 
-        // CRITICAL: Validate frequency sensor data before safety decisions
-        const altivar31_state_t* vfd_state = altivar31GetState();
-        uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
+      // CRITICAL: Validate frequency sensor data before safety decisions
+      const altivar31_state_t *vfd_state = altivar31GetState();
+      uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
 
-        // Only use frequency data if fresh (<1s) and valid (not NaN, in range 0-60Hz typical)
-        bool freq_valid = (data_age_ms < 1000) &&
-                          !isnan(current_freq) &&
-                          (current_freq >= 0.0f && current_freq <= 100.0f);
+      // Only use frequency data if fresh (<1s) and valid (not NaN, in range
+      // 0-60Hz typical)
+      bool freq_valid = (data_age_ms < 1000) && !isnan(current_freq) &&
+                        (current_freq >= 0.0f && current_freq <= 100.0f);
 
-        // Check for sudden frequency loss (>80% drop in one cycle)
-        // altivar31DetectFrequencyLoss() already includes freshness check
-        if (freq_valid && altivar31DetectFrequencyLoss(last_frequency_hz)) {
-            logError("[SAFETY] [FAIL] VFD Frequency Loss: %.1f Hz -> %.1f Hz (>80% drop)",
-                     last_frequency_hz, current_freq);
+      // Check for sudden frequency loss (>80% drop in one cycle)
+      // altivar31DetectFrequencyLoss() already includes freshness check
+      if (freq_valid && altivar31DetectFrequencyLoss(last_frequency_hz)) {
+        logError("[SAFETY] [FAIL] VFD Frequency Loss: %.1f Hz -> %.1f Hz (>80% "
+                 "drop)",
+                 last_frequency_hz, current_freq);
 
-            if (!alarm_active) {
-                safety_state.current_fault = SAFETY_STALLED;
-                char msg[64];
-                snprintf(msg, sizeof(msg), "VFD FREQ LOSS %.1f->%.1f Hz", last_frequency_hz, current_freq);
-                faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, 0, 0, "VFD frequency loss detected");
-                safetyTriggerAlarm(msg);
-            }
+        if (!alarm_active) {
+          safety_state.current_fault = SAFETY_STALLED;
+          char msg[64];
+          snprintf(msg, sizeof(msg), "VFD FREQ LOSS %.1f->%.1f Hz",
+                   last_frequency_hz, current_freq);
+          faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, 0, 0,
+                        "VFD frequency loss detected");
+          safetyTriggerAlarm(msg);
         }
+      }
 
-        // Only update last frequency if current reading is valid
-        if (freq_valid) {
-            last_frequency_hz = current_freq;
-        }
+      // Only update last frequency if current reading is valid
+      if (freq_valid) {
+        last_frequency_hz = current_freq;
+      }
     }
 
     // PHASE 5.5: VFD Thermal Monitoring
-    // Monitor motor/VFD heatsink temperature with warning and critical thresholds
+    // Monitor motor/VFD heatsink temperature with warning and critical
+    // thresholds
     static uint32_t last_thermal_check = 0;
-    if ((uint32_t)(now - last_thermal_check) > 1000) {  // Check every 1 second
-        last_thermal_check = now;
+    if ((uint32_t)(now - last_thermal_check) > 1000) { // Check every 1 second
+      last_thermal_check = now;
 
-        int16_t thermal_state = altivar31GetThermalState();
+      int16_t thermal_state = altivar31GetThermalState();
 
-        // CRITICAL: Validate thermal sensor data before safety decisions
-        const altivar31_state_t* vfd_state = altivar31GetState();
-        uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
+      // CRITICAL: Validate thermal sensor data before safety decisions
+      const altivar31_state_t *vfd_state = altivar31GetState();
+      uint32_t data_age_ms = now - vfd_state->last_read_time_ms;
 
-        // Valid range: 0-200% (100% = nominal, >118% typically triggers VFD fault)
-        bool thermal_valid = (data_age_ms < 1000) &&
-                             (thermal_state > 0 && thermal_state <= 200);
+      // Valid range: 0-200% (100% = nominal, >118% typically triggers VFD
+      // fault)
+      bool thermal_valid =
+          (data_age_ms < 1000) && (thermal_state > 0 && thermal_state <= 200);
 
-        if (thermal_valid) {  // Valid reading (percentage, 100% = nominal)
-            int32_t temp_warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
-            int32_t temp_crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
+      if (thermal_valid) { // Valid reading (percentage, 100% = nominal)
+        int32_t temp_warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
+        int32_t temp_crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
 
-            if (thermal_state > (temp_crit * 1.4)) {  // Over 140% or absolute >90°C
-                logError("[SAFETY] [FAIL] VFD Thermal Critical: %d%% (>%ld°C)",
-                         thermal_state, (long)temp_crit);
+        if (thermal_state > (temp_crit * SAFETY_THERMAL_CRITICAL_MULTIPLIER)) {
+          logError("[SAFETY] [FAIL] VFD Thermal Critical: %d%% (>%ld°C)",
+                   thermal_state, (long)temp_crit);
 
-                if (!alarm_active) {
-                    safety_state.current_fault = SAFETY_THERMAL;
-                    char msg[64];
-                    snprintf(msg, sizeof(msg), "VFD OVERHEAT %d%%", thermal_state);
-                    faultLogEntry(FAULT_ERROR, FAULT_TEMPERATURE_HIGH, 0, 0, "VFD thermal critical");
-                    safetyTriggerAlarm(msg);
-                }
+          if (!alarm_active) {
+            safety_state.current_fault = SAFETY_THERMAL;
+            char msg[64];
+            snprintf(msg, sizeof(msg), "VFD OVERHEAT %d%%", thermal_state);
+            faultLogEntry(FAULT_ERROR, FAULT_TEMPERATURE_HIGH, 0, 0,
+                          "VFD thermal critical");
+            safetyTriggerAlarm(msg);
+          }
 
-            } else if (thermal_state > (temp_warn * 1.3)) {  // Over 130% or >85°C
-                static uint32_t last_thermal_warn = 0;
-                if ((uint32_t)(now - last_thermal_warn) > 5000) {  // Log warning every 5s max
-                    last_thermal_warn = now;
-                    logWarning("[SAFETY] [WARN] VFD Thermal Warning: %d%% (>%ld°C)",
-                            thermal_state, (long)temp_warn);
-                }
-            }
+        } else if (thermal_state >
+                   (temp_warn * SAFETY_THERMAL_WARNING_MULTIPLIER)) {
+          static uint32_t last_thermal_warn = 0;
+          if ((uint32_t)(now - last_thermal_warn) >
+              SAFETY_THERMAL_WARN_INTERVAL_MS) {
+            last_thermal_warn = now;
+            logWarning("[SAFETY] [WARN] VFD Thermal Warning: %d%% (>%ld°C)",
+                       thermal_state, (long)temp_warn);
+          }
         }
+      }
     }
 
     // PHASE 5.6: Axis Motion Quality Validation
-    // Monitor per-axis synchronization quality and trigger alarms on degradation
+    // Monitor per-axis synchronization quality and trigger alarms on
+    // degradation
     static uint32_t last_axis_quality_check = 0;
-    if ((uint32_t)(now - last_axis_quality_check) > 500) {  // Check every 500ms
-        last_axis_quality_check = now;
+    if ((uint32_t)(now - last_axis_quality_check) >
+        SAFETY_AXIS_QUALITY_CHECK_MS) {
+      last_axis_quality_check = now;
 
-        // Check each axis quality score (0-100)
-        for (uint8_t axis = 0; axis < 3; axis++) {
-            const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
-            if (metrics) {
-                // Trigger alarm if quality drops critically low (below 25%)
-                if (metrics->quality_score < 25 && metrics->is_moving && !alarm_active) {
-                    char axis_char = 'X' + axis;
-                    char msg[64];
-                    snprintf(msg, sizeof(msg), "AXIS %c QUALITY CRITICAL: %lu%%",
-                             axis_char, (unsigned long)metrics->quality_score);
-                    logError("[SAFETY] [FAIL] %s", msg);
-                    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
-                                 "Axis motion quality critical");
-                    safetyTriggerAlarm(msg);
-                    break;  // Only trigger one alarm per check cycle
-                }
+      // Check each axis quality score (0-100)
+      for (uint8_t axis = 0; axis < 3; axis++) {
+        const axis_metrics_t *metrics = axisSynchronizationGetAxisMetrics(axis);
+        if (metrics) {
+          // Trigger alarm if quality drops critically low (below 25%)
+          if (metrics->quality_score < 25 && metrics->is_moving &&
+              !alarm_active) {
+            char axis_char = 'X' + axis;
+            char msg[64];
+            snprintf(msg, sizeof(msg), "AXIS %c QUALITY CRITICAL: %lu%%",
+                     axis_char, (unsigned long)metrics->quality_score);
+            logError("[SAFETY] [FAIL] %s", msg);
+            faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
+                          "Axis motion quality critical");
+            safetyTriggerAlarm(msg);
+            break; // Only trigger one alarm per check cycle
+          }
 
-                // Detect axis stall from quality metrics
-                if (metrics->stalled && metrics->is_moving && !alarm_active) {
-                    char axis_char = 'X' + axis;
-                    char msg[64];
-                    snprintf(msg, sizeof(msg), "AXIS %c STALL (Quality: %lu%%)",
-                             axis_char, (unsigned long)metrics->quality_score);
-                    logError("[SAFETY] [FAIL] %s", msg);
-                    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
-                                 "Axis motion stall detected via quality metrics");
-                    safetyTriggerAlarm(msg);
-                    break;
-                }
+          // Detect axis stall from quality metrics
+          if (metrics->stalled && metrics->is_moving && !alarm_active) {
+            char axis_char = 'X' + axis;
+            char msg[64];
+            snprintf(msg, sizeof(msg), "AXIS %c STALL (Quality: %lu%%)",
+                     axis_char, (unsigned long)metrics->quality_score);
+            logError("[SAFETY] [FAIL] %s", msg);
+            faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
+                          "Axis motion stall detected via quality metrics");
+            safetyTriggerAlarm(msg);
+            break;
+          }
 
-                // Log warning if quality is degraded (below 50%)
-                if (metrics->quality_score < 50 && metrics->is_moving) {
-                    static uint32_t last_quality_warn[3] = {0, 0, 0};
-                    if ((uint32_t)(now - last_quality_warn[axis]) > 3000) {  // Warn every 3s max
-                        last_quality_warn[axis] = now;
-                        char axis_char = 'X' + axis;
-                        logWarning("[SAFETY] [WARN] AXIS %c motion quality degraded: %lu%%",
-                               axis_char, (unsigned long)metrics->quality_score);
-                    }
-                }
+          // Log warning if quality is degraded (below 50%)
+          if (metrics->quality_score < 50 && metrics->is_moving) {
+            static uint32_t last_quality_warn[3] = {0, 0, 0};
+            if ((uint32_t)(now - last_quality_warn[axis]) >
+                3000) { // Warn every 3s max
+              last_quality_warn[axis] = now;
+              char axis_char = 'X' + axis;
+              logWarning(
+                  "[SAFETY] [WARN] AXIS %c motion quality degraded: %lu%%",
+                  axis_char, (unsigned long)metrics->quality_score);
             }
+          }
         }
+      }
     }
   }
 
@@ -251,20 +284,24 @@ void safetyUpdate() {
 }
 
 bool safetyCheckMotionAllowed(uint8_t axis) {
-  if (axis >= MOTION_AXES) return false;
+  if (axis >= MOTION_AXES)
+    return false;
   return !alarm_active && safety_state.current_fault == SAFETY_OK;
 }
 
 // PHASE 5.7: Cursor AI Fix - Thread-safe alarm trigger with mutex protection
-void safetyTriggerAlarm(const char* reason) {
+void safetyTriggerAlarm(const char *reason) {
   // CRITICAL: Acquire mutex to prevent race conditions on alarm_active
-  if (safety_state_mutex && xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-    logError("[SAFETY] [CRITICAL] Failed to acquire safety mutex in triggerAlarm!");
+  if (safety_state_mutex &&
+      xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+    logError(
+        "[SAFETY] [CRITICAL] Failed to acquire safety mutex in triggerAlarm!");
     // Continue anyway - safety is critical, cannot skip alarm
   }
 
   if (alarm_active) {
-    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+    if (safety_state_mutex)
+      xSemaphoreGive(safety_state_mutex);
     return;
   }
 
@@ -273,18 +310,23 @@ void safetyTriggerAlarm(const char* reason) {
   safety_state.fault_timestamp = alarm_trigger_time;
   safety_state.fault_count++;
 
-  safety_state.fault_history[safety_state.history_index] = safety_state.current_fault;
-  safety_state.history_index = (safety_state.history_index + 1) % SAFETY_FAULT_HISTORY_SIZE;
+  safety_state.fault_history[safety_state.history_index] =
+      safety_state.current_fault;
+  safety_state.history_index =
+      (safety_state.history_index + 1) % SAFETY_FAULT_HISTORY_SIZE;
 
-  snprintf(safety_state.fault_message, sizeof(safety_state.fault_message), "%s", reason);
+  snprintf(safety_state.fault_message, sizeof(safety_state.fault_message), "%s",
+           reason);
 
-  if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+  if (safety_state_mutex)
+    xSemaphoreGive(safety_state_mutex);
 
   // Hardware operations outside mutex (no shared state)
   digitalWrite(SAFETY_ALARM_PIN, HIGH);
 
   Serial.printf("[SAFETY] [ALARM] Triggered: %s\n", reason);
-  Serial.printf("[SAFETY] Fault Count: %lu\n", (unsigned long)safety_state.fault_count);
+  Serial.printf("[SAFETY] Fault Count: %lu\n",
+                (unsigned long)safety_state.fault_count);
 
   // CRITICAL: Deadlock-Safe Emergency Stop (Gemini Audit)
   // motionEmergencyStop() uses 10ms timeout to prevent deadlock
@@ -297,14 +339,18 @@ void safetyTriggerAlarm(const char* reason) {
 // PHASE 5.7: Cursor AI Fix - Safety Alarm Reset Validation with Thread Safety
 void safetyResetAlarm() {
   // CRITICAL: Acquire mutex to prevent race conditions on alarm_active
-  if (safety_state_mutex && xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-    logError("[SAFETY] [CRITICAL] Failed to acquire safety mutex in resetAlarm!");
+  if (safety_state_mutex &&
+      xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+    logError(
+        "[SAFETY] [CRITICAL] Failed to acquire safety mutex in resetAlarm!");
     return;
   }
 
   if (!alarm_active) {
-    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
-    Serial.println("[SAFETY] [WARNING] Alarm reset requested but no alarm is active");
+    if (safety_state_mutex)
+      xSemaphoreGive(safety_state_mutex);
+    Serial.println(
+        "[SAFETY] [WARNING] Alarm reset requested but no alarm is active");
     return;
   }
 
@@ -313,47 +359,59 @@ void safetyResetAlarm() {
   for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
     motion_state_t state = motionGetState(axis);
     if (state == MOTION_EXECUTING || state == MOTION_WAIT_CONSENSO ||
-        state == MOTION_HOMING_APPROACH_FAST || state == MOTION_HOMING_BACKOFF ||
+        state == MOTION_HOMING_APPROACH_FAST ||
+        state == MOTION_HOMING_BACKOFF ||
         state == MOTION_HOMING_APPROACH_FINE) {
       any_axis_moving = true;
-      logWarning("[SAFETY] [BLOCKED] Cannot reset alarm - Axis %d still moving", axis);
+      logWarning("[SAFETY] [BLOCKED] Cannot reset alarm - Axis %d still moving",
+                 axis);
       break;
     }
   }
   if (any_axis_moving) {
-    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+    if (safety_state_mutex)
+      xSemaphoreGive(safety_state_mutex);
     logError("[SAFETY] [BLOCKED] Alarm reset denied - motion must stop first");
     return;
   }
 
   // VALIDATION 2: Check encoder communication status
-  // Note: This is a basic check - full encoder validation happens in encoder task
+  // Note: This is a basic check - full encoder validation happens in encoder
+  // task
   bool encoder_ok = true;
   encoder_status_t global_status = wj66GetStatus();
   if (global_status == ENCODER_ERROR || global_status == ENCODER_TIMEOUT) {
     encoder_ok = false;
-    logWarning("[SAFETY] [WARNING] Encoder communication error (global status: %d)", global_status);
+    logWarning(
+        "[SAFETY] [WARNING] Encoder communication error (global status: %d)",
+        global_status);
   }
   // Also check per-axis stale status
   for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {
     if (wj66IsStale(axis)) {
       encoder_ok = false;
-      logWarning("[SAFETY] [WARNING] Axis %d encoder not responding (stale)", axis);
+      logWarning("[SAFETY] [WARNING] Axis %d encoder not responding (stale)",
+                 axis);
     }
   }
   if (!encoder_ok && safety_state.current_fault == SAFETY_ENCODER_ERROR) {
-    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
-    logError("[SAFETY] [BLOCKED] Alarm reset denied - encoder fault not cleared");
+    if (safety_state_mutex)
+      xSemaphoreGive(safety_state_mutex);
+    logError(
+        "[SAFETY] [BLOCKED] Alarm reset denied - encoder fault not cleared");
     return;
   }
 
-  // VALIDATION 3: Wait minimum time after alarm trigger (prevent rapid reset)
-  #define SAFETY_MIN_ALARM_DURATION_MS 1000  // Minimum 1 second before reset allowed
+// VALIDATION 3: Wait minimum time after alarm trigger (prevent rapid reset)
+#define SAFETY_MIN_ALARM_DURATION_MS                                           \
+  1000 // Minimum 1 second before reset allowed
   uint32_t alarm_duration = (uint32_t)(millis() - alarm_trigger_time);
   if (alarm_duration < SAFETY_MIN_ALARM_DURATION_MS) {
-    if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
-    logWarning("[SAFETY] [BLOCKED] Alarm reset too soon (%lu ms < %d ms minimum)",
-               (unsigned long)alarm_duration, SAFETY_MIN_ALARM_DURATION_MS);
+    if (safety_state_mutex)
+      xSemaphoreGive(safety_state_mutex);
+    logWarning(
+        "[SAFETY] [BLOCKED] Alarm reset too soon (%lu ms < %d ms minimum)",
+        (unsigned long)alarm_duration, SAFETY_MIN_ALARM_DURATION_MS);
     return;
   }
 
@@ -362,13 +420,15 @@ void safetyResetAlarm() {
   safety_state.current_fault = SAFETY_OK;
   safety_state.fault_duration_ms = alarm_duration;
 
-  if (safety_state_mutex) xSemaphoreGive(safety_state_mutex);
+  if (safety_state_mutex)
+    xSemaphoreGive(safety_state_mutex);
 
   // Hardware operations outside mutex (no shared state)
   digitalWrite(SAFETY_ALARM_PIN, LOW);
 
-  Serial.printf("[SAFETY] [OK] Alarm reset (Duration: %lu ms, validations passed)\n",
-                (unsigned long)safety_state.fault_duration_ms);
+  Serial.printf(
+      "[SAFETY] [OK] Alarm reset (Duration: %lu ms, validations passed)\n",
+      (unsigned long)safety_state.fault_duration_ms);
 }
 
 void safetyReportStall(uint8_t axis) {
@@ -376,7 +436,8 @@ void safetyReportStall(uint8_t axis) {
     safety_state.current_fault = SAFETY_STALLED;
     char msg[64];
     snprintf(msg, sizeof(msg), "STALL Axis %d", axis);
-    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0, "Motion stall detected");
+    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
+                  "Motion stall detected");
     safetyTriggerAlarm(msg);
   }
 }
@@ -386,7 +447,8 @@ void safetyReportSoftLimit(uint8_t axis) {
     safety_state.current_fault = SAFETY_SOFT_LIMIT;
     char msg[64];
     snprintf(msg, sizeof(msg), "LIMIT Axis %d", axis);
-    faultLogEntry(FAULT_ERROR, FAULT_SOFT_LIMIT_EXCEEDED, axis, 0, "Soft limit reached");
+    faultLogEntry(FAULT_ERROR, FAULT_SOFT_LIMIT_EXCEEDED, axis, 0,
+                  "Soft limit reached");
     safetyTriggerAlarm(msg);
   }
 }
@@ -396,7 +458,8 @@ void safetyReportEncoderError(uint8_t axis) {
     safety_state.current_fault = SAFETY_ENCODER_ERROR;
     char msg[64];
     snprintf(msg, sizeof(msg), "ENC_ERR Axis %d", axis);
-    faultLogEntry(FAULT_ERROR, FAULT_ENCODER_TIMEOUT, axis, 0, "Encoder comm failure");
+    faultLogEntry(FAULT_ERROR, FAULT_ENCODER_TIMEOUT, axis, 0,
+                  "Encoder comm failure");
     safetyTriggerAlarm(msg);
   }
 }
@@ -404,43 +467,63 @@ void safetyReportEncoderError(uint8_t axis) {
 void safetyReportPLCFault() {
   safety_state.current_fault = SAFETY_PLC_FAULT;
   safetyTriggerAlarm("PLC_FAULT");
-  faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, -1, 0, "PLC Consensus Failure");
+  faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, -1, 0,
+                "PLC Consensus Failure");
 }
 
 safety_fault_t safetyGetCurrentFault() { return safety_state.current_fault; }
 bool safetyIsAlarmed() { return alarm_active; }
 uint32_t safetyGetAlarmDuration() {
-  return alarm_active ? (millis() - alarm_trigger_time) : safety_state.fault_duration_ms;
+  return alarm_active ? (millis() - alarm_trigger_time)
+                      : safety_state.fault_duration_ms;
 }
 
 void safetyDiagnostics() {
   Serial.println("\n[SAFETY] === Diagnostics ===");
   Serial.printf("Status: %s\n", alarm_active ? "[ALARM]" : "[OK]");
-  
-  const char* faultStr = "UNKNOWN";
-  switch(safety_state.current_fault) {
-    case SAFETY_OK: faultStr = "NONE"; break;
-    case SAFETY_STALLED: faultStr = "STALLED"; break;
-    case SAFETY_SOFT_LIMIT: faultStr = "SOFT_LIMIT"; break;
-    case SAFETY_PLC_FAULT: faultStr = "PLC_FAULT"; break;
-    case SAFETY_THERMAL: faultStr = "THERMAL"; break;
-    case SAFETY_ALARM: faultStr = "ALARM"; break;
-    case SAFETY_ENCODER_ERROR: faultStr = "ENCODER_ERROR"; break;
+
+  const char *faultStr = "UNKNOWN";
+  switch (safety_state.current_fault) {
+  case SAFETY_OK:
+    faultStr = "NONE";
+    break;
+  case SAFETY_STALLED:
+    faultStr = "STALLED";
+    break;
+  case SAFETY_SOFT_LIMIT:
+    faultStr = "SOFT_LIMIT";
+    break;
+  case SAFETY_PLC_FAULT:
+    faultStr = "PLC_FAULT";
+    break;
+  case SAFETY_THERMAL:
+    faultStr = "THERMAL";
+    break;
+  case SAFETY_ALARM:
+    faultStr = "ALARM";
+    break;
+  case SAFETY_ENCODER_ERROR:
+    faultStr = "ENCODER_ERROR";
+    break;
   }
   Serial.printf("Current Fault: %s\n", faultStr);
-  Serial.printf("GPIO State: %s\n", digitalRead(SAFETY_ALARM_PIN) ? "HIGH" : "LOW");
+  Serial.printf("GPIO State: %s\n",
+                digitalRead(SAFETY_ALARM_PIN) ? "HIGH" : "LOW");
   Serial.printf("Count: %lu\n", (unsigned long)safety_state.fault_count);
   Serial.printf("Last Msg: %s\n", safety_state.fault_message);
-  
+
   if (alarm_active) {
-    Serial.printf("Duration: %lu ms\n", (unsigned long)safetyGetAlarmDuration());
+    Serial.printf("Duration: %lu ms\n",
+                  (unsigned long)safetyGetAlarmDuration());
   }
-  
+
   Serial.println("\nHistory (Last 16):");
   for (int i = 0; i < SAFETY_FAULT_HISTORY_SIZE; i++) {
     int idx = (safety_state.history_index + i) % SAFETY_FAULT_HISTORY_SIZE;
     if (safety_state.fault_history[idx] != SAFETY_OK) {
-      Serial.printf("  [%d] %s\n", i, faultCodeToString((fault_code_t)safety_state.fault_history[idx])); 
+      Serial.printf(
+          "  [%d] %s\n", i,
+          faultCodeToString((fault_code_t)safety_state.fault_history[idx]));
     }
   }
 }

@@ -345,24 +345,16 @@ void WebServerManager::setupRoutes() {
       return;
     }
 
-    // Export performance metrics as JSON
-    char *metrics_buffer = (char *)malloc(2048);
-    if (!metrics_buffer) {
-      request->send(500, "application/json",
-                    "{\"error\":\"Memory allocation failed\"}");
-      return;
-    }
-
-    size_t metrics_size = perfMonitorExportJSON(metrics_buffer, 2048);
+    // MEMORY FIX: Stack allocation - 2KB is safe for async handlers (8KB stack)
+    char metrics_buffer[2048];
+    size_t metrics_size = perfMonitorExportJSON(metrics_buffer, sizeof(metrics_buffer));
     if (metrics_size == 0) {
-      free(metrics_buffer);
       request->send(500, "application/json",
                     "{\"error\":\"Failed to export metrics\"}");
       return;
     }
 
     request->send(200, "application/json", metrics_buffer);
-    free(metrics_buffer);
   });
 
   // 6. API OTA Firmware Update (Protected, Large Upload) - PHASE 5.1
@@ -404,24 +396,16 @@ void WebServerManager::setupRoutes() {
           return;
         }
 
-        // Export comprehensive telemetry as JSON
-        char *telemetry_buffer = (char *)malloc(3072);
-        if (!telemetry_buffer) {
-          request->send(500, "application/json",
-                        "{\"error\":\"Memory allocation failed\"}");
-          return;
-        }
-
-        size_t telemetry_size = telemetryExportJSON(telemetry_buffer, 3072);
+        // MEMORY FIX: Stack allocation - 3KB is safe for async handlers (8KB stack)
+        char telemetry_buffer[3072];
+        size_t telemetry_size = telemetryExportJSON(telemetry_buffer, sizeof(telemetry_buffer));
         if (telemetry_size == 0) {
-          free(telemetry_buffer);
           request->send(500, "application/json",
                         "{\"error\":\"Failed to export telemetry\"}");
           return;
         }
 
         request->send(200, "application/json", telemetry_buffer);
-        free(telemetry_buffer);
       });
 
   // Lightweight telemetry for high-frequency polling
@@ -547,23 +531,16 @@ void WebServerManager::setupRoutes() {
           return;
         }
 
-        char *diag_buffer = (char *)malloc(2048);
-        if (!diag_buffer) {
-          request->send(500, "application/json",
-                        "{\"error\":\"Memory allocation failed\"}");
-          return;
-        }
-
-        size_t diag_size = encoderDiagnosticsExportJSON(diag_buffer, 2048);
+        // MEMORY FIX: Stack allocation - 2KB is safe for async handlers (8KB stack)
+        char diag_buffer[2048];
+        size_t diag_size = encoderDiagnosticsExportJSON(diag_buffer, sizeof(diag_buffer));
         if (diag_size == 0) {
-          free(diag_buffer);
           request->send(500, "application/json",
                         "{\"error\":\"Failed to export encoder diagnostics\"}");
           return;
         }
 
         request->send(200, "application/json", diag_buffer);
-        free(diag_buffer);
       });
 
   // 11. PHASE 5.3: API Load Status (Protected, Rate Limited)
