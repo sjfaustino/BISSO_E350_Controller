@@ -454,6 +454,34 @@ void motionUpdate() {
     backoff_level = 0;
   }
 
+  // PHASE 5.10: I2C Health Check - Monitor PLC communication
+  // If shadow register is dirty (I2C failures), stop motion to prevent unsafe operation
+  static uint32_t last_i2c_check_ms = 0;
+  if (millis() - last_i2c_check_ms > 1000) {
+    if (elboIsShadowRegisterDirty()) {
+      logError("[MOTION] CRITICAL: PLC I2C communication failure - shadow register dirty!");
+      faultLogCritical(FAULT_I2C_ERROR, "PLC I2C failure detected - emergency stop");
+      motionEmergencyStop();
+      taskUnlockMutex(taskGetMotionMutex());
+      return;
+    }
+
+    // Check mutex timeout count (if > 10, PLC is having serious issues)
+    static uint32_t last_timeout_count = 0;
+    uint32_t current_timeout_count = elboGetMutexTimeoutCount();
+    if (current_timeout_count > last_timeout_count + 10) {
+      logError("[MOTION] CRITICAL: PLC mutex timeout escalation (%lu timeouts)",
+               (unsigned long)(current_timeout_count - last_timeout_count));
+      faultLogCritical(FAULT_I2C_ERROR, "PLC mutex timeout threshold exceeded");
+      motionEmergencyStop();
+      last_timeout_count = current_timeout_count;
+      taskUnlockMutex(taskGetMotionMutex());
+      return;
+    }
+    last_timeout_count = current_timeout_count;
+    last_i2c_check_ms = millis();
+  }
+
   int strict_mode = m_state.strict_limits;
 
   for (int i = 0; i < MOTION_AXES; i++) {
@@ -503,11 +531,25 @@ const Axis *motionGetAxis(uint8_t axis) {
 }
 
 int32_t motionGetPosition(uint8_t axis) {
-  return (axis < MOTION_AXES) ? axes[axis].position : 0;
+  if (axis >= MOTION_AXES) return 0;
+
+  // PHASE 5.10: Use spinlock to protect 32-bit position read (prevent torn reads)
+  portENTER_CRITICAL(&motionSpinlock);
+  int32_t pos = axes[axis].position;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  return pos;
 }
 
 int32_t motionGetTarget(uint8_t axis) {
-  return (axis < MOTION_AXES) ? axes[axis].target_position : 0;
+  if (axis >= MOTION_AXES) return 0;
+
+  // PHASE 5.10: Use spinlock to protect 32-bit target read (prevent torn reads)
+  portENTER_CRITICAL(&motionSpinlock);
+  int32_t target = axes[axis].target_position;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  return target;
 }
 
 motion_state_t motionGetState(uint8_t axis) {
@@ -525,7 +567,12 @@ motion_state_t motionGetState(uint8_t axis) {
 float motionGetPositionMM(uint8_t axis) {
   if (axis >= MOTION_AXES)
     return 0.0f;
+
+  // PHASE 5.10: Use spinlock to protect position read
+  portENTER_CRITICAL(&motionSpinlock);
   int32_t counts = axes[axis].position;
+  portEXIT_CRITICAL(&motionSpinlock);
+
   float scale = 1.0f;
 
   if (axis == 0)

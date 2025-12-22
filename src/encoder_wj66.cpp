@@ -23,8 +23,8 @@
 
 // Internal State
 struct {
-  int32_t position[WJ66_AXES];      
-  int32_t zero_offset[WJ66_AXES];   
+  int32_t position[WJ66_AXES];
+  int32_t zero_offset[WJ66_AXES];
   uint32_t last_read[WJ66_AXES];
   uint32_t read_count[WJ66_AXES];
   encoder_status_t status;
@@ -33,9 +33,21 @@ struct {
   bool waiting_for_response; // Added for flow control
 } wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false};
 
+// PHASE 5.10: Mutex for thread-safe encoder position access
+// Protects wj66_state from torn reads between Encoder task and Motion task
+static SemaphoreHandle_t wj66_mutex = NULL;
+
 void wj66Init() {
   logInfo("[WJ66] Initializing...");
-  
+
+  // PHASE 5.10: Create mutex for thread-safe position access
+  if (wj66_mutex == NULL) {
+    wj66_mutex = xSemaphoreCreateMutex();
+    if (wj66_mutex == NULL) {
+      logError("[WJ66] Failed to create position mutex!");
+    }
+  }
+
   uint32_t final_baud = WJ66_BAUD;
   bool confirmed = false;
 
@@ -162,12 +174,19 @@ void wj66Update() {
         // Final Value & Validation
         if (commas == 3) {
           values[3] = is_negative ? -current_value : current_value;
-          
-          for (int i = 0; i < WJ66_AXES; i++) {
-            wj66_state.position[i] = values[i];
-            wj66_state.last_read[i] = millis();
-            wj66_state.read_count[i]++;
+
+          // PHASE 5.10: Thread-safe position write
+          if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            for (int i = 0; i < WJ66_AXES; i++) {
+              wj66_state.position[i] = values[i];
+              wj66_state.last_read[i] = millis();
+              wj66_state.read_count[i]++;
+            }
+            xSemaphoreGive(wj66_mutex);
+          } else {
+            logWarning("[WJ66] Mutex timeout writing position update");
           }
+
           wj66_state.status = ENCODER_OK;
           wj66_state.waiting_for_response = false; // Transaction Complete
         } else {
@@ -196,9 +215,21 @@ void wj66Update() {
   }
 }
 
-int32_t wj66GetPosition(uint8_t axis) { 
+int32_t wj66GetPosition(uint8_t axis) {
     if (axis >= WJ66_AXES) return 0;
-    return wj66_state.position[axis] - wj66_state.zero_offset[axis]; 
+
+    // PHASE 5.10: Thread-safe position read to prevent torn reads
+    int32_t position = 0;
+    if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+      position = wj66_state.position[axis] - wj66_state.zero_offset[axis];
+      xSemaphoreGive(wj66_mutex);
+    } else {
+      logWarning("[WJ66] Mutex timeout reading axis %d position", axis);
+      // Return cached value without protection (better than blocking)
+      position = wj66_state.position[axis] - wj66_state.zero_offset[axis];
+    }
+
+    return position;
 }
 
 uint32_t wj66GetAxisAge(uint8_t axis) { 
@@ -224,8 +255,14 @@ void wj66Reset() {
 
 void wj66SetZero(uint8_t axis) {
     if (axis < WJ66_AXES) {
-        wj66_state.zero_offset[axis] = wj66_state.position[axis];
-        logInfo("[WJ66] Axis %d Zeroed. Offset: %ld", axis, (long)wj66_state.zero_offset[axis]);
+        // PHASE 5.10: Thread-safe zero offset update
+        if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+          wj66_state.zero_offset[axis] = wj66_state.position[axis];
+          xSemaphoreGive(wj66_mutex);
+          logInfo("[WJ66] Axis %d Zeroed. Offset: %ld", axis, (long)wj66_state.zero_offset[axis]);
+        } else {
+          logWarning("[WJ66] Mutex timeout setting zero for axis %d", axis);
+        }
     }
 }
 
