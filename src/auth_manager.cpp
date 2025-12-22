@@ -19,6 +19,21 @@ static char stored_password_hash[AUTH_MAX_STORED_PW_LEN] = "";
 static bool password_change_required = false;
 static bool credentials_loaded = false;
 
+// PHASE 5.10: Rate limiting for brute force protection
+#define AUTH_RATE_LIMIT_MAX_IPS 16
+#define AUTH_RATE_LIMIT_MAX_ATTEMPTS 5
+#define AUTH_RATE_LIMIT_WINDOW_MS 60000  // 1 minute
+
+struct AuthRateLimitEntry {
+  char ip_address[16];  // "xxx.xxx.xxx.xxx"
+  uint32_t attempt_count;
+  uint32_t first_attempt_time;
+  uint32_t last_attempt_time;
+};
+
+static AuthRateLimitEntry rate_limit_table[AUTH_RATE_LIMIT_MAX_IPS];
+static int rate_limit_entries = 0;
+
 // Minimum password requirements
 #define MIN_PASSWORD_LENGTH 8
 #define MAX_PASSWORD_LENGTH 64
@@ -449,4 +464,121 @@ bool authVerifyHTTPBasicAuth(const char* auth_header) {
 
   // Verify credentials
   return authVerifyCredentials(username, password);
+}
+
+// PHASE 5.10: Rate limiting implementation
+bool authCheckRateLimit(const char* ip_address) {
+  if (!ip_address) {
+    return true;  // Allow if no IP provided (shouldn't happen)
+  }
+
+  uint32_t now = millis();
+
+  // Find entry for this IP
+  for (int i = 0; i < rate_limit_entries; i++) {
+    if (strcmp(rate_limit_table[i].ip_address, ip_address) == 0) {
+      // Check if window has expired
+      if (now - rate_limit_table[i].first_attempt_time > AUTH_RATE_LIMIT_WINDOW_MS) {
+        // Window expired - reset
+        rate_limit_table[i].attempt_count = 0;
+        rate_limit_table[i].first_attempt_time = now;
+        return true;
+      }
+
+      // Check if rate limit exceeded
+      if (rate_limit_table[i].attempt_count >= AUTH_RATE_LIMIT_MAX_ATTEMPTS) {
+        logWarning("[AUTH] Rate limit exceeded for IP: %s (%lu attempts in %lu ms)",
+                   ip_address,
+                   (unsigned long)rate_limit_table[i].attempt_count,
+                   (unsigned long)(now - rate_limit_table[i].first_attempt_time));
+        return false;
+      }
+
+      return true;
+    }
+  }
+
+  // IP not found - allowed
+  return true;
+}
+
+void authRecordFailedAttempt(const char* ip_address) {
+  if (!ip_address) {
+    return;
+  }
+
+  uint32_t now = millis();
+
+  // Find existing entry or add new one
+  for (int i = 0; i < rate_limit_entries; i++) {
+    if (strcmp(rate_limit_table[i].ip_address, ip_address) == 0) {
+      // Check if window expired
+      if (now - rate_limit_table[i].first_attempt_time > AUTH_RATE_LIMIT_WINDOW_MS) {
+        // Reset window
+        rate_limit_table[i].attempt_count = 1;
+        rate_limit_table[i].first_attempt_time = now;
+        rate_limit_table[i].last_attempt_time = now;
+      } else {
+        // Increment count
+        rate_limit_table[i].attempt_count++;
+        rate_limit_table[i].last_attempt_time = now;
+
+        if (rate_limit_table[i].attempt_count == AUTH_RATE_LIMIT_MAX_ATTEMPTS) {
+          logWarning("[AUTH] IP %s reached rate limit (%d failed attempts in %lu ms)",
+                     ip_address, AUTH_RATE_LIMIT_MAX_ATTEMPTS,
+                     (unsigned long)(now - rate_limit_table[i].first_attempt_time));
+        }
+      }
+      return;
+    }
+  }
+
+  // Not found - add new entry
+  if (rate_limit_entries < AUTH_RATE_LIMIT_MAX_IPS) {
+    strncpy(rate_limit_table[rate_limit_entries].ip_address, ip_address, 15);
+    rate_limit_table[rate_limit_entries].ip_address[15] = '\0';
+    rate_limit_table[rate_limit_entries].attempt_count = 1;
+    rate_limit_table[rate_limit_entries].first_attempt_time = now;
+    rate_limit_table[rate_limit_entries].last_attempt_time = now;
+    rate_limit_entries++;
+  } else {
+    // Table full - evict oldest entry (LRU)
+    int oldest_idx = 0;
+    uint32_t oldest_time = rate_limit_table[0].last_attempt_time;
+
+    for (int i = 1; i < AUTH_RATE_LIMIT_MAX_IPS; i++) {
+      if (rate_limit_table[i].last_attempt_time < oldest_time) {
+        oldest_time = rate_limit_table[i].last_attempt_time;
+        oldest_idx = i;
+      }
+    }
+
+    // Replace oldest entry
+    strncpy(rate_limit_table[oldest_idx].ip_address, ip_address, 15);
+    rate_limit_table[oldest_idx].ip_address[15] = '\0';
+    rate_limit_table[oldest_idx].attempt_count = 1;
+    rate_limit_table[oldest_idx].first_attempt_time = now;
+    rate_limit_table[oldest_idx].last_attempt_time = now;
+
+    logWarning("[AUTH] Rate limit table full - evicted entry for new IP: %s", ip_address);
+  }
+}
+
+void authClearRateLimit(const char* ip_address) {
+  if (!ip_address) {
+    return;
+  }
+
+  // Find and clear entry for this IP
+  for (int i = 0; i < rate_limit_entries; i++) {
+    if (strcmp(rate_limit_table[i].ip_address, ip_address) == 0) {
+      // Clear entry by shifting remaining entries
+      for (int j = i; j < rate_limit_entries - 1; j++) {
+        rate_limit_table[j] = rate_limit_table[j + 1];
+      }
+      rate_limit_entries--;
+      logInfo("[AUTH] Cleared rate limit for IP: %s", ip_address);
+      return;
+    }
+  }
 }

@@ -10,8 +10,18 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
-// PHASE 5.10: Local auth helper using auth_manager
+// PHASE 5.10: Local auth helper with rate limiting
 static bool requireAuth(AsyncWebServerRequest *request) {
+  // Get client IP address for rate limiting
+  String client_ip = request->client()->remoteIP().toString();
+  const char* ip_address = client_ip.c_str();
+
+  // Check rate limit (brute force protection)
+  if (!authCheckRateLimit(ip_address)) {
+    request->send(429, "text/plain", "Too many authentication attempts. Please try again later.");
+    return false;
+  }
+
   if (!request->hasHeader("Authorization")) {
     request->requestAuthentication();
     return false;
@@ -21,10 +31,12 @@ static bool requireAuth(AsyncWebServerRequest *request) {
   const char* auth = authHeader->value().c_str();
 
   if (!authVerifyHTTPBasicAuth(auth)) {
+    authRecordFailedAttempt(ip_address);
     request->requestAuthentication();
     return false;
   }
 
+  authClearRateLimit(ip_address);
   return true;
 }
 

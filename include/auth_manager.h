@@ -74,4 +74,25 @@ bool authValidatePasswordStrength(const char* password);
  */
 bool authVerifyHTTPBasicAuth(const char* auth_header);
 
+/**
+ * @brief Check if IP address is rate limited for authentication attempts
+ * @param ip_address IP address to check (e.g., "192.168.1.100")
+ * @return true if IP is allowed to attempt auth, false if rate limited
+ * @details Limits to 5 failed attempts per minute per IP
+ */
+bool authCheckRateLimit(const char* ip_address);
+
+/**
+ * @brief Record failed authentication attempt for IP address
+ * @param ip_address IP address that failed auth
+ * @details Increments failure count, used for rate limiting
+ */
+void authRecordFailedAttempt(const char* ip_address);
+
+/**
+ * @brief Clear rate limit for IP address (on successful auth)
+ * @param ip_address IP address to clear
+ */
+void authClearRateLimit(const char* ip_address);
+
 #endif // AUTH_MANAGER_H

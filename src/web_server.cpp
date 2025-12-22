@@ -48,9 +48,20 @@ WebServerManager webServer(80);
  * @brief Check authentication and send 401 if failed
  * @param request The async web request
  * @return true if authenticated, false if authentication was requested
- * @note PHASE 5.10: Uses SHA-256 hashed password verification via auth_manager
+ * @note PHASE 5.10: SHA-256 password verification + rate limiting (5 attempts/min)
  */
 static bool requireAuth(AsyncWebServerRequest *request) {
+  // Get client IP address for rate limiting
+  String client_ip = request->client()->remoteIP().toString();
+  const char* ip_address = client_ip.c_str();
+
+  // PHASE 5.10: Check rate limit (brute force protection)
+  if (!authCheckRateLimit(ip_address)) {
+    // Rate limit exceeded - return 429 Too Many Requests
+    request->send(429, "text/plain", "Too many authentication attempts. Please try again later.");
+    return false;
+  }
+
   // Check for Authorization header
   if (!request->hasHeader("Authorization")) {
     request->requestAuthentication();
@@ -63,9 +74,14 @@ static bool requireAuth(AsyncWebServerRequest *request) {
 
   // Verify credentials using auth_manager (SHA-256 hashing)
   if (!authVerifyHTTPBasicAuth(auth)) {
+    // PHASE 5.10: Record failed attempt for rate limiting
+    authRecordFailedAttempt(ip_address);
     request->requestAuthentication();
     return false;
   }
+
+  // PHASE 5.10: Successful auth - clear rate limit for this IP
+  authClearRateLimit(ip_address);
 
   return true;
 }

@@ -47,31 +47,49 @@ void handle_jog_command(char* cmd) {
         return;
     }
 
-    bool use_relative = false; 
+    bool use_relative = false;
     if (strstr(cmd, "G91")) use_relative = true;
     else if (strstr(cmd, "G90")) use_relative = false;
 
+    // PHASE 5.10: Use strtof with error checking instead of atof
     float feed_mm_min = 0.0f;
     char* f_ptr = strchr(cmd, 'F');
-    if (f_ptr) feed_mm_min = atof(f_ptr + 1);
-    
-    if (feed_mm_min <= 0.1f) feed_mm_min = 100.0f; 
+    if (f_ptr) {
+        char* endptr = NULL;
+        float parsed = strtof(f_ptr + 1, &endptr);
+        if (endptr != (f_ptr + 1) && !isnan(parsed) && !isinf(parsed)) {
+            feed_mm_min = parsed;
+        } else {
+            Serial.println("error:33"); // Invalid G-code target
+            return;
+        }
+    }
+
+    if (feed_mm_min <= 0.1f) feed_mm_min = 100.0f;
     float feed_mm_s = feed_mm_min / 60.0f;
 
     float target[4] = {0};
     bool axis_present[4] = {false};
     char axes_char[] = "XYZA";
-    
+
     float current_mpos[4] = {
         motionGetPositionMM(0), motionGetPositionMM(1),
         motionGetPositionMM(2), motionGetPositionMM(3)
     };
 
+    // PHASE 5.10: Use strtof with error checking for axis values
     for(int i=0; i<4; i++) {
         char* ax_ptr = strchr(cmd, axes_char[i]);
         if (ax_ptr) {
-            target[i] = atof(ax_ptr + 1);
-            axis_present[i] = true;
+            char* endptr = NULL;
+            float parsed = strtof(ax_ptr + 1, &endptr);
+            if (endptr != (ax_ptr + 1) && !isnan(parsed) && !isinf(parsed)) {
+                target[i] = parsed;
+                axis_present[i] = true;
+            } else {
+                Serial.println("error:33"); // Invalid G-code target
+                return;
+            }
         } else {
             target[i] = use_relative ? 0.0f : current_mpos[i];
         }
@@ -200,11 +218,25 @@ void cliProcessCommand(const char* cmd) {
   }
 
   // Settings ($100=val)
+  // PHASE 5.10: Use strtol/strtof with error checking
   if (cmd[0] == '$' && isdigit(cmd[1])) {
-      int id = atoi(cmd + 1);
+      char* endptr = NULL;
+      long id_long = strtol(cmd + 1, &endptr, 10);
+      if (endptr == (cmd + 1) || id_long < 0 || id_long > 255) {
+          Serial.println("error:3"); // Unsupported command
+          return;
+      }
+      int id = (int)id_long;
+
       char* eq = strchr((char*)cmd, '=');
       if (eq) {
-          float val = atof(eq + 1);
+          char* endptr2 = NULL;
+          float val = strtof(eq + 1, &endptr2);
+          if (endptr2 == (eq + 1) || isnan(val) || isinf(val)) {
+              Serial.println("error:33"); // Invalid G-code target
+              return;
+          }
+
           const char* key = NULL;
           switch(id) {
               case 100: key = KEY_PPM_X; break;
@@ -215,7 +247,7 @@ void cliProcessCommand(const char* cmd) {
               case 111: key = KEY_SPEED_CAL_Y; break;
               case 112: key = KEY_SPEED_CAL_Z; break;
               case 113: key = KEY_SPEED_CAL_A; break;
-              case 120: key = KEY_DEFAULT_ACCEL; break; 
+              case 120: key = KEY_DEFAULT_ACCEL; break;
               case 130: key = KEY_X_LIMIT_MAX; break;
               case 131: key = KEY_Y_LIMIT_MAX; break;
               case 132: key = KEY_Z_LIMIT_MAX; break;
