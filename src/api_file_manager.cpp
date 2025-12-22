@@ -14,6 +14,44 @@
 extern void motionMoveAbsolute(float x, float y, float z, float a,
                                float speed_mm_s);
 
+// --- Helper Functions ---
+
+/**
+ * @brief Validates filename to prevent path traversal attacks
+ * @param filename The filename to validate
+ * @return true if filename is safe, false if it contains malicious patterns
+ *
+ * PHASE 5.10: Security - Path Traversal Prevention
+ * Blocks: "..", absolute paths, special characters
+ * Allows: alphanumeric, underscore, dot, dash
+ */
+static bool isValidFilename(const char* filename) {
+  if (!filename || filename[0] == '\0') {
+    return false;
+  }
+
+  // Block path traversal attempts
+  if (strstr(filename, "..") != NULL) {
+    Serial.printf("[FILE_API] [SECURITY] Blocked path traversal: %s\n", filename);
+    return false;
+  }
+
+  // Block absolute paths (should be relative to SPIFFS root)
+  if (filename[0] == '/') {
+    filename++;  // Skip leading slash for validation
+  }
+
+  // Whitelist: alphanumeric + underscore + dot + dash
+  for (const char* p = filename; *p; p++) {
+    if (!isalnum(*p) && *p != '_' && *p != '.' && *p != '-' && *p != '/') {
+      Serial.printf("[FILE_API] [SECURITY] Blocked invalid character in filename: %s\n", filename);
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // --- Extracted Implementations ---
 
 void handleFileList(AsyncWebServerRequest *request) {
@@ -32,6 +70,9 @@ void handleFileList(AsyncWebServerRequest *request) {
     obj["size"] = file.size();
     file = root.openNextFile();
   }
+
+  // PHASE 5.10: Critical fix - Close directory handle to prevent leak
+  root.close();
 
   char response[1024];
   serializeJson(doc, response, sizeof(response));
@@ -56,6 +97,14 @@ void handleFileDelete(AsyncWebServerRequest *request) {
 
 void handleFileUpload(AsyncWebServerRequest *request, String filename,
                       size_t index, uint8_t *data, size_t len, bool final) {
+  // PHASE 5.10: Security - Validate filename first (path traversal prevention)
+  if (!isValidFilename(filename.c_str())) {
+    if (index == 0) {
+      Serial.printf("[FILE_API] [SECURITY] Rejected unsafe filename: %s\n", filename.c_str());
+    }
+    return;
+  }
+
   // Security: Filter extensions
   if (!filename.endsWith(".nc") && !filename.endsWith(".gcode") &&
       !filename.endsWith(".txt")) {

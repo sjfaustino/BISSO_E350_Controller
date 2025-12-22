@@ -398,6 +398,33 @@ void configUnifiedInit() {
   logInfo("[CONFIG] Ready. Loaded %d entries.", config_count);
 }
 
+/**
+ * @brief Cleanup configuration system resources
+ *
+ * PHASE 5.10: Resource Leak Fix - Properly cleanup mutex and NVS
+ * Should be called before system shutdown/reboot
+ */
+void configUnifiedCleanup() {
+  logInfo("[CONFIG] Cleaning up resources...");
+
+  // Close NVS preferences
+  if (initialized) {
+    prefs.end();
+    initialized = false;
+  }
+
+  // Delete mutex
+  if (config_cache_mutex != NULL) {
+    vSemaphoreDelete(config_cache_mutex);
+    config_cache_mutex = NULL;
+    logInfo("[CONFIG] Mutex deleted");
+  }
+
+  // Clear cache
+  config_count = 0;
+  logInfo("[CONFIG] Cleanup complete");
+}
+
 // ============================================================================
 // GETTERS
 // ============================================================================

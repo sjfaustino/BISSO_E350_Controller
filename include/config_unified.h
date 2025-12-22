@@ -36,6 +36,7 @@ typedef struct {
 } config_entry_t;
 
 void configUnifiedInit();
+void configUnifiedCleanup();  // PHASE 5.10: Resource cleanup
 void configSetDefaults();
 
 int32_t configGetInt(const char* key, int32_t default_val);

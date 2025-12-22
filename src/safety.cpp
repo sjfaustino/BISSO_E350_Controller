@@ -289,19 +289,28 @@ bool safetyCheckMotionAllowed(uint8_t axis) {
   return !alarm_active && safety_state.current_fault == SAFETY_OK;
 }
 
-// PHASE 5.7: Cursor AI Fix - Thread-safe alarm trigger with mutex protection
+// PHASE 5.7 + 5.10: Thread-safe alarm trigger with proper mutex error handling
 void safetyTriggerAlarm(const char *reason) {
-  // CRITICAL: Acquire mutex to prevent race conditions on alarm_active
-  if (safety_state_mutex &&
-      xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-    logError(
-        "[SAFETY] [CRITICAL] Failed to acquire safety mutex in triggerAlarm!");
-    // Continue anyway - safety is critical, cannot skip alarm
+  // PHASE 5.10: CRITICAL FIX - Mutex must succeed for safety operations
+  // If mutex is NULL or acquisition fails, force hardware E-stop immediately
+  if (safety_state_mutex == NULL) {
+    logError("[SAFETY] [CRITICAL] Mutex not initialized - FORCING HARDWARE ESTOP");
+    digitalWrite(SAFETY_ALARM_PIN, HIGH);
+    motionEmergencyStop();
+    return;
   }
 
+  BaseType_t got_mutex = xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100));
+  if (got_mutex != pdTRUE) {
+    logError("[SAFETY] [CRITICAL] Mutex timeout - FORCING HARDWARE ESTOP");
+    digitalWrite(SAFETY_ALARM_PIN, HIGH);
+    motionEmergencyStop();
+    return;
+  }
+
+  // NOW SAFE: Mutex is confirmed acquired
   if (alarm_active) {
-    if (safety_state_mutex)
-      xSemaphoreGive(safety_state_mutex);
+    xSemaphoreGive(safety_state_mutex);
     return;
   }
 
@@ -318,8 +327,7 @@ void safetyTriggerAlarm(const char *reason) {
   snprintf(safety_state.fault_message, sizeof(safety_state.fault_message), "%s",
            reason);
 
-  if (safety_state_mutex)
-    xSemaphoreGive(safety_state_mutex);
+  xSemaphoreGive(safety_state_mutex);
 
   // Hardware operations outside mutex (no shared state)
   digitalWrite(SAFETY_ALARM_PIN, HIGH);
@@ -336,19 +344,23 @@ void safetyTriggerAlarm(const char *reason) {
   motionEmergencyStop();
 }
 
-// PHASE 5.7: Cursor AI Fix - Safety Alarm Reset Validation with Thread Safety
+// PHASE 5.7 + 5.10: Safety Alarm Reset with proper mutex error handling
 void safetyResetAlarm() {
-  // CRITICAL: Acquire mutex to prevent race conditions on alarm_active
-  if (safety_state_mutex &&
-      xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-    logError(
-        "[SAFETY] [CRITICAL] Failed to acquire safety mutex in resetAlarm!");
+  // PHASE 5.10: CRITICAL FIX - Must acquire mutex for safe state access
+  if (safety_state_mutex == NULL) {
+    logError("[SAFETY] [CRITICAL] Mutex not initialized - cannot reset alarm safely");
     return;
   }
 
+  BaseType_t got_mutex = xSemaphoreTake(safety_state_mutex, pdMS_TO_TICKS(100));
+  if (got_mutex != pdTRUE) {
+    logError("[SAFETY] [CRITICAL] Mutex timeout in resetAlarm - cannot proceed");
+    return;
+  }
+
+  // NOW SAFE: Mutex is confirmed acquired
   if (!alarm_active) {
-    if (safety_state_mutex)
-      xSemaphoreGive(safety_state_mutex);
+    xSemaphoreGive(safety_state_mutex);
     Serial.println(
         "[SAFETY] [WARNING] Alarm reset requested but no alarm is active");
     return;
@@ -369,8 +381,7 @@ void safetyResetAlarm() {
     }
   }
   if (any_axis_moving) {
-    if (safety_state_mutex)
-      xSemaphoreGive(safety_state_mutex);
+    xSemaphoreGive(safety_state_mutex);  // Mutex confirmed acquired
     logError("[SAFETY] [BLOCKED] Alarm reset denied - motion must stop first");
     return;
   }
@@ -395,8 +406,7 @@ void safetyResetAlarm() {
     }
   }
   if (!encoder_ok && safety_state.current_fault == SAFETY_ENCODER_ERROR) {
-    if (safety_state_mutex)
-      xSemaphoreGive(safety_state_mutex);
+    xSemaphoreGive(safety_state_mutex);  // Mutex confirmed acquired
     logError(
         "[SAFETY] [BLOCKED] Alarm reset denied - encoder fault not cleared");
     return;
@@ -407,8 +417,7 @@ void safetyResetAlarm() {
   1000 // Minimum 1 second before reset allowed
   uint32_t alarm_duration = (uint32_t)(millis() - alarm_trigger_time);
   if (alarm_duration < SAFETY_MIN_ALARM_DURATION_MS) {
-    if (safety_state_mutex)
-      xSemaphoreGive(safety_state_mutex);
+    xSemaphoreGive(safety_state_mutex);  // Mutex confirmed acquired
     logWarning(
         "[SAFETY] [BLOCKED] Alarm reset too soon (%lu ms < %d ms minimum)",
         (unsigned long)alarm_duration, SAFETY_MIN_ALARM_DURATION_MS);
