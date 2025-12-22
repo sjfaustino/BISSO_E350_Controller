@@ -241,18 +241,24 @@ void WebServerManager::setupRoutes() {
       .setDefaultFile("index.html")
       .setAuthentication(http_username, http_password);
 
-  // 1.1 Custom 404 Handler (Diagnostics)
+  // 1.1 Custom 404 Handler
+  // PHASE 5.9: Security - Only expose filesystem debug info in debug builds
   server->onNotFound([this](AsyncWebServerRequest *request) {
     if (!requireAuth(request)) return;
-    
+
     Serial.printf("[WEB] [404] %s\n", request->url().c_str());
-    
+
     String message = "<h1>404 Not Found</h1>";
     message += "<p>The requested URL was not found on this server.</p>";
+
+    #ifdef DEBUG_BUILD
+    // Debug info only exposed in debug builds (not production)
+    // Prevents information disclosure about filesystem state
     if (!SPIFFS.exists("/index.html")) {
        message += "<p><b>DEBUG:</b> SPIFFS might be empty or index.html missing.</p>";
     }
-    
+    #endif
+
     request->send(404, "text/html", message);
   });
 

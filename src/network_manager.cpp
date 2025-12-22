@@ -69,15 +69,46 @@ void NetworkManager::init() {
 
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(ap_ssid, ap_pass);
-    
-    // Captive Portal DNS: Redirect all requests to controller IP (192.168.4.1)
+
+    // PHASE 5.9: Captive Portal DNS with safety checks
+    // NOTE: DNS server only responds to queries from AP clients (192.168.4.x)
+    // Does NOT interfere with STA mode DNS resolution (ESP32 network stack keeps interfaces separate)
+    // Cleanup existing DNS server if init() called multiple times (prevents memory leak)
+    if (dnsServer) {
+      dnsServer->stop();
+      delete dnsServer;
+      dnsServer = nullptr;
+      Serial.println("[NET] [DEBUG] Cleaned up existing DNS server before re-init");
+    }
+
+    // Allocate and start DNS server for captive portal
     dnsServer = new DNSServer();
-    dnsServer->start(NET_DNS_PORT, "*", WiFi.softAPIP());
-    
+    if (dnsServer == nullptr) {
+      Serial.println("[NET] [ERROR] Failed to allocate DNS server (out of memory)");
+    } else {
+      // Start DNS server: Redirect all DNS queries to AP IP (192.168.4.1)
+      // This triggers captive portal on mobile devices when they connect to AP
+      if (dnsServer->start(NET_DNS_PORT, "*", WiFi.softAPIP())) {
+        Serial.printf("[NET] [OK] Captive portal DNS started on port %d\n", NET_DNS_PORT);
+      } else {
+        Serial.println("[NET] [ERROR] Failed to start DNS server (port conflict?)");
+        delete dnsServer;
+        dnsServer = nullptr;
+      }
+    }
+
     Serial.printf("[NET] AP Mode ENABLED (SSID: %s, IP: %s)\n", ap_ssid, WiFi.softAPIP().toString().c_str());
   } else {
     WiFi.mode(WIFI_STA);
     Serial.println("[NET] AP Mode DISABLED (Station only)");
+
+    // Ensure DNS server cleaned up if switching from AP to STA mode
+    if (dnsServer) {
+      dnsServer->stop();
+      delete dnsServer;
+      dnsServer = nullptr;
+      Serial.println("[NET] [DEBUG] DNS server stopped (STA mode only)");
+    }
   }
 
   // Try to connect to saved network without blocking
