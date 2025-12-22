@@ -5,9 +5,28 @@
  */
 
 #include "api_file_manager.h"
+#include "auth_manager.h"  // PHASE 5.10: SHA-256 authentication
 #include "web_server.h" // For WEB_BUFFER_SIZE, though not ideal dependency
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
+
+// PHASE 5.10: Local auth helper using auth_manager
+static bool requireAuth(AsyncWebServerRequest *request) {
+  if (!request->hasHeader("Authorization")) {
+    request->requestAuthentication();
+    return false;
+  }
+
+  AsyncWebHeader* authHeader = request->getHeader("Authorization");
+  const char* auth = authHeader->value().c_str();
+
+  if (!authVerifyHTTPBasicAuth(auth)) {
+    request->requestAuthentication();
+    return false;
+  }
+
+  return true;
+}
 
 
 // External definitions from motion_commands needed to complete API
@@ -133,37 +152,31 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename,
 
 // --- Registration ---
 
-void apiRegisterFileRoutes(AsyncWebServer *server, const char *username,
-                           const char *password) {
+// PHASE 5.10: Removed username/password parameters - using SHA-256 auth
+void apiRegisterFileRoutes(AsyncWebServer *server) {
   // API: List Files (Protected)
   server->on("/api/files", HTTP_GET,
-             [username, password](AsyncWebServerRequest *request) {
-               if (!request->authenticate(username, password))
-                 return request->requestAuthentication();
+             [](AsyncWebServerRequest *request) {
+               if (!requireAuth(request)) return;
                handleFileList(request);
              });
 
   // API: Delete File (Protected)
   server->on("/api/files", HTTP_DELETE,
-             [username, password](AsyncWebServerRequest *request) {
-               if (!request->authenticate(username, password))
-                 return request->requestAuthentication();
+             [](AsyncWebServerRequest *request) {
+               if (!requireAuth(request)) return;
                handleFileDelete(request);
              });
 
   // API: Upload File (Protected)
-  server
-      ->on(
-          "/api/upload", HTTP_POST,
-          [](AsyncWebServerRequest *request) {
-            request->send(200);
-          }, // On success
-          [username, password](AsyncWebServerRequest *request, String filename,
-                               size_t index, uint8_t *data, size_t len,
-                               bool final) {
-            // Check auth in the main handler function if necessary, or rely on
-            // route auth
-            handleFileUpload(request, filename, index, data, len, final);
-          })
-      .setAuthentication(username, password);
+  server->on(
+      "/api/upload", HTTP_POST,
+      [](AsyncWebServerRequest *request) {
+        if (!requireAuth(request)) return;
+        request->send(200);
+      },
+      [](AsyncWebServerRequest *request, String filename,
+         size_t index, uint8_t *data, size_t len, bool final) {
+        handleFileUpload(request, filename, index, data, len, final);
+      });
 }

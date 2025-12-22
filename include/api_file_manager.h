@@ -9,6 +9,7 @@
 
 #include <ESPAsyncWebServer.h>
 
-void apiRegisterFileRoutes(AsyncWebServer* server, const char* username, const char* password);
+// PHASE 5.10: Removed username/password parameters - auth handled via auth_manager
+void apiRegisterFileRoutes(AsyncWebServer* server);
 
 #endif // API_FILE_MANAGER_H

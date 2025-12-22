@@ -11,13 +11,14 @@
 #include "motion.h"
 #include "plc_iface.h"
 #include "safety.h"
-#include "serial_logger.h" 
+#include "serial_logger.h"
 #include "system_constants.h"
 #include "task_manager.h"
 #include "task_performance_monitor.h"  // PHASE 5.1: Task performance monitoring
 #include "config_validator_schema.h"  // PHASE 5.2: Configuration schema validation
 #include "timeout_manager.h"
 #include "watchdog_manager.h"
+#include "auth_manager.h"  // PHASE 5.10: SHA-256 password hashing
 #include "web_server.h"
 #include "network_manager.h"
 #include "encoder_diagnostics.h"  // PHASE 5.3: Advanced encoder diagnostics
@@ -47,6 +48,7 @@ bool init_watchdog_wrapper() { watchdogInit(); return true; }
 bool init_timeout_wrapper() { timeoutManagerInit(); return true; }
 bool init_config_wrapper() { configUnifiedInit(); return true; }
 bool init_schema_wrapper() { configSchemaVersioningInit(); configSchemaInit(); return !configIsMigrationNeeded(); }
+bool init_auth_wrapper() { authInit(); return true; }  // PHASE 5.10: SHA-256 authentication
 
 // PHASE 5.7: Cursor AI Fix - Proper error checking for calibration initialization
 bool init_calib_wrapper() {
@@ -112,6 +114,7 @@ void setup() {
   BOOT_INIT("Watchdog", init_watchdog_wrapper, BOOT_ERROR_WATCHDOG);
   BOOT_INIT("Config", init_config_wrapper, BOOT_ERROR_CONFIG);
   BOOT_INIT("Schema", init_schema_wrapper, BOOT_ERROR_SCHEMA);
+  BOOT_INIT("Auth", init_auth_wrapper, (boot_status_code_t)20);  // PHASE 5.10: SHA-256 auth
 
   // CRITICAL: Initialize task manager BEFORE Motion to create mutexes/queues
   // Motion buffer needs mutex during init, so this must come first

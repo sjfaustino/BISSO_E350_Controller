@@ -14,6 +14,7 @@
 #include "api_file_manager.h"  // Delegated file handling
 #include "api_ota_updater.h"   // PHASE 5.1: OTA firmware updates
 #include "api_rate_limiter.h"  // PHASE 5.1: Rate limiting
+#include "auth_manager.h"      // PHASE 5.10: SHA-256 password hashing
 #include "config_keys.h"       // Configuration keys
 #include "config_unified.h"    // NVS configuration
 #include "dashboard_metrics.h" // PHASE 5.3: Web UI dashboard metrics
@@ -35,10 +36,8 @@
 // Global instance
 WebServerManager webServer(80);
 
-// Credentials loaded from NVS (PHASE 5.1: Security hardening)
-static char http_username[CONFIG_VALUE_LEN] = "admin";
-static char http_password[CONFIG_VALUE_LEN] = "password";
-static bool password_change_enforced = false;
+// PHASE 5.10: Removed plain text credentials - now using auth_manager with SHA-256 hashing
+// See auth_manager.cpp for secure credential storage
 
 // Security Constants
 #define MAX_REQUEST_BODY_SIZE 8192  // Maximum size for POST body (8KB)
@@ -49,13 +48,25 @@ static bool password_change_enforced = false;
  * @brief Check authentication and send 401 if failed
  * @param request The async web request
  * @return true if authenticated, false if authentication was requested
- * @note Helper function to reduce code duplication
+ * @note PHASE 5.10: Uses SHA-256 hashed password verification via auth_manager
  */
 static bool requireAuth(AsyncWebServerRequest *request) {
-  if (!request->authenticate(http_username, http_password)) {
+  // Check for Authorization header
+  if (!request->hasHeader("Authorization")) {
     request->requestAuthentication();
     return false;
   }
+
+  // Get Authorization header
+  AsyncWebHeader* authHeader = request->getHeader("Authorization");
+  const char* auth = authHeader->value().c_str();
+
+  // Verify credentials using auth_manager (SHA-256 hashing)
+  if (!authVerifyHTTPBasicAuth(auth)) {
+    request->requestAuthentication();
+    return false;
+  }
+
   return true;
 }
 
@@ -104,84 +115,29 @@ WebServerManager::~WebServerManager() {
     delete ws;
 }
 
-// Load credentials from NVS (PHASE 5.1: Security hardening)
+// PHASE 5.10: Credentials now managed by auth_manager.cpp
+// This function is kept for compatibility but no longer loads plain text passwords
 void WebServerManager::loadCredentials() {
-  const char *user = configGetString(KEY_WEB_USERNAME, "admin");
-  const char *pass = configGetString(KEY_WEB_PASSWORD, "password");
-  int pw_changed = configGetInt(KEY_WEB_PW_CHANGED, 0);
-
-  strncpy(http_username, user, CONFIG_VALUE_LEN - 1);
-  http_username[CONFIG_VALUE_LEN - 1] = '\0';
-  strncpy(http_password, pass, CONFIG_VALUE_LEN - 1);
-  http_password[CONFIG_VALUE_LEN - 1] = '\0';
-
-  if (pw_changed == 0) {
-    // SECURITY WARNING: Default credentials in use
-    Serial.println();
-    Serial.println(
-        "╔══════════════════════════════════════════════════════════════╗");
-    Serial.println(
-        "║  ⚠️  SECURITY WARNING: DEFAULT CREDENTIALS IN USE!  ⚠️       ║");
-    Serial.println(
-        "╠══════════════════════════════════════════════════════════════╣");
-    Serial.println(
-        "║  Username: admin    Password: password                       ║");
-    Serial.println(
-        "║                                                              ║");
-    Serial.println(
-        "║  Change immediately using CLI command:                       ║");
-    Serial.println(
-        "║    web_setpass <new_password>                                ║");
-    Serial.println(
-        "║                                                              ║");
-    Serial.println(
-        "║  Password must be at least 8 characters.                     ║");
-    Serial.println(
-        "╚══════════════════════════════════════════════════════════════╝");
-    Serial.println();
-    password_change_enforced = true;
-  } else {
-    Serial.println("[WEB] [OK] Credentials loaded from NVS");
-    password_change_enforced = false;
-  }
+  // authInit() is called from main.cpp during system initialization
+  // Just log that auth system is ready
+  Serial.println("[WEB] [OK] Using secure SHA-256 authentication");
 }
 
-// Check if password has been changed from default
+// PHASE 5.10: Delegate to auth_manager
 bool WebServerManager::isPasswordChangeRequired() {
-  return password_change_enforced;
+  return authIsPasswordChangeRequired();
 }
 
-// Minimum password length for security
-#define MIN_PASSWORD_LENGTH 8
-
-// Set new password (for CLI command)
+// PHASE 5.10: Set new password using SHA-256 hashing
 void WebServerManager::setPassword(const char *new_password) {
-  if (!new_password || strlen(new_password) < MIN_PASSWORD_LENGTH) {
-    Serial.printf("[WEB] [ERR] Password must be at least %d characters\n",
-                  MIN_PASSWORD_LENGTH);
-    return;
+  char username[32];
+  authGetUsername(username, sizeof(username));
+
+  if (authSetPassword(username, new_password)) {
+    Serial.println("[WEB] [OK] Password changed successfully (SHA-256 hashed)");
+  } else {
+    Serial.println("[WEB] [ERR] Failed to set password - check validation requirements");
   }
-
-  // Check password doesn't match common weak passwords
-  const char *weak_passwords[] = {"password", "12345678", "admin123",
-                                  "qwerty12", "00000000"};
-  for (int i = 0; i < 5; i++) {
-    if (strcmp(new_password, weak_passwords[i]) == 0) {
-      Serial.println(
-          "[WEB] [ERR] Password too weak - choose a stronger password");
-      return;
-    }
-  }
-
-  configSetString(KEY_WEB_PASSWORD, new_password);
-  configSetInt(KEY_WEB_PW_CHANGED, 1);
-  configUnifiedSave();
-
-  strncpy(http_password, new_password, CONFIG_VALUE_LEN - 1);
-  http_password[CONFIG_VALUE_LEN - 1] = '\0';
-  password_change_enforced = false;
-
-  Serial.println("[WEB] [OK] Password changed successfully");
 }
 
 void WebServerManager::init() {
@@ -237,9 +193,13 @@ void WebServerManager::setupRoutes() {
   apiConfigInit();
 
   // 1. Static Files (Protected)
+  // PHASE 5.10: Custom auth filter for static files (SHA-256 verification)
   server->serveStatic("/", SPIFFS, "/")
       .setDefaultFile("index.html")
-      .setAuthentication(http_username, http_password);
+      .setFilter([](AsyncWebServerRequest *request) {
+        // Return true to allow serving, false to block
+        return requireAuth(request);
+      });
 
   // 1.1 Custom 404 Handler
   // PHASE 5.9: Security - Only expose filesystem debug info in debug builds
@@ -293,15 +253,19 @@ void WebServerManager::setupRoutes() {
   });
 
   // 3. API Jog (Protected, Rate Limited)
+  // PHASE 5.10: Auth check moved to request handler (SHA-256 verification)
   server
       ->on(
           "/api/jog", HTTP_POST,
-          [](AsyncWebServerRequest *request) { request->send(200); }, NULL,
+          [](AsyncWebServerRequest *request) {
+            if (!requireAuth(request)) return;
+            request->send(200);
+          },
+          NULL,
           [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
                  size_t index, size_t total) {
             this->handleJogBody(request, data, len, index, total);
-          })
-      .setAuthentication(http_username, http_password);
+          });
 
   // 4. API Spindle Telemetry (Protected, Rate Limited) - PHASE 5.1
   server->on("/api/spindle", HTTP_GET, [this](AsyncWebServerRequest *request) {
@@ -386,10 +350,12 @@ void WebServerManager::setupRoutes() {
                request->send(200, "application/json", status_buffer);
              });
 
+  // PHASE 5.10: Auth check moved to request handler (SHA-256 verification)
   server
       ->on(
           "/api/update", HTTP_POST,
           [](AsyncWebServerRequest *request) {
+            if (!requireAuth(request)) return;
             request->send(202, "application/json",
                           "{\"status\":\"Upload in progress...\"}");
           },
@@ -397,8 +363,7 @@ void WebServerManager::setupRoutes() {
           [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
                  size_t index, size_t total) {
             this->handleFirmwareUpload(request, data, len, index, total);
-          })
-      .setAuthentication(http_username, http_password);
+          });
 
   // 7. API Comprehensive System Telemetry (Protected, Rate Limited) - PHASE 5.1
   server->on(
@@ -617,7 +582,8 @@ void WebServerManager::setupRoutes() {
 
   // 13. DELEGATE FILE MANAGEMENT
   // Registers /api/files (GET, DELETE) and /api/upload (POST)
-  apiRegisterFileRoutes(server, http_username, http_password);
+  // PHASE 5.10: Auth handled internally via auth_manager
+  apiRegisterFileRoutes(server);
 
   // 14. PHASE 5.6: CONFIGURATION API (Protected, Rate Limited)
   // GET /api/config/get?category=<N> - Retrieve configuration by category
