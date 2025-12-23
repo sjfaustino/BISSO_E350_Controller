@@ -48,6 +48,14 @@ WebServerManager webServer(80);
 static uint8_t chunked_request_buffer[MAX_REQUEST_BODY_SIZE];
 static SemaphoreHandle_t chunked_request_mutex = NULL;
 
+// AUDIT FIX: Static buffers to prevent heap fragmentation from malloc in handlers
+#define ENDPOINTS_BUFFER_SIZE 4096
+#define OPENAPI_BUFFER_SIZE 8192
+static char endpoints_static_buffer[ENDPOINTS_BUFFER_SIZE];
+static char openapi_static_buffer[OPENAPI_BUFFER_SIZE];
+static SemaphoreHandle_t endpoints_buffer_mutex = NULL;
+static SemaphoreHandle_t openapi_buffer_mutex = NULL;
+
 /**
  * @brief Check authentication and send 401 if failed
  * @param request The async web request
@@ -496,54 +504,62 @@ void WebServerManager::setupRoutes() {
              });
 
   // 8. API Endpoint Discovery (Unprotected for auto-discovery) - PHASE 5.2
+  // AUDIT FIX: Initialize mutex if needed (lazy init for static buffers)
+  if (!endpoints_buffer_mutex) {
+    endpoints_buffer_mutex = xSemaphoreCreateMutex();
+  }
   server->on(
       "/api/endpoints", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        char *endpoints_buffer = (char *)malloc(4096);
-        if (!endpoints_buffer) {
-          request->send(500, "application/json",
-                        "{\"error\":\"Memory allocation failed\"}");
+        // AUDIT FIX: Use static buffer with mutex protection instead of malloc
+        if (!endpoints_buffer_mutex || xSemaphoreTake(endpoints_buffer_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+          request->send(503, "application/json",
+                        "{\"error\":\"Resource busy, try again\"}");
           return;
         }
 
-        size_t endpoints_size = apiEndpointsExportJSON(endpoints_buffer, 4096);
+        size_t endpoints_size = apiEndpointsExportJSON(endpoints_static_buffer, ENDPOINTS_BUFFER_SIZE);
         if (endpoints_size == 0) {
-          free(endpoints_buffer);
+          xSemaphoreGive(endpoints_buffer_mutex);
           request->send(500, "application/json",
                         "{\"error\":\"Failed to export endpoints\"}");
           return;
         }
 
-        request->send(200, "application/json", endpoints_buffer);
-        free(endpoints_buffer);
+        request->send(200, "application/json", endpoints_static_buffer);
+        xSemaphoreGive(endpoints_buffer_mutex);
       });
 
   // 8.5. OpenAPI Specification (Unprotected for Swagger UI) - PHASE 6
+  // AUDIT FIX: Initialize mutex if needed (lazy init for static buffers)
+  if (!openapi_buffer_mutex) {
+    openapi_buffer_mutex = xSemaphoreCreateMutex();
+  }
   server->on(
       "/api/openapi.json", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        char *openapi_buffer = (char *)malloc(8192);
-        if (!openapi_buffer) {
-          request->send(500, "application/json",
-                        "{\"error\":\"Memory allocation failed\"}");
+        // AUDIT FIX: Use static buffer with mutex protection instead of malloc
+        if (!openapi_buffer_mutex || xSemaphoreTake(openapi_buffer_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+          request->send(503, "application/json",
+                        "{\"error\":\"Resource busy, try again\"}");
           return;
         }
 
-        size_t openapi_size = openAPIGenerateJSON(openapi_buffer, 8192);
+        size_t openapi_size = openAPIGenerateJSON(openapi_static_buffer, OPENAPI_BUFFER_SIZE);
         if (openapi_size == 0) {
-          free(openapi_buffer);
+          xSemaphoreGive(openapi_buffer_mutex);
           request->send(500, "application/json",
                         "{\"error\":\"Failed to generate OpenAPI spec\"}");
           return;
         }
 
-        if (!openAPIValidate(openapi_buffer)) {
-          free(openapi_buffer);
+        if (!openAPIValidate(openapi_static_buffer)) {
+          xSemaphoreGive(openapi_buffer_mutex);
           request->send(500, "application/json",
                         "{\"error\":\"Generated invalid OpenAPI spec\"}");
           return;
         }
 
-        request->send(200, "application/json", openapi_buffer);
-        free(openapi_buffer);
+        request->send(200, "application/json", openapi_static_buffer);
+        xSemaphoreGive(openapi_buffer_mutex);
       });
 
   // 8.6. Swagger UI Documentation (Unprotected for discovery) - PHASE 6

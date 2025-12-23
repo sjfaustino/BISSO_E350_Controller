@@ -52,7 +52,7 @@ static void binToHex(const uint8_t* data, size_t data_len, char* output, size_t 
   }
 
   for (size_t i = 0; i < data_len; i++) {
-    sprintf(output + i * 2, "%02x", data[i]);
+    snprintf(output + i * 2, 3, "%02x", data[i]);
   }
   output[data_len * 2] = '\0';
 }
