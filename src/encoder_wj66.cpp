@@ -131,10 +131,14 @@ void wj66Update() {
   bool time_to_poll = (now - wj66_state.last_command_time > WJ66_READ_INTERVAL_MS);
 
   if (timeout) {
+      // PHASE 5.10: Protect status/error_count writes with mutex
+      if (xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        wj66_state.status = ENCODER_TIMEOUT;
+        wj66_state.error_count++;
+        xSemaphoreGive(wj66_mutex);
+      }
       // Packet lost, reset flag so we can try again next cycle
       wj66_state.waiting_for_response = false;
-      wj66_state.status = ENCODER_TIMEOUT;
-      wj66_state.error_count++;
   } 
   else if (time_to_poll && !wj66_state.waiting_for_response) {
       Serial1.print("#00\r"); // Request Data
@@ -175,23 +179,27 @@ void wj66Update() {
         if (commas == 3) {
           values[3] = is_negative ? -current_value : current_value;
 
-          // PHASE 5.10: Thread-safe position write
+          // PHASE 5.10: Thread-safe position and status write
           if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             for (int i = 0; i < WJ66_AXES; i++) {
               wj66_state.position[i] = values[i];
               wj66_state.last_read[i] = millis();
               wj66_state.read_count[i]++;
             }
+            wj66_state.status = ENCODER_OK;
             xSemaphoreGive(wj66_mutex);
           } else {
             logWarning("[WJ66] Mutex timeout writing position update");
           }
 
-          wj66_state.status = ENCODER_OK;
           wj66_state.waiting_for_response = false; // Transaction Complete
         } else {
-          wj66_state.status = ENCODER_CRC_ERROR;
-          wj66_state.error_count++;
+          // PHASE 5.10: Protect status/error_count writes with mutex
+          if (xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            wj66_state.status = ENCODER_CRC_ERROR;
+            wj66_state.error_count++;
+            xSemaphoreGive(wj66_mutex);
+          }
           wj66_state.waiting_for_response = false; // Reset to allow retry
         }
       }
@@ -240,7 +248,15 @@ bool wj66IsStale(uint8_t axis) {
     return wj66GetAxisAge(axis) > WJ66_TIMEOUT_MS; 
 }
 
-encoder_status_t wj66GetStatus() { return wj66_state.status; }
+// PHASE 5.10: Protect status read with mutex
+encoder_status_t wj66GetStatus() {
+  encoder_status_t status = ENCODER_OK;
+  if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+    status = wj66_state.status;
+    xSemaphoreGive(wj66_mutex);
+  }
+  return status;
+}
 
 void wj66Reset() {
   for (int i = 0; i < WJ66_AXES; i++) {
