@@ -1134,47 +1134,54 @@ void WebServerManager::broadcastState() {
   if (ws->count() == 0)
     return;
 
+  // PHASE 5.10: Make atomic snapshot of current_status under spinlock
+  // This prevents torn reads while building JSON
+  decltype(current_status) status_snapshot;
+  portENTER_CRITICAL(&statusSpinlock);
+  memcpy(&status_snapshot, &current_status, sizeof(current_status));
+  portEXIT_CRITICAL(&statusSpinlock);
+
   // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
   // fragmentation This function is called frequently (WebSocket broadcasts),
   // critical for stability
   JsonDocument doc;
-  doc["status"] = current_status.status;
-  doc["x"] = current_status.x_pos;
-  doc["y"] = current_status.y_pos;
-  doc["z"] = current_status.z_pos;
-  doc["a"] = current_status.a_pos;
+  doc["status"] = status_snapshot.status;
+  doc["x"] = status_snapshot.x_pos;
+  doc["y"] = status_snapshot.y_pos;
+  doc["z"] = status_snapshot.z_pos;
+  doc["a"] = status_snapshot.a_pos;
 
   // VFD telemetry (PHASE 5.5)
   JsonObject vfd = doc["vfd"].to<JsonObject>();
-  vfd["current_amps"] = current_status.vfd_current_amps;
-  vfd["frequency_hz"] = current_status.vfd_frequency_hz;
-  vfd["thermal_percent"] = current_status.vfd_thermal_percent;
-  vfd["fault_code"] = current_status.vfd_fault_code;
-  vfd["stall_threshold_amps"] = current_status.vfd_threshold_amps;
-  vfd["calibration_valid"] = current_status.vfd_calibration_valid;
+  vfd["current_amps"] = status_snapshot.vfd_current_amps;
+  vfd["frequency_hz"] = status_snapshot.vfd_frequency_hz;
+  vfd["thermal_percent"] = status_snapshot.vfd_thermal_percent;
+  vfd["fault_code"] = status_snapshot.vfd_fault_code;
+  vfd["stall_threshold_amps"] = status_snapshot.vfd_threshold_amps;
+  vfd["calibration_valid"] = status_snapshot.vfd_calibration_valid;
 
   // Axis metrics (PHASE 5.6) - per-axis
   JsonObject axis = doc["axis"].to<JsonObject>();
   JsonObject x_metrics = axis["x"].to<JsonObject>();
-  x_metrics["quality"] = current_status.axis_metrics[0].quality_score;
-  x_metrics["jitter_mms"] = current_status.axis_metrics[0].jitter_mms;
-  x_metrics["stalled"] = current_status.axis_metrics[0].stalled;
+  x_metrics["quality"] = status_snapshot.axis_metrics[0].quality_score;
+  x_metrics["jitter_mms"] = status_snapshot.axis_metrics[0].jitter_mms;
+  x_metrics["stalled"] = status_snapshot.axis_metrics[0].stalled;
   x_metrics["vfd_error_percent"] =
-      current_status.axis_metrics[0].vfd_error_percent;
+      status_snapshot.axis_metrics[0].vfd_error_percent;
 
   JsonObject y_metrics = axis["y"].to<JsonObject>();
-  y_metrics["quality"] = current_status.axis_metrics[1].quality_score;
-  y_metrics["jitter_mms"] = current_status.axis_metrics[1].jitter_mms;
-  y_metrics["stalled"] = current_status.axis_metrics[1].stalled;
+  y_metrics["quality"] = status_snapshot.axis_metrics[1].quality_score;
+  y_metrics["jitter_mms"] = status_snapshot.axis_metrics[1].jitter_mms;
+  y_metrics["stalled"] = status_snapshot.axis_metrics[1].stalled;
   y_metrics["vfd_error_percent"] =
-      current_status.axis_metrics[1].vfd_error_percent;
+      status_snapshot.axis_metrics[1].vfd_error_percent;
 
   JsonObject z_metrics = axis["z"].to<JsonObject>();
-  z_metrics["quality"] = current_status.axis_metrics[2].quality_score;
-  z_metrics["jitter_mms"] = current_status.axis_metrics[2].jitter_mms;
-  z_metrics["stalled"] = current_status.axis_metrics[2].stalled;
+  z_metrics["quality"] = status_snapshot.axis_metrics[2].quality_score;
+  z_metrics["jitter_mms"] = status_snapshot.axis_metrics[2].jitter_mms;
+  z_metrics["stalled"] = status_snapshot.axis_metrics[2].stalled;
   z_metrics["vfd_error_percent"] =
-      current_status.axis_metrics[2].vfd_error_percent;
+      status_snapshot.axis_metrics[2].vfd_error_percent;
 
   size_t len =
       serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
@@ -1183,12 +1190,17 @@ void WebServerManager::broadcastState() {
 
 void WebServerManager::setSystemStatus(const char *status) {
   if (status) {
+    // PHASE 5.10: Protect current_status with spinlock
+    portENTER_CRITICAL(&statusSpinlock);
     strncpy(current_status.status, status, 31);
     current_status.status[31] = '\0';
+    portEXIT_CRITICAL(&statusSpinlock);
   }
 }
 
 void WebServerManager::setAxisPosition(char axis, float position) {
+  // PHASE 5.10: Protect current_status with spinlock
+  portENTER_CRITICAL(&statusSpinlock);
   switch (axis) {
   case 'X':
     current_status.x_pos = position;
@@ -1203,10 +1215,14 @@ void WebServerManager::setAxisPosition(char axis, float position) {
     current_status.a_pos = position;
     break;
   }
+  portEXIT_CRITICAL(&statusSpinlock);
 }
 
 void WebServerManager::setSystemUptime(uint32_t seconds) {
+  // PHASE 5.10: Protect current_status with spinlock
+  portENTER_CRITICAL(&statusSpinlock);
   current_status.uptime_sec = seconds;
+  portEXIT_CRITICAL(&statusSpinlock);
 }
 
 // ============================================================================
@@ -1214,27 +1230,39 @@ void WebServerManager::setSystemUptime(uint32_t seconds) {
 // ============================================================================
 
 void WebServerManager::setVFDCurrent(float current_amps) {
+  portENTER_CRITICAL(&statusSpinlock);
   current_status.vfd_current_amps = current_amps;
+  portEXIT_CRITICAL(&statusSpinlock);
 }
 
 void WebServerManager::setVFDFrequency(float frequency_hz) {
+  portENTER_CRITICAL(&statusSpinlock);
   current_status.vfd_frequency_hz = frequency_hz;
+  portEXIT_CRITICAL(&statusSpinlock);
 }
 
 void WebServerManager::setVFDThermalState(int16_t thermal_percent) {
+  portENTER_CRITICAL(&statusSpinlock);
   current_status.vfd_thermal_percent = thermal_percent;
+  portEXIT_CRITICAL(&statusSpinlock);
 }
 
 void WebServerManager::setVFDFaultCode(uint16_t fault_code) {
+  portENTER_CRITICAL(&statusSpinlock);
   current_status.vfd_fault_code = fault_code;
+  portEXIT_CRITICAL(&statusSpinlock);
 }
 
 void WebServerManager::setVFDCalibrationThreshold(float threshold_amps) {
+  portENTER_CRITICAL(&statusSpinlock);
   current_status.vfd_threshold_amps = threshold_amps;
+  portEXIT_CRITICAL(&statusSpinlock);
 }
 
 void WebServerManager::setVFDCalibrationValid(bool is_valid) {
+  portENTER_CRITICAL(&statusSpinlock);
   current_status.vfd_calibration_valid = is_valid;
+  portEXIT_CRITICAL(&statusSpinlock);
 }
 
 // ============================================================================
@@ -1244,24 +1272,32 @@ void WebServerManager::setVFDCalibrationValid(bool is_valid) {
 void WebServerManager::setAxisQualityScore(uint8_t axis,
                                            uint32_t quality_score) {
   if (axis < 3) {
+    portENTER_CRITICAL(&statusSpinlock);
     current_status.axis_metrics[axis].quality_score = quality_score;
+    portEXIT_CRITICAL(&statusSpinlock);
   }
 }
 
 void WebServerManager::setAxisJitterAmplitude(uint8_t axis, float jitter_mms) {
   if (axis < 3) {
+    portENTER_CRITICAL(&statusSpinlock);
     current_status.axis_metrics[axis].jitter_mms = jitter_mms;
+    portEXIT_CRITICAL(&statusSpinlock);
   }
 }
 
 void WebServerManager::setAxisStalled(uint8_t axis, bool is_stalled) {
   if (axis < 3) {
+    portENTER_CRITICAL(&statusSpinlock);
     current_status.axis_metrics[axis].stalled = is_stalled;
+    portEXIT_CRITICAL(&statusSpinlock);
   }
 }
 
 void WebServerManager::setAxisVFDError(uint8_t axis, float error_percent) {
   if (axis < 3) {
+    portENTER_CRITICAL(&statusSpinlock);
     current_status.axis_metrics[axis].vfd_error_percent = error_percent;
+    portEXIT_CRITICAL(&statusSpinlock);
   }
 }

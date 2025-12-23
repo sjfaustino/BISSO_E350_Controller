@@ -81,6 +81,9 @@ private:
         } axis_metrics[3];  // 0=X, 1=Y, 2=Z
     } current_status;
 
+    // PHASE 5.10: Spinlock to protect current_status from concurrent access
+    portMUX_TYPE statusSpinlock = portMUX_INITIALIZER_UNLOCKED;
+
     // Handlers
     void setupRoutes();
     void handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
