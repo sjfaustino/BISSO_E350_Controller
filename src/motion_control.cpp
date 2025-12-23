@@ -368,7 +368,12 @@ void motionInit() {
 }
 
 void motionUpdate() {
-  if (!m_state.global_enabled)
+  // PHASE 5.10: Use spinlock for thread-safe global_enabled check
+  portENTER_CRITICAL(&motionSpinlock);
+  bool enabled = m_state.global_enabled;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  if (!enabled)
     return;
 
   // PHASE 5.1: Exponential backoff with safety escalation
@@ -390,12 +395,11 @@ void motionUpdate() {
   bool consensus_active = false;
   uint8_t current_axis = 255;
 
-  // Peek at active axis to know which input to read (safe-ish read/write race
-  // handled by I/O idempotency)
-  if (taskLockMutex(taskGetMotionMutex(), 100)) {
-    current_axis = m_state.active_axis;
-    taskUnlockMutex(taskGetMotionMutex());
-  }
+  // PHASE 5.10: Use spinlock instead of mutex for consistent state protection
+  // All writes to m_state.active_axis use spinlock, so reads must too
+  portENTER_CRITICAL(&motionSpinlock);
+  current_axis = m_state.active_axis;
+  portEXIT_CRITICAL(&motionSpinlock);
 
   // Read I/O if we have an active axis
   if (current_axis < MOTION_AXES) {
@@ -620,9 +624,21 @@ bool motionIsMoving() {
 // FIX: Delegating to encoder integration instead of hardcoded false
 bool motionIsStalled(uint8_t axis) { return encoderMotionHasError(axis); }
 
-bool motionIsEmergencyStopped() { return !m_state.global_enabled; }
+// PHASE 5.10: Use spinlock for thread-safe global_enabled read
+bool motionIsEmergencyStopped() {
+  portENTER_CRITICAL(&motionSpinlock);
+  bool disabled = !m_state.global_enabled;
+  portEXIT_CRITICAL(&motionSpinlock);
+  return disabled;
+}
 
-uint8_t motionGetActiveAxis() { return m_state.active_axis; }
+// PHASE 5.10: Use spinlock for thread-safe active_axis read
+uint8_t motionGetActiveAxis() {
+  portENTER_CRITICAL(&motionSpinlock);
+  uint8_t axis = m_state.active_axis;
+  portEXIT_CRITICAL(&motionSpinlock);
+  return axis;
+}
 
 const char *motionStateToString(motion_state_t state) {
   switch (state) {
@@ -682,7 +698,12 @@ bool motionHome(uint8_t axis) {
 }
 
 bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
-  if (!m_state.global_enabled) {
+  // PHASE 5.10: Use spinlock for thread-safe global_enabled check
+  portENTER_CRITICAL(&motionSpinlock);
+  bool enabled = m_state.global_enabled;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  if (!enabled) {
     logError("[MOTION] Disabled");
     return false;
   }
@@ -866,7 +887,12 @@ void motionEnableSoftLimits(uint8_t axis, bool enable) {
       logError("[MOTION] Reject Limit Config: Axis %d Busy", axis);
       return;
     }
-    if (m_state.global_enabled) {
+    // PHASE 5.10: Use spinlock for thread-safe global_enabled check
+    portENTER_CRITICAL(&motionSpinlock);
+    bool enabled = m_state.global_enabled;
+    portEXIT_CRITICAL(&motionSpinlock);
+
+    if (enabled) {
       logError(
           "[MOTION] Reject Limit Config: System must be Disabled (E-Stop)");
       return;
@@ -912,7 +938,12 @@ bool motionStop() {
 }
 
 bool motionPause() {
-  if (!m_state.global_enabled)
+  // PHASE 5.10: Use spinlock for thread-safe global_enabled check
+  portENTER_CRITICAL(&motionSpinlock);
+  bool enabled = m_state.global_enabled;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  if (!enabled)
     return false;
   if (!taskLockMutex(taskGetMotionMutex(), 100))
     return false;
@@ -938,7 +969,12 @@ bool motionPause() {
 }
 
 bool motionResume() {
-  if (!m_state.global_enabled)
+  // PHASE 5.10: Use spinlock for thread-safe global_enabled check
+  portENTER_CRITICAL(&motionSpinlock);
+  bool enabled = m_state.global_enabled;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  if (!enabled)
     return false;
   if (!taskLockMutex(taskGetMotionMutex(), 100))
     return false;
@@ -975,7 +1011,12 @@ bool motionResume() {
 bool motionDwell(uint32_t ms) {
   // Non-blocking dwell command for G4 gcode
   // Uses one axis (axis 0) as the dwell controller
-  if (!m_state.global_enabled)
+  // PHASE 5.10: Use spinlock for thread-safe global_enabled check
+  portENTER_CRITICAL(&motionSpinlock);
+  bool enabled = m_state.global_enabled;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  if (!enabled)
     return false;
   if (!taskLockMutex(taskGetMotionMutex(), 100))
     return false;
@@ -1002,7 +1043,12 @@ bool motionWaitPin(uint8_t pin_id, uint8_t pin_type, uint8_t state,
                    uint32_t timeout_sec) {
   // Non-blocking pin state wait command for M226 gcode
   // Uses axis 0 as the wait controller
-  if (!m_state.global_enabled)
+  // PHASE 5.10: Use spinlock for thread-safe global_enabled check
+  portENTER_CRITICAL(&motionSpinlock);
+  bool enabled = m_state.global_enabled;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  if (!enabled)
     return false;
   if (!taskLockMutex(taskGetMotionMutex(), 100))
     return false;
@@ -1076,7 +1122,12 @@ void motionEmergencyStop() {
 }
 
 bool motionClearEmergencyStop() {
-  if (m_state.global_enabled) {
+  // PHASE 5.10: Use spinlock for thread-safe global_enabled check
+  portENTER_CRITICAL(&motionSpinlock);
+  bool enabled = m_state.global_enabled;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  if (enabled) {
     Serial.println("[MOTION] E-Stop already cleared");
     return true;
   }
