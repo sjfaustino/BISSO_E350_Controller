@@ -4,6 +4,7 @@
 #include "config_unified.h" // For OTA password from NVS
 #include "serial_logger.h"
 #include "web_server.h"
+#include "auth_manager.h"   // PHASE 5.10: For authVerifyCredentials (SHA-256)
 #include <ArduinoOTA.h>
 #include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
 
@@ -191,10 +192,8 @@ void NetworkManager::update() {
       clientConnected = true;
       telnetClient.flush();
 
-      // Reset auth state for new connection
-      resetTelnetAuthState();
-
-      // Check lockout status
+      // PHASE 5.10: Check lockout BEFORE resetting auth state
+      // (bug: reset was clearing lockout state before checking it)
       if (telnet_auth_state == TELNET_AUTH_LOCKED_OUT &&
           millis() < telnet_lockout_until) {
         telnetClient.println("Connection refused: Too many failed attempts.");
@@ -209,6 +208,9 @@ void NetworkManager::update() {
         telnet_auth_state = TELNET_AUTH_IDLE;
         telnet_failed_attempts = 0;
       }
+
+      // Reset auth state for new connection (after lockout check)
+      resetTelnetAuthState();
 
       telnetClient.println("==================================");
       telnetClient.println("   BISSO E350 REMOTE TERMINAL     ");
@@ -255,13 +257,9 @@ void NetworkManager::update() {
       break;
 
     case TELNET_AUTH_WAIT_PASSWORD: {
-      // Get credentials from config
-      const char *valid_username = configGetString(KEY_WEB_USERNAME, "admin");
-      const char *valid_password =
-          configGetString(KEY_WEB_PASSWORD, "password");
-
-      if (strcmp(telnet_username_attempt, valid_username) == 0 &&
-          strcmp(input.c_str(), valid_password) == 0) {
+      // PHASE 5.10: Use auth_manager for credential verification (SHA-256)
+      // Previously used plain config credentials, now synced with web auth
+      if (authVerifyCredentials(telnet_username_attempt, input.c_str())) {
         // Authentication successful
         telnet_auth_state = TELNET_AUTH_AUTHENTICATED;
         telnet_failed_attempts = 0;

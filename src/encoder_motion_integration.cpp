@@ -72,16 +72,21 @@ bool encoderMotionUpdate() {
     }
     
     int32_t encoder_pos = wj66GetPosition(i);
-    int32_t target_pos = motionGetTarget(i); 
+    int32_t target_pos = motionGetTarget(i);
     motion_state_t state = motionGetState(i);
 
+    // PHASE 5.10: Detect deviation during motion AND at idle
+    // During motion: compare encoder to current position (detect lost steps)
+    // At idle: compare encoder to target (detect drift)
     int32_t error = 0;
     if (state == MOTION_IDLE) {
         error = encoder_pos - target_pos;
     } else {
-        error = 0; 
+        // During motion, check following error (encoder vs current position)
+        int32_t current_pos = motionGetPosition(i);
+        error = encoder_pos - current_pos;
     }
-    
+
     position_errors[i].current_error = error;
     if (abs(error) > abs(position_errors[i].max_error)) {
       position_errors[i].max_error = error;

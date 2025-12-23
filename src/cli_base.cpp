@@ -84,14 +84,16 @@ void handle_jog_command(char* cmd) {
             char* endptr = NULL;
             float parsed = strtof(ax_ptr + 1, &endptr);
             if (endptr != (ax_ptr + 1) && !isnan(parsed) && !isinf(parsed)) {
-                target[i] = parsed;
+                target[i] = parsed;  // Work coordinate for specified axis
                 axis_present[i] = true;
             } else {
                 Serial.println("error:33"); // Invalid G-code target
                 return;
             }
         } else {
-            target[i] = use_relative ? 0.0f : current_mpos[i];
+            // PHASE 5.10: For non-specified axes, store work position (not machine)
+            // This ensures target[] array uses consistent coordinate system
+            target[i] = use_relative ? 0.0f : gcodeParser.getWorkPosition(i, current_mpos[i]);
         }
     }
 
@@ -153,7 +155,9 @@ void cliUpdate() {
         else if (motionGetState(0) == MOTION_HOMING_APPROACH_FAST) state_str = "Home";
         else if (motionGetState(0) == MOTION_PAUSED) state_str = "Hold:0";
 
-        int plan_slots = 31 - motionBuffer.available(); 
+        // PHASE 5.10: Use MOTION_BUFFER_SIZE instead of hardcoded 31
+        // Grbl convention: report available planning buffer slots (capacity - 1 - used)
+        int plan_slots = (MOTION_BUFFER_SIZE - 1) - motionBuffer.available();
         if (plan_slots < 0) plan_slots = 0;
 
         float mPos[4] = {

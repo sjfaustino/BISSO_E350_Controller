@@ -157,13 +157,13 @@ void safetyUpdate() {
                  last_frequency_hz, current_freq);
 
         if (!alarm_active) {
-          safety_state.current_fault = SAFETY_STALLED;
+          // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
           char msg[64];
           snprintf(msg, sizeof(msg), "VFD FREQ LOSS %.1f->%.1f Hz",
                    last_frequency_hz, current_freq);
           faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, 0, 0,
                         "VFD frequency loss detected");
-          safetyTriggerAlarm(msg);
+          safetyTriggerAlarm(msg, SAFETY_STALLED);
         }
       }
 
@@ -200,12 +200,12 @@ void safetyUpdate() {
                    thermal_state, (long)temp_crit);
 
           if (!alarm_active) {
-            safety_state.current_fault = SAFETY_THERMAL;
+            // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
             char msg[64];
             snprintf(msg, sizeof(msg), "VFD OVERHEAT %d%%", thermal_state);
             faultLogEntry(FAULT_ERROR, FAULT_TEMPERATURE_HIGH, 0, 0,
                           "VFD thermal critical");
-            safetyTriggerAlarm(msg);
+            safetyTriggerAlarm(msg, SAFETY_THERMAL);
           }
 
         } else if (thermal_state >
@@ -243,7 +243,7 @@ void safetyUpdate() {
             logError("[SAFETY] [FAIL] %s", msg);
             faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
                           "Axis motion quality critical");
-            safetyTriggerAlarm(msg);
+            safetyTriggerAlarm(msg, SAFETY_STALLED);
             break; // Only trigger one alarm per check cycle
           }
 
@@ -256,7 +256,7 @@ void safetyUpdate() {
             logError("[SAFETY] [FAIL] %s", msg);
             faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
                           "Axis motion stall detected via quality metrics");
-            safetyTriggerAlarm(msg);
+            safetyTriggerAlarm(msg, SAFETY_STALLED);
             break;
           }
 
@@ -290,7 +290,8 @@ bool safetyCheckMotionAllowed(uint8_t axis) {
 }
 
 // PHASE 5.7 + 5.10: Thread-safe alarm trigger with proper mutex error handling
-void safetyTriggerAlarm(const char *reason) {
+// PHASE 5.10: Added fault_type parameter to ensure thread-safe fault assignment
+void safetyTriggerAlarm(const char *reason, safety_fault_t fault_type) {
   // PHASE 5.10: CRITICAL FIX - Mutex must succeed for safety operations
   // If mutex is NULL or acquisition fails, force hardware E-stop immediately
   if (safety_state_mutex == NULL) {
@@ -314,13 +315,15 @@ void safetyTriggerAlarm(const char *reason) {
     return;
   }
 
+  // PHASE 5.10: Set current_fault under mutex protection (thread-safe)
+  safety_state.current_fault = fault_type;
+
   alarm_active = true;
   alarm_trigger_time = millis();
   safety_state.fault_timestamp = alarm_trigger_time;
   safety_state.fault_count++;
 
-  safety_state.fault_history[safety_state.history_index] =
-      safety_state.current_fault;
+  safety_state.fault_history[safety_state.history_index] = fault_type;
   safety_state.history_index =
       (safety_state.history_index + 1) % SAFETY_FAULT_HISTORY_SIZE;
 
@@ -442,40 +445,40 @@ void safetyResetAlarm() {
 
 void safetyReportStall(uint8_t axis) {
   if (axis < MOTION_AXES) {
-    safety_state.current_fault = SAFETY_STALLED;
+    // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
     char msg[64];
     snprintf(msg, sizeof(msg), "STALL Axis %d", axis);
     faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
                   "Motion stall detected");
-    safetyTriggerAlarm(msg);
+    safetyTriggerAlarm(msg, SAFETY_STALLED);
   }
 }
 
 void safetyReportSoftLimit(uint8_t axis) {
   if (axis < MOTION_AXES) {
-    safety_state.current_fault = SAFETY_SOFT_LIMIT;
+    // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
     char msg[64];
     snprintf(msg, sizeof(msg), "LIMIT Axis %d", axis);
     faultLogEntry(FAULT_ERROR, FAULT_SOFT_LIMIT_EXCEEDED, axis, 0,
                   "Soft limit reached");
-    safetyTriggerAlarm(msg);
+    safetyTriggerAlarm(msg, SAFETY_SOFT_LIMIT);
   }
 }
 
 void safetyReportEncoderError(uint8_t axis) {
   if (axis < MOTION_AXES) {
-    safety_state.current_fault = SAFETY_ENCODER_ERROR;
+    // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
     char msg[64];
     snprintf(msg, sizeof(msg), "ENC_ERR Axis %d", axis);
     faultLogEntry(FAULT_ERROR, FAULT_ENCODER_TIMEOUT, axis, 0,
                   "Encoder comm failure");
-    safetyTriggerAlarm(msg);
+    safetyTriggerAlarm(msg, SAFETY_ENCODER_ERROR);
   }
 }
 
 void safetyReportPLCFault() {
-  safety_state.current_fault = SAFETY_PLC_FAULT;
-  safetyTriggerAlarm("PLC_FAULT");
+  // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
+  safetyTriggerAlarm("PLC_FAULT", SAFETY_PLC_FAULT);
   faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, -1, 0,
                 "PLC Consensus Failure");
 }

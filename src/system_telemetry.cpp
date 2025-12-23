@@ -130,9 +130,14 @@ void telemetryUpdate() {
     if (telemetry_cache.wifi_connected) {
         int rssi = WiFi.RSSI();  // Returns negative dBm
         // Convert RSSI to 0-100 scale (typical range -100 to -30 dBm)
-        telemetry_cache.wifi_signal_strength = (uint8_t)((rssi + 100) * 100 / 70);
-        if (telemetry_cache.wifi_signal_strength > 100) {
+        // PHASE 5.10: Clamp to prevent underflow for RSSI < -100
+        int signal_raw = (rssi + 100) * 100 / 70;
+        if (signal_raw < 0) {
+            telemetry_cache.wifi_signal_strength = 0;
+        } else if (signal_raw > 100) {
             telemetry_cache.wifi_signal_strength = 100;
+        } else {
+            telemetry_cache.wifi_signal_strength = (uint8_t)signal_raw;
         }
     }
 

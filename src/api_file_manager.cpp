@@ -120,6 +120,14 @@ void handleFileDelete(AsyncWebServerRequest *request) {
 
   // MEMORY FIX: Use const char* directly instead of String
   const char *path = request->getParam("name")->value().c_str();
+
+  // PHASE 5.10: Security - Validate filename before deletion (path traversal prevention)
+  if (!isValidFilename(path)) {
+    Serial.printf("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s\n", path);
+    request->send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
+    return;
+  }
+
   if (SPIFFS.exists(path)) {
     SPIFFS.remove(path);
     request->send(200, "text/plain", "Deleted");

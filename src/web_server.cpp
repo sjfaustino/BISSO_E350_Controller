@@ -330,7 +330,12 @@ void WebServerManager::setupRoutes() {
     }
 
     char response[512];
-    serializeJson(doc, response, sizeof(response));
+    // PHASE 5.10: Check serializeJson return value for truncation
+    size_t written = serializeJson(doc, response, sizeof(response));
+    if (written >= sizeof(response)) {
+      request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+      return;
+    }
     request->send(200, "application/json", response);
   });
 
@@ -364,7 +369,12 @@ void WebServerManager::setupRoutes() {
 
                // Stack allocation - 512 bytes is safe for async handlers
                char status_buffer[512];
-               otaUpdaterExportJSON(status_buffer, sizeof(status_buffer));
+               // PHASE 5.10: Check export function return value for truncation
+               size_t written = otaUpdaterExportJSON(status_buffer, sizeof(status_buffer));
+               if (written == 0 || written >= sizeof(status_buffer) - 1) {
+                 request->send(500, "application/json", "{\"error\":\"Failed to export OTA status\"}");
+                 return;
+               }
                request->send(200, "application/json", status_buffer);
              });
 
@@ -414,8 +424,13 @@ void WebServerManager::setupRoutes() {
 
                // Stack allocation - 512 bytes is safe for async handlers
                char compact_buffer[512];
-               telemetryExportCompactJSON(compact_buffer,
+               // PHASE 5.10: Check export function return value for truncation
+               size_t written = telemetryExportCompactJSON(compact_buffer,
                                           sizeof(compact_buffer));
+               if (written == 0 || written >= sizeof(compact_buffer) - 1) {
+                 request->send(500, "application/json", "{\"error\":\"Failed to export telemetry\"}");
+                 return;
+               }
                request->send(200, "application/json", compact_buffer);
              });
 
@@ -497,7 +512,8 @@ void WebServerManager::setupRoutes() {
     else if (t.health_status == HEALTH_WARNING)
       health_status = "warning";
 
-    snprintf(health_buffer, sizeof(health_buffer),
+    // PHASE 5.10: Check snprintf return value for truncation
+    int written = snprintf(health_buffer, sizeof(health_buffer),
              "{\"status\":\"%s\",\"checks\":{"
              "\"memory\":\"%s\","
              "\"tasks\":\"%s\","
@@ -510,6 +526,11 @@ void WebServerManager::setupRoutes() {
              t.wifi_connected ? "ok" : "warning",
              t.estop_active ? "critical" : (t.alarm_active ? "warning" : "ok"),
              (unsigned long)millis());
+
+    if (written < 0 || written >= (int)sizeof(health_buffer)) {
+      request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+      return;
+    }
 
     request->send(200, "application/json", health_buffer);
   });
@@ -561,13 +582,19 @@ void WebServerManager::setupRoutes() {
     else if (load_status.current_state == LOAD_STATE_CRITICAL)
       state_str = "CRITICAL";
 
-    snprintf(load_buffer, sizeof(load_buffer),
+    // PHASE 5.10: Check snprintf return value for truncation
+    int written = snprintf(load_buffer, sizeof(load_buffer),
              "{\"state\":\"%s\",\"cpu_percent\":%d,\"time_in_state_ms\":%lu,"
              "\"state_changed\":%s,\"emergency_estop\":%s}",
              state_str, load_status.current_cpu_percent,
              (unsigned long)load_status.time_in_state_ms,
              load_status.state_changed ? "true" : "false",
              load_status.emergency_estop_initiated ? "true" : "false");
+
+    if (written < 0 || written >= (int)sizeof(load_buffer)) {
+      request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+      return;
+    }
 
     request->send(200, "application/json", load_buffer);
   });
@@ -589,7 +616,8 @@ void WebServerManager::setupRoutes() {
         char metrics_buffer[512];
         size_t metrics_size =
             dashboardMetricsExportJSON(metrics_buffer, sizeof(metrics_buffer));
-        if (metrics_size == 0) {
+        // PHASE 5.10: Check for both failure and truncation
+        if (metrics_size == 0 || metrics_size >= sizeof(metrics_buffer) - 1) {
           request->send(500, "application/json",
                         "{\"error\":\"Failed to export dashboard metrics\"}");
           return;
@@ -634,7 +662,12 @@ void WebServerManager::setupRoutes() {
         }
 
         char response[512];
-        serializeJson(doc, response, sizeof(response));
+        // PHASE 5.10: Check serializeJson return value for truncation
+        size_t written = serializeJson(doc, response, sizeof(response));
+        if (written >= sizeof(response)) {
+          request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+          return;
+        }
         request->send(200, "application/json", response);
       });
 
@@ -792,7 +825,12 @@ void WebServerManager::setupRoutes() {
         }
 
         char response[512];
-        serializeJson(doc, response, sizeof(response));
+        // PHASE 5.10: Check serializeJson return value for truncation
+        size_t written = serializeJson(doc, response, sizeof(response));
+        if (written >= sizeof(response)) {
+          request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+          return;
+        }
         request->send(200, "application/json", response);
       });
 

@@ -113,18 +113,20 @@ bool apiConfigReset(void) {
 
 /**
  * @brief Validate soft limit configuration
+ * PHASE 5.10: Changed from uint16_t to int32_t to support negative limits
+ * (e.g., machines with coordinate systems crossing zero: min=-500, max=500)
  */
 static bool validateSoftLimit(const char *key, JsonVariant value,
                               char *error_msg, size_t error_msg_len) {
-  if (!value.is<uint16_t>()) {
+  if (!value.is<int>()) {
     snprintf(error_msg, error_msg_len,
-             "Soft limit must be numeric (0-1000 mm)");
+             "Soft limit must be numeric (-10000 to +10000 mm)");
     return false;
   }
 
-  uint16_t val = value.as<uint16_t>();
-  if (val > 1000) {
-    snprintf(error_msg, error_msg_len, "Soft limit cannot exceed 1000 mm");
+  int32_t val = value.as<int32_t>();
+  if (val < -10000 || val > 10000) {
+    snprintf(error_msg, error_msg_len, "Soft limit must be between -10000 and +10000 mm");
     return false;
   }
 

@@ -636,6 +636,10 @@ void configUnifiedSave() {
 
 void configUnifiedReset() {
   logWarning("[CONFIG] Resetting to Factory Defaults...");
+
+  // PHASE 5.10: Clear in-memory cache before reset to prevent stale values
+  configUnifiedClear();
+
   prefs.clear();
   configSetDefaults();
 

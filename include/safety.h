@@ -36,7 +36,8 @@ typedef struct safety_system_data {
 void safetyInit();
 void safetyUpdate();
 bool safetyCheckMotionAllowed(uint8_t axis);
-void safetyTriggerAlarm(const char* reason);
+// PHASE 5.10: Added fault_type parameter for thread-safe fault assignment
+void safetyTriggerAlarm(const char* reason, safety_fault_t fault_type);
 void safetyResetAlarm();
 void safetyReportStall(uint8_t axis);
 void safetyReportSoftLimit(uint8_t axis);
