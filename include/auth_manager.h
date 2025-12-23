@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>  // For size_t
 
 // Password hash format: $sha256$<salt_hex>$<hash_hex>
 // Example: $sha256$a1b2c3d4e5f67890$1234567890abcdef...
