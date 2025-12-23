@@ -271,8 +271,35 @@ void watchdogShowStats() {
 
 reset_reason_t watchdogGetLastResetReason() { return last_reset_reason; }
 uint32_t watchdogGetResetCount() { return wdt_stats.reset_count; }
-bool watchdogIsTaskAlive(const char* task_name) { return true; } // Simplified
-uint32_t watchdogGetMissedTicks(const char* task_name) { return 0; }
+
+// PHASE 5.10: Implement proper task alive checking
+bool watchdogIsTaskAlive(const char* task_name) {
+  if (!wdt_initialized || !wdt_enabled || !task_name) return true;
+
+  uint32_t now = millis();
+  for (int i = 0; i < wdt_task_count; i++) {
+    if (strcmp(wdt_tasks[i].task_name, task_name) == 0) {
+      uint32_t time_since_feed = now - wdt_tasks[i].last_tick;
+      // Task is alive if it fed within half the timeout period
+      return (time_since_feed < (WATCHDOG_TIMEOUT_SEC * 1000 / 2));
+    }
+  }
+  // Task not registered - return true to avoid false alarms
+  return true;
+}
+
+// PHASE 5.10: Implement proper missed ticks retrieval
+uint32_t watchdogGetMissedTicks(const char* task_name) {
+  if (!wdt_initialized || !task_name) return 0;
+
+  for (int i = 0; i < wdt_task_count; i++) {
+    if (strcmp(wdt_tasks[i].task_name, task_name) == 0) {
+      return wdt_tasks[i].missed_ticks;
+    }
+  }
+  // Task not found
+  return 0;
+}
 
 void watchdogRecovery() {
   logWarning("[WDT] Attempting recovery...");
