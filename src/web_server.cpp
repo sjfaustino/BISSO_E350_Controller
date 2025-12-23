@@ -44,6 +44,10 @@ WebServerManager webServer(80);
 #define MAX_CONFIG_KEY_LENGTH 64    // Maximum length for config keys
 #define MAX_CONFIG_VALUE_LENGTH 256 // Maximum length for config values
 
+// Chunked request handling (PHASE 5.10: Proper multi-chunk POST support)
+static uint8_t chunked_request_buffer[MAX_REQUEST_BODY_SIZE];
+static SemaphoreHandle_t chunked_request_mutex = NULL;
+
 /**
  * @brief Check authentication and send 401 if failed
  * @param request The async web request
@@ -96,6 +100,63 @@ static bool requireAuth(AsyncWebServerRequest *request) {
  */
 static bool validateBodySize(size_t len, size_t total) {
   return total <= MAX_REQUEST_BODY_SIZE;
+}
+
+/**
+ * @brief Assemble chunked POST request bodies
+ * @param data Pointer to chunk data
+ * @param len Length of this chunk
+ * @param index Offset of this chunk in the complete body
+ * @param total Total body size
+ * @param complete_data Output pointer to complete data (when ready)
+ * @param complete_len Output length of complete data
+ * @return true if request is complete and can be processed, false if still accumulating
+ * @note For single-chunk requests, returns immediately with original data pointer.
+ *       For multi-chunk requests, accumulates into static buffer with mutex protection.
+ */
+static bool assembleChunkedRequest(uint8_t *data, size_t len, size_t index,
+                                    size_t total, uint8_t **complete_data,
+                                    size_t *complete_len) {
+  // Fast path: single-chunk request (most common case)
+  if (len == total && index == 0) {
+    *complete_data = data;
+    *complete_len = len;
+    return true;
+  }
+
+  // Multi-chunk request - initialize mutex if needed
+  if (!chunked_request_mutex) {
+    chunked_request_mutex = xSemaphoreCreateMutex();
+    if (!chunked_request_mutex) {
+      return false; // Mutex creation failed
+    }
+  }
+
+  // Only one chunked request at a time (prevents concurrent buffer corruption)
+  if (xSemaphoreTake(chunked_request_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+    return false; // Another chunked request is in progress
+  }
+
+  // Copy this chunk into the assembly buffer
+  if (index + len <= MAX_REQUEST_BODY_SIZE) {
+    memcpy(chunked_request_buffer + index, data, len);
+  } else {
+    // Overflow protection
+    xSemaphoreGive(chunked_request_mutex);
+    return false;
+  }
+
+  // Check if this is the final chunk
+  if (index + len == total) {
+    *complete_data = chunked_request_buffer;
+    *complete_len = total;
+    xSemaphoreGive(chunked_request_mutex);
+    return true; // Complete request ready for processing
+  }
+
+  // Not complete yet - still accumulating chunks
+  xSemaphoreGive(chunked_request_mutex);
+  return false;
 }
 
 // Telemetry Buffer
@@ -677,18 +738,19 @@ void WebServerManager::setupRoutes() {
                     size_t index, size_t total) {
                if (!requireAuth(request)) return;
 
-               // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
-               if (len != total) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Chunked requests not supported\"}");
-                 return;
-               }
-
                // INPUT VALIDATION: Check body size to prevent overflow
                if (!validateBodySize(len, total)) {
                  request->send(413, "application/json",
                                "{\"error\":\"Request body too large\"}");
                  return;
+               }
+
+               // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
+               uint8_t *complete_data = nullptr;
+               size_t complete_len = 0;
+               if (!assembleChunkedRequest(data, len, index, total,
+                                          &complete_data, &complete_len)) {
+                 return; // Still accumulating chunks or error
                }
 
                if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
@@ -700,7 +762,7 @@ void WebServerManager::setupRoutes() {
                // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
                // heap fragmentation
                JsonDocument doc;
-               DeserializationError error = deserializeJson(doc, data, len);
+               DeserializationError error = deserializeJson(doc, complete_data, complete_len);
 
                if (error) {
                  request->send(400, "application/json",
@@ -756,17 +818,25 @@ void WebServerManager::setupRoutes() {
                     size_t index, size_t total) {
                if (!requireAuth(request)) return;
 
-               // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
-               if (len != total) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Chunked requests not supported\"}");
+               // INPUT VALIDATION: Check body size to prevent overflow
+               if (!validateBodySize(len, total)) {
+                 request->send(413, "application/json",
+                               "{\"error\":\"Request body too large\"}");
                  return;
+               }
+
+               // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
+               uint8_t *complete_data = nullptr;
+               size_t complete_len = 0;
+               if (!assembleChunkedRequest(data, len, index, total,
+                                          &complete_data, &complete_len)) {
+                 return; // Still accumulating chunks or error
                }
 
                // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
                // heap fragmentation
                JsonDocument doc;
-               DeserializationError error = deserializeJson(doc, data, len);
+               DeserializationError error = deserializeJson(doc, complete_data, complete_len);
 
                if (error) {
                  request->send(400, "application/json",
@@ -840,11 +910,19 @@ void WebServerManager::setupRoutes() {
                     size_t index, size_t total) {
                if (!requireAuth(request)) return;
 
-               // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
-               if (len != total) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Chunked requests not supported\"}");
+               // INPUT VALIDATION: Check body size to prevent overflow
+               if (!validateBodySize(len, total)) {
+                 request->send(413, "application/json",
+                               "{\"error\":\"Request body too large\"}");
                  return;
+               }
+
+               // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
+               uint8_t *complete_data = nullptr;
+               size_t complete_len = 0;
+               if (!assembleChunkedRequest(data, len, index, total,
+                                          &complete_data, &complete_len)) {
+                 return; // Still accumulating chunks or error
                }
 
                if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
@@ -856,7 +934,7 @@ void WebServerManager::setupRoutes() {
                // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
                // heap fragmentation
                JsonDocument doc;
-               DeserializationError error = deserializeJson(doc, data, len);
+               DeserializationError error = deserializeJson(doc, complete_data, complete_len);
 
                if (error) {
                  request->send(400, "application/json",
@@ -895,11 +973,19 @@ void WebServerManager::setupRoutes() {
              size_t index, size_t total) {
         if (!requireAuth(request)) return;
 
-        // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
-        if (len != total) {
-          request->send(400, "application/json",
-                        "{\"error\":\"Chunked requests not supported\"}");
+        // INPUT VALIDATION: Check body size to prevent overflow
+        if (!validateBodySize(len, total)) {
+          request->send(413, "application/json",
+                        "{\"error\":\"Request body too large\"}");
           return;
+        }
+
+        // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
+        uint8_t *complete_data = nullptr;
+        size_t complete_len = 0;
+        if (!assembleChunkedRequest(data, len, index, total,
+                                   &complete_data, &complete_len)) {
+          return; // Still accumulating chunks or error
         }
 
         if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) { // Reuse jog rate limit
@@ -911,7 +997,7 @@ void WebServerManager::setupRoutes() {
         // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
         // fragmentation
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, data, len);
+        DeserializationError error = deserializeJson(doc, complete_data, complete_len);
 
         if (error) {
           request->send(400, "application/json",
@@ -1023,11 +1109,19 @@ void WebServerManager::setupRoutes() {
 void WebServerManager::handleJogBody(AsyncWebServerRequest *request,
                                      uint8_t *data, size_t len, size_t index,
                                      size_t total) {
-  // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
-  if (len != total) {
-    request->send(400, "application/json",
-                  "{\"error\":\"Chunked requests not supported\"}");
+  // INPUT VALIDATION: Check body size to prevent overflow
+  if (!validateBodySize(len, total)) {
+    request->send(413, "application/json",
+                  "{\"error\":\"Request body too large\"}");
     return;
+  }
+
+  // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
+  uint8_t *complete_data = nullptr;
+  size_t complete_len = 0;
+  if (!assembleChunkedRequest(data, len, index, total,
+                              &complete_data, &complete_len)) {
+    return; // Still accumulating chunks or error
   }
 
   // PHASE 5.1: Rate limiting check
@@ -1040,7 +1134,7 @@ void WebServerManager::handleJogBody(AsyncWebServerRequest *request,
   // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
   // fragmentation
   JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, data, len);
+  DeserializationError error = deserializeJson(doc, complete_data, complete_len);
 
   if (error) {
     Serial.printf("[WEB] [ERR] JSON parse failed: %s\n", error.c_str());
