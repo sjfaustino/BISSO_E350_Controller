@@ -11,7 +11,9 @@
 // Rate limit configuration
 #define API_RATE_LIMIT_REQUESTS 50         // Max requests per window
 #define API_RATE_LIMIT_WINDOW_MS 60000     // Time window: 60 seconds (50 req/min)
-#define API_RATE_LIMIT_ENDPOINTS 16        // Track up to 16 different endpoints
+// PHASE 5.10: Increased from 16 to 32 (24 current endpoints + room for growth)
+// Issue: 24 unique endpoints exist but only 16 slots, causing endpoints 17-24 to be blocked
+#define API_RATE_LIMIT_ENDPOINTS 32        // Track up to 32 different endpoints
 
 // Token bucket state per endpoint
 typedef struct {

@@ -184,6 +184,8 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         t.wifi_signal_strength,
         (unsigned long)t.config_version,
         t.config_is_default ? "true" : "false");
+    // PHASE 5.10: Check for buffer overflow
+    if (offset >= buffer_size) return buffer_size - 1;
 
     return offset;
 }
@@ -205,6 +207,8 @@ size_t telemetryExportCompactJSON(char* buffer, size_t buffer_size) {
         t.motion_moving ? "true" : "false",
         t.estop_active ? "true" : "false",
         t.wifi_connected ? "true" : "false");
+    // PHASE 5.10: Check for buffer overflow
+    if (offset >= buffer_size) return buffer_size - 1;
 
     return offset;
 }

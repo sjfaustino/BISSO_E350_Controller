@@ -143,9 +143,23 @@ void MotionPlanner::applyDynamicApproach(Axis *axis, uint8_t active_axis,
   int32_t dist = abs(axis->target_position - current_pos);
   int32_t approach_mm = configGetInt(KEY_X_APPROACH, 50);
 
-  // Scale mm to counts
-  float scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm
-                                                 : MOTION_POSITION_SCALE_FACTOR;
+  // PHASE 5.10: CRITICAL FIX - Use correct axis scaling instead of hardcoded X-axis
+  // Bug: Y/Z/A axes were using X-axis scaling, causing incorrect threshold calculations
+  float scale = MOTION_POSITION_SCALE_FACTOR;
+  switch (active_axis) {
+    case 0: // X-axis
+      scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+      break;
+    case 1: // Y-axis
+      scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+      break;
+    case 2: // Z-axis
+      scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+      break;
+    case 3: // A-axis (rotary, degrees)
+      scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG;
+      break;
+  }
   int32_t threshold_counts = (int32_t)(approach_mm * scale);
 
   if (dist < threshold_counts && axis->saved_speed_profile != SPEED_PROFILE_1) {

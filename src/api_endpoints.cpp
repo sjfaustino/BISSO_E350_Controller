@@ -247,33 +247,41 @@ size_t apiEndpointsExportJSON(char* buffer, size_t buffer_size) {
     size_t offset = 0;
     offset += snprintf(buffer + offset, buffer_size - offset,
         "{\"api_version\":\"1.0\",\"endpoints\":[");
+    // PHASE 5.10: Check for buffer overflow after each snprintf
+    if (offset >= buffer_size) return buffer_size - 1;
 
     for (int i = 0; i < endpoint_count; i++) {
         const api_endpoint_t* ep = &api_endpoints[i];
 
         if (i > 0) {
             offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (offset >= buffer_size) return buffer_size - 1;
         }
 
         offset += snprintf(buffer + offset, buffer_size - offset,
             "{\"path\":\"%s\",\"methods\":[", ep->path);
+        if (offset >= buffer_size) return buffer_size - 1;
 
         // Add methods as array
         bool first = true;
         if (ep->methods & HTTP_GET) {
             offset += snprintf(buffer + offset, buffer_size - offset, "\"GET\"");
+            if (offset >= buffer_size) return buffer_size - 1;
             first = false;
         }
         if (ep->methods & HTTP_POST) {
             offset += snprintf(buffer + offset, buffer_size - offset, "%s\"POST\"", first ? "" : ",");
+            if (offset >= buffer_size) return buffer_size - 1;
             first = false;
         }
         if (ep->methods & HTTP_PUT) {
             offset += snprintf(buffer + offset, buffer_size - offset, "%s\"PUT\"", first ? "" : ",");
+            if (offset >= buffer_size) return buffer_size - 1;
             first = false;
         }
         if (ep->methods & HTTP_DELETE) {
             offset += snprintf(buffer + offset, buffer_size - offset, "%s\"DELETE\"", first ? "" : ",");
+            if (offset >= buffer_size) return buffer_size - 1;
         }
 
         offset += snprintf(buffer + offset, buffer_size - offset,
@@ -281,15 +289,12 @@ size_t apiEndpointsExportJSON(char* buffer, size_t buffer_size) {
             ep->description,
             ep->requires_auth ? "true" : "false",
             ep->rate_limit_info);
-
-        // Prevent buffer overrun
-        if (offset >= buffer_size - 100) {
-            offset = buffer_size - 100;
-            break;
-        }
+        if (offset >= buffer_size) return buffer_size - 1;
     }
 
     offset += snprintf(buffer + offset, buffer_size - offset, "]}");
+    if (offset >= buffer_size) return buffer_size - 1;
+
     return offset;
 }
 

@@ -88,10 +88,11 @@ size_t dashboardMetricsExportJSON(char* buffer, size_t buffer_size) {
     if (!buffer || buffer_size < 512) return 0;
 
     // Compact JSON for frequent WebSocket updates
+    // PHASE 5.10: Fixed duplicate "a" key (was A-axis and alarm, now "a" and "alm")
     size_t offset = snprintf(buffer, buffer_size,
         "{\"t\":%llu,\"cpu\":%u,\"heap\":%lu,"
         "\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"a\":%.2f,"
-        "\"m\":%s,\"e\":%s,\"a\":%s,\"s\":%.2f,"
+        "\"m\":%s,\"e\":%s,\"alm\":%s,\"s\":%.2f,"
         "\"w\":%s,\"ws\":%u,\"load\":%u}",
         (unsigned long long)metrics_cache.timestamp_ms,
         metrics_cache.cpu_percent,
@@ -105,6 +106,8 @@ size_t dashboardMetricsExportJSON(char* buffer, size_t buffer_size) {
         metrics_cache.wifi_connected ? "1" : "0",
         metrics_cache.wifi_signal,
         metrics_cache.load_state);
+    // PHASE 5.10: Check for buffer overflow
+    if (offset >= buffer_size) return buffer_size - 1;
 
     return offset;
 }
@@ -145,20 +148,25 @@ size_t dashboardMetricsExportExtendedJSON(char* buffer, size_t buffer_size) {
         metrics_cache.wifi_signal,
         metrics_cache.slowest_task_id,
         (unsigned long)metrics_cache.slowest_task_us);
+    // PHASE 5.10: Check for buffer overflow after each snprintf
+    if (offset >= buffer_size) return buffer_size - 1;
 
     // Add encoder status
     const char* health_strings[] = {"optimal", "normal", "degraded", "critical"};
     for (int i = 0; i < 4; i++) {
         if (i > 0) {
             offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (offset >= buffer_size) return buffer_size - 1;
         }
         offset += snprintf(buffer + offset, buffer_size - offset,
             "{\"axis\":%d,\"health\":\"%s\"}",
             i, health_strings[metrics_cache.encoder_health[i]]);
+        if (offset >= buffer_size) return buffer_size - 1;
     }
 
     offset += snprintf(buffer + offset, buffer_size - offset, "],\"load_state\":%u}",
                       metrics_cache.load_state);
+    if (offset >= buffer_size) return buffer_size - 1;
 
     return offset;
 }

@@ -286,6 +286,8 @@ size_t perfMonitorExportJSON(char* buffer, size_t buffer_size) {
         sys.total_cpu_percent,
         (unsigned long)sys.free_heap_bytes,
         (unsigned long)sys.min_free_heap_bytes);
+    // PHASE 5.10: Check for buffer overflow after each snprintf
+    if (offset >= buffer_size) return buffer_size - 1;
 
     uint32_t total_time = 0;
     for (int i = 0; i < active_tasks; i++) {
@@ -298,6 +300,7 @@ size_t perfMonitorExportJSON(char* buffer, size_t buffer_size) {
 
         if (i > 0) {
             offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (offset >= buffer_size) return buffer_size - 1;
         }
 
         offset += snprintf(buffer + offset, buffer_size - offset,
@@ -308,14 +311,11 @@ size_t perfMonitorExportJSON(char* buffer, size_t buffer_size) {
             (unsigned long)task_metrics[i].max_runtime_us,
             (unsigned long)task_metrics[i].min_runtime_us,
             cpu_percent);
-
-        // Safety check: don't overrun buffer
-        if (offset >= buffer_size - 10) {
-            offset = buffer_size - 10;
-            break;
-        }
+        if (offset >= buffer_size) return buffer_size - 1;
     }
 
     offset += snprintf(buffer + offset, buffer_size - offset, "]}");
+    if (offset >= buffer_size) return buffer_size - 1;
+
     return offset;
 }

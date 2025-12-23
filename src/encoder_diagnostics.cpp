@@ -231,12 +231,15 @@ size_t encoderDiagnosticsExportJSON(char* buffer, size_t buffer_size) {
 
     size_t offset = 0;
     offset += snprintf(buffer + offset, buffer_size - offset, "{\"encoders\":[");
+    // PHASE 5.10: Check for buffer overflow after each snprintf
+    if (offset >= buffer_size) return buffer_size - 1;
 
     for (int i = 0; i < 4; i++) {
         const encoder_diagnostic_t* diag = &diagnostics[i];
 
         if (i > 0) {
             offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (offset >= buffer_size) return buffer_size - 1;
         }
 
         offset += snprintf(buffer + offset, buffer_size - offset,
@@ -252,14 +255,12 @@ size_t encoderDiagnosticsExportJSON(char* buffer, size_t buffer_size) {
             diag->signal_quality,
             diag->error_rate * 100.0f,
             diag->needs_recalibration ? "true" : "false");
-
-        if (offset >= buffer_size - 100) {
-            offset = buffer_size - 100;
-            break;
-        }
+        if (offset >= buffer_size) return buffer_size - 1;
     }
 
     offset += snprintf(buffer + offset, buffer_size - offset, "]}");
+    if (offset >= buffer_size) return buffer_size - 1;
+
     return offset;
 }
 
