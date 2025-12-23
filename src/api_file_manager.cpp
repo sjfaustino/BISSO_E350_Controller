@@ -27,8 +27,10 @@ static bool requireAuth(AsyncWebServerRequest *request) {
     return false;
   }
 
+  // CRITICAL FIX: Store String before calling c_str() to prevent dangling pointer
   AsyncWebHeader* authHeader = request->getHeader("Authorization");
-  const char* auth = authHeader->value().c_str();
+  String auth_value = authHeader->value();
+  const char* auth = auth_value.c_str();
 
   if (!authVerifyHTTPBasicAuth(auth)) {
     authRecordFailedAttempt(ip_address);
@@ -132,6 +134,7 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename,
   if (!isValidFilename(filename.c_str())) {
     if (index == 0) {
       Serial.printf("[FILE_API] [SECURITY] Rejected unsafe filename: %s\n", filename.c_str());
+      request->send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
     }
     return;
   }
@@ -139,8 +142,10 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename,
   // Security: Filter extensions
   if (!filename.endsWith(".nc") && !filename.endsWith(".gcode") &&
       !filename.endsWith(".txt")) {
-    if (index == 0)
+    if (index == 0) {
       Serial.println("[FILE_API] Blocked upload of non-GCode file");
+      request->send(400, "text/plain", "Invalid file type: only .nc, .gcode, .txt allowed");
+    }
     return;
   }
 
@@ -159,6 +164,8 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename,
       request->_tempFile.close();
     Serial.printf("[FILE_API] Upload Complete: %s (%u bytes)\n",
                   filename.c_str(), index + len);
+    // PHASE 5.10: Send response on final chunk to prevent double-response
+    request->send(200, "text/plain", "Upload complete");
   }
 }
 
@@ -184,8 +191,9 @@ void apiRegisterFileRoutes(AsyncWebServer *server) {
   server->on(
       "/api/upload", HTTP_POST,
       [](AsyncWebServerRequest *request) {
+        // PHASE 5.10: Auth check only - response sent by body handler on final chunk
         if (!requireAuth(request)) return;
-        request->send(200);
+        // Response removed to prevent double-send (body handler responds on completion/error)
       },
       [](AsyncWebServerRequest *request, String filename,
          size_t index, uint8_t *data, size_t len, bool final) {

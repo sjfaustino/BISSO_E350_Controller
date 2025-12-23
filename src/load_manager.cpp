@@ -7,6 +7,7 @@
 #include "task_manager.h"
 #include "serial_logger.h"
 #include "safety.h"
+#include "motion.h"  // PHASE 5.10: For motionEmergencyStop()
 #include <Arduino.h>
 #include <string.h>
 #include <stdio.h>
@@ -143,9 +144,9 @@ void loadManagerUpdate() {
             logError("[LOAD_MGR] CRITICAL: Emergency E-STOP triggered after 30 seconds at max load");
             Serial.println("[LOAD_MGR] [CRITICAL] INITIATING EMERGENCY E-STOP DUE TO SYSTEM OVERLOAD");
 
-            // This is safe - safetyEmergencyStop will be called
-            // The safety system will handle the E-STOP
-            // (Implementation depends on your safety module API)
+            // PHASE 5.10: CRITICAL FIX - Actually trigger E-STOP instead of just logging
+            motionEmergencyStop();
+
             logError("[LOAD_MGR] System overload detected - manual intervention required");
         }
     }

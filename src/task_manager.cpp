@@ -79,37 +79,38 @@ void taskManagerInit() {
   // Create Queues with individual error checking
   bool queue_failure = false;
 
-  queue_motion = xQueueCreate(QUEUE_LEN_MOTION, QUEUE_ITEM_SIZE);
+  // PHASE 5.10: Use sizeof(queue_message_t) to prevent memory corruption
+  queue_motion = xQueueCreate(QUEUE_LEN_MOTION, sizeof(queue_message_t));
   if (!queue_motion) {
     Serial.println("[TASKS] [FAIL] Motion queue creation failed!");
     queue_failure = true;
   }
 
-  queue_safety = xQueueCreate(QUEUE_LEN_SAFETY, QUEUE_ITEM_SIZE);
+  queue_safety = xQueueCreate(QUEUE_LEN_SAFETY, sizeof(queue_message_t));
   if (!queue_safety) {
     Serial.println("[TASKS] [FAIL] Safety queue creation failed!");
     queue_failure = true;
   }
 
-  queue_encoder = xQueueCreate(QUEUE_LEN_ENCODER, QUEUE_ITEM_SIZE);
+  queue_encoder = xQueueCreate(QUEUE_LEN_ENCODER, sizeof(queue_message_t));
   if (!queue_encoder) {
     Serial.println("[TASKS] [FAIL] Encoder queue creation failed!");
     queue_failure = true;
   }
 
-  queue_plc = xQueueCreate(QUEUE_LEN_PLC, QUEUE_ITEM_SIZE);
+  queue_plc = xQueueCreate(QUEUE_LEN_PLC, sizeof(queue_message_t));
   if (!queue_plc) {
     Serial.println("[TASKS] [FAIL] PLC queue creation failed!");
     queue_failure = true;
   }
 
-  queue_fault = xQueueCreate(QUEUE_LEN_FAULT, QUEUE_ITEM_SIZE);
+  queue_fault = xQueueCreate(QUEUE_LEN_FAULT, sizeof(queue_message_t));
   if (!queue_fault) {
     Serial.println("[TASKS] [FAIL] Fault queue creation failed!");
     queue_failure = true;
   }
 
-  queue_display = xQueueCreate(QUEUE_LEN_DISPLAY, QUEUE_ITEM_SIZE);
+  queue_display = xQueueCreate(QUEUE_LEN_DISPLAY, sizeof(queue_message_t));
   if (!queue_display) {
     Serial.println("[TASKS] [FAIL] Display queue creation failed!");
     queue_failure = true;

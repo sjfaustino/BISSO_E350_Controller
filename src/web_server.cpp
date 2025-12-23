@@ -68,9 +68,11 @@ static bool requireAuth(AsyncWebServerRequest *request) {
     return false;
   }
 
-  // Get Authorization header
+  // CRITICAL FIX: Store String before calling c_str() to prevent dangling pointer
+  // authHeader->value().c_str() would return pointer to temporary that's immediately destroyed
   AsyncWebHeader* authHeader = request->getHeader("Authorization");
-  const char* auth = authHeader->value().c_str();
+  String auth_value = authHeader->value();
+  const char* auth = auth_value.c_str();
 
   // Verify credentials using auth_manager (SHA-256 hashing)
   if (!authVerifyHTTPBasicAuth(auth)) {
@@ -371,9 +373,9 @@ void WebServerManager::setupRoutes() {
       ->on(
           "/api/update", HTTP_POST,
           [](AsyncWebServerRequest *request) {
+            // PHASE 5.10: Auth check only - response sent by body handler
             if (!requireAuth(request)) return;
-            request->send(202, "application/json",
-                          "{\"status\":\"Upload in progress...\"}");
+            // Response removed to prevent double-send (body handler responds on final chunk)
           },
           NULL,
           [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
@@ -642,6 +644,13 @@ void WebServerManager::setupRoutes() {
                     size_t index, size_t total) {
                if (!requireAuth(request)) return;
 
+               // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
+               if (len != total) {
+                 request->send(400, "application/json",
+                               "{\"error\":\"Chunked requests not supported\"}");
+                 return;
+               }
+
                // INPUT VALIDATION: Check body size to prevent overflow
                if (!validateBodySize(len, total)) {
                  request->send(413, "application/json",
@@ -713,6 +722,13 @@ void WebServerManager::setupRoutes() {
              [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
                     size_t index, size_t total) {
                if (!requireAuth(request)) return;
+
+               // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
+               if (len != total) {
+                 request->send(400, "application/json",
+                               "{\"error\":\"Chunked requests not supported\"}");
+                 return;
+               }
 
                // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
                // heap fragmentation
@@ -786,6 +802,13 @@ void WebServerManager::setupRoutes() {
                     size_t index, size_t total) {
                if (!requireAuth(request)) return;
 
+               // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
+               if (len != total) {
+                 request->send(400, "application/json",
+                               "{\"error\":\"Chunked requests not supported\"}");
+                 return;
+               }
+
                if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
                  request->send(429, "application/json",
                                "{\"error\":\"Rate limit exceeded\"}");
@@ -833,6 +856,13 @@ void WebServerManager::setupRoutes() {
       [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
              size_t index, size_t total) {
         if (!requireAuth(request)) return;
+
+        // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
+        if (len != total) {
+          request->send(400, "application/json",
+                        "{\"error\":\"Chunked requests not supported\"}");
+          return;
+        }
 
         if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) { // Reuse jog rate limit
           request->send(429, "application/json",
@@ -946,9 +976,8 @@ void WebServerManager::setupRoutes() {
                request->send(success ? 200 : 400, "application/json", response);
              });
 
-  server->onNotFound([](AsyncWebServerRequest *request) {
-    request->send(404, "text/plain", "Not Found");
-  });
+  // PHASE 5.10: Security - 404 handler already registered at line 224 with auth
+  // Duplicate handler removed to prevent auth bypass
 }
 
 // --- Handlers ---
@@ -956,6 +985,13 @@ void WebServerManager::setupRoutes() {
 void WebServerManager::handleJogBody(AsyncWebServerRequest *request,
                                      uint8_t *data, size_t len, size_t index,
                                      size_t total) {
+  // PHASE 5.10: Reject multi-chunk requests (proper buffering would be complex)
+  if (len != total) {
+    request->send(400, "application/json",
+                  "{\"error\":\"Chunked requests not supported\"}");
+    return;
+  }
+
   // PHASE 5.1: Rate limiting check
   if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) {
     request->send(429, "application/json",

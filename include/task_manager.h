@@ -106,7 +106,8 @@
 // MESSAGE QUEUE DEFINITIONS
 // ============================================================================
 
-#define QUEUE_ITEM_SIZE 96
+// PHASE 5.10: Renamed to QUEUE_DATA_SIZE to clarify it's the payload size, not full message
+#define QUEUE_DATA_SIZE 96
 #define QUEUE_LEN_MOTION 10
 #define QUEUE_LEN_SAFETY 20
 #define QUEUE_LEN_ENCODER 10
@@ -145,7 +146,7 @@ typedef struct {
   message_type_t type;
   uint32_t param1;
   uint32_t param2;
-  uint8_t data[QUEUE_ITEM_SIZE];
+  uint8_t data[QUEUE_DATA_SIZE];
   uint32_t timestamp;
 } queue_message_t;
 
