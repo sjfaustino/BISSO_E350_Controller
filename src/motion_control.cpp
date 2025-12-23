@@ -693,8 +693,11 @@ bool motionHome(uint8_t axis) {
   m_state.active_axis = axis;
   portEXIT_CRITICAL(&motionSpinlock);
 
+  // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
+  portENTER_CRITICAL(&motionSpinlock);
   axes[axis].state = MOTION_HOMING_APPROACH_FAST;
   axes[axis].state_entry_ms = millis();
+  portEXIT_CRITICAL(&motionSpinlock);
 
   int fast_prof = configGetInt(KEY_HOME_PROFILE_FAST, 2);
 
@@ -779,8 +782,11 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   m_state.active_start_position = axes[target_axis].position;
   portEXIT_CRITICAL(&motionSpinlock);
 
+  // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
+  portENTER_CRITICAL(&motionSpinlock);
   axes[target_axis].state = MOTION_WAIT_CONSENSO;
   axes[target_axis].state_entry_ms = millis();
+  portEXIT_CRITICAL(&motionSpinlock);
 
   taskUnlockMutex(taskGetMotionMutex());
 
@@ -942,9 +948,12 @@ bool motionStop() {
   portEXIT_CRITICAL(&motionSpinlock);
 
   if (active != 255) {
+    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
+    portENTER_CRITICAL(&motionSpinlock);
     axes[active].state = MOTION_STOPPING;
     axes[active].target_position = axes[active].position;
     axes[active].position_at_stop = axes[active].position;
+    portEXIT_CRITICAL(&motionSpinlock);
   }
   taskUnlockMutex(taskGetMotionMutex());
 
@@ -975,7 +984,10 @@ bool motionPause() {
   if (active != 255 &&
       (axes[active].state == MOTION_EXECUTING ||
        axes[active].state == MOTION_WAIT_CONSENSO)) {
+    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
+    portENTER_CRITICAL(&motionSpinlock);
     axes[active].state = MOTION_PAUSED;
+    portEXIT_CRITICAL(&motionSpinlock);
     logInfo("[MOTION] Paused axis %d", active);
     valid_pause = true;
   }
@@ -1018,8 +1030,11 @@ bool motionResume() {
 
     is_fwd = (axes[axis].target_position > axes[axis].position);
 
+    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
+    portENTER_CRITICAL(&motionSpinlock);
     axes[axis].state = MOTION_WAIT_CONSENSO;
     axes[axis].state_entry_ms = millis();
+    portEXIT_CRITICAL(&motionSpinlock);
     valid_resume = true;
   }
 
@@ -1055,9 +1070,12 @@ bool motionDwell(uint32_t ms) {
 
   // Only execute dwell if no motion is active
   if (active == 255 && axes[0].state == MOTION_IDLE) {
+    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
+    portENTER_CRITICAL(&motionSpinlock);
     axes[0].state = MOTION_DWELL;
     axes[0].dwell_end_ms = millis() + ms;
     axes[0].state_entry_ms = millis();
+    portEXIT_CRITICAL(&motionSpinlock);
 
     portENTER_CRITICAL(&motionSpinlock);
     m_state.active_axis = 0; // Mark axis 0 as "active" during dwell
@@ -1095,12 +1113,15 @@ bool motionWaitPin(uint8_t pin_id, uint8_t pin_type, uint8_t state,
 
   // Only execute pin wait if no motion is active
   if (active == 255 && axes[0].state == MOTION_IDLE) {
+    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
+    portENTER_CRITICAL(&motionSpinlock);
     axes[0].state = MOTION_WAIT_PIN;
     axes[0].wait_pin_id = pin_id;
     axes[0].wait_pin_type = pin_type;
     axes[0].wait_pin_state = state;
     axes[0].wait_pin_timeout_ms = (timeout_sec > 0) ? (timeout_sec * 1000) : 0;
     axes[0].state_entry_ms = millis();
+    portEXIT_CRITICAL(&motionSpinlock);
 
     portENTER_CRITICAL(&motionSpinlock);
     m_state.active_axis = 0; // Mark axis 0 as "active" during wait
