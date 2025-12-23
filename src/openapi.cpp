@@ -195,17 +195,21 @@ size_t openAPIGenerateJSON(char* buffer, size_t buffer_size) {
 
     size_t offset = 0;
 
+    // PHASE 5.10: Add truncation checks after each snprintf
     // Header
     offset += snprintf(buffer + offset, buffer_size - offset,
         "{\"openapi\":\"%s\",\"info\":%s,",
         OPENAPI_VERSION, openAPIGetInfoJson());
+    if (offset >= buffer_size) return 0;
 
     // Servers
     offset += snprintf(buffer + offset, buffer_size - offset,
         "\"servers\":[{\"url\":\"http://localhost\",\"description\":\"Local device\"},{\"url\":\"https://device.local\",\"description\":\"HTTPS endpoint\"}],");
+    if (offset >= buffer_size) return 0;
 
     // Paths
     offset += snprintf(buffer + offset, buffer_size - offset, "\"paths\":{");
+    if (offset >= buffer_size) return 0;
 
     int endpoint_count = 0;
     const api_endpoint_t* endpoints = apiEndpointsGetAll(&endpoint_count);
@@ -215,47 +219,62 @@ size_t openAPIGenerateJSON(char* buffer, size_t buffer_size) {
 
         if (i > 0) {
             offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (offset >= buffer_size) return 0;
         }
 
         offset += snprintf(buffer + offset, buffer_size - offset, "\"%s\":{", ep->path);
+        if (offset >= buffer_size) return 0;
 
         bool first_method = true;
 
         if (ep->methods & HTTP_GET) {
-            if (!first_method) offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (!first_method) {
+                offset += snprintf(buffer + offset, buffer_size - offset, ",");
+                if (offset >= buffer_size) return 0;
+            }
             appendMethodDetail(buffer, &offset, buffer_size, ep, "get");
+            if (offset >= buffer_size) return 0;
             first_method = false;
         }
         if (ep->methods & HTTP_POST) {
-            if (!first_method) offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (!first_method) {
+                offset += snprintf(buffer + offset, buffer_size - offset, ",");
+                if (offset >= buffer_size) return 0;
+            }
             appendMethodDetail(buffer, &offset, buffer_size, ep, "post");
+            if (offset >= buffer_size) return 0;
             first_method = false;
         }
         if (ep->methods & HTTP_PUT) {
-            if (!first_method) offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (!first_method) {
+                offset += snprintf(buffer + offset, buffer_size - offset, ",");
+                if (offset >= buffer_size) return 0;
+            }
             appendMethodDetail(buffer, &offset, buffer_size, ep, "put");
+            if (offset >= buffer_size) return 0;
             first_method = false;
         }
         if (ep->methods & HTTP_DELETE) {
-            if (!first_method) offset += snprintf(buffer + offset, buffer_size - offset, ",");
+            if (!first_method) {
+                offset += snprintf(buffer + offset, buffer_size - offset, ",");
+                if (offset >= buffer_size) return 0;
+            }
             appendMethodDetail(buffer, &offset, buffer_size, ep, "delete");
+            if (offset >= buffer_size) return 0;
         }
 
         offset += snprintf(buffer + offset, buffer_size - offset, "}");
-
-        // Prevent buffer overrun
-        if (offset >= buffer_size - 200) {
-            offset = buffer_size - 100;
-            break;
-        }
+        if (offset >= buffer_size) return 0;
     }
 
     offset += snprintf(buffer + offset, buffer_size - offset, "}");
+    if (offset >= buffer_size) return 0;
 
     // Components (security schemes)
     offset += snprintf(buffer + offset, buffer_size - offset,
         ",\"components\":{\"securitySchemes\":%s}}",
         openAPIGetSecurityScheme());
+    if (offset >= buffer_size) return 0;
 
     return offset;
 }
