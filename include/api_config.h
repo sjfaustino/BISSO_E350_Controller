@@ -30,10 +30,11 @@ typedef enum {
 
 /**
  * @brief Motion configuration structure
+ * @note PHASE 5.10: Changed from uint16_t to int32_t to support negative coordinates
  */
 typedef struct {
-    uint16_t soft_limit_low_mm[3];      // Lower limit for X, Y, Z (mm)
-    uint16_t soft_limit_high_mm[3];     // Upper limit for X, Y, Z (mm)
+    int32_t soft_limit_low_mm[3];       // Lower limit for X, Y, Z (mm) - supports negative
+    int32_t soft_limit_high_mm[3];      // Upper limit for X, Y, Z (mm)
 } motion_config_t;
 
 /**

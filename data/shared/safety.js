@@ -85,10 +85,9 @@ class SafetyManager {
                 return;
             }
 
+            // PHASE 5.10: Removed hardcoded credentials - browser handles auth via 401 prompt
             const response = await fetch('/api/alarms', {
-                headers: {
-                    'Authorization': 'Basic ' + btoa('admin:password') // TODO: Use actual auth
-                }
+                credentials: 'same-origin' // Include auth credentials from browser
             });
 
             if (!response.ok) return;
@@ -191,11 +190,10 @@ class SafetyManager {
         }
 
         try {
+            // PHASE 5.10: Removed hardcoded credentials - browser handles auth via 401 prompt
             const response = await fetch('/api/estop/trigger', {
                 method: 'POST',
-                headers: {
-                    'Authorization': 'Basic ' + btoa('admin:password') // TODO: Use actual auth
-                }
+                credentials: 'same-origin' // Include auth credentials from browser
             });
 
             if (response.ok) {
@@ -218,11 +216,10 @@ class SafetyManager {
         }
 
         try {
+            // PHASE 5.10: Removed hardcoded credentials - browser handles auth via 401 prompt
             const response = await fetch('/api/estop/reset', {
                 method: 'POST',
-                headers: {
-                    'Authorization': 'Basic ' + btoa('admin:password') // TODO: Use actual auth
-                }
+                credentials: 'same-origin' // Include auth credentials from browser
             });
 
             const data = await response.json();

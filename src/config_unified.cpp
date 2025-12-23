@@ -492,23 +492,37 @@ void configSetInt(const char *key, int32_t value) {
   // VALIDATION STEP
   value = validateInt(key, value);
 
+  // PHASE 5.10: Protect config_table writes with mutex
+  if (config_cache_mutex != NULL) {
+    if (xSemaphoreTake(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
+      logWarning("[CONFIG] Mutex timeout in configSetInt");
+      return;
+    }
+  }
+
   int idx = findConfigEntry(key);
   if (idx < 0) {
-    if (config_count >= CONFIG_MAX_KEYS)
+    if (config_count >= CONFIG_MAX_KEYS) {
+      if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
       return;
+    }
     idx = config_count++;
     strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
     config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
     config_table[idx].type = CONFIG_INT32;
   }
 
-  if (config_table[idx].is_set && config_table[idx].value.int_val == value)
+  if (config_table[idx].is_set && config_table[idx].value.int_val == value) {
+    if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
     return;
+  }
 
   config_table[idx].value.int_val = value;
   config_table[idx].is_set = true;
   config_dirty = true;
   last_nvs_save = millis();
+
+  if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
 
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putInt(key, value);
@@ -526,10 +540,20 @@ void configSetFloat(const char *key, float value) {
   // VALIDATION STEP
   value = validateFloat(key, value);
 
+  // PHASE 5.10: Protect config_table writes with mutex
+  if (config_cache_mutex != NULL) {
+    if (xSemaphoreTake(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
+      logWarning("[CONFIG] Mutex timeout in configSetFloat");
+      return;
+    }
+  }
+
   int idx = findConfigEntry(key);
   if (idx < 0) {
-    if (config_count >= CONFIG_MAX_KEYS)
+    if (config_count >= CONFIG_MAX_KEYS) {
+      if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
       return;
+    }
     idx = config_count++;
     strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
     config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
@@ -537,13 +561,17 @@ void configSetFloat(const char *key, float value) {
   }
 
   if (config_table[idx].is_set &&
-      fabsf(config_table[idx].value.float_val - value) < 0.0001f)
+      fabsf(config_table[idx].value.float_val - value) < 0.0001f) {
+    if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
     return;
+  }
 
   config_table[idx].value.float_val = value;
   config_table[idx].is_set = true;
   config_dirty = true;
   last_nvs_save = millis();
+
+  if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
 
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putFloat(key, value);
@@ -563,10 +591,20 @@ void configSetString(const char *key, const char *value) {
   // VALIDATION STEP
   validateString(key, validated_value, CONFIG_VALUE_LEN);
 
+  // PHASE 5.10: Protect config_table writes with mutex
+  if (config_cache_mutex != NULL) {
+    if (xSemaphoreTake(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
+      logWarning("[CONFIG] Mutex timeout in configSetString");
+      return;
+    }
+  }
+
   int idx = findConfigEntry(key);
   if (idx < 0) {
-    if (config_count >= CONFIG_MAX_KEYS)
+    if (config_count >= CONFIG_MAX_KEYS) {
+      if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
       return;
+    }
     idx = config_count++;
     strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
     config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
@@ -575,8 +613,10 @@ void configSetString(const char *key, const char *value) {
 
   if (config_table[idx].is_set &&
       strncmp(config_table[idx].value.str_val, validated_value,
-              CONFIG_VALUE_LEN) == 0)
+              CONFIG_VALUE_LEN) == 0) {
+    if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
     return;
+  }
 
   strncpy(config_table[idx].value.str_val, validated_value,
           CONFIG_VALUE_LEN - 1);
@@ -584,6 +624,8 @@ void configSetString(const char *key, const char *value) {
   config_table[idx].is_set = true;
   config_dirty = true;
   last_nvs_save = millis();
+
+  if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
 
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putString(key, validated_value);

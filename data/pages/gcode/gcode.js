@@ -180,13 +180,14 @@ class GCodePage {
         }
 
         try {
+            // PHASE 5.10: Removed hardcoded credentials - browser handles auth via 401 prompt
             const response = await fetch('/api/gcode', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa('admin:password') // TODO: Use actual auth
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ command })
+                body: JSON.stringify({ command }),
+                credentials: 'same-origin' // Include auth credentials from browser
             });
 
             const data = await response.json();

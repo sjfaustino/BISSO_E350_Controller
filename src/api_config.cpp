@@ -225,18 +225,19 @@ bool apiConfigSet(config_category_t category, const char *key,
   // Apply based on category
   switch (category) {
   case CONFIG_CATEGORY_MOTION:
+    // PHASE 5.10: Changed from uint16_t to int32_t to support negative limits
     if (strcmp(key, "soft_limit_x_low") == 0) {
-      current_motion.soft_limit_low_mm[0] = value.as<uint16_t>();
+      current_motion.soft_limit_low_mm[0] = value.as<int32_t>();
     } else if (strcmp(key, "soft_limit_x_high") == 0) {
-      current_motion.soft_limit_high_mm[0] = value.as<uint16_t>();
+      current_motion.soft_limit_high_mm[0] = value.as<int32_t>();
     } else if (strcmp(key, "soft_limit_y_low") == 0) {
-      current_motion.soft_limit_low_mm[1] = value.as<uint16_t>();
+      current_motion.soft_limit_low_mm[1] = value.as<int32_t>();
     } else if (strcmp(key, "soft_limit_y_high") == 0) {
-      current_motion.soft_limit_high_mm[1] = value.as<uint16_t>();
+      current_motion.soft_limit_high_mm[1] = value.as<int32_t>();
     } else if (strcmp(key, "soft_limit_z_low") == 0) {
-      current_motion.soft_limit_low_mm[2] = value.as<uint16_t>();
+      current_motion.soft_limit_low_mm[2] = value.as<int32_t>();
     } else if (strcmp(key, "soft_limit_z_high") == 0) {
-      current_motion.soft_limit_high_mm[2] = value.as<uint16_t>();
+      current_motion.soft_limit_high_mm[2] = value.as<int32_t>();
     }
     break;
 
@@ -322,11 +323,31 @@ bool apiConfigGetSchema(config_category_t category, JsonDocument &json_doc) {
 
   switch (category) {
   case CONFIG_CATEGORY_MOTION: {
+    // PHASE 5.10: Changed min from 0 to -10000 to support negative coordinates
     obj["soft_limit_x_low"]["type"] = "integer";
-    obj["soft_limit_x_low"]["min"] = 0;
-    obj["soft_limit_x_low"]["max"] = 1000;
+    obj["soft_limit_x_low"]["min"] = -10000;
+    obj["soft_limit_x_low"]["max"] = 10000;
     obj["soft_limit_x_low"]["unit"] = "mm";
-    // Similar for other axes...
+    obj["soft_limit_x_high"]["type"] = "integer";
+    obj["soft_limit_x_high"]["min"] = -10000;
+    obj["soft_limit_x_high"]["max"] = 10000;
+    obj["soft_limit_x_high"]["unit"] = "mm";
+    obj["soft_limit_y_low"]["type"] = "integer";
+    obj["soft_limit_y_low"]["min"] = -10000;
+    obj["soft_limit_y_low"]["max"] = 10000;
+    obj["soft_limit_y_low"]["unit"] = "mm";
+    obj["soft_limit_y_high"]["type"] = "integer";
+    obj["soft_limit_y_high"]["min"] = -10000;
+    obj["soft_limit_y_high"]["max"] = 10000;
+    obj["soft_limit_y_high"]["unit"] = "mm";
+    obj["soft_limit_z_low"]["type"] = "integer";
+    obj["soft_limit_z_low"]["min"] = -10000;
+    obj["soft_limit_z_low"]["max"] = 10000;
+    obj["soft_limit_z_low"]["unit"] = "mm";
+    obj["soft_limit_z_high"]["type"] = "integer";
+    obj["soft_limit_z_high"]["min"] = -10000;
+    obj["soft_limit_z_high"]["max"] = 10000;
+    obj["soft_limit_z_high"]["unit"] = "mm";
     break;
   }
 
