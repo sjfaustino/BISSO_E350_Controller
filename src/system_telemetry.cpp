@@ -21,6 +21,9 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+// PHASE 5.10: Add spinlock to protect cache from concurrent read/write races
+static portMUX_TYPE telemetrySpinlock = portMUX_INITIALIZER_UNLOCKED;
+
 // Telemetry cache
 static system_telemetry_t telemetry_cache;
 static uint32_t last_update_ms = 0;
@@ -71,6 +74,9 @@ void telemetryUpdate() {
     }
 
     last_update_ms = now;
+
+    // PHASE 5.10: Protect cache writes with spinlock to prevent torn reads
+    portENTER_CRITICAL(&telemetrySpinlock);
 
     // System Status
     telemetry_cache.health_status = calculateHealthStatus();
@@ -133,11 +139,19 @@ void telemetryUpdate() {
     // Configuration
     telemetry_cache.config_version = configGetInt("schema_version", 1);
     telemetry_cache.config_is_default = (configGetInt(KEY_WEB_PW_CHANGED, 0) == 0);
+
+    portEXIT_CRITICAL(&telemetrySpinlock);
 }
 
 system_telemetry_t telemetryGetSnapshot() {
     telemetryUpdate();
-    return telemetry_cache;
+
+    // PHASE 5.10: Atomic copy under spinlock protection
+    portENTER_CRITICAL(&telemetrySpinlock);
+    system_telemetry_t snapshot = telemetry_cache;
+    portEXIT_CRITICAL(&telemetrySpinlock);
+
+    return snapshot;
 }
 
 system_health_t telemetryGetHealthStatus() {

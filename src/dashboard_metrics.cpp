@@ -15,6 +15,8 @@
 #include <string.h>
 #include <stdio.h>
 
+// PHASE 5.10: Add spinlock to protect cache from concurrent read/write races
+static portMUX_TYPE metricsSpinlock = portMUX_INITIALIZER_UNLOCKED;
 static dashboard_metrics_t metrics_cache;
 static uint32_t last_update_ms = 0;
 
@@ -35,6 +37,10 @@ void dashboardMetricsUpdate() {
 
     // Collect system telemetry
     system_telemetry_t telemetry = telemetryGetSnapshot();
+
+    // PHASE 5.10: Protect cache writes with spinlock to prevent torn reads
+    portENTER_CRITICAL(&metricsSpinlock);
+
     metrics_cache.uptime_ms = now;
     metrics_cache.cpu_percent = telemetry.cpu_usage_percent;
     metrics_cache.free_heap_bytes = telemetry.free_heap_bytes;
@@ -77,11 +83,19 @@ void dashboardMetricsUpdate() {
     metrics_cache.load_state = load_status.current_state;
 
     metrics_cache.timestamp_ms = now;
+
+    portEXIT_CRITICAL(&metricsSpinlock);
 }
 
 dashboard_metrics_t dashboardMetricsGetSnapshot() {
     dashboardMetricsUpdate();
-    return metrics_cache;
+
+    // PHASE 5.10: Atomic copy under spinlock protection
+    portENTER_CRITICAL(&metricsSpinlock);
+    dashboard_metrics_t snapshot = metrics_cache;
+    portEXIT_CRITICAL(&metricsSpinlock);
+
+    return snapshot;
 }
 
 size_t dashboardMetricsExportJSON(char* buffer, size_t buffer_size) {
