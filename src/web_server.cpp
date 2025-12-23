@@ -74,7 +74,7 @@ static bool requireAuth(AsyncWebServerRequest *request) {
 
   // CRITICAL FIX: Store String before calling c_str() to prevent dangling pointer
   // authHeader->value().c_str() would return pointer to temporary that's immediately destroyed
-  AsyncWebHeader* authHeader = request->getHeader("Authorization");
+  const AsyncWebHeader* authHeader = request->getHeader("Authorization");
   String auth_value = authHeader->value();
   const char* auth = auth_value.c_str();
 
