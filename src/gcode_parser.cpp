@@ -69,16 +69,144 @@ void GCodeParser::getWCO(float* wco_array) {
 
 void GCodeParser::getParserState(char* buffer, size_t len) {
     // Standard Grbl response string
-    snprintf(buffer, len, "[GC:G%d G%d %s G94 M5]", 
-        (motionIsMoving() ? 1 : 0), 
+    snprintf(buffer, len, "[GC:G%d G%d %s G94 M5]",
+        (motionIsMoving() ? 1 : 0),
         (54 + currentWCS),
         (distanceMode == G_MODE_ABSOLUTE ? "G90" : "G91")
     );
 }
 
+/**
+ * @brief Validate G-code syntax before queuing to motion buffer
+ * @param line G-code command line to validate
+ * @param error_msg Buffer for error message output
+ * @param error_msg_len Size of error message buffer
+ * @return true if syntax is valid, false otherwise
+ */
+bool GCodeParser::validateGCodeSyntax(const char* line, char* error_msg, size_t error_msg_len) {
+    if (!line) {
+        snprintf(error_msg, error_msg_len, "Null command");
+        return false;
+    }
+
+    size_t len = strlen(line);
+
+    // Check length (prevent buffer overflow)
+    if (len == 0) {
+        snprintf(error_msg, error_msg_len, "Empty command");
+        return false;
+    }
+    if (len > 128) {
+        snprintf(error_msg, error_msg_len, "Command too long (max 128 chars)");
+        return false;
+    }
+
+    // Skip comments and whitespace
+    if (line[0] == '(' || line[0] == ';' || line[0] == ' ' || line[0] == '\t') {
+        return true; // Comments are valid
+    }
+
+    // Check for valid command letter (G or M)
+    if (line[0] != 'G' && line[0] != 'g' && line[0] != 'M' && line[0] != 'm') {
+        snprintf(error_msg, error_msg_len, "Invalid command (must start with G or M)");
+        return false;
+    }
+
+    // Extract command number
+    char cmd_letter = toupper(line[0]);
+    const char* num_start = line + 1;
+    char* end_ptr;
+    long cmd_num = strtol(num_start, &end_ptr, 10);
+
+    // Check if number was found
+    if (end_ptr == num_start) {
+        snprintf(error_msg, error_msg_len, "Missing command number after %c", cmd_letter);
+        return false;
+    }
+
+    // Validate command ranges
+    if (cmd_letter == 'G') {
+        if (cmd_num < 0 || cmd_num > 99) {
+            snprintf(error_msg, error_msg_len, "Invalid G-code number G%ld (range: G0-G99)", cmd_num);
+            return false;
+        }
+        // Check for supported G-codes
+        bool valid_g = (cmd_num == 0 || cmd_num == 1 || cmd_num == 4 || cmd_num == 10 ||
+                       cmd_num == 28 || cmd_num == 30 || cmd_num == 53 ||
+                       (cmd_num >= 54 && cmd_num <= 59) ||
+                       cmd_num == 90 || cmd_num == 91 || cmd_num == 92);
+        if (!valid_g) {
+            snprintf(error_msg, error_msg_len, "Unsupported G-code G%ld", cmd_num);
+            return false;
+        }
+    } else if (cmd_letter == 'M') {
+        if (cmd_num < 0 || cmd_num > 999) {
+            snprintf(error_msg, error_msg_len, "Invalid M-code number M%ld (range: M0-M999)", cmd_num);
+            return false;
+        }
+        // Check for supported M-codes
+        bool valid_m = (cmd_num == 0 || cmd_num == 1 || cmd_num == 114 || cmd_num == 115 ||
+                       cmd_num == 117 || cmd_num == 154 || cmd_num == 226 || cmd_num == 255 ||
+                       cmd_num == 999);
+        if (!valid_m) {
+            snprintf(error_msg, error_msg_len, "Unsupported M-code M%ld", cmd_num);
+            return false;
+        }
+    }
+
+    // Validate parameters (if any)
+    const char* param_start = end_ptr;
+    while (*param_start) {
+        // Skip whitespace
+        while (*param_start && (*param_start == ' ' || *param_start == '\t')) {
+            param_start++;
+        }
+        if (*param_start == '\0') break;
+
+        // Check for valid parameter letter
+        char param_letter = toupper(*param_start);
+        bool valid_param = (param_letter == 'X' || param_letter == 'Y' || param_letter == 'Z' ||
+                           param_letter == 'A' || param_letter == 'F' || param_letter == 'S' ||
+                           param_letter == 'P' || param_letter == 'L' || param_letter == 'R' ||
+                           param_letter == 'I' || param_letter == 'J' || param_letter == 'K');
+
+        if (!valid_param) {
+            snprintf(error_msg, error_msg_len, "Invalid parameter '%c'", param_letter);
+            return false;
+        }
+
+        // Check parameter value
+        param_start++;
+        char* param_end;
+        float param_val = strtof(param_start, &param_end);
+
+        if (param_end == param_start) {
+            snprintf(error_msg, error_msg_len, "Missing value for parameter %c", param_letter);
+            return false;
+        }
+
+        // Validate numeric range (prevent overflow)
+        if (!isfinite(param_val)) {
+            snprintf(error_msg, error_msg_len, "Invalid numeric value for %c", param_letter);
+            return false;
+        }
+
+        param_start = param_end;
+    }
+
+    return true;
+}
+
 bool GCodeParser::processCommand(const char* line) {
     if (!line || strlen(line) == 0) return false;
-    if (line[0] == '(' || line[0] == ';') return true; 
+    if (line[0] == '(' || line[0] == ';') return true;
+
+    // PHASE 5.10: Validate G-code syntax before processing
+    char error_msg[128];
+    if (!validateGCodeSyntax(line, error_msg, sizeof(error_msg))) {
+        logError("[GCODE] Syntax error: %s (line: %s)", error_msg, line);
+        return false;
+    }
 
     float val = -1.0f;
     

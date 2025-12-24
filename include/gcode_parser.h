@@ -22,16 +22,19 @@ class GCodeParser {
 public:
     GCodeParser();
     void init();
-    
+
     // Core Processing
     bool processCommand(const char* line);
-    
+
+    // Syntax Validation
+    bool validateGCodeSyntax(const char* line, char* error_msg, size_t error_msg_len);
+
     // Status Reporting
     gcode_distance_mode_t getDistanceMode();
     void getParserState(char* buffer, size_t len); // Signature fixed
-    
+
     // WCS Helpers
-    float getWorkPosition(uint8_t axis, float mpos); 
+    float getWorkPosition(uint8_t axis, float mpos);
     void getWCO(float* wco_array); 
 
 private:
