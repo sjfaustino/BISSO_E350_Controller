@@ -5,6 +5,7 @@
 #include "safety_state_machine.h"
 #include "serial_logger.h"
 #include "task_manager.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <Preferences.h>
 #include <stdio.h>
 #include <string.h>
@@ -365,10 +366,19 @@ void emergencyStopSetActive(bool active) {
     motionEmergencyStop();
     safetySetState(FSM_EMERGENCY);
     logError("[E-STOP] ACTIVATED via Fault");
+
+    // PHASE 5.10: Signal event group for emergency stop
+    systemEventsSafetySet(EVENT_SAFETY_ESTOP_PRESSED);
+    systemEventsSafetySet(EVENT_SAFETY_ALARM_RAISED);
   } else if (!active && estop_active) {
     estop_active = false;
     safetySetState(FSM_OK);
     logInfo("[E-STOP] CLEARED");
+
+    // PHASE 5.10: Signal event group for E-STOP release
+    systemEventsSafetySet(EVENT_SAFETY_ESTOP_RELEASED);
+    systemEventsSafetyClear(EVENT_SAFETY_ESTOP_PRESSED);
+    systemEventsSafetyClear(EVENT_SAFETY_ALARM_RAISED);
   }
 }
 

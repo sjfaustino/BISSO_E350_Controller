@@ -14,6 +14,7 @@
 #include "safety.h"
 #include "serial_logger.h"
 #include "system_constants.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include "watchdog_manager.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -114,6 +115,15 @@ void taskManagerInit() {
   if (!queue_display) {
     Serial.println("[TASKS] [FAIL] Display queue creation failed!");
     queue_failure = true;
+  }
+
+  // PHASE 5.10: Initialize event groups for event-driven architecture
+  Serial.println("[TASKS] Initializing event groups...");
+  if (!systemEventsInit()) {
+    Serial.println("[TASKS] [FAIL] Event group initialization failed!");
+    queue_failure = true; // Reuse queue_failure flag for init error
+  } else {
+    Serial.println("[TASKS] [OK] Event groups initialized");
   }
 
   // Create Mutexes with individual error checking

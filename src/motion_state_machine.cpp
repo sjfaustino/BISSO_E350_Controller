@@ -13,6 +13,7 @@
 #include "fault_log.h"
 #include "logger.h"
 #include "board_inputs.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <Arduino.h>
 
 // External spinlock for thread-safe state access
@@ -143,6 +144,44 @@ bool MotionStateMachine::transitionTo(Axis* axis, motion_state_t new_state) {
     logDebug("[FSM] Axis %d: %s -> %s", axis->id,
              motionStateToString(old_state),
              motionStateToString(new_state));
+
+    // PHASE 5.10: Signal event group for state changes
+    // This allows tasks to wake up immediately instead of polling
+    systemEventsMotionSet(EVENT_MOTION_STATE_CHANGE);
+
+    // Signal specific events based on new state
+    switch (new_state) {
+        case MOTION_IDLE:
+            systemEventsMotionSet(EVENT_MOTION_IDLE);
+            if (old_state == MOTION_EXECUTING || old_state == MOTION_STOPPING) {
+                systemEventsMotionSet(EVENT_MOTION_COMPLETED);
+            }
+            break;
+
+        case MOTION_EXECUTING:
+            systemEventsMotionSet(EVENT_MOTION_STARTED);
+            break;
+
+        case MOTION_STOPPING:
+            systemEventsMotionSet(EVENT_MOTION_STOPPED);
+            break;
+
+        case MOTION_ERROR:
+            systemEventsMotionSet(EVENT_MOTION_ERROR);
+            break;
+
+        case MOTION_HOMING_APPROACH_FAST:
+            systemEventsMotionSet(EVENT_MOTION_HOMING_START);
+            break;
+
+        case MOTION_HOMING_SETTLE:
+            // Clear homing start, will set complete after settle
+            systemEventsMotionClear(EVENT_MOTION_HOMING_START);
+            break;
+
+        default:
+            break;
+    }
 
     return true;
 }
@@ -299,6 +338,10 @@ void state_homing_settle_handler(Axis* axis, int32_t pos, int32_t target, bool c
         axis->target_position = 0;
 
         logInfo("[HOME] Axis %d zeroed", axis->id);
+
+        // PHASE 5.10: Signal homing completion event before transitioning
+        systemEventsMotionSet(EVENT_MOTION_HOMING_COMPLETE);
+
         MotionStateMachine::transitionTo(axis, MOTION_IDLE);
     }
 }
