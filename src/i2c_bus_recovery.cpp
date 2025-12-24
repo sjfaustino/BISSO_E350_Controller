@@ -2,6 +2,7 @@
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "system_constants.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <Wire.h>
 
 // FIX: Fully initialized struct to suppress -Wmissing-field-initializers
@@ -82,6 +83,10 @@ i2c_bus_status_t i2cCheckBusStatus() {
 
 void i2cRecoverBus() {
   logInfo("[I2C] Executing recovery...");
+
+  // PHASE 5.10: Signal I2C error event before recovery
+  systemEventsSystemSet(EVENT_SYSTEM_I2C_ERROR);
+
   pinMode(PIN_I2C_SDA, INPUT_PULLUP);
   pinMode(PIN_I2C_SCL, INPUT_PULLUP);
 
@@ -109,6 +114,9 @@ void i2cRecoverBus() {
   logInfo("[I2C] Recovery complete.");
   stats.bus_recoveries++;
   i2cSoftReset();
+
+  // PHASE 5.10: Clear I2C error event after successful recovery
+  systemEventsSystemClear(EVENT_SYSTEM_I2C_ERROR);
 }
 
 void i2cSoftReset() {

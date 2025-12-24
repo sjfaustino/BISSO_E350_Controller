@@ -16,6 +16,7 @@
 #include "config_unified.h"
 #include "config_keys.h"
 #include "system_constants.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <string.h>
 #include <stdio.h>
 #include <Arduino.h>
@@ -28,6 +29,9 @@ static portMUX_TYPE telemetrySpinlock = portMUX_INITIALIZER_UNLOCKED;
 static system_telemetry_t telemetry_cache;
 static uint32_t last_update_ms = 0;
 static uint32_t loop_cycle_counter = 0;
+
+// PHASE 5.10: Track WiFi connection state changes for event signaling
+static bool wifi_was_connected = false;
 
 const char* telemetryGetHealthStatusString(system_health_t status) {
     switch (status) {
@@ -140,6 +144,18 @@ void telemetryUpdate() {
             telemetry_cache.wifi_signal_strength = (uint8_t)signal_raw;
         }
     }
+
+    // PHASE 5.10: Signal network connection events on state changes
+    if (telemetry_cache.wifi_connected && !wifi_was_connected) {
+        // Transition from disconnected to connected
+        systemEventsSystemSet(EVENT_SYSTEM_NETWORK_CONNECTED);
+        logInfo("[TELEMETRY] WiFi connected");
+    } else if (!telemetry_cache.wifi_connected && wifi_was_connected) {
+        // Transition from connected to disconnected
+        systemEventsSystemSet(EVENT_SYSTEM_NETWORK_LOST);
+        logWarning("[TELEMETRY] WiFi connection lost");
+    }
+    wifi_was_connected = telemetry_cache.wifi_connected;
 
     // Configuration
     telemetry_cache.config_version = configGetInt("schema_version", 1);

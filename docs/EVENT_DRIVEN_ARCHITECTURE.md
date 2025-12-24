@@ -78,10 +78,10 @@ while (1) {
 | Event | Description | Set By | Used By |
 |-------|-------------|--------|---------|
 | `EVENT_SYSTEM_CONFIG_CHANGED` | Configuration updated | config_unified.cpp | All tasks |
-| `EVENT_SYSTEM_I2C_ERROR` | I2C error | i2c_manager.cpp | Monitor task |
+| `EVENT_SYSTEM_I2C_ERROR` | I2C error | i2c_bus_recovery.cpp | Monitor task |
 | `EVENT_SYSTEM_MODBUS_ERROR` | Modbus error | modbus drivers | Monitor task |
-| `EVENT_SYSTEM_NETWORK_CONNECTED` | Network up | web_server.cpp | Telemetry |
-| `EVENT_SYSTEM_NETWORK_LOST` | Network down | web_server.cpp | Telemetry |
+| `EVENT_SYSTEM_NETWORK_CONNECTED` | Network up | system_telemetry.cpp | Telemetry |
+| `EVENT_SYSTEM_NETWORK_LOST` | Network down | system_telemetry.cpp | Telemetry |
 | `EVENT_SYSTEM_LOW_MEMORY` | Low memory | memory_monitor.cpp | All tasks |
 | `EVENT_SYSTEM_WATCHDOG_ALERT` | Watchdog warning | watchdog_manager.cpp | Monitor task |
 | `EVENT_SYSTEM_OTA_REQUESTED` | OTA update | web_server.cpp | System task |

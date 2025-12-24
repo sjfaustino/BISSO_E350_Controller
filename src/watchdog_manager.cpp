@@ -1,6 +1,7 @@
 #include "watchdog_manager.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <Preferences.h>
 #include <esp_task_wdt.h>
 #include <string.h>
@@ -168,6 +169,9 @@ void watchdogFeed(const char* task_name) {
       
       if (wdt_tasks[i].consecutive_misses > 0) {
         wdt_stats.automatic_recoveries++;
+
+        // PHASE 5.10: Clear watchdog alert event when task recovers
+        systemEventsSystemClear(EVENT_SYSTEM_WATCHDOG_ALERT);
       }
       wdt_tasks[i].consecutive_misses = 0;
       
@@ -195,6 +199,10 @@ wdt_status_t watchdogGetStatus() {
         
         if (wdt_tasks[i].consecutive_misses > 3) {
           wdt_status = WDT_STATUS_TIMEOUT;
+
+          // PHASE 5.10: Signal watchdog alert event
+          systemEventsSystemSet(EVENT_SYSTEM_WATCHDOG_ALERT);
+
           return wdt_status;
         }
       }
