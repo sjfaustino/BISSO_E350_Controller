@@ -74,8 +74,8 @@ move_validation_result_t motion_mock_validate_move(
         return MOVE_SOFT_LIMIT_VIOLATION;
     }
 
-    // Check for E-stop
-    if (motion->e_stop_active) {
+    // Check for E-stop or error state
+    if (motion->e_stop_active || motion->state == MOTION_ERROR || motion->state == MOTION_STALLED) {
         return MOVE_HARDWARE_ERROR;
     }
 
