@@ -60,6 +60,21 @@ void cmd_estop_off(int argc, char** argv) {
   }
 }
 
+void cmd_estop_main(int argc, char** argv) {
+  if (argc < 2 || strcasecmp(argv[1], "status") == 0) {
+    cmd_estop_status(argc, argv);
+    return;
+  }
+  
+  if (strcasecmp(argv[1], "on") == 0) {
+    cmd_estop_on(argc, argv);
+  } else if (strcasecmp(argv[1], "off") == 0) {
+    cmd_estop_off(argc, argv);
+  } else {
+    Serial.println("Usage: estop [status|on|off]");
+  }
+}
+
 // ============================================================================
 // CONFIGURATION COMMANDS
 // ============================================================================
@@ -113,9 +128,7 @@ void cliRegisterMotionCommands() {
   cliRegisterCommand("pause", "Pause motion", cmd_motion_pause);
   cliRegisterCommand("resume", "Resume motion", cmd_motion_resume);
   
-  cliRegisterCommand("estop", "Trigger Emergency Stop", cmd_estop_on);
-  cliRegisterCommand("clear", "Clear Emergency Stop", cmd_estop_off);
-  cliRegisterCommand("estop_status", "Show E-Stop status", cmd_estop_status);
+  cliRegisterCommand("estop", "Emergency Stop management (status|on|off)", cmd_estop_main);
   
   cliRegisterCommand("limit", "Set soft limits", cmd_soft_limits);
   cliRegisterCommand("feed", "Set Feed Override (0.1 - 2.0)", cmd_feed_override);

@@ -86,37 +86,37 @@ void cmd_config_main(int argc, char **argv) {
     return;
   }
 
-  if (strcmp(argv[1], "get") == 0)
+  if (strcasecmp(argv[1], "get") == 0)
     cmd_config_get(argc, argv);
-  else if (strcmp(argv[1], "set") == 0)
+  else if (strcasecmp(argv[1], "set") == 0)
     cmd_config_set(argc, argv);
-  else if (strcmp(argv[1], "dump") == 0)
+  else if (strcasecmp(argv[1], "dump") == 0)
     cmd_config_dump(argc, argv);
-  else if (strcmp(argv[1], "show") == 0)
+  else if (strcasecmp(argv[1], "show") == 0)
     cmd_config_show(argc, argv);
-  else if (strcmp(argv[1], "save") == 0)
+  else if (strcasecmp(argv[1], "save") == 0)
     cmd_config_save(argc, argv);
-  else if (strcmp(argv[1], "reset") == 0)
+  else if (strcasecmp(argv[1], "reset") == 0)
     cmd_config_reset(argc, argv);
-  else if (strcmp(argv[1], "validate") == 0)
+  else if (strcasecmp(argv[1], "validate") == 0)
     cmd_config_validate(argc, argv);
-  else if (strcmp(argv[1], "schema") == 0)
+  else if (strcasecmp(argv[1], "schema") == 0)
     cmd_config_schema_show(argc, argv);
-  else if (strcmp(argv[1], "migrate") == 0)
+  else if (strcasecmp(argv[1], "migrate") == 0)
     cmd_config_migrate(argc, argv);
-  else if (strcmp(argv[1], "export") == 0)
+  else if (strcasecmp(argv[1], "export") == 0)
     cmd_config_export(argc, argv);
-  else if (strcmp(argv[1], "import") == 0)
+  else if (strcasecmp(argv[1], "import") == 0)
     cmd_config_import(argc, argv);
-  else if (strcmp(argv[1], "backup") == 0)
+  else if (strcasecmp(argv[1], "backup") == 0)
     cmd_config_backup(argc, argv);
-  else if (strcmp(argv[1], "restore") == 0)
+  else if (strcasecmp(argv[1], "restore") == 0)
     cmd_config_restore(argc, argv);
-  else if (strcmp(argv[1], "showbkp") == 0)
+  else if (strcasecmp(argv[1], "showbkp") == 0)
     cmd_config_show_backup(argc, argv);
-  else if (strcmp(argv[1], "clrbkp") == 0)
+  else if (strcasecmp(argv[1], "clrbkp") == 0)
     cmd_config_clear_backup(argc, argv);
-  else if (strcmp(argv[1], "rollback") == 0) {
+  else if (strcasecmp(argv[1], "rollback") == 0) {
     if (argc < 3) {
       Serial.println("[CONFIG] [ERR] Usage: config rollback <version>");
       return;
@@ -324,6 +324,13 @@ void cmd_config_import(int argc, char **argv) {
     }
 
     char c = Serial.read();
+    
+    // Ctrl+C (0x03) aborts the import
+    if (c == 0x03) {
+      Serial.println("\n[CONFIG] Import ABORTED by user.");
+      return;
+    }
+
     if (c == '\n' || c == '\r') {
       if (buffer_pos == 0 || json_buffer[buffer_pos - 1] == '\n') {
         empty_line_count++;

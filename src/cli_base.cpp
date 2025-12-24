@@ -196,7 +196,18 @@ void cliUpdate() {
 
     // 3. Command buffering
     c = Serial.read(); 
+    
+    static bool last_was_eol = false;
+    static char last_eol_char = 0;
+
     if (c == '\n' || c == '\r') {
+      if (last_was_eol && c != last_eol_char) {
+        last_was_eol = false; // Reset for next time
+        return; // Skip the second part of a CRLF or LFCR
+      }
+      last_was_eol = true;
+      last_eol_char = c;
+
       if (cli_echo_enabled) Serial.println();
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
@@ -210,11 +221,13 @@ void cliUpdate() {
         Serial.println("ok"); 
       }
     } else if (c == '\b' || c == 0x7F) {
+      last_was_eol = false;
       if (cli_pos > 0) {
         cli_pos--;
         if (cli_echo_enabled) Serial.print("\b \b");
       }
     } else if (c >= 32 && c < 127 && cli_pos < CLI_BUFFER_SIZE - 1) {
+      last_was_eol = false;
       cli_buffer[cli_pos++] = c;
       if (cli_echo_enabled) Serial.write(c);
     }
@@ -225,7 +238,8 @@ void cliProcessCommand(const char* cmd) {
   if (strlen(cmd) == 0) { Serial.println("ok"); return; }
   
   // G-Code
-  if (cmd[0] == 'G' || cmd[0] == 'M' || cmd[0] == 'T') {
+  char first_char = toupper(cmd[0]);
+  if (first_char == 'G' || first_char == 'M' || first_char == 'T') {
       if (gcodeParser.processCommand(cmd)) Serial.println("ok"); 
       else Serial.println("error:20");
       return;
@@ -283,7 +297,7 @@ void cliProcessCommand(const char* cmd) {
   if (argc == 0) { Serial.println("ok"); return; }
   
   for (int i = 0; i < command_count; i++) {
-    if (strcmp(commands[i].command, argv[0]) == 0) {
+    if (strcasecmp(commands[i].command, argv[0]) == 0) {
       commands[i].handler(argc, argv);
       Serial.println("ok"); 
       return;
@@ -344,6 +358,7 @@ void cmd_grbl_state(int argc, char** argv) {
     Serial.println(buf);
 }
 
+
 void cmd_system_info(int argc, char** argv) {
   char ver[32]; firmwareGetVersionString(ver, 32);
   Serial.printf("[VER:1.1h.Gemini:%s]\r\n", ver);
@@ -359,10 +374,10 @@ void cmd_echo(int argc, char** argv) {
     return;
   }
   
-  if (strcmp(argv[1], "on") == 0) {
+  if (strcasecmp(argv[1], "on") == 0) { // Changed strcmp to strcasecmp
     cli_echo_enabled = true;
     Serial.println("Echo ENABLED");
-  } else if (strcmp(argv[1], "off") == 0) {
+  } else if (strcasecmp(argv[1], "off") == 0) { // Changed strcmp to strcasecmp
     cli_echo_enabled = false;
     Serial.println("Echo DISABLED");
   } else {
