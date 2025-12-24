@@ -27,7 +27,9 @@
 
 // CLI State
 static char cli_buffer[CLI_BUFFER_SIZE];
+static char history_buffer[CLI_BUFFER_SIZE] = {0}; // Single command history
 static uint16_t cli_pos = 0;
+static uint8_t esc_state = 0; // 0=None, 1=ESC, 2=ESC [
 static bool cli_echo_enabled = false;
 static cli_command_t commands[CLI_MAX_COMMANDS];
 static int command_count = 0;
@@ -197,6 +199,34 @@ void cliUpdate() {
     // 3. Command buffering
     c = Serial.read(); 
     
+    // --- ESCAPE SEQUENCE HANDLING (History) ---
+    if (esc_state == 0 && c == 0x1B) { // ESC
+        esc_state = 1;
+        return;
+    } else if (esc_state == 1 && c == 0x5B) { // [
+        esc_state = 2;
+        return;
+    } else if (esc_state == 2) {
+        if (c == 0x41) { // Up Arrow (ESC[A)
+            if (strlen(history_buffer) > 0) {
+                // Clear current line on terminal
+                if (cli_echo_enabled) {
+                    for (int i = 0; i < cli_pos; i++) Serial.print("\b \b");
+                }
+                
+                // Copy history to current buffer
+                strncpy(cli_buffer, history_buffer, CLI_BUFFER_SIZE - 1);
+                cli_pos = strlen(cli_buffer);
+                
+                // Echo the recalled command
+                if (cli_echo_enabled) Serial.print(cli_buffer);
+            }
+        }
+        esc_state = 0;
+        return;
+    }
+    esc_state = 0; // Reset if any other char comes during sequence
+    
     static bool last_was_eol = false;
     static char last_eol_char = 0;
 
@@ -211,6 +241,12 @@ void cliUpdate() {
       if (cli_echo_enabled) Serial.println();
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
+        
+        // Save to history before processing (if it's not empty and different)
+        if (strlen(cli_buffer) > 0 && strcmp(cli_buffer, history_buffer) != 0) {
+            strncpy(history_buffer, cli_buffer, CLI_BUFFER_SIZE - 1);
+        }
+
         if (strncmp(cli_buffer, "$J=", 3) == 0) {
             handle_jog_command(cli_buffer + 3);
         } else {
