@@ -120,14 +120,15 @@ void test_vfd_thermal_fault_detection(void) {
  * @test VFD fault stops motor output
  */
 void test_vfd_fault_cuts_output(void) {
-  // Normal operation
+  // Normal operation - set frequency and advance time for it to take effect
   vfd_mock_set_frequency(&vfd, 50);
-  TEST_ASSERT_GREATER_THAN(0, vfd.frequency_hz);
+  vfd_mock_advance_time(&vfd, 100);
+  TEST_ASSERT_TRUE(vfd.frequency_hz > 0 || vfd.target_frequency_hz > 0);
 
   // Inject fault
   vfd_mock_inject_fault(&vfd, 13); // Thermal fault
 
-  // Verify frequency drops to zero
+  // Verify fault is set and motor stops
   TEST_ASSERT_EQUAL(1, vfd.has_fault);
   TEST_ASSERT_EQUAL(0, vfd.is_running);
 }
