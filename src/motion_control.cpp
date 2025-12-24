@@ -17,6 +17,7 @@
 #include "motion.h"
 #include "motion_planner.h"
 #include "motion_state.h"
+#include "motion_state_machine.h" // PHASE 5.10: Formal state machine
 #include "plc_iface.h"
 #include "safety.h"
 #include "serial_logger.h"
@@ -133,204 +134,9 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
   prev_update_ms = current_time_ms;
   position = current_pos;
 
-  // CRITICAL FIX: Use spinlock to protect state reads/writes
-  // This ensures atomic state transitions and prevents race conditions
-  // when multiple tasks access state (motion task vs CLI/status reporting)
-  portENTER_CRITICAL(&motionSpinlock);
-
-  motion_state_t current_state = state;
-
-  portEXIT_CRITICAL(&motionSpinlock);
-
-  if (current_state == MOTION_ERROR || !enabled)
-    return;
-
-  switch (current_state) {
-  case MOTION_WAIT_CONSENSO:
-    // PHASE 5.1: Wraparound-safe timeout comparison
-    if ((uint32_t)(millis() - state_entry_ms) > MOTION_CONSENSO_TIMEOUT_MS) {
-      faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, id, 0,
-                    "Consensus Timeout");
-      portENTER_CRITICAL(&motionSpinlock);
-      state = MOTION_ERROR;
-      portEXIT_CRITICAL(&motionSpinlock);
-    } else {
-      // PHASE 5.7 Fix: Use passed-in consensus state instead of blocking I2C
-      // call
-      if (consensus_active) {
-        portENTER_CRITICAL(&motionSpinlock);
-        state = MOTION_EXECUTING;
-        state_entry_ms = millis();
-        portEXIT_CRITICAL(&motionSpinlock);
-      }
-    }
-    break;
-
-  case MOTION_EXECUTING:
-    if ((m_state.active_start_position < target_position &&
-         position >= target_position) ||
-        (m_state.active_start_position > target_position &&
-         position <= target_position)) {
-
-      portENTER_CRITICAL(&motionSpinlock);
-      state = MOTION_STOPPING;
-      state_entry_ms = millis();
-      portEXIT_CRITICAL(&motionSpinlock);
-
-      position_at_stop = position;
-      motionSetPLCAxisDirection(255, false, false);
-    }
-    break;
-
-  case MOTION_STOPPING:
-    if (abs(position - target_position) <
-        configGetInt(KEY_MOTION_DEADBAND, 10)) {
-      portENTER_CRITICAL(&motionSpinlock);
-      state = MOTION_IDLE;
-      m_state.active_axis = 255;
-      portEXIT_CRITICAL(&motionSpinlock);
-    } else {
-      // FIX: Configurable Timeout (PHASE 5.1: Wraparound-safe)
-      uint32_t timeout = configGetInt(KEY_STOP_TIMEOUT, 5000);
-      if ((uint32_t)(millis() - state_entry_ms) > timeout) {
-        logWarning("[AXIS %d] Stop Settlement Timeout", id);
-        portENTER_CRITICAL(&motionSpinlock);
-        state = MOTION_IDLE;
-        m_state.active_axis = 255;
-        portEXIT_CRITICAL(&motionSpinlock);
-      }
-    }
-    break;
-
-  case MOTION_HOMING_APPROACH_FAST:
-  case MOTION_HOMING_APPROACH_FINE: {
-    bool hit = elboI73GetInput(AXIS_TO_I73_BIT[id]);
-    // PHASE 5.1: Wraparound-safe timeout comparison
-    if ((uint32_t)(millis() - state_entry_ms) > 45000) {
-      portENTER_CRITICAL(&motionSpinlock);
-      state = MOTION_ERROR;
-      portEXIT_CRITICAL(&motionSpinlock);
-      logError("[HOME] Timeout");
-    }
-
-    if (hit) {
-      motionSetPLCAxisDirection(255, false, false);
-      if (current_state == MOTION_HOMING_APPROACH_FAST) {
-        int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0);
-        motionSetPLCSpeedProfile((speed_profile_t)slow_prof);
-        motionSetPLCAxisDirection(id, true, true);
-        portENTER_CRITICAL(&motionSpinlock);
-        state = MOTION_HOMING_BACKOFF;
-        state_entry_ms = millis();
-        portEXIT_CRITICAL(&motionSpinlock);
-      } else {
-        homing_trigger_pos = position;
-        portENTER_CRITICAL(&motionSpinlock);
-        state = MOTION_HOMING_SETTLE;
-        state_entry_ms = millis();
-        portEXIT_CRITICAL(&motionSpinlock);
-      }
-    }
-  } break;
-
-  case MOTION_HOMING_BACKOFF:
-    if (!elboI73GetInput(AXIS_TO_I73_BIT[id])) {
-      // PHASE 5.1: Wraparound-safe timeout comparison
-      if ((uint32_t)(millis() - state_entry_ms) > 1000) {
-        motionSetPLCAxisDirection(255, false, false);
-        int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0);
-        motionSetPLCSpeedProfile((speed_profile_t)slow_prof);
-        motionSetPLCAxisDirection(id, true, false);
-        portENTER_CRITICAL(&motionSpinlock);
-        state = MOTION_HOMING_APPROACH_FINE;
-        state_entry_ms = millis();
-        portEXIT_CRITICAL(&motionSpinlock);
-      }
-    }
-    break;
-
-  case MOTION_HOMING_SETTLE:
-    // PHASE 5.1: Wraparound-safe timeout comparison
-    if ((uint32_t)(millis() - state_entry_ms) > HOMING_SETTLE_MS) {
-      wj66SetZero(id);
-      position = 0;
-      target_position = 0;
-      portENTER_CRITICAL(&motionSpinlock);
-      state = MOTION_IDLE;
-      m_state.active_axis = 255;
-      portEXIT_CRITICAL(&motionSpinlock);
-      logInfo("[HOME] Axis %d Zeroed.", id);
-    }
-    break;
-
-  case MOTION_DWELL:
-    // Non-blocking dwell - just wait for timer to expire
-    // PHASE 5.1: Wraparound-safe timeout comparison
-    if ((int32_t)(millis() - dwell_end_ms) >= 0) {
-      portENTER_CRITICAL(&motionSpinlock);
-      state = MOTION_IDLE;
-      m_state.active_axis = 255;
-      portEXIT_CRITICAL(&motionSpinlock);
-      logInfo("[MOTION] Dwell complete");
-    }
-    break;
-
-  case MOTION_WAIT_PIN: {
-    // Non-blocking pin state wait with optional timeout
-    bool pin_state = false;
-    bool pin_ready = false;
-
-    // Read pin state based on type
-    if (wait_pin_type == 0) {
-      // I73 input (ELBO PLC)
-      pin_state = elboI73GetInput(wait_pin_id);
-      pin_ready = true;
-    } else if (wait_pin_type == 1) {
-      // Board input (KC868-A16)
-      button_state_t buttons = boardInputsUpdate();
-      // Map button state based on pin ID
-      if (wait_pin_id == 0)
-        pin_state = buttons.estop_active;
-      else if (wait_pin_id == 1)
-        pin_state = buttons.pause_pressed;
-      else if (wait_pin_id == 2)
-        pin_state = buttons.resume_pressed;
-      else
-        pin_state = false;
-      pin_ready = buttons.connection_ok;
-    } else if (wait_pin_type == 2) {
-      // Direct ESP32 GPIO
-      pinMode(wait_pin_id, INPUT);
-      pin_state = (digitalRead(wait_pin_id) == HIGH);
-      pin_ready = true;
-    }
-
-    // Check if pin state matches what we're waiting for
-    if (pin_ready && pin_state == wait_pin_state) {
-      portENTER_CRITICAL(&motionSpinlock);
-      state = MOTION_IDLE;
-      m_state.active_axis = 255;
-      portEXIT_CRITICAL(&motionSpinlock);
-      logInfo("[MOTION] Pin %d state %d detected", wait_pin_id, wait_pin_state);
-      break;
-    }
-
-    // Check for timeout (PHASE 5.1: Wraparound-safe)
-    if (wait_pin_timeout_ms > 0 &&
-        (uint32_t)(millis() - state_entry_ms) >= wait_pin_timeout_ms) {
-      portENTER_CRITICAL(&motionSpinlock);
-      state = MOTION_ERROR;
-      portEXIT_CRITICAL(&motionSpinlock);
-      faultLogEntry(FAULT_WARNING, FAULT_MOTION_TIMEOUT, id, 0,
-                    "Pin wait timeout");
-      logWarning("[MOTION] Pin %d wait timeout", wait_pin_id);
-    }
-    break;
-  }
-
-  default:
-    break;
-  }
+  // PHASE 5.10: Use formal state machine instead of switch/case
+  // State machine handles thread-safe state transitions internally
+  MotionStateMachine::update(this, current_pos, global_target, consensus_active);
 }
 
 // ============================================================================
@@ -347,6 +153,7 @@ void motionInit() {
     axes[i].soft_limit_max = 500000;
   }
   motionPlanner.init();
+  MotionStateMachine::init(); // PHASE 5.10: Initialize formal state machine
   autoReportInit(); // PHASE 4.0: Initialize auto-report system
   lcdSleepInit();   // PHASE 4.0: Initialize LCD sleep system
 
@@ -693,11 +500,8 @@ bool motionHome(uint8_t axis) {
   m_state.active_axis = axis;
   portEXIT_CRITICAL(&motionSpinlock);
 
-  // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
-  portENTER_CRITICAL(&motionSpinlock);
-  axes[axis].state = MOTION_HOMING_APPROACH_FAST;
-  axes[axis].state_entry_ms = millis();
-  portEXIT_CRITICAL(&motionSpinlock);
+  // PHASE 5.10: Use formal state machine for state transitions
+  MotionStateMachine::transitionTo(&axes[axis], MOTION_HOMING_APPROACH_FAST);
 
   int fast_prof = configGetInt(KEY_HOME_PROFILE_FAST, 2);
 
@@ -782,11 +586,8 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   m_state.active_start_position = axes[target_axis].position;
   portEXIT_CRITICAL(&motionSpinlock);
 
-  // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
-  portENTER_CRITICAL(&motionSpinlock);
-  axes[target_axis].state = MOTION_WAIT_CONSENSO;
-  axes[target_axis].state_entry_ms = millis();
-  portEXIT_CRITICAL(&motionSpinlock);
+  // PHASE 5.10: Use formal state machine for state transitions
+  MotionStateMachine::transitionTo(&axes[target_axis], MOTION_WAIT_CONSENSO);
 
   taskUnlockMutex(taskGetMotionMutex());
 
@@ -948,12 +749,10 @@ bool motionStop() {
   portEXIT_CRITICAL(&motionSpinlock);
 
   if (active != 255) {
-    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
-    portENTER_CRITICAL(&motionSpinlock);
-    axes[active].state = MOTION_STOPPING;
+    // PHASE 5.10: Use formal state machine for state transitions
     axes[active].target_position = axes[active].position;
     axes[active].position_at_stop = axes[active].position;
-    portEXIT_CRITICAL(&motionSpinlock);
+    MotionStateMachine::transitionTo(&axes[active], MOTION_STOPPING);
   }
   taskUnlockMutex(taskGetMotionMutex());
 
@@ -984,10 +783,8 @@ bool motionPause() {
   if (active != 255 &&
       (axes[active].state == MOTION_EXECUTING ||
        axes[active].state == MOTION_WAIT_CONSENSO)) {
-    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
-    portENTER_CRITICAL(&motionSpinlock);
-    axes[active].state = MOTION_PAUSED;
-    portEXIT_CRITICAL(&motionSpinlock);
+    // PHASE 5.10: Use formal state machine for state transitions
+    MotionStateMachine::transitionTo(&axes[active], MOTION_PAUSED);
     logInfo("[MOTION] Paused axis %d", active);
     valid_pause = true;
   }
@@ -1030,11 +827,8 @@ bool motionResume() {
 
     is_fwd = (axes[axis].target_position > axes[axis].position);
 
-    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
-    portENTER_CRITICAL(&motionSpinlock);
-    axes[axis].state = MOTION_WAIT_CONSENSO;
-    axes[axis].state_entry_ms = millis();
-    portEXIT_CRITICAL(&motionSpinlock);
+    // PHASE 5.10: Use formal state machine for state transitions
+    MotionStateMachine::transitionTo(&axes[axis], MOTION_WAIT_CONSENSO);
     valid_resume = true;
   }
 
@@ -1070,12 +864,9 @@ bool motionDwell(uint32_t ms) {
 
   // Only execute dwell if no motion is active
   if (active == 255 && axes[0].state == MOTION_IDLE) {
-    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
-    portENTER_CRITICAL(&motionSpinlock);
-    axes[0].state = MOTION_DWELL;
+    // PHASE 5.10: Use formal state machine for state transitions
     axes[0].dwell_end_ms = millis() + ms;
-    axes[0].state_entry_ms = millis();
-    portEXIT_CRITICAL(&motionSpinlock);
+    MotionStateMachine::transitionTo(&axes[0], MOTION_DWELL);
 
     portENTER_CRITICAL(&motionSpinlock);
     m_state.active_axis = 0; // Mark axis 0 as "active" during dwell
@@ -1113,15 +904,12 @@ bool motionWaitPin(uint8_t pin_id, uint8_t pin_type, uint8_t state,
 
   // Only execute pin wait if no motion is active
   if (active == 255 && axes[0].state == MOTION_IDLE) {
-    // PHASE 5.10: Protect axes[].state writes with spinlock (consistent lock domain)
-    portENTER_CRITICAL(&motionSpinlock);
-    axes[0].state = MOTION_WAIT_PIN;
+    // PHASE 5.10: Use formal state machine for state transitions
     axes[0].wait_pin_id = pin_id;
     axes[0].wait_pin_type = pin_type;
     axes[0].wait_pin_state = state;
     axes[0].wait_pin_timeout_ms = (timeout_sec > 0) ? (timeout_sec * 1000) : 0;
-    axes[0].state_entry_ms = millis();
-    portEXIT_CRITICAL(&motionSpinlock);
+    MotionStateMachine::transitionTo(&axes[0], MOTION_WAIT_PIN);
 
     portENTER_CRITICAL(&motionSpinlock);
     m_state.active_axis = 0; // Mark axis 0 as "active" during wait
@@ -1158,10 +946,13 @@ void motionEmergencyStop() {
 
   portENTER_CRITICAL(&motionSpinlock);
   m_state.global_enabled = false;
-  for (int i = 0; i < MOTION_AXES; i++)
-    axes[i].state = MOTION_ERROR;
   m_state.active_axis = 255;
   portEXIT_CRITICAL(&motionSpinlock);
+
+  // PHASE 5.10: Use formal state machine for state transitions
+  for (int i = 0; i < MOTION_AXES; i++) {
+    MotionStateMachine::transitionTo(&axes[i], MOTION_ERROR);
+  }
 
   motionBuffer.clear();
   autoReportDisable(); // PHASE 4.0: Disable auto-report on E-Stop
@@ -1202,11 +993,14 @@ bool motionClearEmergencyStop() {
 
   portENTER_CRITICAL(&motionSpinlock);
   m_state.global_enabled = true;
-  for (int i = 0; i < MOTION_AXES; i++) {
-    if (axes[i].state == MOTION_ERROR)
-      axes[i].state = MOTION_IDLE;
-  }
   m_state.active_axis = 255;
+
+  // PHASE 5.10: Use formal state machine for state transitions
+  for (int i = 0; i < MOTION_AXES; i++) {
+    if (axes[i].state == MOTION_ERROR) {
+      MotionStateMachine::transitionTo(&axes[i], MOTION_IDLE);
+    }
+  }
   portEXIT_CRITICAL(&motionSpinlock);
 
   emergencyStopSetActive(false);
