@@ -11,6 +11,8 @@
 #include "config_schema_versioning.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
+#include "config_keys.h"
+#include <Preferences.h>
 #include <string.h>
 
 // ============================================================================
@@ -22,6 +24,7 @@ static bool migration_initialized = false;
 
 // Default values for new configuration keys
 // These are applied when upgrading to a version that adds new keys
+static const config_default_t default_values[] = {
   // PHASE 5.10: Gemini v2.0 Keys
   {KEY_MOTION_BUFFER_ENABLE, "1", "int32", true},
   {KEY_WIFI_SSID, "BISSO-E350-Setup", "string", true},
