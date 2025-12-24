@@ -18,6 +18,7 @@
 #include "motion_buffer.h" 
 #include "config_unified.h"
 #include "config_keys.h"
+#include "auth_manager.h"
 #include "safety.h"
 #include <string.h>
 #include <stdlib.h>
@@ -137,6 +138,7 @@ void cliInit() {
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
   cliRegisterWifiCommands(); 
+  cliRegisterCommand("web_setpass", "Set Web UI password", cmd_web_setpass);
   
   gcodeParser.init();
 }

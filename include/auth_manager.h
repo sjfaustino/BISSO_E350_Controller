@@ -96,4 +96,11 @@ void authRecordFailedAttempt(const char* ip_address);
  */
 void authClearRateLimit(const char* ip_address);
 
+/**
+ * @brief CLI Command handler for setting web password
+ * @param argc Argument count
+ * @param argv Argument array
+ */
+void cmd_web_setpass(int argc, char** argv);
+
 #endif // AUTH_MANAGER_H

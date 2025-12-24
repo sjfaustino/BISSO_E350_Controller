@@ -582,3 +582,23 @@ void authClearRateLimit(const char* ip_address) {
     }
   }
 }
+
+void cmd_web_setpass(int argc, char** argv) {
+  if (argc < 2) {
+    Serial.println("\n[AUTH] === Web Password Management (CLI) ===");
+    Serial.println("Usage: web_setpass <new_password>");
+    Serial.println("Note: Password must be at least 8 characters");
+    Serial.println("      Requires 3 character types (lower/upper/digit/symbol)");
+    return;
+  }
+
+  const char* new_pass = argv[1];
+
+  if (authSetPassword("admin", new_pass)) {
+    Serial.println("[AUTH] [OK] Web password updated successfully.");
+    Serial.println("[AUTH] [OK] You can now log in to the Web UI with the new password.");
+  } else {
+    Serial.println("[AUTH] [ERR] Password update failed.");
+    Serial.println("[AUTH] [ERR] Ensure it meets length and complexity requirements.");
+  }
+}
