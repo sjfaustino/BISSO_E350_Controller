@@ -67,6 +67,7 @@ static void local_setUp(void) {
   encoder_config.calibrated[2] = 1;
 }
 
+static void local_tearDown(void) __attribute__((unused));
 static void local_tearDown(void) {
   // Cleanup
 }

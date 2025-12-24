@@ -126,11 +126,13 @@ static config_t config_create_default(void) {
 static config_test_fixture_t fixture;
 static config_t config;
 
+static void local_setUp(void) __attribute__((unused));
 static void local_setUp(void) {
   test_init_config_fixture(&fixture);
   config = config_create_default();
 }
 
+static void local_tearDown(void) __attribute__((unused));
 static void local_tearDown(void) {
   // Reset for next test
 }

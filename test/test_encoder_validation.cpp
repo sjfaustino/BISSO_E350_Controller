@@ -21,7 +21,7 @@
  * @brief Test fixtures for encoder tests
  */
 static encoder_mock_state_t encoder;
-static vfd_mock_state_t vfd;
+static vfd_mock_state_t vfd __attribute__((unused));
 
 /**
  * @section Calibration Tests

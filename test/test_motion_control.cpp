@@ -23,8 +23,8 @@
  */
 static motion_mock_state_t motion;
 static plc_mock_state_t plc;
-static vfd_mock_state_t vfd;
-static encoder_mock_state_t encoder;
+static vfd_mock_state_t vfd __attribute__((unused));
+static encoder_mock_state_t encoder __attribute__((unused));
 
 /**
  * @section Move Validation Tests
