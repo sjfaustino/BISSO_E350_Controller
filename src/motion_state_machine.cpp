@@ -9,8 +9,8 @@
 #include "config_unified.h"
 #include "plc_iface.h"      // ELBO PLC I2C interface (replaces elbo_q73.h and elbo_i73.h)
 #include "encoder_wj66.h"
-#include "fault_log.h"
-#include "logger.h"
+#include "fault_logging.h"
+#include "serial_logger.h"
 #include "board_inputs.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <Arduino.h>
