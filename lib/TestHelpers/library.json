@@ -1,0 +1,13 @@
+{
+    "name": "TestHelpers",
+    "version": "1.0.0",
+    "description": "Helper utilities for BISSO E350 unit tests",
+    "keywords": "helpers, testing",
+    "platforms": "native",
+    "build": {
+        "flags": [
+            "-DUNIT_TEST",
+            "-I include"
+        ]
+    }
+}
