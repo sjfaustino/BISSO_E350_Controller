@@ -411,6 +411,11 @@ void test_multiple_fault_handling(void) {
  * Called from test_runner.cpp
  */
 void run_safety_system_tests(void) {
+  // Initialize mocks before running tests
+  motion = motion_mock_init();
+  vfd = vfd_mock_init();
+  plc = plc_mock_init();
+  
   // E-stop tests
   RUN_TEST(test_e_stop_prevents_motion_when_active);
   RUN_TEST(test_e_stop_halts_active_motion);

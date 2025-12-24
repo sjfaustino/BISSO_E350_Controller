@@ -375,6 +375,10 @@ void test_motion_quality_score_calculation(void) {
  * Called from test_runner.cpp
  */
 void run_motion_control_tests(void) {
+  // Initialize mocks before running tests
+  motion = motion_mock_init();
+  plc = plc_mock_init();
+  
   // Validation tests
   RUN_TEST(test_motion_validation_rejects_invalid_axis);
   RUN_TEST(test_motion_validation_rejects_zero_distance);

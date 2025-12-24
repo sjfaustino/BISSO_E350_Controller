@@ -436,6 +436,9 @@ void test_encoder_health_check(void) {
  * Called from test_runner.cpp
  */
 void run_encoder_validation_tests(void) {
+  // Initialize mocks before running tests
+  encoder = encoder_mock_init();
+  
   // Calibration tests
   RUN_TEST(test_encoder_initial_uncalibrated_state);
   RUN_TEST(test_encoder_calibration_sets_ppm);
