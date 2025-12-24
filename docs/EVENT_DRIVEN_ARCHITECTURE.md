@@ -56,7 +56,7 @@ while (1) {
 | `EVENT_SAFETY_RESUME_PRESSED` | Resume button pressed | tasks_safety.cpp | Motion task |
 | `EVENT_SAFETY_ALARM_RAISED` | Safety alarm triggered | fault_logging.cpp | All tasks |
 | `EVENT_SAFETY_ALARM_CLEARED` | Safety alarm cleared | fault_logging.cpp | All tasks |
-| `EVENT_SAFETY_SOFT_LIMIT_HIT` | Soft limit violation | motion_control.cpp | Safety task |
+| `EVENT_SAFETY_SOFT_LIMIT_HIT` | Soft limit violation | safety.cpp | Safety task |
 | `EVENT_SAFETY_ENCODER_DEVIATION` | Encoder deviation | encoder_deviation.cpp | Motion task |
 
 ### Motion Events
@@ -82,9 +82,9 @@ while (1) {
 | `EVENT_SYSTEM_MODBUS_ERROR` | Modbus error | modbus drivers | Monitor task |
 | `EVENT_SYSTEM_NETWORK_CONNECTED` | Network up | system_telemetry.cpp | Telemetry |
 | `EVENT_SYSTEM_NETWORK_LOST` | Network down | system_telemetry.cpp | Telemetry |
-| `EVENT_SYSTEM_LOW_MEMORY` | Low memory | memory_monitor.cpp | All tasks |
+| `EVENT_SYSTEM_LOW_MEMORY` | Low memory (<25% free) | memory_monitor.cpp | All tasks |
 | `EVENT_SYSTEM_WATCHDOG_ALERT` | Watchdog warning | watchdog_manager.cpp | Monitor task |
-| `EVENT_SYSTEM_OTA_REQUESTED` | OTA update | web_server.cpp | System task |
+| `EVENT_SYSTEM_OTA_REQUESTED` | OTA update started | api_ota_updater.cpp | System task |
 
 ## Usage Examples
 
