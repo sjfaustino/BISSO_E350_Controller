@@ -7,6 +7,7 @@
 #include "motion_state_machine.h"
 #include "motion.h"
 #include "config_unified.h"
+#include "config_keys.h"
 #include "plc_iface.h"      // ELBO PLC I2C interface (replaces elbo_q73.h and elbo_i73.h)
 #include "encoder_wj66.h"
 #include "fault_logging.h"
@@ -17,12 +18,6 @@
 
 // External spinlock for thread-safe state access
 extern portMUX_TYPE motionSpinlock;
-
-// External motion state (declared in motion_control.cpp)
-extern struct {
-    uint8_t active_axis;
-    int32_t active_start_position;
-} m_state;
 
 // ============================================================================
 // STATE TABLE - Defines all states and their handlers
@@ -237,9 +232,10 @@ void state_executing_handler(Axis* axis, int32_t pos, int32_t target, bool conse
     // Check if target reached
     bool target_reached = false;
 
-    if (m_state.active_start_position < target && pos >= target) {
+    int32_t start_pos = motionGetActiveStartPosition();
+    if (start_pos < target && pos >= target) {
         target_reached = true;
-    } else if (m_state.active_start_position > target && pos <= target) {
+    } else if (start_pos > target && pos <= target) {
         target_reached = true;
     }
 
@@ -404,16 +400,12 @@ void state_wait_pin_handler(Axis* axis, int32_t pos, int32_t target, bool consen
 
 void state_idle_entry(Axis* axis) {
     // Clear active axis when entering IDLE
-    portENTER_CRITICAL(&motionSpinlock);
-    m_state.active_axis = 255;
-    portEXIT_CRITICAL(&motionSpinlock);
+    motionClearActiveAxis();
 }
 
 void state_executing_entry(Axis* axis) {
     // Record start position for target detection
-    portENTER_CRITICAL(&motionSpinlock);
-    m_state.active_start_position = axis->position;
-    portEXIT_CRITICAL(&motionSpinlock);
+    motionSetActiveStartPosition(axis->position);
 }
 
 void state_stopping_entry(Axis* axis) {

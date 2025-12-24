@@ -44,7 +44,8 @@ static struct {
   int strict_limits;
 } m_state = {255, 0, true, 1};
 
-static portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
+// PHASE 5.10: Non-static to allow external access from motion_state_machine.cpp
+portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y,
                                    ELBO_I73_AXIS_Z, ELBO_I73_AXIS_A};
@@ -445,6 +446,28 @@ uint8_t motionGetActiveAxis() {
   uint8_t axis = m_state.active_axis;
   portEXIT_CRITICAL(&motionSpinlock);
   return axis;
+}
+
+// PHASE 5.10: Accessor for active_start_position (for state machine)
+int32_t motionGetActiveStartPosition() {
+  portENTER_CRITICAL(&motionSpinlock);
+  int32_t pos = m_state.active_start_position;
+  portEXIT_CRITICAL(&motionSpinlock);
+  return pos;
+}
+
+// PHASE 5.10: Setter for active_start_position (for state machine)
+void motionSetActiveStartPosition(int32_t position) {
+  portENTER_CRITICAL(&motionSpinlock);
+  m_state.active_start_position = position;
+  portEXIT_CRITICAL(&motionSpinlock);
+}
+
+// PHASE 5.10: Clear active axis (for state machine IDLE transition)
+void motionClearActiveAxis() {
+  portENTER_CRITICAL(&motionSpinlock);
+  m_state.active_axis = 255;
+  portEXIT_CRITICAL(&motionSpinlock);
 }
 
 const char *motionStateToString(motion_state_t state) {

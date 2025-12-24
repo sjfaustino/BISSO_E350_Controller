@@ -5,7 +5,7 @@
  */
 
 #include "system_events.h"
-#include "logger.h"
+#include "serial_logger.h"
 #include <Arduino.h>
 
 // ============================================================================

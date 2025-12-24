@@ -436,11 +436,15 @@ void cmd_spindle_config_address(int argc, char** argv) {
     }
 
     uint8_t addr = (uint8_t)addr_i32;
-    // TODO: Implement Modbus write to change device address
-    // For now, just update local configuration
+    
+    // NOTE: JXK-10 address change requires physical device reconfiguration
+    // The Modbus slave address is set via DIP switches or device programming tool.
+    // This command only updates the controller's expected address for communication.
+    // After changing DIP switches on JXK-10, set this value to match.
     configSetInt(KEY_SPINDLE_ADDRESS, (int)addr);
     Serial.printf("[SPINDLE CONFIG] JXK-10 address set to %u and saved to NVS\n", addr);
-    Serial.println("[SPINDLE CONFIG] Note: Restart system to apply address change");
+    Serial.println("[SPINDLE CONFIG] Restart system to apply address change");
+    Serial.println("[SPINDLE CONFIG] NOTE: Ensure JXK-10 DIP switches match this address");
 }
 
 void cmd_spindle_config_threshold(int argc, char** argv) {

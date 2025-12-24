@@ -125,6 +125,9 @@ bool motionIsMoving();
 bool motionIsStalled(uint8_t axis);
 bool motionIsEmergencyStopped();
 uint8_t motionGetActiveAxis();
+int32_t motionGetActiveStartPosition();
+void motionSetActiveStartPosition(int32_t position);
+void motionClearActiveAxis();
 const char *motionStateToString(motion_state_t state);
 
 // --- HELPERS ---

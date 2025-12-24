@@ -115,11 +115,11 @@ void telemetryUpdate() {
     telemetry_cache.estop_active = emergencyStopIsActive();
     telemetry_cache.alarm_active = safetyIsAlarmed();
     telemetry_cache.faults_logged = faultGetRingBufferEntryCount();
-
+    
     // Count critical faults in ring buffer
-    uint8_t critical_count = 0;
-    uint8_t fault_count = faultGetRingBufferEntryCount();
-    for (uint8_t i = 0; i < fault_count; i++) {
+    uint32_t critical_count = 0;
+    uint8_t entry_count = faultGetRingBufferEntryCount();
+    for (uint8_t i = 0; i < entry_count; i++) {
         const fault_entry_t* entry = faultGetRingBufferEntry(i);
         if (entry && entry->severity == FAULT_CRITICAL) {
             critical_count++;
