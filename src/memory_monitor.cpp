@@ -1,10 +1,14 @@
 #include "memory_monitor.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <esp_heap_caps.h>
 
 // FIX: Fully initialize struct to suppress warnings
 static memory_stats_t mem_stats = {0, 0, 0, 0, 0, 0, 0};
 static bool mem_monitor_initialized = false;
 static uint32_t total_heap_size = 0;
+
+// PHASE 5.10: Track low memory state for event signaling
+static bool low_memory_event_active = false;
 
 void memoryMonitorInit() {
   Serial.println("[MEM] Initializing...");
@@ -23,18 +27,32 @@ void memoryMonitorInit() {
 
 void memoryMonitorUpdate() {
   if (!mem_monitor_initialized) { memoryMonitorInit(); return; }
-  
+
   uint32_t current_free = ESP.getFreeHeap();
   uint32_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
-  
+
   mem_stats.current_free = current_free;
   if (current_free < mem_stats.minimum_free) mem_stats.minimum_free = current_free;
-  
+
   uint32_t used = total_heap_size - current_free;
   if (used > mem_stats.maximum_used) mem_stats.maximum_used = used;
-  
+
   mem_stats.largest_block = largest_block;
   mem_stats.sample_count++;
+
+  // PHASE 5.10: Signal low memory event when free heap drops below 25%
+  uint32_t low_memory_threshold = total_heap_size / 4;
+  bool is_low_memory = (current_free < low_memory_threshold);
+
+  if (is_low_memory && !low_memory_event_active) {
+    // Transition to low memory state
+    systemEventsSystemSet(EVENT_SYSTEM_LOW_MEMORY);
+    low_memory_event_active = true;
+  } else if (!is_low_memory && low_memory_event_active) {
+    // Memory recovered above threshold
+    systemEventsSystemClear(EVENT_SYSTEM_LOW_MEMORY);
+    low_memory_event_active = false;
+  }
 }
 
 memory_stats_t* memoryMonitorGetStats() { return &mem_stats; }

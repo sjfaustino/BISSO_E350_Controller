@@ -17,6 +17,7 @@
 #include "safety_state_machine.h"
 #include "serial_logger.h"
 #include "system_constants.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include "vfd_current_calibration.h" // PHASE 5.5: VFD current calibration
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
@@ -461,6 +462,10 @@ void safetyReportSoftLimit(uint8_t axis) {
     snprintf(msg, sizeof(msg), "LIMIT Axis %d", axis);
     faultLogEntry(FAULT_ERROR, FAULT_SOFT_LIMIT_EXCEEDED, axis, 0,
                   "Soft limit reached");
+
+    // PHASE 5.10: Signal soft limit violation event
+    systemEventsSafetySet(EVENT_SAFETY_SOFT_LIMIT_HIT);
+
     safetyTriggerAlarm(msg, SAFETY_SOFT_LIMIT);
   }
 }

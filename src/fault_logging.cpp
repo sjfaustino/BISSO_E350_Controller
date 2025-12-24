@@ -377,6 +377,7 @@ void emergencyStopSetActive(bool active) {
 
     // PHASE 5.10: Signal event group for E-STOP release
     systemEventsSafetySet(EVENT_SAFETY_ESTOP_RELEASED);
+    systemEventsSafetySet(EVENT_SAFETY_ALARM_CLEARED);
     systemEventsSafetyClear(EVENT_SAFETY_ESTOP_PRESSED);
     systemEventsSafetyClear(EVENT_SAFETY_ALARM_RAISED);
   }

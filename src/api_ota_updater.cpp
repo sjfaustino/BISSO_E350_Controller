@@ -5,6 +5,7 @@
 
 #include "api_ota_updater.h"
 #include "serial_logger.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <string.h>
@@ -101,6 +102,9 @@ bool otaUpdaterStartUpdate(uint32_t total_size, const char* filename) {
     ota_state.crc32 = 0;
     ota_state.status = OTA_STATUS_IN_PROGRESS;
     ota_state.start_timestamp = millis();
+
+    // PHASE 5.10: Signal OTA update requested event
+    systemEventsSystemSet(EVENT_SYSTEM_OTA_REQUESTED);
 
     logInfo("[OTA] Update started: %lu bytes, partition %s",
             (unsigned long)total_size, ota_state.update_partition->label);
