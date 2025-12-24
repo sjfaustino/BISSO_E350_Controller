@@ -11,6 +11,7 @@
 
 #include <unity.h>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <cmath>
 
