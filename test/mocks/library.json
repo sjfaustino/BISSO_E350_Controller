@@ -1,0 +1,9 @@
+{
+    "name": "TestMocks",
+    "version": "1.0.0",
+    "description": "Mock implementations for BISSO E350 unit tests",
+    "keywords": "mocks, testing",
+    "build": {
+        "flags": ["-DUNIT_TEST"]
+    }
+}
