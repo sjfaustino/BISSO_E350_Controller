@@ -156,13 +156,21 @@ void motion_mock_update(
         motion->stall_status = STALL_NONE;
     }
 
-    // Check if motion is complete
-    if (motion->target_position_steps > motion->current_position_steps &&
-        motion->target_position_steps <= motion->current_position_steps) {
-        motion->state = MOTION_IDLE;
-        motion->move_completed++;
-    } else if (motion->target_position_steps < motion->current_position_steps &&
-               motion->target_position_steps >= motion->current_position_steps) {
+    // Check if motion is complete (position reached target)
+    bool completed = false;
+    if (motion->target_position_steps >= motion->current_position_steps) {
+        // Moving forward - reached target when current >= target (accounting for update)
+        if (encoder_feedback_steps >= motion->target_position_steps) {
+            completed = true;
+        }
+    } else {
+        // Moving backward - reached target when current <= target
+        if (encoder_feedback_steps <= motion->target_position_steps) {
+            completed = true;
+        }
+    }
+    
+    if (completed) {
         motion->state = MOTION_IDLE;
         motion->move_completed++;
     }

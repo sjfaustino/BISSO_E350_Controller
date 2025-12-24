@@ -155,6 +155,9 @@ void test_motion_soft_limits_allow_valid_motion(void) {
  * @test Motion starts in correct state and transitions properly
  */
 void test_motion_state_transitions(void) {
+  // Reset motion for clean test
+  motion = motion_mock_init();
+  
   // Initial state: IDLE
   TEST_ASSERT_EQUAL(MOTION_IDLE, motion_mock_get_state(&motion));
 
@@ -344,6 +347,9 @@ void test_contactor_settling_required_for_motion(void) {
  * @test Motion records successful moves
  */
 void test_motion_success_count(void) {
+  // Reset motion for clean test  
+  motion = motion_mock_init();
+  
   // Start move
   motion_mock_start_move(&motion, AXIS_X, 5000, 50);
   TEST_ASSERT_EQUAL(1, motion.move_attempts);

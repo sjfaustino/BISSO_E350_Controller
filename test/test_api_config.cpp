@@ -227,6 +227,9 @@ void test_encoder_calibration_status_per_axis(void) {
  */
 
 void test_vfd_and_motion_independent(void) {
+  // Reset fixtures for clean cross-config test
+  local_setUp();
+  
   // Changing motion config should not affect VFD config
   motion_config.soft_limit_high_mm[0] = 600;
   TEST_ASSERT_EQUAL_UINT16(105, vfd_config.max_speed_hz);
@@ -234,6 +237,9 @@ void test_vfd_and_motion_independent(void) {
 }
 
 void test_encoder_and_vfd_independent(void) {
+  // Reset fixtures for clean cross-config test
+  local_setUp();
+  
   // Changing encoder config should not affect VFD config
   encoder_config.ppm[0] = 150;
   TEST_ASSERT_EQUAL_UINT16(105, vfd_config.max_speed_hz);
