@@ -45,13 +45,8 @@ jobs:
         run: pio run -e esp32dev
         continue-on-error: false
 
-      - name: Build Unit Tests (Native)
-        run: pio run -e test
-        continue-on-error: false
-
-      - name: Run Unit Tests
-        run: |
-          .pio/build/native/program
+      - name: Run Unit Tests (Native)
+        run: pio test -e test --verbose
         continue-on-error: false
 
       - name: Generate Test Report
@@ -102,12 +97,6 @@ jobs:
         if: success()
         run: |
           echo "::notice::Build and tests completed successfully"
-
-      - name: Post Failure
-        if: failure()
-        run: |
-          echo "::error::Build or tests failed - see logs above"
-          exit 1
 
   lint-and-quality:
     name: Code Quality Checks
