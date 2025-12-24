@@ -15,7 +15,7 @@
  */
 
 #include "helpers/test_utils.h"
-#include "helpers/test_fixtures.h"
+#include "test_fixtures.h"
 #include <cmath>
 #include <unity.h>
 

@@ -13,7 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <unity.h>
-#include "helpers/test_fixtures.h"
+#include "test_fixtures.h"
 
 /**
  * @brief Global test fixtures instance
