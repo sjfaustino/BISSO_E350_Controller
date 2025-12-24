@@ -28,6 +28,7 @@
 // CLI State
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint16_t cli_pos = 0;
+static bool cli_echo_enabled = false;
 static cli_command_t commands[CLI_MAX_COMMANDS];
 static int command_count = 0;
 
@@ -38,6 +39,7 @@ void cmd_system_reset(int argc, char** argv);
 void cmd_grbl_settings(int argc, char** argv);
 void cmd_grbl_home(int argc, char** argv);
 void cmd_grbl_state(int argc, char** argv); 
+void cmd_echo(int argc, char** argv);
 
 extern void bootRebootSystem();    
 
@@ -131,6 +133,7 @@ void cliInit() {
   cliRegisterCommand("$", "Grbl Settings", cmd_grbl_settings);
   cliRegisterCommand("$H", "Homing", cmd_grbl_home);
   cliRegisterCommand("$G", "Parser State", cmd_grbl_state);
+  cliRegisterCommand("echo", "Echo on/off", cmd_echo);
 
   cliRegisterConfigCommands();
   cliRegisterMotionCommands();
@@ -194,6 +197,7 @@ void cliUpdate() {
     // 3. Command buffering
     c = Serial.read(); 
     if (c == '\n' || c == '\r') {
+      if (cli_echo_enabled) Serial.println();
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
         if (strncmp(cli_buffer, "$J=", 3) == 0) {
@@ -206,9 +210,13 @@ void cliUpdate() {
         Serial.println("ok"); 
       }
     } else if (c == '\b' || c == 0x7F) {
-      if (cli_pos > 0) cli_pos--;
+      if (cli_pos > 0) {
+        cli_pos--;
+        if (cli_echo_enabled) Serial.print("\b \b");
+      }
     } else if (c >= 32 && c < 127 && cli_pos < CLI_BUFFER_SIZE - 1) {
       cli_buffer[cli_pos++] = c;
+      if (cli_echo_enabled) Serial.write(c);
     }
   }
 }
@@ -295,7 +303,21 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
 
 // FIX: Added missing implementation
 void cliPrintHelp() {
-  Serial.println("[HLP:$$ $# $G $I $N $x=val $Nx=line Gcode]");
+  Serial.println("\n=== BISSO E350 CLI Help ===");
+  Serial.println("Grbl Commands:");
+  Serial.println("  $         - Show Grbl settings");
+  Serial.println("  $H        - Run homing cycle");
+  Serial.println("  $G        - Show parser state");
+  Serial.println("  ?         - Real-time status report");
+  Serial.println("  !         - Feed hold");
+  Serial.println("  ~         - Cycle start / resume");
+  Serial.println("  Ctrl-X    - Soft reset");
+  
+  Serial.println("\nSystem Commands:");
+  for (int i = 0; i < command_count; i++) {
+    Serial.printf("  %-12s - %s\n", commands[i].command, commands[i].help);
+  }
+  Serial.println("==========================\n");
 }
 
 // --- COMMANDS ---
@@ -330,3 +352,20 @@ void cmd_system_info(int argc, char** argv) {
 
 void cmd_system_reset(int argc, char** argv) { bootRebootSystem(); }
 void cmd_help(int argc, char** argv) { cliPrintHelp(); }
+
+void cmd_echo(int argc, char** argv) {
+  if (argc < 2) {
+    Serial.printf("Echo is currently %s\n", cli_echo_enabled ? "ON" : "OFF");
+    return;
+  }
+  
+  if (strcmp(argv[1], "on") == 0) {
+    cli_echo_enabled = true;
+    Serial.println("Echo ENABLED");
+  } else if (strcmp(argv[1], "off") == 0) {
+    cli_echo_enabled = false;
+    Serial.println("Echo DISABLED");
+  } else {
+    Serial.println("Usage: echo [on|off]");
+  }
+}
