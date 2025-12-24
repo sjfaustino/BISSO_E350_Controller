@@ -7,8 +7,7 @@
 #include "motion_state_machine.h"
 #include "motion.h"
 #include "config_unified.h"
-#include "elbo_q73.h"
-#include "elbo_i73.h"
+#include "plc_iface.h"      // ELBO PLC I2C interface (replaces elbo_q73.h and elbo_i73.h)
 #include "encoder_wj66.h"
 #include "fault_log.h"
 #include "logger.h"

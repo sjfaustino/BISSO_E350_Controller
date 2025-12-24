@@ -136,7 +136,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
 
   // PHASE 5.10: Use formal state machine instead of switch/case
   // State machine handles thread-safe state transitions internally
-  MotionStateMachine::update(this, current_pos, global_target, consensus_active);
+  MotionStateMachine::update(this, current_pos, global_target_pos, consensus_active);
 }
 
 // ============================================================================
