@@ -9,19 +9,21 @@
  * - Jitter detection (bearing wear indicator)
  * - Communication error handling
  * - Deviation from target velocity
+ * 
+ * Required mocks: encoder
+ * Initialization: Automatic via setUp() in test_runner.cpp
  */
 
 #include "helpers/test_utils.h"
-#include "mocks/encoder_mock.h"
-#include "mocks/vfd_mock.h"
+#include "helpers/test_fixtures.h"
 #include <cmath>
 #include <unity.h>
 
 /**
- * @brief Test fixtures for encoder tests
+ * @brief Convenience references to global fixtures
  */
-static encoder_mock_state_t encoder;
-static vfd_mock_state_t vfd __attribute__((unused));
+#define encoder (g_fixtures.encoder)
+#define vfd (g_fixtures.vfd)
 
 /**
  * @section Calibration Tests
@@ -452,8 +454,7 @@ void test_encoder_health_check(void) {
  * Called from test_runner.cpp
  */
 void run_encoder_validation_tests(void) {
-  // Initialize mocks before running tests
-  encoder = encoder_mock_init();
+  // Mocks are automatically initialized by setUp() before each test
   
   // Calibration tests
   RUN_TEST(test_encoder_initial_uncalibrated_state);

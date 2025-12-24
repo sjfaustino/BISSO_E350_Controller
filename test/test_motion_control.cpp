@@ -9,22 +9,23 @@
  * - Motion quality scoring
  * - PLC contactor settling time
  * - Emergency stop functionality
+ * 
+ * Required mocks: motion, plc
+ * Initialization: Automatic via setUp() in test_runner.cpp
  */
 
 #include "helpers/test_utils.h"
-#include "mocks/encoder_mock.h"
-#include "mocks/motion_mock.h"
-#include "mocks/plc_mock.h"
-#include "mocks/vfd_mock.h"
+#include "helpers/test_fixtures.h"
 #include <unity.h>
 
 /**
- * @brief Test fixture for motion tests
+ * @brief Convenience references to global fixtures
+ * These provide shorter names for accessing mock states
  */
-static motion_mock_state_t motion;
-static plc_mock_state_t plc;
-static vfd_mock_state_t vfd __attribute__((unused));
-static encoder_mock_state_t encoder __attribute__((unused));
+#define motion (g_fixtures.motion)
+#define plc (g_fixtures.plc)
+#define vfd (g_fixtures.vfd)
+#define encoder (g_fixtures.encoder)
 
 /**
  * @section Move Validation Tests
@@ -381,9 +382,7 @@ void test_motion_quality_score_calculation(void) {
  * Called from test_runner.cpp
  */
 void run_motion_control_tests(void) {
-  // Initialize mocks before running tests
-  motion = motion_mock_init();
-  plc = plc_mock_init();
+  // Mocks are automatically initialized by setUp() before each test
   
   // Validation tests
   RUN_TEST(test_motion_validation_rejects_invalid_axis);

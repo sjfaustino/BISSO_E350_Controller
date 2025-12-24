@@ -9,20 +9,21 @@
  * - Recovery procedures
  * - Thermal protection
  * - VFD fault detection
+ * 
+ * Required mocks: motion, vfd, plc
+ * Initialization: Automatic via setUp() in test_runner.cpp
  */
 
 #include "helpers/test_utils.h"
-#include "mocks/motion_mock.h"
-#include "mocks/plc_mock.h"
-#include "mocks/vfd_mock.h"
+#include "helpers/test_fixtures.h"
 #include <unity.h>
 
 /**
- * @brief Test fixtures for safety tests
+ * @brief Convenience references to global fixtures
  */
-static motion_mock_state_t motion;
-static vfd_mock_state_t vfd;
-static plc_mock_state_t plc;
+#define motion (g_fixtures.motion)
+#define vfd (g_fixtures.vfd)
+#define plc (g_fixtures.plc)
 
 /**
  * @section E-Stop Functionality Tests
@@ -423,10 +424,7 @@ void test_multiple_fault_handling(void) {
  * Called from test_runner.cpp
  */
 void run_safety_system_tests(void) {
-  // Initialize mocks before running tests
-  motion = motion_mock_init();
-  vfd = vfd_mock_init();
-  plc = plc_mock_init();
+  // Mocks are automatically initialized by setUp() before each test
   
   // E-stop tests
   RUN_TEST(test_e_stop_prevents_motion_when_active);
