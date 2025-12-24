@@ -500,8 +500,31 @@ void WebServerManager::setupRoutes() {
                  request->send(500, "application/json", "{\"error\":\"Failed to export telemetry\"}");
                  return;
                }
-               request->send(200, "application/json", compact_buffer);
+                request->send(200, "application/json", compact_buffer);
              });
+  
+  // 7.5. API Binary Telemetry (Compressed, Ultra-Low Latency) - PHASE 5.10
+  server->on("/api/telemetry/binary", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+
+    // PHASE 5.1: Rate limiting check (using status bucket)
+    if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+      request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+      return;
+    }
+
+    telemetry_packet_t packet;
+    size_t written = telemetryExportBinary(&packet);
+
+    if (written == 0) {
+      request->send(500, "application/json", "{\"error\":\"Export failed\"}");
+      return;
+    }
+
+    // Send binary packet with appropriate content type
+    // ESPAsyncWebServer copies the buffer into its own internal management
+    request->send(200, "application/octet-stream", (uint8_t*)&packet, written);
+  });
 
   // 8. API Endpoint Discovery (Unprotected for auto-discovery) - PHASE 5.2
   // AUDIT FIX: Initialize mutex if needed (lazy init for static buffers)

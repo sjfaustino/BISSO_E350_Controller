@@ -65,6 +65,15 @@ static const api_endpoint_t api_endpoints[] = {
         .response_type = "application/json"
     },
     {
+        .path = "/api/telemetry/binary",
+        .methods = HTTP_GET,
+        .description = "Ultra-low latency compressed binary telemetry packet",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "100 requests/min",
+        .response_type = "application/octet-stream"
+    },
+    {
         .path = "/api/health",
         .methods = HTTP_GET,
         .description = "System health check with component status",

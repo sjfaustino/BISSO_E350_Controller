@@ -172,8 +172,17 @@ static void appendMethodDetail(char* buffer, size_t* offset, size_t buffer_size,
     }
 
     // Response
+    const char* content_type = ep->response_type ? ep->response_type : "application/json";
+    const char* schema_type = "{\"type\":\"object\"}";
+    
+    // PHASE 5.10: Handle binary response schema
+    if (strstr(content_type, "octet-stream")) {
+        schema_type = "{\"type\":\"string\",\"format\":\"binary\"}";
+    }
+
     *offset += snprintf(buffer + *offset, buffer_size - *offset,
-        "\"responses\":{\"200\":{\"description\":\"Success\",\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\"}}}},\"401\":{\"description\":\"Unauthorized\"},\"429\":{\"description\":\"Rate limit exceeded\"},\"400\":{\"description\":\"Bad request\"}}}");
+        "\"responses\":{\"200\":{\"description\":\"Success\",\"content\":{\"%s\":{\"schema\":%s}}},\"401\":{\"description\":\"Unauthorized\"},\"429\":{\"description\":\"Rate limit exceeded\"},\"400\":{\"description\":\"Bad request\"}}}",
+        content_type, schema_type);
 
     *offset += snprintf(buffer + *offset, buffer_size - *offset, "}");
 }

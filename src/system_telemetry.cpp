@@ -258,6 +258,50 @@ size_t telemetryExportCompactJSON(char* buffer, size_t buffer_size) {
     return offset;
 }
 
+size_t telemetryExportBinary(telemetry_packet_t* packet) {
+    if (!packet) return 0;
+
+    system_telemetry_t t = telemetryGetSnapshot();
+
+    // PHASE 5.10: Atomic copy into packed structure
+    packet->magic = 0xB155; // BISSO
+    packet->version = 1;
+    packet->health = (uint8_t)t.health_status;
+    packet->uptime = t.uptime_seconds;
+    packet->cpu_usage = t.cpu_usage_percent;
+    packet->free_heap = t.free_heap_bytes;
+    
+    // Pack flags
+    packet->flags = 0;
+    if (t.motion_enabled)   packet->flags |= (1 << 0);
+    if (t.motion_moving)    packet->flags |= (1 << 1);
+    if (t.spindle_enabled)  packet->flags |= (1 << 2);
+    if (t.spindle_overcurrent) packet->flags |= (1 << 3);
+    if (t.spindle_fault)    packet->flags |= (1 << 4);
+    if (t.wifi_connected)   packet->flags |= (1 << 5);
+    if (t.estop_active)     packet->flags |= (1 << 6);
+    if (t.alarm_active)     packet->flags |= (1 << 7);
+
+    packet->axis_x = t.axis_x_mm;
+    packet->axis_y = t.axis_y_mm;
+    packet->axis_z = t.axis_z_mm;
+    packet->axis_a = t.axis_a_mm;
+
+    packet->spindle_amps = t.spindle_current_amps;
+    packet->spindle_peak = t.spindle_current_peak_amps;
+
+    packet->faults_logged = t.faults_logged;
+    packet->critical_faults = t.critical_faults;
+    
+    packet->slowest_id = t.slowest_task_id;
+    packet->slowest_us = t.slowest_task_time_us;
+    
+    packet->wifi_signal = t.wifi_signal_strength;
+
+    return sizeof(telemetry_packet_t);
+}
+
+
 void telemetryPrintSummary() {
     system_telemetry_t t = telemetryGetSnapshot();
 

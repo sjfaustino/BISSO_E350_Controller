@@ -16,6 +16,14 @@ static bool buttons_enabled =
 // --- FAST PATH CACHE ---
 // Bitmasks are resolved during init to avoid expensive lookups
 // inside the high-frequency (5ms) safety loop.
+// --- STABILITY FILTER (DEBOUNCE) ---
+// To filter electrical noise, an input must remain stable for 
+// DEBOUNCE_STABILITY_REQUIRED consecutive polls (5ms each = 15ms total)
+#define DEBOUNCE_STABILITY_REQUIRED 3
+static uint8_t debounced_input_cache = 0xFF;
+static uint8_t input_stability_count[8] = {0};
+static uint8_t last_raw_input = 0xFF;
+
 static uint8_t mask_estop = 0;
 static uint8_t mask_pause = 0;
 static uint8_t mask_resume = 0;
@@ -143,15 +151,44 @@ button_state_t boardInputsUpdate() {
   }
   state.connection_ok = true;
 
+  // --- STABILITY FILTER (DEBOUNCE) ---
+  // Iterate through all 8 bits of the input byte
+  for (int i = 0; i < 8; i++) {
+    uint8_t bit_mask = (1 << i);
+    bool current_bit_raw = (input_cache & bit_mask);
+    bool last_bit_raw = (last_raw_input & bit_mask);
+    bool current_bit_debounced = (debounced_input_cache & bit_mask);
+
+    if (current_bit_raw != current_bit_debounced) {
+      if (current_bit_raw == last_bit_raw) {
+        // Input is stable but different from debounced state
+        input_stability_count[i]++;
+        if (input_stability_count[i] >= DEBOUNCE_STABILITY_REQUIRED) {
+          // Commit change to debounced cache
+          if (current_bit_raw) debounced_input_cache |= bit_mask;
+          else debounced_input_cache &= ~bit_mask;
+          input_stability_count[i] = 0;
+        }
+      } else {
+        // Input is jittering, reset counter
+        input_stability_count[i] = 0;
+      }
+    } else {
+      // Input matches debounced state, reset counter
+      input_stability_count[i] = 0;
+    }
+  }
+  last_raw_input = input_cache;
+
   // --- FAST PATH EXECUTION ---
-  // Apply cached masks. No function calls, no branches.
+  // Apply cached masks to the DEBOUNCED cache.
   // Logic:
   // E-STOP: NC (Normally Closed). Active = High (Open Circuit/Pressed)
   // Buttons: NO (Normally Open). Active = Low (Short to Ground)
 
-  state.estop_active = (input_cache & mask_estop);
-  state.pause_pressed = !(input_cache & mask_pause);
-  state.resume_pressed = !(input_cache & mask_resume);
+  state.estop_active = (debounced_input_cache & mask_estop);
+  state.pause_pressed = !(debounced_input_cache & mask_pause);
+  state.resume_pressed = !(debounced_input_cache & mask_resume);
 
   return state;
 }
@@ -170,12 +207,12 @@ void boardInputsDiagnostics() {
     return;
   }
 
-  Serial.printf("Raw Byte: 0x%02X\n", input_cache);
+  Serial.printf("Raw Byte: 0x%02X | Debounced: 0x%02X\n", input_cache, debounced_input_cache);
 
   // Decode using current maps for diagnostics
-  bool estop = (input_cache & mask_estop);
-  bool pause = !(input_cache & mask_pause);
-  bool resume = !(input_cache & mask_resume);
+  bool estop = (debounced_input_cache & mask_estop);
+  bool pause = !(debounced_input_cache & mask_pause);
+  bool resume = !(debounced_input_cache & mask_resume);
 
   Serial.printf("  E-STOP (Mask 0x%02X): %s\n", mask_estop,
                 estop ? "TRIPPED (OPEN)" : "OK (CLOSED)");

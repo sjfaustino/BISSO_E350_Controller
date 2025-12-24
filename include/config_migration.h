@@ -32,6 +32,9 @@ typedef struct {
 // Initialize migration framework
 void configMigrationInit();
 
+// Create a backup of current configuration before migration
+bool configMigrationBackup(uint8_t version);
+
 // Perform migration with default value application
 // Returns true if successful
 bool configMigrationExecute(uint8_t from_version, uint8_t to_version);

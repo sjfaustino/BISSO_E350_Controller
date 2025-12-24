@@ -90,6 +90,39 @@ typedef struct {
 } system_telemetry_t;
 
 /**
+ * Binary telemetry packet (Packed for 90% space reduction)
+ */
+#pragma pack(push, 1)
+typedef struct {
+    uint16_t magic;           // 0xB155 (BISSO)
+    uint8_t version;          // Protocol version: 1
+    uint8_t health;           // system_health_t
+
+    uint32_t uptime;          // seconds
+    uint8_t cpu_usage;        // percentage
+    uint32_t free_heap;       // bytes
+    
+    uint8_t flags;            // [0]:motion_en, [1]:moving, [2]:spindle_en, [3]:overcurrent, [4]:fault, [5]:wifi_conn, [6]:estop, [7]:alarm
+
+    float axis_x;             // mm
+    float axis_y;             // mm
+    float axis_z;             // mm
+    float axis_a;             // mm
+
+    float spindle_amps;       // Current
+    float spindle_peak;       // Peak Current
+
+    uint32_t faults_logged;
+    uint32_t critical_faults;
+    
+    uint8_t slowest_id;
+    uint32_t slowest_us;
+    
+    uint8_t wifi_signal;      // percentage
+} telemetry_packet_t;
+#pragma pack(pop)
+
+/**
  * Initialize telemetry collection
  */
 void telemetryInit();
@@ -126,6 +159,13 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size);
  * @return Number of bytes written
  */
 size_t telemetryExportCompactJSON(char* buffer, size_t buffer_size);
+
+/**
+ * Export telemetry as binary packet (High performance)
+ * @param packet Output packet buffer
+ * @return Number of bytes written
+ */
+size_t telemetryExportBinary(telemetry_packet_t* packet);
 
 /**
  * Print human-readable telemetry summary
