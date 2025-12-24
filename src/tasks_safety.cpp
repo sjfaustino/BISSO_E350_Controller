@@ -10,6 +10,7 @@
 #include "safety.h"
 #include "serial_logger.h"
 #include "system_constants.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include "task_manager.h"
 #include "watchdog_manager.h"
 #include <freertos/FreeRTOS.h>
@@ -61,6 +62,10 @@ void taskSafetyFunction(void *parameter) {
           // Now visible
           if (motionIsMoving()) {
             logInfo("[SAFETY] Physical PAUSE button pressed");
+
+            // PHASE 5.10: Signal event before action
+            systemEventsSafetySet(EVENT_SAFETY_PAUSE_PRESSED);
+
             motionPause();
           }
           last_pause_press = now;
@@ -72,6 +77,10 @@ void taskSafetyFunction(void *parameter) {
         if (now - last_resume_press > BUTTON_DEBOUNCE_MS) {
           if (!safetyIsAlarmed()) {
             logInfo("[SAFETY] Physical RESUME button pressed");
+
+            // PHASE 5.10: Signal event before action
+            systemEventsSafetySet(EVENT_SAFETY_RESUME_PRESSED);
+
             motionResume();
           }
           last_resume_press = now;

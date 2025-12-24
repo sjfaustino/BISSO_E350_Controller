@@ -9,6 +9,7 @@
 #include "encoder_calibration.h" // For machine calibration data
 #include "serial_logger.h"
 #include "system_constants.h" // For MOTION_POSITION_SCALE_FACTOR
+#include "system_events.h"    // PHASE 5.10: Event-driven architecture
 #include "task_manager.h"     // For taskGetMotionMutex()
 #include <string.h>
 
@@ -171,7 +172,13 @@ bool MotionBuffer::pop(motion_cmd_t *cmd) {
     return false;
   }
 
+  bool was_full = isFull_unsafe();
   bool result = pop_unsafe(cmd);
+
+  // PHASE 5.10: Signal event if buffer has space now
+  if (was_full && result) {
+    systemEventsMotionSet(EVENT_MOTION_BUFFER_READY);
+  }
 
   xSemaphoreGive(buffer_mutex);
   return result;

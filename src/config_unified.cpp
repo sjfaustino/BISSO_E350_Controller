@@ -9,6 +9,7 @@
 #include "config_keys.h"
 #include "serial_logger.h"
 #include "system_constants.h"
+#include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <Arduino.h>
 #include <Preferences.h>
 #include <math.h>
@@ -531,6 +532,9 @@ void configSetInt(const char *key, int32_t value) {
   } else {
     logInfo("[CONFIG] Set %s = %ld (Cached)", key, (long)value);
   }
+
+  // PHASE 5.10: Signal configuration change event
+  systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
 }
 
 void configSetFloat(const char *key, float value) {
@@ -577,6 +581,9 @@ void configSetFloat(const char *key, float value) {
     prefs.putFloat(key, value);
     config_dirty = false;
   }
+
+  // PHASE 5.10: Signal configuration change event
+  systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
 }
 
 void configSetString(const char *key, const char *value) {
@@ -634,6 +641,9 @@ void configSetString(const char *key, const char *value) {
   } else {
     logInfo("[CONFIG] Set %s (Cached)", key);
   }
+
+  // PHASE 5.10: Signal configuration change event
+  systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
 }
 
 // ============================================================================
