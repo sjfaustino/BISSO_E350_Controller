@@ -11,6 +11,7 @@
 #include "spindle_current_monitor.h"
 #include "system_constants.h"
 #include "task_manager.h"
+#include "encoder_wj66.h"
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 #include <stdio.h>
@@ -218,21 +219,40 @@ void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
                  ? machineCal.A.pulses_per_degree
                  : def_ang;
 
+  // --- SENSOR CONNECTIVITY CHECK ---
+  char x_str[9], y_str[9], z_str[9], a_str[9], amps_str[9];
+  
+  // WJ66 Encoder Status
+  bool enc_ok = (wj66GetStatus() == ENCODER_OK);
+  
+  if (enc_ok) {
+    snprintf(x_str, sizeof(x_str), "%7.1f", x_counts / sx);
+    snprintf(y_str, sizeof(y_str), "%8.1f", y_counts / sy);
+    snprintf(z_str, sizeof(z_str), "%7.1f", z_counts / sz);
+    snprintf(a_str, sizeof(a_str), "%4.0f", a_counts / sa);
+  } else {
+    // Show question marks if disconnected or timeout
+    strncpy(x_str, "    ???", sizeof(x_str));
+    strncpy(y_str, "     ???", sizeof(y_str));
+    strncpy(z_str, "    ???", sizeof(z_str));
+    strncpy(a_str, " ???", sizeof(a_str));
+  }
+
+  // Spindle Monitor Status
+  const spindle_monitor_state_t* spindl = spindleMonitorGetState();
+  if (spindl && spindl->enabled && spindl->read_count > 0) {
+    snprintf(amps_str, sizeof(amps_str), "%2.0fA", spindl->current_amps);
+  } else {
+    strncpy(amps_str, "??A", sizeof(amps_str));
+  }
+
   // Line 0: X and Y positions
   // Format: "X " + 7-char value + "  Y" + 8-char value = 20 chars
-  snprintf(line1, LCD_COLS + 1, "X %7.1f  Y%8.1f", x_counts / sx,
-           y_counts / sy);
+  snprintf(line1, LCD_COLS + 1, "X %s  Y%s", x_str, y_str);
 
   // Line 1: Z and A positions with right-justified spindle amps
   // Format: "Z " + 7-char value + "  A" + 4-char value + " " + amps = 20 chars
-  // Aligns: X/Z at pos 0, Y/A at pos 11, values start at pos 12
-  float z_mm = z_counts / sz;
-  float a_deg = a_counts / sa;
-
-  // Get spindle current
-  float amps = spindleMonitorGetCurrent();
-
-  snprintf(line2, LCD_COLS + 1, "Z %7.1f  A%4.0f %2.0fA", z_mm, a_deg, amps);
+  snprintf(line2, LCD_COLS + 1, "Z %s  A%s %s", z_str, a_str, amps_str);
 
   lcdInterfacePrintLine(0, line1);
   lcdInterfacePrintLine(1, line2);
