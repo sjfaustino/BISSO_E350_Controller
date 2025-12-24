@@ -299,6 +299,8 @@ void test_contactor_failure_detection(void) {
  * @test Motor temperature rises under load
  */
 void test_motor_temperature_rise_under_load(void) {
+  // Reset VFD for clean thermal test
+  vfd = vfd_mock_init();
   float initial_temp = vfd.motor_temperature_c;
 
   vfd_mock_set_frequency(&vfd, 100); // High load
@@ -313,6 +315,9 @@ void test_motor_temperature_rise_under_load(void) {
  * @test Motor temperature falls when idle
  */
 void test_motor_temperature_fall_at_idle(void) {
+  // Reset VFD for clean thermal test
+  vfd = vfd_mock_init();
+  
   // First, heat it up
   vfd_mock_set_frequency(&vfd, 105);
   for (int i = 0; i < 10; i++) {

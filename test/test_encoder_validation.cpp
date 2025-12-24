@@ -66,6 +66,10 @@ void test_encoder_accepts_various_calibration_values(void) {
  * @test Uncalibrated encoder doesn't track position
  */
 void test_uncalibrated_encoder_no_position_tracking(void) {
+  // Reset encoder to uncalibrated state
+  encoder = encoder_mock_init();
+  encoder.calibrated = 0;  // Ensure uncalibrated
+  
   // Don't calibrate
   encoder_mock_set_target_velocity(&encoder, 15.0f);
   encoder_mock_advance_time(&encoder, 1000);
@@ -84,6 +88,8 @@ void test_uncalibrated_encoder_no_position_tracking(void) {
  * @test Position tracking after calibration
  */
 void test_position_tracking_after_calibration(void) {
+  // Reset encoder for clean test
+  encoder = encoder_mock_init();
   encoder_mock_calibrate(&encoder, 100); // 100 PPM
 
   // Move at 15 mm/s for 1 second
@@ -99,6 +105,8 @@ void test_position_tracking_after_calibration(void) {
  * @test Position accumulates correctly over multiple steps
  */
 void test_position_accumulation_multipart(void) {
+  // Reset encoder for clean test
+  encoder = encoder_mock_init();
   encoder_mock_calibrate(&encoder, 100);
 
   // First move: 10mm at 10 mm/s
@@ -116,6 +124,8 @@ void test_position_accumulation_multipart(void) {
  * @test Negative movement tracked correctly
  */
 void test_position_tracking_backward_motion(void) {
+  // Reset encoder for clean test
+  encoder = encoder_mock_init();
   encoder_mock_calibrate(&encoder, 100);
 
   // Move forward 20mm
@@ -133,6 +143,8 @@ void test_position_tracking_backward_motion(void) {
  * @test Position reset function
  */
 void test_position_reset_clears_tracking(void) {
+  // Reset encoder for clean test
+  encoder = encoder_mock_init();
   encoder_mock_calibrate(&encoder, 100);
 
   encoder_mock_set_target_velocity(&encoder, 15.0f);
@@ -168,6 +180,8 @@ void test_velocity_measurement_clean_signal(void) {
  * @test Velocity zero at rest
  */
 void test_velocity_zero_when_stopped(void) {
+  // Reset encoder for clean test
+  encoder = encoder_mock_init();
   encoder_mock_calibrate(&encoder, 100);
 
   // No velocity set (defaults to 0)

@@ -114,7 +114,7 @@ void vfd_mock_update_temperature(vfd_mock_state_t* vfd, uint32_t time_ms)
 
     // Temperature rises with I²R heating
     float current = vfd->motor_current_amps;
-    float heating_rate = current * current * 0.001f;  // Watts per amp²
+    float heating_rate = current * current * 0.01f;  // Degrees per amp² per second (test-scaled)
 
     // Temperature falls exponentially to ambient when idle
     float temp_diff = vfd->motor_temperature_c - ambient_temp;
