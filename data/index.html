@@ -141,6 +141,13 @@
     <div class="alerts" role="region" aria-label="System alerts" aria-live="polite" aria-atomic="true"
         id="alerts-container"></div>
 
+    <!-- Floating Connection Status Badge -->
+    <div class="connection-badge" id="connection-badge" role="status" aria-live="polite">
+        <div class="status-dot online" id="badge-status-dot"></div>
+        <span class="status-text" id="badge-status-text">Connected</span>
+        <span class="latency" id="badge-latency">-- ms</span>
+    </div>
+
     <!-- Main Content -->
     <main id="page-container" class="container" role="main" id="main-content">
         <div style="text-align: center; padding: var(--space-xl);">
@@ -202,20 +209,29 @@
             }
 
             static setupEventListeners() {
-                // Status indicator
+                // Status indicator (header + floating badge)
                 window.addEventListener('ws-connected', () => {
                     document.getElementById('status-dot').className = 'status-dot online';
                     document.getElementById('status-text').textContent = 'Online';
+                    // Update floating badge
+                    document.getElementById('badge-status-dot').className = 'status-dot online';
+                    document.getElementById('badge-status-text').textContent = 'Connected';
                 });
 
                 window.addEventListener('ws-disconnected', () => {
                     document.getElementById('status-dot').className = 'status-dot warning';
                     document.getElementById('status-text').textContent = 'Reconnecting...';
+                    // Update floating badge
+                    document.getElementById('badge-status-dot').className = 'status-dot connecting';
+                    document.getElementById('badge-status-text').textContent = 'Reconnecting';
                 });
 
                 window.addEventListener('ws-error', () => {
                     document.getElementById('status-dot').className = 'status-dot offline';
                     document.getElementById('status-text').textContent = 'Offline';
+                    // Update floating badge
+                    document.getElementById('badge-status-dot').className = 'status-dot offline';
+                    document.getElementById('badge-status-text').textContent = 'Offline';
                 });
 
                 // Alerts
@@ -302,6 +318,9 @@
                     // Approximate latency
                     const latency = Math.round(Math.random() * 50 + 10);
                     document.getElementById('latency').textContent = latency + ' ms';
+                    // Update floating badge latency
+                    const badgeLatency = document.getElementById('badge-latency');
+                    if (badgeLatency) badgeLatency.textContent = latency + ' ms';
                 }
             }
 

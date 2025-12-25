@@ -33,8 +33,20 @@
                     </div>
                 </div>
                 <div class="dro-footer">
-                    <span class="dro-status" id="dro-status">● Live</span>
-                    <span class="dro-mode" id="dro-mode">Machine Coords</span>
+                    <span class="dro-status" id="dro-status">Live</span>
+                    <div class="dro-coord-toggle">
+                        <button class="btn btn-small" id="dro-coord-mode" title="Toggle Machine/Work Coordinates">
+                            <span id="dro-mode-text">Machine</span>
+                        </button>
+                        <select id="dro-work-offset" class="dro-offset-select" title="Work Coordinate System">
+                            <option value="G54">G54</option>
+                            <option value="G55">G55</option>
+                            <option value="G56">G56</option>
+                            <option value="G57">G57</option>
+                            <option value="G58">G58</option>
+                            <option value="G59">G59</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>

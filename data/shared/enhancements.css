@@ -216,12 +216,10 @@ textarea {
 
 /* Skeleton loading */
 .skeleton {
-    background: linear-gradient(
-        90deg,
-        var(--bg-secondary) 25%,
-        var(--bg-tertiary) 50%,
-        var(--bg-secondary) 75%
-    );
+    background: linear-gradient(90deg,
+            var(--bg-secondary) 25%,
+            var(--bg-tertiary) 50%,
+            var(--bg-secondary) 75%);
     background-size: 200% 100%;
     animation: skeleton-loading 1.5s ease-in-out infinite;
     border-radius: 4px;
@@ -231,6 +229,7 @@ textarea {
     0% {
         background-position: 200% 0;
     }
+
     100% {
         background-position: -200% 0;
     }
@@ -379,6 +378,7 @@ textarea {
 
 /* Reduced motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
@@ -425,6 +425,7 @@ html {
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -439,6 +440,7 @@ html {
         transform: translateY(20px);
         opacity: 0;
     }
+
     to {
         transform: translateY(0);
         opacity: 1;
@@ -450,9 +452,12 @@ html {
 }
 
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.5;
     }
@@ -599,6 +604,128 @@ html {
 }
 
 @keyframes dro-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* Work Coordinate Toggle */
+.dro-coord-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dro-coord-toggle .btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    min-width: 80px;
+}
+
+.dro-coord-toggle .btn.work-mode {
+    background: var(--color-warning);
+    color: #000;
+}
+
+.dro-offset-select {
+    font-size: 12px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.dro-offset-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* =====================================================================
+   FLOATING CONNECTION STATUS BADGE
+   ===================================================================== */
+
+.connection-badge {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 13px;
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+.connection-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.connection-badge .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.connection-badge .status-dot.online {
+    background: var(--color-optimal);
+}
+
+.connection-badge .status-dot.connecting {
+    background: var(--color-warning);
+}
+
+.connection-badge .status-dot.offline {
+    background: var(--color-critical);
+    animation: none;
+}
+
+.connection-badge .status-text {
+    font-weight: 500;
+}
+
+.connection-badge .latency {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+@keyframes pulse-dot {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.2);
+        opacity: 0.7;
+    }
+}
+
+@media (max-width: 767px) {
+    .connection-badge {
+        bottom: 10px;
+        right: 10px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+
+    .connection-badge .latency {
+        display: none;
+    }
 }

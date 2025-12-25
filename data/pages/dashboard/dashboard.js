@@ -64,6 +64,50 @@ window.DashboardModule = window.DashboardModule || {
                 this.drawChart();
             });
         });
+
+        // Work Coordinate Toggle (Machine/Work)
+        const coordModeBtn = document.getElementById('dro-coord-mode');
+        const workOffsetSelect = document.getElementById('dro-work-offset');
+
+        if (coordModeBtn) {
+            // Initialize state
+            this.workCoordMode = localStorage.getItem('droCoordMode') || 'machine';
+            this.workOffset = localStorage.getItem('droWorkOffset') || 'G54';
+            this.updateCoordModeUI();
+
+            coordModeBtn.addEventListener('click', () => {
+                this.workCoordMode = this.workCoordMode === 'machine' ? 'work' : 'machine';
+                localStorage.setItem('droCoordMode', this.workCoordMode);
+                this.updateCoordModeUI();
+                this.onStateChanged(); // Refresh DRO display
+            });
+        }
+
+        if (workOffsetSelect) {
+            workOffsetSelect.value = this.workOffset || 'G54';
+            workOffsetSelect.addEventListener('change', (e) => {
+                this.workOffset = e.target.value;
+                localStorage.setItem('droWorkOffset', this.workOffset);
+                this.onStateChanged(); // Refresh DRO display
+            });
+        }
+    },
+
+    // Update Work Coordinate Mode UI
+    updateCoordModeUI() {
+        const modeBtn = document.getElementById('dro-coord-mode');
+        const modeText = document.getElementById('dro-mode-text');
+        const offsetSelect = document.getElementById('dro-work-offset');
+
+        if (modeText) {
+            modeText.textContent = this.workCoordMode === 'machine' ? 'Machine' : 'Work';
+        }
+        if (modeBtn) {
+            modeBtn.classList.toggle('work-mode', this.workCoordMode === 'work');
+        }
+        if (offsetSelect) {
+            offsetSelect.disabled = this.workCoordMode === 'machine';
+        }
     },
 
     initializeGraphs() {
