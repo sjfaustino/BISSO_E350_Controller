@@ -331,6 +331,9 @@ window.DashboardModule = window.DashboardModule || {
             this.updateAxisCard('x', state.axis.x);
             this.updateAxisCard('y', state.axis.y);
             this.updateAxisCard('z', state.axis.z);
+
+            // Update DRO (Digital Readout) display
+            this.updateDRO(state.axis);
         }
 
         // Update history for chart
@@ -405,6 +408,29 @@ window.DashboardModule = window.DashboardModule || {
                 stalledEl.textContent = '✓ OK';
                 stalledEl.style.color = 'var(--color-optimal)';
             }
+        }
+    },
+
+    updateDRO(axisData) {
+        const axes = ['x', 'y', 'z', 'a'];
+
+        axes.forEach(axis => {
+            const el = document.getElementById(`dro-${axis}`);
+            if (el) {
+                // Get position from axis data (position_mm or position field)
+                const pos = axisData[axis]?.position_mm ?? axisData[axis]?.position ?? 0;
+                el.textContent = pos.toFixed(3);
+
+                // Add negative class for styling
+                el.classList.toggle('negative', pos < 0);
+            }
+        });
+
+        // Update live status indicator
+        const statusEl = document.getElementById('dro-status');
+        if (statusEl) {
+            statusEl.textContent = 'Live';
+            statusEl.classList.remove('offline');
         }
     },
 
@@ -653,7 +679,7 @@ window.DashboardModule = window.DashboardModule || {
 
     exportGraphsData() {
         const csv = 'Graph Data Export\n' +
-                    'Generated: ' + new Date().toLocaleString() + '\n\n';
+            'Generated: ' + new Date().toLocaleString() + '\n\n';
 
         // Collect all graph exports
         let allData = csv;

@@ -491,3 +491,114 @@ html {
 .gap-lg {
     gap: 24px;
 }
+
+/* =====================================================================
+   DRO (DIGITAL READOUT) DISPLAY
+   ===================================================================== */
+
+.dro-container {
+    margin-bottom: 20px;
+}
+
+.dro-card {
+    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+    border: 2px solid var(--border-color);
+}
+
+.dro-card .card-header {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dro-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.dro-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+}
+
+@media (max-width: 767px) {
+    .dro-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.dro-axis {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 12px 15px;
+    background: var(--bg-primary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.dro-label {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-normal);
+    min-width: 30px;
+}
+
+.dro-value {
+    font-family: 'Courier New', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+    text-align: right;
+}
+
+.dro-unit {
+    font-size: 14px;
+    color: var(--text-secondary);
+    min-width: 25px;
+}
+
+.dro-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    font-size: 12px;
+}
+
+.dro-status {
+    color: var(--color-optimal);
+    font-weight: 600;
+}
+
+.dro-status.offline {
+    color: var(--color-critical);
+}
+
+.dro-mode {
+    color: var(--text-secondary);
+}
+
+/* Negative value styling */
+.dro-value.negative {
+    color: var(--color-warning);
+}
+
+/* Pulsing animation for live indicator */
+.dro-status::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    margin-right: 6px;
+    animation: dro-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dro-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}

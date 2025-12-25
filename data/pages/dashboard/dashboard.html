@@ -1,4 +1,45 @@
 <div class="dashboard">
+    <!-- Live Position Display (DRO) -->
+    <div class="dro-container">
+        <div class="card dro-card">
+            <div class="card-header">
+                <h2>🎯 Position (DRO)</h2>
+                <div class="dro-controls">
+                    <button class="btn btn-small btn-secondary" id="dro-zero-all" title="Zero all axes">Zero
+                        All</button>
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="dro-grid">
+                    <div class="dro-axis">
+                        <span class="dro-label">X</span>
+                        <span class="dro-value" id="dro-x">0.000</span>
+                        <span class="dro-unit">mm</span>
+                    </div>
+                    <div class="dro-axis">
+                        <span class="dro-label">Y</span>
+                        <span class="dro-value" id="dro-y">0.000</span>
+                        <span class="dro-unit">mm</span>
+                    </div>
+                    <div class="dro-axis">
+                        <span class="dro-label">Z</span>
+                        <span class="dro-value" id="dro-z">0.000</span>
+                        <span class="dro-unit">mm</span>
+                    </div>
+                    <div class="dro-axis">
+                        <span class="dro-label">A</span>
+                        <span class="dro-value" id="dro-a">0.000</span>
+                        <span class="dro-unit">°</span>
+                    </div>
+                </div>
+                <div class="dro-footer">
+                    <span class="dro-status" id="dro-status">● Live</span>
+                    <span class="dro-mode" id="dro-mode">Machine Coords</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- System Status Cards -->
     <div class="card-grid">
         <div class="card">
@@ -277,7 +318,8 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="margin: 0;">📊 Advanced Graphs & Analytics</h2>
             <div style="display: flex; gap: 10px;">
-                <select id="graph-time-range" style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                <select id="graph-time-range"
+                    style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
                     <option value="300">Last 5 min</option>
                     <option value="900">Last 15 min</option>
                     <option value="1800">Last 30 min</option>
@@ -294,8 +336,10 @@
                     <h3 style="margin: 0;">CPU Usage Trend</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
-                    <canvas id="cpu-graph" style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
-                    <div style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                    <canvas id="cpu-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
                         Current: <span id="cpu-current" style="font-weight: 600;">--%</span> |
                         Avg: <span id="cpu-stat-avg" style="font-weight: 600;">--%</span> |
                         Max: <span id="cpu-stat-max" style="font-weight: 600;">--%</span>
@@ -309,8 +353,10 @@
                     <h3 style="margin: 0;">Memory Usage Trend</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
-                    <canvas id="memory-graph" style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
-                    <div style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                    <canvas id="memory-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
                         Current: <span id="mem-current" style="font-weight: 600;">-- KB</span> |
                         Avg: <span id="mem-stat-avg" style="font-weight: 600;">-- KB</span> |
                         Max: <span id="mem-stat-max" style="font-weight: 600;">-- KB</span>
@@ -324,8 +370,10 @@
                     <h3 style="margin: 0;">Spindle Current Trend</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
-                    <canvas id="spindle-graph" style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
-                    <div style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                    <canvas id="spindle-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
                         Current: <span id="spindle-current" style="font-weight: 600;">-- A</span> |
                         Avg: <span id="spindle-stat-avg" style="font-weight: 600;">-- A</span> |
                         Max: <span id="spindle-stat-max" style="font-weight: 600;">-- A</span>
@@ -339,8 +387,10 @@
                     <h3 style="margin: 0;">Temperature Trend</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
-                    <canvas id="temperature-graph" style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
-                    <div style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                    <canvas id="temperature-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
                         Current: <span id="temp-current" style="font-weight: 600;">-- °C</span> |
                         Avg: <span id="temp-stat-avg" style="font-weight: 600;">-- °C</span> |
                         Max: <span id="temp-stat-max" style="font-weight: 600;">-- °C</span>
@@ -354,8 +404,10 @@
                     <h3 style="margin: 0;">WebSocket Latency</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
-                    <canvas id="latency-graph" style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
-                    <div style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                    <canvas id="latency-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
                         Current: <span id="latency-current" style="font-weight: 600;">-- ms</span> |
                         Avg: <span id="latency-stat-avg" style="font-weight: 600;">-- ms</span> |
                         Max: <span id="latency-stat-max" style="font-weight: 600;">-- ms</span>
@@ -369,8 +421,10 @@
                     <h3 style="margin: 0;">Motion System Load</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
-                    <canvas id="motion-load-graph" style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
-                    <div style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                    <canvas id="motion-load-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
                         Encoder Quality: <span id="motion-quality" style="font-weight: 600;">--%</span> |
                         Jitter: <span id="motion-jitter" style="font-weight: 600;">-- mm/s</span>
                     </div>
