@@ -221,19 +221,66 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis,
   }
 }
 
-// NVS Write Cooldown
-#define NVS_WRITE_COOLDOWN_MS 1000
+// NVS Write Cooldown with Adaptive Flash Wear Protection
+// ROBUSTNESS FIX: Adaptive cooldown prevents flash wear during fault storms
+#define NVS_WRITE_COOLDOWN_NORMAL_MS 1000   // 1 second normal operation
+#define NVS_WRITE_COOLDOWN_STORM_MS 10000   // 10 seconds during fault storm
+#define FAULT_STORM_THRESHOLD_PER_SEC 5     // >5 faults/sec = storm
 static uint32_t last_nvs_write_time[FAULT_CODE_MAX] = {0};
+
+// Fault rate tracking (sliding window of last 10 faults)
+#define FAULT_RATE_WINDOW_SIZE 10
+static uint32_t fault_timestamps[FAULT_RATE_WINDOW_SIZE] = {0};
+static uint8_t fault_timestamp_idx = 0;
+
+// Calculate current fault rate (faults per second)
+static uint32_t getFaultRate() {
+  uint32_t now = millis();
+
+  // Add current timestamp to window
+  fault_timestamps[fault_timestamp_idx] = now;
+  fault_timestamp_idx = (fault_timestamp_idx + 1) % FAULT_RATE_WINDOW_SIZE;
+
+  // Find oldest timestamp in window
+  uint32_t oldest = fault_timestamps[fault_timestamp_idx];
+  if (oldest == 0) return 0;  // Not enough data yet
+
+  // Calculate time span and faults/sec
+  uint32_t time_span_ms = now - oldest;
+  if (time_span_ms == 0) return 0;
+
+  // Return faults per second (10 faults over time_span)
+  return (FAULT_RATE_WINDOW_SIZE * 1000) / time_span_ms;
+}
 
 void faultLogToNVS(const fault_entry_t *entry) {
   if (!entry)
     return;
 
   uint32_t now = millis();
+
+  // ROBUSTNESS FIX: Adaptive cooldown based on fault rate
+  // During fault storms (>5 faults/sec), increase cooldown to 10s to prevent flash wear
+  uint32_t faults_per_sec = getFaultRate();
+  uint32_t cooldown_ms = (faults_per_sec > FAULT_STORM_THRESHOLD_PER_SEC)
+      ? NVS_WRITE_COOLDOWN_STORM_MS
+      : NVS_WRITE_COOLDOWN_NORMAL_MS;
+
   if (entry->code < FAULT_CODE_MAX) {
     uint32_t time_since_last_write = now - last_nvs_write_time[entry->code];
-    if (time_since_last_write < NVS_WRITE_COOLDOWN_MS)
+    if (time_since_last_write < cooldown_ms) {
+      // During storms, log skip to monitor flash wear protection
+      if (cooldown_ms == NVS_WRITE_COOLDOWN_STORM_MS) {
+        static uint32_t last_storm_log = 0;
+        if (now - last_storm_log > 30000) {  // Log once per 30 seconds
+          logWarning("[FAULT] Fault storm detected (%lu faults/sec) - NVS cooldown extended to %lus",
+                     (unsigned long)faults_per_sec,
+                     (unsigned long)(cooldown_ms / 1000));
+          last_storm_log = now;
+        }
+      }
       return;
+    }
     last_nvs_write_time[entry->code] = now;
   }
 
