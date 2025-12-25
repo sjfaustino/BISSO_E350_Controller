@@ -31,7 +31,7 @@
 #include "task_performance_monitor.h" // PHASE 5.1: Task performance metrics
 #include "vfd_current_calibration.h"  // PHASE 5.5: Current calibration
 #include <ArduinoJson.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 // Global instance
 WebServerManager webServer(80);
@@ -228,11 +228,11 @@ void WebServerManager::setPassword(const char *new_password) {
 }
 
 void WebServerManager::init() {
-  if (!SPIFFS.begin(true)) {
-    Serial.println("[WEB] [FAIL] SPIFFS Mount Failed");
+  if (!LittleFS.begin(true)) {
+    Serial.println("[WEB] [FAIL] LittleFS Mount Failed");
     return;
   }
-  Serial.println("[WEB] [OK] SPIFFS mounted");
+  Serial.println("[WEB] [OK] LittleFS mounted");
 
   // Load credentials from NVS (PHASE 5.1)
   loadCredentials();
@@ -281,7 +281,7 @@ void WebServerManager::setupRoutes() {
 
   // 1. Static Files (Protected)
   // PHASE 5.10: Custom auth filter for static files (SHA-256 verification)
-  server->serveStatic("/", SPIFFS, "/")
+  server->serveStatic("/", LittleFS, "/")
       .setDefaultFile("index.html")
       .setFilter([](AsyncWebServerRequest *request) {
         // Return true to allow serving, false to block
@@ -301,8 +301,8 @@ void WebServerManager::setupRoutes() {
     #ifdef DEBUG_BUILD
     // Debug info only exposed in debug builds (not production)
     // Prevents information disclosure about filesystem state
-    if (!SPIFFS.exists("/index.html")) {
-       message += "<p><b>DEBUG:</b> SPIFFS might be empty or index.html missing.</p>";
+    if (!LittleFS.exists("/index.html")) {
+       message += "<p><b>DEBUG:</b> LittleFS might be empty or index.html missing.</p>";
     }
     #endif
 
@@ -335,6 +335,34 @@ void WebServerManager::setupRoutes() {
     // Or if real-time needed: doc["uptime"] = taskGetUptime();
 
     char response[256];
+    serializeJson(doc, response, sizeof(response));
+    request->send(200, "application/json", response);
+  });
+
+  // 2.5 Network Status API (Protected)
+  server->on("/api/network/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    JsonDocument doc;
+    
+    // WiFi Station Info
+    doc["wifi_connected"] = (WiFi.status() == WL_CONNECTED);
+    doc["wifi_ssid"] = WiFi.SSID();
+    doc["wifi_rssi"] = WiFi.RSSI();
+    doc["wifi_ip"] = WiFi.localIP().toString();
+    doc["wifi_mac"] = WiFi.macAddress();
+    doc["wifi_gateway"] = WiFi.gatewayIP().toString();
+    doc["wifi_dns"] = WiFi.dnsIP().toString();
+    
+    // Signal quality (0-100%)
+    int rssi = WiFi.RSSI();
+    int quality = (rssi >= -50) ? 100 : (rssi <= -100) ? 0 : 2 * (rssi + 100);
+    doc["signal_quality"] = quality;
+    
+    // Uptime
+    doc["uptime_ms"] = millis();
+    
+    char response[384];
     serializeJson(doc, response, sizeof(response));
     request->send(200, "application/json", response);
   });
@@ -587,7 +615,7 @@ void WebServerManager::setupRoutes() {
 
   // 8.6. Swagger UI Documentation (Unprotected for discovery) - PHASE 6
   server->on("/api/docs", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    request->send(SPIFFS, "/pages/swagger-ui.html", "text/html");
+    request->send(LittleFS, "/pages/swagger-ui.html", "text/html");
   });
 
   // 9. API Health Check (Protected, Rate Limited) - PHASE 5.2

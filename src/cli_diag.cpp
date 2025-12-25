@@ -16,6 +16,7 @@
 #include "jxk10_modbus.h"
 #include "spindle_current_monitor.h"
 #include "i2c_bus_recovery.h"
+#include <Wire.h>
 #include "task_manager.h"
 #include "watchdog_manager.h"
 #include "timeout_manager.h"
@@ -60,6 +61,230 @@ void debugConfigHandler();
 void cmd_diag_scheduler_main(int argc, char** argv);
 
 // ============================================================================
+// QUICK STATUS DASHBOARD
+// ============================================================================
+void cmd_status_dashboard(int argc, char** argv) {
+    (void)argc; (void)argv;
+    watchdogFeed("CLI");
+    
+    uint32_t uptime_sec = millis() / 1000;
+    uint32_t hours = uptime_sec / 3600;
+    uint32_t mins = (uptime_sec % 3600) / 60;
+    uint32_t secs = uptime_sec % 60;
+    
+    Serial.println("\n╔══════════════════════════════════════════════════════════╗");
+    Serial.println("║           BISSO E350 QUICK STATUS DASHBOARD               ║");
+    Serial.printf( "║  Uptime: %02lu:%02lu:%02lu                                        ║\n", hours, mins, secs);
+    Serial.println("╠══════════════════════════════════════════════════════════╣");
+    
+    Serial.println("║ POSITION (mm)                                             ║");
+    Serial.printf( "║   X: %10.3f    Y: %10.3f                        ║\n",
+                  motionGetPosition(0) / 1000.0f, motionGetPosition(1) / 1000.0f);
+    Serial.printf( "║   Z: %10.3f    A: %10.3f                        ║\n",
+                  motionGetPosition(2) / 1000.0f, motionGetPosition(3) / 1000.0f);
+    
+    Serial.println("╠──────────────────────────────────────────────────────────╣");
+    Serial.println("║ ENCODER FEEDBACK                                          ║");
+    bool fb_active = encoderMotionIsFeedbackActive();
+    Serial.printf( "║   Status: %s                                         ║\n",
+                  fb_active ? "[ON] " : "[OFF]");
+    
+    Serial.println("╠──────────────────────────────────────────────────────────╣");
+    Serial.println("║ SPINDLE CURRENT                                           ║");
+    const spindle_monitor_state_t* spindle = spindleMonitorGetState();
+    if (spindle->enabled) {
+        Serial.printf( "║   Current: %5.1f A  |  Peak: %5.1f A                    ║\n",
+                      spindle->current_amps, spindle->current_peak_amps);
+        const char* alarm = "OK";
+        if (spindle->alarm_tool_breakage) alarm = "TOOL BREAK";
+        else if (spindle->alarm_stall) alarm = "STALL";
+        else if (spindle->alarm_overload) alarm = "OVERLOAD";
+        Serial.printf( "║   Alarm: %-10s                                      ║\n", alarm);
+    } else {
+        Serial.println("║   Status: [DISABLED]                                      ║");
+    }
+    
+    Serial.println("╠──────────────────────────────────────────────────────────╣");
+    Serial.println("║ NETWORK                                                   ║");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf( "║   WiFi: Connected (%d dBm)                              ║\n", WiFi.RSSI());
+        Serial.printf( "║   IP: %-15s                                   ║\n",
+                      WiFi.localIP().toString().c_str());
+    } else {
+        Serial.println("║   WiFi: [DISCONNECTED]                                    ║");
+    }
+    
+    Serial.println("╠──────────────────────────────────────────────────────────╣");
+    Serial.println("║ ACTIVE FAULTS                                             ║");
+    fault_stats_t faults = faultGetStats();
+    if (faults.total_faults == 0) {
+        Serial.println("║   [NONE] System healthy                                   ║");
+    } else {
+        Serial.printf( "║   Total: %lu  |  Last: %lu sec ago                       ║\n",
+                      (unsigned long)faults.total_faults,
+                      (unsigned long)((millis() - faults.last_fault_time_ms) / 1000));
+    }
+    
+    if (emergencyStopIsActive()) {
+        Serial.println("╠══════════════════════════════════════════════════════════╣");
+        Serial.println("║  E-STOP ACTIVE - MOTION DISABLED                          ║");
+    }
+    
+    Serial.println("╚══════════════════════════════════════════════════════════╝");
+}
+
+// ============================================================================
+// RUNTIME / CYCLE COUNTER
+// ============================================================================
+static uint32_t session_start_mins = 0;
+static uint32_t boot_time_ms = 0;
+
+void runtimeInit() {
+    session_start_mins = configGetInt(KEY_RUNTIME_MINS, 0);
+    boot_time_ms = millis();
+}
+
+void cmd_runtime(int argc, char** argv) {
+    uint32_t session_mins = (millis() - boot_time_ms) / 60000;
+    uint32_t total_mins = session_start_mins + session_mins;
+    uint32_t cycles = configGetInt(KEY_CYCLE_COUNT, 0);
+    uint32_t last_maint = configGetInt(KEY_LAST_MAINT_MINS, 0);
+    uint32_t since_maint = total_mins - last_maint;
+    
+    if (argc >= 2) {
+        if (strcasecmp(argv[1], "reset") == 0) {
+            configSetInt(KEY_CYCLE_COUNT, 0);
+            Serial.println("[RUNTIME] Cycle counter reset to 0");
+            return;
+        } else if (strcasecmp(argv[1], "maint") == 0) {
+            configSetInt(KEY_LAST_MAINT_MINS, total_mins);
+            Serial.println("[RUNTIME] Maintenance recorded");
+            return;
+        }
+    }
+    
+    uint32_t hours = total_mins / 60;
+    uint32_t mins = total_mins % 60;
+    uint32_t maint_hours = since_maint / 60;
+    
+    Serial.println("\n[RUNTIME] === Machine Usage Statistics ===\n");
+    Serial.println("┌─────────────────────────┬────────────────────┐");
+    Serial.println("│ Metric                  │ Value              │");
+    Serial.println("├─────────────────────────┼────────────────────┤");
+    
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%lu hrs %lu min", (unsigned long)hours, (unsigned long)mins);
+    Serial.printf("│ %-23s │ %-18s │\n", "Total Runtime", buf);
+    
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)cycles);
+    Serial.printf("│ %-23s │ %-18s │\n", "Job Cycles Completed", buf);
+    
+    snprintf(buf, sizeof(buf), "%lu hrs", (unsigned long)maint_hours);
+    Serial.printf("│ %-23s │ %-18s │\n", "Since Last Maintenance", buf);
+    
+    Serial.println("└─────────────────────────┴────────────────────┘");
+    
+    if (maint_hours >= 100) {
+        Serial.println("\n⚠️  MAINTENANCE RECOMMENDED (100+ hours since last service)");
+    }
+}
+
+// ============================================================================
+// DIGITAL I/O STATUS DISPLAY
+// ============================================================================
+void cmd_dio_main(int argc, char** argv) {
+    (void)argc; (void)argv;
+    Serial.println("\n[DIO] === Digital I/O Status ===\n");
+    watchdogFeed("CLI");
+    
+    static const char* input1_labels[] = {"Limit-X", "Limit-Y", "Limit-Z", "E-Stop", "Pause", "Resume", "Probe", "Door"};
+    static const char* input2_labels[] = {"Home-X", "Home-Y", "Home-Z", "Home-A", "ToolSns", "Coolant", "In-15", "In-16"};
+    static const char* output1_labels[] = {"Spindle", "SpinDir", "Coolant", "Mist", "Clamp", "Vacuum", "Light", "Out-8"};
+    static const char* output2_labels[] = {"AirBlast", "Lube", "Alarm", "Ready", "Running", "Error", "Out-15", "Out-16"};
+    
+    struct { uint8_t addr; const char* name; const char** labels; bool is_output; } banks[] = {
+        {0x21, "INPUTS-SAFE", input1_labels, false},
+        {0x22, "INPUTS-AUX", input2_labels, false},
+        {0x24, "OUTPUTS-MAIN", output1_labels, true},
+        {0x25, "OUTPUTS-AUX", output2_labels, true}
+    };
+    
+    Serial.println("┌────────┬────────────────┬────────────────────────┐");
+    Serial.println("│ Addr   │ Name           │ State (MSB..LSB)       │");
+    Serial.println("├────────┼────────────────┼────────────────────────┤");
+    
+    for (int b = 0; b < 4; b++) {
+        Wire.beginTransmission(banks[b].addr);
+        if (Wire.endTransmission() != 0) {
+            Serial.printf("│ 0x%02X   │ %-14s │ [NOT CONNECTED]        │\n", banks[b].addr, banks[b].name);
+            continue;
+        }
+        
+        Wire.requestFrom(banks[b].addr, (uint8_t)1);
+        uint8_t state = Wire.available() ? Wire.read() : 0xFF;
+        
+        char bits[9];
+        for (int i = 7; i >= 0; i--) bits[7-i] = (state & (1 << i)) ? '1' : '0';
+        bits[8] = '\0';
+        
+        Serial.printf("│ 0x%02X   │ %-14s │ %s (0x%02X)        │\n", banks[b].addr, banks[b].name, bits, state);
+        
+        // Show active channels
+        Serial.print("│        │                │ ");
+        int count = 0;
+        for (int i = 0; i < 8; i++) {
+            bool active = banks[b].is_output ? !(state & (1 << i)) : (state & (1 << i));
+            if (active) {
+                if (count > 0) Serial.print(", ");
+                Serial.print(banks[b].labels[i]);
+                count++;
+            }
+        }
+        if (count == 0) Serial.print("(none active)");
+        Serial.println("  │");
+    }
+    
+    Serial.println("└────────┴────────────────┴────────────────────────┘");
+    Serial.println("Legend: Inputs=HIGH when active, Outputs=LOW when relay ON");
+}
+
+// ============================================================================
+// SPINDLE ALARM CLI SUBCOMMANDS
+// ============================================================================
+static void cmd_spindle_alarm(int argc, char** argv) {
+    if (argc < 3) {
+        Serial.println("\n[SPINDLE] Alarm commands:");
+        Serial.println("  spindle alarm status   - Show alarm states");
+        Serial.println("  spindle alarm clear    - Clear all alarms");
+        Serial.println("  spindle alarm toolbreak <amps> - Set threshold (1-20A)");
+        Serial.println("  spindle alarm stall <amps> <ms> - Set stall params");
+        return;
+    }
+    
+    const spindle_monitor_state_t* state = spindleMonitorGetState();
+    
+    if (strcasecmp(argv[2], "status") == 0) {
+        Serial.println("\n[SPINDLE] === Alarm Status ===");
+        Serial.printf("Tool Breakage: %s (count: %lu)\n", 
+                     state->alarm_tool_breakage ? "ACTIVE" : "OK",
+                     (unsigned long)state->tool_breakage_count);
+        Serial.printf("Stall:         %s (count: %lu)\n",
+                     state->alarm_stall ? "ACTIVE" : "OK",
+                     (unsigned long)state->stall_count);
+        Serial.printf("Thresholds: %.1f A drop, %.1f A for %lu ms\n", 
+                     state->tool_breakage_drop_amps,
+                     state->stall_threshold_amps,
+                     (unsigned long)state->stall_timeout_ms);
+    } else if (strcasecmp(argv[2], "clear") == 0) {
+        spindleMonitorClearAlarms();
+    } else if (strcasecmp(argv[2], "toolbreak") == 0 && argc >= 4) {
+        spindleMonitorSetToolBreakageThreshold(atof(argv[3]));
+    } else if (strcasecmp(argv[2], "stall") == 0 && argc >= 5) {
+        spindleMonitorSetStallParams(atof(argv[3]), atoi(argv[4]));
+    }
+}
+
+// ============================================================================
 // SELF-TEST COMMAND IMPLEMENTATION
 // ============================================================================
 void cmd_selftest(int argc, char** argv) {
@@ -71,7 +296,7 @@ void cmd_selftest(int argc, char** argv) {
         Serial.println("  quick         Quick health check (fast tests only)");
         Serial.println("  memory        Memory subsystem tests");
         Serial.println("  i2c           I2C bus and device tests");
-        Serial.println("  storage       SPIFFS and NVS tests");
+        Serial.println("  storage       LittleFS and NVS tests");
         Serial.println("  motion        Motion system tests");
         Serial.println("  spindle       Spindle monitor tests");
         Serial.println("  safety        Safety system tests");
@@ -516,7 +741,7 @@ void cmd_spindle_config_main(int argc, char** argv) {
 
 void cmd_spindle_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[SPINDLE] Usage: spindle [diag | config]");
+        Serial.println("[SPINDLE] Usage: spindle [diag | config | alarm]");
         return;
     }
 
@@ -526,6 +751,8 @@ void cmd_spindle_main(int argc, char** argv) {
         rs485MuxPrintDiagnostics();
     } else if (strcmp(argv[1], "config") == 0) {
         cmd_spindle_config_main(argc, argv);
+    } else if (strcmp(argv[1], "alarm") == 0) {
+        cmd_spindle_alarm(argc, argv);
     } else {
         Serial.printf("[SPINDLE] Unknown sub-command: %s\n", argv[1]);
     }
@@ -1072,4 +1299,12 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("fault_recovery", "Fault recovery status", cmd_fault_recovery_diag);
     cliRegisterCommand("task_list", "Detailed task list with stack usage", cmd_task_list_detailed);
     cliRegisterCommand("memory_detailed", "Detailed memory analysis with fragmentation", cmd_memory_detailed);
+
+
+    // Session features
+    cliRegisterCommand("status", "Quick system status dashboard", cmd_status_dashboard);
+    cliRegisterCommand("runtime", "Machine runtime & cycle counter", cmd_runtime);
+
+    cliRegisterCommand("dio", "Digital I/O status display", cmd_dio_main);
+    cliRegisterCommand("spindle", "Spindle monitor & alarms", cmd_spindle_main);
 }

@@ -8,7 +8,7 @@
 #include "auth_manager.h"  // PHASE 5.10: SHA-256 authentication
 #include "web_server.h" // For WEB_BUFFER_SIZE, though not ideal dependency
 #include <ArduinoJson.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 // PHASE 5.10: Local auth helper with rate limiting
 static bool requireAuth(AsyncWebServerRequest *request) {
@@ -69,7 +69,7 @@ static bool isValidFilename(const char* filename) {
     return false;
   }
 
-  // Block absolute paths (should be relative to SPIFFS root)
+  // Block absolute paths (should be relative to LittleFS root)
   if (filename[0] == '/') {
     filename++;  // Skip leading slash for validation
   }
@@ -93,7 +93,7 @@ void handleFileList(AsyncWebServerRequest *request) {
   JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
 
-  File root = SPIFFS.open("/");
+  File root = LittleFS.open("/");
   File file = root.openNextFile();
   while (file) {
     JsonObject obj = array.add<JsonObject>();
@@ -128,8 +128,8 @@ void handleFileDelete(AsyncWebServerRequest *request) {
     return;
   }
 
-  if (SPIFFS.exists(path)) {
-    SPIFFS.remove(path);
+  if (LittleFS.exists(path)) {
+    LittleFS.remove(path);
     request->send(200, "text/plain", "Deleted");
   } else {
     request->send(404, "text/plain", "File not found");
@@ -160,7 +160,7 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename,
   if (!index) {
     if (!filename.startsWith("/"))
       filename = "/" + filename;
-    request->_tempFile = SPIFFS.open(filename, "w");
+    request->_tempFile = LittleFS.open(filename, "w");
   }
 
   if (request->_tempFile) {

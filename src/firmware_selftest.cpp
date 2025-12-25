@@ -22,7 +22,7 @@
 #include <WiFi.h>
 #include <string.h>
 #include <stdio.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <WiFi.h>
 
 // Test context
@@ -114,12 +114,12 @@ static void testI2CBusStatus() {
 
 static void testSPIFFSMount() {
     uint32_t start = millis();
-    bool spiffs_ok = SPIFFS.begin();
+    bool spiffs_ok = LittleFS.begin();
     if (spiffs_ok) {
-        SPIFFS.end();
+        LittleFS.end();
     }
-    addTestResult("Storage.SPIFFS", spiffs_ok,
-                  spiffs_ok ? NULL : "SPIFFS mount failed",
+    addTestResult("Storage.LittleFS", spiffs_ok,
+                  spiffs_ok ? NULL : "LittleFS mount failed",
                   millis() - start);
 }
 
@@ -247,7 +247,7 @@ static const test_definition_t test_definitions[] = {
     {"I2C.Bus", testI2CBusStatus, SELFTEST_CAT_I2C, true},
 
     // Storage tests
-    {"Storage.SPIFFS", testSPIFFSMount, SELFTEST_CAT_STORAGE, false},
+    {"Storage.LittleFS", testSPIFFSMount, SELFTEST_CAT_STORAGE, false},
     {"Storage.NVS", testNVSConfig, SELFTEST_CAT_STORAGE, true},
 
     // Motion tests

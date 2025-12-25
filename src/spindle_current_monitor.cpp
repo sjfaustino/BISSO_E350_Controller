@@ -23,10 +23,20 @@ static spindle_monitor_state_t monitor_state = {
     .current_amps = 0.0f,
     .current_peak_amps = 0.0f,
     .current_average_amps = 0.0f,
+    .current_previous_amps = 0.0f,
+    .tool_breakage_drop_amps = 5.0f,
+    .stall_threshold_amps = 25.0f,
+    .stall_timeout_ms = 2000,
+    .alarm_tool_breakage = false,
+    .alarm_stall = false,
+    .alarm_overload = false,
+    .overload_start_time_ms = 0,
     .read_count = 0,
     .error_count = 0,
     .overload_count = 0,
     .shutdown_count = 0,
+    .tool_breakage_count = 0,
+    .stall_count = 0,
     .last_shutdown_time_ms = 0,
     .last_shutdown_current_amps = 0.0f,
     .jxk10_slave_address = 1,
@@ -287,4 +297,54 @@ void spindleMonitorPrintDiagnostics(void) {
         (unsigned long)(millis() - monitor_state.last_shutdown_time_ms),
         monitor_state.last_shutdown_current_amps);
   }
+  
+  // Alarm status
+  Serial.printf("Tool Breakage Alarm: %s (count: %lu)\n",
+                monitor_state.alarm_tool_breakage ? "ACTIVE" : "OK",
+                (unsigned long)monitor_state.tool_breakage_count);
+  Serial.printf("Stall Alarm:         %s (count: %lu)\n",
+                monitor_state.alarm_stall ? "ACTIVE" : "OK",
+                (unsigned long)monitor_state.stall_count);
+  Serial.printf("Tool Breakage Threshold: %.1f A drop\n",
+                monitor_state.tool_breakage_drop_amps);
+  Serial.printf("Stall Threshold:     %.1f A for %lu ms\n",
+                monitor_state.stall_threshold_amps,
+                (unsigned long)monitor_state.stall_timeout_ms);
+}
+
+// === ALARM API FUNCTIONS ===
+
+bool spindleMonitorIsToolBreakage(void) {
+  return monitor_state.alarm_tool_breakage;
+}
+
+bool spindleMonitorIsStall(void) {
+  return monitor_state.alarm_stall;
+}
+
+void spindleMonitorClearAlarms(void) {
+  monitor_state.alarm_tool_breakage = false;
+  monitor_state.alarm_stall = false;
+  monitor_state.alarm_overload = false;
+  monitor_state.overload_start_time_ms = 0;
+  Serial.println("[SPINDLE] All alarms cleared");
+}
+
+void spindleMonitorSetToolBreakageThreshold(float drop_amps) {
+  if (drop_amps >= 1.0f && drop_amps <= 20.0f) {
+    monitor_state.tool_breakage_drop_amps = drop_amps;
+    Serial.printf("[SPINDLE] Tool breakage threshold set to %.1f A\n", drop_amps);
+  }
+}
+
+void spindleMonitorSetStallParams(float threshold_amps, uint32_t timeout_ms) {
+  if (threshold_amps >= 5.0f && threshold_amps <= 50.0f) {
+    monitor_state.stall_threshold_amps = threshold_amps;
+  }
+  if (timeout_ms >= 500 && timeout_ms <= 10000) {
+    monitor_state.stall_timeout_ms = timeout_ms;
+  }
+  Serial.printf("[SPINDLE] Stall params: %.1f A for %lu ms\n",
+                monitor_state.stall_threshold_amps,
+                (unsigned long)monitor_state.stall_timeout_ms);
 }

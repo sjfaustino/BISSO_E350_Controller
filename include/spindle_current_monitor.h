@@ -27,12 +27,26 @@ typedef struct {
     float current_amps;                 // Latest current reading
     float current_peak_amps;            // Peak current since startup
     float current_average_amps;         // Running average
+    float current_previous_amps;        // Previous reading for delta detection
+
+    // Alarm thresholds
+    float tool_breakage_drop_amps;      // Min drop to detect tool breakage (default 5A)
+    float stall_threshold_amps;         // Current threshold for stall (default 25A)
+    uint32_t stall_timeout_ms;          // Duration before stall triggers (default 2000ms)
+    
+    // Alarm states
+    bool alarm_tool_breakage;           // Tool breakage detected (sudden drop)
+    bool alarm_stall;                   // Stall detected (prolonged overload)
+    bool alarm_overload;                // Overcurrent condition active
+    uint32_t overload_start_time_ms;    // When overload condition started
 
     // Statistics
     uint32_t read_count;                // Total successful reads
     uint32_t error_count;               // Total read errors
     uint32_t overload_count;            // Times overload condition detected
     uint32_t shutdown_count;            // Times safety shutdown triggered
+    uint32_t tool_breakage_count;       // Times tool breakage detected
+    uint32_t stall_count;               // Times stall detected
 
     // Fault history
     uint32_t last_shutdown_time_ms;     // Timestamp of last shutdown
@@ -148,6 +162,36 @@ void spindleMonitorResetStats(void);
  * @brief Print spindle monitor diagnostics to console
  */
 void spindleMonitorPrintDiagnostics(void);
+
+/**
+ * @brief Check for tool breakage alarm
+ * @return true if tool breakage detected (sudden current drop)
+ */
+bool spindleMonitorIsToolBreakage(void);
+
+/**
+ * @brief Check for stall alarm
+ * @return true if stall detected (prolonged overload)
+ */
+bool spindleMonitorIsStall(void);
+
+/**
+ * @brief Clear all alarms
+ */
+void spindleMonitorClearAlarms(void);
+
+/**
+ * @brief Set tool breakage detection threshold
+ * @param drop_amps Minimum current drop to trigger alarm (default 5A)
+ */
+void spindleMonitorSetToolBreakageThreshold(float drop_amps);
+
+/**
+ * @brief Set stall detection parameters
+ * @param threshold_amps Current threshold for stall (default 25A)  
+ * @param timeout_ms Duration before stall alarm triggers (default 2000ms)
+ */
+void spindleMonitorSetStallParams(float threshold_amps, uint32_t timeout_ms);
 
 #ifdef __cplusplus
 }

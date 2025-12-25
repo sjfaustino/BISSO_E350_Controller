@@ -30,6 +30,15 @@ void cliPrintPrompt();
 bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handler);
 int cliGetCommandCount();
 
+// --- Table Rendering Helpers (Box Drawing) ---
+void cliPrintTableHeader(int w1, int w2, int w3, int w4 = 0, int w5 = 0);
+void cliPrintTableDivider(int w1, int w2, int w3, int w4 = 0, int w5 = 0);
+void cliPrintTableFooter(int w1, int w2, int w3, int w4 = 0, int w5 = 0);
+void cliPrintTableRow(const char* c1, const char* c2, const char* c3, 
+                      int w1, int w2, int w3,
+                      const char* c4 = nullptr, int w4 = 0,
+                      const char* c5 = nullptr, int w5 = 0);
+
 // ============================================================================
 // MODULE REGISTRATION FUNCTIONS
 // ============================================================================

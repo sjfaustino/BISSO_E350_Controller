@@ -89,41 +89,59 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     updateWiFiStatus() {
-        // Replace with actual API call to /api/health or similar
-        const wifiStatus = 'Connected';
-        const ssid = 'BISSO-Lab-5GHz';
-        const signal = Math.round(Math.random() * 30 + 40); // -75 to -45 dBm
+        // Fetch real network status from backend
+        if (Utils.isOfflineMode()) return;
 
-        const wifiStatusEl = document.getElementById('wifi-status');
-        const wifiSsidEl = document.getElementById('wifi-ssid');
-        const signalDbmEl = document.getElementById('signal-dbm');
+        fetch('/api/network/status')
+            .then(r => r.json())
+            .then(data => {
+                const wifiStatus = data.wifi_connected ? 'Connected' : 'Disconnected';
+                const ssid = data.wifi_ssid || '--';
+                const signal = data.wifi_rssi || -100;
+                const quality = data.signal_quality || 0;
 
-        if (wifiStatusEl) wifiStatusEl.textContent = wifiStatus;
-        if (wifiSsidEl) wifiSsidEl.textContent = ssid;
-        if (signalDbmEl) signalDbmEl.textContent = signal + ' dBm';
+                const wifiStatusEl = document.getElementById('wifi-status');
+                const wifiSsidEl = document.getElementById('wifi-ssid');
+                const signalDbmEl = document.getElementById('signal-dbm');
 
-        // Calculate quality percentage (0-100)
-        const quality = Math.max(0, Math.min(100, (signal + 100) * 2));
-        const signalBarEl = document.getElementById('signal-bar');
-        if (signalBarEl) signalBarEl.style.width = quality + '%';
+                if (wifiStatusEl) {
+                    wifiStatusEl.textContent = wifiStatus;
+                    wifiStatusEl.style.color = data.wifi_connected ? 'var(--color-optimal)' : 'var(--color-critical)';
+                }
+                if (wifiSsidEl) wifiSsidEl.textContent = ssid;
+                if (signalDbmEl) signalDbmEl.textContent = signal + ' dBm';
 
-        const qualityText = quality > 75 ? 'Excellent' : quality > 50 ? 'Good' : quality > 25 ? 'Fair' : 'Poor';
-        const signalQualityEl = document.getElementById('signal-quality');
-        if (signalQualityEl) signalQualityEl.textContent = qualityText;
+                const signalBarEl = document.getElementById('signal-bar');
+                if (signalBarEl) signalBarEl.style.width = quality + '%';
 
-        // Color code the bar
-        const bar = document.getElementById('signal-bar');
-        if (bar) {
-            if (quality > 75) {
-                bar.style.background = 'var(--color-optimal)';
-            } else if (quality > 50) {
-                bar.style.background = 'var(--color-normal)';
-            } else if (quality > 25) {
-                bar.style.background = 'var(--color-warning)';
-            } else {
-                bar.style.background = 'var(--color-critical)';
-            }
-        }
+                const qualityText = quality > 75 ? 'Excellent' : quality > 50 ? 'Good' : quality > 25 ? 'Fair' : 'Poor';
+                const signalQualityEl = document.getElementById('signal-quality');
+                if (signalQualityEl) signalQualityEl.textContent = qualityText;
+
+                const bar = document.getElementById('signal-bar');
+                if (bar) {
+                    if (quality > 75) bar.style.background = 'var(--color-optimal)';
+                    else if (quality > 50) bar.style.background = 'var(--color-normal)';
+                    else if (quality > 25) bar.style.background = 'var(--color-warning)';
+                    else bar.style.background = 'var(--color-critical)';
+                }
+
+                // Update IP and MAC
+                const ipEl = document.getElementById('ip-address');
+                const macEl = document.getElementById('mac-address');
+                if (ipEl) ipEl.textContent = data.wifi_ip || '--';
+                if (macEl) macEl.textContent = data.wifi_mac || '--';
+
+                // Update uptime from same response
+                if (data.uptime_ms) {
+                    const uptimeSec = Math.floor(data.uptime_ms / 1000);
+                    const hours = Math.floor(uptimeSec / 3600);
+                    const mins = Math.floor((uptimeSec % 3600) / 60);
+                    const deviceUptimeEl = document.getElementById('device-uptime');
+                    if (deviceUptimeEl) deviceUptimeEl.textContent = hours + ' h ' + mins + ' m';
+                }
+            })
+            .catch(err => console.error('[Network] Status fetch failed:', err));
     },
 
     updateLatency() {
@@ -243,31 +261,46 @@ window.NetworkModule = window.NetworkModule || {
         const output = document.getElementById('diagnostics-output');
         output.textContent = 'Running diagnostics...\n\n';
 
-        const diagnostics = [
-            'WiFi Signal: -45 dBm (Excellent)',
-            'IP Address: 192.168.1.100',
-            'Gateway: 192.168.1.1',
-            'DNS: 8.8.8.8',
-            'WebSocket Latency: 25ms',
-            'Modbus RTU: Connected at 19200 baud',
-            'VFD Response: 18ms',
-            'Packet Loss: 0.2%',
-            'Data Rate: 150 KB/s',
-            'Uptime: 2h 34m',
-            'Reconnects: 0',
-            '\n✓ All systems operational'
-        ];
+        // Fetch real data for diagnostics
+        fetch('/api/network/status')
+            .then(r => r.json())
+            .then(data => {
+                const uptimeSec = Math.floor((data.uptime_ms || 0) / 1000);
+                const hours = Math.floor(uptimeSec / 3600);
+                const mins = Math.floor((uptimeSec % 3600) / 60);
 
-        let index = 0;
-        const interval = setInterval(() => {
-            if (index < diagnostics.length) {
-                output.textContent += diagnostics[index] + '\n';
-                output.scrollTop = output.scrollHeight;
-                index++;
-            } else {
-                clearInterval(interval);
-            }
-        }, 200);
+                const qualityText = data.signal_quality > 75 ? 'Excellent' :
+                    data.signal_quality > 50 ? 'Good' :
+                        data.signal_quality > 25 ? 'Fair' : 'Poor';
+
+                const diagnostics = [
+                    `WiFi Status: ${data.wifi_connected ? 'Connected' : 'Disconnected'}`,
+                    `SSID: ${data.wifi_ssid || 'N/A'}`,
+                    `WiFi Signal: ${data.wifi_rssi} dBm (${qualityText})`,
+                    `IP Address: ${data.wifi_ip || 'N/A'}`,
+                    `MAC Address: ${data.wifi_mac || 'N/A'}`,
+                    `Gateway: ${data.wifi_gateway || 'N/A'}`,
+                    `DNS: ${data.wifi_dns || 'N/A'}`,
+                    `Signal Quality: ${data.signal_quality}%`,
+                    `Uptime: ${hours}h ${mins}m`,
+                    '',
+                    data.wifi_connected ? '✓ Network operational' : '✗ Network disconnected'
+                ];
+
+                let index = 0;
+                const interval = setInterval(() => {
+                    if (index < diagnostics.length) {
+                        output.textContent += diagnostics[index] + '\n';
+                        output.scrollTop = output.scrollHeight;
+                        index++;
+                    } else {
+                        clearInterval(interval);
+                    }
+                }, 150);
+            })
+            .catch(err => {
+                output.textContent += 'Error fetching network status: ' + err.message + '\n';
+            });
     },
 
     closeDiagnostics() {

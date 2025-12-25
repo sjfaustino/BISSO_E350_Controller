@@ -6,7 +6,7 @@
  * This file generates OpenAPI spec at runtime (~10KB flash, 5-10ms per request).
  *
  * OPTIMIZATION OPPORTUNITY:
- * - Static .json.gz file in SPIFFS would save ~5KB flash
+ * - Static .json.gz file in LittleFS would save ~5KB flash
  * - Trade-off: Requires build-time generation, breaks auto-sync with endpoints
  * - Current approach: Acceptable for production (simple, auto-syncs)
  * - Future optimization: Available if flash space becomes constrained

@@ -12,7 +12,7 @@
 #include "fault_logging.h"
 #include "config_unified.h"
 #include "config_keys.h"
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 JobManager jobManager;
 
@@ -23,8 +23,8 @@ JobManager::JobManager() : file_open(false), buffer_low_water_mark(4) {
 
 void JobManager::init() {
     logInfo("[JOB] Initializing Job Engine...");
-    if(!SPIFFS.begin(true)) {
-        logError("[JOB] SPIFFS Mount Fail");
+    if(!LittleFS.begin(true)) {
+        logError("[JOB] LittleFS Mount Fail");
     }
 }
 
@@ -75,12 +75,12 @@ bool JobManager::startJob(const char* filename) {
 
     configSetInt(KEY_MOTION_BUFFER_ENABLE, 1);
 
-    if (!SPIFFS.exists(filename)) {
+    if (!LittleFS.exists(filename)) {
         logError("[JOB] File not found: %s", filename);
         return false;
     }
 
-    jobFile = SPIFFS.open(filename, "r");
+    jobFile = LittleFS.open(filename, "r");
     if (!jobFile) {
         logError("[JOB] Failed to open file");
         return false;

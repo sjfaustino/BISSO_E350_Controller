@@ -37,6 +37,13 @@
  * - "temperature" → "temp"
  */
 
+// --- WIFI CONFIGURATION ---
+#define KEY_WIFI_SSID "wifi_ssid"       // Station SSID to connect to
+#define KEY_WIFI_PASS "wifi_pass"       // Station password
+#define KEY_WIFI_AP_EN "wifi_ap_en"     // AP mode enable (1=on, 0=off)
+#define KEY_WIFI_AP_SSID "wifi_ap_ssid" // AP broadcast SSID
+#define KEY_WIFI_AP_PASS "wifi_ap_pass" // AP password (min 8 chars)
+
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"
 #define KEY_X_LIMIT_MAX "x_limit_max"
@@ -53,6 +60,7 @@
 #define KEY_PPM_Z "ppm_z"
 #define KEY_PPM_A "ppm_a"
 #define KEY_ENC_ERR_THRESHOLD "enc_thresh"
+#define KEY_ENC_FEEDBACK "enc_fb_en"  // Encoder feedback enable (1=on, 0=off)
 #define KEY_ENC_INTERFACE                                                      \
   "enc_iface" // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)
 #define KEY_ENC_BAUD "enc_baud" // WJ66 baud rate
@@ -88,6 +96,11 @@
   "vfd_temp_warn" // Temperature warning threshold (°C, default 85)
 #define KEY_VFD_TEMP_CRIT                                                      \
   "vfd_temp_crit" // Temperature critical threshold (°C, default 90)
+
+// --- RUNTIME/MAINTENANCE TRACKING ---
+#define KEY_RUNTIME_MINS "rt_mins"       // Total runtime in minutes
+#define KEY_CYCLE_COUNT "cycles"         // Total job cycles completed
+#define KEY_LAST_MAINT_MINS "maint_mins" // Runtime at last maintenance
 
 // --- PREDEFINED POSITIONS (G30) ---
 #define KEY_POS_SAFE_X "pos_safe_x" // Safe position X coordinate in mm
