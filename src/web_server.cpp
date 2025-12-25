@@ -48,6 +48,55 @@ WebServerManager webServer(80);
 static uint8_t chunked_request_buffer[MAX_REQUEST_BODY_SIZE];
 static SemaphoreHandle_t chunked_request_mutex = NULL;
 
+// SECURITY FIX: G-code command whitelist validation
+// Prevents command injection attacks by only allowing safe, known G-code commands
+static bool isValidGcodeCommand(const char* cmd) {
+  if (!cmd || strlen(cmd) == 0) return false;
+
+  // Whitelist of allowed G-code commands
+  // Motion commands
+  if (strncmp(cmd, "G0 ", 3) == 0) return true;   // Rapid positioning
+  if (strncmp(cmd, "G1 ", 3) == 0) return true;   // Linear interpolation
+  if (strncmp(cmd, "G2 ", 3) == 0) return true;   // Circular interpolation CW
+  if (strncmp(cmd, "G3 ", 3) == 0) return true;   // Circular interpolation CCW
+  if (strncmp(cmd, "G4 ", 3) == 0) return true;   // Dwell (pause)
+
+  // Positioning commands
+  if (strncmp(cmd, "G28", 3) == 0) return true;   // Home all axes
+  if (strcmp(cmd, "G28 X") == 0) return true;     // Home X
+  if (strcmp(cmd, "G28 Y") == 0) return true;     // Home Y
+  if (strcmp(cmd, "G28 Z") == 0) return true;     // Home Z
+  if (strncmp(cmd, "G90", 3) == 0) return true;   // Absolute positioning
+  if (strncmp(cmd, "G91", 3) == 0) return true;   // Relative positioning
+  if (strncmp(cmd, "G92 ", 4) == 0) return true;  // Set position
+
+  // Spindle commands
+  if (strncmp(cmd, "M3 ", 3) == 0) return true;   // Spindle on CW
+  if (strcmp(cmd, "M3") == 0) return true;        // Spindle on CW (no args)
+  if (strncmp(cmd, "M4 ", 3) == 0) return true;   // Spindle on CCW
+  if (strcmp(cmd, "M4") == 0) return true;        // Spindle on CCW (no args)
+  if (strcmp(cmd, "M5") == 0) return true;        // Spindle off
+
+  // Coolant commands
+  if (strcmp(cmd, "M7") == 0) return true;        // Mist coolant on
+  if (strcmp(cmd, "M8") == 0) return true;        // Flood coolant on
+  if (strcmp(cmd, "M9") == 0) return true;        // Coolant off
+
+  // Program control
+  if (strcmp(cmd, "M0") == 0) return true;        // Program pause
+  if (strcmp(cmd, "M30") == 0) return true;       // Program end
+
+  // Units
+  if (strcmp(cmd, "G20") == 0) return true;       // Inches
+  if (strcmp(cmd, "G21") == 0) return true;       // Millimeters
+
+  // Feed rate mode
+  if (strcmp(cmd, "G93") == 0) return true;       // Inverse time mode
+  if (strcmp(cmd, "G94") == 0) return true;       // Units per minute mode
+
+  return false;  // Command not in whitelist
+}
+
 // AUDIT FIX: Static buffers to prevent heap fragmentation from malloc in handlers
 #define ENDPOINTS_BUFFER_SIZE 4096
 #define OPENAPI_BUFFER_SIZE 8192
@@ -1263,6 +1312,14 @@ void WebServerManager::setupRoutes() {
         if (!command || strlen(command) == 0) {
           request->send(400, "application/json",
                         "{\"error\":\"Missing or empty command\"}");
+          return;
+        }
+
+        // SECURITY FIX: Validate command against whitelist to prevent injection
+        if (!isValidGcodeCommand(command)) {
+          logWarning("[WEB] [SECURITY] Rejected invalid G-code command: %s", command);
+          request->send(400, "application/json",
+                        "{\"error\":\"Invalid or unauthorized G-code command\"}");
           return;
         }
 
