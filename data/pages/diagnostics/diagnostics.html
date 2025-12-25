@@ -74,166 +74,134 @@
     </div>
 
     <div class="card-grid">
-        <!-- I/O Monitor Card -->
+        <!-- Safety Status Card (simplified - operator panel controls elsewhere) -->
         <div class="card">
             <div class="card-header">
-                <h2>Digital I/O Monitor</h2>
+                <h2>Safety Status</h2>
                 <button class="btn btn-small btn-secondary" id="refresh-io-btn">Refresh</button>
             </div>
             <div class="card-content">
-                <h3 style="font-size: 14px; margin-bottom: 10px; color: var(--text-secondary);">Inputs</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
+                    Spindle, coolant, vacuum, door controlled via operator panel
+                </p>
                 <div class="io-grid" id="io-inputs">
-                    <div class="io-item">
+                    <div class="io-item io-large">
                         <span class="io-indicator off" id="io-estop"></span>
                         <span class="io-label">E-Stop</span>
                     </div>
-                    <div class="io-item">
-                        <span class="io-indicator off" id="io-door"></span>
-                        <span class="io-label">Door</span>
-                    </div>
-                    <div class="io-item">
-                        <span class="io-indicator off" id="io-probe"></span>
-                        <span class="io-label">Probe</span>
-                    </div>
-                    <div class="io-item">
-                        <span class="io-indicator off" id="io-limit-x"></span>
-                        <span class="io-label">Limit X</span>
-                    </div>
-                    <div class="io-item">
-                        <span class="io-indicator off" id="io-limit-y"></span>
-                        <span class="io-label">Limit Y</span>
-                    </div>
-                    <div class="io-item">
-                        <span class="io-indicator off" id="io-limit-z"></span>
-                        <span class="io-label">Limit Z</span>
-                    </div>
-                </div>
-                <h3 style="font-size: 14px; margin: 15px 0 10px; color: var(--text-secondary);">Outputs</h3>
-                <div class="io-grid" id="io-outputs">
-                    <div class="io-item">
-                        <span class="io-indicator off" id="io-spindle"></span>
-                        <span class="io-label">Spindle</span>
-                    </div>
-                    <div class="io-item">
-                        <span class="io-indicator off" id="io-coolant"></span>
-                        <span class="io-label">Coolant</span>
-                    </div>
-                    <div class="io-item">
-                        <span class="io-indicator off" id="io-vacuum"></span>
-                        <span class="io-label">Vacuum</span>
-                    </div>
-                    <div class="io-item">
+                    <div class="io-item io-large">
                         <span class="io-indicator off" id="io-alarm"></span>
-                        <span class="io-label">Alarm</span>
+                        <span class="io-label">System Alarm</span>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Enhanced Encoder Status Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Encoder Status</h2>
-            </div>
-            <div class="card-content">
-                <div class="encoder-row">
-                    <span class="encoder-axis">X</span>
-                    <div class="encoder-details">
-                        <div class="encoder-stat">
-                            <span class="stat-label">Position Error:</span>
-                            <span class="stat-value" id="enc-x-error">-- mm</span>
-                        </div>
-                        <div class="encoder-stat">
-                            <span class="stat-label">Feedback:</span>
-                            <span class="stat-value" id="enc-x-feedback">--</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="encoder-row">
-                    <span class="encoder-axis">Y</span>
-                    <div class="encoder-details">
-                        <div class="encoder-stat">
-                            <span class="stat-label">Position Error:</span>
-                            <span class="stat-value" id="enc-y-error">-- mm</span>
-                        </div>
-                        <div class="encoder-stat">
-                            <span class="stat-label">Feedback:</span>
-                            <span class="stat-value" id="enc-y-feedback">--</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="encoder-row">
-                    <span class="encoder-axis">Z</span>
-                    <div class="encoder-details">
-                        <div class="encoder-stat">
-                            <span class="stat-label">Position Error:</span>
-                            <span class="stat-value" id="enc-z-error">-- mm</span>
-                        </div>
-                        <div class="encoder-stat">
-                            <span class="stat-label">Feedback:</span>
-                            <span class="stat-value" id="enc-z-feedback">--</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="encoder-row">
-                    <span class="encoder-axis">A</span>
-                    <div class="encoder-details">
-                        <div class="encoder-stat">
-                            <span class="stat-label">Position Error:</span>
-                            <span class="stat-value" id="enc-a-error">-- °</span>
-                        </div>
-                        <div class="encoder-stat">
-                            <span class="stat-label">Feedback:</span>
-                            <span class="stat-value" id="enc-a-feedback">--</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Fault Log Viewer Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Fault Log</h2>
-                <button class="btn btn-small btn-secondary" id="clear-faults-btn">Clear</button>
-            </div>
-            <div class="card-content">
-                <div class="fault-summary" style="margin-bottom: 15px;">
-                    <span class="fault-count" id="fault-count">0</span>
-                    <span class="fault-label">Active Faults</span>
-                </div>
-                <div class="fault-list" id="fault-list">
-                    <div class="fault-empty">No faults recorded</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card-grid">
-        <div class="card">
-            <div class="card-header">
-                <h2>VFD Diagnostics</h2>
+    <!-- Enhanced Encoder Status Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2>Encoder Status</h2>
+        </div>
+        <div class="card-content">
+            <div class="encoder-row">
+                <span class="encoder-axis">X</span>
+                <div class="encoder-details">
+                    <div class="encoder-stat">
+                        <span class="stat-label">Position Error:</span>
+                        <span class="stat-value" id="enc-x-error">-- mm</span>
+                    </div>
+                    <div class="encoder-stat">
+                        <span class="stat-label">Feedback:</span>
+                        <span class="stat-value" id="enc-x-feedback">--</span>
+                    </div>
+                </div>
             </div>
-            <div class="card-content">
-                <div class="metric-card">
-                    <div class="metric-label">Current Draw</div>
-                    <div class="metric-value" id="diag-vfd-current">-- A</div>
+            <div class="encoder-row">
+                <span class="encoder-axis">Y</span>
+                <div class="encoder-details">
+                    <div class="encoder-stat">
+                        <span class="stat-label">Position Error:</span>
+                        <span class="stat-value" id="enc-y-error">-- mm</span>
+                    </div>
+                    <div class="encoder-stat">
+                        <span class="stat-label">Feedback:</span>
+                        <span class="stat-value" id="enc-y-feedback">--</span>
+                    </div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-label">Frequency</div>
-                    <div class="metric-value" id="diag-vfd-freq">-- Hz</div>
+            </div>
+            <div class="encoder-row">
+                <span class="encoder-axis">Z</span>
+                <div class="encoder-details">
+                    <div class="encoder-stat">
+                        <span class="stat-label">Position Error:</span>
+                        <span class="stat-value" id="enc-z-error">-- mm</span>
+                    </div>
+                    <div class="encoder-stat">
+                        <span class="stat-label">Feedback:</span>
+                        <span class="stat-value" id="enc-z-feedback">--</span>
+                    </div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-label">Thermal State</div>
-                    <div class="metric-value" id="diag-vfd-thermal">--%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Fault Code</div>
-                    <div class="metric-value" id="diag-vfd-fault">0x0000</div>
+            </div>
+            <div class="encoder-row">
+                <span class="encoder-axis">A</span>
+                <div class="encoder-details">
+                    <div class="encoder-stat">
+                        <span class="stat-label">Position Error:</span>
+                        <span class="stat-value" id="enc-a-error">-- °</span>
+                    </div>
+                    <div class="encoder-stat">
+                        <span class="stat-label">Feedback:</span>
+                        <span class="stat-value" id="enc-a-feedback">--</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Fault Log Viewer Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2>Fault Log</h2>
+            <button class="btn btn-small btn-secondary" id="clear-faults-btn">Clear</button>
+        </div>
+        <div class="card-content">
+            <div class="fault-summary" style="margin-bottom: 15px;">
+                <span class="fault-count" id="fault-count">0</span>
+                <span class="fault-label">Active Faults</span>
+            </div>
+            <div class="fault-list" id="fault-list">
+                <div class="fault-empty">No faults recorded</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2>VFD Diagnostics</h2>
+        </div>
+        <div class="card-content">
+            <div class="metric-card">
+                <div class="metric-label">Current Draw</div>
+                <div class="metric-value" id="diag-vfd-current">-- A</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Frequency</div>
+                <div class="metric-value" id="diag-vfd-freq">-- Hz</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Thermal State</div>
+                <div class="metric-value" id="diag-vfd-thermal">--%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Fault Code</div>
+                <div class="metric-value" id="diag-vfd-fault">0x0000</div>
+            </div>
+        </div>
+    </div>
+</div>
 </div>
 
 <style>
@@ -276,6 +244,20 @@
     .diagnostics-page .io-label {
         font-size: 12px;
         color: var(--text-primary);
+    }
+
+    .diagnostics-page .io-item.io-large {
+        padding: 15px 20px;
+    }
+
+    .diagnostics-page .io-item.io-large .io-indicator {
+        width: 20px;
+        height: 20px;
+    }
+
+    .diagnostics-page .io-item.io-large .io-label {
+        font-size: 14px;
+        font-weight: 600;
     }
 
     .diagnostics-page .encoder-row {
