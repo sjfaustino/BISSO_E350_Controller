@@ -375,15 +375,77 @@ extern void taskShowStats();
 extern void taskShowAllTasks();
 extern uint8_t taskGetCpuUsage();
 
+void cmd_wdt_test_stall(int argc, char** argv) {
+    Serial.println("\n[WDT TEST] === Watchdog Verification Test ===");
+    Serial.println("[WDT TEST] WARNING: This will deliberately stall for 10 seconds");
+    Serial.println("[WDT TEST] The watchdog should detect this and log a fault");
+    Serial.println("[WDT TEST] System will NOT reboot during this test");
+    Serial.println("\n[WDT TEST] Starting deliberate stall in 3 seconds...");
+
+    // Give user time to read warning
+    delay(1000); Serial.println("[WDT TEST] 2...");
+    delay(1000); Serial.println("[WDT TEST] 1...");
+    delay(1000); Serial.println("[WDT TEST] Starting stall NOW");
+
+    // Record starting stats
+    watchdog_stats_t* stats_before = watchdogGetStats();
+    uint32_t timeouts_before = stats_before->timeouts_detected;
+    uint32_t missed_before = stats_before->missed_ticks;
+
+    Serial.println("[WDT TEST] CLI task will now stall for 10 seconds without feeding watchdog");
+
+    // DELIBERATELY stall without feeding watchdog
+    uint32_t stall_start = millis();
+    while (millis() - stall_start < 10000) {
+        // Do nothing - don't feed watchdog
+        // This should trigger watchdog timeout detection
+        delay(100);
+    }
+
+    Serial.println("\n[WDT TEST] Stall complete - checking watchdog response...");
+
+    // Feed watchdog again to recover
+    watchdogFeed("CLI");
+
+    // Check if watchdog detected the stall
+    watchdog_stats_t* stats_after = watchdogGetStats();
+    uint32_t timeouts_after = stats_after->timeouts_detected;
+    uint32_t missed_after = stats_after->missed_ticks;
+
+    bool test_passed = (timeouts_after > timeouts_before) || (missed_after > missed_before);
+
+    Serial.println("\n[WDT TEST] === Test Results ===");
+    Serial.printf("Timeouts Detected: %lu -> %lu (delta: %lu)\n",
+                  (unsigned long)timeouts_before,
+                  (unsigned long)timeouts_after,
+                  (unsigned long)(timeouts_after - timeouts_before));
+    Serial.printf("Missed Ticks:      %lu -> %lu (delta: %lu)\n",
+                  (unsigned long)missed_before,
+                  (unsigned long)missed_after,
+                  (unsigned long)(missed_after - missed_before));
+
+    if (test_passed) {
+        Serial.println("\n[WDT TEST] ✓ PASS - Watchdog successfully detected task stall");
+        Serial.println("[WDT TEST] System fault monitoring is functioning correctly");
+    } else {
+        Serial.println("\n[WDT TEST] ✗ FAIL - Watchdog did NOT detect stall");
+        Serial.println("[WDT TEST] WARNING: Watchdog monitoring may not be working properly");
+    }
+
+    Serial.println("\n[WDT TEST] Use 'faults show' to view logged faults");
+}
+
 void cmd_wdt_main(int argc, char** argv) {
-    if (argc < 2) { 
-        Serial.println("[WDT] Usage: wdt [status | tasks | stats | report]");
+    if (argc < 2) {
+        Serial.println("[WDT] Usage: wdt [status | tasks | stats | report | test]");
+        Serial.println("  test: Run watchdog verification test (deliberate 10s stall)");
         return;
     }
     if (strcmp(argv[1], "status") == 0) watchdogShowStatus();
     else if (strcmp(argv[1], "tasks") == 0) watchdogShowTasks();
     else if (strcmp(argv[1], "stats") == 0) watchdogShowStats();
     else if (strcmp(argv[1], "report") == 0) watchdogPrintDetailedReport();
+    else if (strcmp(argv[1], "test") == 0) cmd_wdt_test_stall(argc, argv);
 }
 
 void cmd_task_main(int argc, char** argv) {
