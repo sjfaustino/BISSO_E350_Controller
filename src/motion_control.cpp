@@ -266,33 +266,9 @@ void motionUpdate() {
     backoff_level = 0;
   }
 
-  // PHASE 5.10: I2C Health Check - Monitor PLC communication
-  // If shadow register is dirty (I2C failures), stop motion to prevent unsafe operation
-  static uint32_t last_i2c_check_ms = 0;
-  if (millis() - last_i2c_check_ms > 1000) {
-    if (elboIsShadowRegisterDirty()) {
-      logError("[MOTION] CRITICAL: PLC I2C communication failure - shadow register dirty!");
-      faultLogCritical(FAULT_I2C_ERROR, "PLC I2C failure detected - emergency stop");
-      motionEmergencyStop();
-      taskUnlockMutex(taskGetMotionMutex());
-      return;
-    }
-
-    // Check mutex timeout count (if > 10, PLC is having serious issues)
-    static uint32_t last_timeout_count = 0;
-    uint32_t current_timeout_count = elboGetMutexTimeoutCount();
-    if (current_timeout_count > last_timeout_count + 10) {
-      logError("[MOTION] CRITICAL: PLC mutex timeout escalation (%lu timeouts)",
-               (unsigned long)(current_timeout_count - last_timeout_count));
-      faultLogCritical(FAULT_I2C_ERROR, "PLC mutex timeout threshold exceeded");
-      motionEmergencyStop();
-      last_timeout_count = current_timeout_count;
-      taskUnlockMutex(taskGetMotionMutex());
-      return;
-    }
-    last_timeout_count = current_timeout_count;
-    last_i2c_check_ms = millis();
-  }
+  // PERFORMANCE FIX: I2C Health Check moved to monitor task (tasks_monitor.cpp)
+  // Removed from motion loop to prevent real-time delays (was taking up to 20ms)
+  // Health checks now run at 1Hz in low-priority background task instead
 
   int strict_mode = m_state.strict_limits;
 

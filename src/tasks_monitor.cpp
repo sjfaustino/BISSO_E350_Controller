@@ -13,6 +13,8 @@
 #include "system_constants.h"
 #include "fault_logging.h"
 #include "config_unified.h"
+#include "plc_iface.h"              // PERFORMANCE FIX: I2C health monitoring
+#include "motion.h"                 // PERFORMANCE FIX: For motionEmergencyStop()
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -44,6 +46,29 @@ void taskMonitorFunction(void* parameter) {
     // 3. Task Stall Detection
     // PHASE 2.5: Check for task stalls and log warnings
     taskStallDetectionUpdate();
+
+    // 3.5. I2C Health Check (moved from motion loop for performance)
+    // PERFORMANCE FIX: Check PLC I2C communication health at 1Hz instead of 100Hz
+    // This was previously in motion_control.cpp running every 10ms, causing real-time delays
+    static uint32_t last_i2c_check_ms = 0;
+    static uint32_t last_timeout_count = 0;
+    if (millis() - last_i2c_check_ms > 1000) {
+      if (elboIsShadowRegisterDirty()) {
+        logError("[MONITOR] CRITICAL: PLC I2C communication failure - shadow register dirty!");
+        faultLogCritical(FAULT_I2C_ERROR, "PLC I2C failure detected - emergency stop");
+        motionEmergencyStop();
+      }
+
+      uint32_t current_timeout_count = elboGetMutexTimeoutCount();
+      if (current_timeout_count > last_timeout_count + 10) {
+        logError("[MONITOR] CRITICAL: PLC mutex timeout escalation (%lu timeouts)",
+                 (unsigned long)(current_timeout_count - last_timeout_count));
+        faultLogCritical(FAULT_I2C_ERROR, "PLC mutex timeout threshold exceeded");
+        motionEmergencyStop();
+      }
+      last_timeout_count = current_timeout_count;
+      last_i2c_check_ms = millis();
+    }
 
     // 4. Task Health Analysis
     // Scans all registered tasks for stack overflows or execution starvation.
