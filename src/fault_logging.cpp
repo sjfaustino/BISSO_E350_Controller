@@ -4,6 +4,7 @@
 #include "motion.h"
 #include "safety_state_machine.h"
 #include "serial_logger.h"
+#include "system_tuning.h"  // MAINTAINABILITY FIX: Centralized tuning parameters
 #include "task_manager.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <Preferences.h>
@@ -223,13 +224,14 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis,
 
 // NVS Write Cooldown with Adaptive Flash Wear Protection
 // ROBUSTNESS FIX: Adaptive cooldown prevents flash wear during fault storms
-#define NVS_WRITE_COOLDOWN_NORMAL_MS 1000   // 1 second normal operation
-#define NVS_WRITE_COOLDOWN_STORM_MS 10000   // 10 seconds during fault storm
-#define FAULT_STORM_THRESHOLD_PER_SEC 5     // >5 faults/sec = storm
+// Constants defined in system_tuning.h:
+//   FAULT_NVS_WRITE_COOLDOWN_NORMAL_MS = 1000   // 1 second normal operation
+//   FAULT_NVS_WRITE_COOLDOWN_STORM_MS = 10000   // 10 seconds during fault storm
+//   FAULT_STORM_THRESHOLD_PER_SEC = 5           // >5 faults/sec = storm
+//   FAULT_RATE_WINDOW_SIZE = 10                 // Sliding window size
 static uint32_t last_nvs_write_time[FAULT_CODE_MAX] = {0};
 
 // Fault rate tracking (sliding window of last 10 faults)
-#define FAULT_RATE_WINDOW_SIZE 10
 static uint32_t fault_timestamps[FAULT_RATE_WINDOW_SIZE] = {0};
 static uint8_t fault_timestamp_idx = 0;
 
@@ -263,14 +265,14 @@ void faultLogToNVS(const fault_entry_t *entry) {
   // During fault storms (>5 faults/sec), increase cooldown to 10s to prevent flash wear
   uint32_t faults_per_sec = getFaultRate();
   uint32_t cooldown_ms = (faults_per_sec > FAULT_STORM_THRESHOLD_PER_SEC)
-      ? NVS_WRITE_COOLDOWN_STORM_MS
-      : NVS_WRITE_COOLDOWN_NORMAL_MS;
+      ? FAULT_NVS_WRITE_COOLDOWN_STORM_MS
+      : FAULT_NVS_WRITE_COOLDOWN_NORMAL_MS;
 
   if (entry->code < FAULT_CODE_MAX) {
     uint32_t time_since_last_write = now - last_nvs_write_time[entry->code];
     if (time_since_last_write < cooldown_ms) {
       // During storms, log skip to monitor flash wear protection
-      if (cooldown_ms == NVS_WRITE_COOLDOWN_STORM_MS) {
+      if (cooldown_ms == FAULT_NVS_WRITE_COOLDOWN_STORM_MS) {
         static uint32_t last_storm_log = 0;
         if (now - last_storm_log > 30000) {  // Log once per 30 seconds
           logWarning("[FAULT] Fault storm detected (%lu faults/sec) - NVS cooldown extended to %lus",
