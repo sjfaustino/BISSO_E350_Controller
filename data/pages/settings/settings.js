@@ -215,6 +215,34 @@ window.SettingsModule = window.SettingsModule || {
             document.getElementById('z-ppm-display').textContent = e.target.value;
             this.hideError('encoder');
         });
+
+        // Spindle Alarm Configuration listeners
+        document.getElementById('spindle-toolbreak-threshold')?.addEventListener('input', (e) => {
+            document.getElementById('toolbreak-value').textContent = parseFloat(e.target.value).toFixed(1);
+            this.hideError('spindle-alarm');
+        });
+
+        document.getElementById('spindle-stall-threshold')?.addEventListener('input', (e) => {
+            document.getElementById('stall-threshold-value').textContent = e.target.value;
+            this.hideError('spindle-alarm');
+        });
+
+        document.getElementById('spindle-stall-timeout')?.addEventListener('input', (e) => {
+            document.getElementById('stall-timeout-value').textContent = e.target.value;
+            this.hideError('spindle-alarm');
+        });
+
+        document.getElementById('save-spindle-alarm-btn')?.addEventListener('click', () => {
+            this.saveSpindleAlarmSettings();
+        });
+
+        document.getElementById('reset-spindle-alarm-btn')?.addEventListener('click', () => {
+            this.resetSpindleAlarmSettings();
+        });
+
+        document.getElementById('clear-spindle-alarms-btn')?.addEventListener('click', () => {
+            this.clearSpindleAlarms();
+        });
     },
 
     updateDisplay() {
@@ -296,8 +324,8 @@ window.SettingsModule = window.SettingsModule || {
                 fillElem.style.background = percent > 80
                     ? 'var(--color-critical)'
                     : percent > 60
-                    ? 'var(--color-warning)'
-                    : 'var(--color-optimal)';
+                        ? 'var(--color-warning)'
+                        : 'var(--color-optimal)';
             }
         } catch (e) {
             console.warn('[Settings] Could not calculate storage:', e);
@@ -451,10 +479,12 @@ window.SettingsModule = window.SettingsModule || {
         Promise.all([
             this.loadMotionConfig(),
             this.loadVfdConfig(),
-            this.loadEncoderConfig()
+            this.loadEncoderConfig(),
+            this.loadSpindleAlarmConfig()
         ]).catch(err => {
             console.error('[Settings] Failed to load configuration:', err);
         });
+
     },
 
     loadMotionConfig() {
@@ -654,21 +684,21 @@ window.SettingsModule = window.SettingsModule || {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ axis, ppm })
         })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                AlertManager.add(`${axisNames[axis]}-axis calibrated to ${ppm} PPM`, 'success', 2000);
-                this.setStatusLoaded('encoder');
-            } else {
-                this.showError('encoder', data.error || 'Calibration failed');
-                this.setStatusError('encoder', 'Calibration failed');
-            }
-        })
-        .catch(err => {
-            console.error(`[Settings] Calibration failed:`, err);
-            this.showError('encoder', 'Failed to calibrate encoder');
-            this.setStatusError('encoder', 'Error');
-        });
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    AlertManager.add(`${axisNames[axis]}-axis calibrated to ${ppm} PPM`, 'success', 2000);
+                    this.setStatusLoaded('encoder');
+                } else {
+                    this.showError('encoder', data.error || 'Calibration failed');
+                    this.setStatusError('encoder', 'Calibration failed');
+                }
+            })
+            .catch(err => {
+                console.error(`[Settings] Calibration failed:`, err);
+                this.showError('encoder', 'Failed to calibrate encoder');
+                this.setStatusError('encoder', 'Error');
+            });
     },
 
     resetEncoderSettings() {
@@ -694,13 +724,153 @@ window.SettingsModule = window.SettingsModule || {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ category, key, value })
         })
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) {
-                throw new Error(data.error || 'Set config failed');
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Set config failed');
+                }
+                return data;
+            });
+    },
+
+    // =====================================================================
+    // SPINDLE ALARM CONFIGURATION
+    // =====================================================================
+
+    loadSpindleAlarmConfig() {
+        return fetch('/api/spindle/alarm')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Update sliders
+                    const toolbreakSlider = document.getElementById('spindle-toolbreak-threshold');
+                    const stallThreshSlider = document.getElementById('spindle-stall-threshold');
+                    const stallTimeoutSlider = document.getElementById('spindle-stall-timeout');
+
+                    if (toolbreakSlider) {
+                        toolbreakSlider.value = data.toolbreak_threshold || 5;
+                        document.getElementById('toolbreak-value').textContent = parseFloat(data.toolbreak_threshold || 5).toFixed(1);
+                    }
+                    if (stallThreshSlider) {
+                        stallThreshSlider.value = data.stall_threshold || 25;
+                        document.getElementById('stall-threshold-value').textContent = data.stall_threshold || 25;
+                    }
+                    if (stallTimeoutSlider) {
+                        stallTimeoutSlider.value = data.stall_timeout_ms || 2000;
+                        document.getElementById('stall-timeout-value').textContent = data.stall_timeout_ms || 2000;
+                    }
+
+                    // Update alarm status
+                    this.updateSpindleAlarmStatus(data);
+                    this.setStatusLoaded('spindle-alarm');
+                }
+            })
+            .catch(err => {
+                console.error('[Settings] Spindle alarm config load failed:', err);
+                this.setStatusError('spindle-alarm', 'Failed to load');
+            });
+    },
+
+    updateSpindleAlarmStatus(data) {
+        const toolbreakEl = document.getElementById('alarm-toolbreak-status');
+        const stallEl = document.getElementById('alarm-stall-status');
+
+        if (toolbreakEl) {
+            if (data.alarm_tool_breakage) {
+                toolbreakEl.textContent = 'ALARM';
+                toolbreakEl.style.color = 'var(--color-critical)';
+            } else {
+                toolbreakEl.textContent = 'OK';
+                toolbreakEl.style.color = 'var(--color-optimal)';
             }
-            return data;
-        });
+        }
+
+        if (stallEl) {
+            if (data.alarm_stall) {
+                stallEl.textContent = 'ALARM';
+                stallEl.style.color = 'var(--color-critical)';
+            } else {
+                stallEl.textContent = 'OK';
+                stallEl.style.color = 'var(--color-optimal)';
+            }
+        }
+    },
+
+    saveSpindleAlarmSettings() {
+        console.log('[Settings] Saving spindle alarm settings');
+
+        const toolbreakThreshold = parseFloat(document.getElementById('spindle-toolbreak-threshold').value);
+        const stallThreshold = parseInt(document.getElementById('spindle-stall-threshold').value);
+        const stallTimeout = parseInt(document.getElementById('spindle-stall-timeout').value);
+
+        fetch('/api/spindle/alarm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                toolbreak_threshold: toolbreakThreshold,
+                stall_threshold: stallThreshold,
+                stall_timeout_ms: stallTimeout
+            })
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    AlertManager.add('Spindle alarm settings saved', 'success', 2000);
+                    this.setStatusLoaded('spindle-alarm');
+                } else {
+                    this.showError('spindle-alarm', data.error || 'Save failed');
+                    this.setStatusError('spindle-alarm', 'Save failed');
+                }
+            })
+            .catch(err => {
+                console.error('[Settings] Spindle alarm save failed:', err);
+                this.showError('spindle-alarm', 'Failed to save settings');
+                this.setStatusError('spindle-alarm', 'Error');
+            });
+    },
+
+    resetSpindleAlarmSettings() {
+        if (!confirm('Reset spindle alarm settings to defaults?')) return;
+
+        // Reset UI to defaults
+        document.getElementById('spindle-toolbreak-threshold').value = 5;
+        document.getElementById('toolbreak-value').textContent = '5.0';
+        document.getElementById('spindle-stall-threshold').value = 25;
+        document.getElementById('stall-threshold-value').textContent = '25';
+        document.getElementById('spindle-stall-timeout').value = 2000;
+        document.getElementById('stall-timeout-value').textContent = '2000';
+
+        // Save defaults
+        this.saveSpindleAlarmSettings();
+    },
+
+    clearSpindleAlarms() {
+        console.log('[Settings] Clearing spindle alarms');
+
+        fetch('/api/spindle/alarm/clear', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    AlertManager.add('Spindle alarms cleared', 'success', 2000);
+                    // Update status display
+                    const toolbreakEl = document.getElementById('alarm-toolbreak-status');
+                    const stallEl = document.getElementById('alarm-stall-status');
+                    if (toolbreakEl) {
+                        toolbreakEl.textContent = 'OK';
+                        toolbreakEl.style.color = 'var(--color-optimal)';
+                    }
+                    if (stallEl) {
+                        stallEl.textContent = 'OK';
+                        stallEl.style.color = 'var(--color-optimal)';
+                    }
+                } else {
+                    AlertManager.add('Failed to clear alarms: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => {
+                console.error('[Settings] Clear alarms failed:', err);
+                AlertManager.add('Failed to clear alarms', 'error');
+            });
     },
 
     showError(section, message) {

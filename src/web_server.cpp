@@ -436,6 +436,78 @@ void WebServerManager::setupRoutes() {
     request->send(200, "application/json", response);
   });
 
+  // 4.5 Spindle Alarm Configuration API (Protected)
+  server->on("/api/spindle/alarm", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    JsonDocument doc;
+    const spindle_monitor_state_t *state = spindleMonitorGetState();
+    
+    if (state) {
+      doc["success"] = true;
+      doc["toolbreak_threshold"] = state->tool_breakage_drop_amps;
+      doc["stall_threshold"] = state->stall_threshold_amps;
+      doc["stall_timeout_ms"] = state->stall_timeout_ms;
+      doc["alarm_tool_breakage"] = state->alarm_tool_breakage;
+      doc["alarm_stall"] = state->alarm_stall;
+      doc["alarm_overload"] = state->alarm_overload;
+    } else {
+      doc["success"] = false;
+      doc["error"] = "Spindle monitor not initialized";
+    }
+    
+    char response[256];
+    serializeJson(doc, response, sizeof(response));
+    request->send(200, "application/json", response);
+  });
+
+  // 4.6 Spindle Alarm Configuration POST (Protected)
+  server->on("/api/spindle/alarm", HTTP_POST, 
+    [](AsyncWebServerRequest *request) {
+      if (!requireAuth(request)) return;
+      request->send(200);
+    },
+    NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total) {
+      JsonDocument doc;
+      DeserializationError err = deserializeJson(doc, data, len);
+      
+      if (err) {
+        request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
+        return;
+      }
+      
+      bool changed = false;
+      
+      if (doc.containsKey("toolbreak_threshold")) {
+        float val = doc["toolbreak_threshold"].as<float>();
+        spindleMonitorSetToolBreakageThreshold(val);
+        changed = true;
+      }
+      
+      if (doc.containsKey("stall_threshold") && doc.containsKey("stall_timeout_ms")) {
+        float thresh = doc["stall_threshold"].as<float>();
+        uint32_t timeout = doc["stall_timeout_ms"].as<uint32_t>();
+        spindleMonitorSetStallParams(thresh, timeout);
+        changed = true;
+      }
+      
+      if (changed) {
+        request->send(200, "application/json", "{\"success\":true}");
+      } else {
+        request->send(400, "application/json", "{\"success\":false,\"error\":\"No parameters provided\"}");
+      }
+    });
+
+  // 4.7 Spindle Alarm Clear (Protected)
+  server->on("/api/spindle/alarm/clear", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    spindleMonitorClearAlarms();
+    request->send(200, "application/json", "{\"success\":true}");
+  });
+
   // 5. API Task Performance Metrics (Protected, Rate Limited) - PHASE 5.1
   server->on("/api/metrics", HTTP_GET, [this](AsyncWebServerRequest *request) {
     if (!requireAuth(request)) return;

@@ -237,6 +237,73 @@
             </div>
         </div>
 
+        <!-- Spindle Alarm Configuration Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Spindle Alarm Configuration</h2>
+                <span class="card-status" id="spindle-alarm-status"></span>
+            </div>
+            <div class="card-content">
+                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                    Configure spindle load monitoring alarms for tool breakage and stall detection.
+                </p>
+
+                <!-- Current Alarm Status -->
+                <div class="alarm-status-panel" style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <span class="card-label">Tool Breakage:</span>
+                            <span class="card-value" id="alarm-toolbreak-status" style="color: var(--color-optimal);">OK</span>
+                        </div>
+                        <div>
+                            <span class="card-label">Stall Alarm:</span>
+                            <span class="card-value" id="alarm-stall-status" style="color: var(--color-optimal);">OK</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary btn-small" id="clear-spindle-alarms-btn" style="margin-top: 10px; width: 100%;">Clear All Alarms</button>
+                </div>
+
+                <div class="setting-group">
+                    <label for="spindle-toolbreak-threshold">Tool Breakage Threshold (sudden current drop):</label>
+                    <div class="input-with-value">
+                        <input type="range" id="spindle-toolbreak-threshold" min="1" max="20" step="0.5" value="5" class="slider">
+                        <span class="input-value"><span id="toolbreak-value">5.0</span> A</span>
+                    </div>
+                    <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;">
+                        Triggers if spindle current drops by this amount suddenly (tool break detection)
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="spindle-stall-threshold">Stall Current Threshold:</label>
+                    <div class="input-with-value">
+                        <input type="range" id="spindle-stall-threshold" min="5" max="50" step="1" value="25" class="slider">
+                        <span class="input-value"><span id="stall-threshold-value">25</span> A</span>
+                    </div>
+                    <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;">
+                        Triggers stall alarm if current exceeds this threshold for specified duration
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="spindle-stall-timeout">Stall Detection Timeout:</label>
+                    <div class="input-with-value">
+                        <input type="range" id="spindle-stall-timeout" min="500" max="10000" step="250" value="2000" class="slider">
+                        <span class="input-value"><span id="stall-timeout-value">2000</span> ms</span>
+                    </div>
+                    <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;">
+                        How long current must exceed threshold before stall alarm triggers
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <button class="btn btn-primary" id="save-spindle-alarm-btn">Save Alarm Settings</button>
+                    <button class="btn btn-secondary" id="reset-spindle-alarm-btn">Reset to Defaults</button>
+                </div>
+                <div id="spindle-alarm-error" class="error-message" style="display:none;"></div>
+            </div>
+        </div>
+
         <!-- Encoder Calibration Card -->
         <div class="card">
             <div class="card-header">
