@@ -108,14 +108,41 @@ void cmd_feed_override(int argc, char** argv) {
         Serial.printf("[CLI] Current Feed: %.0f%%\n", motionGetFeedOverride() * 100.0f);
         return;
     }
-    
+
     float factor = atof(argv[1]);
-    
+
     // Support percentage input (e.g., "150" -> 1.5)
     if (factor > 10.0f) factor /= 100.0f;
-    
+
     motionSetFeedOverride(factor);
     Serial.printf("[CLI] Feed override set to %.2f\n", factor);
+}
+
+// ============================================================================
+// PERFORMANCE DIAGNOSTICS
+// ============================================================================
+
+void cmd_spinlock_main(int argc, char** argv) {
+    if (argc < 2) {
+        Serial.println("[SPINLOCK] === Spinlock Timing Diagnostics ===");
+        Serial.println("Usage: spinlock [stats | reset]");
+        Serial.println("  stats:  Show critical section timing report");
+        Serial.println("  reset:  Reset timing statistics");
+        Serial.println("");
+        Serial.println("Purpose: Audit spinlock critical section durations");
+        Serial.println("         to identify sections >10us that should use mutexes");
+        Serial.println("");
+        Serial.println("See: COMPREHENSIVE_AUDIT_REPORT.md Finding 1.3");
+        return;
+    }
+
+    if (strcmp(argv[1], "stats") == 0) {
+        motionPrintSpinlockStats();
+    } else if (strcmp(argv[1], "reset") == 0) {
+        motionResetSpinlockStats();
+    } else {
+        Serial.printf("[SPINLOCK] Unknown sub-command: %s\n", argv[1]);
+    }
 }
 
 // ============================================================================
@@ -127,9 +154,11 @@ void cliRegisterMotionCommands() {
   cliRegisterCommand("stop", "Stop all motion", cmd_motion_stop);
   cliRegisterCommand("pause", "Pause motion", cmd_motion_pause);
   cliRegisterCommand("resume", "Resume motion", cmd_motion_resume);
-  
+
   cliRegisterCommand("estop", "Emergency Stop management (status|on|off)", cmd_estop_main);
-  
+
   cliRegisterCommand("limit", "Set soft limits", cmd_soft_limits);
   cliRegisterCommand("feed", "Set Feed Override (0.1 - 2.0)", cmd_feed_override);
+
+  cliRegisterCommand("spinlock", "Spinlock timing diagnostics (stats|reset)", cmd_spinlock_main);
 }

@@ -47,6 +47,81 @@ static struct {
 // PHASE 5.10: Non-static to allow external access from motion_state_machine.cpp
 portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
+// PERFORMANCE AUDIT: Spinlock critical section duration tracking
+// Enable to measure and log spinlock durations for migration analysis
+#define ENABLE_SPINLOCK_TIMING 1
+
+#if ENABLE_SPINLOCK_TIMING
+typedef struct {
+  const char* location;   // Source code location identifier
+  uint32_t max_duration_us;  // Maximum duration observed (microseconds)
+  uint32_t total_count;      // Number of times executed
+  uint32_t over_10us_count;  // Count of executions >10μs (should use mutex)
+} spinlock_stats_t;
+
+#define MAX_SPINLOCK_LOCATIONS 32
+static spinlock_stats_t spinlock_stats[MAX_SPINLOCK_LOCATIONS];
+static uint8_t spinlock_stats_count = 0;
+static SemaphoreHandle_t spinlock_stats_mutex = NULL;
+
+// Get or create stats entry for a location
+static spinlock_stats_t* getSpinlockStats(const char* location) {
+  if (!spinlock_stats_mutex) {
+    spinlock_stats_mutex = xSemaphoreCreateMutex();
+  }
+
+  xSemaphoreTake(spinlock_stats_mutex, portMAX_DELAY);
+
+  // Find existing entry
+  for (uint8_t i = 0; i < spinlock_stats_count; i++) {
+    if (strcmp(spinlock_stats[i].location, location) == 0) {
+      xSemaphoreGive(spinlock_stats_mutex);
+      return &spinlock_stats[i];
+    }
+  }
+
+  // Create new entry
+  if (spinlock_stats_count < MAX_SPINLOCK_LOCATIONS) {
+    spinlock_stats_t* entry = &spinlock_stats[spinlock_stats_count];
+    entry->location = location;
+    entry->max_duration_us = 0;
+    entry->total_count = 0;
+    entry->over_10us_count = 0;
+    spinlock_stats_count++;
+    xSemaphoreGive(spinlock_stats_mutex);
+    return entry;
+  }
+
+  xSemaphoreGive(spinlock_stats_mutex);
+  return NULL;
+}
+
+// Macros for timed critical sections
+#define SPINLOCK_ENTER(location) \
+  uint32_t _spinlock_start_##location = micros(); \
+  portENTER_CRITICAL(&motionSpinlock);
+
+#define SPINLOCK_EXIT(location) \
+  portEXIT_CRITICAL(&motionSpinlock); \
+  uint32_t _spinlock_duration_##location = micros() - _spinlock_start_##location; \
+  spinlock_stats_t* _stats_##location = getSpinlockStats(#location); \
+  if (_stats_##location) { \
+    _stats_##location->total_count++; \
+    if (_spinlock_duration_##location > _stats_##location->max_duration_us) { \
+      _stats_##location->max_duration_us = _spinlock_duration_##location; \
+    } \
+    if (_spinlock_duration_##location > 10) { \
+      _stats_##location->over_10us_count++; \
+      logWarning("[MOTION] Long critical section '%s': %lu us (should use mutex)", \
+                 #location, (unsigned long)_spinlock_duration_##location); \
+    } \
+  }
+#else
+// Timing disabled - use standard spinlock macros
+#define SPINLOCK_ENTER(location) portENTER_CRITICAL(&motionSpinlock);
+#define SPINLOCK_EXIT(location) portEXIT_CRITICAL(&motionSpinlock);
+#endif
+
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y,
                                    ELBO_I73_AXIS_Z, ELBO_I73_AXIS_A};
 const uint8_t AXIS_TO_CONSENSO_BIT[] = {
@@ -1017,3 +1092,67 @@ void motionDiagnostics() {
                   motionStateToString(axes[i].state));
   }
 }
+
+#if ENABLE_SPINLOCK_TIMING
+void motionPrintSpinlockStats() {
+  Serial.println("\n[MOTION] === Spinlock Critical Section Timing Report ===");
+  Serial.println("Location                       | Count      | Max (us) | >10us | Status");
+  Serial.println("-------------------------------|------------|----------|-------|--------");
+
+  uint8_t needs_migration = 0;
+  uint32_t total_executions = 0;
+  uint32_t total_slow_executions = 0;
+
+  for (uint8_t i = 0; i < spinlock_stats_count; i++) {
+    spinlock_stats_t* stats = &spinlock_stats[i];
+    total_executions += stats->total_count;
+    total_slow_executions += stats->over_10us_count;
+
+    const char* status = "OK";
+    if (stats->max_duration_us > 10) {
+      status = "MIGRATE";
+      needs_migration++;
+    }
+
+    Serial.printf("%-30s | %10lu | %8lu | %5lu | %s\n",
+                  stats->location,
+                  (unsigned long)stats->total_count,
+                  (unsigned long)stats->max_duration_us,
+                  (unsigned long)stats->over_10us_count,
+                  status);
+  }
+
+  Serial.println("-------------------------------|------------|----------|-------|--------");
+  Serial.printf("Total locations: %u | Executions: %lu | Slow executions: %lu\n",
+                spinlock_stats_count,
+                (unsigned long)total_executions,
+                (unsigned long)total_slow_executions);
+
+  if (needs_migration > 0) {
+    Serial.printf("\n⚠️  %u critical sections exceed 10us threshold\n", needs_migration);
+    Serial.println("Recommendation: Migrate these to mutexes for better real-time performance");
+    Serial.println("See COMPREHENSIVE_AUDIT_REPORT.md Finding 1.3 for migration guide");
+  } else {
+    Serial.println("\n✓ All critical sections are <10us - spinlock usage is appropriate");
+  }
+
+  Serial.println("\nNOTE: This report shows MAXIMUM observed durations.");
+  Serial.println("      Run system under load to capture worst-case timing.");
+}
+
+void motionResetSpinlockStats() {
+  for (uint8_t i = 0; i < spinlock_stats_count; i++) {
+    spinlock_stats[i].max_duration_us = 0;
+    spinlock_stats[i].total_count = 0;
+    spinlock_stats[i].over_10us_count = 0;
+  }
+  Serial.println("[MOTION] Spinlock statistics reset");
+}
+#else
+void motionPrintSpinlockStats() {
+  Serial.println("[MOTION] Spinlock timing not enabled (compile with ENABLE_SPINLOCK_TIMING=1)");
+}
+void motionResetSpinlockStats() {
+  Serial.println("[MOTION] Spinlock timing not enabled");
+}
+#endif

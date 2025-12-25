@@ -135,6 +135,10 @@ speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed);
 void motionSetPLCSpeedProfile(speed_profile_t profile);
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
 
+// --- PERFORMANCE DIAGNOSTICS ---
+void motionPrintSpinlockStats();  // Print spinlock critical section timing report
+void motionResetSpinlockStats();  // Reset spinlock timing statistics
+
 extern const uint8_t AXIS_TO_I73_BIT[];
 extern const uint8_t AXIS_TO_CONSENSO_BIT[];
 
