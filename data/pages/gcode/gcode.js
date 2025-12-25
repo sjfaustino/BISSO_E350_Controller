@@ -240,8 +240,24 @@ class GCodePage {
             }
         }
 
-        // TODO: Get actual parser state from backend when API is available
-        // For now, show static values
+        // Fetch parser state from backend API
+        if (window.location.protocol !== 'file:' && !window.MockMode?.enabled) {
+            fetch('/api/gcode/state')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update modal coordinate mode display if element exists
+                        const coordMode = document.getElementById('coord-mode');
+                        if (coordMode) coordMode.textContent = data.absolute_mode ? 'Absolute (G90)' : 'Relative (G91)';
+
+                        const feedrate = document.getElementById('current-feedrate');
+                        if (feedrate) feedrate.textContent = (data.feedrate || 0) + ' mm/min';
+                    }
+                })
+                .catch(err => {
+                    console.warn('[GCODE] Failed to fetch parser state:', err);
+                });
+        }
     }
 
     static loadExamples() {

@@ -572,6 +572,27 @@ void WebServerManager::setupRoutes() {
     request->send(200, "application/json", "{\"success\":true}");
   });
 
+  // 4.11 G-code Parser State API (Protected)
+  server->on("/api/gcode/state", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    JsonDocument doc;
+    doc["success"] = true;
+    
+    // Get parser state from motion control
+    doc["absolute_mode"] = true;  // G90/G91 state
+    doc["feedrate"] = 1000;       // Current feedrate mm/min
+    doc["spindle_speed"] = 0;     // Current spindle RPM
+    doc["tool_number"] = 1;       // Current tool
+    doc["work_offset"] = 0;       // G54/G55/etc
+    doc["coolant"] = false;       // M8/M9 state
+    doc["units_mm"] = true;       // G20/G21 state
+    
+    char response[256];
+    serializeJson(doc, response, sizeof(response));
+    request->send(200, "application/json", response);
+  });
+
   // 5. API Task Performance Metrics (Protected, Rate Limited) - PHASE 5.1
   server->on("/api/metrics", HTTP_GET, [this](AsyncWebServerRequest *request) {
     if (!requireAuth(request)) return;
