@@ -74,15 +74,142 @@
     </div>
 
     <div class="card-grid">
+        <!-- I/O Monitor Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Encoder Health</h2>
+                <h2>Digital I/O Monitor</h2>
+                <button class="btn btn-small btn-secondary" id="refresh-io-btn">Refresh</button>
             </div>
-            <div class="card-content" id="encoder-health">
-                <p>Loading encoder data...</p>
+            <div class="card-content">
+                <h3 style="font-size: 14px; margin-bottom: 10px; color: var(--text-secondary);">Inputs</h3>
+                <div class="io-grid" id="io-inputs">
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-estop"></span>
+                        <span class="io-label">E-Stop</span>
+                    </div>
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-door"></span>
+                        <span class="io-label">Door</span>
+                    </div>
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-probe"></span>
+                        <span class="io-label">Probe</span>
+                    </div>
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-limit-x"></span>
+                        <span class="io-label">Limit X</span>
+                    </div>
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-limit-y"></span>
+                        <span class="io-label">Limit Y</span>
+                    </div>
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-limit-z"></span>
+                        <span class="io-label">Limit Z</span>
+                    </div>
+                </div>
+                <h3 style="font-size: 14px; margin: 15px 0 10px; color: var(--text-secondary);">Outputs</h3>
+                <div class="io-grid" id="io-outputs">
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-spindle"></span>
+                        <span class="io-label">Spindle</span>
+                    </div>
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-coolant"></span>
+                        <span class="io-label">Coolant</span>
+                    </div>
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-vacuum"></span>
+                        <span class="io-label">Vacuum</span>
+                    </div>
+                    <div class="io-item">
+                        <span class="io-indicator off" id="io-alarm"></span>
+                        <span class="io-label">Alarm</span>
+                    </div>
+                </div>
             </div>
         </div>
 
+        <!-- Enhanced Encoder Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Encoder Status</h2>
+            </div>
+            <div class="card-content">
+                <div class="encoder-row">
+                    <span class="encoder-axis">X</span>
+                    <div class="encoder-details">
+                        <div class="encoder-stat">
+                            <span class="stat-label">Position Error:</span>
+                            <span class="stat-value" id="enc-x-error">-- mm</span>
+                        </div>
+                        <div class="encoder-stat">
+                            <span class="stat-label">Feedback:</span>
+                            <span class="stat-value" id="enc-x-feedback">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="encoder-row">
+                    <span class="encoder-axis">Y</span>
+                    <div class="encoder-details">
+                        <div class="encoder-stat">
+                            <span class="stat-label">Position Error:</span>
+                            <span class="stat-value" id="enc-y-error">-- mm</span>
+                        </div>
+                        <div class="encoder-stat">
+                            <span class="stat-label">Feedback:</span>
+                            <span class="stat-value" id="enc-y-feedback">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="encoder-row">
+                    <span class="encoder-axis">Z</span>
+                    <div class="encoder-details">
+                        <div class="encoder-stat">
+                            <span class="stat-label">Position Error:</span>
+                            <span class="stat-value" id="enc-z-error">-- mm</span>
+                        </div>
+                        <div class="encoder-stat">
+                            <span class="stat-label">Feedback:</span>
+                            <span class="stat-value" id="enc-z-feedback">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="encoder-row">
+                    <span class="encoder-axis">A</span>
+                    <div class="encoder-details">
+                        <div class="encoder-stat">
+                            <span class="stat-label">Position Error:</span>
+                            <span class="stat-value" id="enc-a-error">-- °</span>
+                        </div>
+                        <div class="encoder-stat">
+                            <span class="stat-label">Feedback:</span>
+                            <span class="stat-value" id="enc-a-feedback">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fault Log Viewer Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Fault Log</h2>
+                <button class="btn btn-small btn-secondary" id="clear-faults-btn">Clear</button>
+            </div>
+            <div class="card-content">
+                <div class="fault-summary" style="margin-bottom: 15px;">
+                    <span class="fault-count" id="fault-count">0</span>
+                    <span class="fault-label">Active Faults</span>
+                </div>
+                <div class="fault-list" id="fault-list">
+                    <div class="fault-empty">No faults recorded</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-grid">
         <div class="card">
             <div class="card-header">
                 <h2>VFD Diagnostics</h2>
@@ -108,3 +235,155 @@
         </div>
     </div>
 </div>
+
+<style>
+    .diagnostics-page .io-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    .diagnostics-page .io-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: var(--bg-secondary);
+        border-radius: 6px;
+    }
+
+    .diagnostics-page .io-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--text-secondary);
+    }
+
+    .diagnostics-page .io-indicator.on {
+        background: var(--color-optimal);
+        box-shadow: 0 0 8px var(--color-optimal);
+    }
+
+    .diagnostics-page .io-indicator.off {
+        background: #555;
+    }
+
+    .diagnostics-page .io-indicator.alarm {
+        background: var(--color-critical);
+        box-shadow: 0 0 8px var(--color-critical);
+    }
+
+    .diagnostics-page .io-label {
+        font-size: 12px;
+        color: var(--text-primary);
+    }
+
+    .diagnostics-page .encoder-row {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 10px;
+        margin-bottom: 10px;
+        background: var(--bg-secondary);
+        border-radius: 6px;
+    }
+
+    .diagnostics-page .encoder-axis {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--color-normal);
+        min-width: 30px;
+    }
+
+    .diagnostics-page .encoder-details {
+        flex: 1;
+        display: flex;
+        gap: 20px;
+    }
+
+    .diagnostics-page .encoder-stat {
+        display: flex;
+        gap: 8px;
+    }
+
+    .diagnostics-page .stat-label {
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+
+    .diagnostics-page .stat-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .diagnostics-page .fault-summary {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .diagnostics-page .fault-count {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--color-optimal);
+    }
+
+    .diagnostics-page .fault-count.has-faults {
+        color: var(--color-critical);
+    }
+
+    .diagnostics-page .fault-label {
+        font-size: 14px;
+        color: var(--text-secondary);
+    }
+
+    .diagnostics-page .fault-list {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .diagnostics-page .fault-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 10px;
+        margin-bottom: 5px;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        border-left: 3px solid var(--color-critical);
+    }
+
+    .diagnostics-page .fault-code {
+        font-family: monospace;
+        font-weight: 600;
+        color: var(--color-critical);
+    }
+
+    .diagnostics-page .fault-desc {
+        font-size: 12px;
+        color: var(--text-primary);
+    }
+
+    .diagnostics-page .fault-time {
+        font-size: 11px;
+        color: var(--text-secondary);
+    }
+
+    .diagnostics-page .fault-empty {
+        padding: 20px;
+        text-align: center;
+        color: var(--text-secondary);
+        font-style: italic;
+    }
+
+    @media (max-width: 767px) {
+        .diagnostics-page .io-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .diagnostics-page .encoder-details {
+            flex-direction: column;
+            gap: 5px;
+        }
+    }
+</style>

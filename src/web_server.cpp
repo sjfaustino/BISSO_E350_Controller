@@ -508,6 +508,70 @@ void WebServerManager::setupRoutes() {
     request->send(200, "application/json", "{\"success\":true}");
   });
 
+  // 4.8 Digital I/O Status API (Protected)
+  server->on("/api/io/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    JsonDocument doc;
+    doc["success"] = true;
+    
+    // Input states - use existing safety APIs where available
+    doc["estop"] = emergencyStopIsActive();
+    doc["door"] = false;   // Placeholder - no door sensor implemented
+    doc["probe"] = false;  // Placeholder - probe input
+    doc["limit_x"] = false; // Placeholder - limit switches
+    doc["limit_y"] = false;
+    doc["limit_z"] = false;
+    
+    // Output states - placeholders for now
+    // These could be connected to actual output tracking if available
+    doc["spindle_on"] = false;
+    doc["coolant_on"] = false;
+    doc["vacuum_on"] = false;
+    doc["alarm_on"] = emergencyStopIsActive(); // Alarm mirrors e-stop
+    
+    char response[256];
+    serializeJson(doc, response, sizeof(response));
+    request->send(200, "application/json", response);
+  });
+
+  // 4.9 Fault Log API (Protected)
+  server->on("/api/faults", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    JsonDocument doc;
+    doc["success"] = true;
+    
+    // Get fault log from fault_logging ring buffer
+    JsonArray faultsArr = doc["faults"].to<JsonArray>();
+    
+    // Get recent faults from ring buffer
+    uint8_t faultCount = faultGetRingBufferEntryCount();
+    
+    for (uint8_t i = 0; i < faultCount; i++) {
+      const fault_entry_t* entry = faultGetRingBufferEntry(i);
+      if (entry) {
+        JsonObject fault = faultsArr.add<JsonObject>();
+        fault["code"] = (uint8_t)entry->code;
+        fault["description"] = faultCodeToString(entry->code);
+        fault["timestamp"] = entry->timestamp;
+        fault["severity"] = faultSeverityToString(entry->severity);
+      }
+    }
+    
+    char response[512];
+    serializeJson(doc, response, sizeof(response));
+    request->send(200, "application/json", response);
+  });
+
+  // 4.10 Fault Log Clear API (Protected)
+  server->on("/api/faults/clear", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    faultClearHistory();
+    request->send(200, "application/json", "{\"success\":true}");
+  });
+
   // 5. API Task Performance Metrics (Protected, Rate Limited) - PHASE 5.1
   server->on("/api/metrics", HTTP_GET, [this](AsyncWebServerRequest *request) {
     if (!requireAuth(request)) return;
