@@ -15,6 +15,7 @@
 #include "config_unified.h"
 #include "plc_iface.h"              // PERFORMANCE FIX: I2C health monitoring
 #include "motion.h"                 // PERFORMANCE FIX: For motionEmergencyStop()
+#include "i2c_bus_recovery.h"       // ROBUSTNESS FIX: I2C bus recovery before E-STOP
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -53,10 +54,37 @@ void taskMonitorFunction(void* parameter) {
     static uint32_t last_i2c_check_ms = 0;
     static uint32_t last_timeout_count = 0;
     if (millis() - last_i2c_check_ms > 1000) {
+      // ROBUSTNESS FIX: 3-retry I2C bus recovery before escalating to E-STOP
+      // Single I2C glitches should not cause permanent emergency stop
       if (elboIsShadowRegisterDirty()) {
-        logError("[MONITOR] CRITICAL: PLC I2C communication failure - shadow register dirty!");
-        faultLogCritical(FAULT_I2C_ERROR, "PLC I2C failure detected - emergency stop");
-        motionEmergencyStop();
+        bool recovery_success = false;
+
+        // Attempt recovery up to 3 times with exponential backoff
+        for (int retry = 0; retry < 3; retry++) {
+          logWarning("[MONITOR] I2C shadow register dirty - attempting recovery %d/3", retry + 1);
+
+          // Attempt bus recovery
+          i2cRecoverBus();
+
+          // Wait with exponential backoff: 50ms, 100ms, 200ms
+          uint32_t backoff_ms = 50 << retry;
+          vTaskDelay(pdMS_TO_TICKS(backoff_ms));
+
+          // Check if recovery succeeded
+          if (!elboIsShadowRegisterDirty()) {
+            recovery_success = true;
+            logInfo("[MONITOR] [OK] I2C bus recovery successful on attempt %d/3", retry + 1);
+            faultLogWarning(FAULT_I2C_ERROR, "I2C bus recovered after %d attempt(s)", retry + 1);
+            break;
+          }
+        }
+
+        // All recovery attempts failed - trigger E-STOP
+        if (!recovery_success) {
+          logError("[MONITOR] CRITICAL: PLC I2C failure - all 3 recovery attempts exhausted");
+          faultLogCritical(FAULT_I2C_ERROR, "PLC I2C failure after 3 recovery attempts - emergency stop");
+          motionEmergencyStop();
+        }
       }
 
       uint32_t current_timeout_count = elboGetMutexTimeoutCount();
