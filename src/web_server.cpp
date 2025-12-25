@@ -1011,6 +1011,36 @@ void WebServerManager::setupRoutes() {
                  return;
                }
 
+               // SECURITY FIX: Whitelist validation for allowed configuration keys
+               // Defense-in-depth: Explicit whitelist check before processing
+               static const char* ALLOWED_CONFIG_KEYS[] = {
+                 // Motion category
+                 "soft_limit_x_low", "soft_limit_x_high",
+                 "soft_limit_y_low", "soft_limit_y_high",
+                 "soft_limit_z_low", "soft_limit_z_high",
+                 // VFD category
+                 "min_speed_hz", "max_speed_hz",
+                 "acc_time_ms", "dec_time_ms",
+                 // Encoder category
+                 "ppm_x", "ppm_y", "ppm_z",
+                 NULL  // Terminator
+               };
+
+               bool key_allowed = false;
+               for (int i = 0; ALLOWED_CONFIG_KEYS[i] != NULL; i++) {
+                 if (strcmp(key, ALLOWED_CONFIG_KEYS[i]) == 0) {
+                   key_allowed = true;
+                   break;
+                 }
+               }
+
+               if (!key_allowed) {
+                 logWarning("[WEB] [SECURITY] Rejected unauthorized config key: %s", key);
+                 request->send(403, "application/json",
+                               "{\"error\":\"Configuration key not allowed\"}");
+                 return;
+               }
+
                // INPUT VALIDATION: Check string value length if applicable
                if (value.is<const char *>()) {
                  const char *strValue = value.as<const char *>();
