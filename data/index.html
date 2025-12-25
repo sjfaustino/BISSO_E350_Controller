@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -84,6 +85,7 @@
                 transform: translateX(400px);
                 opacity: 0;
             }
+
             to {
                 transform: translateX(0);
                 opacity: 1;
@@ -99,13 +101,15 @@
         }
     </style>
 </head>
+
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
     <!-- Header -->
     <header role="banner">
         <div style="display: flex; align-items: center; gap: var(--space-md);">
-            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu"
+                aria-expanded="false">
                 <span></span>
                 <span></span>
                 <span></span>
@@ -134,7 +138,8 @@
     </nav>
 
     <!-- Alerts Container -->
-    <div class="alerts" role="region" aria-label="System alerts" aria-live="polite" aria-atomic="true" id="alerts-container"></div>
+    <div class="alerts" role="region" aria-label="System alerts" aria-live="polite" aria-atomic="true"
+        id="alerts-container"></div>
 
     <!-- Main Content -->
     <main id="page-container" class="container" role="main" id="main-content">
@@ -145,7 +150,8 @@
 
     <!-- Footer -->
     <footer>
-        <p>BISSO E350 Dashboard v3.1 | Last Update: <span id="last-update">--</span> | Latency: <span id="latency">-- ms</span></p>
+        <p>BISSO E350 Dashboard v3.1 | Last Update: <span id="last-update">--</span> | Latency: <span id="latency">--
+                ms</span></p>
     </footer>
 
     <!-- Shared Modules -->
@@ -161,6 +167,7 @@
     <script src="shared/alerts.js"></script>
     <script src="shared/theme.js"></script>
     <script src="shared/safety.js"></script>
+    <script src="shared/fallback-pages.js"></script>
     <script src="shared/router.js"></script>
     <script src="shared/graphs.js"></script>
     <script src="shared/mock-data.js"></script>
@@ -311,4 +318,5 @@
         }
     </script>
 </body>
+
 </html>

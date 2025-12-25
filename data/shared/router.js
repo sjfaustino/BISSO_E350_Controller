@@ -1,6 +1,7 @@
 /**
  * @file shared/router.js
  * @brief Client-side router for page navigation
+ * @description Refactored to use FallbackPages for fallback HTML templates
  */
 
 console.log('[ROUTER] router.js loading...');
@@ -65,240 +66,9 @@ class Router {
                 fetchFailed = true;
                 console.log(`[ROUTER] ${isFileProtocol ? 'File protocol detected' : 'Mock mode enabled'} - using fallback HTML for:`, page);
 
-                // Generate fallback HTML structure for file:// or mock mode
-                if (page === 'dashboard') {
-                    html = `
-                        <div class="dashboard-page">
-                            <div style="padding: 20px 0;">
-                                <h1>📊 Dashboard ${isFileProtocol ? '(File Mode)' : '(Mock Mode)'}</h1>
-                                <p style="color: var(--text-secondary); font-size: 14px;">Simulated data${isFileProtocol ? '' : ' - press M to disable'}</p>
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
-                                <div class="card">
-                                    <div class="card-header"><h3>Status</h3></div>
-                                    <div class="card-content">
-                                        <div id="motion-status">--</div>
-                                    </div>
-                                </div>
-                                <div class="card">
-                                    <div class="card-header"><h3>CPU</h3></div>
-                                    <div class="card-content">
-                                        <div id="cpu-value" style="font-size: 24px;">--</div>
-                                    </div>
-                                </div>
-                                <div class="card">
-                                    <div class="card-header"><h3>Memory</h3></div>
-                                    <div class="card-content">
-                                        <div id="memory-value" style="font-size: 24px;">--</div>
-                                    </div>
-                                </div>
-                                <div class="card">
-                                    <div class="card-header"><h3>VFD</h3></div>
-                                    <div class="card-content">
-                                        <div id="vfd-status">--</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div id="charts-section" style="margin-top: 30px;"></div>
-                        </div>
-                    `;
-                } else if (page === 'gcode') {
-                    html = `
-                        <div class="gcode-page">
-                            <div class="card">
-                                <div class="card-header"><h2>G-code Command Input (File Mode)</h2></div>
-                                <div class="card-content">
-                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">G-code execution requires connection to the ESP32 device. This interface is view-only in file mode.</p>
-                                    <textarea id="gcode-input" placeholder="Enter G-code commands..." style="width: 100%; min-height: 150px; padding: 10px; font-family: monospace; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px;" readonly></textarea>
-                                    <div style="margin-top: 10px;">
-                                        <button class="btn btn-primary" disabled>▶️ Execute Command (Requires Device)</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card">
-                                <div class="card-header"><h2>Parser State</h2></div>
-                                <div class="card-content">
-                                    <div id="distance-mode">Distance Mode: G90 (Absolute)</div>
-                                    <div id="work-coordinate">Work Coordinate: G54</div>
-                                    <div id="feed-rate">Feed Rate: -- mm/min</div>
-                                    <div id="motion-state">Motion State: Idle</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else if (page === 'motion') {
-                    html = `
-                        <div class="motion-page">
-                            <div class="card">
-                                <div class="card-header"><h2>Motion Control (File Mode)</h2></div>
-                                <div class="card-content">
-                                    <p style="color: var(--text-secondary);">Motion control requires connection to the ESP32 device. View-only in file mode.</p>
-                                    <div style="margin-top: 20px;">
-                                        <h3>Current Position</h3>
-                                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;">
-                                            <div class="position-display">
-                                                <div style="color: var(--text-secondary); font-size: 12px;">X Axis</div>
-                                                <div id="pos-x" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
-                                            </div>
-                                            <div class="position-display">
-                                                <div style="color: var(--text-secondary); font-size: 12px;">Y Axis</div>
-                                                <div id="pos-y" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
-                                            </div>
-                                            <div class="position-display">
-                                                <div style="color: var(--text-secondary); font-size: 12px;">Z Axis</div>
-                                                <div id="pos-z" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
-                                            </div>
-                                            <div class="position-display">
-                                                <div style="color: var(--text-secondary); font-size: 12px;">A Axis</div>
-                                                <div id="pos-a" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else if (page === 'diagnostics') {
-                    html = `
-                        <div class="diagnostics-page">
-                            <div class="card">
-                                <div class="card-header"><h2>System Diagnostics (File Mode)</h2></div>
-                                <div class="card-content">
-                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Live diagnostics require connection to the ESP32 device.</p>
-                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                        <h3>Status</h3>
-                                        <div id="system-status">System: Offline (File Mode)</div>
-                                        <div id="motion-system">Motion: Not Connected</div>
-                                        <div id="vfd-system">VFD: Not Connected</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else if (page === 'network') {
-                    html = `
-                        <div class="network-page">
-                            <div class="card">
-                                <div class="card-header"><h2>Network Status (File Mode)</h2></div>
-                                <div class="card-content">
-                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Network information requires connection to the ESP32 device.</p>
-                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                        <div id="wifi-status">WiFi: Not Connected</div>
-                                        <div id="wifi-ssid">SSID: --</div>
-                                        <div id="signal-dbm">Signal: -- dBm</div>
-                                        <div id="signal-quality">Quality: --</div>
-                                        <div id="latency-ms" style="margin-top: 10px;">Latency: -- ms</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else if (page === 'system') {
-                    html = `
-                        <div class="system-page">
-                            <div class="card">
-                                <div class="card-header"><h2>System Information (File Mode)</h2></div>
-                                <div class="card-content">
-                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">System information requires connection to the ESP32 device.</p>
-                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                        <h3>Device Info</h3>
-                                        <div>Firmware: Not Connected</div>
-                                        <div>Hardware: ESP32-WROOM-32E</div>
-                                        <div>Uptime: --</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else if (page === 'maintenance') {
-                    html = `
-                        <div class="maintenance-page">
-                            <div class="card">
-                                <div class="card-header"><h2>Maintenance (File Mode)</h2></div>
-                                <div class="card-content">
-                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Maintenance tracking requires connection to the ESP32 device.</p>
-                                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                        <h3>Component Status</h3>
-                                        <div>Motor Hours: --</div>
-                                        <div>VFD Runtime: --</div>
-                                        <div>Last Service: --</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else if (page === 'logs') {
-                    html = `
-                        <div class="logs-page">
-                            <div class="card">
-                                <div class="card-header"><h2>System Logs (File Mode)</h2></div>
-                                <div class="card-content">
-                                    <p style="color: var(--text-secondary); margin-bottom: 15px;">Log viewing requires connection to the ESP32 device.</p>
-                                    <div id="log-container" style="padding: 20px; background: var(--bg-secondary); border-radius: 4px; font-family: monospace; max-height: 400px; overflow-y: auto;">
-                                        <div>No logs available in file mode</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else if (page === 'settings') {
-                    html = `
-                        <div class="settings-page">
-                            <div class="card">
-                                <div class="card-header"><h2>⚙️ Display & Theme Settings</h2></div>
-                                <div class="card-content">
-                                    <div class="setting-group">
-                                        <label>Theme:</label>
-                                        <div class="theme-selector" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;">
-                                            <button class="theme-option" data-theme="light" title="Light Theme" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); cursor: pointer;">
-                                                <div class="theme-preview light" style="width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid var(--border-color);"></div>
-                                                <span style="font-size: 12px;">Light</span>
-                                            </button>
-                                            <button class="theme-option" data-theme="dark" title="Dark Theme" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); cursor: pointer;">
-                                                <div class="theme-preview dark" style="width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid var(--border-color);"></div>
-                                                <span style="font-size: 12px;">Dark</span>
-                                            </button>
-                                            <button class="theme-option" data-theme="high-contrast" title="High Contrast" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); cursor: pointer;">
-                                                <div class="theme-preview high-contrast" style="width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #000000 0%, #ffffff 100%); border: 1px solid var(--border-color);"></div>
-                                                <span style="font-size: 12px;">High Contrast</span>
-                                            </button>
-                                            <button class="theme-option" data-theme="colorblind" title="Colorblind Mode" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); cursor: pointer;">
-                                                <div class="theme-preview colorblind" style="width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #0173b2 0%, #de8f05 100%); border: 1px solid var(--border-color);"></div>
-                                                <span style="font-size: 12px;">Colorblind</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="setting-group" style="margin-top: 20px;">
-                                        <label>Font Size: <span id="font-size-display">100</span>%</label>
-                                        <div class="slider-container" style="margin: 10px 0;">
-                                            <input type="range" id="font-size-slider" min="80" max="120" value="100" class="slider" style="width: 100%;">
-                                            <div class="slider-labels" style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-top: 5px;">
-                                                <span>Smaller</span>
-                                                <span>Normal</span>
-                                                <span>Larger</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <p style="color: var(--text-secondary); margin-top: 20px; font-size: 14px;">
-                                        💡 Tip: Press <strong>T</strong> key to quickly cycle through themes
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    // Generic fallback for any other pages
-                    html = `
-                        <div style="padding: 40px 20px; text-align: center;">
-                            <h2>📄 ${page.charAt(0).toUpperCase() + page.slice(1)} Page</h2>
-                            <p style="color: var(--text-secondary); margin: 20px 0;">
-                                ${isFileProtocol ? 'File mode' : 'Mock mode'} - This page requires connection to the ESP32 device.
-                            </p>
-                        </div>
-                    `;
-                }
+                // Use FallbackPages module for fallback HTML
+                html = window.FallbackPages?.getPageHTML(page, isFileProtocol) ||
+                    `<div style="padding: 40px 20px; text-align: center;"><h2>${page} (Fallback)</h2></div>`;
             } else {
                 try {
                     const htmlResponse = await fetch(route.file);
@@ -308,246 +78,23 @@ class Router {
                     fetchFailed = true;
                     console.warn(`[ROUTER] Failed to fetch ${route.file}:`, fetchError.message);
 
-                // If mock mode is enabled after fetch failed, create minimal HTML with basic structure
-                // The JS module will populate it with mock data
-                if (window.MockMode?.enabled) {
-                    console.log('[ROUTER] Mock mode enabled after fetch failure, generating fallback structure for:', page);
-
-                    // Generate page-specific fallback structures
-                    if (page === 'dashboard') {
-                        html = `
-                            <div class="dashboard-page">
-                                <div style="padding: 20px 0;">
-                                    <h1>📊 Dashboard (Mock Mode)</h1>
-                                    <p style="color: var(--text-secondary); font-size: 14px;">Simulated data - press M to disable</p>
-                                </div>
-
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
-                                    <div class="card">
-                                        <div class="card-header"><h3>Status</h3></div>
-                                        <div class="card-content">
-                                            <div id="motion-status">--</div>
-                                        </div>
-                                    </div>
-                                    <div class="card">
-                                        <div class="card-header"><h3>CPU</h3></div>
-                                        <div class="card-content">
-                                            <div id="cpu-value" style="font-size: 24px;">--</div>
-                                        </div>
-                                    </div>
-                                    <div class="card">
-                                        <div class="card-header"><h3>Memory</h3></div>
-                                        <div class="card-content">
-                                            <div id="memory-value" style="font-size: 24px;">--</div>
-                                        </div>
-                                    </div>
-                                    <div class="card">
-                                        <div class="card-header"><h3>VFD</h3></div>
-                                        <div class="card-content">
-                                            <div id="vfd-status">--</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div id="charts-section" style="margin-top: 30px;"></div>
-                            </div>
-                        `;
-                    } else if (page === 'gcode') {
-                        html = `
-                            <div class="gcode-page">
-                                <div class="card">
-                                    <div class="card-header"><h2>G-code Command Input (Mock Mode)</h2></div>
-                                    <div class="card-content">
-                                        <p style="color: var(--text-secondary); margin-bottom: 15px;">Mock mode - interface view-only.</p>
-                                        <textarea id="gcode-input" placeholder="Enter G-code commands..." style="width: 100%; min-height: 150px; padding: 10px; font-family: monospace; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px;" readonly></textarea>
-                                        <div style="margin-top: 10px;">
-                                            <button class="btn btn-primary" disabled>▶️ Execute Command (Mock Mode)</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card">
-                                    <div class="card-header"><h2>Parser State</h2></div>
-                                    <div class="card-content">
-                                        <div id="distance-mode">Distance Mode: G90 (Absolute)</div>
-                                        <div id="work-coordinate">Work Coordinate: G54</div>
-                                        <div id="feed-rate">Feed Rate: -- mm/min</div>
-                                        <div id="motion-state">Motion State: Idle</div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    } else if (page === 'motion') {
-                        html = `
-                            <div class="motion-page">
-                                <div class="card">
-                                    <div class="card-header"><h2>Motion Control (Mock Mode)</h2></div>
-                                    <div class="card-content">
-                                        <p style="color: var(--text-secondary);">Mock mode - view-only.</p>
-                                        <div style="margin-top: 20px;">
-                                            <h3>Current Position</h3>
-                                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;">
-                                                <div class="position-display">
-                                                    <div style="color: var(--text-secondary); font-size: 12px;">X Axis</div>
-                                                    <div id="pos-x" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
-                                                </div>
-                                                <div class="position-display">
-                                                    <div style="color: var(--text-secondary); font-size: 12px;">Y Axis</div>
-                                                    <div id="pos-y" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
-                                                </div>
-                                                <div class="position-display">
-                                                    <div style="color: var(--text-secondary); font-size: 12px;">Z Axis</div>
-                                                    <div id="pos-z" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
-                                                </div>
-                                                <div class="position-display">
-                                                    <div style="color: var(--text-secondary); font-size: 12px;">A Axis</div>
-                                                    <div id="pos-a" style="font-size: 20px; font-weight: bold;">0.00 mm</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    } else if (page === 'diagnostics') {
-                        html = `
-                            <div class="diagnostics-page">
-                                <div class="card">
-                                    <div class="card-header"><h2>System Diagnostics (Mock Mode)</h2></div>
-                                    <div class="card-content">
-                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                            <h3>Status</h3>
-                                            <div id="system-status">System: Mock Mode</div>
-                                            <div id="motion-system">Motion: Simulated</div>
-                                            <div id="vfd-system">VFD: Simulated</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    } else if (page === 'network') {
-                        html = `
-                            <div class="network-page">
-                                <div class="card">
-                                    <div class="card-header"><h2>Network Status (Mock Mode)</h2></div>
-                                    <div class="card-content">
-                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                            <div id="wifi-status">WiFi: Simulated</div>
-                                            <div id="wifi-ssid">SSID: --</div>
-                                            <div id="signal-dbm">Signal: -- dBm</div>
-                                            <div id="signal-quality">Quality: --</div>
-                                            <div id="latency-ms" style="margin-top: 10px;">Latency: -- ms</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    } else if (page === 'system') {
-                        html = `
-                            <div class="system-page">
-                                <div class="card">
-                                    <div class="card-header"><h2>System Information (Mock Mode)</h2></div>
-                                    <div class="card-content">
-                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                            <h3>Device Info</h3>
-                                            <div>Firmware: Simulated</div>
-                                            <div>Hardware: ESP32-WROOM-32E</div>
-                                            <div>Uptime: --</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    } else if (page === 'maintenance') {
-                        html = `
-                            <div class="maintenance-page">
-                                <div class="card">
-                                    <div class="card-header"><h2>Maintenance (Mock Mode)</h2></div>
-                                    <div class="card-content">
-                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                            <h3>Component Status</h3>
-                                            <div>Motor Hours: --</div>
-                                            <div>VFD Runtime: --</div>
-                                            <div>Last Service: --</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    } else if (page === 'logs') {
-                        html = `
-                            <div class="logs-page">
-                                <div class="card">
-                                    <div class="card-header"><h2>System Logs (Mock Mode)</h2></div>
-                                    <div class="card-content">
-                                        <div id="log-container" style="padding: 20px; background: var(--bg-secondary); border-radius: 4px; font-family: monospace; max-height: 400px; overflow-y: auto;">
-                                            <div>Mock mode - no logs available</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    } else if (page === 'settings') {
-                        html = `
-                            <div class="settings-page">
-                                <div class="card">
-                                    <div class="card-header"><h2>Settings (Mock Mode)</h2></div>
-                                    <div class="card-content">
-                                        <div style="padding: 20px; background: var(--bg-secondary); border-radius: 4px;">
-                                            <h3>Display Settings</h3>
-                                            <div style="margin: 10px 0;">
-                                                <label>Theme: <select disabled><option>Light</option></select></label>
-                                            </div>
-                                            <div style="margin: 10px 0;">
-                                                <label>Font Size: <input type="range" disabled /></label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
+                    // If mock mode is enabled after fetch failed, use fallback HTML
+                    if (window.MockMode?.enabled) {
+                        console.log('[ROUTER] Mock mode enabled after fetch failure, generating fallback structure for:', page);
+                        html = window.FallbackPages?.getPageHTML(page, false) ||
+                            `<div style="padding: 40px 20px; text-align: center;"><h2>${page} (Mock)</h2></div>`;
+                    } else if (!navigator.onLine) {
+                        // Offline but mock mode not enabled - show helpful message
+                        html = window.FallbackPages?.getOfflineHTML() ||
+                            `<div style="padding: 40px 20px; text-align: center;"><h2>Offline</h2></div>`;
+                        container.innerHTML = html;
+                        this.isLoading = false;
+                        return;
                     } else {
-                        // Generic fallback for any other pages
-                        html = `
-                            <div style="padding: 40px 20px; text-align: center;">
-                                <h2>📄 ${page.charAt(0).toUpperCase() + page.slice(1)} Page</h2>
-                                <p style="color: var(--text-secondary); margin: 20px 0;">
-                                    Mock mode - This page requires connection to the ESP32 device.
-                                </p>
-                            </div>
-                        `;
+                        throw fetchError;
                     }
-                    // Don't return - continue to load the JS module below
-                } else if (!navigator.onLine) {
-                    // Offline but mock mode not enabled - show helpful message
-                    html = `
-                        <div style="padding: 40px 20px; text-align: center;">
-                            <h2>📡 Offline Mode</h2>
-                            <p style="color: var(--text-secondary); margin: 20px 0;">
-                                Cannot load page content while offline.
-                            </p>
-                            <div style="background: var(--bg-secondary); padding: 20px; border-radius: 8px; margin: 20px 0;">
-                                <p style="margin: 10px 0; font-size: 14px;">
-                                    <strong>Mock Mode:</strong>
-                                    ✗ Disabled
-                                </p>
-                                <p style="margin: 10px 0; font-size: 14px;">
-                                    <strong>Network:</strong>
-                                    ✗ Offline
-                                </p>
-                            </div>
-                            <p style="color: var(--text-secondary); margin-top: 20px; font-size: 14px;">
-                                Enable mock mode with <strong>M</strong> key to preview dashboard with simulated data.
-                            </p>
-                        </div>
-                    `;
-                    container.innerHTML = html;
-                    this.isLoading = false;
-                    return;
-                } else {
-                    throw fetchError;
                 }
-                }  // Close catch block
-            }  // Close else block
+            }
 
             console.log('[ROUTER] Setting page content, HTML length:', html?.length || 0);
             container.innerHTML = html;
@@ -583,15 +130,8 @@ class Router {
 
                 // If JS also fails and we're offline, show error
                 if (fetchFailed && !navigator.onLine) {
-                    container.innerHTML = `
-                        <div style="padding: 40px 20px; text-align: center; color: var(--color-critical);">
-                            <h2>❌ Error Loading Page</h2>
-                            <p>Could not load page module and content is not available offline.</p>
-                            <p style="font-size: 14px; margin-top: 20px;">
-                                Enable <strong>Mock Mode</strong> (press <strong>M</strong>) to use simulated data.
-                            </p>
-                        </div>
-                    `;
+                    container.innerHTML = window.FallbackPages?.getErrorHTML('Could not load page module') ||
+                        '<div style="color: red;">Error loading page</div>';
                 }
                 this.isLoading = false;
             };
@@ -600,15 +140,8 @@ class Router {
         } catch (error) {
             console.error('[ROUTER] Navigation error:', error);
             const container = document.getElementById('page-container');
-            container.innerHTML = `
-                <div style="padding: 40px 20px; text-align: center; color: var(--color-critical);">
-                    <h2>❌ Error Loading Page</h2>
-                    <p>${error.message}</p>
-                    <p style="font-size: 14px; margin-top: 20px;">
-                        Make sure the device is online or enable <strong>Mock Mode</strong> (press <strong>M</strong>)
-                    </p>
-                </div>
-            `;
+            container.innerHTML = window.FallbackPages?.getErrorHTML(error.message) ||
+                `<div style="color: red;">Error: ${error.message}</div>`;
             this.isLoading = false;
         }
     }
