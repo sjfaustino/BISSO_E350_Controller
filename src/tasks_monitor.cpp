@@ -56,13 +56,26 @@ void taskMonitorFunction(void* parameter) {
             logWarning("[MONITOR] [WARN] Task '%s' is slow: %lu ms",
                        stats_array[i].name, (unsigned long)stats_array[i].last_run_time_ms);
         }
-        
-        // Stack Depth Check (Watermark)
+
+        // SECURITY FIX: Enhanced stack overflow monitoring with critical fault logging
+        // Stack sizes are typically 2048 words (8192 bytes)
+        // Thresholds: CRITICAL < 128 words (6.25%), WARNING < 256 words (12.5%)
         if (stats_array[i].handle != NULL) {
             UBaseType_t high_water = uxTaskGetStackHighWaterMark(stats_array[i].handle);
-            if (high_water < 50) { // < 200 bytes safe margin
-                 logError("[MONITOR] [CRIT] Stack near overflow: %s (%lu words free)", 
-                          stats_array[i].name, (unsigned long)high_water);
+
+            if (high_water < 128) {  // < 512 bytes remaining - CRITICAL
+                faultLogEntry(FAULT_CRITICAL, FAULT_CRITICAL_SYSTEM_ERROR, i, high_water,
+                             "CRITICAL: Stack near overflow in task '%s' (%lu words free)",
+                             stats_array[i].name, (unsigned long)high_water);
+                logError("[MONITOR] [CRITICAL] Stack overflow imminent: %s (%lu words / %lu bytes free)",
+                         stats_array[i].name, (unsigned long)high_water, (unsigned long)(high_water * 4));
+            }
+            else if (high_water < 256) {  // < 1024 bytes remaining - WARNING
+                faultLogEntry(FAULT_WARNING, FAULT_CRITICAL_SYSTEM_ERROR, i, high_water,
+                             "WARNING: Low stack space in task '%s' (%lu words free)",
+                             stats_array[i].name, (unsigned long)high_water);
+                logWarning("[MONITOR] [WARN] Low stack: %s (%lu words / %lu bytes free)",
+                          stats_array[i].name, (unsigned long)high_water, (unsigned long)(high_water * 4));
             }
         }
     }
