@@ -16,6 +16,7 @@ class Router {
         'system': { file: 'pages/system/system.html', js: 'pages/system/system.js' },
         'maintenance': { file: 'pages/maintenance/maintenance.html', js: 'pages/maintenance/maintenance.js' },
         'logs': { file: 'pages/logs/logs.html', js: 'pages/logs/logs.js' },
+        'hardware': { file: 'pages/hardware/hardware.html', js: 'pages/hardware/hardware.js' },
         'settings': { file: 'pages/settings/settings.html', js: 'pages/settings/settings.js' }
     };
 
