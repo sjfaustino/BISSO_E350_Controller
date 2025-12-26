@@ -63,20 +63,43 @@
         <p>BISSO E350 Dashboard v3.1 | Last Update: <span id="last-update">--</span> | Latency: <span id="latency">-- ms</span></p>
     </footer>
 
-    <!-- Single Bundle Script -->
-    <script src="bundle.js?v=1766770416"></script>
-    
+    <!-- Progressive Bundle Loading: Core first (5.8KB), then Dashboard (11KB) -->
+    <script src="bundle-core.js?v=2"></script>
+
     <script>
-        // Main App Initialization
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("Initializing App...");
-            // Initialize Router directly since there is no main App class
+        // Progressive Loading System
+        console.log('[APP] Core bundle loaded, loading dashboard bundle...');
+
+        // Load dashboard bundle dynamically
+        const dashboardScript = document.createElement('script');
+        dashboardScript.src = 'bundle-dashboard.js?v=2';
+        dashboardScript.onload = () => {
+            console.log('[APP] Dashboard bundle loaded successfully');
+            initializeApp();
+        };
+        dashboardScript.onerror = () => {
+            console.error('[APP] Failed to load dashboard bundle, continuing with core only');
+            initializeApp();
+        };
+        document.head.appendChild(dashboardScript);
+
+        // Initialize app after bundles load
+        function initializeApp() {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', startRouter);
+            } else {
+                startRouter();
+            }
+        }
+
+        function startRouter() {
+            console.log('[APP] Initializing Router...');
             if (window.Router) {
                 window.Router.init();
             } else {
-                console.error("Router not found!");
+                console.error('[APP] Router not found in core bundle!');
             }
-        });
+        }
     </script>
 </body>
 </html>
