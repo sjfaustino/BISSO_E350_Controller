@@ -308,6 +308,7 @@ size_t apiEndpointsExportJSON(char* buffer, size_t buffer_size) {
 }
 
 void apiEndpointsPrint() {
+    serialLoggerLock();
     Serial.println("\n[API ENDPOINTS] === Registered Endpoints ===");
     Serial.println("Path                        | Methods            | Auth | Rate Limit");
     Serial.println("----------------------------|-------------------|------|---------------------");
@@ -323,4 +324,5 @@ void apiEndpointsPrint() {
     }
 
     Serial.printf("\nTotal endpoints: %d\n\n", endpoint_count);
+    serialLoggerUnlock();
 }

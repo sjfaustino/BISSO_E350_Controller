@@ -74,7 +74,7 @@ static uint32_t boot_time_ms = 0;
 // ============================================================================
 
 void taskManagerInit() {
-  Serial.println("[TASKS] Initializing FreeRTOS manager...");
+  logPrintln("[TASKS] Initializing FreeRTOS manager...");
   boot_time_ms = millis();
 
   // Create Queues with individual error checking
@@ -83,47 +83,47 @@ void taskManagerInit() {
   // PHASE 5.10: Use sizeof(queue_message_t) to prevent memory corruption
   queue_motion = xQueueCreate(QUEUE_LEN_MOTION, sizeof(queue_message_t));
   if (!queue_motion) {
-    Serial.println("[TASKS] [FAIL] Motion queue creation failed!");
+    logError("[TASKS] Motion queue creation failed!");
     queue_failure = true;
   }
 
   queue_safety = xQueueCreate(QUEUE_LEN_SAFETY, sizeof(queue_message_t));
   if (!queue_safety) {
-    Serial.println("[TASKS] [FAIL] Safety queue creation failed!");
+    logError("[TASKS] Safety queue creation failed!");
     queue_failure = true;
   }
 
   queue_encoder = xQueueCreate(QUEUE_LEN_ENCODER, sizeof(queue_message_t));
   if (!queue_encoder) {
-    Serial.println("[TASKS] [FAIL] Encoder queue creation failed!");
+    logError("[TASKS] Encoder queue creation failed!");
     queue_failure = true;
   }
 
   queue_plc = xQueueCreate(QUEUE_LEN_PLC, sizeof(queue_message_t));
   if (!queue_plc) {
-    Serial.println("[TASKS] [FAIL] PLC queue creation failed!");
+    logError("[TASKS] PLC queue creation failed!");
     queue_failure = true;
   }
 
   queue_fault = xQueueCreate(QUEUE_LEN_FAULT, sizeof(queue_message_t));
   if (!queue_fault) {
-    Serial.println("[TASKS] [FAIL] Fault queue creation failed!");
+    logError("[TASKS] Fault queue creation failed!");
     queue_failure = true;
   }
 
   queue_display = xQueueCreate(QUEUE_LEN_DISPLAY, sizeof(queue_message_t));
   if (!queue_display) {
-    Serial.println("[TASKS] [FAIL] Display queue creation failed!");
+    logError("[TASKS] Display queue creation failed!");
     queue_failure = true;
   }
 
   // PHASE 5.10: Initialize event groups for event-driven architecture
-  Serial.println("[TASKS] Initializing event groups...");
+  logPrintln("[TASKS] Initializing event groups...");
   if (!systemEventsInit()) {
-    Serial.println("[TASKS] [FAIL] Event group initialization failed!");
+    logError("[TASKS] Event group initialization failed!");
     queue_failure = true; // Reuse queue_failure flag for init error
   } else {
-    Serial.println("[TASKS] [OK] Event groups initialized");
+    logInfo("[TASKS] [OK] Event groups initialized");
   }
 
   // Create Mutexes with individual error checking
@@ -131,13 +131,13 @@ void taskManagerInit() {
 
   mutex_config = xSemaphoreCreateMutex();
   if (!mutex_config) {
-    Serial.println("[TASKS] [FAIL] Config mutex creation failed!");
+    logError("[TASKS] Config mutex creation failed!");
     mutex_failure = true;
   }
 
   mutex_i2c = xSemaphoreCreateMutex();
   if (!mutex_i2c) {
-    Serial.println("[TASKS] [FAIL] I2C mutex creation failed!");
+    logError("[TASKS] I2C mutex creation failed!");
     mutex_failure = true;
   }
 
@@ -146,37 +146,33 @@ void taskManagerInit() {
 
   mutex_motion = xSemaphoreCreateMutex();
   if (!mutex_motion) {
-    Serial.println("[TASKS] [FAIL] Motion mutex creation failed!");
+    logError("[TASKS] Motion mutex creation failed!");
     mutex_failure = true;
   }
 
   mutex_buffer = xSemaphoreCreateMutex();
   if (!mutex_buffer) {
-    Serial.println("[TASKS] [FAIL] Buffer mutex creation failed!");
+    logError("[TASKS] Buffer mutex creation failed!");
     mutex_failure = true;
   }
 
   // CRITICAL: Halt system if any queue or mutex creation failed
   if (queue_failure || mutex_failure) {
-    Serial.println(
-        "[TASKS] CRITICAL FAILURE: FreeRTOS primitives creation failed!");
-    Serial.print("[TASKS] Available heap: ");
-    Serial.print(ESP.getFreeHeap());
-    Serial.println(" bytes");
-    Serial.println("[TASKS] This usually indicates insufficient memory.");
-    Serial.println(
-        "[TASKS] HALTING SYSTEM - Cannot operate safely without primitives!");
+    logError("[TASKS] CRITICAL: FreeRTOS primitives creation failed!");
+    logError("[TASKS] Available heap: %u bytes", ESP.getFreeHeap());
+    logError("[TASKS] This usually indicates insufficient memory.");
+    logError("[TASKS] HALTING SYSTEM!");
 
     while (1) {
       delay(1000); // Halt system - DO NOT CONTINUE
     }
   }
 
-  Serial.println("[TASKS] [OK] Primitives created");
+  logInfo("[TASKS] [OK] Primitives created");
 }
 
 void taskManagerStart() {
-  Serial.println("[TASKS] Starting scheduler...");
+  logPrintln("[TASKS] Starting scheduler...");
 
   taskSafetyCreate();
   taskMotionCreate();
@@ -218,7 +214,7 @@ void taskManagerStart() {
     }
   }
 
-  Serial.println("[TASKS] [OK] All tasks active");
+  logInfo("[TASKS] [OK] All tasks active");
 }
 
 // ============================================================================
@@ -415,9 +411,9 @@ void taskLcdCreate() {
 // ============================================================================
 
 void taskShowStats() {
-  Serial.println("\n=== TASK STATISTICS ===");
-  Serial.println("Task               Runs      Avg(ms)   Max(ms)   CPU%");
-  Serial.println("------------------------------------------------------");
+  logPrintln("\n=== TASK STATISTICS ===");
+  logPrintln("Task               Runs      Avg(ms)   Max(ms)   CPU%%");
+  logPrintln("------------------------------------------------------");
 
   uint32_t total_time = 0;
   for (int i = 0; i < stats_count; i++)
@@ -433,17 +429,17 @@ void taskShowStats() {
             ? ((float)task_stats[i].total_time_ms / total_time) * 100.0
             : 0;
 
-    Serial.printf("%-18s %-9lu %-9.2f %-9lu %-6.1f%%\n", task_stats[i].name,
+    logPrintf("%-18s %-9lu %-9.2f %-9lu %-6.1f%%\n", task_stats[i].name,
                   (unsigned long)task_stats[i].run_count, avg_time,
                   (unsigned long)task_stats[i].max_run_time_ms, cpu_percent);
   }
-  Serial.println();
+  logPrintln("");
 }
 
 void taskShowAllTasks() {
-  Serial.println("\n=== TASK LIST ===");
-  Serial.println("Task                  Priority  Stack(bytes)  Core");
-  Serial.println("--------------------------------------------------");
+  logPrintln("\n=== TASK LIST ===");
+  logPrintln("Task                  Priority  Stack(bytes)  Core");
+  logPrintln("--------------------------------------------------");
   for (int i = 0; i < stats_count; i++) {
     if (!task_stats[i].handle)
       continue;
@@ -452,11 +448,11 @@ void taskShowAllTasks() {
         uxTaskGetStackHighWaterMark(task_stats[i].handle);
     BaseType_t core_id = xTaskGetAffinity(task_stats[i].handle);
 
-    Serial.printf("%-21s %-9lu %-13lu %ld\n", task_stats[i].name,
+    logPrintf("%-21s %-9lu %-13lu %ld\n", task_stats[i].name,
                   (unsigned long)priority,
                   (unsigned long)(stack_high_water * 4), (long)core_id);
   }
-  Serial.println();
+  logPrintln("");
 }
 
 uint8_t taskGetCpuUsage() {

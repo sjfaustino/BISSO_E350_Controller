@@ -230,6 +230,7 @@ migration_stats_t configMigrationGetStats() {
 }
 
 void configMigrationShowReport() {
+  serialLoggerLock();
   Serial.println("\n=== MIGRATION REPORT ===");
   Serial.printf("Keys Migrated: %lu\n", (unsigned long)last_migration_stats.keys_migrated);
   Serial.printf("Keys Initialized: %lu\n", (unsigned long)last_migration_stats.keys_initialized);
@@ -237,6 +238,7 @@ void configMigrationShowReport() {
   Serial.printf("Errors: %lu\n", (unsigned long)last_migration_stats.errors);
   Serial.printf("Time: %lu ms\n", (unsigned long)last_migration_stats.migration_time_ms);
   Serial.println();
+  serialLoggerUnlock();
 }
 
 // ============================================================================

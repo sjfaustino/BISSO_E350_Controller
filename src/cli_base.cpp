@@ -48,7 +48,7 @@ extern void bootRebootSystem();
 // --- SAFE JOGGING PARSER ---
 void handle_jog_command(char* cmd) {
     if (motionIsMoving() || motionIsEmergencyStopped() || safetyIsAlarmed()) {
-        Serial.println("error:8"); // Not Idle
+        logPrintln("error:8"); // Not Idle
         return;
     }
 
@@ -65,7 +65,7 @@ void handle_jog_command(char* cmd) {
         if (endptr != (f_ptr + 1) && !isnan(parsed) && !isinf(parsed)) {
             feed_mm_min = parsed;
         } else {
-            Serial.println("error:33"); // Invalid G-code target
+            logPrintln("error:33"); // Invalid G-code target
             return;
         }
     }
@@ -92,7 +92,7 @@ void handle_jog_command(char* cmd) {
                 target[i] = parsed;  // Work coordinate for specified axis
                 axis_present[i] = true;
             } else {
-                Serial.println("error:33"); // Invalid G-code target
+                logPrintln("error:33"); // Invalid G-code target
                 return;
             }
         } else {
@@ -117,14 +117,14 @@ void handle_jog_command(char* cmd) {
         ok = motionMoveAbsolute(machine_target_x, machine_target_y, machine_target_z, machine_target_a, feed_mm_s);
     }
 
-    if (ok) Serial.println("ok");
-    else Serial.println("error:3"); 
+    if (ok) logPrintln("ok");
+    else logPrintln("error:3"); 
 }
 
 // --- CORE CLI ---
 
 void cliInit() {
-  Serial.println("\r\nGrbl 1.1h ['$' for help]"); 
+  logPrintln("\r\nGrbl 1.1h ['$' for help]"); 
   memset(cli_buffer, 0, sizeof(cli_buffer));
   cli_pos = 0;
   command_count = 0;
@@ -144,6 +144,7 @@ void cliInit() {
   cliRegisterCalibCommands();
   cliRegisterWifiCommands(); 
   cliRegisterCommand("web_setpass", "Set Web UI password", cmd_web_setpass);
+  cliRegisterCommand("auth", "Auth diagnostics & testing", cmd_auth);
   
   gcodeParser.init();
 }
@@ -175,6 +176,7 @@ void cliUpdate() {
         float wPos[4];
         for(int i=0; i<4; i++) wPos[i] = gcodeParser.getWorkPosition(i, mPos[i]);
 
+        serialLoggerLock();
         Serial.printf("<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f|Bf:%d,127|FS:%.0f,0>\r\n",
             state_str,
             mPos[0], mPos[1], mPos[2], mPos[3],
@@ -182,6 +184,7 @@ void cliUpdate() {
             plan_slots,
             motionPlanner.getFeedOverride() * 100.0f 
         );
+        serialLoggerUnlock();
         return; 
     }
 
@@ -191,7 +194,7 @@ void cliUpdate() {
     if (c == 0x18) { // Soft Reset
         Serial.read();
         motionEmergencyStop();
-        Serial.print("\r\nGrbl 1.1h ['$' for help]\r\n");
+        logPrintln("\r\nGrbl 1.1h ['$' for help]");
         cli_pos = 0;
         return;
     }
@@ -254,7 +257,7 @@ void cliUpdate() {
         }
         cli_pos = 0;
       } else {
-        Serial.println("ok"); 
+        logPrintln("ok"); 
       }
     } else if (c == '\b' || c == 0x7F) {
       last_was_eol = false;
@@ -271,13 +274,13 @@ void cliUpdate() {
 }
 
 void cliProcessCommand(const char* cmd) {
-  if (strlen(cmd) == 0) { Serial.println("ok"); return; }
+  if (strlen(cmd) == 0) { logPrintln("ok"); return; }
   
   // G-Code
   char first_char = toupper(cmd[0]);
   if (first_char == 'G' || first_char == 'M' || first_char == 'T') {
-      if (gcodeParser.processCommand(cmd)) Serial.println("ok"); 
-      else Serial.println("error:20");
+      if (gcodeParser.processCommand(cmd)) logPrintln("ok"); 
+      else logPrintln("error:20");
       return;
   }
 
@@ -287,7 +290,7 @@ void cliProcessCommand(const char* cmd) {
       char* endptr = NULL;
       long id_long = strtol(cmd + 1, &endptr, 10);
       if (endptr == (cmd + 1) || id_long < 0 || id_long > 255) {
-          Serial.println("error:3"); // Unsupported command
+          logPrintln("error:3"); // Unsupported command
           return;
       }
       int id = (int)id_long;
@@ -297,7 +300,7 @@ void cliProcessCommand(const char* cmd) {
           char* endptr2 = NULL;
           float val = strtof(eq + 1, &endptr2);
           if (endptr2 == (eq + 1) || isnan(val) || isinf(val)) {
-              Serial.println("error:33"); // Invalid G-code target
+              logPrintln("error:33"); // Invalid G-code target
               return;
           }
 
@@ -316,8 +319,8 @@ void cliProcessCommand(const char* cmd) {
               case 131: key = KEY_Y_LIMIT_MAX; break;
               case 132: key = KEY_Z_LIMIT_MAX; break;
           }
-          if (key) { configSetFloat(key, val); Serial.println("ok"); }
-          else Serial.println("error:3");
+          if (key) { configSetFloat(key, val); logPrintln("ok"); }
+          else logPrintln("error:3");
       }
       return;
   }
@@ -335,11 +338,11 @@ void cliProcessCommand(const char* cmd) {
   for (int i = 0; i < command_count; i++) {
     if (strcasecmp(commands[i].command, argv[0]) == 0) {
       commands[i].handler(argc, argv);
-      Serial.println("ok"); 
+      logPrintln("ok"); 
       return;
     }
   }
-  Serial.println("error:1");
+  logPrintln("error:1");
 }
 
 bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handler) {
@@ -353,6 +356,7 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
 
 // FIX: Added missing implementation
 void cliPrintHelp() {
+  serialLoggerLock();
   Serial.println("\n=== BISSO E350 CLI Help ===");
   Serial.println("Grbl Commands:");
   Serial.println("  $         - Show Grbl settings");
@@ -368,11 +372,13 @@ void cliPrintHelp() {
     Serial.printf("  %-12s - %s\n", commands[i].command, commands[i].help);
   }
   Serial.println("==========================\n");
+  serialLoggerUnlock();
 }
 
 // --- COMMANDS ---
 
 void cmd_grbl_settings(int argc, char** argv) {
+    serialLoggerLock();
     Serial.printf("$100=%.3f\r\n", configGetFloat(KEY_PPM_X, 100.0));
     Serial.printf("$101=%.3f\r\n", configGetFloat(KEY_PPM_Y, 100.0));
     Serial.printf("$102=%.3f\r\n", configGetFloat(KEY_PPM_Z, 100.0));
@@ -383,7 +389,8 @@ void cmd_grbl_settings(int argc, char** argv) {
     Serial.printf("$113=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_A, 1000.0));
     Serial.printf("$120=%.3f\r\n", configGetFloat(KEY_DEFAULT_ACCEL, 100.0));
     Serial.printf("$130=%.3f\r\n", (float)configGetInt(KEY_X_LIMIT_MAX, 500000) / configGetFloat(KEY_PPM_X, 1.0));
-    Serial.println("ok");
+    serialLoggerUnlock();
+    logPrintln("ok");
 }
 
 void cmd_grbl_home(int argc, char** argv) { motionHome(0); }
@@ -397,8 +404,8 @@ void cmd_grbl_state(int argc, char** argv) {
 
 void cmd_system_info(int argc, char** argv) {
   char ver[32]; firmwareGetVersionString(ver, 32);
-  Serial.printf("[VER:1.1h.Gemini:%s]\r\n", ver);
-  Serial.println("ok");
+  logPrintf("[VER:1.1h.Gemini:%s]\r\n", ver);
+  logPrintln("ok");
 }
 
 void cmd_system_reset(int argc, char** argv) { bootRebootSystem(); }
@@ -406,17 +413,17 @@ void cmd_help(int argc, char** argv) { cliPrintHelp(); }
 
 void cmd_echo(int argc, char** argv) {
   if (argc < 2) {
-    Serial.printf("Echo is currently %s\n", cli_echo_enabled ? "ON" : "OFF");
+    logInfo("Echo is currently %s", cli_echo_enabled ? "ON" : "OFF");
     return;
   }
   
-  if (strcasecmp(argv[1], "on") == 0) { // Changed strcmp to strcasecmp
+  if (strcasecmp(argv[1], "on") == 0) {
     cli_echo_enabled = true;
-    Serial.println("Echo ENABLED");
-  } else if (strcasecmp(argv[1], "off") == 0) { // Changed strcmp to strcasecmp
+    logInfo("Echo ENABLED");
+  } else if (strcasecmp(argv[1], "off") == 0) {
     cli_echo_enabled = false;
-    Serial.println("Echo DISABLED");
+    logInfo("Echo DISABLED");
   } else {
-    Serial.println("Usage: echo [on|off]");
+    logPrintln("Usage: echo [on|off]");
   }
 }

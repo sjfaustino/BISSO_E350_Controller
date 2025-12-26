@@ -1,6 +1,7 @@
 #include "config_manager.h"
 #include "config_unified.h"
 #include "string_safety.h"
+#include "serial_logger.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -40,7 +41,6 @@ size_t configExportToJSON(char* buffer, size_t buffer_size) {
   offset += snprintf(buffer + offset, buffer_size - offset,
     "{\n  \"version\": 1,\n  \"timestamp\": %lu,\n  \"configuration\": {\n", (unsigned long)millis());
   
-  // FIX: Explicit casting to match %ld and %lu format specifiers
   offset += snprintf(buffer + offset, buffer_size - offset,
     "    \"max_position\": %ld,\n    \"min_position\": %ld,\n    \"max_velocity\": %lu,\n"
     "    \"max_acceleration\": %lu,\n    \"num_axes\": %u,\n    \"timeout_ms\": %lu,\n    \"retry_count\": %u\n",
@@ -55,7 +55,6 @@ bool configImportFromJSON(const char* json_string) {
   if (!json_string) return false;
   config_limits_t new_limits = current_limits;
   
-  // FIX: Use temporary long variables for sscanf to match types
   long t_max_pos = new_limits.max_position;
   long t_min_pos = new_limits.min_position;
   unsigned long t_max_vel = new_limits.max_velocity;
@@ -79,32 +78,32 @@ bool configImportFromJSON(const char* json_string) {
   new_limits.max_acceleration = (uint32_t)t_max_acc;
 
   if (!configValidate(false)) {
-    Serial.println("[CONFIG] [FAIL] Import validation failed");
+    logError("[CONFIG] Import validation failed");
     return false;
   }
   current_limits = new_limits;
-  Serial.println("[CONFIG] [OK] Configuration imported");
+  logInfo("[CONFIG] Configuration imported");
   return true;
 }
 
 bool configExportToFile(const char* filename) {
   if (!filename) return false;
-  Serial.printf("[CONFIG] Exporting to file: %s\n", filename);
-  Serial.println("[CONFIG] [OK] Exported");
+  logInfo("[CONFIG] Exporting to file: %s", filename);
+  logInfo("[CONFIG] [OK] Exported");
   return true;
 }
 
 bool configImportFromFile(const char* filename) {
   if (!filename) return false;
-  Serial.printf("[CONFIG] Importing from file: %s\n", filename);
-  Serial.println("[CONFIG] [OK] Imported");
+  logInfo("[CONFIG] Importing from file: %s", filename);
+  logInfo("[CONFIG] [OK] Imported");
   return true;
 }
 
 bool configLoadPreset(config_preset_t preset) {
   if (!presets_initialized) { initializePresets(); presets_initialized = true; }
   if (preset >= 5) return false;
-  Serial.printf("[CONFIG] Loading preset: %s\n", preset_info[preset].name);
+  logInfo("[CONFIG] Loading preset: %s", preset_info[preset].name);
   
   switch (preset) {
     case CONFIG_PRESET_DEFAULT:
@@ -117,7 +116,7 @@ bool configLoadPreset(config_preset_t preset) {
       current_limits.max_velocity = 25000; current_limits.max_acceleration = 5000; current_limits.timeout_ms = 8000; break;
     default: return false;
   }
-  Serial.println("[CONFIG] [OK] Preset loaded");
+  logInfo("[CONFIG] [OK] Preset loaded");
   return true;
 }
 
@@ -127,12 +126,11 @@ bool configSaveAsPreset(config_preset_t preset, const char* name) {
   preset_info[preset].name[63] = '\0';
   preset_info[preset].timestamp = millis();
   preset_info[preset].valid = true;
-  Serial.printf("[CONFIG] [OK] Preset saved: %s\n", name);
+  logInfo("[CONFIG] [OK] Preset saved: %s", name);
   return true;
 }
 
 config_preset_info_t configGetPresetInfo(config_preset_t preset) {
-  // FIX: Explicit initialization to avoid -Wmissing-field-initializers
   if (preset >= 5) { 
       config_preset_info_t empty;
       memset(&empty, 0, sizeof(empty));
@@ -142,6 +140,7 @@ config_preset_info_t configGetPresetInfo(config_preset_t preset) {
 }
 
 uint8_t configListPresets() {
+  serialLoggerLock();
   Serial.println("\n=== AVAILABLE PRESETS ===");
   uint8_t count = 0;
   for (int i = 0; i < 5; i++) {
@@ -151,22 +150,23 @@ uint8_t configListPresets() {
     }
   }
   Serial.println();
+  serialLoggerUnlock();
   return count;
 }
 
 bool configDeletePreset(config_preset_t preset) {
   if (preset == CONFIG_PRESET_DEFAULT) {
-    Serial.println("[CONFIG] [ERR] Cannot delete factory defaults");
+    logError("[CONFIG] Cannot delete factory defaults");
     return false;
   }
   if (preset >= 5) return false;
   preset_info[preset].valid = false;
-  Serial.println("[CONFIG] [OK] Preset deleted");
+  logInfo("[CONFIG] [OK] Preset deleted");
   return true;
 }
 
 bool configResetToDefaults() {
-  Serial.println("[CONFIG] Resetting to factory defaults...");
+  logInfo("[CONFIG] Resetting to factory defaults...");
   return configLoadPreset(CONFIG_PRESET_DEFAULT);
 }
 
@@ -174,7 +174,6 @@ int configCompareTo(const char* json_compare, char* diff_buffer, size_t diff_siz
   if (!json_compare || !diff_buffer) return 0;
   config_limits_t compare_limits = current_limits;
   
-  // FIX: Use temporary var for sscanf
   long t_max_pos = compare_limits.max_position;
   char* pos = strstr(json_compare, "\"max_position\":");
   if (pos) sscanf(pos, "\"max_position\": %ld", &t_max_pos);
@@ -183,7 +182,6 @@ int configCompareTo(const char* json_compare, char* diff_buffer, size_t diff_siz
   int diff_count = 0;
   int offset = 0;
   if (compare_limits.max_position != current_limits.max_position) {
-    // FIX: Cast for printf
     offset += snprintf(diff_buffer + offset, diff_size - offset, "max_pos: %ld -> %ld\n", 
         (long)current_limits.max_position, (long)compare_limits.max_position);
     diff_count++;
@@ -212,15 +210,15 @@ uint8_t configDiffFromPreset(config_preset_t preset) {
 bool configValidate(bool strict) {
   bool valid = true;
   if (current_limits.max_position <= current_limits.min_position) {
-    Serial.println("[CONFIG] [ERR] max_position <= min_position");
+    logError("[CONFIG] max_position <= min_position");
     valid = false;
   }
   if (current_limits.max_velocity < 100 || current_limits.max_velocity > 100000) {
-    Serial.println("[CONFIG] [ERR] max_velocity out of range");
+    logError("[CONFIG] max_velocity out of range");
     valid = false;
   }
   if (strict && current_limits.max_acceleration > current_limits.max_velocity) {
-    Serial.println("[CONFIG] [WARN] acceleration > velocity (strict)");
+    logWarning("[CONFIG] acceleration > velocity (strict)");
     valid = false;
   }
   return valid;
@@ -252,19 +250,20 @@ bool configSetLimits(const config_limits_t* limits) {
   if (!limits) return false;
   current_limits = *limits;
   if (configValidate(false)) {
-    Serial.println("[CONFIG] [OK] Limits updated");
+    logInfo("[CONFIG] [OK] Limits updated");
     return true;
   } else {
-    Serial.println("[CONFIG] [FAIL] Limits invalid");
+    logError("[CONFIG] Limits invalid");
     return false;
   }
 }
 
 void configPrintValidationReport() {
+  serialLoggerLock();
   Serial.println("\n=== CONFIG VALIDATION REPORT ===");
-  // FIX: Cast to long/unsigned long for printf
   Serial.printf("Max Pos: %ld\nMin Pos: %ld\n", (long)current_limits.max_position, (long)current_limits.min_position);
   Serial.printf("Max Vel: %lu\nMax Acc: %lu\n", (unsigned long)current_limits.max_velocity, (unsigned long)current_limits.max_acceleration);
   Serial.printf("Status: %s\n", configValidate(false) ? "[VALID]" : "[INVALID]");
   Serial.println();
+  serialLoggerUnlock();
 }

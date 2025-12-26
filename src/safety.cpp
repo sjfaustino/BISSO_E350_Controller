@@ -50,14 +50,14 @@ static uint32_t last_stall_check = 0;
 static SemaphoreHandle_t safety_state_mutex = NULL;
 
 void safetyInit() {
-  Serial.println("[SAFETY] Initializing...");
+  logPrintln("[SAFETY] Initializing...");
 
   // PHASE 5.7: Cursor AI Fix - Create mutex for thread-safe safety state
   safety_state_mutex = xSemaphoreCreateMutex();
   if (safety_state_mutex == NULL) {
-    Serial.println("[SAFETY] [CRITICAL] Failed to create safety state mutex!");
+    logError("[SAFETY] CRITICAL: Failed to create safety state mutex!");
   } else {
-    Serial.println("[SAFETY] [OK] Safety state mutex created");
+    logInfo("[SAFETY] [OK] Safety state mutex created");
   }
 
   pinMode(SAFETY_ALARM_PIN, OUTPUT);
@@ -71,7 +71,7 @@ void safetyInit() {
   memset(safety_state.fault_message, 0, sizeof(safety_state.fault_message));
   memset(safety_state.fault_history, 0, sizeof(safety_state.fault_history));
 
-  Serial.printf("[SAFETY] [OK] Alarm Pin: GPIO %d\n", SAFETY_ALARM_PIN);
+  logInfo("[SAFETY] [OK] Alarm Pin: GPIO %d", SAFETY_ALARM_PIN);
 }
 
 void safetyUpdate() {
@@ -336,8 +336,8 @@ void safetyTriggerAlarm(const char *reason, safety_fault_t fault_type) {
   // Hardware operations outside mutex (no shared state)
   digitalWrite(SAFETY_ALARM_PIN, HIGH);
 
-  Serial.printf("[SAFETY] [ALARM] Triggered: %s\n", reason);
-  Serial.printf("[SAFETY] Fault Count: %lu\n",
+  logError("[SAFETY] [ALARM] Triggered: %s", reason);
+  logPrintf("[SAFETY] Fault Count: %lu\n",
                 (unsigned long)safety_state.fault_count);
 
   // CRITICAL: Deadlock-Safe Emergency Stop (Gemini Audit)
@@ -365,8 +365,7 @@ void safetyResetAlarm() {
   // NOW SAFE: Mutex is confirmed acquired
   if (!alarm_active) {
     xSemaphoreGive(safety_state_mutex);
-    Serial.println(
-        "[SAFETY] [WARNING] Alarm reset requested but no alarm is active");
+    logWarning("[SAFETY] Alarm reset requested but no alarm is active");
     return;
   }
 
@@ -439,8 +438,7 @@ void safetyResetAlarm() {
   // Hardware operations outside mutex (no shared state)
   digitalWrite(SAFETY_ALARM_PIN, LOW);
 
-  Serial.printf(
-      "[SAFETY] [OK] Alarm reset (Duration: %lu ms, validations passed)\n",
+  logInfo("[SAFETY] [OK] Alarm reset (Duration: %lu ms, validations passed)",
       (unsigned long)safety_state.fault_duration_ms);
 }
 
@@ -496,8 +494,8 @@ uint32_t safetyGetAlarmDuration() {
 }
 
 void safetyDiagnostics() {
-  Serial.println("\n[SAFETY] === Diagnostics ===");
-  Serial.printf("Status: %s\n", alarm_active ? "[ALARM]" : "[OK]");
+  logPrintln("\n[SAFETY] === Diagnostics ===");
+  logPrintf("Status: %s\n", alarm_active ? "[ALARM]" : "[OK]");
 
   const char *faultStr = "UNKNOWN";
   switch (safety_state.current_fault) {
@@ -523,22 +521,22 @@ void safetyDiagnostics() {
     faultStr = "ENCODER_ERROR";
     break;
   }
-  Serial.printf("Current Fault: %s\n", faultStr);
-  Serial.printf("GPIO State: %s\n",
+  logPrintf("Current Fault: %s\n", faultStr);
+  logPrintf("GPIO State: %s\n",
                 digitalRead(SAFETY_ALARM_PIN) ? "HIGH" : "LOW");
-  Serial.printf("Count: %lu\n", (unsigned long)safety_state.fault_count);
-  Serial.printf("Last Msg: %s\n", safety_state.fault_message);
+  logPrintf("Count: %lu\n", (unsigned long)safety_state.fault_count);
+  logPrintf("Last Msg: %s\n", safety_state.fault_message);
 
   if (alarm_active) {
-    Serial.printf("Duration: %lu ms\n",
+    logPrintf("Duration: %lu ms\n",
                   (unsigned long)safetyGetAlarmDuration());
   }
 
-  Serial.println("\nHistory (Last 16):");
+  logPrintln("\nHistory (Last 16):");
   for (int i = 0; i < SAFETY_FAULT_HISTORY_SIZE; i++) {
     int idx = (safety_state.history_index + i) % SAFETY_FAULT_HISTORY_SIZE;
     if (safety_state.fault_history[idx] != SAFETY_OK) {
-      Serial.printf(
+      logPrintf(
           "  [%d] %s\n", i,
           faultCodeToString((fault_code_t)safety_state.fault_history[idx]));
     }

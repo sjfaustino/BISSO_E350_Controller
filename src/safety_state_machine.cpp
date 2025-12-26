@@ -93,7 +93,7 @@ bool safetySetState(safety_fsm_state_t new_state) {
 
     // 3. Validate
     if (!trans) {
-        Serial.printf("[SAFETY] [FAIL] Invalid FSM transition: %s -> %s\n", 
+        logError("[SAFETY] Invalid FSM transition: %s -> %s", 
             safetyStateToString(current_safety_state), safetyStateToString(new_state));
         faultLogError(FAULT_BOOT_FAILED, "Invalid safety FSM transition attempt");
         return false;
@@ -104,7 +104,7 @@ bool safetySetState(safety_fsm_state_t new_state) {
     current_safety_state = new_state;
 
     // 5. Log
-    Serial.printf("[SAFETY] FSM: %s -> %s (%s)\n", 
+    logInfo("[SAFETY] FSM: %s -> %s (%s)", 
         safetyStateToString(previous), 
         safetyStateToString(new_state), 
         trans->description);

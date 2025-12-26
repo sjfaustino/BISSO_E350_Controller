@@ -202,6 +202,7 @@ system_performance_t perfMonitorGetSystemMetrics() {
 }
 
 void perfMonitorPrintSummary() {
+    serialLoggerLock();
     Serial.println("\n[PERF] === Performance Summary ===");
     Serial.println("Task            | Runs    | Avg(us)  | Max(us)  | CPU%");
     Serial.println("-----------|---------|----------|----------|------");
@@ -228,9 +229,11 @@ void perfMonitorPrintSummary() {
         sys.total_cpu_percent,
         (unsigned long)sys.free_heap_bytes);
     Serial.println();
+    serialLoggerUnlock();
 }
 
 void perfMonitorPrintDiagnostics() {
+    serialLoggerLock();
     Serial.println("\n[PERF] === Detailed Performance Diagnostics ===");
 
     system_performance_t sys = perfMonitorGetSystemMetrics();
@@ -263,6 +266,7 @@ void perfMonitorPrintDiagnostics() {
     }
 
     Serial.println();
+    serialLoggerUnlock();
 }
 
 void perfMonitorReset() {

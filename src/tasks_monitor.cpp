@@ -75,7 +75,7 @@ void taskMonitorFunction(void* parameter) {
           if (!elboIsShadowRegisterDirty()) {
             recovery_success = true;
             logInfo("[MONITOR] [OK] I2C bus recovery successful on attempt %d/3", retry + 1);
-            faultLogWarning(FAULT_I2C_ERROR, "I2C bus recovered after %d attempt(s)", retry + 1);
+            faultLogWarning(FAULT_I2C_ERROR, "I2C bus recovered after retry");
             break;
           }
         }

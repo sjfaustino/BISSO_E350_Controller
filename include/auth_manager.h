@@ -103,4 +103,23 @@ void authClearRateLimit(const char* ip_address);
  */
 void cmd_web_setpass(int argc, char** argv);
 
+/**
+ * @brief CLI Command handler for auth diagnostics and testing
+ * @param argc Argument count
+ * @param argv Argument array
+ */
+void cmd_auth(int argc, char** argv);
+
+/**
+ * @brief Print authentication diagnostics
+ */
+void authPrintDiagnostics(void);
+
+/**
+ * @brief Test password verification (for debugging)
+ * @param password Password to test
+ * @return true if password matches stored hash
+ */
+bool authTestPassword(const char* password);
+
 #endif // AUTH_MANAGER_H

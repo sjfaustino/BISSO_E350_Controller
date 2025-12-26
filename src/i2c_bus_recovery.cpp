@@ -242,8 +242,8 @@ i2c_stats_t i2cGetStats() {
 }
 
 void i2cShowStats() {
+  serialLoggerLock();
   Serial.println("\n[I2C] === Statistics ===");
-  // FIX: Cast to unsigned long for printf
   Serial.printf("Total: %lu | OK: %lu (%.1f%%) | Fail: %lu\n",
                 (unsigned long)stats.transactions_total,
                 (unsigned long)stats.transactions_success, stats.success_rate,
@@ -254,6 +254,7 @@ void i2cShowStats() {
   Serial.printf(
       "Errors: NACK=%lu Time=%lu Bus=%lu\n", (unsigned long)stats.error_nack,
       (unsigned long)stats.error_timeout, (unsigned long)stats.error_bus);
+  serialLoggerUnlock();
 }
 
 void i2cMonitorBusHealth() {

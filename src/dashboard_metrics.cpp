@@ -186,6 +186,7 @@ size_t dashboardMetricsExportExtendedJSON(char* buffer, size_t buffer_size) {
 }
 
 void dashboardMetricsPrint() {
+    serialLoggerLock();
     Serial.println("\n[DASHBOARD] === Real-time Metrics ===");
     Serial.printf("Uptime: %llu ms | CPU: %u%% | Heap: %lu bytes\n",
                  (unsigned long long)metrics_cache.timestamp_ms,
@@ -210,13 +211,14 @@ void dashboardMetricsPrint() {
     for (int i = 0; i < 4; i++) {
         if (i > 0) Serial.print(" ");
         switch (metrics_cache.encoder_health[i]) {
-            case 0: Serial.print("✓"); break;
+            case 0: Serial.print("OK"); break;
             case 1: Serial.print("~"); break;
-            case 2: Serial.print("⚠"); break;
-            case 3: Serial.print("✗"); break;
+            case 2: Serial.print("!"); break;
+            case 3: Serial.print("X"); break;
         }
     }
     Serial.println("]");
 
     Serial.println();
+    serialLoggerUnlock();
 }

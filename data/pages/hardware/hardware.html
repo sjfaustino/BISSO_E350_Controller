@@ -1,0 +1,466 @@
+<div class="hardware-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h2>🔌 Hardware Pin Configuration</h2>
+        <p class="page-description">
+            Configure pin connections for each device. Changes take effect immediately for testing.
+            Click "Save Configuration" to persist to flash memory.
+        </p>
+    </div>
+
+    <!-- Device Cards Grid -->
+    <div class="device-grid">
+
+        <!-- WJ66 Encoder Card -->
+        <div class="card device-card">
+            <div class="card-header device-header wj66">
+                <h3>📡 WJ66 Encoder</h3>
+                <span class="device-protocol">RS232 TTL</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>RX Pin:</label>
+                    <select class="pin-select" id="wj66_rx" data-signal="wj66_rx">
+                        <option value="14">HT1 (GPIO14)</option>
+                        <option value="32">HT3 (GPIO32)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>TX Pin:</label>
+                    <select class="pin-select" id="wj66_tx" data-signal="wj66_tx">
+                        <option value="33">HT2 (GPIO33)</option>
+                        <option value="32">HT3 (GPIO32)</option>
+                    </select>
+                </div>
+                <div class="device-note">Absolute rotary encoder for position feedback</div>
+            </div>
+        </div>
+
+        <!-- LCD Display Card -->
+        <div class="card device-card">
+            <div class="card-header device-header lcd">
+                <h3>📺 LCD Display</h3>
+                <span class="device-protocol">I2C</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>SDA Pin:</label>
+                    <select class="pin-select" id="lcd_sda" data-signal="lcd_sda" disabled>
+                        <option value="4">GPIO4 (Fixed)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>SCL Pin:</label>
+                    <select class="pin-select" id="lcd_scl" data-signal="lcd_scl" disabled>
+                        <option value="5">GPIO5 (Fixed)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>I2C Address:</label>
+                    <input type="text" class="pin-input" id="lcd_addr" value="0x27" disabled>
+                </div>
+                <div class="device-note">20x4 character LCD via PCF8574</div>
+            </div>
+        </div>
+
+        <!-- VFD Card -->
+        <div class="card device-card">
+            <div class="card-header device-header vfd">
+                <h3>⚡ VFD (Altivar31)</h3>
+                <span class="device-protocol">RS485 Modbus</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>RS485 A:</label>
+                    <select class="pin-select" id="vfd_rs485_a" data-signal="vfd_rs485_a" disabled>
+                        <option value="16">RXD2 (GPIO16)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>RS485 B:</label>
+                    <select class="pin-select" id="vfd_rs485_b" data-signal="vfd_rs485_b" disabled>
+                        <option value="13">TXD2 (GPIO13)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>Modbus Address:</label>
+                    <input type="number" class="pin-input" id="vfd_addr" value="1" min="1" max="247">
+                </div>
+                <div class="device-note">Variable frequency drive control (shared bus)</div>
+            </div>
+        </div>
+
+        <!-- JXK-10 Card -->
+        <div class="card device-card">
+            <div class="card-header device-header jxk10">
+                <h3>🔋 JXK-10 Current Monitor</h3>
+                <span class="device-protocol">RS485 Modbus</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>RS485 A:</label>
+                    <select class="pin-select" id="jxk10_rs485_a" data-signal="jxk10_rs485_a" disabled>
+                        <option value="16">RXD2 (GPIO16)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>RS485 B:</label>
+                    <select class="pin-select" id="jxk10_rs485_b" data-signal="jxk10_rs485_b" disabled>
+                        <option value="13">TXD2 (GPIO13)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>Modbus Address:</label>
+                    <input type="number" class="pin-input" id="jxk10_addr" value="2" min="1" max="247">
+                </div>
+                <div class="device-note">Spindle current monitoring (shared bus with VFD)</div>
+            </div>
+        </div>
+
+        <!-- PLC → ESP32 (Inputs) Card -->
+        <div class="card device-card wide-card">
+            <div class="card-header device-header plc-input">
+                <h3>← PLC → ESP32 (Inputs)</h3>
+                <span class="device-protocol">Digital Opto</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-grid-4col">
+                    <div class="pin-row">
+                        <label>Consenso C:</label>
+                        <select class="pin-select" id="input_c" data-signal="input_c"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Consenso T:</label>
+                        <select class="pin-select" id="input_t" data-signal="input_t"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Consenso C+T:</label>
+                        <select class="pin-select" id="input_ct" data-signal="input_ct"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Manual Mode:</label>
+                        <select class="pin-select" id="input_manual" data-signal="input_manual"></select>
+                    </div>
+                </div>
+                <div class="device-note">Mode selection signals from ELBO PLC</div>
+            </div>
+        </div>
+
+        <!-- ESP32 → PLC (Outputs) Card -->
+        <div class="card device-card wide-card">
+            <div class="card-header device-header plc-output">
+                <h3>→ ESP32 → PLC (Outputs)</h3>
+                <span class="device-protocol">Digital Relay</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-grid-4col">
+                    <div class="pin-row">
+                        <label>Axis X:</label>
+                        <select class="pin-select" id="output_axis_x" data-signal="output_axis_x"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Axis Y:</label>
+                        <select class="pin-select" id="output_axis_y" data-signal="output_axis_y"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Axis Z:</label>
+                        <select class="pin-select" id="output_axis_z" data-signal="output_axis_z"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Direction +:</label>
+                        <select class="pin-select" id="output_dir_plus" data-signal="output_dir_plus"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Direction −:</label>
+                        <select class="pin-select" id="output_dir_minus" data-signal="output_dir_minus"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Speed Fast:</label>
+                        <select class="pin-select" id="output_speed_fast" data-signal="output_speed_fast"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Speed Med:</label>
+                        <select class="pin-select" id="output_speed_med" data-signal="output_speed_med"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label>Speed Slow:</label>
+                        <select class="pin-select" id="output_speed_slow" data-signal="output_speed_slow"></select>
+                    </div>
+                </div>
+                <div class="device-note">Control signals to ELBO PLC via KC868-A16 digital outputs</div>
+            </div>
+        </div>
+
+        <!-- Operator Panel Switches Card -->
+        <div class="card device-card">
+            <div class="card-header device-header switches">
+                <h3>🎚️ Operator Panel</h3>
+                <span class="device-protocol">Digital Inputs</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>E-Stop:</label>
+                    <select class="pin-select" id="input_estop" data-signal="input_estop"></select>
+                </div>
+                <div class="pin-row">
+                    <label>Pause Button:</label>
+                    <select class="pin-select" id="input_pause" data-signal="input_pause"></select>
+                </div>
+                <div class="pin-row">
+                    <label>Resume Button:</label>
+                    <select class="pin-select" id="input_resume" data-signal="input_resume"></select>
+                </div>
+                <div class="device-note">Operator panel buttons via KC868-A16 inputs</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pin Summary Table -->
+    <div class="card pin-summary-card">
+        <div class="card-header">
+            <h3>📋 KC868-A16 Pin Summary</h3>
+        </div>
+        <div class="card-content">
+            <div class="pin-summary-grid" id="pin-summary-table">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-bar">
+        <button class="btn btn-primary" id="save-config-btn">💾 Save Configuration</button>
+        <button class="btn btn-secondary" id="reload-config-btn">🔄 Reload</button>
+        <button class="btn btn-danger" id="reset-defaults-btn">⚠️ Reset to Defaults</button>
+    </div>
+
+    <!-- Status Message -->
+    <div id="status-message" class="status-message" style="display: none;"></div>
+</div>
+
+<style>
+    .hardware-page {
+        padding: var(--space-md);
+    }
+
+    .hardware-page .page-header {
+        margin-bottom: var(--space-lg);
+    }
+
+    .hardware-page .page-header h2 {
+        margin-bottom: var(--space-sm);
+    }
+
+    .hardware-page .page-description {
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
+        background: var(--bg-secondary);
+        padding: var(--space-md);
+        border-radius: var(--radius-md);
+        border-left: 4px solid var(--color-normal);
+    }
+
+    /* Device Grid */
+    .hardware-page .device-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: var(--space-md);
+        margin-bottom: var(--space-lg);
+    }
+
+    .hardware-page .device-card {
+        overflow: hidden;
+    }
+
+    .hardware-page .wide-card {
+        grid-column: span 2;
+    }
+
+    /* Device Headers */
+    .hardware-page .device-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: white;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+
+    .hardware-page .device-header h3 {
+        margin: 0;
+        font-size: var(--font-size-base);
+    }
+
+    .hardware-page .device-protocol {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: var(--font-size-sm);
+    }
+
+    .hardware-page .device-header.wj66 {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    }
+
+    .hardware-page .device-header.lcd {
+        background: linear-gradient(135deg, #06b6d4, #0891b2);
+    }
+
+    .hardware-page .device-header.vfd {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    .hardware-page .device-header.jxk10 {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .hardware-page .device-header.plc-input {
+        background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    .hardware-page .device-header.plc-output {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+    }
+
+    .hardware-page .device-header.switches {
+        background: linear-gradient(135deg, #ec4899, #db2777);
+    }
+
+    /* Pin Rows */
+    .hardware-page .pin-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-sm);
+        gap: var(--space-sm);
+    }
+
+    .hardware-page .pin-row label {
+        font-weight: 500;
+        min-width: 100px;
+    }
+
+    .hardware-page .pin-select,
+    .hardware-page .pin-input {
+        flex: 1;
+        padding: 6px 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-color);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: 'Courier New', monospace;
+        font-size: var(--font-size-sm);
+    }
+
+    .hardware-page .pin-select:disabled,
+    .hardware-page .pin-input:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .hardware-page .pin-grid-4col {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--space-sm) var(--space-md);
+    }
+
+    .hardware-page .device-note {
+        margin-top: var(--space-sm);
+        padding-top: var(--space-sm);
+        border-top: 1px solid var(--border-color);
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+        font-style: italic;
+    }
+
+    /* Pin Summary Table */
+    .hardware-page .pin-summary-card {
+        margin-bottom: var(--space-lg);
+    }
+
+    .hardware-page .pin-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: var(--space-xs);
+    }
+
+    .hardware-page .pin-summary-row {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: var(--space-sm);
+        padding: var(--space-xs) var(--space-sm);
+        background: var(--bg-secondary);
+        border-radius: var(--radius-sm);
+        font-family: 'Courier New', monospace;
+        font-size: var(--font-size-sm);
+    }
+
+    .hardware-page .pin-name {
+        font-weight: 600;
+        color: var(--color-normal);
+    }
+
+    .hardware-page .pin-device {
+        color: var(--text-secondary);
+    }
+
+    /* Action Bar */
+    .hardware-page .action-bar {
+        display: flex;
+        gap: var(--space-md);
+        justify-content: center;
+        padding: var(--space-lg);
+        background: var(--bg-secondary);
+        border-radius: var(--radius-md);
+    }
+
+    .hardware-page .btn-danger {
+        background: var(--color-critical);
+        color: white;
+    }
+
+    /* Status Message */
+    .hardware-page .status-message {
+        margin-top: var(--space-md);
+        padding: var(--space-md);
+        border-radius: var(--radius-md);
+        text-align: center;
+    }
+
+    .hardware-page .status-message.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        border: 1px solid #10b981;
+    }
+
+    .hardware-page .status-message.error {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 1px solid #ef4444;
+    }
+
+    .hardware-page .status-message.info {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+        border: 1px solid #3b82f6;
+    }
+
+    @media (max-width: 900px) {
+        .hardware-page .wide-card {
+            grid-column: span 1;
+        }
+
+        .hardware-page .pin-grid-4col {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .hardware-page .pin-grid-4col {
+            grid-template-columns: 1fr;
+        }
+
+        .hardware-page .action-bar {
+            flex-direction: column;
+        }
+    }
+</style>

@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "serial_logger.h"
+
 // Global I2C LCD instance (will be initialized in lcdInterfaceInit)
 static LiquidCrystal_I2C *lcd_i2c = nullptr;
 
@@ -32,7 +34,7 @@ struct {
                {true, true, true, true}, false};
 
 void lcdInterfaceInit() {
-  Serial.println("[LCD] Initializing...");
+  logPrintln("[LCD] Initializing...");
 
   for (int i = 0; i < LCD_ROWS; i++) {
     memset(lcd_state.display[i], 0, LCD_COLS + 1);
@@ -52,7 +54,7 @@ void lcdInterfaceInit() {
   if (lcd_mutex != NULL) {
     mutex_locked = taskLockMutex(lcd_mutex, 1000); // 1s timeout for init
     if (!mutex_locked) {
-      Serial.println("[LCD] [WARN] Could not acquire mutex for init");
+      logWarning("[LCD] Could not acquire mutex for init");
     }
   }
 
@@ -79,16 +81,15 @@ void lcdInterfaceInit() {
       lcd_i2c->print("LCD Init OK");
 
       lcd_state.mode = LCD_MODE_I2C;
-      Serial.printf("[LCD] [OK] I2C LCD Initialized at 0x%02X (20x4)\n",
+      logInfo("[LCD] [OK] I2C LCD Initialized at 0x%02X (20x4)",
                     LCD_I2C_ADDR);
     } else {
       lcd_state.mode = LCD_MODE_SERIAL;
-      Serial.println(
-          "[LCD] [ERR] Failed to allocate LiquidCrystal_I2C, using Serial");
+      logError("[LCD] Failed to allocate LiquidCrystal_I2C, using Serial");
     }
   } else {
     lcd_state.mode = LCD_MODE_SERIAL;
-    Serial.println("[LCD] [WARN] I2C Not Found, using Serial simulation");
+    logWarning("[LCD] I2C Not Found, using Serial simulation");
   }
 
   // Release mutex if we locked it
@@ -96,7 +97,7 @@ void lcdInterfaceInit() {
     taskUnlockMutex(lcd_mutex);
   }
 
-  Serial.println("[LCD] [OK] Ready");
+  logInfo("[LCD] [OK] Ready");
 }
 
 void lcdInterfaceCleanup() {
@@ -137,8 +138,7 @@ void lcdInterfaceUpdate() {
               // Do NOT switch to Serial mode permanently - retry next frame
               static uint32_t last_lcd_err = 0;
               if (millis() - last_lcd_err > 2000) {
-                Serial.println(
-                    "[LCD] [WARN] I2C write failed - skipping frame");
+                logWarning("[LCD] I2C write failed - skipping frame");
                 last_lcd_err = millis();
               }
               i2c_error = true;
@@ -160,7 +160,7 @@ void lcdInterfaceUpdate() {
         // Mutex timeout - skip this update cycle (LCD is non-critical)
         static uint32_t last_log = 0;
         if (millis() - last_log > 5000) {
-          Serial.println("[LCD] [WARN] LCD mutex timeout - skipping update");
+          logWarning("[LCD] LCD mutex timeout - skipping update");
           last_log = millis();
         }
       }
@@ -170,7 +170,7 @@ void lcdInterfaceUpdate() {
   case LCD_MODE_SERIAL:
     for (int i = 0; i < LCD_ROWS; i++) {
       if (lcd_state.display_dirty[i]) {
-        Serial.printf("[LCD:%d] %s\n", i, lcd_state.display[i]);
+        logPrintf("[LCD:%d] %s\n", i, lcd_state.display[i]);
         lcd_state.display_dirty[i] = false;
       }
     }
@@ -203,8 +203,12 @@ void lcdInterfacePrintLine(uint8_t line, const char *text) {
 
 void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
                            int32_t a_counts) {
-  char line1[LCD_COLS + 1];
-  char line2[LCD_COLS + 1];
+  // Line 0: X and Y positions
+  // Line 1: Z and A positions with right-justified spindle amps
+  // Buffer size increased to 48 to avoid "truncation" warnings regarding null terminators
+  // Worst case: "Z " (2) + 11 + "  A" (3) + 11 + " " (1) + 11 = 39 chars + null
+  char line1[48];
+  char line2[48];
 
   const float def_lin = (float)MOTION_POSITION_SCALE_FACTOR;
   const float def_ang = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
@@ -220,7 +224,8 @@ void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
                  : def_ang;
 
   // --- SENSOR CONNECTIVITY CHECK ---
-  char x_str[9], y_str[9], z_str[9], a_str[9], amps_str[9];
+  // Increased buffer sizes to 12 to ensure room for null terminator
+  char x_str[12], y_str[12], z_str[12], a_str[12], amps_str[12];
   
   // WJ66 Encoder Status
   bool enc_ok = (wj66GetStatus() == ENCODER_OK);
@@ -247,12 +252,10 @@ void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
   }
 
   // Line 0: X and Y positions
-  // Format: "X " + 7-char value + "  Y" + 8-char value = 20 chars
-  snprintf(line1, LCD_COLS + 1, "X %s  Y%s", x_str, y_str);
+  snprintf(line1, sizeof(line1), "X %s  Y%s", x_str, y_str);
 
   // Line 1: Z and A positions with right-justified spindle amps
-  // Format: "Z " + 7-char value + "  A" + 4-char value + " " + amps = 20 chars
-  snprintf(line2, LCD_COLS + 1, "Z %s  A%s %s", z_str, a_str, amps_str);
+  snprintf(line2, sizeof(line2), "Z %s  A%s %s", z_str, a_str, amps_str);
 
   lcdInterfacePrintLine(0, line1);
   lcdInterfacePrintLine(1, line2);
@@ -260,11 +263,11 @@ void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
 
 void lcdInterfaceSetMode(lcd_mode_t mode) {
   if (mode == LCD_MODE_I2C && !lcd_state.i2c_found) {
-    Serial.println("[LCD] [ERR] I2C Hardware not present");
+    logError("[LCD] I2C Hardware not present");
     return;
   }
   lcd_state.mode = mode;
-  Serial.printf("[LCD] [INFO] Mode set to %d\n", mode);
+  logInfo("[LCD] Mode set to %d", mode);
 }
 
 lcd_mode_t lcdInterfaceGetMode() { return lcd_state.mode; }
@@ -278,7 +281,7 @@ void lcdInterfaceClear() {
   if (lcd_i2c) {
     lcd_i2c->clear();
   }
-  Serial.println("[LCD] [OK] Cleared");
+  logInfo("[LCD] [OK] Cleared");
 }
 
 void lcdInterfaceBacklight(bool on) {
@@ -290,18 +293,17 @@ void lcdInterfaceBacklight(bool on) {
       lcd_i2c->noBacklight();
     }
   }
-  Serial.printf("[LCD] Backlight: %s\n", on ? "ON" : "OFF");
+  logInfo("[LCD] Backlight: %s", on ? "ON" : "OFF");
 }
 
 void lcdInterfaceDiagnostics() {
-  Serial.println("\n[LCD] === Diagnostics ===");
-  // FIX: Cast for printf to match %lu
-  Serial.printf("Mode: %d\nI2C Found: %s\nBacklight: %s\nUpdates: %lu\n",
+  logPrintln("\n[LCD] === Diagnostics ===");
+  logPrintf("Mode: %d\nI2C Found: %s\nBacklight: %s\nUpdates: %lu\n",
                 lcd_state.mode, lcd_state.i2c_found ? "YES" : "NO",
                 lcd_state.backlight_on ? "ON" : "OFF",
                 (unsigned long)lcd_state.update_count);
 
   for (int i = 0; i < LCD_ROWS; i++) {
-    Serial.printf("  [%d] %s\n", i, lcd_state.display[i]);
+    logPrintf("  [%d] %s\n", i, lcd_state.display[i]);
   }
 }

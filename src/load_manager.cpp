@@ -86,22 +86,22 @@ static void transitionToState(load_state_t new_state) {
             break;
 
         case LOAD_STATE_ELEVATED:
-            Serial.println("[LOAD_MGR] [WARN] System entering ELEVATED load state");
-            Serial.println("  - Reducing refresh rates");
-            Serial.println("  - Increasing telemetry intervals");
+            logWarning("[LOAD_MGR] System entering ELEVATED load state");
+            logWarning("  - Reducing refresh rates");
+            logWarning("  - Increasing telemetry intervals");
             break;
 
         case LOAD_STATE_HIGH:
-            Serial.println("[LOAD_MGR] [WARN] System entering HIGH load state");
-            Serial.println("  - Suspending non-critical tasks");
-            Serial.println("  - Reducing motion poll rate");
+            logWarning("[LOAD_MGR] System entering HIGH load state");
+            logWarning("  - Suspending non-critical tasks");
+            logWarning("  - Reducing motion poll rate");
             logWarning("[LOAD_MGR] HIGH load detected - suspending telemetry");
             break;
 
         case LOAD_STATE_CRITICAL:
-            Serial.println("[LOAD_MGR] [CRITICAL] System CRITICAL load state");
-            Serial.println("  - All non-essential services suspended");
-            Serial.println("  - E-STOP will trigger if condition persists 30 seconds");
+            logError("[LOAD_MGR] System CRITICAL load state");
+            logError("  - All non-essential services suspended");
+            logError("  - E-STOP will trigger if condition persists 30 seconds");
             logWarning("[LOAD_MGR] CRITICAL load - emergency shutdown in 30 seconds if not resolved");
             load_state.critical_load_start_ms = millis();
             break;
@@ -142,7 +142,7 @@ void loadManagerUpdate() {
         if (time_in_critical > CRITICAL_LOAD_TIMEOUT_MS && !load_state.emergency_triggered) {
             load_state.emergency_triggered = true;
             logError("[LOAD_MGR] CRITICAL: Emergency E-STOP triggered after 30 seconds at max load");
-            Serial.println("[LOAD_MGR] [CRITICAL] INITIATING EMERGENCY E-STOP DUE TO SYSTEM OVERLOAD");
+            logError("[LOAD_MGR] INITIATING EMERGENCY E-STOP DUE TO SYSTEM OVERLOAD");
 
             // PHASE 5.10: CRITICAL FIX - Actually trigger E-STOP instead of just logging
             motionEmergencyStop();
@@ -235,6 +235,7 @@ void loadManagerForceState(load_state_t state) {
 void loadManagerPrintStatus() {
     load_status_t status = loadManagerGetStatus();
 
+    serialLoggerLock();
     Serial.println("\n[LOAD_MGR] === System Load Status ===");
     Serial.printf("Current State: %s\n", loadManagerGetStateString(status.current_state));
     Serial.printf("CPU Usage: %u%%\n", status.current_cpu_percent);
@@ -249,14 +250,15 @@ void loadManagerPrintStatus() {
     Serial.printf("  Critical  > %u%% CPU (emergency shutdown in 30s)\n", LOAD_THRESHOLD_HIGH);
 
     Serial.println("\nActions by State:");
-    Serial.println("  NORMAL:    All subsystems active, normal refresh rates");
-    Serial.println("  ELEVATED:  Reduce LCD refresh (100ms→200ms), increase telemetry (500ms→750ms)");
-    Serial.println("  HIGH:      Suspend LCD/Monitor/Telemetry, reduce motion poll (10ms→20ms)");
-    Serial.println("  CRITICAL:  Only safety-critical systems active, E-STOP after 30s");
+    Serial.println("  NORMAL:    All subsystems active");
+    Serial.println("  ELEVATED:  Reduce LCD refresh, increase telemetry interval");
+    Serial.println("  HIGH:      Suspend LCD/Monitor/Telemetry");
+    Serial.println("  CRITICAL:  Safety-only, E-STOP after 30s");
 
     if (status.emergency_estop_initiated) {
         Serial.println("\n[!] EMERGENCY E-STOP HAS BEEN TRIGGERED");
     }
 
     Serial.println();
+    serialLoggerUnlock();
 }

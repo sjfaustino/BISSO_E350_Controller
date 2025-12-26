@@ -15,7 +15,7 @@ static uint8_t calibrating_axis = 255;
 static uint32_t calib_start_time = 0;
 
 void encoderCalibrationInit() {
-  Serial.println("[CALIB] Initializing...");
+  logInfo("[CALIB] Initializing...");
   for (int i = 0; i < 4; i++) {
     calib_data[i].pulses_per_mm = 0.0;
     calib_data[i].is_valid = false;
@@ -23,25 +23,25 @@ void encoderCalibrationInit() {
   }
   calib_state = CALIBRATION_IDLE;
   g_manual_calib.state = CALIBRATION_IDLE;
-  Serial.println("[CALIB] [OK] Ready");
+  logInfo("[CALIB] [OK] Ready");
 }
 
 void encoderCalibrationUpdate() {
   if (calib_state != CALIBRATION_IN_PROGRESS) return;
   if (millis() - calib_start_time > ENCODER_CALIBRATION_TIMEOUT_MS) {
     calib_state = CALIBRATION_ERROR;
-    Serial.println("[CALIB] [FAIL] Timeout");
+    logError("[CALIB] Timeout");
     calibrating_axis = 255;
   }
 }
 
 bool encoderCalibrationStart(uint8_t axis, float distance_mm) { 
   if (axis >= 4 || distance_mm <= 0.0f) {
-    Serial.println("[CALIB] [ERR] Invalid parameters");
+    logError("[CALIB] Invalid parameters");
     return false;
   }
   if (calib_state == CALIBRATION_IN_PROGRESS) {
-    Serial.println("[CALIB] [ERR] Busy");
+    logError("[CALIB] Busy");
     return false;
   }
   calibrating_axis = axis;
@@ -49,20 +49,20 @@ bool encoderCalibrationStart(uint8_t axis, float distance_mm) {
   calib_start_time = millis();
   calib_data[axis].manual_distance_mm = distance_mm;
   calib_data[axis].sample_count = 0;
-  Serial.printf("[CALIB] Started Axis %d (Dist: %.1f mm)\n", axis, distance_mm);
+  logInfo("[CALIB] Started Axis %d (Dist: %.1f mm)", axis, distance_mm);
   return true;
 }
 
 bool encoderCalibrationFinalize(uint8_t axis) {
   if (axis >= 4 || axis != calibrating_axis) return false;
   if (calib_data[axis].sample_count == 0) {
-    Serial.println("[CALIB] [ERR] No samples collected");
+    logError("[CALIB] No samples collected");
     return false;
   }
   
   int32_t distance_counts = calib_data[axis].end_position - calib_data[axis].start_position;
   if (distance_counts == 0) {
-    Serial.println("[CALIB] [ERR] No motion detected");
+    logError("[CALIB] No motion detected");
     return false;
   }
   
@@ -79,7 +79,7 @@ bool encoderCalibrationFinalize(uint8_t axis) {
       }
   }
   
-  Serial.printf("[CALIB] Axis %d Result: %.4f pulses/unit\n", axis, scale_factor);
+  logInfo("[CALIB] Axis %d Result: %.4f pulses/unit", axis, scale_factor);
   encoderCalibrationSetPPM(axis, scale_factor);
   calib_state = CALIBRATION_COMPLETE;
   calibrating_axis = 255;
@@ -104,7 +104,7 @@ uint8_t encoderCalibrationGetAxis() {
 void encoderCalibrationAbort() {
   calib_state = CALIBRATION_IDLE;
   calibrating_axis = 255;
-  Serial.println("[CALIB] Aborted");
+  logInfo("[CALIB] Aborted");
 }
 
 void encoderCalibrationReset(uint8_t axis) {
@@ -112,16 +112,18 @@ void encoderCalibrationReset(uint8_t axis) {
     calib_data[axis].is_valid = false;
     calib_data[axis].pulses_per_mm = 0.0;
     calib_data[axis].ppm_error = 0.0;
-    Serial.printf("[CALIB] Reset Axis %d\n", axis);
+    logInfo("[CALIB] Reset Axis %d", axis);
   }
 }
 
 void encoderCalibrationDiagnostics() {
+  serialLoggerLock();
   Serial.println("\n[CALIB] === Diagnostics ===");
   Serial.printf("State: %d | Axis: %d\n", calib_state, calibrating_axis);
   for (int i = 0; i < 4; i++) {
     Serial.printf("  Axis %d: %s | Scale=%.2f\n", i, calib_data[i].is_valid ? "VALID" : "INVALID", calib_data[i].pulses_per_mm);
   }
+  serialLoggerUnlock();
 }
 
 void encoderCalibrationSetPPM(uint8_t axis, double ppm) {

@@ -101,4 +101,16 @@ char* serialLoggerGetBuffer();
  */
 size_t serialLoggerGetBufferSize();
 
+/**
+ * @brief Acquire serial mutex for thread-safe direct Serial access
+ * @return true if acquired, false on timeout
+ * @note Use serialLoggerUnlock() after Serial operations complete
+ */
+bool serialLoggerLock();
+
+/**
+ * @brief Release serial mutex after thread-safe Serial access
+ */
+void serialLoggerUnlock();
+
 #endif

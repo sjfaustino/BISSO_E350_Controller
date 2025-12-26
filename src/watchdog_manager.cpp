@@ -218,63 +218,62 @@ bool watchdogRecoveredFromTimeout() {
 }
 
 // ============================================================================
-// DIAGNOSTICS (CLI USAGE - uses Serial.print)
+// DIAGNOSTICS (CLI USAGE - thread-safe logging)
 // ============================================================================
 
 void watchdogShowStatus() {
-  Serial.println("\n=== WATCHDOG STATUS ===");
-  Serial.printf("State: %s\n", wdt_enabled ? "[ENABLED]" : "[DISABLED]");
-  Serial.printf("Timeout: %d sec\n", WATCHDOG_TIMEOUT_SEC);
+  logPrintln("\n=== WATCHDOG STATUS ===");
+  logPrintf("State: %s\n", wdt_enabled ? "[ENABLED]" : "[DISABLED]");
+  logPrintf("Timeout: %d sec\n", WATCHDOG_TIMEOUT_SEC);
   
-  Serial.print("Status: ");
+  const char* status_str = "[UNKNOWN]";
   switch (watchdogGetStatus()) {
-    case WDT_STATUS_OK: Serial.println("[OK]"); break;
-    case WDT_STATUS_TIMEOUT: Serial.println("[FAIL] TIMEOUT"); break;
-    case WDT_STATUS_PANIC: Serial.println("[FAIL] PANIC"); break;
-    case WDT_STATUS_RECOVERY_ATTEMPTED: Serial.println("[WARN] RECOVERING"); break;
-    case WDT_STATUS_DISABLED: Serial.println("[DISABLED]"); break;
+    case WDT_STATUS_OK: status_str = "[OK]"; break;
+    case WDT_STATUS_TIMEOUT: status_str = "[FAIL] TIMEOUT"; break;
+    case WDT_STATUS_PANIC: status_str = "[FAIL] PANIC"; break;
+    case WDT_STATUS_RECOVERY_ATTEMPTED: status_str = "[WARN] RECOVERING"; break;
+    case WDT_STATUS_DISABLED: status_str = "[DISABLED]"; break;
   }
+  logPrintf("Status: %s\n", status_str);
   
-  Serial.printf("Last Reset: %s\n", resetReasonString(last_reset_reason));
-  // FIX: Cast to unsigned long for printf
-  Serial.printf("Total Resets: %lu\n", (unsigned long)wdt_stats.reset_count);
-  Serial.printf("Timeouts: %lu\n", (unsigned long)wdt_stats.timeouts_detected);
-  Serial.println();
+  logPrintf("Last Reset: %s\n", resetReasonString(last_reset_reason));
+  logPrintf("Total Resets: %lu\n", (unsigned long)wdt_stats.reset_count);
+  logPrintf("Timeouts: %lu\n", (unsigned long)wdt_stats.timeouts_detected);
+  logPrintln("");
 }
 
 void watchdogShowTasks() {
-  Serial.println("\n=== MONITORED TASKS ===");
-  Serial.println("Task                  Ticks     Missed   Age(ms)  Status");
-  Serial.println("------------------------------------------------------");
+  logPrintln("\n=== MONITORED TASKS ===");
+  logPrintln("Task                  Ticks     Missed   Age(ms)  Status");
+  logPrintln("------------------------------------------------------");
   
   uint32_t now = millis();
   for (int i = 0; i < wdt_task_count; i++) {
     uint32_t age = now - wdt_tasks[i].last_tick;
     
-    // FIX: Cast to unsigned long for printf
-    Serial.printf("%-20s  %-8lu  %-8lu %-8lu ", 
+    const char* status_str = "[FAIL]";
+    if (age < (WATCHDOG_TIMEOUT_SEC * 1000 / 2)) status_str = "[OK]";
+    else if (age < WATCHDOG_TIMEOUT_SEC * 1000) status_str = "[WARN]";
+    
+    logPrintf("%-20s  %-8lu  %-8lu %-8lu %s\n", 
         wdt_tasks[i].task_name, 
         (unsigned long)wdt_tasks[i].tick_count, 
         (unsigned long)wdt_tasks[i].missed_ticks, 
-        (unsigned long)age);
-    
-    if (age < (WATCHDOG_TIMEOUT_SEC * 1000 / 2)) Serial.println("[OK]");
-    else if (age < WATCHDOG_TIMEOUT_SEC * 1000) Serial.println("[WARN]");
-    else Serial.println("[FAIL]");
+        (unsigned long)age,
+        status_str);
   }
-  Serial.println();
+  logPrintln("");
 }
 
 void watchdogShowStats() {
-  Serial.println("\n=== WATCHDOG STATISTICS ===");
-  // FIX: Cast to unsigned long for printf
-  Serial.printf("Timeouts: %lu\n", (unsigned long)wdt_stats.timeouts_detected);
-  Serial.printf("Recoveries: %lu\n", (unsigned long)wdt_stats.automatic_recoveries);
-  Serial.printf("Task Resets: %lu\n", (unsigned long)wdt_stats.task_resets);
-  Serial.printf("Sys Resets: %lu\n", (unsigned long)wdt_stats.system_resets);
-  Serial.printf("Total Feeds: %lu\n", (unsigned long)wdt_stats.total_ticks);
-  Serial.printf("Missed Ticks: %lu\n", (unsigned long)wdt_stats.missed_ticks);
-  Serial.println();
+  logPrintln("\n=== WATCHDOG STATISTICS ===");
+  logPrintf("Timeouts: %lu\n", (unsigned long)wdt_stats.timeouts_detected);
+  logPrintf("Recoveries: %lu\n", (unsigned long)wdt_stats.automatic_recoveries);
+  logPrintf("Task Resets: %lu\n", (unsigned long)wdt_stats.task_resets);
+  logPrintf("Sys Resets: %lu\n", (unsigned long)wdt_stats.system_resets);
+  logPrintf("Total Feeds: %lu\n", (unsigned long)wdt_stats.total_ticks);
+  logPrintf("Missed Ticks: %lu\n", (unsigned long)wdt_stats.missed_ticks);
+  logPrintln("");
 }
 
 reset_reason_t watchdogGetLastResetReason() { return last_reset_reason; }

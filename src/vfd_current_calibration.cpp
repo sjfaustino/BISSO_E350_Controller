@@ -54,17 +54,17 @@ static measure_state_t measure_state = {};  // Initialize to zero/default values
 // ============================================================================
 
 void vfdCalibrationInit(void) {
-    Serial.println("[VFDCAL] Initializing calibration system");
+    logInfo("[VFDCAL] Initializing calibration system");
     memset(&calib_data, 0, sizeof(calib_data));
     memset(&measure_state, 0, sizeof(measure_state));
     calib_data.stall_margin_percent = 20.0f;
 
     // Attempt to load existing calibration from NVS
     if (!vfdCalibrationLoad()) {
-        Serial.println("[VFDCAL] No valid calibration found, starting fresh");
+        logInfo("[VFDCAL] No valid calibration found, starting fresh");
         calib_data.is_calibrated = false;
     } else {
-        Serial.println("[VFDCAL] Loaded existing calibration from NVS");
+        logInfo("[VFDCAL] Loaded existing calibration from NVS");
     }
 }
 
@@ -106,7 +106,7 @@ bool vfdCalibrationLoad(void) {
     calib_data.is_calibrated = (valid_i == 1);
     calib_data.calibration_count = configGetInt("vfd_calib_cnt", 0);
 
-    Serial.printf("[VFDCAL] Loaded: Idle=%.1f/%.1f A, Std=%.1f/%.1f A, Threshold=%.1f A\n",
+    logInfo("[VFDCAL] Loaded: Idle=%.1f/%.1f A, Std=%.1f/%.1f A, Threshold=%.1f A",
                   calib_data.idle_rms_amps, calib_data.idle_peak_amps,
                   calib_data.standard_cut_rms_amps, calib_data.standard_cut_peak_amps,
                   calib_data.stall_threshold_amps);
@@ -131,7 +131,7 @@ bool vfdCalibrationSave(void) {
     configUnifiedFlush();
     configUnifiedSave();
 
-    Serial.printf("[VFDCAL] Saved calibration data (%u times)\n", calib_data.calibration_count);
+    logInfo("[VFDCAL] Saved calibration data (%u times)", calib_data.calibration_count);
     return true;
 }
 
@@ -150,7 +150,7 @@ void vfdCalibrationStartMeasure(uint32_t duration_ms, const char* phase_name) {
     strncpy(measure_state.phase_name, phase_name, sizeof(measure_state.phase_name) - 1);
     measure_state.phase_name[sizeof(measure_state.phase_name) - 1] = '\0';
 
-    Serial.printf("[VFDCAL] Starting measurement: %s (duration: %lu ms)\n",
+    logInfo("[VFDCAL] Starting measurement: %s (duration: %lu ms)",
                   measure_state.phase_name, (unsigned long)duration_ms);
 }
 
@@ -162,7 +162,7 @@ bool vfdCalibrationIsMeasureComplete(void) {
     uint32_t elapsed = millis() - measure_state.start_time_ms;
     if (elapsed >= measure_state.duration_ms) {
         measure_state.active = false;
-        Serial.printf("[VFDCAL] Measurement complete: %lu samples collected\n",
+        logInfo("[VFDCAL] Measurement complete: %lu samples collected",
                       (unsigned long)measure_state.sample_count);
         return true;
     }
@@ -184,7 +184,7 @@ bool vfdCalibrationGetMeasurement(float* out_rms_amps, float* out_peak_amps) {
     *out_rms_amps = rms;
     *out_peak_amps = measure_state.current_max;
 
-    Serial.printf("[VFDCAL] Measurement result: RMS=%.2f A, Peak=%.2f A (samples: %lu)\n",
+    logInfo("[VFDCAL] Measurement result: RMS=%.2f A, Peak=%.2f A (samples: %lu)",
                   rms, measure_state.current_max, (unsigned long)measure_state.sample_count);
 
     return true;
@@ -195,21 +195,21 @@ void vfdCalibrationStoreMeasurement(uint8_t phase, float rms_amps, float peak_am
         case 0:  // Idle baseline
             calib_data.idle_rms_amps = rms_amps;
             calib_data.idle_peak_amps = peak_amps;
-            Serial.printf("[VFDCAL] Stored idle baseline: %.2f A (RMS), %.2f A (peak)\n",
+            logInfo("[VFDCAL] Stored idle baseline: %.2f A (RMS), %.2f A (peak)",
                           rms_amps, peak_amps);
             break;
 
         case 1:  // Standard cut baseline
             calib_data.standard_cut_rms_amps = rms_amps;
             calib_data.standard_cut_peak_amps = peak_amps;
-            Serial.printf("[VFDCAL] Stored standard cut baseline: %.2f A (RMS), %.2f A (peak)\n",
+            logInfo("[VFDCAL] Stored standard cut baseline: %.2f A (RMS), %.2f A (peak)",
                           rms_amps, peak_amps);
             break;
 
         case 2:  // Heavy load (optional)
             calib_data.heavy_cut_rms_amps = rms_amps;
             calib_data.heavy_cut_peak_amps = peak_amps;
-            Serial.printf("[VFDCAL] Stored heavy load baseline: %.2f A (RMS), %.2f A (peak)\n",
+            logInfo("[VFDCAL] Stored heavy load baseline: %.2f A (RMS), %.2f A (peak)",
                           rms_amps, peak_amps);
             break;
 
@@ -231,7 +231,7 @@ bool vfdCalibrationCalculateThreshold(float margin_percent) {
     }
 
     if (max_peak <= 0.0f) {
-        Serial.println("[VFDCAL] ERROR: No valid baseline measurements for threshold calculation");
+        logError("[VFDCAL] No valid baseline measurements for threshold calculation");
         return false;
     }
 
@@ -243,7 +243,7 @@ bool vfdCalibrationCalculateThreshold(float margin_percent) {
     calib_data.is_calibrated = true;
     calib_data.calibration_count++;
 
-    Serial.printf("[VFDCAL] Calculated stall threshold: %.2f A (max peak: %.2f A, margin: %.0f%%)\n",
+    logInfo("[VFDCAL] Calculated stall threshold: %.2f A (max peak: %.2f A, margin: %.0f%%)",
                   calib_data.stall_threshold_amps, max_peak, margin_percent);
 
     return vfdCalibrationSave();
@@ -276,7 +276,7 @@ bool vfdCalibrationIsValid(void) {
 }
 
 void vfdCalibrationReset(void) {
-    Serial.println("[VFDCAL] Resetting all calibration data");
+    logInfo("[VFDCAL] Resetting all calibration data");
     memset(&calib_data, 0, sizeof(calib_data));
     calib_data.stall_margin_percent = 20.0f;
     calib_data.is_calibrated = false;
@@ -316,6 +316,7 @@ const vfd_calibration_data_t* vfdCalibrationGetData(void) {
 }
 
 void vfdCalibrationPrintSummary(void) {
+    serialLoggerLock();
     Serial.println("\n[VFDCAL] === Current Calibration Summary ===");
     Serial.printf("Status:              %s\n", calib_data.is_calibrated ? "VALID" : "INVALID");
     Serial.printf("Calibration Count:   %lu\n", (unsigned long)calib_data.calibration_count);
@@ -349,4 +350,5 @@ void vfdCalibrationPrintSummary(void) {
                       (unsigned long)(millis() - calib_data.last_calibration_ms));
     }
     Serial.println();
+    serialLoggerUnlock();
 }

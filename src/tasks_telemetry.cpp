@@ -9,6 +9,7 @@
 
 #include "altivar31_modbus.h"     // PHASE 5.5: VFD current monitoring
 #include "axis_synchronization.h" // PHASE 5.6: Axis validation
+#include "cutting_analytics.h"    // Stone cutting analytics
 #include "dashboard_metrics.h"    // PHASE 5.3: Web UI dashboard metrics
 #include "encoder_diagnostics.h"  // PHASE 5.3: Encoder health monitoring
 #include "load_manager.h"         // PHASE 5.3: Graceful degradation under load
@@ -16,13 +17,11 @@
 #include "motion_state.h"
 #include "safety.h"
 #include "serial_logger.h"
-#include "spindle_current_monitor.h" // For spindleMonitorIsEnabled()
-#include "spindle_current_rs485.h" // PHASE 5.7: RS485 multiplexer (Gemini fix)
-#include "system_telemetry.h"      // PHASE 5.1: System telemetry
-#include "task_manager.h"
 #include "vfd_current_calibration.h" // PHASE 5.5: Current calibration
 #include "watchdog_manager.h"
 #include "web_server.h"
+#include "task_manager.h"
+#include "system_telemetry.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <math.h> // For isnan() sensor validation
@@ -30,25 +29,7 @@
 // External reference to the global WebServer instance
 extern WebServerManager webServer;
 
-// Static state for VFD telemetry cycling (PHASE 5.5)
-static uint32_t vfd_telemetry_cycle = 0;
-
-// PHASE 5.7: VFD Modbus State Machine (Gemini RS485 Bus Conflict Fix)
-// CRITICAL FIX: Altivar31 VFD shares Serial1 with encoder but was bypassing
-// multiplexer This caused ~72 encoder timeouts per hour due to bus collisions
-// Solution: Implement non-blocking state machine with multiplexer arbitration
-// Reference: spindle_current_monitor.cpp (JXK-10 implementation - proven
-// correct) See: docs/GEMINI_RS485_BUS_CONFLICT.md for complete analysis
-typedef enum {
-  VFD_POLL_IDLE = 0,
-  VFD_POLL_SWITCH_DEVICE = 1,
-  VFD_POLL_SEND_REQUEST = 2,
-  VFD_POLL_WAIT_RESPONSE = 3
-} vfd_poll_state_t;
-
-static vfd_poll_state_t vfd_poll_state = VFD_POLL_IDLE;
-static uint32_t vfd_state_time_ms = 0;
-static uint32_t vfd_last_poll_ms = 0;
+// Static state for telemetry processing
 
 void taskTelemetryFunction(void *parameter) {
   TickType_t last_wake = xTaskGetTickCount();
@@ -56,6 +37,9 @@ void taskTelemetryFunction(void *parameter) {
   logInfo("[TELEMETRY_TASK] [OK] Started on core 0 - Background collection");
   watchdogTaskAdd("Telemetry");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Telemetry");
+  
+  // Initialize cutting analytics
+  cuttingAnalyticsInit();
 
   while (1) {
     // 1. Update System Telemetry (PHASE 5.1)
@@ -67,123 +51,17 @@ void taskTelemetryFunction(void *parameter) {
     encoderDiagnosticsUpdate();
     loadManagerUpdate();
     dashboardMetricsUpdate();
+    
+    // 2.5. Update Stone Cutting Analytics
+    cuttingAnalyticsUpdate();
 
-    // 3. PHASE 5.7: VFD Current Monitoring (GEMINI FIX - Multiplexer State
-    // Machine) CRITICAL FIX: Altivar31 VFD shares Serial1 with encoder Previous
-    // implementation bypassed RS485 multiplexer → bus collisions → encoder
-    // timeouts New implementation: Non-blocking state machine with proper
-    // multiplexer arbitration Pattern: IDLE → SWITCH_DEVICE → SEND_REQUEST →
-    // WAIT_RESPONSE → IDLE Reference: spindle_current_monitor.cpp (JXK-10 -
-    // proven correct)
-    uint32_t now = millis();
-
-    // Skip VFD polling if spindle monitoring is disabled
-    if (!spindleMonitorIsEnabled()) {
-      vfd_poll_state = VFD_POLL_IDLE;
-    } else {
-
-      switch (vfd_poll_state) {
-      case VFD_POLL_IDLE: {
-        // Check if it's time to poll (every 1 second)
-        if ((now - vfd_last_poll_ms) < 1000) {
-          break; // Not yet time to poll
-        }
-
-        // Time to start polling - switch to spindle device
-        vfd_poll_state = VFD_POLL_SWITCH_DEVICE;
-        vfd_state_time_ms = now;
-        break;
-      }
-
-      case VFD_POLL_SWITCH_DEVICE: {
-        // ✅ FIX: Check and switch multiplexer state before sending
-        // This prevents bus collision with encoder reads
-        if (rs485MuxGetCurrentDevice() != RS485_DEVICE_SPINDLE) {
-          rs485MuxSwitchDevice(RS485_DEVICE_SPINDLE);
-        }
-
-        // ✅ FIX: Wait for multiplexer to complete switch (10ms inter-frame
-        // delay) This ensures encoder transaction completes before VFD takes
-        // bus
-        if (rs485MuxUpdate()) {
-          vfd_poll_state = VFD_POLL_SEND_REQUEST;
-        }
-
-        // Timeout protection: if multiplexer switch takes too long, abort
-        // PHASE 5.7 Fix: Increased from 100ms to 2500ms because task runs at
-        // 1Hz
-        if ((now - vfd_state_time_ms) > 2500) {
-          logWarning("[TELEMETRY] VFD multiplexer switch timeout");
-          vfd_poll_state = VFD_POLL_IDLE;
-        }
-        break;
-      }
-
-      case VFD_POLL_SEND_REQUEST: {
-        // ✅ FIX: Now safe to send Modbus request (multiplexer switched to
-        // SPINDLE) Rotate through VFD register queries to avoid flooding the
-        // Modbus bus Cycle through: current (every 3s), frequency (every 3s),
-        // thermal (every 3s)
-        bool sent = false;
-        switch (vfd_telemetry_cycle % 3) {
-        case 0: // Query motor current
-          sent = altivar31ModbusReadCurrent();
-          break;
-        case 1: // Query output frequency
-          sent = altivar31ModbusReadFrequency();
-          break;
-        case 2: // Query thermal state
-          sent = altivar31ModbusReadThermalState();
-          break;
-        }
-
-        if (sent) {
-          vfd_poll_state = VFD_POLL_WAIT_RESPONSE;
-          vfd_state_time_ms = now;
-          vfd_telemetry_cycle++;
-        } else {
-          // Send failed - abort and try next cycle
-          logWarning("[TELEMETRY] VFD Modbus send failed");
-          vfd_poll_state = VFD_POLL_IDLE;
-        }
-        break;
-      }
-
-      case VFD_POLL_WAIT_RESPONSE: {
-        // Wait minimum 50ms for Modbus response
-        if ((now - vfd_state_time_ms) < 50) {
-          break; // Still waiting for response
-        }
-
-        // ✅ Attempt to parse response
-        if (altivar31ModbusReceiveResponse()) {
-          // Successfully received VFD data
-          float current_amps = altivar31GetCurrentAmps();
-
-          // Feed current sample to calibration system if measurement is active
-          // CRITICAL: Validate sensor data before sampling (NaN check, range
-          // check)
-          if (!isnan(current_amps) && current_amps > 0.0f &&
-              current_amps <= 100.0f) {
-            vfdCalibrationSampleCurrent(current_amps);
-          }
-        }
-
-        // ✅ FIX: Switch back to encoder device after VFD transaction complete
-        // This allows encoder to resume normal operation
-        rs485MuxSwitchDevice(RS485_DEVICE_ENCODER);
-        rs485MuxUpdate();
-
-        vfd_last_poll_ms = now;
-        vfd_poll_state = VFD_POLL_IDLE;
-        break;
-      }
-
-      default:
-        vfd_poll_state = VFD_POLL_IDLE;
-        break;
-      }
-    } // end if(spindleMonitorIsEnabled())
+    // 3. Telemetry Processing (Registry Integrated)
+    // VFD polling is now handled by the RS-485 registry.
+    // We just process the latest data here.
+    float current_amps = altivar31GetCurrentAmps();
+    if (!isnan(current_amps) && current_amps > 0.0f && current_amps <= 100.0f) {
+        vfdCalibrationSampleCurrent(current_amps);
+    }
 
     // Push VFD telemetry to web UI (PHASE 5.5k)
     // CRITICAL: Sanitize sensor data before sending to web UI

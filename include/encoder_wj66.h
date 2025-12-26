@@ -18,7 +18,7 @@ typedef enum {
 } encoder_status_t;
 
 void wj66Init();
-void wj66Update();
+// Note: wj66Update() removed - polling is now handled by RS-485 registry
 
 // Accessors
 int32_t wj66GetPosition(uint8_t axis);

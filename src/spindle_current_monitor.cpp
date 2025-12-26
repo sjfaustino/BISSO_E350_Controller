@@ -9,7 +9,6 @@
 #include "jxk10_modbus.h"
 #include "motion.h"
 #include "serial_logger.h"
-#include "spindle_current_rs485.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -42,28 +41,12 @@ static spindle_monitor_state_t monitor_state = {
     .jxk10_slave_address = 1,
     .jxk10_baud_rate = 9600};
 
-// State machine for non-blocking Modbus polling
-typedef enum {
-  POLL_STATE_IDLE = 0,
-  POLL_STATE_SWITCH_DEVICE = 1,
-  POLL_STATE_SEND_REQUEST = 2,
-  POLL_STATE_WAIT_RESPONSE = 3,
-  POLL_STATE_PARSE_RESPONSE = 4
-} poll_state_t;
-
-static poll_state_t poll_state = POLL_STATE_IDLE;
-static uint32_t poll_state_time_ms = 0;
+static uint32_t last_check_time_ms = 0;
 
 bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
-  // Initialize RS485 multiplexer
-  if (!rs485MuxInit()) {
-    Serial.println("[SPINDLE] Failed to initialize RS485 multiplexer");
-    return false;
-  }
-
-  // Initialize JXK-10 driver
+  // Initialize JXK-10 driver (registry registration happens here)
   if (!jxk10ModbusInit(jxk10_address, 9600)) {
-    Serial.println("[SPINDLE] Failed to initialize JXK-10 driver");
+    logError("[SPINDLE] Failed to initialize JXK-10 driver");
     return false;
   }
 
@@ -75,9 +58,7 @@ bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
   monitor_state.poll_interval_ms = 1000;
   monitor_state.last_poll_time_ms = millis();
 
-  poll_state = POLL_STATE_IDLE;
-
-  Serial.printf("[SPINDLE] Initialized (JXK-10 ID: %u, Threshold: %.1f A)\n",
+  logInfo("[SPINDLE] Initialized (JXK-10 ID: %u, Threshold: %.1f A)",
                 jxk10_address, threshold_amps);
   return true;
 }
@@ -85,9 +66,9 @@ bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
 void spindleMonitorSetEnabled(bool enable) {
   monitor_state.enabled = enable;
   if (enable) {
-    Serial.println("[SPINDLE] Monitoring ENABLED");
+    logInfo("[SPINDLE] Monitoring ENABLED");
   } else {
-    Serial.println("[SPINDLE] Monitoring DISABLED");
+    logInfo("[SPINDLE] Monitoring DISABLED");
   }
 }
 
@@ -116,112 +97,32 @@ uint32_t spindleMonitorGetPollInterval(void) {
 }
 
 bool spindleMonitorUpdate(void) {
-  // If monitoring is disabled, do nothing
   if (!monitor_state.enabled) {
     return false;
   }
 
   uint32_t now = millis();
+  if (now - last_check_time_ms < 100) {
+      return false; // Rate limit logic check
+  }
+  last_check_time_ms = now;
 
-  // State machine for non-blocking Modbus polling
-  switch (poll_state) {
-  case POLL_STATE_IDLE: {
-    // Check if it's time to poll
-    if ((now - monitor_state.last_poll_time_ms) <
-        monitor_state.poll_interval_ms) {
-      return false; // Not yet time to poll
-    }
+  // Read latest current from JXK-10 (polled by registry)
+  float current = jxk10GetCurrentAmps();
+  monitor_state.current_amps = current;
 
-    // Time to start polling - switch to spindle device
-    poll_state = POLL_STATE_SWITCH_DEVICE;
-    poll_state_time_ms = now;
-    return false;
+  // Update statistics and peaks
+  if (current > monitor_state.current_peak_amps) {
+      monitor_state.current_peak_amps = current;
   }
 
-  case POLL_STATE_SWITCH_DEVICE: {
-    // Request device switch if needed
-    if (rs485MuxGetCurrentDevice() != RS485_DEVICE_SPINDLE) {
-      rs485MuxSwitchDevice(RS485_DEVICE_SPINDLE);
-    }
-
-    // Check if switch is complete
-    if (rs485MuxUpdate()) {
-      poll_state = POLL_STATE_SEND_REQUEST;
-    }
-
-    // Timeout: if we've been waiting too long, abort
-    if ((now - poll_state_time_ms) > 100) {
-      monitor_state.error_count++;
-      poll_state = POLL_STATE_IDLE;
-    }
-    return false;
+  // Check for overcurrent condition
+  if (current > monitor_state.overcurrent_threshold_amps) {
+      monitor_state.overload_count++;
+      spindleMonitorTriggerShutdown();
   }
 
-  case POLL_STATE_SEND_REQUEST: {
-    // Send Modbus read current request
-    if (jxk10ModbusReadCurrent()) {
-      poll_state = POLL_STATE_WAIT_RESPONSE;
-      poll_state_time_ms = now;
-    } else {
-      monitor_state.error_count++;
-      poll_state = POLL_STATE_IDLE;
-    }
-    return false;
-  }
-
-  case POLL_STATE_WAIT_RESPONSE: {
-    // Wait for Modbus response (minimum 50ms after request)
-    if ((now - poll_state_time_ms) < 50) {
-      return false; // Still waiting
-    }
-
-    poll_state = POLL_STATE_PARSE_RESPONSE;
-    return false;
-  }
-
-  case POLL_STATE_PARSE_RESPONSE: {
-    // Parse Modbus response
-    if (jxk10ModbusReceiveResponse()) {
-      // Successfully read current
-      float current = jxk10GetCurrentAmps();
-      monitor_state.current_amps = current;
-      monitor_state.read_count++;
-
-      // Update peak current
-      if (current > monitor_state.current_peak_amps) {
-        monitor_state.current_peak_amps = current;
-      }
-
-      // Update running average (simple moving average)
-      if (monitor_state.read_count == 1) {
-        monitor_state.current_average_amps = current;
-      } else {
-        monitor_state.current_average_amps =
-            (monitor_state.current_average_amps * 0.8f) + (current * 0.2f);
-      }
-
-      // Check for overcurrent condition
-      if (current > monitor_state.overcurrent_threshold_amps) {
-        monitor_state.overload_count++;
-        spindleMonitorTriggerShutdown();
-      }
-    } else {
-      monitor_state.error_count++;
-    }
-
-    // Switch back to encoder device for continued normal operation
-    rs485MuxSwitchDevice(RS485_DEVICE_ENCODER);
-    rs485MuxUpdate();
-
-    monitor_state.last_poll_time_ms = now;
-    poll_state = POLL_STATE_IDLE;
-    return true; // Poll cycle completed
-  }
-
-  default:
-    poll_state = POLL_STATE_IDLE;
-    return false;
-  }
+  return true;
 }
 
 float spindleMonitorGetCurrent(void) { return monitor_state.current_amps; }
@@ -249,8 +150,8 @@ void spindleMonitorTriggerShutdown(void) {
                 "Spindle overcurrent - triggering emergency shutdown");
 
   // Trigger safety shutdown
-  Serial.printf(
-      "[SPINDLE] OVERCURRENT SHUTDOWN! Current: %.1f A (Threshold: %.1f A)\n",
+  logError(
+      "[SPINDLE] OVERCURRENT SHUTDOWN! Current: %.1f A (Threshold: %.1f A)",
       monitor_state.current_amps, monitor_state.overcurrent_threshold_amps);
 
   motionEmergencyStop();
@@ -271,6 +172,7 @@ void spindleMonitorResetStats(void) {
 }
 
 void spindleMonitorPrintDiagnostics(void) {
+  serialLoggerLock();
   Serial.println("\n[SPINDLE] === Current Monitor Diagnostics ===");
   Serial.printf("Status:              %s\n",
                 monitor_state.enabled ? "ENABLED" : "DISABLED");
@@ -310,6 +212,7 @@ void spindleMonitorPrintDiagnostics(void) {
   Serial.printf("Stall Threshold:     %.1f A for %lu ms\n",
                 monitor_state.stall_threshold_amps,
                 (unsigned long)monitor_state.stall_timeout_ms);
+  serialLoggerUnlock();
 }
 
 // === ALARM API FUNCTIONS ===
@@ -327,13 +230,13 @@ void spindleMonitorClearAlarms(void) {
   monitor_state.alarm_stall = false;
   monitor_state.alarm_overload = false;
   monitor_state.overload_start_time_ms = 0;
-  Serial.println("[SPINDLE] All alarms cleared");
+  logInfo("[SPINDLE] All alarms cleared");
 }
 
 void spindleMonitorSetToolBreakageThreshold(float drop_amps) {
   if (drop_amps >= 1.0f && drop_amps <= 20.0f) {
     monitor_state.tool_breakage_drop_amps = drop_amps;
-    Serial.printf("[SPINDLE] Tool breakage threshold set to %.1f A\n", drop_amps);
+    logInfo("[SPINDLE] Tool breakage threshold set to %.1f A", drop_amps);
   }
 }
 
@@ -344,7 +247,7 @@ void spindleMonitorSetStallParams(float threshold_amps, uint32_t timeout_ms) {
   if (timeout_ms >= 500 && timeout_ms <= 10000) {
     monitor_state.stall_timeout_ms = timeout_ms;
   }
-  Serial.printf("[SPINDLE] Stall params: %.1f A for %lu ms\n",
+  logInfo("[SPINDLE] Stall params: %.1f A for %lu ms",
                 monitor_state.stall_threshold_amps,
                 (unsigned long)monitor_state.stall_timeout_ms);
 }

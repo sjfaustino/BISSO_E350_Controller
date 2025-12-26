@@ -22,9 +22,9 @@ void cmd_motion_status(int argc, char** argv) {
 
 void cmd_estop_status(int argc, char** argv) {
   if (motionIsEmergencyStopped()) {
-    Serial.println("[MOTION] [WARN] EMERGENCY STOP ACTIVE");
+    logWarning("[MOTION] EMERGENCY STOP ACTIVE");
   } else {
-    Serial.println("[MOTION] [OK] System Enabled");
+    logInfo("[MOTION] [OK] System Enabled");
   }
 }
 
@@ -34,29 +34,29 @@ void cmd_estop_status(int argc, char** argv) {
 
 void cmd_motion_stop(int argc, char** argv) {
   motionStop();
-  Serial.println("[MOTION] Stop command sent");
+  logInfo("[MOTION] Stop command sent");
 }
 
 void cmd_motion_pause(int argc, char** argv) {
   motionPause();
-  Serial.println("[MOTION] Pause command sent");
+  logInfo("[MOTION] Pause command sent");
 }
 
 void cmd_motion_resume(int argc, char** argv) {
   motionResume();
-  Serial.println("[MOTION] Resume command sent");
+  logInfo("[MOTION] Resume command sent");
 }
 
 void cmd_estop_on(int argc, char** argv) {
   motionEmergencyStop();
-  Serial.println("[MOTION] [CRITICAL] E-STOP TRIGGERED BY USER");
+  logError("[MOTION] CRITICAL: E-STOP TRIGGERED BY USER");
 }
 
 void cmd_estop_off(int argc, char** argv) {
   if (motionClearEmergencyStop()) {
-    Serial.println("[MOTION] [OK] E-Stop Cleared");
+    logInfo("[MOTION] [OK] E-Stop Cleared");
   } else {
-    Serial.println("[MOTION] [FAIL] Could not clear E-Stop (Check Safety Alarms)");
+    logWarning("[MOTION] Could not clear E-Stop (Check Safety Alarms)");
   }
 }
 
@@ -71,7 +71,7 @@ void cmd_estop_main(int argc, char** argv) {
   } else if (strcasecmp(argv[1], "off") == 0) {
     cmd_estop_off(argc, argv);
   } else {
-    Serial.println("Usage: estop [status|on|off]");
+    logPrintln("Usage: estop [status|on|off]");
   }
 }
 
@@ -81,13 +81,13 @@ void cmd_estop_main(int argc, char** argv) {
 
 void cmd_soft_limits(int argc, char** argv) {
   if (argc < 4) {
-    Serial.println("Usage: limit <axis> <min> <max> [enable]");
+    logPrintln("Usage: limit <axis> <min> <max> [enable]");
     return;
   }
   
   uint8_t axis = axisCharToIndex(argv[1]);
   if (axis == 255) {
-    Serial.println("[MOTION] Invalid axis");
+    logWarning("[MOTION] Invalid axis");
     return;
   }
   
@@ -100,12 +100,12 @@ void cmd_soft_limits(int argc, char** argv) {
     motionEnableSoftLimits(axis, enable);
   }
   
-  Serial.printf("[MOTION] Soft limits updated for Axis %d\n", axis);
+  logInfo("[MOTION] Soft limits updated for Axis %d", axis);
 }
 
 void cmd_feed_override(int argc, char** argv) {
     if (argc < 2) {
-        Serial.printf("[CLI] Current Feed: %.0f%%\n", motionGetFeedOverride() * 100.0f);
+        logPrintf("[CLI] Current Feed: %.0f%%\n", motionGetFeedOverride() * 100.0f);
         return;
     }
 
@@ -115,7 +115,7 @@ void cmd_feed_override(int argc, char** argv) {
     if (factor > 10.0f) factor /= 100.0f;
 
     motionSetFeedOverride(factor);
-    Serial.printf("[CLI] Feed override set to %.2f\n", factor);
+    logInfo("[CLI] Feed override set to %.2f", factor);
 }
 
 // ============================================================================
@@ -124,15 +124,15 @@ void cmd_feed_override(int argc, char** argv) {
 
 void cmd_spinlock_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[SPINLOCK] === Spinlock Timing Diagnostics ===");
-        Serial.println("Usage: spinlock [stats | reset]");
-        Serial.println("  stats:  Show critical section timing report");
-        Serial.println("  reset:  Reset timing statistics");
-        Serial.println("");
-        Serial.println("Purpose: Audit spinlock critical section durations");
-        Serial.println("         to identify sections >10us that should use mutexes");
-        Serial.println("");
-        Serial.println("See: COMPREHENSIVE_AUDIT_REPORT.md Finding 1.3");
+        logPrintln("[SPINLOCK] === Spinlock Timing Diagnostics ===");
+        logPrintln("Usage: spinlock [stats | reset]");
+        logPrintln("  stats:  Show critical section timing report");
+        logPrintln("  reset:  Reset timing statistics");
+        logPrintln("");
+        logPrintln("Purpose: Audit spinlock critical section durations");
+        logPrintln("         to identify sections >10us that should use mutexes");
+        logPrintln("");
+        logPrintln("See: COMPREHENSIVE_AUDIT_REPORT.md Finding 1.3");
         return;
     }
 
@@ -141,7 +141,7 @@ void cmd_spinlock_main(int argc, char** argv) {
     } else if (strcmp(argv[1], "reset") == 0) {
         motionResetSpinlockStats();
     } else {
-        Serial.printf("[SPINLOCK] Unknown sub-command: %s\n", argv[1]);
+        logWarning("[SPINLOCK] Unknown sub-command: %s", argv[1]);
     }
 }
 

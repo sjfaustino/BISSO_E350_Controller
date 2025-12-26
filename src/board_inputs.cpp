@@ -194,6 +194,7 @@ button_state_t boardInputsUpdate() {
 }
 
 void boardInputsDiagnostics() {
+  serialLoggerLock();
   Serial.println("\n[INPUTS] === Physical Inputs (0x24) ===");
 
   // THREAD SAFETY FIX: Protect I2C bus access with mutex
@@ -204,6 +205,7 @@ void boardInputsDiagnostics() {
     xSemaphoreGive(i2c_mutex);
   } else {
     Serial.println("[INPUTS] [ERR] Mutex timeout - I2C bus busy");
+    serialLoggerUnlock();
     return;
   }
 
@@ -220,4 +222,5 @@ void boardInputsDiagnostics() {
                 pause ? "PRESSED" : "RELEASED");
   Serial.printf("  RESUME (Mask 0x%02X): %s\n", mask_resume,
                 resume ? "PRESSED" : "RELEASED");
+  serialLoggerUnlock();
 }

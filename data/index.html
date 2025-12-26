@@ -1,118 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="BISSO E350 CNC Control System Dashboard">
     <meta name="theme-color" content="#3b82f6">
     <title>BISSO E350 Dashboard</title>
-
-    <!-- CSS Framework -->
-    <link rel="stylesheet" href="css/variables.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/cards.css">
-    <link rel="stylesheet" href="css/charts.css">
-    <link rel="stylesheet" href="css/responsive.css">
-    <link rel="stylesheet" href="css/mobile-menu.css">
-
-    <!-- UI Enhancements -->
-    <link rel="stylesheet" href="shared/enhancements.css">
-
-    <style>
-        /* Quick styles for alerts container */
-        .alerts {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-sm);
-            position: fixed;
-            top: 80px;
-            right: var(--space-lg);
-            z-index: 999;
-            max-width: 400px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .alert {
-            padding: var(--space-md);
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-lg);
-            animation: slideInRight 0.3s ease;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: var(--space-md);
-            font-size: var(--font-size-sm);
-        }
-
-        .alert.info {
-            background: var(--color-normal);
-            color: white;
-        }
-
-        .alert.success {
-            background: var(--color-optimal);
-            color: white;
-        }
-
-        .alert.warning {
-            background: var(--color-warning);
-            color: white;
-        }
-
-        .alert.critical {
-            background: var(--color-critical);
-            color: white;
-        }
-
-        .alert-close {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 18px;
-            padding: 0;
-            opacity: 0.8;
-        }
-
-        .alert-close:hover {
-            opacity: 1;
-        }
-
-        @keyframes slideInRight {
-            from {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .alerts {
-                right: var(--space-sm);
-                left: var(--space-sm);
-                max-width: none;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="bundle.css?v=1766770416">
 </head>
-
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
     <!-- Header -->
     <header role="banner">
-        <div style="display: flex; align-items: center; gap: var(--space-md);">
-            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu"
-                aria-expanded="false">
-                <span></span>
-                <span></span>
-                <span></span>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu">
+                <span></span><span></span><span></span>
             </button>
             <h1>⚙️ BISSO E350</h1>
             <div class="status-indicator" aria-label="System connection status">
@@ -133,209 +36,47 @@
             <li><a href="#system" class="nav-item" data-icon="ℹ️"><span>System</span></a></li>
             <li><a href="#maintenance" class="nav-item" data-icon="🔧"><span>Maintenance</span></a></li>
             <li><a href="#logs" class="nav-item" data-icon="📋"><span>Logs</span></a></li>
+            <li><a href="#hardware" class="nav-item" data-icon="🔌"><span>Hardware</span></a></li>
             <li><a href="#settings" class="nav-item" data-icon="⚙️"><span>Settings</span></a></li>
         </ul>
     </nav>
 
     <!-- Alerts Container -->
-    <div class="alerts" role="region" aria-label="System alerts" aria-live="polite" aria-atomic="true"
-        id="alerts-container"></div>
+    <div class="alerts" role="region" aria-label="System alerts" id="alerts-container"></div>
 
     <!-- Floating Connection Status Badge -->
-    <div class="connection-badge" id="connection-badge" role="status" aria-live="polite">
+    <div class="connection-badge" id="connection-badge">
         <div class="status-dot online" id="badge-status-dot"></div>
         <span class="status-text" id="badge-status-text">Connected</span>
         <span class="latency" id="badge-latency">-- ms</span>
     </div>
 
     <!-- Main Content -->
-    <main id="page-container" class="container" role="main" id="main-content">
-        <div style="text-align: center; padding: var(--space-xl);">
+    <main id="page-container" class="container" role="main">
+        <div style="text-align: center; padding: 2rem;">
             <p>Loading...</p>
         </div>
     </main>
 
     <!-- Footer -->
     <footer>
-        <p>BISSO E350 Dashboard v3.1 | Last Update: <span id="last-update">--</span> | Latency: <span id="latency">--
-                ms</span></p>
+        <p>BISSO E350 Dashboard v3.1 | Last Update: <span id="last-update">--</span> | Latency: <span id="latency">-- ms</span></p>
     </footer>
 
-    <!-- Shared Modules -->
-    <!-- Core utilities (load first) -->
-    <script src="shared/utils.js"></script>
-    <script src="shared/toast.js"></script>
-    <script src="shared/mini-charts.js"></script>
-    <script src="shared/calibration-wizard.js"></script>
-
-    <!-- Application scripts -->
-    <script src="shared/websocket.js"></script>
-    <script src="shared/state.js"></script>
-    <script src="shared/alerts.js"></script>
-    <script src="shared/theme.js"></script>
-    <script src="shared/safety.js"></script>
-    <script src="shared/fallback-pages.js"></script>
-    <script src="shared/router.js"></script>
-    <script src="shared/graphs.js"></script>
-    <script src="shared/mock-data.js"></script>
-
-    <!-- Main Script -->
+    <!-- Single Bundle Script -->
+    <script src="bundle.js?v=1766770416"></script>
+    
     <script>
-        /**
-         * Main Application Controller
-         */
-        class App {
-            static init() {
-                // Enable mock mode first if requested (without triggering navigation)
-                // Router.init() will handle the initial navigation
-                if (window.__mockModeRequested && window.MockMode) {
-                    MockMode.enable(false);  // false = don't trigger navigation yet
-                }
-
-                this.setupEventListeners();
-                this.updateStatus();
-                this.initMobileMenu();
-
-                // Initialize router after everything else is ready
-                console.log('[APP] Checking Router, typeof window.Router:', typeof window.Router);
-                if (window.Router) {
-                    console.log('[APP] Calling Router.init()');
-                    Router.init();
-                } else {
-                    console.error('[APP] Router is not defined!');
-                }
-
-                console.log('[APP] Initialized');
+        // Main App Initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("Initializing App...");
+            // Initialize Router directly since there is no main App class
+            if (window.Router) {
+                window.Router.init();
+            } else {
+                console.error("Router not found!");
             }
-
-            static setupEventListeners() {
-                // Status indicator (header + floating badge)
-                window.addEventListener('ws-connected', () => {
-                    document.getElementById('status-dot').className = 'status-dot online';
-                    document.getElementById('status-text').textContent = 'Online';
-                    // Update floating badge
-                    document.getElementById('badge-status-dot').className = 'status-dot online';
-                    document.getElementById('badge-status-text').textContent = 'Connected';
-                });
-
-                window.addEventListener('ws-disconnected', () => {
-                    document.getElementById('status-dot').className = 'status-dot warning';
-                    document.getElementById('status-text').textContent = 'Reconnecting...';
-                    // Update floating badge
-                    document.getElementById('badge-status-dot').className = 'status-dot connecting';
-                    document.getElementById('badge-status-text').textContent = 'Reconnecting';
-                });
-
-                window.addEventListener('ws-error', () => {
-                    document.getElementById('status-dot').className = 'status-dot offline';
-                    document.getElementById('status-text').textContent = 'Offline';
-                    // Update floating badge
-                    document.getElementById('badge-status-dot').className = 'status-dot offline';
-                    document.getElementById('badge-status-text').textContent = 'Offline';
-                });
-
-                // Alerts
-                window.addEventListener('alert-added', (event) => {
-                    this.renderAlert(event.detail);
-                });
-
-                window.addEventListener('alert-removed', (event) => {
-                    this.removeAlert(event.detail.id);
-                });
-
-                // Telemetry updates
-                window.addEventListener('telemetry', (event) => {
-                    this.updateTimestamp();
-                });
-
-                // Theme toggle shortcut (T key)
-                window.addEventListener('keydown', (e) => {
-                    if (e.key.toLowerCase() === 't' && !e.ctrlKey && !e.metaKey) {
-                        const current = ThemeManager.getCurrentTheme();
-                        const themes = ThemeManager.getThemes();
-                        const index = themes.indexOf(current);
-                        const next = themes[(index + 1) % themes.length];
-                        ThemeManager.applyTheme(next);
-                        AlertManager.add(`Theme: ${next}`, 'info', 2000);
-                    }
-                });
-            }
-
-            static initMobileMenu() {
-                const toggle = document.getElementById('mobile-menu-toggle');
-                const nav = document.getElementById('main-nav');
-
-                if (!toggle || !nav) return;
-
-                toggle.addEventListener('click', () => {
-                    const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
-                    toggle.setAttribute('aria-expanded', !isExpanded);
-                    nav.classList.toggle('open');
-                });
-
-                // Close menu when nav item clicked
-                nav.querySelectorAll('.nav-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        toggle.setAttribute('aria-expanded', 'false');
-                        nav.classList.remove('open');
-                    });
-                });
-
-                // Close menu on Escape key
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        toggle.setAttribute('aria-expanded', 'false');
-                        nav.classList.remove('open');
-                    }
-                });
-            }
-
-            static renderAlert(alert) {
-                const container = document.getElementById('alerts-container');
-                const alertEl = document.createElement('div');
-                alertEl.className = `alert ${alert.type}`;
-                alertEl.id = `alert-${alert.id}`;
-                alertEl.innerHTML = `
-                    <div>${alert.message}</div>
-                    <button class="alert-close" onclick="App.removeAlert(${alert.id})" aria-label="Dismiss alert">✕</button>
-                `;
-                container.appendChild(alertEl);
-            }
-
-            static removeAlert(id) {
-                const el = document.getElementById(`alert-${id}`);
-                if (el) {
-                    el.style.animation = 'slideInRight 0.3s ease reverse';
-                    setTimeout(() => el.remove(), 300);
-                }
-            }
-
-            static updateTimestamp() {
-                const now = new Date();
-                document.getElementById('last-update').textContent = now.toLocaleTimeString();
-
-                if (SharedWebSocket.ws && SharedWebSocket.isConnected) {
-                    // Approximate latency
-                    const latency = Math.round(Math.random() * 50 + 10);
-                    document.getElementById('latency').textContent = latency + ' ms';
-                    // Update floating badge latency
-                    const badgeLatency = document.getElementById('badge-latency');
-                    if (badgeLatency) badgeLatency.textContent = latency + ' ms';
-                }
-            }
-
-            static updateStatus() {
-                setInterval(() => this.updateTimestamp(), 1000);
-            }
-        }
-
-        // Initialize app when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => App.init());
-        } else {
-            App.init();
-        }
+        });
     </script>
 </body>
-
 </html>

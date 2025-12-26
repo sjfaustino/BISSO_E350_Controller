@@ -329,7 +329,7 @@ bool elboI73GetInput(uint8_t bit, bool *success) {
 }
 
 void elboDiagnostics() {
-  Serial.println("\n[PLC] === IO Diagnostics ===");
+  logPrintln("\n[PLC] === IO Diagnostics ===");
 
   // Read shadow register safely with mutex protection
   uint8_t output_reg = 0x00;
@@ -337,27 +337,27 @@ void elboDiagnostics() {
     output_reg = q73_shadow_register;
     xSemaphoreGive(plc_shadow_mutex);
   } else {
-    Serial.println("Warning: Could not acquire shadow mutex for diagnostics");
+    logWarning("[PLC] Could not acquire shadow mutex for diagnostics");
   }
 
-  Serial.printf("Output Register: 0x%02X\n", output_reg);
-  Serial.printf("Input Register:  0x%02X\n", i73_input_shadow);
+  logPrintf("Output Register: 0x%02X\n", output_reg);
+  logPrintf("Input Register:  0x%02X\n", i73_input_shadow);
 
   // PHASE 5.7: Gemini Fix - Display shadow register health
-  Serial.printf("Shadow Register Dirty: %s\n",
+  logPrintf("Shadow Register Dirty: %s\n",
                 q73_shadow_dirty ? "YES (OUT OF SYNC!)" : "No");
-  Serial.printf("Mutex Timeout Count: %lu\n",
+  logPrintf("Mutex Timeout Count: %lu\n",
                 (unsigned long)q73_mutex_timeout_count);
 
   // CRITICAL FIX: Acquire PLC I2C mutex for diagnostics
   if (taskLockMutex(taskGetI2cPlcMutex(), 500)) {
     Wire.beginTransmission(ADDR_Q73_OUTPUT);
     uint8_t err = Wire.endTransmission();
-    Serial.printf("Q73 (0x%02X) Status: %s\n", ADDR_Q73_OUTPUT,
+    logPrintf("Q73 (0x%02X) Status: %s\n", ADDR_Q73_OUTPUT,
                   (err == 0) ? "OK" : "ERROR");
     taskUnlockMutex(taskGetI2cPlcMutex());
   } else {
-    Serial.println("Q73: Could not acquire I2C mutex for diagnostics");
+    logWarning("[PLC] Q73: Could not acquire I2C mutex for diagnostics");
   }
 }
 

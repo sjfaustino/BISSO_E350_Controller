@@ -7,6 +7,7 @@
 #include "api_file_manager.h"
 #include "auth_manager.h"  // PHASE 5.10: SHA-256 authentication
 #include "web_server.h" // For WEB_BUFFER_SIZE, though not ideal dependency
+#include "serial_logger.h"
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 
@@ -65,7 +66,7 @@ static bool isValidFilename(const char* filename) {
 
   // Block path traversal attempts
   if (strstr(filename, "..") != NULL) {
-    Serial.printf("[FILE_API] [SECURITY] Blocked path traversal: %s\n", filename);
+    logWarning("[FILE_API] [SECURITY] Blocked path traversal: %s", filename);
     return false;
   }
 
@@ -77,7 +78,7 @@ static bool isValidFilename(const char* filename) {
   // Whitelist: alphanumeric + underscore + dot + dash
   for (const char* p = filename; *p; p++) {
     if (!isalnum(*p) && *p != '_' && *p != '.' && *p != '-' && *p != '/') {
-      Serial.printf("[FILE_API] [SECURITY] Blocked invalid character in filename: %s\n", filename);
+      logWarning("[FILE_API] [SECURITY] Blocked invalid character in filename: %s", filename);
       return false;
     }
   }
@@ -123,7 +124,7 @@ void handleFileDelete(AsyncWebServerRequest *request) {
 
   // PHASE 5.10: Security - Validate filename before deletion (path traversal prevention)
   if (!isValidFilename(path)) {
-    Serial.printf("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s\n", path);
+    logWarning("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s", path);
     request->send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
     return;
   }
@@ -141,7 +142,7 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename,
   // PHASE 5.10: Security - Validate filename first (path traversal prevention)
   if (!isValidFilename(filename.c_str())) {
     if (index == 0) {
-      Serial.printf("[FILE_API] [SECURITY] Rejected unsafe filename: %s\n", filename.c_str());
+      logWarning("[FILE_API] [SECURITY] Rejected unsafe filename: %s", filename.c_str());
       request->send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
     }
     return;
@@ -151,7 +152,7 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename,
   if (!filename.endsWith(".nc") && !filename.endsWith(".gcode") &&
       !filename.endsWith(".txt")) {
     if (index == 0) {
-      Serial.println("[FILE_API] Blocked upload of non-GCode file");
+      logWarning("[FILE_API] Blocked upload of non-GCode file");
       request->send(400, "text/plain", "Invalid file type: only .nc, .gcode, .txt allowed");
     }
     return;
@@ -170,9 +171,8 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename,
   if (final) {
     if (request->_tempFile)
       request->_tempFile.close();
-    Serial.printf("[FILE_API] Upload Complete: %s (%u bytes)\n",
+    logInfo("[FILE_API] Upload Complete: %s (%u bytes)",
                   filename.c_str(), index + len);
-    // PHASE 5.10: Send response on final chunk to prevent double-response
     request->send(200, "text/plain", "Upload complete");
   }
 }

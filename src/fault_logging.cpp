@@ -40,8 +40,7 @@ typedef struct {
 
 static fault_log_header_t log_header = {0};
 
-// PHASE 5.1: Ring buffer fallback for queue overflow
-#define FAULT_RING_BUFFER_SIZE 8
+// PHASE 5.1: Ring buffer fallback for queue overflow (Size defined in system_tuning.h)
 static struct {
   fault_entry_t entries[FAULT_RING_BUFFER_SIZE];
   uint8_t head;
@@ -196,7 +195,7 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis,
       return;
   }
 
-  Serial.printf("[FAULT_RT] %s: %s\n", faultSeverityToString(severity),
+  logPrintf("[FAULT_RT] %s: %s\n", faultSeverityToString(severity),
                 msg_buffer);
 
   queue_message_t msg;
@@ -213,7 +212,7 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis,
   payload->message[63] = '\0';
 
   if (!taskSendMessage(taskGetFaultQueue(), &msg)) {
-    Serial.println("[FAULT_RT] [WARN] Queue Full! Using ring buffer fallback.");
+    logWarning("[FAULT_RT] Queue Full! Using ring buffer fallback.");
     faultAddToRingBuffer(payload);
   }
 
@@ -388,11 +387,11 @@ fault_stats_t faultGetStats() {
 }
 
 void faultShowHistory() {
-  Serial.println("[FAULT] Full history dump via CLI only.");
+  logPrintln("[FAULT] Full history dump via CLI only.");
 }
 
 void faultClearHistory() {
-  Serial.println("[FAULT] Clearing history...");
+  logPrintln("[FAULT] Clearing history...");
   // Clear faults
   for (int i = 0; i < MAX_FAULT_ENTRIES_NVS; i++) {
     char key[32];
@@ -406,7 +405,7 @@ void faultClearHistory() {
   log_header.total_lifetime_faults = 0;
   fault_prefs.putBytes(KEY_HEADER, &log_header, sizeof(log_header));
 
-  Serial.println("[FAULT] [OK] Cleared");
+  logInfo("[FAULT] [OK] Cleared");
 }
 
 void emergencyStopSetActive(bool active) {

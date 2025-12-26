@@ -295,20 +295,20 @@ void authInit() {
     prefs.putBool("first_boot", false);
     prefs.end();
 
-    // Display credentials
-    Serial.println();
-    Serial.println("╔══════════════════════════════════════════════════════════════╗");
-    Serial.println("║           FIRST BOOT - RANDOM CREDENTIALS GENERATED          ║");
-    Serial.println("╠══════════════════════════════════════════════════════════════╣");
-    Serial.printf("║  Username: %-48s ║\n", current_username);
-    Serial.printf("║  Password: %-48s ║\n", random_password);
-    Serial.println("║                                                              ║");
-    Serial.println("║  ⚠️  SAVE THESE CREDENTIALS - THEY WILL NOT BE SHOWN AGAIN  ║");
-    Serial.println("║                                                              ║");
-    Serial.println("║  Change password via web interface or CLI:                  ║");
-    Serial.println("║    web_setpass <new_password>                               ║");
-    Serial.println("╚══════════════════════════════════════════════════════════════╝");
-    Serial.println();
+    // Display credentials (thread-safe)
+    logPrintln("");
+    logPrintln("╔══════════════════════════════════════════════════════════════╗");
+    logPrintln("║           FIRST BOOT - RANDOM CREDENTIALS GENERATED          ║");
+    logPrintln("╠══════════════════════════════════════════════════════════════╣");
+    logPrintf("║  Username: %-48s ║\n", current_username);
+    logPrintf("║  Password: %-48s ║\n", random_password);
+    logPrintln("║                                                              ║");
+    logPrintln("║  ⚠️  SAVE THESE CREDENTIALS - THEY WILL NOT BE SHOWN AGAIN  ║");
+    logPrintln("║                                                              ║");
+    logPrintln("║  Change password via web interface or CLI:                  ║");
+    logPrintln("║    web_setpass <new_password>                               ║");
+    logPrintln("╚══════════════════════════════════════════════════════════════╝");
+    logPrintln("");
 
     password_change_required = false;  // Random password is already strong
     credentials_loaded = true;
@@ -343,14 +343,28 @@ bool authVerifyCredentials(const char* username, const char* password) {
 
   // Verify username
   if (strcmp(username, current_username) != 0) {
-    logWarning("[AUTH] Invalid username: %s", username);
+    // Log failed attempt with full details for security monitoring
+    logWarning("[AUTH] FAILED LOGIN - Invalid username");
+    logWarning("[AUTH]   Attempted user: '%s'", username);
+    logWarning("[AUTH]   Attempted pass: '%s' (len=%d)", password, strlen(password));
     return false;
   }
 
   // Verify password
   bool valid = verifyPassword(password, stored_password_hash);
 
-  if (valid && strncmp(stored_password_hash, "$sha256$", 8) != 0) {
+  if (!valid) {
+    // Log failed attempt with full details for security monitoring / debugging
+    logWarning("[AUTH] FAILED LOGIN - Invalid password");
+    logWarning("[AUTH]   Username: '%s' (correct)", username);
+    logWarning("[AUTH]   Password: '%s' (len=%d)", password, strlen(password));
+    logWarning("[AUTH]   Expected hash prefix: %.20s...", stored_password_hash);
+    return false;
+  }
+
+  // Login successful (don't log on every request - too verbose)
+
+  if (strncmp(stored_password_hash, "$sha256$", 8) != 0) {
     // Auto-upgrade legacy plain text password to hashed
     logInfo("[AUTH] Auto-upgrading plain text password to SHA-256");
     createPasswordHash(password, stored_password_hash, sizeof(stored_password_hash));
@@ -391,11 +405,17 @@ bool authSetPassword(const char* username, const char* new_password) {
   // Create hash
   createPasswordHash(new_password, stored_password_hash, sizeof(stored_password_hash));
 
+  // Yield to prevent watchdog timeout during NVS write
+  yield();
+
   // Save to NVS
   Preferences prefs;
   prefs.begin("auth", false);
   prefs.putString("password", stored_password_hash);
   prefs.end();
+
+  // Yield after NVS write
+  yield();
 
   logInfo("[AUTH] Password updated successfully for user: %s", username);
   password_change_required = false;
@@ -585,20 +605,138 @@ void authClearRateLimit(const char* ip_address) {
 
 void cmd_web_setpass(int argc, char** argv) {
   if (argc < 2) {
-    Serial.println("\n[AUTH] === Web Password Management (CLI) ===");
-    Serial.println("Usage: web_setpass <new_password>");
-    Serial.println("Note: Password must be at least 8 characters");
-    Serial.println("      Requires 3 character types (lower/upper/digit/symbol)");
+    logPrintln("\n[AUTH] === Web Password Management (CLI) ===");
+    logPrintln("Usage: web_setpass <new_password>");
+    logPrintln("Note: Password must be at least 8 characters");
+    logPrintln("      Requires 3 character types (lower/upper/digit/symbol)");
     return;
   }
 
   const char* new_pass = argv[1];
 
+  // Yield before password update to ensure watchdog is fed
+  yield();
+
   if (authSetPassword("admin", new_pass)) {
-    Serial.println("[AUTH] [OK] Web password updated successfully.");
-    Serial.println("[AUTH] [OK] You can now log in to the Web UI with the new password.");
+    yield();  // Feed watchdog after NVS write
+    logPrintln("[AUTH] [OK] Web password updated successfully.");
+    logPrintln("[AUTH] [OK] You can now log in to the Web UI with the new password.");
   } else {
-    Serial.println("[AUTH] [ERR] Password update failed.");
-    Serial.println("[AUTH] [ERR] Ensure it meets length and complexity requirements.");
+    logPrintln("[AUTH] [ERR] Password update failed.");
+    logPrintln("[AUTH] [ERR] Ensure it meets length and complexity requirements.");
+  }
+}
+
+bool authTestPassword(const char* password) {
+  if (!credentials_loaded) {
+    logError("[AUTH] Credentials not loaded");
+    return false;
+  }
+  
+  // Test against stored hash
+  if (strncmp(stored_password_hash, "$sha256$", 8) != 0) {
+    // Plain text comparison (legacy)
+    return strcmp(password, stored_password_hash) == 0;
+  }
+  
+  // Parse and verify hash
+  const char* salt_hex = stored_password_hash + 8;
+  const char* hash_hex = strchr(salt_hex, '$');
+  if (!hash_hex) {
+    return false;
+  }
+  hash_hex++;
+  
+  // Extract salt
+  char salt_hex_str[AUTH_SALT_BYTES * 2 + 1];
+  strncpy(salt_hex_str, salt_hex, AUTH_SALT_BYTES * 2);
+  salt_hex_str[AUTH_SALT_BYTES * 2] = '\0';
+  
+  uint8_t salt[AUTH_SALT_BYTES];
+  hexToBin(salt_hex_str, salt, sizeof(salt));
+  
+  // Extract expected hash
+  uint8_t expected_hash[AUTH_HASH_BYTES];
+  hexToBin(hash_hex, expected_hash, sizeof(expected_hash));
+  
+  // Compute actual hash
+  uint8_t actual_hash[AUTH_HASH_BYTES];
+  hashPassword(password, salt, actual_hash);
+  
+  // Compare
+  uint8_t diff = 0;
+  for (size_t i = 0; i < AUTH_HASH_BYTES; i++) {
+    diff |= expected_hash[i] ^ actual_hash[i];
+  }
+  
+  return diff == 0;
+}
+
+void authPrintDiagnostics(void) {
+  serialLoggerLock();
+  Serial.println("\n[AUTH] === Authentication Diagnostics ===");
+  Serial.printf("Username:          %s\n", current_username);
+  Serial.printf("Credentials Loaded: %s\n", credentials_loaded ? "YES" : "NO");
+  Serial.printf("Password Change:   %s\n", password_change_required ? "REQUIRED" : "Not required");
+  Serial.printf("Hash Format:       %s\n", 
+    strncmp(stored_password_hash, "$sha256$", 8) == 0 ? "SHA-256 (secure)" : "PLAIN TEXT (insecure!)");
+  Serial.printf("Hash Length:       %d chars\n", strlen(stored_password_hash));
+  
+  // Show partial hash for debugging (safe - only first few chars)
+  if (strlen(stored_password_hash) > 20) {
+    Serial.printf("Hash Preview:      %.20s...\n", stored_password_hash);
+  }
+  
+  Serial.printf("Rate Limit IPs:    %d/%d\n", rate_limit_entries, AUTH_RATE_LIMIT_MAX_IPS);
+  Serial.println();
+  serialLoggerUnlock();
+}
+
+void cmd_auth(int argc, char** argv) {
+  if (argc < 2) {
+    serialLoggerLock();
+    Serial.println("\n[AUTH] === Authentication Management ===");
+    Serial.println("Usage:");
+    Serial.println("  auth diag           - Show auth diagnostics");
+    Serial.println("  auth test <pass>    - Test password verification");
+    Serial.println("  auth reload         - Reload credentials from NVS");
+    Serial.println("  auth clear_limits   - Clear all rate limits");
+    serialLoggerUnlock();
+    return;
+  }
+  
+  if (strcasecmp(argv[1], "diag") == 0) {
+    authPrintDiagnostics();
+  } else if (strcasecmp(argv[1], "test") == 0) {
+    if (argc < 3) {
+      logPrintln("[AUTH] Usage: auth test <password>");
+      return;
+    }
+    bool result = authTestPassword(argv[2]);
+    logPrintf("[AUTH] Password test: %s\n", result ? "MATCH" : "NO MATCH");
+    if (!result) {
+      logPrintln("[AUTH] Hint: Password may have been entered incorrectly");
+      logPrintln("[AUTH] Hint: Clear browser cache or try incognito mode");
+    }
+  } else if (strcasecmp(argv[1], "reload") == 0) {
+    logPrintln("[AUTH] Reloading credentials from NVS...");
+    Preferences prefs;
+    prefs.begin("auth", true);
+    String pw_hash = prefs.getString("password", "");
+    prefs.end();
+    
+    if (pw_hash.length() > 0) {
+      strncpy(stored_password_hash, pw_hash.c_str(), sizeof(stored_password_hash) - 1);
+      stored_password_hash[sizeof(stored_password_hash) - 1] = '\0';
+      logInfo("[AUTH] Credentials reloaded successfully");
+      authPrintDiagnostics();
+    } else {
+      logError("[AUTH] No credentials found in NVS");
+    }
+  } else if (strcasecmp(argv[1], "clear_limits") == 0) {
+    rate_limit_entries = 0;
+    logInfo("[AUTH] All rate limits cleared");
+  } else {
+    logWarning("[AUTH] Unknown command: %s", argv[1]);
   }
 }

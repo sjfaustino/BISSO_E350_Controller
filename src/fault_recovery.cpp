@@ -165,6 +165,7 @@ void faultRecoveryResetAll() {
 // ============================================================================
 
 void faultRecoveryDiagnostics() {
+    serialLoggerLock();
     Serial.println("\n[FAULT_RECOVERY] === Recovery Status ===");
 
     for (int i = 0; i < 6; i++) {
@@ -177,4 +178,5 @@ void faultRecoveryDiagnostics() {
         Serial.printf("  Last Status: %s\n", recovery->success ? "SUCCESS" : "FAILED");
         Serial.printf("  Backoff: %lu ms\n", (unsigned long)recovery->backoff_delay_ms);
     }
+    serialLoggerUnlock();
 }

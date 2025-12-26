@@ -12,9 +12,9 @@
 #include "encoder_wj66.h"
 #include "encoder_comm_stats.h"
 #include "encoder_hal.h"
-#include "spindle_current_rs485.h"
 #include "jxk10_modbus.h"
 #include "spindle_current_monitor.h"
+#include "rs485_device_registry.h"
 #include "i2c_bus_recovery.h"
 #include <Wire.h>
 #include "task_manager.h"
@@ -43,6 +43,7 @@
 #include "board_inputs.h"
 #include "system_constants.h"
 #include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion quality diagnostics
+#include "cutting_analytics.h"      // Stone cutting analytics
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -72,9 +73,10 @@ void cmd_status_dashboard(int argc, char** argv) {
     uint32_t mins = (uptime_sec % 3600) / 60;
     uint32_t secs = uptime_sec % 60;
     
+    serialLoggerLock();
     Serial.println("\n╔══════════════════════════════════════════════════════════╗");
     Serial.println("║           BISSO E350 QUICK STATUS DASHBOARD               ║");
-    Serial.printf( "║  Uptime: %02lu:%02lu:%02lu                                        ║\n", hours, mins, secs);
+    Serial.printf( "║  Uptime: %02u:%02u:%02u                                        ║\n", (unsigned int)hours, (unsigned int)mins, (unsigned int)secs);
     Serial.println("╠══════════════════════════════════════════════════════════╣");
     
     Serial.println("║ POSITION (mm)                                             ║");
@@ -131,6 +133,7 @@ void cmd_status_dashboard(int argc, char** argv) {
     }
     
     Serial.println("╚══════════════════════════════════════════════════════════╝");
+    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -154,11 +157,11 @@ void cmd_runtime(int argc, char** argv) {
     if (argc >= 2) {
         if (strcasecmp(argv[1], "reset") == 0) {
             configSetInt(KEY_CYCLE_COUNT, 0);
-            Serial.println("[RUNTIME] Cycle counter reset to 0");
+            logInfo("[RUNTIME] Cycle counter reset to 0");
             return;
         } else if (strcasecmp(argv[1], "maint") == 0) {
             configSetInt(KEY_LAST_MAINT_MINS, total_mins);
-            Serial.println("[RUNTIME] Maintenance recorded");
+            logInfo("[RUNTIME] Maintenance recorded");
             return;
         }
     }
@@ -167,6 +170,7 @@ void cmd_runtime(int argc, char** argv) {
     uint32_t mins = total_mins % 60;
     uint32_t maint_hours = since_maint / 60;
     
+    serialLoggerLock();
     Serial.println("\n[RUNTIME] === Machine Usage Statistics ===\n");
     Serial.println("┌─────────────────────────┬────────────────────┐");
     Serial.println("│ Metric                  │ Value              │");
@@ -187,6 +191,7 @@ void cmd_runtime(int argc, char** argv) {
     if (maint_hours >= 100) {
         Serial.println("\n⚠️  MAINTENANCE RECOMMENDED (100+ hours since last service)");
     }
+    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -194,7 +199,7 @@ void cmd_runtime(int argc, char** argv) {
 // ============================================================================
 void cmd_dio_main(int argc, char** argv) {
     (void)argc; (void)argv;
-    Serial.println("\n[DIO] === Digital I/O Status ===\n");
+    logPrintln("\n[DIO] === Digital I/O Status ===\n");
     watchdogFeed("CLI");
     
     static const char* input1_labels[] = {"Limit-X", "Limit-Y", "Limit-Z", "E-Stop", "Pause", "Resume", "Probe", "Door"};
@@ -209,6 +214,7 @@ void cmd_dio_main(int argc, char** argv) {
         {0x25, "OUTPUTS-AUX", output2_labels, true}
     };
     
+    serialLoggerLock();
     Serial.println("┌────────┬────────────────┬────────────────────────┐");
     Serial.println("│ Addr   │ Name           │ State (MSB..LSB)       │");
     Serial.println("├────────┼────────────────┼────────────────────────┤");
@@ -246,6 +252,7 @@ void cmd_dio_main(int argc, char** argv) {
     
     Serial.println("└────────┴────────────────┴────────────────────────┘");
     Serial.println("Legend: Inputs=HIGH when active, Outputs=LOW when relay ON");
+    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -253,17 +260,20 @@ void cmd_dio_main(int argc, char** argv) {
 // ============================================================================
 static void cmd_spindle_alarm(int argc, char** argv) {
     if (argc < 3) {
+        serialLoggerLock();
         Serial.println("\n[SPINDLE] Alarm commands:");
         Serial.println("  spindle alarm status   - Show alarm states");
         Serial.println("  spindle alarm clear    - Clear all alarms");
         Serial.println("  spindle alarm toolbreak <amps> - Set threshold (1-20A)");
         Serial.println("  spindle alarm stall <amps> <ms> - Set stall params");
+        serialLoggerUnlock();
         return;
     }
     
     const spindle_monitor_state_t* state = spindleMonitorGetState();
     
     if (strcasecmp(argv[2], "status") == 0) {
+        serialLoggerLock();
         Serial.println("\n[SPINDLE] === Alarm Status ===");
         Serial.printf("Tool Breakage: %s (count: %lu)\n", 
                      state->alarm_tool_breakage ? "ACTIVE" : "OK",
@@ -275,6 +285,7 @@ static void cmd_spindle_alarm(int argc, char** argv) {
                      state->tool_breakage_drop_amps,
                      state->stall_threshold_amps,
                      (unsigned long)state->stall_timeout_ms);
+        serialLoggerUnlock();
     } else if (strcasecmp(argv[2], "clear") == 0) {
         spindleMonitorClearAlarms();
     } else if (strcasecmp(argv[2], "toolbreak") == 0 && argc >= 4) {
@@ -290,6 +301,7 @@ static void cmd_spindle_alarm(int argc, char** argv) {
 void cmd_selftest(int argc, char** argv) {
     // PHASE 5.2: Enhanced self-test with sub-commands
     if (argc > 1 && strcmp(argv[1], "help") == 0) {
+        serialLoggerLock();
         Serial.println("\n[SELFTEST] === Self-Test Suite ===");
         Serial.println("Usage: selftest [command] [options]");
         Serial.println("  (no args)     Run comprehensive test suite");
@@ -304,6 +316,7 @@ void cmd_selftest(int argc, char** argv) {
         Serial.println("  watchdog      Watchdog timer tests");
         Serial.println("  list          List all available tests");
         Serial.println("  help          Show this message");
+        serialLoggerUnlock();
         return;
     }
 
@@ -313,9 +326,9 @@ void cmd_selftest(int argc, char** argv) {
     }
 
     if (argc > 1 && strcmp(argv[1], "quick") == 0) {
-        Serial.println("\n[SELFTEST] === Quick Health Check ===");
+        logPrintln("\n[SELFTEST] === Quick Health Check ===");
         bool healthy = selftestQuickCheck();
-        Serial.println(healthy ? "[OK] Quick checks passed\n" : "[FAIL] Quick checks failed\n");
+        logInfo("%s", healthy ? "[OK] Quick checks passed\n" : "[FAIL] Quick checks failed\n");
         return;
     }
 
@@ -354,14 +367,14 @@ void cmd_selftest(int argc, char** argv) {
 // ============================================================================
 void cmd_debug_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("\n[DEBUG] Usage: debug [all | encoders | config]");
+        logPrintln("\n[DEBUG] Usage: debug [all | encoders | config]");
         return;
     }
 
     if (strcmp(argv[1], "all") == 0) debugAllHandler();
     else if (strcmp(argv[1], "encoders") == 0) debugEncodersHandler();
     else if (strcmp(argv[1], "config") == 0) debugConfigHandler();
-    else Serial.printf("[CLI] Unknown target '%s'\n", argv[1]);
+    else logWarning("[CLI] Unknown target '%s'", argv[1]);
 }
 
 // ============================================================================
@@ -376,23 +389,25 @@ extern void taskShowAllTasks();
 extern uint8_t taskGetCpuUsage();
 
 void cmd_wdt_test_stall(int argc, char** argv) {
+    serialLoggerLock();
     Serial.println("\n[WDT TEST] === Watchdog Verification Test ===");
     Serial.println("[WDT TEST] WARNING: This will deliberately stall for 10 seconds");
     Serial.println("[WDT TEST] The watchdog should detect this and log a fault");
     Serial.println("[WDT TEST] System will NOT reboot during this test");
     Serial.println("\n[WDT TEST] Starting deliberate stall in 3 seconds...");
+    serialLoggerUnlock();
 
     // Give user time to read warning
-    delay(1000); Serial.println("[WDT TEST] 2...");
-    delay(1000); Serial.println("[WDT TEST] 1...");
-    delay(1000); Serial.println("[WDT TEST] Starting stall NOW");
+    delay(1000); logPrintln("[WDT TEST] 2...");
+    delay(1000); logPrintln("[WDT TEST] 1...");
+    delay(1000); logPrintln("[WDT TEST] Starting stall NOW");
 
     // Record starting stats
     watchdog_stats_t* stats_before = watchdogGetStats();
     uint32_t timeouts_before = stats_before->timeouts_detected;
     uint32_t missed_before = stats_before->missed_ticks;
 
-    Serial.println("[WDT TEST] CLI task will now stall for 10 seconds without feeding watchdog");
+    logPrintln("[WDT TEST] CLI task will now stall for 10 seconds without feeding watchdog");
 
     // DELIBERATELY stall without feeding watchdog
     uint32_t stall_start = millis();
@@ -402,7 +417,7 @@ void cmd_wdt_test_stall(int argc, char** argv) {
         delay(100);
     }
 
-    Serial.println("\n[WDT TEST] Stall complete - checking watchdog response...");
+    logPrintln("\n[WDT TEST] Stall complete - checking watchdog response...");
 
     // Feed watchdog again to recover
     watchdogFeed("CLI");
@@ -414,6 +429,7 @@ void cmd_wdt_test_stall(int argc, char** argv) {
 
     bool test_passed = (timeouts_after > timeouts_before) || (missed_after > missed_before);
 
+    serialLoggerLock();
     Serial.println("\n[WDT TEST] === Test Results ===");
     Serial.printf("Timeouts Detected: %lu -> %lu (delta: %lu)\n",
                   (unsigned long)timeouts_before,
@@ -433,12 +449,13 @@ void cmd_wdt_test_stall(int argc, char** argv) {
     }
 
     Serial.println("\n[WDT TEST] Use 'faults show' to view logged faults");
+    serialLoggerUnlock();
 }
 
 void cmd_wdt_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[WDT] Usage: wdt [status | tasks | stats | report | test]");
-        Serial.println("  test: Run watchdog verification test (deliberate 10s stall)");
+        logPrintln("[WDT] Usage: wdt [status | tasks | stats | report | test]");
+        logPrintln("  test: Run watchdog verification test (deliberate 10s stall)");
         return;
     }
     if (strcmp(argv[1], "status") == 0) watchdogShowStatus();
@@ -450,12 +467,12 @@ void cmd_wdt_main(int argc, char** argv) {
 
 void cmd_task_main(int argc, char** argv) {
     if (argc < 2) { 
-        Serial.println("[TASK] Usage: task [stats | list | cpu]");
+        logPrintln("[TASK] Usage: task [stats | list | cpu]");
         return;
     }
     if (strcmp(argv[1], "stats") == 0) taskShowStats();
     else if (strcmp(argv[1], "list") == 0) taskShowAllTasks();
-    else if (strcmp(argv[1], "cpu") == 0) Serial.printf("[TASK] CPU: %u%%\n", taskGetCpuUsage());
+    else if (strcmp(argv[1], "cpu") == 0) logInfo("[TASK] CPU: %u%%", taskGetCpuUsage());
 }
 
 // ============================================================================
@@ -471,16 +488,16 @@ static const char* formatTimestamp(uint32_t timestamp_ms) {
 
 void cmd_faults_stats(int argc, char** argv) {
     fault_stats_t stats = faultGetStats();
-    Serial.println("\n[FAULT] === Statistics ===");
-    Serial.printf("Total: %lu\n", (unsigned long)stats.total_faults);
+    logPrintln("\n[FAULT] === Statistics ===");
+    logPrintf("Total: %lu\n", (unsigned long)stats.total_faults);
     if (stats.total_faults > 0) {
-        Serial.printf("Last: %s\n", formatTimestamp(stats.last_fault_time_ms));
+        logPrintf("Last: %s\n", formatTimestamp(stats.last_fault_time_ms));
     }
 }
 
 void cmd_faults_main(int argc, char** argv) {
     if (argc < 2) { 
-        Serial.println("[FAULTS] Usage: faults [show | stats | clear]");
+        logPrintln("[FAULTS] Usage: faults [show | stats | clear]");
         return;
     }
     if (strcmp(argv[1], "show") == 0) faultShowHistory();
@@ -502,20 +519,20 @@ extern bool encoderSetBaudRate(uint32_t baud_rate);
 
 void cmd_encoder_set_baud(int argc, char** argv) {
   if (argc < 2) {
-    Serial.println("[CLI] Usage: encoder_baud_set <baud_rate>");
+    logPrintln("[CLI] Usage: encoder_baud_set <baud_rate>");
     return;
   }
 
   int32_t new_baud_rate_i32 = 0;
   if (!parseAndValidateInt(argv[1], &new_baud_rate_i32, 1200, 115200)) {
-    Serial.println("[CLI] Invalid baud rate (1200-115200).");
+    logError("[CLI] Invalid baud rate (1200-115200).");
     return;
   }
 
   if (encoderSetBaudRate((uint32_t)new_baud_rate_i32)) {
-    Serial.printf("[CLI] [OK] Encoder baud set to %ld.\n", (long)new_baud_rate_i32);
+    logInfo("[CLI] [OK] Encoder baud set to %ld.", (long)new_baud_rate_i32);
   } else {
-    Serial.println("[CLI] [ERR] Failed to set baud rate.");
+    logError("[CLI] Failed to set baud rate.");
   }
 }
 
@@ -524,14 +541,15 @@ void cmd_encoder_set_baud(int argc, char** argv) {
 // ============================================================================
 
 void cmd_encoder_config_show(int argc, char** argv) {
-    Serial.println("\n[ENCODER CONFIG] === WJ66 Configuration ===");
+    logPrintln("\n[ENCODER CONFIG] === WJ66 Configuration ===");
 
     const encoder_hal_config_t* config = encoderHalGetConfig();
     if (!config) {
-        Serial.println("[ENCODER CONFIG] Error: Unable to get HAL configuration");
+        logError("[ENCODER CONFIG] Unable to get HAL configuration");
         return;
     }
 
+    serialLoggerLock();
     Serial.printf("Interface:      %s\n", encoderHalGetInterfaceName(config->interface));
     Serial.printf("Description:    %s\n", encoderHalGetInterfaceDescription(config->interface));
     Serial.printf("Baud Rate:      %lu\n", (unsigned long)config->baud_rate);
@@ -543,10 +561,12 @@ void cmd_encoder_config_show(int argc, char** argv) {
     uint32_t stored_iface = configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS232_HT);
     uint32_t stored_baud = configGetInt(KEY_ENC_BAUD, 9600);
     Serial.printf("\nStored in NVS:  Interface=%lu, Baud=%lu\n", (unsigned long)stored_iface, (unsigned long)stored_baud);
+    serialLoggerUnlock();
 }
 
 void cmd_encoder_config_interface(int argc, char** argv) {
     if (argc < 3) {
+        serialLoggerLock();
         Serial.println("[ENCODER CONFIG] Usage: encoder config interface [RS232_HT | RS485_RXD2 | CUSTOM]");
         Serial.println("  RS232_HT:    GPIO14/33 (HT1/HT2) - RS232 3.3V (standard)");
         Serial.println("  RS485_RXD2:  GPIO17/18 (RXD2/TXD2) - RS485 Differential (alternative)");
@@ -557,6 +577,7 @@ void cmd_encoder_config_interface(int argc, char** argv) {
         if (config) {
             Serial.printf("\nCurrent: %s\n", encoderHalGetInterfaceName(config->interface));
         }
+        serialLoggerUnlock();
         return;
     }
 
@@ -569,7 +590,7 @@ void cmd_encoder_config_interface(int argc, char** argv) {
     } else if (strcmp(argv[2], "CUSTOM") == 0) {
         interface_type = ENCODER_INTERFACE_CUSTOM;
     } else {
-        Serial.printf("[ENCODER CONFIG] Unknown interface: %s\n", argv[2]);
+        logWarning("[ENCODER CONFIG] Unknown interface: %s", argv[2]);
         return;
     }
 
@@ -578,13 +599,13 @@ void cmd_encoder_config_interface(int argc, char** argv) {
 
     // Switch interface
     if (encoderHalSwitchInterface(interface_type, baud_rate)) {
-        Serial.printf("[ENCODER CONFIG] Switched to %s\n", encoderHalGetInterfaceName(interface_type));
+        logInfo("[ENCODER CONFIG] Switched to %s", encoderHalGetInterfaceName(interface_type));
 
         // Save to NVS
         configSetInt(KEY_ENC_INTERFACE, (int)interface_type);
-        Serial.printf("[ENCODER CONFIG] Configuration saved to NVS\n");
+        logInfo("[ENCODER CONFIG] Configuration saved to NVS");
     } else {
-        Serial.println("[ENCODER CONFIG] Failed to switch interface");
+        logError("[ENCODER CONFIG] Failed to switch interface");
     }
 }
 
@@ -592,16 +613,16 @@ void cmd_encoder_config_baud(int argc, char** argv) {
     if (argc < 3) {
         const encoder_hal_config_t* config = encoderHalGetConfig();
         if (config) {
-            Serial.printf("[ENCODER CONFIG] Current Baud Rate: %lu\n", (unsigned long)config->baud_rate);
+            logInfo("[ENCODER CONFIG] Current Baud Rate: %lu", (unsigned long)config->baud_rate);
         }
-        Serial.println("[ENCODER CONFIG] Usage: encoder config baud <rate>");
-        Serial.println("  Valid rates: 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200");
+        logPrintln("[ENCODER CONFIG] Usage: encoder config baud <rate>");
+        logPrintln("  Valid rates: 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200");
         return;
     }
 
     int32_t new_baud_i32 = 0;
     if (!parseAndValidateInt(argv[2], &new_baud_i32, 1200, 115200)) {
-        Serial.println("[ENCODER CONFIG] Invalid baud rate (must be 1200-115200)");
+        logError("[ENCODER CONFIG] Invalid baud rate (must be 1200-115200)");
         return;
     }
 
@@ -613,22 +634,24 @@ void cmd_encoder_config_baud(int argc, char** argv) {
 
     // Re-initialize with new baud rate
     if (encoderHalInit(interface, new_baud)) {
-        Serial.printf("[ENCODER CONFIG] Baud rate set to %lu\n", (unsigned long)new_baud);
+        logInfo("[ENCODER CONFIG] Baud rate set to %lu", (unsigned long)new_baud);
 
         // Save to NVS
         configSetInt(KEY_ENC_BAUD, (int)new_baud);
-        Serial.printf("[ENCODER CONFIG] Configuration saved to NVS\n");
+        logInfo("[ENCODER CONFIG] Configuration saved to NVS");
     } else {
-        Serial.println("[ENCODER CONFIG] Failed to set baud rate");
+        logError("[ENCODER CONFIG] Failed to set baud rate");
     }
 }
 
 void cmd_encoder_config_main(int argc, char** argv) {
     if (argc < 3) {
+        serialLoggerLock();
         Serial.println("\n[ENCODER CONFIG] Usage: encoder config [show | interface | baud]");
         Serial.println("  show:       Display current configuration");
         Serial.println("  interface:  Set encoder interface (RS232_HT or RS485_RXD2)");
         Serial.println("  baud:       Set baud rate");
+        serialLoggerUnlock();
         return;
     }
 
@@ -639,19 +662,19 @@ void cmd_encoder_config_main(int argc, char** argv) {
     } else if (strcmp(argv[2], "baud") == 0) {
         cmd_encoder_config_baud(argc, argv);
     } else {
-        Serial.printf("[ENCODER CONFIG] Unknown sub-command: %s\n", argv[2]);
+        logWarning("[ENCODER CONFIG] Unknown sub-command: %s", argv[2]);
     }
 }
 
 void cmd_encoder_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[ENCODER] Usage: encoder [diag | baud | config]");
+        logPrintln("[ENCODER] Usage: encoder [diag | baud | config]");
         return;
     }
     if (strcmp(argv[1], "diag") == 0) cmd_encoder_diag(argc, argv);
     else if (strcmp(argv[1], "baud") == 0) cmd_encoder_baud_detect(argc, argv);
     else if (strcmp(argv[1], "config") == 0) cmd_encoder_config_main(argc, argv);
-    else Serial.printf("[ENCODER] Unknown sub-command: %s\n", argv[1]);
+    else logWarning("[ENCODER] Unknown sub-command: %s", argv[1]);
 }
 
 // ============================================================================
@@ -659,14 +682,15 @@ void cmd_encoder_main(int argc, char** argv) {
 // ============================================================================
 
 void cmd_spindle_config_show(int argc, char** argv) {
-    Serial.println("\n[SPINDLE CONFIG] === JXK-10 Configuration ===");
+    logPrintln("\n[SPINDLE CONFIG] === JXK-10 Configuration ===");
 
     const spindle_monitor_state_t* state = spindleMonitorGetState();
     if (!state) {
-        Serial.println("[SPINDLE CONFIG] Error: Unable to get spindle state");
+        logError("[SPINDLE CONFIG] Unable to get spindle state");
         return;
     }
 
+    serialLoggerLock();
     Serial.printf("Status:              %s\n", state->enabled ? "ENABLED" : "DISABLED");
     Serial.printf("JXK-10 Address:      %u\n", state->jxk10_slave_address);
     Serial.printf("Baud Rate:           %lu bps\n", (unsigned long)state->jxk10_baud_rate);
@@ -683,12 +707,13 @@ void cmd_spindle_config_show(int argc, char** argv) {
                   (unsigned long)stored_addr,
                   (unsigned long)stored_thresh,
                   (unsigned long)stored_poll);
+    serialLoggerUnlock();
 }
 
 void cmd_spindle_config_enable(int argc, char** argv) {
     if (argc < 3) {
-        Serial.println("[SPINDLE CONFIG] Usage: spindle config enable [on | off]");
-        Serial.printf("Current status: %s\n", spindleMonitorIsEnabled() ? "ON" : "OFF");
+        logPrintln("[SPINDLE CONFIG] Usage: spindle config enable [on | off]");
+        logInfo("Current status: %s", spindleMonitorIsEnabled() ? "ON" : "OFF");
         return;
     }
 
@@ -698,91 +723,88 @@ void cmd_spindle_config_enable(int argc, char** argv) {
     } else if (strcmp(argv[2], "off") == 0 || strcmp(argv[2], "no") == 0 || strcmp(argv[2], "0") == 0) {
         enable = false;
     } else {
-        Serial.println("[SPINDLE CONFIG] Invalid option (use: on, off)");
+        logError("[SPINDLE CONFIG] Invalid option (use: on, off)");
         return;
     }
 
     spindleMonitorSetEnabled(enable);
     configSetInt(KEY_SPINDLE_ENABLED, enable ? 1 : 0);
-    Serial.printf("[SPINDLE CONFIG] Spindle monitoring %s and saved to NVS\n",
+    logInfo("[SPINDLE CONFIG] Spindle monitoring %s and saved to NVS",
                   enable ? "ENABLED" : "DISABLED");
 }
 
 void cmd_spindle_config_address(int argc, char** argv) {
     if (argc < 3) {
         const spindle_monitor_state_t* state = spindleMonitorGetState();
-        Serial.printf("[SPINDLE CONFIG] Current JXK-10 Address: %u\n", state->jxk10_slave_address);
-        Serial.println("[SPINDLE CONFIG] Usage: spindle config address <1-247>");
+        logInfo("[SPINDLE CONFIG] Current JXK-10 Address: %u", state->jxk10_slave_address);
+        logPrintln("[SPINDLE CONFIG] Usage: spindle config address <1-247>");
         return;
     }
 
     int32_t addr_i32 = 0;
     if (!parseAndValidateInt(argv[2], &addr_i32, 1, 247)) {
-        Serial.println("[SPINDLE CONFIG] Invalid address (must be 1-247)");
+        logError("[SPINDLE CONFIG] Invalid address (must be 1-247)");
         return;
     }
 
     uint8_t addr = (uint8_t)addr_i32;
-    
-    // NOTE: JXK-10 address change requires physical device reconfiguration
-    // The Modbus slave address is set via DIP switches or device programming tool.
-    // This command only updates the controller's expected address for communication.
-    // After changing DIP switches on JXK-10, set this value to match.
     configSetInt(KEY_SPINDLE_ADDRESS, (int)addr);
-    Serial.printf("[SPINDLE CONFIG] JXK-10 address set to %u and saved to NVS\n", addr);
-    Serial.println("[SPINDLE CONFIG] Restart system to apply address change");
-    Serial.println("[SPINDLE CONFIG] NOTE: Ensure JXK-10 DIP switches match this address");
+    logInfo("[SPINDLE CONFIG] JXK-10 address set to %u and saved to NVS", addr);
+    logPrintln("[SPINDLE CONFIG] Restart system to apply address change");
+    logPrintln("[SPINDLE CONFIG] NOTE: Ensure JXK-10 DIP switches match this address");
 }
 
 void cmd_spindle_config_threshold(int argc, char** argv) {
     if (argc < 3) {
         const spindle_monitor_state_t* state = spindleMonitorGetState();
-        Serial.printf("[SPINDLE CONFIG] Current Threshold: %.1f A\n", state->overcurrent_threshold_amps);
-        Serial.println("[SPINDLE CONFIG] Usage: spindle config threshold <0-50>");
+        logPrintf("[SPINDLE CONFIG] Current Threshold: %.1f A\n", state->overcurrent_threshold_amps);
+        logPrintln("[SPINDLE CONFIG] Usage: spindle config threshold <0-50>");
         return;
     }
 
     float threshold = atof(argv[2]);
     if (threshold < 0.0f || threshold > 50.0f) {
-        Serial.println("[SPINDLE CONFIG] Invalid threshold (must be 0.0-50.0 A)");
+        logError("[SPINDLE CONFIG] Invalid threshold (must be 0.0-50.0 A)");
         return;
     }
 
     spindleMonitorSetThreshold(threshold);
     configSetInt(KEY_SPINDLE_THRESHOLD, (int)threshold);
-    Serial.printf("[SPINDLE CONFIG] Overcurrent threshold set to %.1f A and saved to NVS\n", threshold);
+    logPrintf("[SPINDLE CONFIG] Overcurrent threshold set to %.1f A and saved to NVS\n", threshold);
 }
 
 void cmd_spindle_config_interval(int argc, char** argv) {
     if (argc < 3) {
         const spindle_monitor_state_t* state = spindleMonitorGetState();
-        Serial.printf("[SPINDLE CONFIG] Current Poll Interval: %lu ms\n",
+        logInfo("[SPINDLE CONFIG] Current Poll Interval: %lu ms",
                       (unsigned long)state->poll_interval_ms);
-        Serial.println("[SPINDLE CONFIG] Usage: spindle config interval <100-60000>");
+        logPrintln("[SPINDLE CONFIG] Usage: spindle config interval <100-60000>");
         return;
     }
 
     int32_t interval_i32 = 0;
     if (!parseAndValidateInt(argv[2], &interval_i32, 100, 60000)) {
-        Serial.println("[SPINDLE CONFIG] Invalid interval (must be 100-60000 ms)");
+        logError("[SPINDLE CONFIG] Invalid interval (must be 100-60000 ms)");
         return;
     }
 
     uint32_t interval = (uint32_t)interval_i32;
     spindleMonitorSetPollInterval(interval);
     configSetInt(KEY_SPINDLE_POLL_MS, (int)interval);
-    Serial.printf("[SPINDLE CONFIG] Poll interval set to %lu ms and saved to NVS\n",
+    logInfo("[SPINDLE CONFIG] Poll interval set to %lu ms and saved to NVS",
                   (unsigned long)interval);
 }
 
 void cmd_spindle_config_main(int argc, char** argv) {
     if (argc < 3) {
+        serialLoggerLock();
         Serial.println("\n[SPINDLE CONFIG] Usage: spindle config [show | enable | address | threshold | interval]");
         Serial.println("  show:       Display current configuration");
         Serial.println("  enable:     Enable/disable monitoring (on/off)");
         Serial.println("  address:    Set JXK-10 Modbus address (1-247)");
         Serial.println("  threshold:  Set overcurrent threshold (0-50 A)");
         Serial.println("  interval:   Set poll interval (100-60000 ms)");
+        serialLoggerUnlock();
         return;
     }
 
@@ -797,26 +819,26 @@ void cmd_spindle_config_main(int argc, char** argv) {
     } else if (strcmp(argv[2], "interval") == 0) {
         cmd_spindle_config_interval(argc, argv);
     } else {
-        Serial.printf("[SPINDLE CONFIG] Unknown sub-command: %s\n", argv[2]);
+        logWarning("[SPINDLE CONFIG] Unknown sub-command: %s", argv[2]);
     }
 }
 
 void cmd_spindle_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[SPINDLE] Usage: spindle [diag | config | alarm]");
+        logPrintln("[SPINDLE] Usage: spindle [diag | config | alarm]");
         return;
     }
 
     if (strcmp(argv[1], "diag") == 0) {
         spindleMonitorPrintDiagnostics();
         jxk10PrintDiagnostics();
-        rs485MuxPrintDiagnostics();
+        rs485PrintDiagnostics();
     } else if (strcmp(argv[1], "config") == 0) {
         cmd_spindle_config_main(argc, argv);
     } else if (strcmp(argv[1], "alarm") == 0) {
         cmd_spindle_alarm(argc, argv);
     } else {
-        Serial.printf("[SPINDLE] Unknown sub-command: %s\n", argv[1]);
+        logWarning("[SPINDLE] Unknown sub-command: %s", argv[1]);
     }
 }
 
@@ -834,32 +856,31 @@ void cmd_diag_scheduler_main(int argc, char** argv) {
 // DEBUG HANDLERS
 // ============================================================================
 void debugEncodersHandler() {
-    Serial.println("[DEBUG] -- Encoder Status --");
+    logPrintln("[DEBUG] -- Encoder Status --");
     wj66Diagnostics();
 }
 
 void debugConfigHandler() {
-    Serial.println("[DEBUG] -- Config Status --");
+    logPrintln("[DEBUG] -- Config Status --");
     configUnifiedDiagnostics();
 }
 
 void debugAllHandler() {
-    Serial.println("\n[DEBUG] === FULL SYSTEM DUMP ===");
+    logPrintln("\n[DEBUG] === FULL SYSTEM DUMP ===");
     char ver[FIRMWARE_VERSION_STRING_LEN]; 
     firmwareGetVersionString(ver, sizeof(ver));
-    Serial.printf("Firmware: %s | Uptime: %lu s\n", ver, (unsigned long)taskGetUptime());
+    logPrintf("Firmware: %s | Uptime: %lu s\n", ver, (unsigned long)taskGetUptime());
     
     debugEncodersHandler();
     motionDiagnostics();
     safetyDiagnostics();
     
-    // UPDATED: Use new diagnostics function
     elboDiagnostics();
     
     configUnifiedDiagnostics();
     watchdogShowStatus();
     taskShowStats();
-    Serial.println("[DEBUG] === END DUMP ===");
+    logPrintln("[DEBUG] === END DUMP ===");
 }
 
 // ============================================================================
@@ -878,17 +899,18 @@ void cmd_fault_recovery_diag(int argc, char** argv) {
 }
 
 void cmd_task_list_detailed(int argc, char** argv) {
-    Serial.println("\n[TASK] === Detailed Task List ===");
+    logPrintln("\n[TASK] === Detailed Task List ===");
 
     int task_count = taskGetStatsCount();
     if (task_count <= 0) {
-        Serial.println("[TASK] No tasks registered");
+        logPrintln("[TASK] No tasks registered");
         return;
     }
 
     task_stats_t* tasks = taskGetStatsArray();
 
     // Header
+    serialLoggerLock();
     Serial.println("\nTask Name          | Priority | Stack HWM | Runs    | Time(ms)  | Max(ms)");
     Serial.println("-------------------|----------|-----------|---------|-----------|--------");
 
@@ -907,10 +929,11 @@ void cmd_task_list_detailed(int argc, char** argv) {
 
     Serial.println("\nNote: Stack HWM = High Water Mark (bytes still available)");
     Serial.println("      Time = Total cumulative time");
+    serialLoggerUnlock();
 }
 
 void cmd_memory_detailed(int argc, char** argv) {
-    Serial.println("\n[MEMORY] === Detailed Memory Analysis ===");
+    logPrintln("\n[MEMORY] === Detailed Memory Analysis ===");
 
     // Update memory monitor
     extern void memoryMonitorUpdate();
@@ -927,6 +950,7 @@ void cmd_memory_detailed(int argc, char** argv) {
     uint32_t largest = memoryMonitorGetLargestFreeBlock();
     uint32_t used = total - free;
 
+    serialLoggerLock();
     Serial.printf("\nHeap Summary:\n");
     Serial.printf("  Total:      %lu bytes\n", (unsigned long)total);
     Serial.printf("  Used:       %lu bytes (%.1f%%)\n", (unsigned long)used, (used * 100.0f) / total);
@@ -942,6 +966,7 @@ void cmd_memory_detailed(int argc, char** argv) {
             Serial.println("[WARN] High memory fragmentation detected!");
         }
     }
+    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -949,30 +974,30 @@ void cmd_memory_detailed(int argc, char** argv) {
 // ============================================================================
 
 void cmd_web_config_show(int argc, char** argv) {
-    Serial.println("\n[WEB CONFIG] === Web Server Credentials ===");
+    logPrintln("\n[WEB CONFIG] === Web Server Credentials ===");
 
     const char* username = configGetString(KEY_WEB_USERNAME, "admin");
     uint32_t pw_changed = configGetInt(KEY_WEB_PW_CHANGED, 0);
 
-    Serial.printf("Username:            %s\n", username);
-    Serial.printf("Password Changed:    %s\n", pw_changed ? "YES" : "NO (default)");
+    logPrintf("Username:            %s\n", username);
+    logPrintf("Password Changed:    %s\n", pw_changed ? "YES" : "NO (default)");
     if (pw_changed == 0) {
-        Serial.println("\n[WEB CONFIG] WARNING: Using default password! Please set a new password.");
-        Serial.println("[WEB CONFIG] Usage: web config password <password>");
+        logWarning("[WEB CONFIG] Using default password! Please set a new password.");
+        logPrintln("[WEB CONFIG] Usage: web config password <password>");
     }
 }
 
 void cmd_web_config_username(int argc, char** argv) {
     if (argc < 3) {
-        Serial.println("[WEB CONFIG] Usage: web config username <username>");
-        Serial.printf("Current:   %s\n", configGetString(KEY_WEB_USERNAME, "admin"));
-        Serial.println("Limits:    3-32 characters");
+        logPrintln("[WEB CONFIG] Usage: web config username <username>");
+        logPrintf("Current:   %s\n", configGetString(KEY_WEB_USERNAME, "admin"));
+        logPrintln("Limits:    3-32 characters");
         return;
     }
 
     const char* username = argv[2];
     if (strlen(username) < 3 || strlen(username) > 32) {
-        Serial.println("[WEB CONFIG] [ERR] Username must be 3-32 characters");
+        logError("[WEB CONFIG] Username must be 3-32 characters");
         return;
     }
 
@@ -980,37 +1005,39 @@ void cmd_web_config_username(int argc, char** argv) {
     configUnifiedSave();
     webServer.loadCredentials();
 
-    Serial.printf("[WEB CONFIG] [OK] Username set to '%s' and saved to NVS\n", username);
+    logInfo("[WEB CONFIG] [OK] Username set to '%s' and saved to NVS", username);
 }
 
 void cmd_web_config_password(int argc, char** argv) {
     if (argc < 3) {
-        Serial.println("[WEB CONFIG] Usage: web config password <password>");
-        Serial.println("Limits:    4-64 characters");
+        logPrintln("[WEB CONFIG] Usage: web config password <password>");
+        logPrintln("Limits:    4-64 characters");
         return;
     }
 
     const char* password = argv[2];
     if (strlen(password) < 4 || strlen(password) > 64) {
-        Serial.println("[WEB CONFIG] [ERR] Password must be 4-64 characters");
+        logError("[WEB CONFIG] Password must be 4-64 characters");
         return;
     }
 
     configSetString(KEY_WEB_PASSWORD, password);
-    configSetInt(KEY_WEB_PW_CHANGED, 1);  // Mark password as changed
+    configSetInt(KEY_WEB_PW_CHANGED, 1);
     configUnifiedSave();
     webServer.loadCredentials();
 
-    Serial.printf("[WEB CONFIG] [OK] Password updated and saved to NVS\n");
-    Serial.println("[WEB CONFIG] WARNING: Password is stored in plaintext in NVS");
+    logInfo("[WEB CONFIG] [OK] Password updated and saved to NVS");
+    logWarning("[WEB CONFIG] Password is stored in plaintext in NVS");
 }
 
 void cmd_web_config_main(int argc, char** argv) {
     if (argc < 3) {
+        serialLoggerLock();
         Serial.println("\n[WEB CONFIG] Usage: web config [show | username | password]");
         Serial.println("  show:       Display current configuration");
         Serial.println("  username:   Set web server username (3-32 chars)");
         Serial.println("  password:   Set web server password (4-64 chars)");
+        serialLoggerUnlock();
         return;
     }
 
@@ -1021,20 +1048,20 @@ void cmd_web_config_main(int argc, char** argv) {
     } else if (strcmp(argv[2], "password") == 0) {
         cmd_web_config_password(argc, argv);
     } else {
-        Serial.printf("[WEB CONFIG] [ERR] Unknown sub-command: %s\n", argv[2]);
+        logWarning("[WEB CONFIG] Unknown sub-command: %s", argv[2]);
     }
 }
 
 void cmd_web_main(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[WEB] Usage: web [config]");
+        logPrintln("[WEB] Usage: web [config]");
         return;
     }
 
     if (strcmp(argv[1], "config") == 0) {
         cmd_web_config_main(argc, argv);
     } else {
-        Serial.printf("[WEB] [ERR] Unknown sub-command: %s\n", argv[1]);
+        logWarning("[WEB] Unknown sub-command: %s", argv[1]);
     }
 }
 
@@ -1043,20 +1070,20 @@ void cmd_web_main(int argc, char** argv) {
 // ============================================================================
 
 void cmd_config_backup(int argc, char** argv) {
-    Serial.println("\n[CONFIG] === Backup Configuration ===");
-    Serial.println("Saving all NVS configuration to 'config_backup' key...");
+    logPrintln("\n[CONFIG] === Backup Configuration ===");
+    logPrintln("Saving all NVS configuration to 'config_backup' key...");
 
     // Export entire config to JSON
     extern size_t configExportToJSON(char* buffer, size_t buffer_size);
     char* json_buffer = (char*)malloc(2048);
     if (!json_buffer) {
-        Serial.println("[CONFIG] [ERR] Memory allocation failed");
+        logError("[CONFIG] Memory allocation failed");
         return;
     }
 
     size_t json_size = configExportToJSON(json_buffer, 2048);
     if (json_size == 0) {
-        Serial.println("[CONFIG] [ERR] Failed to export configuration");
+        logError("[CONFIG] Failed to export configuration");
         free(json_buffer);
         return;
     }
@@ -1065,51 +1092,52 @@ void cmd_config_backup(int argc, char** argv) {
     configSetString("config_backup_json", json_buffer);
     configUnifiedSave();
 
-    Serial.printf("[CONFIG] [OK] Backup saved (%lu bytes)\n", (unsigned long)json_size);
-    Serial.println("[CONFIG] Use 'config restore' to restore from backup");
+    logInfo("[CONFIG] [OK] Backup saved (%lu bytes)", (unsigned long)json_size);
+    logPrintln("[CONFIG] Use 'config restore' to restore from backup");
 
     free(json_buffer);
 }
 
 void cmd_config_restore(int argc, char** argv) {
-    Serial.println("\n[CONFIG] === Restore Configuration ===");
+    logPrintln("\n[CONFIG] === Restore Configuration ===");
 
     // Load backup JSON from NVS
     const char* backup_json = configGetString("config_backup_json", NULL);
     if (!backup_json) {
-        Serial.println("[CONFIG] [ERR] No backup found");
+        logError("[CONFIG] No backup found");
         return;
     }
 
+    serialLoggerLock();
     Serial.println("[CONFIG] Restoring configuration from backup...");
     Serial.println("[CONFIG] Backup JSON (first 256 chars):");
     for (int i = 0; i < 256 && backup_json[i]; i++) {
         Serial.write(backup_json[i]);
     }
     Serial.println("\n");
-
-    // In a real implementation, would parse and apply the JSON
-    // For now, just confirm load was successful
     Serial.println("[CONFIG] [OK] Backup restored");
     Serial.println("[CONFIG] Review with: config show");
+    serialLoggerUnlock();
 }
 
 void cmd_config_show_backup(int argc, char** argv) {
     const char* backup = configGetString("config_backup_json", NULL);
     if (!backup) {
-        Serial.println("[CONFIG] No backup exists");
+        logPrintln("[CONFIG] No backup exists");
         return;
     }
 
+    serialLoggerLock();
     Serial.println("\n[CONFIG] === Stored Backup ===");
     Serial.println(backup);
     Serial.println("");
+    serialLoggerUnlock();
 }
 
 void cmd_config_clear_backup(int argc, char** argv) {
     configSetString("config_backup_json", "");
     configUnifiedSave();
-    Serial.println("[CONFIG] [OK] Backup cleared");
+    logInfo("[CONFIG] [OK] Backup cleared");
 }
 
 // ============================================================================
@@ -1121,14 +1149,16 @@ void cmd_api_ratelimit_diag(int argc, char** argv) {
 
 void cmd_api_ratelimit_reset(int argc, char** argv) {
     apiRateLimiterReset();
-    Serial.println("[OK] API rate limiter reset");
+    logInfo("[OK] API rate limiter reset");
 }
 
 void cmd_api_ratelimit_main(int argc, char** argv) {
     if (argc < 2) {
+        serialLoggerLock();
         Serial.println("[API] Usage: api [diag | reset]");
         Serial.println("  diag:   Show rate limiter diagnostics");
         Serial.println("  reset:  Reset all rate limit counters");
+        serialLoggerUnlock();
         return;
     }
 
@@ -1137,7 +1167,7 @@ void cmd_api_ratelimit_main(int argc, char** argv) {
     } else if (strcmp(argv[1], "reset") == 0) {
         cmd_api_ratelimit_reset(argc, argv);
     } else {
-        Serial.printf("[API] [ERR] Unknown sub-command: %s\n", argv[1]);
+        logWarning("[API] Unknown sub-command: %s", argv[1]);
     }
 }
 
@@ -1155,16 +1185,18 @@ void cmd_metrics_detail(int argc, char** argv) {
 
 void cmd_metrics_reset(int argc, char** argv) {
     perfMonitorReset();
-    Serial.println("[METRICS] [OK] Performance metrics reset");
+    logInfo("[METRICS] [OK] Performance metrics reset");
 }
 
 void cmd_metrics_main(int argc, char** argv) {
     if (argc < 2) {
+        serialLoggerLock();
         Serial.println("[METRICS] === Task Performance Monitoring ===");
         Serial.println("Usage: metrics [summary | detail | reset]");
         Serial.println("  summary: Show quick performance summary");
         Serial.println("  detail:  Show detailed task diagnostics");
         Serial.println("  reset:   Clear all collected metrics");
+        serialLoggerUnlock();
         return;
     }
 
@@ -1175,7 +1207,7 @@ void cmd_metrics_main(int argc, char** argv) {
     } else if (strcmp(argv[1], "reset") == 0) {
         cmd_metrics_reset(argc, argv);
     } else {
-        Serial.printf("[METRICS] [ERR] Unknown sub-command: %s\n", argv[1]);
+        logWarning("[METRICS] Unknown sub-command: %s", argv[1]);
     }
 }
 
@@ -1189,17 +1221,19 @@ void cmd_ota_status(int argc, char** argv) {
 
 void cmd_ota_cancel(int argc, char** argv) {
     otaUpdaterCancel();
-    Serial.println("[OTA] [OK] OTA update cancelled");
+    logInfo("[OTA] [OK] OTA update cancelled");
 }
 
 void cmd_ota_main(int argc, char** argv) {
     if (argc < 2) {
+        serialLoggerLock();
         Serial.println("[OTA] === Firmware Update Management ===");
         Serial.println("Usage: ota [status | cancel]");
         Serial.println("  status: Show OTA update status");
         Serial.println("  cancel: Cancel current OTA operation");
         Serial.println("");
         Serial.println("NOTE: Binary upload via /api/update endpoint");
+        serialLoggerUnlock();
         return;
     }
 
@@ -1208,7 +1242,7 @@ void cmd_ota_main(int argc, char** argv) {
     } else if (strcmp(argv[1], "cancel") == 0) {
         cmd_ota_cancel(argc, argv);
     } else {
-        Serial.printf("[OTA] [ERR] Unknown sub-command: %s\n", argv[1]);
+        logWarning("[OTA] Unknown sub-command: %s", argv[1]);
     }
 }
 
@@ -1221,13 +1255,13 @@ void cmd_ota_main(int argc, char** argv) {
 // ============================================================================
 
 void cmd_axis_status(int argc, char** argv) {
-    Serial.println("\n[AXIS] === Motion Quality Status (All Axes) ===");
+    logPrintln("\n[AXIS] === Motion Quality Status (All Axes) ===");
     axisSynchronizationPrintSummary();
 }
 
 void cmd_axis_detail(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[AXIS] [ERR] Usage: axis detail [X|Y|Z]");
+        logError("[AXIS] Usage: axis detail [X|Y|Z]");
         return;
     }
 
@@ -1237,17 +1271,17 @@ void cmd_axis_detail(int argc, char** argv) {
     else if (strcmp(argv[1], "Z") == 0 || strcmp(argv[1], "z") == 0) axis = 2;
 
     if (axis >= 3) {
-        Serial.printf("[AXIS] [ERR] Invalid axis: %s (use X, Y, or Z)\n", argv[1]);
+        logError("[AXIS] Invalid axis: %s (use X, Y, or Z)", argv[1]);
         return;
     }
 
-    Serial.printf("\n[AXIS] === Axis %c Detailed Diagnostics ===\n", 'X' + axis);
+    logPrintf("\n[AXIS] === Axis %c Detailed Diagnostics ===\n", 'X' + axis);
     axisSynchronizationPrintAxisDiagnostics(axis);
 }
 
 void cmd_axis_reset(int argc, char** argv) {
     if (argc < 2) {
-        Serial.println("[AXIS] [ERR] Usage: axis reset [X|Y|Z|all]");
+        logError("[AXIS] Usage: axis reset [X|Y|Z|all]");
         return;
     }
 
@@ -1255,7 +1289,7 @@ void cmd_axis_reset(int argc, char** argv) {
         for (uint8_t i = 0; i < 3; i++) {
             axisSynchronizationResetAxis(i);
         }
-        Serial.println("[AXIS] [OK] Reset metrics for all axes");
+        logInfo("[AXIS] [OK] Reset metrics for all axes");
     } else {
         uint8_t axis = 255;
         if (strcmp(argv[1], "X") == 0 || strcmp(argv[1], "x") == 0) axis = 0;
@@ -1263,17 +1297,18 @@ void cmd_axis_reset(int argc, char** argv) {
         else if (strcmp(argv[1], "Z") == 0 || strcmp(argv[1], "z") == 0) axis = 2;
 
         if (axis >= 3) {
-            Serial.printf("[AXIS] [ERR] Invalid axis: %s (use X, Y, Z, or all)\n", argv[1]);
+            logError("[AXIS] Invalid axis: %s (use X, Y, Z, or all)", argv[1]);
             return;
         }
 
         axisSynchronizationResetAxis(axis);
-        Serial.printf("[AXIS] [OK] Reset metrics for axis %c\n", 'X' + axis);
+        logInfo("[AXIS] [OK] Reset metrics for axis %c", 'X' + axis);
     }
 }
 
 void cmd_axis_main(int argc, char** argv) {
     if (argc < 2) {
+        serialLoggerLock();
         Serial.println("[AXIS] === Per-Axis Motion Quality Monitoring (PHASE 5.6) ===");
         Serial.println("Usage: axis [status | detail | reset] [args]");
         Serial.println("");
@@ -1292,6 +1327,7 @@ void cmd_axis_main(int argc, char** argv) {
         Serial.println("  60-80  Good motion");
         Serial.println("  40-60  Fair motion (degradation detected)");
         Serial.println("  < 40   Poor motion (maintenance needed)");
+        serialLoggerUnlock();
         return;
     }
 
@@ -1302,7 +1338,7 @@ void cmd_axis_main(int argc, char** argv) {
     } else if (strcmp(argv[1], "reset") == 0) {
         cmd_axis_reset(argc, argv);
     } else {
-        Serial.printf("[AXIS] [ERR] Unknown sub-command: %s\n", argv[1]);
+        logWarning("[AXIS] Unknown sub-command: %s", argv[1]);
     }
 }
 
@@ -1316,6 +1352,7 @@ void cmd_telemetry_detail(int argc, char** argv) {
 
 void cmd_telemetry_main(int argc, char** argv) {
     if (argc < 2) {
+        serialLoggerLock();
         Serial.println("[TELEMETRY] === Comprehensive System Telemetry ===");
         Serial.println("Usage: telemetry [summary | detail]");
         Serial.println("  summary: Show brief telemetry snapshot");
@@ -1323,6 +1360,7 @@ void cmd_telemetry_main(int argc, char** argv) {
         Serial.println("");
         Serial.println("Web API: GET /api/telemetry (comprehensive)");
         Serial.println("         GET /api/telemetry/compact (lightweight)");
+        serialLoggerUnlock();
         return;
     }
 
@@ -1331,7 +1369,57 @@ void cmd_telemetry_main(int argc, char** argv) {
     } else if (strcmp(argv[1], "detail") == 0) {
         cmd_telemetry_detail(argc, argv);
     } else {
-        Serial.printf("[TELEMETRY] [ERR] Unknown sub-command: %s\n", argv[1]);
+        logWarning("[TELEMETRY] Unknown sub-command: %s", argv[1]);
+    }
+}
+
+// ============================================================================
+// RS-485 REGISTRY DIAGNOSTICS
+// ============================================================================
+void cmd_rs485_diag(int argc, char** argv) {
+    (void)argc; (void)argv;
+    rs485PrintDiagnostics();
+}
+
+void cmd_rs485_main(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("[RS485] Usage: rs485 diag");
+        return;
+    }
+    if (strcmp(argv[1], "diag") == 0) cmd_rs485_diag(argc, argv);
+    else logWarning("[RS485] Unknown sub-command: %s", argv[1]);
+}
+
+// ============================================================================
+// CUTTING ANALYTICS COMMANDS
+// ============================================================================
+void cmd_cutting_main(int argc, char** argv) {
+    if (argc < 2) {
+        cuttingPrintDiagnostics();
+        return;
+    }
+    
+    if (strcmp(argv[1], "diag") == 0) {
+        cuttingPrintDiagnostics();
+    } else if (strcmp(argv[1], "start") == 0) {
+        cuttingStartSession();
+        logInfo("[CUTTING] Session started");
+    } else if (strcmp(argv[1], "stop") == 0) {
+        cuttingEndSession();
+        logInfo("[CUTTING] Session stopped");
+    } else if (strcmp(argv[1], "reset") == 0) {
+        cuttingResetStats();
+    } else if (strcmp(argv[1], "depth") == 0 && argc >= 3) {
+        float depth = atof(argv[2]);
+        cuttingSetDepth(depth);
+    } else if (strcmp(argv[1], "blade") == 0 && argc >= 3) {
+        float width = atof(argv[2]);
+        cuttingSetBladeWidth(width);
+    } else if (strcmp(argv[1], "baseline") == 0 && argc >= 3) {
+        float sce = atof(argv[2]);
+        cuttingSetSCEBaseline(sce);
+    } else {
+        logPrintln("Usage: cutting [diag|start|stop|reset|depth <mm>|blade <mm>|baseline <sce>]");
     }
 }
 
@@ -1364,9 +1452,11 @@ void cliRegisterDiagCommands() {
 
 
     // Session features
+    cliRegisterCommand("rs485", "RS-485 device registry diag", cmd_rs485_main);
     cliRegisterCommand("status", "Quick system status dashboard", cmd_status_dashboard);
     cliRegisterCommand("runtime", "Machine runtime & cycle counter", cmd_runtime);
 
     cliRegisterCommand("dio", "Digital I/O status display", cmd_dio_main);
     cliRegisterCommand("spindle", "Spindle monitor & alarms", cmd_spindle_main);
+    cliRegisterCommand("cutting", "Stone cutting analytics", cmd_cutting_main);
 }

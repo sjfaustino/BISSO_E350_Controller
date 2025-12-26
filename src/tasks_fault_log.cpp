@@ -24,6 +24,8 @@ void taskFaultLogFunction(void* parameter) {
           // Reconstruct and write to NVS (Slow Blocking Operation)
           const fault_entry_t* entry = (const fault_entry_t*)msg.data;
           faultLogToNVS(entry);
+          yield();  // Yield after slow NVS operation
+          watchdogFeed("Fault_Log");  // Feed watchdog immediately after slow op
       }
       else if (msg.type == MSG_FAULT_CRITICAL) {
           logError("[FAULT_TASK] [CRIT] Critical signal received.");

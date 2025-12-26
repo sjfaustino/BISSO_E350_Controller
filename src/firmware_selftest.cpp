@@ -298,12 +298,12 @@ selftest_suite_t selftestRunSuite(uint8_t categories, bool verbose) {
     for (int i = 0; i < test_definition_count; i++) {
         if (test_definitions[i].category & categories) {
             if (verbose) {
-                Serial.printf("[SELFTEST] Running: %s... ", test_definitions[i].name);
+                logPrintf("[SELFTEST] Running: %s... ", test_definitions[i].name);
             }
             test_definitions[i].test_func();
             if (verbose) {
                 selftest_result_t* last = &suite.results[test_ctx.current_test - 1];
-                Serial.printf("%s (%lu ms)\n",
+                logPrintf("%s (%lu ms)\n",
                             last->passed ? "PASS" : "FAIL",
                             (unsigned long)last->duration_ms);
             }
@@ -345,6 +345,7 @@ selftest_result_t selftestRunTest(const char* test_name, bool verbose) {
 void selftestPrintResults(const selftest_suite_t* suite) {
     if (!suite || !suite->results) return;
 
+    serialLoggerLock();
     Serial.println("\n[SELFTEST] === Firmware Self-Test Results ===");
     Serial.println("Test Name                    | Status | Duration");
     Serial.println("-----------------------------|--------|----------");
@@ -366,6 +367,7 @@ void selftestPrintResults(const selftest_suite_t* suite) {
                 (unsigned long)suite->passed_tests,
                 (unsigned long)suite->total_tests,
                 (unsigned long)suite->total_duration_ms);
+    serialLoggerUnlock();
 }
 
 const char* selftestGetSummary(const selftest_suite_t* suite) {
@@ -403,6 +405,7 @@ void selftestFreeResults(selftest_suite_t* suite) {
 }
 
 void selftestListTests() {
+    serialLoggerLock();
     Serial.println("\n[SELFTEST] === Available Tests ===");
 
     for (int i = 0; i < test_definition_count; i++) {
@@ -412,6 +415,7 @@ void selftestListTests() {
     }
 
     Serial.printf("\nTotal: %d tests\n\n", test_definition_count);
+    serialLoggerUnlock();
 }
 
 bool selftestQuickCheck() {

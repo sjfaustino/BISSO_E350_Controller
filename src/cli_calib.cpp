@@ -80,18 +80,18 @@ calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profi
 
 void cmd_encoder_calib(int argc, char** argv) {
   if (argc < 3) {
-    Serial.println("[CLI] Usage: calib axis distance_mm (e.g., calib X 1000.0)");
+    logPrintln("[CLI] Usage: calib axis distance_mm (e.g., calib X 1000.0)");
     return;
   }
   uint8_t axis = axisCharToIndex(argv[1]);
   float distance_mm = 0.0f;
 
   if (axis >= 4) {
-    Serial.println("[CLI] [ERR] Invalid axis. Use X, Y, Z, or A.");
+    logError("[CLI] Invalid axis. Use X, Y, Z, or A.");
     return;
   }
   if (!parseAndValidateFloat(argv[2], &distance_mm, 10.0f, 10000.0f)) {
-      Serial.println("[CLI] [ERR] Invalid distance. Must be > 10.0mm.");
+      logError("[CLI] Invalid distance. Must be > 10.0mm.");
       return;
   }
   encoderCalibrationStart(axis, distance_mm);
@@ -99,32 +99,32 @@ void cmd_encoder_calib(int argc, char** argv) {
 
 void cmd_encoder_reset(int argc, char** argv) {
     if (argc < 4) {
-        Serial.println("[CLI] Usage: calibrate speed reset [AXIS]");
+        logPrintln("[CLI] Usage: calibrate speed reset [AXIS]");
         return;
     }
     uint8_t axis = axisCharToIndex(argv[2]);
     
     if (axis >= 4) {
-        Serial.println("[CLI] [ERR] Invalid axis.");
+        logError("[CLI] Invalid axis.");
         return;
     }
     
     AxisCalibration* cal = getAxisCalPtrForCli(axis);
     if (cal) {
-        Serial.printf("[CLI] Resetting speed profiles for Axis %c...\n", axisIndexToChar(axis));
+        logPrintf("[CLI] Resetting speed profiles for Axis %c...\n", axisIndexToChar(axis));
         cal->speed_slow_mm_min = 300.0f; 
         cal->speed_med_mm_min = 900.0f;
         cal->speed_fast_mm_min = 2400.0f;
         saveAllCalibration();
-        Serial.println("[CLI] [OK] Speed profiles reset and saved.");
+        logInfo("[CLI] [OK] Speed profiles reset and saved.");
     } else {
-         Serial.printf("[CLI] [ERR] Calibration data not found for Axis %c.\n", axisIndexToChar(axis));
+         logError("[CLI] Calibration data not found for Axis %c.", axisIndexToChar(axis));
     }
 }
 
 void cmd_calib_ppmm_start(int argc, char** argv) {
     if (argc < 3) {
-        Serial.println("[CLI] Usage: calibrate ppmm [AXIS] [DISTANCE_MM]");
+        logPrintln("[CLI] Usage: calibrate ppmm [AXIS] [DISTANCE_MM]");
         return;
     }
     uint8_t axis = axisCharToIndex(argv[1]);
@@ -132,15 +132,15 @@ void cmd_calib_ppmm_start(int argc, char** argv) {
     float distance_mm = 0.0f;
 
     if (axis >= 4) {
-        Serial.println("[CLI] [ERR] Invalid axis.");
+        logError("[CLI] Invalid axis.");
         return;
     }
     if (!parseAndValidateFloat(argv[2], &distance_mm, 10.0f, 10000.0f)) {
-        Serial.println("[CLI] [ERR] Invalid distance.");
+        logError("[CLI] Invalid distance.");
         return;
     }
     if (g_manual_calib.state != CALIBRATION_IDLE) {
-        Serial.println("[CLI] [ERR] Calibration already in progress.");
+        logError("[CLI] Calibration already in progress.");
         return;
     }
     
@@ -153,19 +153,19 @@ void cmd_calib_ppmm_start(int argc, char** argv) {
     g_manual_calib.target_mm = distance_mm;
     g_manual_calib.start_counts = wj66GetPosition(axis);
     
+    serialLoggerLock();
     Serial.println("\n=== MANUAL PPM CALIBRATION ===");
     Serial.printf("Axis: %c | Target: %.1f mm\n", axis_char, distance_mm);
     Serial.printf("Start Pos: %ld counts\n", (long)g_manual_calib.start_counts);
-    
-    // FIX: Use printf instead of println for formatted string
     Serial.printf("\nACTION: Move axis exactly %.1f mm, then type 'calibrate ppmm end'.\n\n", distance_mm);
+    serialLoggerUnlock();
     
     g_manual_calib.state = CALIB_MANUAL_WAIT_MOVE;
 }
 
 void cmd_calib_ppmm_end(int argc, char** argv) {
     if (g_manual_calib.state != CALIB_MANUAL_WAIT_MOVE) {
-        Serial.println("[CLI] [ERR] No calibration in progress.");
+        logError("[CLI] No calibration in progress.");
         return;
     }
 
@@ -175,7 +175,7 @@ void cmd_calib_ppmm_end(int argc, char** argv) {
     int32_t moved_counts = abs(end_counts - g_manual_calib.start_counts);
     
     if (moved_counts == 0) {
-        Serial.println("[CLI] [ERR] No movement detected.");
+        logError("[CLI] No movement detected.");
         g_manual_calib.state = CALIBRATION_IDLE;
         return;
     }
@@ -183,39 +183,41 @@ void cmd_calib_ppmm_end(int argc, char** argv) {
     double calculated_ppmm = (double)moved_counts / target_mm;
     encoderCalibrationSetPPM(axis, calculated_ppmm); 
     
+    serialLoggerLock();
     Serial.println("\n=== CALIBRATION COMPLETE ===");
     Serial.printf("Measured: %ld counts\n", (long)moved_counts);
     Serial.printf("Target:   %.1f mm\n", target_mm);
     Serial.printf("Result:   %.3f pulses/unit\n", calculated_ppmm);
+    serialLoggerUnlock();
     
     g_manual_calib.state = CALIBRATION_IDLE;
 }
 
 void cmd_calib_ppmm_reset(int argc, char** argv) {
     if (argc < 3) {
-        Serial.println("[CLI] Usage: calibrate ppmm reset [AXIS]");
+        logPrintln("[CLI] Usage: calibrate ppmm reset [AXIS]");
         return;
     }
     uint8_t axis = axisCharToIndex(argv[2]);
 
     if (axis >= 4) {
-        Serial.println("[CLI] [ERR] Invalid axis.");
+        logError("[CLI] Invalid axis.");
         return;
     }
     encoderCalibrationSetPPM(axis, (double)MOTION_POSITION_SCALE_FACTOR); 
     wj66Reset(); 
-    Serial.printf("[CLI] [OK] PPM reset to default (%d) for Axis %c.\n", MOTION_POSITION_SCALE_FACTOR, axisIndexToChar(axis));
+    logInfo("[CLI] [OK] PPM reset to default (%d) for Axis %c.", MOTION_POSITION_SCALE_FACTOR, axisIndexToChar(axis));
 }
 
 void cmd_auto_calibrate_speed(int argc, char** argv) {
     if (argc < 4) {
-        Serial.println("[CLI] Usage: calibrate speed [AXIS] [PROFILE] [DISTANCE]");
+        logPrintln("[CLI] Usage: calibrate speed [AXIS] [PROFILE] [DISTANCE]");
         return;
     }
 
     uint8_t axis = axisCharToIndex(argv[1]);
     if (axis >= 4) {
-        Serial.println("[CLI] [ERR] Invalid axis.");
+        logError("[CLI] Invalid axis.");
         return;
     }
 
@@ -224,18 +226,18 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     else if (strcmp(argv[2], "MEDIUM") == 0) profile = SPEED_PROFILE_2;
     else if (strcmp(argv[2], "FAST") == 0) profile = SPEED_PROFILE_3;
     else {
-        Serial.println("[CLI] [ERR] Invalid profile (SLOW/MEDIUM/FAST).");
+        logError("[CLI] Invalid profile (SLOW/MEDIUM/FAST).");
         return;
     }
 
     float distance_mm = 0.0f;
     if (!parseAndValidateFloat(argv[3], &distance_mm, 50.0f, 10000.0f)) {
-        Serial.println("[CLI] [ERR] Invalid distance (> 50.0).");
+        logError("[CLI] Invalid distance (> 50.0).");
         return;
     }
     
-    Serial.println("\n=== SPEED CALIBRATION SEQUENCE ===");
-    Serial.printf("Axis: %c | Profile: %s | Dist: %.1f mm\n", axisIndexToChar(axis), argv[2], distance_mm);
+    logPrintln("\n=== SPEED CALIBRATION SEQUENCE ===");
+    logPrintf("Axis: %c | Profile: %s | Dist: %.1f mm\n", axisIndexToChar(axis), argv[2], distance_mm);
     
     calibration_run_t run_fwd = perform_single_measurement(axis, profile, distance_mm, true);
     if (run_fwd.time_ms == 0xFFFFFFFF) return; 
@@ -247,7 +249,7 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     int32_t total_counts = run_fwd.counts + run_rev.counts;
     
     if (total_time_ms == 0 || total_counts == 0) {
-        Serial.println("[CALIB] [ERR] Invalid measurement data.");
+        logError("[CALIB] Invalid measurement data.");
         return;
     }
 
@@ -256,14 +258,16 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     float speed_mm_s = total_distance_mm / avg_time_s;
     float speed_mm_min = speed_mm_s * 60.0f; 
 
+    serialLoggerLock();
     Serial.println("\n--- SUMMARY ---");
     Serial.printf("Fwd: %.1f mm in %.2f s\n", (float)run_fwd.counts / MOTION_POSITION_SCALE_FACTOR, (float)run_fwd.time_ms / 1000.0f);
     Serial.printf("Rev: %.1f mm in %.2f s\n", (float)run_rev.counts / MOTION_POSITION_SCALE_FACTOR, (float)run_rev.time_ms / 1000.0f);
     Serial.printf("Avg Speed: %.2f mm/s (%.1f mm/min)\n", speed_mm_s, speed_mm_min);
+    serialLoggerUnlock();
 
     AxisCalibration* cal = getAxisCalPtrForCli(axis);
     if (cal == NULL) {
-        Serial.println("[CALIB] [ERR] Axis lookup failed.");
+        logError("[CALIB] Axis lookup failed.");
         return;
     }
 
@@ -274,7 +278,7 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     }
     
     saveAllCalibration(); 
-    Serial.println("[CALIB] [OK] Calibration saved to NVS.");
+    logInfo("[CALIB] [OK] Calibration saved to NVS.");
 }
 
 // ============================================================================
@@ -307,6 +311,7 @@ static const uint32_t MEASUREMENT_DURATION_MS = 10000;  // 10 seconds per phase
 void cmd_vfd_calib_current(int argc, char** argv) {
     // Help text
     if (argc < 2 || strcmp(argv[1], "help") == 0) {
+        serialLoggerLock();
         Serial.println("[VFDCAL] === VFD Current Calibration ===");
         Serial.println("Commands:");
         Serial.println("  calibrate vfd current start     - Start calibration workflow");
@@ -315,16 +320,18 @@ void cmd_vfd_calib_current(int argc, char** argv) {
         Serial.println("  calibrate vfd current abort     - Abort calibration");
         Serial.println("  calibrate vfd current reset     - Reset all calibration data");
         Serial.println("  calibrate vfd current show      - Display current calibration values");
+        serialLoggerUnlock();
         return;
     }
 
     // Parse subcommand
     if (strcmp(argv[1], "start") == 0) {
         if (vfd_calib_state != VFD_CALIB_IDLE) {
-            Serial.println("[VFDCAL] ERROR: Calibration already in progress. Use 'abort' to restart.");
+            logError("[VFDCAL] Calibration already in progress. Use 'abort' to restart.");
             return;
         }
 
+        serialLoggerLock();
         Serial.println("\n[VFDCAL] === Starting VFD Current Calibration ===");
         Serial.println("This process measures current baselines for stall detection.");
         Serial.println("You will be guided through three phases:\n");
@@ -332,11 +339,12 @@ void cmd_vfd_calib_current(int argc, char** argv) {
         Serial.println("2. STANDARD CUT: Reference cutting speed (typically 20-25A)");
         Serial.println("3. HEAVY LOAD: (Optional) High-speed or high-load cutting\n");
         Serial.println("Each phase will measure for 10 seconds. Press ENTER when ready for phase 1...");
+        serialLoggerUnlock();
 
         vfd_calib_state = VFD_CALIB_MEASURING_IDLE;
         vfd_calib_start_time = millis();
-        Serial.println("[VFDCAL] Phase 1: Measuring IDLE BASELINE (10 seconds)");
-        Serial.println(">> Spin blade with NO cutting load, then wait for completion <<");
+        logPrintln("[VFDCAL] Phase 1: Measuring IDLE BASELINE (10 seconds)");
+        logPrintln(">> Spin blade with NO cutting load, then wait for completion <<");
         vfdCalibrationStartMeasure(MEASUREMENT_DURATION_MS, "Idle Baseline");
 
     } else if (strcmp(argv[1], "confirm") == 0) {
@@ -345,9 +353,9 @@ void cmd_vfd_calib_current(int argc, char** argv) {
         if (vfd_calib_state == VFD_CALIB_MEASURING_IDLE && vfdCalibrationIsMeasureComplete()) {
             if (vfdCalibrationGetMeasurement(&rms, &peak)) {
                 vfdCalibrationStoreMeasurement(0, rms, peak);
-                Serial.printf("[VFDCAL] Idle phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
-                Serial.println("[VFDCAL] Phase 2: Measuring STANDARD CUT (10 seconds)");
-                Serial.println(">> Perform cutting at standard reference speed, then wait <<");
+                logPrintf("[VFDCAL] Idle phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
+                logPrintln("[VFDCAL] Phase 2: Measuring STANDARD CUT (10 seconds)");
+                logPrintln(">> Perform cutting at standard reference speed, then wait <<");
                 vfd_calib_state = VFD_CALIB_MEASURING_STD;
                 vfd_calib_start_time = millis();
                 vfdCalibrationStartMeasure(MEASUREMENT_DURATION_MS, "Standard Cut");
@@ -356,78 +364,80 @@ void cmd_vfd_calib_current(int argc, char** argv) {
         } else if (vfd_calib_state == VFD_CALIB_MEASURING_STD && vfdCalibrationIsMeasureComplete()) {
             if (vfdCalibrationGetMeasurement(&rms, &peak)) {
                 vfdCalibrationStoreMeasurement(1, rms, peak);
-                Serial.printf("[VFDCAL] Standard cut phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
+                logPrintf("[VFDCAL] Standard cut phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
+                serialLoggerLock();
                 Serial.println("\n[VFDCAL] Phase 3: HEAVY LOAD (Optional)");
                 Serial.println("Measure heavy-load scenario for worst-case baseline?");
                 Serial.println("  - Type 'continue' to measure heavy load (10 seconds)");
                 Serial.println("  - Type 'finish' to skip and calculate thresholds");
+                serialLoggerUnlock();
                 vfd_calib_state = VFD_CALIB_CONFIRM_STD;
             }
 
         } else if (vfd_calib_state == VFD_CALIB_MEASURING_HEAVY && vfdCalibrationIsMeasureComplete()) {
             if (vfdCalibrationGetMeasurement(&rms, &peak)) {
                 vfdCalibrationStoreMeasurement(2, rms, peak);
-                Serial.printf("[VFDCAL] Heavy load phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
-                Serial.println("\n[VFDCAL] Calculating stall detection threshold...");
-                if (vfdCalibrationCalculateThreshold(20.0f)) {  // 20% default margin
-                    Serial.printf("[VFDCAL] Stall threshold set to: %.2f A\n", vfdCalibrationGetThreshold());
+                logPrintf("[VFDCAL] Heavy load phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
+                logPrintln("\n[VFDCAL] Calculating stall detection threshold...");
+                if (vfdCalibrationCalculateThreshold(20.0f)) {
+                    logPrintf("[VFDCAL] Stall threshold set to: %.2f A\n", vfdCalibrationGetThreshold());
                     vfdCalibrationPrintSummary();
                     vfd_calib_state = VFD_CALIB_COMPLETE;
-                    Serial.println("[VFDCAL] Calibration COMPLETE and saved!");
+                    logInfo("[VFDCAL] Calibration COMPLETE and saved!");
                 }
             }
 
         } else {
-            Serial.println("[VFDCAL] ERROR: No measurement in progress or measurement not complete yet.");
+            logError("[VFDCAL] No measurement in progress or measurement not complete yet.");
         }
 
     } else if (strcmp(argv[1], "continue") == 0) {
         if (vfd_calib_state == VFD_CALIB_CONFIRM_STD) {
-            Serial.println("[VFDCAL] Phase 3: Measuring HEAVY LOAD (10 seconds)");
-            Serial.println(">> Perform heavy-load cutting scenario, then wait <<");
+            logPrintln("[VFDCAL] Phase 3: Measuring HEAVY LOAD (10 seconds)");
+            logPrintln(">> Perform heavy-load cutting scenario, then wait <<");
             vfd_calib_state = VFD_CALIB_MEASURING_HEAVY;
             vfdCalibrationStartMeasure(MEASUREMENT_DURATION_MS, "Heavy Load");
         } else {
-            Serial.println("[VFDCAL] ERROR: Not in phase confirmation state.");
+            logError("[VFDCAL] Not in phase confirmation state.");
         }
 
     } else if (strcmp(argv[1], "finish") == 0) {
         if (vfd_calib_state == VFD_CALIB_CONFIRM_STD) {
-            Serial.println("[VFDCAL] Skipping heavy load measurement...");
-            Serial.println("[VFDCAL] Calculating stall detection threshold...");
-            if (vfdCalibrationCalculateThreshold(20.0f)) {  // 20% default margin
-                Serial.printf("[VFDCAL] Stall threshold set to: %.2f A\n", vfdCalibrationGetThreshold());
+            logPrintln("[VFDCAL] Skipping heavy load measurement...");
+            logPrintln("[VFDCAL] Calculating stall detection threshold...");
+            if (vfdCalibrationCalculateThreshold(20.0f)) {
+                logPrintf("[VFDCAL] Stall threshold set to: %.2f A\n", vfdCalibrationGetThreshold());
                 vfdCalibrationPrintSummary();
                 vfd_calib_state = VFD_CALIB_COMPLETE;
-                Serial.println("[VFDCAL] Calibration COMPLETE and saved!");
+                logInfo("[VFDCAL] Calibration COMPLETE and saved!");
             }
         } else {
-            Serial.println("[VFDCAL] ERROR: Not in phase confirmation state.");
+            logError("[VFDCAL] Not in phase confirmation state.");
         }
 
     } else if (strcmp(argv[1], "abort") == 0) {
-        Serial.println("[VFDCAL] Calibration aborted. Use 'start' to begin again.");
+        logWarning("[VFDCAL] Calibration aborted. Use 'start' to begin again.");
         vfd_calib_state = VFD_CALIB_IDLE;
 
     } else if (strcmp(argv[1], "reset") == 0) {
-        Serial.println("[VFDCAL] WARNING: Resetting all VFD calibration data!");
+        logWarning("[VFDCAL] Resetting all VFD calibration data!");
         vfdCalibrationReset();
         vfd_calib_state = VFD_CALIB_IDLE;
-        Serial.println("[VFDCAL] All calibration data cleared.");
+        logInfo("[VFDCAL] All calibration data cleared.");
 
     } else if (strcmp(argv[1], "status") == 0) {
         const char* state_names[] = {
             "IDLE", "MEASURING_IDLE", "CONFIRM_IDLE", "MEASURING_STD",
             "CONFIRM_STD", "MEASURING_HEAVY", "CONFIRM_HEAVY", "COMPLETE"
         };
-        Serial.printf("[VFDCAL] Current state: %s\n", state_names[vfd_calib_state]);
+        logPrintf("[VFDCAL] Current state: %s\n", state_names[vfd_calib_state]);
         vfdCalibrationPrintSummary();
 
     } else if (strcmp(argv[1], "show") == 0) {
         vfdCalibrationPrintSummary();
 
     } else {
-        Serial.println("[VFDCAL] Unknown subcommand. Use 'help' for usage.");
+        logWarning("[VFDCAL] Unknown subcommand. Use 'help' for usage.");
     }
 }
 
@@ -441,6 +451,7 @@ void cmd_vfd_calib_current(int argc, char** argv) {
  */
 void cmd_vfd_diagnostics(int argc, char** argv) {
     if (argc < 2 || strcmp(argv[1], "help") == 0) {
+        serialLoggerLock();
         Serial.println("[VFDDIAG] === VFD Diagnostics ===");
         Serial.println("Commands:");
         Serial.println("  vfd diagnostics status    - Show real-time VFD status");
@@ -449,38 +460,42 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         Serial.println("  vfd diagnostics frequency - Show output frequency data");
         Serial.println("  vfd diagnostics full      - Comprehensive VFD report");
         Serial.println("  vfd diagnostics calib     - Show calibration details");
+        serialLoggerUnlock();
         return;
     }
 
     // Real-time status snapshot
     if (strcmp(argv[1], "status") == 0) {
-        Serial.println("\n[VFDDIAG] === VFD Real-Time Status ===");
+        logPrintln("\n[VFDDIAG] === VFD Real-Time Status ===");
         altivar31PrintDiagnostics();
 
     } else if (strcmp(argv[1], "thermal") == 0) {
-        Serial.println("\n[VFDDIAG] === Thermal Monitoring ===");
+        logPrintln("\n[VFDDIAG] === Thermal Monitoring ===");
         int16_t thermal = altivar31GetThermalState();
         int32_t warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
         int32_t crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
 
+        serialLoggerLock();
         Serial.printf("Thermal State:       %d%% (nominal: 100%%)\n", thermal);
         Serial.printf("Warning Threshold:   >%ld°C (%ld%% state)\n", (long)warn, (long)(warn * 1.3));
         Serial.printf("Critical Threshold:  >%ld°C (%ld%% state)\n", (long)crit, (long)(crit * 1.4));
 
         if (thermal > (crit * 1.4)) {
-            Serial.println("Status:              🔴 CRITICAL - Emergency stop required!");
+            Serial.println("Status:              CRITICAL - Emergency stop required!");
         } else if (thermal > (warn * 1.3)) {
-            Serial.println("Status:              🟡 WARNING - Monitor closely");
+            Serial.println("Status:              WARNING - Monitor closely");
         } else {
-            Serial.println("Status:              🟢 NORMAL");
+            Serial.println("Status:              NORMAL");
         }
         Serial.println();
+        serialLoggerUnlock();
 
     } else if (strcmp(argv[1], "current") == 0) {
-        Serial.println("\n[VFDDIAG] === Motor Current Measurements ===");
+        logPrintln("\n[VFDDIAG] === Motor Current Measurements ===");
         float current = altivar31GetCurrentAmps();
         int16_t raw = altivar31GetCurrentRaw();
 
+        serialLoggerLock();
         Serial.printf("Motor Current:       %.2f A (raw: %d)\n", current, raw);
 
         if (vfdCalibrationIsValid()) {
@@ -501,34 +516,36 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
                           (calib->stall_threshold_amps > 0) ? (current / calib->stall_threshold_amps * 100.0f) : 0.0f);
 
             if (vfdCalibrationIsStall(current)) {
-                Serial.println("  Status:              🔴 STALL DETECTED!");
+                Serial.println("  Status:              STALL DETECTED!");
             } else {
-                Serial.println("  Status:              🟢 Normal");
+                Serial.println("  Status:              Normal");
             }
         } else {
             Serial.println("  Calibration Status:  NOT CALIBRATED");
         }
         Serial.println();
+        serialLoggerUnlock();
 
     } else if (strcmp(argv[1], "frequency") == 0) {
-        Serial.println("\n[VFDDIAG] === Output Frequency ===");
+        logPrintln("\n[VFDDIAG] === Output Frequency ===");
         float freq = altivar31GetFrequencyHz();
         int16_t raw = altivar31GetFrequencyRaw();
 
-        Serial.printf("Output Frequency:    %.1f Hz (raw: %d, 0.1Hz/unit)\n", freq, raw);
-        Serial.printf("Status:              %s\n",
-                      freq > 0.0f ? "RUNNING" : "IDLE/STOPPED");
-        Serial.println();
+        logPrintf("Output Frequency:    %.1f Hz (raw: %d, 0.1Hz/unit)\n", freq, raw);
+        logPrintf("Status:              %s\n", freq > 0.0f ? "RUNNING" : "IDLE/STOPPED");
 
     } else if (strcmp(argv[1], "calib") == 0) {
-        Serial.println("\n[VFDDIAG] === Calibration Details ===");
+        logPrintln("\n[VFDDIAG] === Calibration Details ===");
         vfdCalibrationPrintSummary();
 
     } else if (strcmp(argv[1], "full") == 0) {
+        serialLoggerLock();
         Serial.println("\n[VFDDIAG] === Comprehensive VFD Report ===");
         Serial.println("\n--- Status ---");
+        serialLoggerUnlock();
         altivar31PrintDiagnostics();
 
+        serialLoggerLock();
         Serial.println("\n--- Current Measurements ---");
         float current = altivar31GetCurrentAmps();
         int32_t raw = altivar31GetCurrentRaw();
@@ -544,18 +561,19 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         Serial.println("\n--- Frequency ---");
         float freq = altivar31GetFrequencyHz();
         Serial.printf("Output Frequency:    %.1f Hz\n", freq);
+        serialLoggerUnlock();
 
-        Serial.println("\n--- Calibration ---");
+        logPrintln("\n--- Calibration ---");
         vfdCalibrationPrintSummary();
 
-        Serial.println("\n--- Configuration ---");
+        logPrintln("\n--- Configuration ---");
         float margin = configGetFloat(KEY_VFD_STALL_MARGIN, 20.0f);
         int32_t timeout = configGetInt(KEY_STALL_TIMEOUT, 2000);
-        Serial.printf("Stall Margin:        %.0f%%\n", margin);
-        Serial.printf("Stall Timeout:       %ld ms\n", (long)timeout);
+        logPrintf("Stall Margin:        %.0f%%\n", margin);
+        logPrintf("Stall Timeout:       %ld ms\n", (long)timeout);
 
     } else {
-        Serial.println("[VFDDIAG] Unknown subcommand. Use 'help' for usage.");
+        logWarning("[VFDDIAG] Unknown subcommand. Use 'help' for usage.");
     }
 }
 
@@ -569,67 +587,69 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
  */
 void cmd_vfd_config(int argc, char** argv) {
     if (argc < 2 || strcmp(argv[1], "help") == 0) {
+        serialLoggerLock();
         Serial.println("[VFDCFG] === VFD Configuration ===");
         Serial.println("Commands:");
         Serial.println("  vfd config margin <percent>      - Set stall margin (default 20%)");
         Serial.println("  vfd config timeout <ms>          - Set stall timeout (default 2000ms)");
-        Serial.println("  vfd config temp warn <°C>        - Set temperature warning threshold");
-        Serial.println("  vfd config temp crit <°C>        - Set temperature critical threshold");
+        Serial.println("  vfd config temp warn <C>         - Set temperature warning threshold");
+        Serial.println("  vfd config temp crit <C>         - Set temperature critical threshold");
         Serial.println("  vfd config enable <on|off>       - Enable/disable VFD stall detection");
         Serial.println("  vfd config show                  - Display current settings");
+        serialLoggerUnlock();
         return;
     }
 
     if (strcmp(argv[1], "margin") == 0) {
         if (argc < 3) {
-            Serial.println("[VFDCFG] Usage: vfd config margin <percent>");
+            logPrintln("[VFDCFG] Usage: vfd config margin <percent>");
             return;
         }
         float margin = atof(argv[2]);
         if (margin < 5.0f || margin > 100.0f) {
-            Serial.println("[VFDCFG] ERROR: Margin must be between 5% and 100%");
+            logError("[VFDCFG] Margin must be between 5%% and 100%%");
             return;
         }
         configSetInt(KEY_VFD_STALL_MARGIN, (int32_t)margin);
         configUnifiedFlush();
         configUnifiedSave();
-        Serial.printf("[VFDCFG] Stall margin set to %.0f%%\n", margin);
+        logInfo("[VFDCFG] Stall margin set to %.0f%%", margin);
 
     } else if (strcmp(argv[1], "timeout") == 0) {
         if (argc < 3) {
-            Serial.println("[VFDCFG] Usage: vfd config timeout <milliseconds>");
+            logPrintln("[VFDCFG] Usage: vfd config timeout <milliseconds>");
             return;
         }
         uint32_t timeout_ms = (uint32_t)atoi(argv[2]);
         if (timeout_ms < 100 || timeout_ms > 60000) {
-            Serial.println("[VFDCFG] ERROR: Timeout must be between 100ms and 60000ms");
+            logError("[VFDCFG] Timeout must be between 100ms and 60000ms");
             return;
         }
         configSetInt(KEY_STALL_TIMEOUT, (int32_t)timeout_ms);
         configUnifiedFlush();
         configUnifiedSave();
-        Serial.printf("[VFDCFG] Stall timeout set to %lu ms\n", (unsigned long)timeout_ms);
+        logInfo("[VFDCFG] Stall timeout set to %lu ms", (unsigned long)timeout_ms);
 
     } else if (strcmp(argv[1], "temp") == 0) {
         if (argc < 4) {
-            Serial.println("[VFDCFG] Usage: vfd config temp [warn|crit] <°C>");
+            logPrintln("[VFDCFG] Usage: vfd config temp [warn|crit] <C>");
             return;
         }
 
         int32_t temp = (int32_t)atoi(argv[3]);
         if (temp < 0 || temp > 150) {
-            Serial.println("[VFDCFG] ERROR: Temperature must be between 0°C and 150°C");
+            logError("[VFDCFG] Temperature must be between 0C and 150C");
             return;
         }
 
         if (strcmp(argv[2], "warn") == 0) {
             configSetInt(KEY_VFD_TEMP_WARN, temp);
-            Serial.printf("[VFDCFG] Temperature warning threshold set to %ld°C\n", (long)temp);
+            logInfo("[VFDCFG] Temperature warning threshold set to %ldC", (long)temp);
         } else if (strcmp(argv[2], "crit") == 0) {
             configSetInt(KEY_VFD_TEMP_CRIT, temp);
-            Serial.printf("[VFDCFG] Temperature critical threshold set to %ld°C\n", (long)temp);
+            logInfo("[VFDCFG] Temperature critical threshold set to %ldC", (long)temp);
         } else {
-            Serial.println("[VFDCFG] ERROR: Use 'warn' or 'crit'");
+            logError("[VFDCFG] Use 'warn' or 'crit'");
             return;
         }
         configUnifiedFlush();
@@ -637,7 +657,7 @@ void cmd_vfd_config(int argc, char** argv) {
 
     } else if (strcmp(argv[1], "enable") == 0) {
         if (argc < 3) {
-            Serial.println("[VFDCFG] Usage: vfd config enable [on|off]");
+            logPrintln("[VFDCFG] Usage: vfd config enable [on|off]");
             return;
         }
 
@@ -645,37 +665,36 @@ void cmd_vfd_config(int argc, char** argv) {
         configSetInt("vfd_stall_detect", enable ? 1 : 0);
         configUnifiedFlush();
         configUnifiedSave();
-        Serial.printf("[VFDCFG] VFD stall detection %s\n", enable ? "ENABLED" : "DISABLED");
+        logInfo("[VFDCFG] VFD stall detection %s", enable ? "ENABLED" : "DISABLED");
 
     } else if (strcmp(argv[1], "show") == 0) {
-        Serial.println("\n[VFDCFG] === Current VFD Configuration ===");
+        logPrintln("\n[VFDCFG] === Current VFD Configuration ===");
 
         float margin = configGetFloat(KEY_VFD_STALL_MARGIN, 20.0f);
-        Serial.printf("Stall Margin:        %.0f%%\n", margin);
+        logPrintf("Stall Margin:        %.0f%%\n", margin);
 
         int32_t timeout = configGetInt(KEY_STALL_TIMEOUT, 2000);
-        Serial.printf("Stall Timeout:       %ld ms\n", (long)timeout);
+        logPrintf("Stall Timeout:       %ld ms\n", (long)timeout);
 
         int32_t temp_warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
         int32_t temp_crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
-        Serial.printf("Temperature Warn:    %ld°C\n", (long)temp_warn);
-        Serial.printf("Temperature Crit:    %ld°C\n", (long)temp_crit);
+        logPrintf("Temperature Warn:    %ldC\n", (long)temp_warn);
+        logPrintf("Temperature Crit:    %ldC\n", (long)temp_crit);
 
         int32_t enabled = configGetInt("vfd_stall_detect", 1);
-        Serial.printf("VFD Stall Detect:    %s\n", enabled ? "ENABLED" : "DISABLED");
+        logPrintf("VFD Stall Detect:    %s\n", enabled ? "ENABLED" : "DISABLED");
 
         // Show calibration status
         const vfd_calibration_data_t* calib = vfdCalibrationGetData();
         if (calib->is_calibrated) {
-            Serial.printf("Stall Threshold:     %.2f A (margin: %.0f%%)\n",
+            logPrintf("Stall Threshold:     %.2f A (margin: %.0f%%)\n",
                           calib->stall_threshold_amps, calib->stall_margin_percent);
         } else {
-            Serial.println("Stall Threshold:     NOT CALIBRATED");
+            logPrintln("Stall Threshold:     NOT CALIBRATED");
         }
-        Serial.println();
 
     } else {
-        Serial.println("[VFDCFG] Unknown subcommand. Use 'help' for usage.");
+        logWarning("[VFDCFG] Unknown subcommand. Use 'help' for usage.");
     }
 }
 

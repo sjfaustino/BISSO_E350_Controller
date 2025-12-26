@@ -710,6 +710,7 @@ void configUnifiedClear() {
 int configGetKeyCount() { return config_count; }
 
 void configUnifiedDiagnostics() {
+  serialLoggerLock();
   Serial.println("\n=== CONFIG DIAGNOSTICS ===");
   Serial.printf("Strict Limits: %s\n", configGetInt(KEY_MOTION_STRICT_LIMITS, 1)
                                            ? "ON (Safe)"
@@ -720,6 +721,7 @@ void configUnifiedDiagnostics() {
                 configGetInt(KEY_MOTION_BUFFER_ENABLE, 1) ? "YES" : "NO");
   Serial.printf("Total Keys: %d\n", config_count);
   Serial.println("==========================\n");
+  serialLoggerUnlock();
 }
 
 // PHASE 5.1: Validated getters with bounds checking
@@ -775,6 +777,7 @@ float configGetFloatValidated(const char *key, float default_val, float min_val,
 
 // Added for CLI 'config dump' command
 void configUnifiedPrintAll() {
+  serialLoggerLock();
   for (int i = 0; i < config_count; i++) {
     if (!config_table[i].is_set)
       continue;
@@ -795,4 +798,5 @@ void configUnifiedPrintAll() {
     }
     Serial.println();
   }
+  serialLoggerUnlock();
 }

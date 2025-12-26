@@ -469,6 +469,7 @@ size_t configExportSchemaJSON(char* buffer, size_t buffer_size) {
 }
 
 void configPrintSchema() {
+    serialLoggerLock();
     Serial.println("\n[CONFIG SCHEMA] === Configuration Parameters ===");
     Serial.println("Key                               | Type   | Min/Max          | Unit      | Critical");
     Serial.println("-----------------------------|--------|------------------|-----------|----------");
@@ -510,4 +511,5 @@ void configPrintSchema() {
     }
 
     Serial.printf("\nTotal parameters: %d\n\n", schema_count);
+    serialLoggerUnlock();
 }

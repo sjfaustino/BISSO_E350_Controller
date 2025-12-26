@@ -1,4 +1,5 @@
 #include "timeout_manager.h"
+#include "serial_logger.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -16,10 +17,10 @@ static const uint32_t timeout_values[] = {
 };
 
 void timeoutManagerInit() {
-  Serial.println("[TIMEOUT] Initializing...");
+  logInfo("[TIMEOUT] Initializing...");
   memset(timeout_handles, 0, sizeof(timeout_handles));
   active_timeout_count = 0;
-  Serial.println("[TIMEOUT] [OK] Ready");
+  logInfo("[TIMEOUT] [OK] Ready");
 }
 
 uint32_t timeoutGetStandard(timeout_type_t type) {
@@ -39,7 +40,7 @@ timeout_handle_t* timeoutStartCustom(timeout_type_t type, uint32_t custom_ms) {
       return &timeout_handles[i];
     }
   }
-  Serial.println("[TIMEOUT] [ERR] No free handles");
+  logError("[TIMEOUT] No free handles");
   return NULL;
 }
 
@@ -49,8 +50,6 @@ timeout_handle_t* timeoutStart(timeout_type_t type) {
 
 bool timeoutCheck(timeout_handle_t* handle) {
   if (!handle || !handle->active) return false;
-  // PHASE 5.1: Use wraparound-safe timeout comparison
-  // Pattern: (uint32_t)(now - start) handles millis() rollover correctly
   if ((uint32_t)(millis() - handle->start_time) >= handle->timeout_ms) {
     handle->triggered = true;
     return true;
@@ -68,31 +67,29 @@ void timeoutStop(timeout_handle_t* handle) {
 }
 
 uint32_t timeoutElapsed(timeout_handle_t* handle) {
-    // PHASE 5.1: Use wraparound-safe calculation
     return (handle && handle->active) ? (uint32_t)(millis() - handle->start_time) : 0;
 }
 
 uint32_t timeoutRemaining(timeout_handle_t* handle) {
     if (!handle || !handle->active) return 0;
-    // PHASE 5.1: Use wraparound-safe calculation
     uint32_t el = (uint32_t)(millis() - handle->start_time);
     return (el >= handle->timeout_ms) ? 0 : (handle->timeout_ms - el);
 }
 
 void timeoutResetAll() {
-  Serial.println("[TIMEOUT] Resetting all handles...");
+  logInfo("[TIMEOUT] Resetting all handles...");
   for(int i=0; i<MAX_TIMEOUT_HANDLES; i++) timeout_handles[i].active = false;
   active_timeout_count = 0;
-  Serial.println("[TIMEOUT] [OK] Reset complete.");
+  logInfo("[TIMEOUT] [OK] Reset complete.");
 }
 
 void timeoutShowDiagnostics() {
+  serialLoggerLock();
   Serial.println("\n=== TIMEOUT DIAGNOSTICS ===");
   Serial.printf("Active: %d / %d\n", active_timeout_count, MAX_TIMEOUT_HANDLES);
   
   for (int i = 0; i < MAX_TIMEOUT_HANDLES; i++) {
     if (timeout_handles[i].active) {
-        // FIX: Cast for printf
         Serial.printf("  [%d] %s: Elapsed=%lu ms | Remaining=%lu ms\n",
             i, timeout_names[timeout_handles[i].type],
             (unsigned long)timeoutElapsed(&timeout_handles[i]),
@@ -100,4 +97,5 @@ void timeoutShowDiagnostics() {
     }
   }
   Serial.println();
+  serialLoggerUnlock();
 }

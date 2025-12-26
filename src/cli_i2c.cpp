@@ -83,6 +83,7 @@ const char* getOptionValue(int argc, char** argv, const char* option) {
 }
 
 void printTableSeparator(int col1, int col2, int col3, int col4) {
+    serialLoggerLock();
     Serial.print("┌");
     for (int i = 0; i < col1; i++) Serial.print("─");
     Serial.print("┬");
@@ -92,10 +93,12 @@ void printTableSeparator(int col1, int col2, int col3, int col4) {
     Serial.print("┬");
     for (int i = 0; i < col4; i++) Serial.print("─");
     Serial.println("┐");
+    serialLoggerUnlock();
 }
 
 void printTableRow(const char* col1, const char* col2, const char* col3, const char* col4,
                    int col1_width, int col2_width, int col3_width, int col4_width) {
+    serialLoggerLock();
     Serial.print("│ ");
     Serial.print(col1);
     for (int i = strlen(col1); i < col1_width - 1; i++) Serial.print(" ");
@@ -109,6 +112,7 @@ void printTableRow(const char* col1, const char* col2, const char* col3, const c
     Serial.print(col4);
     for (int i = strlen(col4); i < col4_width - 1; i++) Serial.print(" ");
     Serial.println("│");
+    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -132,7 +136,7 @@ void cmd_i2c_scan(int argc, char** argv) {
     bool compare_baseline = hasOption(argc, argv, "--compare");
     const char* addr_str = getOptionValue(argc, argv, "-r");
 
-    Serial.println("\n[I2C] === Bus Scan ===");
+    logPrintln("\n[I2C] === Bus Scan ===");
 
     uint8_t start_addr = 0x08, end_addr = 0x77;
     // ... filtering and address range logic ...
@@ -147,17 +151,17 @@ void cmd_i2c_scan(int argc, char** argv) {
     // CRITICAL: Acquire I2C Mutex
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 5000)) {
-        Serial.println("[I2C] [ERR] Could not acquire bus mutex (busy)");
+        logError("[I2C] Could not acquire bus mutex (busy)");
         return;
     }
 
     if (verbose) {
-        Serial.printf("[I2C] Scanning range 0x%02X-0x%02X with timing...\n", start_addr, end_addr);
+        logPrintf("[I2C] Scanning range 0x%02X-0x%02X with timing...\n", start_addr, end_addr);
         printTableSeparator(10, 20, 12, 14);
         printTableRow("Address", "Device Name", "Status", "Response", 10, 20, 12, 14);
         printTableSeparator(10, 20, 12, 14);
     } else {
-        Serial.printf("[I2C] Scanning range 0x%02X-0x%02X...\n", start_addr, end_addr);
+        logPrintf("[I2C] Scanning range 0x%02X-0x%02X...\n", start_addr, end_addr);
     }
 
     for (uint8_t addr = start_addr; addr <= end_addr; addr++) {
@@ -186,7 +190,7 @@ void cmd_i2c_scan(int argc, char** argv) {
                 snprintf(time_str, sizeof(time_str), "%lu us", (unsigned long)elapsed_us);
                 printTableRow(hex_addr, dev_name, "OK", time_str, 10, 20, 12, 14);
             } else {
-                Serial.printf("[I2C] Found 0x%02X: %s\n", addr, dev_name);
+                logInfo("[I2C] Found 0x%02X: %s", addr, dev_name);
             }
 
             if (found_count < 16) {
@@ -200,7 +204,7 @@ void cmd_i2c_scan(int argc, char** argv) {
         taskUnlockMutex(mutex);
         vTaskDelay(pdMS_TO_TICKS(1));
         if (!taskLockMutex(mutex, 100)) {
-            Serial.println("[I2C] [ERR] Lost mutex during scan");
+            logError("[I2C] Lost mutex during scan");
             return;
         }
     }
@@ -209,7 +213,7 @@ void cmd_i2c_scan(int argc, char** argv) {
         printTableSeparator(10, 20, 12, 14);
     }
 
-    Serial.printf("[I2C] Found %d device(s)\n", found_count);
+    logInfo("[I2C] Found %d device(s)", found_count);
     taskUnlockMutex(mutex);
 
     // Handle baseline operations (post-scan, no mutex needed for local state)
@@ -218,28 +222,28 @@ void cmd_i2c_scan(int argc, char** argv) {
         memcpy(baseline.addresses, found_addrs, found_count);
         memcpy(baseline.response_times, response_times, found_count * sizeof(float));
         baseline.timestamp_ms = millis();
-        Serial.println("[I2C] Baseline saved.");
+        logInfo("[I2C] Baseline saved.");
     }
 
     if (compare_baseline && baseline.device_count > 0) {
         // ... comparison logic ...
-        Serial.println("[I2C] Comparing with baseline...");
+        logInfo("[I2C] Comparing with baseline...");
         bool changes = false;
         for (int i = 0; i < baseline.device_count; i++) {
             bool found = false;
             for (int j = 0; j < found_count; j++) {
                 if (baseline.addresses[i] == found_addrs[j]) { found = true; break; }
             }
-            if (!found) { Serial.printf("[I2C] [WARN] Device missing: 0x%02X\n", baseline.addresses[i]); changes = true; }
+            if (!found) { logWarning("[I2C] Device missing: 0x%02X", baseline.addresses[i]); changes = true; }
         }
         for (int i = 0; i < found_count; i++) {
             bool found = false;
             for (int j = 0; j < baseline.device_count; j++) {
                 if (found_addrs[i] == baseline.addresses[j]) { found = true; break; }
             }
-            if (!found) { Serial.printf("[I2C] [INFO] New device: 0x%02X\n", found_addrs[i]); changes = true; }
+            if (!found) { logInfo("[I2C] New device: 0x%02X", found_addrs[i]); changes = true; }
         }
-        if (!changes) Serial.println("[I2C] No changes detected from baseline");
+        if (!changes) logInfo("[I2C] No changes detected from baseline");
     }
 }
 
@@ -252,7 +256,7 @@ void cmd_i2c_test(int argc, char** argv) {
     bool stress = hasOption(argc, argv, "--stress");
     bool quick = hasOption(argc, argv, "-q");
 
-    Serial.println("\n[I2C] === Device Test ===");
+    logPrintln("\n[I2C] === Device Test ===");
 
     uint8_t test_addr = 0;
     if (argc > 1 && argv[1][0] == '0' && argv[1][1] == 'x') {
@@ -272,7 +276,7 @@ void cmd_i2c_test(int argc, char** argv) {
 
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 5000)) {
-        Serial.println("[I2C] [ERR] Could not acquire bus mutex");
+        logError("[I2C] Could not acquire bus mutex");
         return;
     }
 
@@ -319,8 +323,8 @@ void cmd_i2c_test(int argc, char** argv) {
         if (read_res == I2C_RESULT_OK) passed++;
 
         if (stress) {
-            Serial.printf("[I2C] Testing 0x%02X: %s\n", addr, (read_res == I2C_RESULT_OK) ? "OK" : "FAIL");
-            Serial.printf("[I2C]   Stress test (500 trans)...\n"); // Reduced from 1000 for safety
+            logPrintf("[I2C] Testing 0x%02X: %s\n", addr, (read_res == I2C_RESULT_OK) ? "OK" : "FAIL");
+            logPrintln("[I2C]   Stress test (500 trans)...");
             int success = 0;
             for (int t = 0; t < 500; t++) {
                 watchdogFeed("CLI");
@@ -332,7 +336,7 @@ void cmd_i2c_test(int argc, char** argv) {
                     if (!taskLockMutex(mutex, 100)) return;
                 }
             }
-            Serial.printf("[I2C]   Success: %d/500 (%.1f%%)\n", success, (success / 5.0f));
+            logInfo("[I2C]   Success: %d/500 (%.1f%%)", success, (success / 5.0f));
         } else if (verbose) {
             char addr_str[8], read_result[20], write_result[20], stab[12];
             snprintf(addr_str, sizeof(addr_str), "0x%02X", addr);
@@ -341,7 +345,7 @@ void cmd_i2c_test(int argc, char** argv) {
             snprintf(stab, sizeof(stab), "%d%%", stability_score);
             printTableRow(addr_str, read_result, write_result, stab, 10, 16, 12, 12);
         } else {
-            Serial.printf("[I2C] 0x%02X: %s\n", addr, (read_res == I2C_RESULT_OK) ? "PASS" : "FAIL");
+            logInfo("[I2C] 0x%02X: %s", addr, (read_res == I2C_RESULT_OK) ? "PASS" : "FAIL");
         }
         
         taskUnlockMutex(mutex);
@@ -350,7 +354,7 @@ void cmd_i2c_test(int argc, char** argv) {
     }
 
     if (!stress && verbose) printTableSeparator(10, 16, 12, 12);
-    Serial.printf("[I2C] Passed: %d/%d\n", passed, test_count);
+    logInfo("[I2C] Passed: %d/%d", passed, test_count);
     taskUnlockMutex(mutex);
 }
 
@@ -364,13 +368,14 @@ void cmd_i2c_stats(int argc, char** argv) {
 
     if (reset) {
         i2cResetStats();
-        Serial.println("[I2C] Statistics cleared");
+        logInfo("[I2C] Statistics cleared");
         return;
     }
 
     i2c_stats_t stats = i2cGetStats();
 
     if (export_json) {
+        serialLoggerLock();
         Serial.println("{");
         Serial.printf("  \"transactions_total\": %lu,\n", (unsigned long)stats.transactions_total);
         Serial.printf("  \"transactions_success\": %lu,\n", (unsigned long)stats.transactions_success);
@@ -382,20 +387,21 @@ void cmd_i2c_stats(int argc, char** argv) {
         Serial.printf("  \"error_timeout\": %lu,\n", (unsigned long)stats.error_timeout);
         Serial.printf("  \"error_bus\": %lu\n", (unsigned long)stats.error_bus);
         Serial.println("}");
+        serialLoggerUnlock();
     } else {
-        Serial.println("\n[I2C] === Statistics ===");
-        Serial.printf("Total Transactions: %lu\n", (unsigned long)stats.transactions_total);
-        Serial.printf("Successful: %lu (%.1f%%)\n", (unsigned long)stats.transactions_success, stats.success_rate);
-        Serial.printf("Failed: %lu\n", (unsigned long)stats.transactions_failed);
-        Serial.println();
-        Serial.printf("Retries: %lu\n", (unsigned long)stats.retries_performed);
-        Serial.printf("Bus Recoveries: %lu\n", (unsigned long)stats.bus_recoveries);
-        Serial.println();
-        Serial.printf("Errors:\n");
-        Serial.printf("  NACK: %lu\n", (unsigned long)stats.error_nack);
-        Serial.printf("  Timeout: %lu\n", (unsigned long)stats.error_timeout);
-        Serial.printf("  Bus: %lu\n", (unsigned long)stats.error_bus);
-        Serial.printf("  Arbitration: %lu\n", (unsigned long)stats.error_arbitration);
+        logPrintln("\n[I2C] === Statistics ===");
+        logPrintf("Total Transactions: %lu\n", (unsigned long)stats.transactions_total);
+        logPrintf("Successful: %lu (%.1f%%)\n", (unsigned long)stats.transactions_success, stats.success_rate);
+        logPrintf("Failed: %lu\n", (unsigned long)stats.transactions_failed);
+        logPrintln("");
+        logPrintf("Retries: %lu\n", (unsigned long)stats.retries_performed);
+        logPrintf("Bus Recoveries: %lu\n", (unsigned long)stats.bus_recoveries);
+        logPrintln("");
+        logPrintln("Errors:");
+        logPrintf("  NACK: %lu\n", (unsigned long)stats.error_nack);
+        logPrintf("  Timeout: %lu\n", (unsigned long)stats.error_timeout);
+        logPrintf("  Bus: %lu\n", (unsigned long)stats.error_bus);
+        logPrintf("  Arbitration: %lu\n", (unsigned long)stats.error_arbitration);
     }
 }
 
@@ -404,22 +410,22 @@ void cmd_i2c_stats(int argc, char** argv) {
 // ============================================================================
 
 void cmd_i2c_recover(int argc, char** argv) {
-    Serial.println("\n[I2C] === Bus Recovery ===");
+    logPrintln("\n[I2C] === Bus Recovery ===");
 
     i2c_bus_status_t status = i2cCheckBusStatus();
-    Serial.printf("Current status: %s\n", i2cBusStatusToString(status));
+    logPrintf("Current status: %s\n", i2cBusStatusToString(status));
 
     if (status == I2C_BUS_OK) {
-        Serial.println("[I2C] Bus is healthy, no recovery needed");
+        logInfo("[I2C] Bus is healthy, no recovery needed");
         return;
     }
 
-    Serial.println("[I2C] Recovering...");
+    logInfo("[I2C] Recovering...");
     i2cRecoverBus();
 
     delay(100);
     status = i2cCheckBusStatus();
-    Serial.printf("[I2C] Recovery complete. New status: %s\n", i2cBusStatusToString(status));
+    logInfo("[I2C] Recovery complete. New status: %s", i2cBusStatusToString(status));
 }
 
 // ============================================================================
@@ -432,8 +438,8 @@ void cmd_i2c_monitor(int argc, char** argv) {
     const char* dur_str = getOptionValue(argc, argv, "-t");
     if (dur_str) duration_sec = atoi(dur_str);
 
-    Serial.printf("\n[I2C] === Monitoring for %d seconds ===\n", duration_sec);
-    Serial.println("[I2C] (Press Ctrl+C to stop)");
+    logPrintf("\n[I2C] === Monitoring for %d seconds ===\n", duration_sec);
+    logPrintln("[I2C] (Press Ctrl+C to stop)");
 
     uint32_t start_time = millis();
     SemaphoreHandle_t mutex = taskGetI2cMutex();
@@ -444,7 +450,7 @@ void cmd_i2c_monitor(int argc, char** argv) {
         // Check for Ctrl+C (0x03)
         if (Serial.available() > 0 && Serial.peek() == 0x03) {
             Serial.read(); // Consume 0x03
-            Serial.println("\n[I2C] Monitor aborted by user");
+            logInfo("\n[I2C] Monitor aborted by user");
             break;
         }
 
@@ -454,17 +460,17 @@ void cmd_i2c_monitor(int argc, char** argv) {
                 uint8_t test_byte = 0;
                 i2c_result_t res = i2cReadWithRetry(addr, &test_byte, 1);
                 if (res == I2C_RESULT_OK) {
-                    Serial.printf("[%lu] 0x%02X (%s): OK\n", (unsigned long)(millis() / 1000), addr, KNOWN_DEVICES[i].name);
+                    logPrintf("[%lu] 0x%02X (%s): OK\n", (unsigned long)(millis() / 1000), addr, KNOWN_DEVICES[i].name);
                 } else {
-                    Serial.printf("[%lu] 0x%02X (%s): FAIL - %s\n", (unsigned long)(millis() / 1000), addr, KNOWN_DEVICES[i].name, i2cResultToString(res));
-                    if (with_alerts) Serial.printf("[ALERT] Device 0x%02X not responding!\n", addr);
+                    logPrintf("[%lu] 0x%02X (%s): FAIL - %s\n", (unsigned long)(millis() / 1000), addr, KNOWN_DEVICES[i].name, i2cResultToString(res));
+                    if (with_alerts) logWarning("[ALERT] Device 0x%02X not responding!", addr);
                 }
             }
             taskUnlockMutex(mutex);
         }
         vTaskDelay(pdMS_TO_TICKS(1000)); // Sample every 1 second
     }
-    Serial.println("[I2C] Monitor stopped");
+    logInfo("[I2C] Monitor stopped");
 }
 
 // ============================================================================
@@ -476,17 +482,17 @@ void cmd_i2c_benchmark(int argc, char** argv) {
     const char* iter_str = getOptionValue(argc, argv, "-n");
     if (iter_str) iterations = atoi(iter_str);
 
-    Serial.printf("\n[I2C] === Benchmarking (%d iterations) ===\n", iterations);
+    logPrintf("\n[I2C] === Benchmarking (%d iterations) ===\n", iterations);
     
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 5000)) {
-        Serial.println("[I2C] [ERR] Could not acquire bus mutex");
+        logError("[I2C] Could not acquire bus mutex");
         return;
     }
 
     for (int i = 0; i < KNOWN_DEVICE_COUNT; i++) {
         uint8_t addr = KNOWN_DEVICES[i].address;
-        Serial.printf("\nDevice 0x%02X (%s):\n", addr, KNOWN_DEVICES[i].name);
+        logPrintf("\nDevice 0x%02X (%s):\n", addr, KNOWN_DEVICES[i].name);
 
         uint32_t min_time = 999999, max_time = 0, total_time = 0;
         int success_count = 0;
@@ -515,10 +521,10 @@ void cmd_i2c_benchmark(int argc, char** argv) {
         float avg = (success_count > 0) ? (float)total_time / success_count : 0;
         float success_pct = (float)success_count * 100.0f / iterations;
 
-        Serial.printf("  Min: %lu ms\n", (unsigned long)min_time);
-        Serial.printf("  Max: %lu ms\n", (unsigned long)max_time);
-        Serial.printf("  Avg: %.2f ms\n", avg);
-        Serial.printf("  Success: %.1f%% (%d/%d)\n", success_pct, success_count, iterations);
+        logPrintf("  Min: %lu ms\n", (unsigned long)min_time);
+        logPrintf("  Max: %lu ms\n", (unsigned long)max_time);
+        logPrintf("  Avg: %.2f ms\n", avg);
+        logPrintf("  Success: %.1f%% (%d/%d)\n", success_pct, success_count, iterations);
     }
     taskUnlockMutex(mutex);
 }
@@ -528,15 +534,15 @@ void cmd_i2c_benchmark(int argc, char** argv) {
 // ============================================================================
 
 void cmd_i2c_health(int argc, char** argv) {
-    Serial.println("\n[I2C] === Health Check ===");
+    logPrintln("\n[I2C] === Health Check ===");
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 1000)) {
-        Serial.println("[I2C] [ERR] Could not acquire bus mutex");
+        logError("[I2C] Could not acquire bus mutex");
         return;
     }
 
     i2c_bus_status_t bus_status = i2cCheckBusStatus();
-    Serial.printf("Bus Status: %s\n", i2cBusStatusToString(bus_status));
+    logPrintf("Bus Status: %s\n", i2cBusStatusToString(bus_status));
 
     uint8_t device_count = 0;
     for (int i = 0; i < KNOWN_DEVICE_COUNT; i++) {
@@ -547,15 +553,15 @@ void cmd_i2c_health(int argc, char** argv) {
     }
     taskUnlockMutex(mutex);
     
-    Serial.printf("Devices Found: %d/%d\n", device_count, KNOWN_DEVICE_COUNT);
+    logPrintf("Devices Found: %d/%d\n", device_count, KNOWN_DEVICE_COUNT);
     i2c_stats_t stats = i2cGetStats();
-    Serial.printf("Error Rate: %.1f%%\n", 100.0f - stats.success_rate);
+    logPrintf("Error Rate: %.1f%%\n", 100.0f - stats.success_rate);
 
     const char* status_str = "OK";
     if (bus_status != I2C_BUS_OK) status_str = "BUS_ERROR";
     else if (device_count < KNOWN_DEVICE_COUNT) status_str = "DEGRADED";
     else if (stats.success_rate < 99.0f) status_str = "DEGRADED";
-    Serial.printf("\nOverall Status: %s\n", status_str);
+    logPrintf("\nOverall Status: %s\n", status_str);
 }
 
 // ============================================================================
@@ -563,36 +569,36 @@ void cmd_i2c_health(int argc, char** argv) {
 // ============================================================================
 
 void cmd_i2c_selftest(int argc, char** argv) {
-    Serial.println("\n[I2C] === I2C Self-Test Sequence ===");
+    logPrintln("\n[I2C] === I2C Self-Test Sequence ===");
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 2000)) {
-        Serial.println("[I2C] [ERR] Could not acquire bus mutex");
+        logError("[I2C] Could not acquire bus mutex");
         return;
     }
 
     bool all_passed = true;
-    Serial.println("[1/5] Checking GPIO pins...");
+    logPrintln("[1/5] Checking GPIO pins...");
     i2c_bus_status_t status = i2cCheckBusStatus();
-    if (status == I2C_BUS_OK) Serial.println("      [PASS] GPIO pins healthy");
-    else { Serial.printf("      [FAIL] GPIO problem: %s\n", i2cBusStatusToString(status)); all_passed = false; }
+    if (status == I2C_BUS_OK) logInfo("      [PASS] GPIO pins healthy");
+    else { logError("      [FAIL] GPIO problem: %s", i2cBusStatusToString(status)); all_passed = false; }
 
-    Serial.println("[2/5] Scanning bus...");
+    logPrintln("[2/5] Scanning bus...");
     int device_count = 0;
     for (int i = 0; i < KNOWN_DEVICE_COUNT; i++) {
         uint8_t test_byte = 0;
         if (i2cReadWithRetry(KNOWN_DEVICES[i].address, &test_byte, 1) == I2C_RESULT_OK) device_count++;
     }
-    Serial.printf("      [PASS] Found %d devices\n", device_count);
+    logInfo("      [PASS] Found %d devices", device_count);
 
     for (int i = 0; i < device_count && i < 3; i++) {
         watchdogFeed("CLI");
-        Serial.printf("[%d/5] Testing device 0x%02X...\n", i + 3, KNOWN_DEVICES[i].address);
+        logPrintf("[%d/5] Testing device 0x%02X...\n", i + 3, KNOWN_DEVICES[i].address);
         uint8_t test_byte = 0;
-        if (i2cReadWithRetry(KNOWN_DEVICES[i].address, &test_byte, 1) == I2C_RESULT_OK) Serial.println("      [PASS]");
-        else { Serial.println("      [FAIL]"); all_passed = false; }
+        if (i2cReadWithRetry(KNOWN_DEVICES[i].address, &test_byte, 1) == I2C_RESULT_OK) logInfo("      [PASS]");
+        else { logError("      [FAIL]"); all_passed = false; }
     }
     taskUnlockMutex(mutex);
-    Serial.println("\n[RESULT] " + String(all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED"));
+    logInfo("\n[RESULT] %s", all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
 }
 
 // ============================================================================
@@ -600,7 +606,7 @@ void cmd_i2c_selftest(int argc, char** argv) {
 // ============================================================================
 
 void cmd_i2c_troubleshoot(int argc, char** argv) {
-    Serial.println("\n[I2C] === Interactive Troubleshooting Wizard ===");
+    logPrintln("\n[I2C] === Interactive Troubleshooting Wizard ===");
     uint8_t target_addr = 0;
     if (argc > 1 && argv[1][0] == '0' && argv[1][1] == 'x') {
         target_addr = strtol(argv[1], NULL, 16);
@@ -608,32 +614,32 @@ void cmd_i2c_troubleshoot(int argc, char** argv) {
 
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 2000)) {
-        Serial.println("[I2C] [ERR] Could not acquire bus mutex");
+        logError("[I2C] Could not acquire bus mutex");
         return;
     }
 
-    Serial.println("\nStep 1: Checking GPIO pin states...");
+    logPrintln("\nStep 1: Checking GPIO pin states...");
     i2c_bus_status_t status = i2cCheckBusStatus();
-    Serial.printf("  SDA (GPIO%d): %s\n", PIN_I2C_SDA, status == I2C_BUS_STUCK_SDA ? "STUCK_LOW" : "OK");
-    Serial.printf("  SCL (GPIO%d): %s\n", PIN_I2C_SCL, status == I2C_BUS_STUCK_SCL ? "STUCK_LOW" : "OK");
+    logPrintf("  SDA (GPIO%d): %s\n", PIN_I2C_SDA, status == I2C_BUS_STUCK_SDA ? "STUCK_LOW" : "OK");
+    logPrintf("  SCL (GPIO%d): %s\n", PIN_I2C_SCL, status == I2C_BUS_STUCK_SCL ? "STUCK_LOW" : "OK");
 
     if (status != I2C_BUS_OK) {
         taskUnlockMutex(mutex);
-        Serial.println("\n[I2C] Problem detected: I2C bus not responding");
+        logWarning("\n[I2C] Problem detected: I2C bus not responding");
         return;
     }
 
-    Serial.println("\nStep 2: Scanning for devices...");
+    logPrintln("\nStep 2: Scanning for devices...");
     if (target_addr) {
         uint8_t test_byte = 0;
         i2c_result_t res = i2cReadWithRetry(target_addr, &test_byte, 1);
-        if (res == I2C_RESULT_OK) Serial.printf("  Device 0x%02X: FOUND\n", target_addr);
-        else Serial.printf("  Device 0x%02X: NOT FOUND (%s)\n", target_addr, i2cResultToString(res));
+        if (res == I2C_RESULT_OK) logInfo("  Device 0x%02X: FOUND", target_addr);
+        else logWarning("  Device 0x%02X: NOT FOUND (%s)", target_addr, i2cResultToString(res));
     } else {
         for (int i = 0; i < KNOWN_DEVICE_COUNT; i++) {
             uint8_t test_byte = 0;
             if (i2cReadWithRetry(KNOWN_DEVICES[i].address, &test_byte, 1) == I2C_RESULT_OK) {
-                Serial.printf("  0x%02X (%s): OK\n", KNOWN_DEVICES[i].address, KNOWN_DEVICES[i].name);
+                logInfo("  0x%02X (%s): OK", KNOWN_DEVICES[i].address, KNOWN_DEVICES[i].name);
             }
         }
     }
@@ -646,6 +652,7 @@ void cmd_i2c_troubleshoot(int argc, char** argv) {
 
 void cmd_i2c_main(int argc, char** argv) {
     if (argc < 2) {
+        serialLoggerLock();
         Serial.println("\n[I2C] Usage: i2c <command> [options]");
         Serial.println("\nCommands:");
         Serial.println("  scan [options]      - Scan for I2C devices");
@@ -661,6 +668,7 @@ void cmd_i2c_main(int argc, char** argv) {
         Serial.println("  health              - Quick health check");
         Serial.println("  selftest            - Comprehensive system test");
         Serial.println("  troubleshoot [addr] - Interactive troubleshooting");
+        serialLoggerUnlock();
         return;
     }
 
@@ -675,7 +683,7 @@ void cmd_i2c_main(int argc, char** argv) {
     else if (strcasecmp(subcmd, "health") == 0) cmd_i2c_health(argc - 1, argv + 1);
     else if (strcasecmp(subcmd, "selftest") == 0) cmd_i2c_selftest(argc - 1, argv + 1);
     else if (strcasecmp(subcmd, "troubleshoot") == 0) cmd_i2c_troubleshoot(argc - 1, argv + 1);
-    else Serial.printf("[I2C] Unknown command: %s\n", subcmd);
+    else logWarning("[I2C] Unknown command: %s", subcmd);
 }
 
 // ============================================================================

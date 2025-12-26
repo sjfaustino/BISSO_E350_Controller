@@ -46,6 +46,7 @@ extern "C" {
 // ============================================================================
 
 typedef struct {
+    bool enabled;                       // Device enabled/connected flag
     uint8_t slave_address;              // Modbus slave ID (1-247, typically 1)
     uint32_t baud_rate;                 // Baud rate in bps (19200 typical)
 

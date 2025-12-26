@@ -1,4 +1,5 @@
 #include "encoder_comm_stats.h"
+#include "serial_logger.h"
 #include "fault_logging.h"
 
 // ESP32-WROOM-32E Pin Configuration
@@ -17,7 +18,7 @@ static const uint32_t supported_bauds[] = {1200, 2400, 4800, 9600, 19200, 38400,
 static const uint8_t num_bauds = sizeof(supported_bauds) / sizeof(supported_bauds[0]);
 
 void encoderStatsInit() {
-  Serial.println("[ENC_STATS] Initialized");
+  logInfo("[ENC_STATS] Initialized");
   memset(&stats, 0, sizeof(stats));
   stats.baud_rate_current = 9600;
   current_baud_rate = 9600;
@@ -90,7 +91,7 @@ bool encoderSendCommandWithStats(const uint8_t* cmd, uint8_t len) {
 }
 
 baud_detect_result_t encoderDetectBaudRate() {
-  Serial.println("[ENC_STATS] Auto-detecting baud rate...");
+  logInfo("[ENC_STATS] Auto-detecting baud rate...");
   baud_detect_result_t result = {0, false, 0};
   
   for (uint8_t i = 0; i < num_bauds; i++) {
@@ -100,16 +101,14 @@ baud_detect_result_t encoderDetectBaudRate() {
     delay(10);
     encoder_serial->begin(baud, SERIAL_8N1, ENCODER_SERIAL_RX, ENCODER_SERIAL_TX);
     
-    // FIX: Cast to unsigned long
-    Serial.printf("[ENC_STATS] Probing %lu baud...\n", (unsigned long)baud);
+    logPrintf("[ENC_STATS] Probing %lu baud...\n", (unsigned long)baud);
     
     uint8_t query[] = {0x01, 0x00}; 
     encoderSendCommandWithStats(query, 2);
     
     uint8_t resp[32];
     if (encoderReadFrameWithStats(resp, 32, 200)) {
-        // FIX: Cast to unsigned long
-        Serial.printf("[ENC_STATS] [OK] Detected: %lu\n", (unsigned long)baud);
+        logInfo("[ENC_STATS] [OK] Detected: %lu", (unsigned long)baud);
         result.baud_rate = baud;
         result.detected = true;
         current_baud_rate = baud;
@@ -117,15 +116,14 @@ baud_detect_result_t encoderDetectBaudRate() {
     }
   }
   
-  Serial.println("[ENC_STATS] [FAIL] Detection failed. Defaulting to 9600.");
+  logWarning("[ENC_STATS] Detection failed. Defaulting to 9600.");
   encoder_serial->begin(9600, SERIAL_8N1, ENCODER_SERIAL_RX, ENCODER_SERIAL_TX);
   result.baud_rate = 9600;
   return result;
 }
 
 bool encoderSetBaudRate(uint32_t baud_rate) {
-  // FIX: Cast to unsigned long
-  Serial.printf("[ENC_STATS] Setting baud to %lu\n", (unsigned long)baud_rate);
+  logInfo("[ENC_STATS] Setting baud to %lu", (unsigned long)baud_rate);
   encoder_serial->updateBaudRate(baud_rate);
   current_baud_rate = baud_rate;
   stats.baud_rate_changes++;
@@ -133,13 +131,14 @@ bool encoderSetBaudRate(uint32_t baud_rate) {
 }
 
 void encoderShowStats() {
+  serialLoggerLock();
   Serial.println("\n=== ENCODER STATISTICS ===");
-  // FIX: Casts to unsigned long
   Serial.printf("Sent: %lu | Recv: %lu | Fail: %lu\n", 
     (unsigned long)stats.frames_sent, (unsigned long)stats.frames_received, (unsigned long)stats.frames_failed);
   Serial.printf("Errors: Cksum=%lu Time=%lu Parse=%lu\n", 
     (unsigned long)stats.checksum_errors, (unsigned long)stats.timeout_errors, (unsigned long)stats.parse_errors);
   Serial.printf("Baud: %lu | Success: %.1f%%\n", (unsigned long)current_baud_rate, stats.success_rate);
+  serialLoggerUnlock();
 }
 
 void encoderResetStats() { memset(&stats, 0, sizeof(stats)); }

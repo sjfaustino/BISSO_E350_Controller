@@ -9,6 +9,7 @@
 #include "motion_state.h"
 #include "safety.h"
 #include "spindle_current_monitor.h"
+#include "yhtc05_modbus.h"  // YH-TC05 RPM sensor
 #include "fault_logging.h"
 #include "memory_monitor.h"
 #include "task_manager.h"
@@ -79,44 +80,63 @@ void telemetryUpdate() {
 
     last_update_ms = now;
 
-    // PHASE 5.10: Protect cache writes with spinlock to prevent torn reads
-    portENTER_CRITICAL(&telemetrySpinlock);
+    // =========================================================================
+    // PHASE 1: Collect all data OUTSIDE critical section
+    // WiFi calls, malloc, logging, etc. MUST NOT be inside spinlock
+    // =========================================================================
 
     // System Status
-    telemetry_cache.health_status = calculateHealthStatus();
-    telemetry_cache.uptime_seconds = taskGetUptime();
-    telemetry_cache.loop_cycle_count = loop_cycle_counter;
+    system_health_t health = calculateHealthStatus();
+    uint32_t uptime = taskGetUptime();
+    uint32_t cycles = loop_cycle_counter;
 
     // CPU & Memory
-    telemetry_cache.cpu_usage_percent = taskGetCpuUsage();
-    telemetry_cache.free_heap_bytes = memoryMonitorGetFreeHeap();
-    telemetry_cache.stack_used_bytes = (TASK_STACK_BOOT * 4) - (uxTaskGetStackHighWaterMark(NULL) * 4);
+    uint8_t cpu = taskGetCpuUsage();
+    uint32_t free_heap = memoryMonitorGetFreeHeap();
+    uint32_t stack_used = (TASK_STACK_BOOT * 4) - (uxTaskGetStackHighWaterMark(NULL) * 4);
 
     // Motion System
-    telemetry_cache.motion_enabled = (motionGetState(0) != MOTION_ERROR);
-    telemetry_cache.motion_moving = motionIsMoving();
-    telemetry_cache.axis_x_mm = motionGetPositionMM(0);
-    telemetry_cache.axis_y_mm = motionGetPositionMM(1);
-    telemetry_cache.axis_z_mm = motionGetPositionMM(2);
-    telemetry_cache.axis_a_mm = motionGetPositionMM(3);
+    bool motion_en = (motionGetState(0) != MOTION_ERROR);
+    bool motion_mov = motionIsMoving();
+    float ax_x = motionGetPositionMM(0);
+    float ax_y = motionGetPositionMM(1);
+    float ax_z = motionGetPositionMM(2);
+    float ax_a = motionGetPositionMM(3);
 
     // Spindle
+    bool sp_en = false;
+    float sp_current = 0.0f;
+    float sp_peak = 0.0f;
+    uint32_t sp_errors = 0;
+    bool sp_overcurrent = false;
+    bool sp_fault = false;
     const spindle_monitor_state_t* spindle_state = spindleMonitorGetState();
     if (spindle_state) {
-        telemetry_cache.spindle_enabled = spindle_state->enabled;
-        telemetry_cache.spindle_current_amps = spindle_state->current_amps;
-        telemetry_cache.spindle_current_peak_amps = spindle_state->current_peak_amps;
-        telemetry_cache.spindle_errors = spindle_state->error_count;
-        telemetry_cache.spindle_overcurrent = spindleMonitorIsOvercurrent();
-        telemetry_cache.spindle_fault = spindleMonitorIsFault();
+        sp_en = spindle_state->enabled;
+        sp_current = spindle_state->current_amps;
+        sp_peak = spindle_state->current_peak_amps;
+        sp_errors = spindle_state->error_count;
+        sp_overcurrent = spindleMonitorIsOvercurrent();
+        sp_fault = spindleMonitorIsFault();
+    }
+
+    // RPM Sensor (YH-TC05)
+    bool rpm_en = false;
+    uint16_t rpm_val = 0;
+    bool rpm_stall = false;
+    const yhtc05_state_t* rpm_state = yhtc05GetState();
+    if (rpm_state) {
+        rpm_en = rpm_state->enabled;
+        rpm_val = rpm_state->rpm;
+        rpm_stall = rpm_state->is_stalled;
     }
 
     // Safety System
-    telemetry_cache.estop_active = emergencyStopIsActive();
-    telemetry_cache.alarm_active = safetyIsAlarmed();
-    telemetry_cache.faults_logged = faultGetRingBufferEntryCount();
+    bool estop = emergencyStopIsActive();
+    bool alarm = safetyIsAlarmed();
+    uint32_t faults = faultGetRingBufferEntryCount();
     
-    // Count critical faults in ring buffer
+    // Count critical faults
     uint32_t critical_count = 0;
     uint8_t entry_count = faultGetRingBufferEntryCount();
     for (uint8_t i = 0; i < entry_count; i++) {
@@ -125,53 +145,84 @@ void telemetryUpdate() {
             critical_count++;
         }
     }
-    telemetry_cache.critical_faults = critical_count;
 
     // Task Metrics
+    uint8_t slowest_id = 0;
+    uint32_t slowest_us = 0;
     int task_count = 0;
     const task_performance_t* task_metrics = perfMonitorGetAllMetrics(&task_count);
-    uint32_t max_task_time = 0;
     for (int i = 0; i < task_count; i++) {
-        if (task_metrics[i].max_runtime_us > max_task_time) {
-            max_task_time = task_metrics[i].max_runtime_us;
-            telemetry_cache.slowest_task_id = i;
+        if (task_metrics[i].max_runtime_us > slowest_us) {
+            slowest_us = task_metrics[i].max_runtime_us;
+            slowest_id = i;
         }
     }
-    telemetry_cache.slowest_task_time_us = max_task_time;
 
-    // Network
-    telemetry_cache.wifi_connected = (WiFi.status() == WL_CONNECTED);
-    if (telemetry_cache.wifi_connected) {
-        int rssi = WiFi.RSSI();  // Returns negative dBm
-        // Convert RSSI to 0-100 scale (typical range -100 to -30 dBm)
-        // PHASE 5.10: Clamp to prevent underflow for RSSI < -100
+    // Network - MUST be outside critical section (WiFi uses interrupts)
+    bool wifi_conn = (WiFi.status() == WL_CONNECTED);
+    uint8_t wifi_signal = 0;
+    if (wifi_conn) {
+        int rssi = WiFi.RSSI();
         int signal_raw = (rssi + 100) * 100 / 70;
-        if (signal_raw < 0) {
-            telemetry_cache.wifi_signal_strength = 0;
-        } else if (signal_raw > 100) {
-            telemetry_cache.wifi_signal_strength = 100;
-        } else {
-            telemetry_cache.wifi_signal_strength = (uint8_t)signal_raw;
-        }
+        if (signal_raw < 0) wifi_signal = 0;
+        else if (signal_raw > 100) wifi_signal = 100;
+        else wifi_signal = (uint8_t)signal_raw;
     }
 
-    // PHASE 5.10: Signal network connection events on state changes
-    if (telemetry_cache.wifi_connected && !wifi_was_connected) {
-        // Transition from disconnected to connected
+    // Configuration
+    uint32_t cfg_ver = configGetInt("schema_version", 1);
+    bool cfg_default = (configGetInt(KEY_WEB_PW_CHANGED, 0) == 0);
+
+    // =========================================================================
+    // PHASE 2: Write to cache under spinlock (fast, no function calls)
+    // =========================================================================
+    portENTER_CRITICAL(&telemetrySpinlock);
+
+    telemetry_cache.health_status = health;
+    telemetry_cache.uptime_seconds = uptime;
+    telemetry_cache.loop_cycle_count = cycles;
+    telemetry_cache.cpu_usage_percent = cpu;
+    telemetry_cache.free_heap_bytes = free_heap;
+    telemetry_cache.stack_used_bytes = stack_used;
+    telemetry_cache.motion_enabled = motion_en;
+    telemetry_cache.motion_moving = motion_mov;
+    telemetry_cache.axis_x_mm = ax_x;
+    telemetry_cache.axis_y_mm = ax_y;
+    telemetry_cache.axis_z_mm = ax_z;
+    telemetry_cache.axis_a_mm = ax_a;
+    telemetry_cache.spindle_enabled = sp_en;
+    telemetry_cache.spindle_current_amps = sp_current;
+    telemetry_cache.spindle_current_peak_amps = sp_peak;
+    telemetry_cache.spindle_errors = sp_errors;
+    telemetry_cache.spindle_overcurrent = sp_overcurrent;
+    telemetry_cache.spindle_fault = sp_fault;
+    telemetry_cache.rpm_sensor_enabled = rpm_en;
+    telemetry_cache.spindle_rpm = rpm_val;
+    telemetry_cache.rpm_stall_detected = rpm_stall;
+    telemetry_cache.estop_active = estop;
+    telemetry_cache.alarm_active = alarm;
+    telemetry_cache.faults_logged = faults;
+    telemetry_cache.critical_faults = critical_count;
+    telemetry_cache.slowest_task_id = slowest_id;
+    telemetry_cache.slowest_task_time_us = slowest_us;
+    telemetry_cache.wifi_connected = wifi_conn;
+    telemetry_cache.wifi_signal_strength = wifi_signal;
+    telemetry_cache.config_version = cfg_ver;
+    telemetry_cache.config_is_default = cfg_default;
+
+    portEXIT_CRITICAL(&telemetrySpinlock);
+
+    // =========================================================================
+    // PHASE 3: Signal events OUTSIDE critical section (may log/allocate)
+    // =========================================================================
+    if (wifi_conn && !wifi_was_connected) {
         systemEventsSystemSet(EVENT_SYSTEM_NETWORK_CONNECTED);
         logInfo("[TELEMETRY] WiFi connected");
-    } else if (!telemetry_cache.wifi_connected && wifi_was_connected) {
-        // Transition from connected to disconnected
+    } else if (!wifi_conn && wifi_was_connected) {
         systemEventsSystemSet(EVENT_SYSTEM_NETWORK_LOST);
         logWarning("[TELEMETRY] WiFi connection lost");
     }
-    wifi_was_connected = telemetry_cache.wifi_connected;
-
-    // Configuration
-    telemetry_cache.config_version = configGetInt("schema_version", 1);
-    telemetry_cache.config_is_default = (configGetInt(KEY_WEB_PW_CHANGED, 0) == 0);
-
-    portEXIT_CRITICAL(&telemetrySpinlock);
+    wifi_was_connected = wifi_conn;
 }
 
 system_telemetry_t telemetryGetSnapshot() {
@@ -202,6 +253,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         "\"spindle\":{\"enabled\":%s,\"current_amps\":%.2f,\"peak_amps\":%.2f,\"errors\":%lu,"
         "\"overcurrent\":%s,\"fault\":%s},"
         "\"safety\":{\"estop\":%s,\"alarm\":%s,\"faults\":%lu,\"critical\":%lu},"
+        "\"rpm_sensor\":{\"enabled\":%s,\"rpm\":%u,\"stall_detected\":%s},"
         "\"tasks\":{\"slowest_id\":%u,\"slowest_us\":%lu},"
         "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},"
         "\"config\":{\"version\":%lu,\"is_default\":%s}}",
@@ -223,6 +275,9 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         t.alarm_active ? "true" : "false",
         (unsigned long)t.faults_logged,
         (unsigned long)t.critical_faults,
+        t.rpm_sensor_enabled ? "true" : "false",
+        t.spindle_rpm,
+        t.rpm_stall_detected ? "true" : "false",
         t.slowest_task_id,
         (unsigned long)t.slowest_task_time_us,
         t.wifi_connected ? "true" : "false",
@@ -305,6 +360,7 @@ size_t telemetryExportBinary(telemetry_packet_t* packet) {
 void telemetryPrintSummary() {
     system_telemetry_t t = telemetryGetSnapshot();
 
+    serialLoggerLock();
     Serial.println("\n[TELEMETRY] === System Health Summary ===");
     Serial.printf("Health: %s | Uptime: %lu sec | CPU: %u%% | Heap: %lu bytes\n",
         telemetryGetHealthStatusString(t.health_status),
@@ -331,11 +387,13 @@ void telemetryPrintSummary() {
         t.wifi_signal_strength);
 
     Serial.println();
+    serialLoggerUnlock();
 }
 
 void telemetryPrintDetailed() {
     system_telemetry_t t = telemetryGetSnapshot();
 
+    serialLoggerLock();
     Serial.println("\n[TELEMETRY] === Detailed System Telemetry ===");
 
     Serial.println("=== SYSTEM ===");
@@ -375,7 +433,7 @@ void telemetryPrintDetailed() {
     Serial.printf("Safety Events: %lu\n", (unsigned long)t.safety_events);
 
     Serial.println("\n=== TASKS ===");
-    Serial.printf("Slowest Task: ID %u (%lu µs)\n",
+    Serial.printf("Slowest Task: ID %u (%lu us)\n",
         t.slowest_task_id,
         (unsigned long)t.slowest_task_time_us);
     Serial.printf("Task Underruns: %lu\n", (unsigned long)t.total_task_underruns);
@@ -394,4 +452,5 @@ void telemetryPrintDetailed() {
     Serial.printf("Watchdog Resets: %lu\n", (unsigned long)t.watchdog_resets);
 
     Serial.println();
+    serialLoggerUnlock();
 }

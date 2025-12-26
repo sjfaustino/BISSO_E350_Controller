@@ -21,10 +21,12 @@
 #include "encoder_diagnostics.h" // PHASE 5.3: Encoder health monitoring
 #include "fault_logging.h"       // PHASE 1: Alarm and E-stop management
 #include "gcode_parser.h"        // PHASE 1: G-code execution
+#include "hardware_config.h"     // Hardware pin configuration
 #include "load_manager.h"        // PHASE 5.3: Graceful degradation under load
 #include "motion.h"
 #include "motion_state.h" // Read-only state access
 #include "openapi.h"      // PHASE 6: OpenAPI/Swagger specification generation
+#include "serial_logger.h" // Logging functions (logWarning, logInfo, etc.)
 #include "spindle_current_monitor.h" // PHASE 5.1: Spindle telemetry
 #include "string_safety.h"           // Safe string operations
 #include "system_telemetry.h" // PHASE 5.1: Comprehensive system telemetry
@@ -116,36 +118,34 @@ static bool requireAuth(AsyncWebServerRequest *request) {
   String client_ip = request->client()->remoteIP().toString();
   const char* ip_address = client_ip.c_str();
 
-  // PHASE 5.10: Check rate limit (brute force protection)
-  if (!authCheckRateLimit(ip_address)) {
-    // Rate limit exceeded - return 429 Too Many Requests
-    request->send(429, "text/plain", "Too many authentication attempts. Please try again later.");
-    return false;
-  }
-
   // Check for Authorization header
   if (!request->hasHeader("Authorization")) {
-    request->requestAuthentication();
+    // CRITICAL FIX: Explicitly request BASIC auth (not Digest)
+    request->requestAuthentication("Login Required", false);  // false = BASIC auth
     return false;
   }
 
-  // CRITICAL FIX: Store String before calling c_str() to prevent dangling pointer
-  // authHeader->value().c_str() would return pointer to temporary that's immediately destroyed
+  // Get auth header
   const AsyncWebHeader* authHeader = request->getHeader("Authorization");
   String auth_value = authHeader->value();
   const char* auth = auth_value.c_str();
 
-  // Verify credentials using auth_manager (SHA-256 hashing)
-  if (!authVerifyHTTPBasicAuth(auth)) {
-    // PHASE 5.10: Record failed attempt for rate limiting
-    authRecordFailedAttempt(ip_address);
-    request->requestAuthentication();
+  // Check rate limit
+  if (!authCheckRateLimit(ip_address)) {
+    logWarning("[WEB] Rate limit blocked auth from %s", ip_address);
+    request->send(429, "text/plain", "Too many authentication attempts. Please try again later.");
     return false;
   }
 
-  // PHASE 5.10: Successful auth - clear rate limit for this IP
-  authClearRateLimit(ip_address);
+  // Verify credentials
+  if (!authVerifyHTTPBasicAuth(auth)) {
+    authRecordFailedAttempt(ip_address);
+    request->requestAuthentication("Login Required", false);
+    return false;
+  }
 
+  // Success
+  authClearRateLimit(ip_address);
   return true;
 }
 
@@ -256,7 +256,7 @@ WebServerManager::~WebServerManager() {
 void WebServerManager::loadCredentials() {
   // authInit() is called from main.cpp during system initialization
   // Just log that auth system is ready
-  Serial.println("[WEB] [OK] Using secure SHA-256 authentication");
+  logInfo("[WEB] [OK] Using secure SHA-256 authentication");
 }
 
 // PHASE 5.10: Delegate to auth_manager
@@ -270,18 +270,18 @@ void WebServerManager::setPassword(const char *new_password) {
   authGetUsername(username, sizeof(username));
 
   if (authSetPassword(username, new_password)) {
-    Serial.println("[WEB] [OK] Password changed successfully (SHA-256 hashed)");
+    logInfo("[WEB] [OK] Password changed successfully (SHA-256 hashed)");
   } else {
-    Serial.println("[WEB] [ERR] Failed to set password - check validation requirements");
+    logError("[WEB] Failed to set password - check validation requirements");
   }
 }
 
 void WebServerManager::init() {
   if (!LittleFS.begin(true)) {
-    Serial.println("[WEB] [FAIL] LittleFS Mount Failed");
+    logError("[WEB] LittleFS Mount Failed");
     return;
   }
-  Serial.println("[WEB] [OK] LittleFS mounted");
+  logInfo("[WEB] [OK] LittleFS mounted");
 
   // Load credentials from NVS (PHASE 5.1)
   loadCredentials();
@@ -310,13 +310,13 @@ void WebServerManager::init() {
 
   setupRoutes();
 
-  Serial.println("[WEB] [OK] Async Server initialized");
+  logInfo("[WEB] [OK] Async Server initialized");
 }
 
 void WebServerManager::begin() {
   if (server) {
     server->begin();
-    Serial.println("[WEB] [OK] Started");
+    logInfo("[WEB] [OK] Started");
   }
 }
 
@@ -328,21 +328,14 @@ void WebServerManager::setupRoutes() {
   // PHASE 5.6: Initialize configuration API
   apiConfigInit();
 
-  // 1. Static Files (Protected)
-  // PHASE 5.10: Custom auth filter for static files (SHA-256 verification)
-  server->serveStatic("/", LittleFS, "/")
-      .setDefaultFile("index.html")
-      .setFilter([](AsyncWebServerRequest *request) {
-        // Return true to allow serving, false to block
-        return requireAuth(request);
-      });
+  // 1. Static Files MOVED TO END
 
   // 1.1 Custom 404 Handler
   // PHASE 5.9: Security - Only expose filesystem debug info in debug builds
   server->onNotFound([this](AsyncWebServerRequest *request) {
     if (!requireAuth(request)) return;
 
-    Serial.printf("[WEB] [404] %s\n", request->url().c_str());
+    logWarning("[WEB] [404] %s", request->url().c_str());
 
     String message = "<h1>404 Not Found</h1>";
     message += "<p>The requested URL was not found on this server.</p>";
@@ -529,13 +522,13 @@ void WebServerManager::setupRoutes() {
       
       bool changed = false;
       
-      if (doc.containsKey("toolbreak_threshold")) {
+      if (doc["toolbreak_threshold"].is<float>()) {
         float val = doc["toolbreak_threshold"].as<float>();
         spindleMonitorSetToolBreakageThreshold(val);
         changed = true;
       }
       
-      if (doc.containsKey("stall_threshold") && doc.containsKey("stall_timeout_ms")) {
+      if (doc["stall_threshold"].is<float>() && doc["stall_timeout_ms"].is<uint32_t>()) {
         float thresh = doc["stall_threshold"].as<float>();
         uint32_t timeout = doc["stall_timeout_ms"].as<uint32_t>();
         spindleMonitorSetStallParams(thresh, timeout);
@@ -1413,6 +1406,127 @@ void WebServerManager::setupRoutes() {
 
   // PHASE 5.10: Security - 404 handler already registered at line 224 with auth
   // Duplicate handler removed to prevent auth bypass
+
+  // ============================================================================
+  // HARDWARE PIN CONFIGURATION API
+  // ============================================================================
+
+  // GET /api/hardware/pins - Get all pins and signal definitions
+  server->on("/api/hardware/pins", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+
+    JsonDocument doc;
+    doc["success"] = true;
+
+    // Build signals array
+    JsonArray signals = doc["signals"].to<JsonArray>();
+    for (size_t i = 0; i < SIGNAL_COUNT; i++) {
+      JsonObject sig = signals.add<JsonObject>();
+      sig["key"] = signalDefinitions[i].key;
+      sig["name"] = signalDefinitions[i].name;
+      sig["desc"] = signalDefinitions[i].desc;
+      sig["default_pin"] = signalDefinitions[i].default_gpio;
+      sig["current_pin"] = getPin(signalDefinitions[i].key);
+      sig["type"] = signalDefinitions[i].type;
+    }
+
+    // Build pins array
+    JsonArray pins = doc["pins"].to<JsonArray>();
+    for (size_t i = 0; i < PIN_COUNT; i++) {
+      JsonObject pin = pins.add<JsonObject>();
+      pin["gpio"] = pinDatabase[i].gpio;
+      pin["silk"] = pinDatabase[i].silk;
+      pin["type"] = pinDatabase[i].type;
+      pin["voltage"] = pinDatabase[i].voltage;
+      pin["note"] = pinDatabase[i].note;
+      
+      const char* assigned = checkPinConflict(pinDatabase[i].gpio, nullptr);
+      if (assigned) {
+        pin["assigned"] = assigned;
+      }
+    }
+
+    char response[4096];
+    size_t written = serializeJson(doc, response, sizeof(response));
+    if (written >= sizeof(response)) {
+      request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+      return;
+    }
+    request->send(200, "application/json", response);
+  });
+
+  // POST /api/hardware/pins - Set a pin assignment
+  server->on("/api/hardware/pins", HTTP_POST, 
+    [](AsyncWebServerRequest *request) {
+      if (!requireAuth(request)) return;
+      request->send(200);
+    },
+    NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total) {
+      if (!validateBodySize(len, total)) {
+        request->send(413, "application/json", "{\"error\":\"Request too large\"}");
+        return;
+      }
+
+      JsonDocument doc;
+      DeserializationError err = deserializeJson(doc, data, len);
+      
+      if (err) {
+        request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
+        return;
+      }
+
+      const char* key = doc["key"] | "";
+      int8_t pin = doc["pin"] | -1;
+
+      if (strlen(key) == 0 || pin < 0) {
+        request->send(400, "application/json", "{\"success\":false,\"error\":\"Missing key or pin\"}");
+        return;
+      }
+
+      bool success = setPin(key, pin);
+      
+      JsonDocument resp;
+      resp["success"] = success;
+      if (!success) {
+        resp["error"] = "Invalid pin assignment (conflict or type mismatch)";
+      }
+
+      char response[128];
+      serializeJson(resp, response, sizeof(response));
+      request->send(success ? 200 : 400, "application/json", response);
+    });
+
+  // POST /api/hardware/pins/save - Persist config and reboot
+  server->on("/api/hardware/pins/save", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+
+    request->send(200, "application/json", "{\"success\":true,\"message\":\"Rebooting...\"}");
+    delay(100);
+    ESP.restart();
+  });
+
+  // POST /api/hardware/pins/reset - Reset all pins to defaults
+  server->on("/api/hardware/pins/reset", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+
+    for (size_t i = 0; i < SIGNAL_COUNT; i++) {
+      char nvs_key[40];
+      safe_snprintf(nvs_key, sizeof(nvs_key), "pin_%s", signalDefinitions[i].key);
+      configSetInt(nvs_key, -1);
+    }
+    configUnifiedSave();
+
+    request->send(200, "application/json", "{\"success\":true,\"message\":\"Reset to defaults. Rebooting...\"}");
+    delay(100);
+    ESP.restart();
+  });
+
+  // 1. Static Files (Moved to end to allow API routes to match first)
+  // No auth needed for static assets (bundled CSS/JS/HTML)
+  server->serveStatic("/", LittleFS, "/")
+      .setDefaultFile("index.html");
 }
 
 // --- Handlers ---
@@ -1448,7 +1562,7 @@ void WebServerManager::handleJogBody(AsyncWebServerRequest *request,
   DeserializationError error = deserializeJson(doc, complete_data, complete_len);
 
   if (error) {
-    Serial.printf("[WEB] [ERR] JSON parse failed: %s\n", error.c_str());
+    logError("[WEB] JSON parse failed: %s", error.c_str());
     return;
   }
 
@@ -1459,7 +1573,7 @@ void WebServerManager::handleJogBody(AsyncWebServerRequest *request,
   if (!direction)
     return;
 
-  Serial.printf("[WEB] Jog: %s, %.1f mm, %.1f mm/s\n", direction, distance,
+  logDebug("[WEB] Jog: %s, %.1f mm, %.1f mm/s", direction, distance,
                 speed);
 
   // Map direction strings to Motion API calls
@@ -1490,7 +1604,7 @@ void WebServerManager::handleFirmwareUpload(AsyncWebServerRequest *request,
 
   // First chunk - start the update
   if (index == 0) {
-    Serial.printf("[WEB] [OTA] Starting firmware upload: %zu bytes\n", total);
+    logInfo("[WEB] [OTA] Starting firmware upload: %zu bytes", total);
 
     if (!otaUpdaterStartUpdate(total, "firmware.bin")) {
       request->send(400, "application/json",
@@ -1509,7 +1623,7 @@ void WebServerManager::handleFirmwareUpload(AsyncWebServerRequest *request,
 
   // Last chunk - finalize update
   if (index + len >= total) {
-    Serial.println("[WEB] [OTA] Firmware upload complete, finalizing...");
+    logInfo("[WEB] [OTA] Firmware upload complete, finalizing...");
 
     if (otaUpdaterFinalize()) {
       // Response will be sent after reboot timer expires
@@ -1527,11 +1641,11 @@ void WebServerManager::onWsEvent(AsyncWebSocket *server,
                                  AwsEventType type, void *arg, uint8_t *data,
                                  size_t len) {
   if (type == WS_EVT_CONNECT) {
-    Serial.printf("[WEB] WS Client #%u connected from %s\n", client->id(),
+    logInfo("[WEB] WS Client #%u connected from %s", client->id(),
                   client->remoteIP().toString().c_str());
     broadcastState();
   } else if (type == WS_EVT_DISCONNECT) {
-    Serial.printf("[WEB] WS Client #%u disconnected\n", client->id());
+    logInfo("[WEB] WS Client #%u disconnected", client->id());
   }
 }
 

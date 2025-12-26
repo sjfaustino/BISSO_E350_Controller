@@ -60,6 +60,11 @@ typedef struct {
     bool spindle_overcurrent;
     bool spindle_fault;
 
+    // RPM Sensor (YH-TC05)
+    bool rpm_sensor_enabled;
+    uint16_t spindle_rpm;
+    bool rpm_stall_detected;
+
     // Safety System
     bool estop_active;
     bool alarm_active;

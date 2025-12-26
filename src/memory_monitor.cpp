@@ -1,5 +1,6 @@
 #include "memory_monitor.h"
-#include "system_events.h" // PHASE 5.10: Event-driven architecture
+#include "serial_logger.h"
+#include "system_events.h"
 #include <esp_heap_caps.h>
 
 // FIX: Fully initialize struct to suppress warnings
@@ -11,7 +12,7 @@ static uint32_t total_heap_size = 0;
 static bool low_memory_event_active = false;
 
 void memoryMonitorInit() {
-  Serial.println("[MEM] Initializing...");
+  logInfo("[MEM] Initializing...");
   total_heap_size = ESP.getHeapSize();
   mem_stats.current_free = ESP.getFreeHeap();
   mem_stats.minimum_free = mem_stats.current_free;
@@ -21,8 +22,7 @@ void memoryMonitorInit() {
   mem_stats.largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
   mem_stats.sample_count = 0;
   mem_monitor_initialized = true;
-  // FIX: Cast for printf
-  Serial.printf("[MEM] [OK] Heap: %lu bytes\n", (unsigned long)total_heap_size);
+  logInfo("[MEM] [OK] Heap: %lu bytes", (unsigned long)total_heap_size);
 }
 
 void memoryMonitorUpdate() {
@@ -61,12 +61,12 @@ uint32_t memoryMonitorGetMinFreeHeap() { return mem_stats.minimum_free; }
 bool memoryMonitorIsCriticallyLow(uint32_t threshold) { return (ESP.getFreeHeap() < threshold); }
 
 void memoryMonitorPrintStats() {
+  serialLoggerLock();
   Serial.println("\n=== MEMORY DIAGNOSTICS ===");
   uint32_t free = ESP.getFreeHeap();
   uint32_t used = total_heap_size - free;
   uint8_t percent = (used * 100) / total_heap_size;
   
-  // FIX: Cast all uint32_t to unsigned long for %lu
   Serial.printf("Total Heap:   %lu\n", (unsigned long)total_heap_size);
   Serial.printf("Current Free: %lu (%u%% used)\n", (unsigned long)free, percent);
   Serial.printf("Min Free:     %lu\n", (unsigned long)mem_stats.minimum_free);
@@ -78,11 +78,12 @@ void memoryMonitorPrintStats() {
   else if (free > (total_heap_size / 4)) Serial.println("Status: [WARN]");
   else Serial.println("Status: [CRITICAL]");
   Serial.println();
+  serialLoggerUnlock();
 }
 
 void memoryMonitorResetMinimum() {
   mem_stats.minimum_free = ESP.getFreeHeap();
-  Serial.println("[MEM] [OK] Stats reset");
+  logInfo("[MEM] [OK] Stats reset");
 }
 
 uint8_t memoryMonitorGetUsagePercent() {

@@ -260,6 +260,7 @@ size_t otaUpdaterExportJSON(char* buffer, size_t buffer_size) {
 void otaUpdaterPrintDiagnostics() {
     ota_status_info_t status = otaUpdaterGetStatus();
 
+    serialLoggerLock();
     Serial.println("\n[OTA] === Firmware Update Status ===");
     Serial.printf("Status: ");
 
@@ -294,4 +295,5 @@ void otaUpdaterPrintDiagnostics() {
     }
 
     Serial.println();
+    serialLoggerUnlock();
 }

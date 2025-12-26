@@ -111,6 +111,7 @@ void apiRateLimiterReset() {
 }
 
 void apiRateLimiterDiagnostics() {
+    serialLoggerLock();
     Serial.println("\n[API_RATELIMIT] === Rate Limiter Diagnostics ===");
     Serial.printf("Active Endpoints: %d / %d\n", active_endpoints, API_RATE_LIMIT_ENDPOINTS);
     Serial.printf("Limit: %d req / %lu ms (%.1f req/min)\n\n",
@@ -130,4 +131,5 @@ void apiRateLimiterDiagnostics() {
 
     Serial.println("\nNote: Tokens are refilled at configured rate.");
     Serial.println("      Blocked count resets at rate limiter reset.\n");
+    serialLoggerUnlock();
 }

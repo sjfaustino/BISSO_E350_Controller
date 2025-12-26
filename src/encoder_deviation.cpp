@@ -178,6 +178,7 @@ void encoderDeviationClearAll() {
 // ============================================================================
 
 void encoderDeviationDiagnostics() {
+    serialLoggerLock();
     Serial.println("\n[ENCODER_DEV] === Deviation Detection Status ===");
 
     bool has_any_deviation = false;
@@ -189,7 +190,7 @@ void encoderDeviationDiagnostics() {
         Serial.printf("\nAxis %s:\n", axis_name[axis]);
         Serial.printf("  Status: %s\n", encoderDeviationStatusToString(dev->status));
         Serial.printf("  Expected: %ld, Actual: %ld\n", (long)dev->expected_position, (long)dev->actual_position);
-        Serial.printf("  Deviation: %ld counts (±%ld max)\n", (long)dev->deviation_counts, (long)dev->max_deviation);
+        Serial.printf("  Deviation: %ld counts (+/-%ld max)\n", (long)dev->deviation_counts, (long)dev->max_deviation);
         Serial.printf("  Events: %lu deviations, %lu alarms\n", (unsigned long)dev->deviation_count, (unsigned long)dev->alarm_count);
 
         if (dev->status != AXIS_OK) {
@@ -201,4 +202,5 @@ void encoderDeviationDiagnostics() {
     if (!has_any_deviation) {
         Serial.println("\n[ENCODER_DEV] All axes tracking normally");
     }
+    serialLoggerUnlock();
 }

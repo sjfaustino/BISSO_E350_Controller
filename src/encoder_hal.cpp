@@ -287,6 +287,7 @@ uint32_t encoderHalGetLastError(void) {
 }
 
 void encoderHalPrintStatus(void) {
+    serialLoggerLock();
     Serial.println("\n========== ENCODER HAL STATUS ==========");
     Serial.print("Interface: ");
     Serial.println(encoderHalGetInterfaceName(hal_state.config.interface));
@@ -307,6 +308,7 @@ void encoderHalPrintStatus(void) {
     Serial.print("RX Available: ");
     Serial.println(encoderHalAvailable());
     Serial.println("=========================================\n");
+    serialLoggerUnlock();
 
     logInfo("[ENCODER-HAL] Status: %s @ %lu baud, %lu sent, %lu received",
             encoderHalGetInterfaceName(hal_state.config.interface),

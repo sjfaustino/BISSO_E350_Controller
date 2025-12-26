@@ -129,6 +129,7 @@ void logRateLimiterReset() {
 }
 
 void logRateLimiterShowStats() {
+  serialLoggerLock();
   Serial.println("\n=== LOG RATE LIMITER STATISTICS ===");
   Serial.println("Fault_ID  Sub_ID  Last(ms)  Suppressed  Interval(ms)");
   Serial.println("--------------------------------------------------------");
@@ -144,4 +145,5 @@ void logRateLimiterShowStats() {
                   (unsigned long)rate_entries[i].limit_interval_ms);
   }
   Serial.println();
+  serialLoggerUnlock();
 }

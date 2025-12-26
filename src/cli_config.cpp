@@ -57,6 +57,7 @@ void cliRegisterConfigCommands() {
 
 void cmd_config_main(int argc, char **argv) {
   if (argc < 2) {
+    serialLoggerLock();
     Serial.println("\n[CONFIG] === Configuration Management ===");
     Serial.println("[CONFIG] Usage: config [command] <parameter>");
     Serial.println("[CONFIG] Commands:");
@@ -83,6 +84,7 @@ void cmd_config_main(int argc, char **argv) {
     Serial.println("  restore   - Load configuration from NVS backup.");
     Serial.println("  showbkp   - Display stored backup configuration.");
     Serial.println("  clrbkp    - Clear backup from NVS.");
+    serialLoggerUnlock();
     return;
   }
 
@@ -118,74 +120,62 @@ void cmd_config_main(int argc, char **argv) {
     cmd_config_clear_backup(argc, argv);
   else if (strcasecmp(argv[1], "rollback") == 0) {
     if (argc < 3) {
-      Serial.println("[CONFIG] [ERR] Usage: config rollback <version>");
+      logError("[CONFIG] Usage: config rollback <version>");
       return;
     }
     cmd_config_rollback(argc, argv);
   } else {
-    Serial.printf("[CONFIG] Error: Unknown parameter '%s'.\n", argv[1]);
+    logWarning("[CONFIG] Error: Unknown parameter '%s'.", argv[1]);
   }
 }
 
 void cmd_config_get(int argc, char **argv) {
   if (argc < 3) {
-    Serial.println("[CONFIG] Usage: config get <key>");
+    logPrintln("[CONFIG] Usage: config get <key>");
     return;
   }
   const char *key = argv[2];
   const char *type = configGetKeyType(key);
 
   if (type == NULL) {
-    // Fallback: Try to find it by trial or assume int if unknown, but safer to
-    // say unknown For flexibility, let's try fetching as int first. If 0
-    // (default), maybe float? Ideally schema knows all.
-    Serial.printf(
-        "[CONFIG] [WARN] Key '%s' not in schema. Attempting raw fetch...\n",
+    logWarning(
+        "[CONFIG] Key '%s' not in schema. Attempting raw fetch...",
         key);
-    // Try printing as int
     int32_t i_val = configGetInt(key, -999999);
     if (i_val != -999999) {
-      Serial.printf("%s = %ld (int)\n", key, (long)i_val);
+      logInfo("%s = %ld (int)", key, (long)i_val);
       return;
     }
-    Serial.printf("[CONFIG] [ERR] Key '%s' not found or unset.\n", key);
+    logError("[CONFIG] Key '%s' not found or unset.", key);
     return;
   }
 
   if (strcmp(type, "int32") == 0) {
     int32_t val = configGetInt(key, 0);
-    Serial.printf("%s = %ld\n", key, (long)val);
+    logInfo("%s = %ld", key, (long)val);
   } else if (strcmp(type, "float") == 0) {
     float val = configGetFloat(key, 0.0f);
-    Serial.printf("%s = %.3f\n", key, val);
+    logPrintf("%s = %.3f\n", key, val);
   } else if (strcmp(type, "string") == 0) {
-    Serial.printf("%s = \"%s\"\n", key, configGetString(key, ""));
+    logPrintf("%s = \"%s\"\n", key, configGetString(key, ""));
   }
 }
 
-// NEW: Dumps all keys defined in the Schema
 void cmd_config_dump(int argc, char **argv) {
-  Serial.println("\n[CONFIG] === FULL CONFIGURATION DUMP ===");
-  Serial.println("KEY                            | VALUE");
-  Serial.println("--------------------------------+----------------");
-
-  // We iterate through a known list of keys.
-  // Since we don't have a public iterator in this file, we rely on the schema
-  // file or we assume config_unified exposes a print function. To make this
-  // self-contained based on previous context, I will create a function
-  // `configUnifiedPrintAll()` in config_unified.cpp (see below) and call it
-  // here.
+  logPrintln("\n[CONFIG] === FULL CONFIGURATION DUMP ===");
+  logPrintln("KEY                            | VALUE");
+  logPrintln("--------------------------------+----------------");
 
   extern void
-  configUnifiedPrintAll(); // You need to add this to config_unified.cpp/h
+  configUnifiedPrintAll();
   configUnifiedPrintAll();
 
-  Serial.println("--------------------------------+----------------");
+  logPrintln("--------------------------------+----------------");
 }
 
 void cmd_config_set(int argc, char **argv) {
   if (argc < 4) {
-    Serial.println("[CONFIG] Usage: config set <key> <value>");
+    logPrintln("[CONFIG] Usage: config set <key> <value>");
     return;
   }
 
@@ -194,38 +184,38 @@ void cmd_config_set(int argc, char **argv) {
   const char *type = configGetKeyType(key);
 
   if (type == NULL) {
-    Serial.printf("[CONFIG] [ERR] Unknown key: '%s' (Check schema)\n", key);
+    logError("[CONFIG] Unknown key: '%s' (Check schema)", key);
     return;
   }
 
   if (strcmp(type, "int32") == 0) {
     int32_t val = atol(value_str);
     configSetInt(key, val);
-    Serial.printf("[CONFIG] [OK] Set %s = %ld\n", key, (long)val);
+    logInfo("[CONFIG] [OK] Set %s = %ld", key, (long)val);
   } else if (strcmp(type, "float") == 0) {
     float val = atof(value_str);
     configSetFloat(key, val);
-    Serial.printf("[CONFIG] [OK] Set %s = %.3f\n", key, val);
+    logPrintf("[CONFIG] [OK] Set %s = %.3f\n", key, val);
   } else if (strcmp(type, "string") == 0) {
     configSetString(key, value_str);
-    Serial.printf("[CONFIG] [OK] Set %s = \"%s\"\n", key, value_str);
+    logPrintf("[CONFIG] [OK] Set %s = \"%s\"\n", key, value_str);
   } else {
-    Serial.printf("[CONFIG] [ERR] Unsupported type for key '%s'\n", key);
+    logError("[CONFIG] Unsupported type for key '%s'", key);
   }
 }
 
 void cmd_config_show(int argc, char **argv) { configUnifiedDiagnostics(); }
 
 void cmd_config_reset(int argc, char **argv) {
-  Serial.println("[CONFIG] Resetting ALL configuration to factory defaults...");
+  logInfo("[CONFIG] Resetting ALL configuration to factory defaults...");
   configUnifiedReset();
-  Serial.println("[CONFIG] [OK] Factory reset complete.");
+  logInfo("[CONFIG] [OK] Factory reset complete.");
 }
 
 void cmd_config_save(int argc, char **argv) {
-  Serial.println("[CONFIG] Saving configuration to NVS...");
+  logInfo("[CONFIG] Saving configuration to NVS...");
   configUnifiedSave();
-  Serial.println("[CONFIG] [OK] Saved.");
+  logInfo("[CONFIG] [OK] Saved.");
 }
 
 void cmd_config_schema_show(int argc, char **argv) {
@@ -236,7 +226,7 @@ void cmd_config_migrate(int argc, char **argv) { configAutoMigrate(); }
 
 void cmd_config_rollback(int argc, char **argv) {
   if (argc < 2) {
-    Serial.println("[CLI] Usage: config rollback <version>");
+    logPrintln("[CLI] Usage: config rollback <version>");
     return;
   }
   uint8_t target_version = atoi(argv[1]);
@@ -254,6 +244,7 @@ void cmd_config_validate(int argc, char **argv) {
 // ============================================================================
 
 void cmd_config_export(int argc, char **argv) {
+  serialLoggerLock();
   Serial.println("\n[CONFIG] === Configuration Export (JSON) ===");
   Serial.println("{\n  \"config\": {");
 
@@ -300,14 +291,14 @@ void cmd_config_export(int argc, char **argv) {
 
   Serial.println("\n  }\n}");
   Serial.println("\n[CONFIG] Export complete. Copy JSON data above to save.");
+  serialLoggerUnlock();
 }
 
 void cmd_config_import(int argc, char **argv) {
-  Serial.println("\n[CONFIG] === Configuration Import (JSON) ===");
-  Serial.println("[CONFIG] Paste JSON data below (end with empty line):");
-  Serial.println("[CONFIG] Example: {\"config\": {\"ppm_0\": 100.5, "
-                 "\"speed_cal_0\": 1000}}");
-  Serial.println("[CONFIG] WARNING: This will overwrite current settings!");
+  logPrintln("\n[CONFIG] === Configuration Import (JSON) ===");
+  logPrintln("[CONFIG] Paste JSON data below (end with empty line):");
+  logPrintln("[CONFIG] Example: {\"config\": {\"ppm_0\": 100.5, \"speed_cal_0\": 1000}}");
+  logWarning("[CONFIG] This will overwrite current settings!");
 
   // CRITICAL FIX: Use ArduinoJson instead of manual string parsing
   // Prevents buffer overflows and fragile parsing logic
@@ -327,7 +318,7 @@ void cmd_config_import(int argc, char **argv) {
     
     // Ctrl+C (0x03) aborts the import
     if (c == 0x03) {
-      Serial.println("\n[CONFIG] Import ABORTED by user.");
+      logInfo("\n[CONFIG] Import ABORTED by user.");
       return;
     }
 
@@ -352,15 +343,15 @@ void cmd_config_import(int argc, char **argv) {
   DeserializationError error = deserializeJson(doc, json_buffer);
 
   if (error) {
-    Serial.printf("[CONFIG] [ERR] JSON parse failed: %s\n", error.c_str());
-    Serial.println("[CONFIG] [ERR] Check JSON format and try again");
+    logError("[CONFIG] JSON parse failed: %s", error.c_str());
+    logError("[CONFIG] Check JSON format and try again");
     return;
   }
 
   // Check for "config" object
   JsonObject config_obj = doc["config"];
   if (!config_obj) {
-    Serial.println("[CONFIG] [ERR] Missing 'config' object in JSON");
+    logError("[CONFIG] Missing 'config' object in JSON");
     return;
   }
 
@@ -370,7 +361,7 @@ void cmd_config_import(int argc, char **argv) {
     const char *type = configGetKeyType(key);
 
     if (type == NULL) {
-      Serial.printf("[CONFIG] [WARN] Skipping unknown key: %s\n", key);
+      logWarning("[CONFIG] Skipping unknown key: %s", key);
       continue;
     }
 
@@ -378,22 +369,21 @@ void cmd_config_import(int argc, char **argv) {
     if (strcmp(type, "int32") == 0) {
       int32_t val = kv.value().as<int32_t>();
       configSetInt(key, val);
-      Serial.printf("[CONFIG] Imported: %s = %ld (int)\n", key, (long)val);
+      logInfo("[CONFIG] Imported: %s = %ld (int)", key, (long)val);
       import_count++;
     } else if (strcmp(type, "float") == 0) {
       float val = kv.value().as<float>();
       configSetFloat(key, val);
-      Serial.printf("[CONFIG] Imported: %s = %.3f (float)\n", key, val);
+      logPrintf("[CONFIG] Imported: %s = %.3f (float)\n", key, val);
       import_count++;
     } else if (strcmp(type, "string") == 0) {
       const char *val = kv.value().as<const char *>();
       configSetString(key, val);
-      Serial.printf("[CONFIG] Imported: %s = \"%s\" (string)\n", key, val);
+      logPrintf("[CONFIG] Imported: %s = \"%s\" (string)\n", key, val);
       import_count++;
     }
   }
 
-  Serial.printf("\n[CONFIG] Import complete: %d settings loaded\n",
-                import_count);
-  Serial.println("[CONFIG] Run 'config save' to persist changes");
+  logInfo("\n[CONFIG] Import complete: %d settings loaded", import_count);
+  logInfo("[CONFIG] Run 'config save' to persist changes");
 }

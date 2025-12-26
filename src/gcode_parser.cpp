@@ -422,7 +422,7 @@ void GCodeParser::handleM114() {
              "[POS:X:%.1f Y:%.1f Z:%.1f A:%.1f]",
              x_mm, y_mm, z_mm, a_deg);
 
-    Serial.println(response);
+    logPrintln(response);
     logInfo("[GCODE] M114 Position: X:%.1f Y:%.1f Z:%.1f A:%.1f",
             x_mm, y_mm, z_mm, a_deg);
 }
@@ -433,6 +433,7 @@ void GCodeParser::handleM115() {
     // Standard Grbl response format
 
     // Build firmware info response
+    serialLoggerLock();
     Serial.println("[VER:Gemini v4.0.0 BISSO-E350]");
     Serial.println("[OPT:B#,M,T#]");  // Options: Block #, Messages, Real-time status
 
@@ -445,6 +446,7 @@ void GCodeParser::handleM115() {
     Serial.println("[CAPABILITY:M117-lcd-msg]");  // M117 LCD message support
     Serial.println("[CAPABILITY:WCS-6-system]");  // 6 work coordinate systems
     Serial.println("[CAPABILITY:soft-limits]");   // Soft limits enabled
+    serialLoggerUnlock();
 
     logInfo("[GCODE] M115 Firmware Info Reported");
 }
@@ -754,7 +756,7 @@ void GCodeParser::handleM0_M1(const char* line) {
     pauseStartTime = millis();
 
     // Display message on LCD
-    Serial.println("[PAUSE] Program paused - press resume to continue");
+    logPrintln("[PAUSE] Program paused - press resume to continue");
     lcdMessageSet("PAUSED: Resume?", 0);  // Stay until operator resumes
 
     // Pause motion control

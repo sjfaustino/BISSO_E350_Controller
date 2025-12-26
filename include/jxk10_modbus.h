@@ -45,6 +45,7 @@ extern "C" {
 
 // JXK-10 device state
 typedef struct {
+    bool enabled;                       // Device enabled/connected flag
     uint8_t slave_address;              // Modbus slave ID (1-247, default 1)
     uint32_t baud_rate;                 // Baud rate in bps
     int16_t current_raw;                // Raw Modbus register value (×100)

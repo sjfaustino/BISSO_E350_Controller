@@ -4,6 +4,7 @@
 #include "serial_logger.h"
 #include "watchdog_manager.h"
 #include "system_constants.h"
+#include "rs485_device_registry.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -11,6 +12,9 @@ void taskEncoderFunction(void* parameter) {
   TickType_t last_wake = xTaskGetTickCount();
 
   logInfo("[ENCODER_TASK] [OK] Started on core 1");
+
+  // Initialize RS-485 Registry with default baud
+  rs485RegistryInit(WJ66_BAUD);
 
   // Diagnostic: Measure stack high water mark
   UBaseType_t stack_hwm_initial = uxTaskGetStackHighWaterMark(NULL);
@@ -21,8 +25,11 @@ void taskEncoderFunction(void* parameter) {
 
   uint32_t loop_count = 0;
   while (1) {
-    // Encoder operations (20ms = 50 Hz)
-    wj66Update();
+    // RUN THE CENTRAL RS-485 BUS HANDLER
+    // This handles both WJ66 and Modbus devices (JXK-10, Altivar31, YH-TC05)
+    rs485HandleBus();
+    
+    // Position/Status updates for motion engine
     encoderMotionUpdate();
 
     // Periodic stack monitoring (every 100 cycles = 2 seconds)

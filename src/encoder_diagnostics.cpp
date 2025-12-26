@@ -265,6 +265,7 @@ size_t encoderDiagnosticsExportJSON(char* buffer, size_t buffer_size) {
 }
 
 void encoderDiagnosticsPrint() {
+    serialLoggerLock();
     Serial.println("\n[ENCODER_DIAG] === Encoder Diagnostics ===");
     Serial.println("Axis | Health    | Position  | Variance | Drift/h  | Quality | Errors");
     Serial.println("-----|-----------|-----------|----------|----------|---------|--------");
@@ -287,6 +288,7 @@ void encoderDiagnosticsPrint() {
     }
 
     Serial.println();
+    serialLoggerUnlock();
 }
 
 void encoderDiagnosticsReset(uint8_t axis_id) {

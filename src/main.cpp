@@ -36,7 +36,7 @@ extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskNa
   static volatile bool handling = false;
   if (handling) return;
   handling = true;
-  Serial.println("\n\n[CRITICAL] STACK OVERFLOW");
+  logError("[CRITICAL] STACK OVERFLOW in task: %s", pcTaskName);
   faultLogCritical(FAULT_CRITICAL_SYSTEM_ERROR, "Stack Overflow");
   delay(1000);
   ESP.restart();

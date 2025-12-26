@@ -1,18 +1,18 @@
 #include "string_safety.h"
 #include "fault_logging.h"
+#include "serial_logger.h"
 #include <stdio.h>
 #include <string.h>
 
 size_t safe_vsnprintf(char* buffer, size_t buffer_size, const char* format, va_list args) {
   if (!buffer || buffer_size == 0) {
-    Serial.println("[SAFETY] [ERR] Invalid buffer/size in safe_vsnprintf");
+    logError("[SAFETY] Invalid buffer/size in safe_vsnprintf");
     return 0;
   }
   size_t result = vsnprintf(buffer, buffer_size, format, args);
   if (result >= buffer_size) {
     buffer[buffer_size - 1] = '\0';
-    // FIX: Cast size_t to unsigned long for %lu
-    Serial.printf("[SAFETY] [WARN] String truncated (Req: %lu, Avail: %lu)\n", (unsigned long)result + 1, (unsigned long)buffer_size);
+    logWarning("[SAFETY] String truncated (Req: %lu, Avail: %lu)", (unsigned long)result + 1, (unsigned long)buffer_size);
     faultLogWarning(FAULT_BOOT_FAILED, "String truncation");
   }
   return result;
@@ -27,7 +27,6 @@ size_t safe_snprintf(char* buffer, size_t buffer_size, const char* format, ...) 
   return result;
 }
 
-// PHASE 5.7: Cursor AI Fix - Replace unsafe strcpy with strncpy
 bool safe_strcpy(char* dest, size_t dest_size, const char* src) {
   if (!dest || !src || dest_size == 0) return false;
   if (dest_size < 1) return false;
@@ -35,38 +34,31 @@ bool safe_strcpy(char* dest, size_t dest_size, const char* src) {
   size_t src_len = strlen(src);
   if (src_len >= dest_size) {
     strncpy(dest, src, dest_size - 1);
-    dest[dest_size - 1] = '\0';  // strncpy doesn't guarantee null termination
-    // FIX: Cast size_t to unsigned long
-    Serial.printf("[SAFETY] [WARN] Copy truncated (Src: %lu, Dest: %lu)\n", (unsigned long)src_len, (unsigned long)dest_size - 1);
+    dest[dest_size - 1] = '\0';
+    logWarning("[SAFETY] Copy truncated (Src: %lu, Dest: %lu)", (unsigned long)src_len, (unsigned long)dest_size - 1);
     faultLogWarning(FAULT_BOOT_FAILED, "String copy truncation");
     return false;
   }
 
-  // PHASE 5.7: Cursor AI Fix - Use strncpy instead of strcpy for bounds safety
-  // Even though length is checked, use strncpy for defense-in-depth
   strncpy(dest, src, dest_size);
-  dest[dest_size - 1] = '\0';  // Ensure null termination
+  dest[dest_size - 1] = '\0';
   return true;
 }
 
-// PHASE 5.7: Cursor AI Fix - Replace unsafe strcat with strncat
 bool safe_strcat(char* dest, size_t dest_size, const char* src) {
   if (!dest || !src || dest_size == 0) return false;
   size_t dest_len = strlen(dest);
   size_t src_len = strlen(src);
 
   if (dest_len + src_len >= dest_size) {
-    // FIX: Cast size_t to unsigned long
-    Serial.printf("[SAFETY] [WARN] Concat truncated (Needed: %lu, Avail: %lu)\n", (unsigned long)(dest_len + src_len + 1), (unsigned long)dest_size);
+    logWarning("[SAFETY] Concat truncated (Needed: %lu, Avail: %lu)", (unsigned long)(dest_len + src_len + 1), (unsigned long)dest_size);
     faultLogWarning(FAULT_BOOT_FAILED, "String concat truncation");
     return false;
   }
 
-  // PHASE 5.7: Cursor AI Fix - Use strncat instead of strcat for bounds safety
-  // strncat takes max characters to append (NOT including null terminator)
-  size_t space_left = dest_size - dest_len - 1;  // -1 for null terminator
+  size_t space_left = dest_size - dest_len - 1;
   strncat(dest, src, space_left);
-  dest[dest_size - 1] = '\0';  // Ensure null termination
+  dest[dest_size - 1] = '\0';
   return true;
 }
 
@@ -75,7 +67,6 @@ bool safe_is_valid_string(const char* buffer, size_t max_size) {
   for (size_t i = 0; i < max_size; i++) {
     if (buffer[i] == '\0') return true;
   }
-  // FIX: Cast size_t to unsigned long
-  Serial.printf("[SAFETY] [ERR] String not null-terminated in %lu bytes\n", (unsigned long)max_size);
+  logError("[SAFETY] String not null-terminated in %lu bytes", (unsigned long)max_size);
   return false;
 }

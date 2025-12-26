@@ -65,7 +65,7 @@ static uint8_t spinlock_stats_count = 0;
 static SemaphoreHandle_t spinlock_stats_mutex = NULL;
 
 // Get or create stats entry for a location
-static spinlock_stats_t* getSpinlockStats(const char* location) {
+static __attribute__((unused)) spinlock_stats_t* getSpinlockStats(const char* location) {
   if (!spinlock_stats_mutex) {
     spinlock_stats_mutex = xSemaphoreCreateMutex();
   }
@@ -1057,11 +1057,11 @@ bool motionClearEmergencyStop() {
   portEXIT_CRITICAL(&motionSpinlock);
 
   if (enabled) {
-    Serial.println("[MOTION] E-Stop already cleared");
+    logInfo("[MOTION] E-Stop already cleared");
     return true;
   }
   if (safetyIsAlarmed()) {
-    Serial.println("[MOTION] Cannot clear - Alarm Active");
+    logWarning("[MOTION] Cannot clear - Alarm Active");
     return false;
   }
 
@@ -1078,16 +1078,16 @@ bool motionClearEmergencyStop() {
   portEXIT_CRITICAL(&motionSpinlock);
 
   emergencyStopSetActive(false);
-  Serial.println("[MOTION] [OK] Emergency stop cleared");
+  logInfo("[MOTION] [OK] Emergency stop cleared");
   taskSignalMotionUpdate();
   return true;
 }
 
 void motionDiagnostics() {
-  Serial.printf("\n[MOTION] State: %s | Active: %d\n",
+  logPrintf("\n[MOTION] State: %s | Active: %d\n",
                 m_state.global_enabled ? "ON" : "ESTOP", m_state.active_axis);
   for (int i = 0; i < MOTION_AXES; i++) {
-    Serial.printf("  Axis %d: Pos=%ld | Tgt=%ld | State=%s\n", i,
+    logPrintf("  Axis %d: Pos=%ld | Tgt=%ld | State=%s\n", i,
                   (long)axes[i].position, (long)axes[i].target_position,
                   motionStateToString(axes[i].state));
   }
@@ -1095,9 +1095,9 @@ void motionDiagnostics() {
 
 #if ENABLE_SPINLOCK_TIMING
 void motionPrintSpinlockStats() {
-  Serial.println("\n[MOTION] === Spinlock Critical Section Timing Report ===");
-  Serial.println("Location                       | Count      | Max (us) | >10us | Status");
-  Serial.println("-------------------------------|------------|----------|-------|--------");
+  logPrintln("\n[MOTION] === Spinlock Critical Section Timing Report ===");
+  logPrintln("Location                       | Count      | Max (us) | >10us | Status");
+  logPrintln("-------------------------------|------------|----------|-------|--------");
 
   uint8_t needs_migration = 0;
   uint32_t total_executions = 0;
@@ -1114,7 +1114,7 @@ void motionPrintSpinlockStats() {
       needs_migration++;
     }
 
-    Serial.printf("%-30s | %10lu | %8lu | %5lu | %s\n",
+    logPrintf("%-30s | %10lu | %8lu | %5lu | %s\n",
                   stats->location,
                   (unsigned long)stats->total_count,
                   (unsigned long)stats->max_duration_us,
@@ -1122,22 +1122,22 @@ void motionPrintSpinlockStats() {
                   status);
   }
 
-  Serial.println("-------------------------------|------------|----------|-------|--------");
-  Serial.printf("Total locations: %u | Executions: %lu | Slow executions: %lu\n",
+  logPrintln("-------------------------------|------------|----------|-------|--------");
+  logPrintf("Total locations: %u | Executions: %lu | Slow executions: %lu\n",
                 spinlock_stats_count,
                 (unsigned long)total_executions,
                 (unsigned long)total_slow_executions);
 
   if (needs_migration > 0) {
-    Serial.printf("\n⚠️  %u critical sections exceed 10us threshold\n", needs_migration);
-    Serial.println("Recommendation: Migrate these to mutexes for better real-time performance");
-    Serial.println("See COMPREHENSIVE_AUDIT_REPORT.md Finding 1.3 for migration guide");
+    logPrintf("\n⚠️  %u critical sections exceed 10us threshold\n", needs_migration);
+    logPrintln("Recommendation: Migrate these to mutexes for better real-time performance");
+    logPrintln("See COMPREHENSIVE_AUDIT_REPORT.md Finding 1.3 for migration guide");
   } else {
-    Serial.println("\n✓ All critical sections are <10us - spinlock usage is appropriate");
+    logPrintln("\n✓ All critical sections are <10us - spinlock usage is appropriate");
   }
 
-  Serial.println("\nNOTE: This report shows MAXIMUM observed durations.");
-  Serial.println("      Run system under load to capture worst-case timing.");
+  logPrintln("\nNOTE: This report shows MAXIMUM observed durations.");
+  logPrintln("      Run system under load to capture worst-case timing.");
 }
 
 void motionResetSpinlockStats() {
@@ -1146,13 +1146,13 @@ void motionResetSpinlockStats() {
     spinlock_stats[i].total_count = 0;
     spinlock_stats[i].over_10us_count = 0;
   }
-  Serial.println("[MOTION] Spinlock statistics reset");
+  logInfo("[MOTION] Spinlock statistics reset");
 }
 #else
 void motionPrintSpinlockStats() {
-  Serial.println("[MOTION] Spinlock timing not enabled (compile with ENABLE_SPINLOCK_TIMING=1)");
+  logInfo("[MOTION] Spinlock timing not enabled (compile with ENABLE_SPINLOCK_TIMING=1)");
 }
 void motionResetSpinlockStats() {
-  Serial.println("[MOTION] Spinlock timing not enabled");
+  logInfo("[MOTION] Spinlock timing not enabled");
 }
 #endif

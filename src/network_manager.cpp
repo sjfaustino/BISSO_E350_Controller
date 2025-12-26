@@ -59,7 +59,7 @@ static void resetTelnetAuthState() {
 }
 
 void NetworkManager::init() {
-  Serial.println("[NET] Initializing Network Stack...");
+  logPrintln("[NET] Initializing Network Stack...");
 
   // 1. WiFi Initialization (Non-blocking to allow boot to continue)
   int ap_enabled = configGetInt(KEY_WIFI_AP_EN, 1); // Phase 5.8: Configurable AP
@@ -79,36 +79,36 @@ void NetworkManager::init() {
       dnsServer->stop();
       delete dnsServer;
       dnsServer = nullptr;
-      Serial.println("[NET] [DEBUG] Cleaned up existing DNS server before re-init");
+      logDebug("[NET] Cleaned up existing DNS server before re-init");
     }
 
     // Allocate and start DNS server for captive portal
     dnsServer = new DNSServer();
     if (dnsServer == nullptr) {
-      Serial.println("[NET] [ERROR] Failed to allocate DNS server (out of memory)");
+      logError("[NET] Failed to allocate DNS server (out of memory)");
     } else {
       // Start DNS server: Redirect all DNS queries to AP IP (192.168.4.1)
       // This triggers captive portal on mobile devices when they connect to AP
       if (dnsServer->start(NET_DNS_PORT, "*", WiFi.softAPIP())) {
-        Serial.printf("[NET] [OK] Captive portal DNS started on port %d\n", NET_DNS_PORT);
+        logInfo("[NET] [OK] Captive portal DNS started on port %d", NET_DNS_PORT);
       } else {
-        Serial.println("[NET] [ERROR] Failed to start DNS server (port conflict?)");
+        logError("[NET] Failed to start DNS server (port conflict?)");
         delete dnsServer;
         dnsServer = nullptr;
       }
     }
 
-    Serial.printf("[NET] AP Mode ENABLED (SSID: %s, IP: %s)\n", ap_ssid, WiFi.softAPIP().toString().c_str());
+    logInfo("[NET] AP Mode ENABLED (SSID: %s, IP: %s)", ap_ssid, WiFi.softAPIP().toString().c_str());
   } else {
     WiFi.mode(WIFI_STA);
-    Serial.println("[NET] AP Mode DISABLED (Station only)");
+    logInfo("[NET] AP Mode DISABLED (Station only)");
 
     // Ensure DNS server cleaned up if switching from AP to STA mode
     if (dnsServer) {
       dnsServer->stop();
       delete dnsServer;
       dnsServer = nullptr;
-      Serial.println("[NET] [DEBUG] DNS server stopped (STA mode only)");
+      logDebug("[NET] DNS server stopped (STA mode only)");
     }
   }
 
@@ -117,7 +117,7 @@ void NetworkManager::init() {
 
   // Don't wait for connection - boot continues
   // WiFi will connect in background during networkManager.update() calls
-  Serial.println("[NET] [OK] WiFi initialization queued (non-blocking)");
+  logInfo("[NET] [OK] WiFi initialization queued (non-blocking)");
 
   // NOTE: AsyncWiFiManager with autoConnect() was BLOCKING boot sequence
   // Removed to allow taskManagerStart() to execute immediately
@@ -133,36 +133,31 @@ void NetworkManager::init() {
   ArduinoOTA.setPassword(ota_password);
 
   if (ota_pw_changed == 0) {
-    Serial.println(
-        "[OTA] [WARN] Default password in use - change recommended!");
-    Serial.println("[OTA] [WARN] Use CLI command: ota_setpass <new_password>");
+    logWarning("[OTA] Default password in use - change recommended!");
+    logWarning("[OTA] Use CLI command: ota_setpass <new_password>");
   } else {
-    Serial.println("[OTA] [OK] Custom password loaded from NVS");
+    logInfo("[OTA] [OK] Custom password loaded from NVS");
   }
 
   ArduinoOTA.onStart([]() {
     String type =
         (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-    Serial.println("[OTA] Start updating " + type);
+    logInfo("[OTA] Start updating %s", type.c_str());
     // Safety: Stop Motion immediately
     // motionEmergencyStop();
   });
-  ArduinoOTA.onEnd([]() { Serial.println("\n[OTA] End"); });
+  ArduinoOTA.onEnd([]() { logPrintln("\n[OTA] End"); });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
+    logPrintf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("[OTA] Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR)
-      Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR)
-      Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR)
-      Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR)
-      Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR)
-      Serial.println("End Failed");
+    const char* err_str = "Unknown";
+    if (error == OTA_AUTH_ERROR) err_str = "Auth Failed";
+    else if (error == OTA_BEGIN_ERROR) err_str = "Begin Failed";
+    else if (error == OTA_CONNECT_ERROR) err_str = "Connect Failed";
+    else if (error == OTA_RECEIVE_ERROR) err_str = "Receive Failed";
+    else if (error == OTA_END_ERROR) err_str = "End Failed";
+    logError("[OTA] Error[%u]: %s", error, err_str);
   });
   ArduinoOTA.begin();
 
@@ -170,8 +165,7 @@ void NetworkManager::init() {
   telnetServer = new WiFiServer(TELNET_PORT);
   telnetServer->begin();
   telnetServer->setNoDelay(true);
-  Serial.println(
-      "[NET] Telnet Server Started on Port 23 (Authentication Required)");
+  logPrintln("[NET] Telnet Server Started on Port 23 (Authentication Required)");
 }
 
 void NetworkManager::update() {
@@ -219,7 +213,7 @@ void NetworkManager::update() {
       telnetClient.print("Username: ");
       telnet_auth_state = TELNET_AUTH_WAIT_USERNAME;
       telnet_last_activity = millis();
-      Serial.println("[NET] Telnet Client Connected - Awaiting Authentication");
+      logInfo("[NET] Telnet Client Connected - Awaiting Authentication");
     } else {
       // Reject multiple clients (Simple 1-client implementation)
       WiFiClient reject = telnetServer->available();
@@ -234,7 +228,7 @@ void NetworkManager::update() {
     telnetClient.println("\r\nSession timed out due to inactivity.");
     telnetClient.stop();
     resetTelnetAuthState();
-    Serial.println("[NET] Telnet Session Timed Out");
+    logInfo("[NET] Telnet Session Timed Out");
     return;
   }
 
@@ -266,12 +260,12 @@ void NetworkManager::update() {
         telnetClient.println("\r\nAuthentication successful.");
         telnetClient.println("Type 'help' for available commands.");
         telnetClient.print("> ");
-        Serial.printf("[NET] Telnet Auth SUCCESS for user '%s'\n",
+        logInfo("[NET] Telnet Auth SUCCESS for user '%s'",
                       telnet_username_attempt);
       } else {
         // Authentication failed
         telnet_failed_attempts++;
-        Serial.printf("[NET] [WARN] Telnet Auth FAILED (attempt %d/%d)\n",
+        logWarning("[NET] Telnet Auth FAILED (attempt %d/%d)",
                       telnet_failed_attempts, TELNET_MAX_FAILED_ATTEMPTS);
 
         if (telnet_failed_attempts >= TELNET_MAX_FAILED_ATTEMPTS) {
@@ -280,7 +274,7 @@ void NetworkManager::update() {
           telnet_auth_state = TELNET_AUTH_LOCKED_OUT;
           telnet_lockout_until = millis() + TELNET_LOCKOUT_DURATION_MS;
           telnetClient.stop();
-          Serial.printf("[NET] [WARN] Telnet LOCKOUT for %d seconds\n",
+          logWarning("[NET] Telnet LOCKOUT for %d seconds",
                         TELNET_LOCKOUT_DURATION_MS / 1000);
         } else {
           telnetClient.println("\r\nInvalid credentials.");
@@ -297,9 +291,9 @@ void NetworkManager::update() {
         telnetClient.println("Goodbye.");
         telnetClient.stop();
         resetTelnetAuthState();
-        Serial.println("[NET] Telnet Client Logged Out");
+        logInfo("[NET] Telnet Client Logged Out");
       } else {
-        Serial.printf("[NET] Remote Command: %s\n", input.c_str());
+        logInfo("[NET] Remote Command: %s", input.c_str());
         // Inject into CLI processor
         cliProcessCommand(input.c_str());
         telnetClient.print("> ");

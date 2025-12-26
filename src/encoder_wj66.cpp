@@ -4,13 +4,15 @@
  * @details Merged: User's Baud/Parsing Logic + v3.5 Safety Flow Control.
  */
 
+#include <Arduino.h>
+#include "rs485_device_registry.h"
+#include "encoder_hal.h"
 #include "encoder_wj66.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "encoder_comm_stats.h" 
 #include "system_constants.h"
 #include <Preferences.h>
-#include <Arduino.h>
 
 // Safety Constants
 // BUFFER SIZE VERIFICATION (Gemini Audit):
@@ -32,6 +34,26 @@ struct {
   uint32_t last_command_time;
   bool waiting_for_response; // Added for flow control
 } wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false};
+
+// RS-485 Registry Device Descriptor
+static bool wj66Poll(void);
+static bool wj66OnResponse(const uint8_t* data, uint16_t len);
+
+static rs485_device_t wj66_device = {
+    .name = "WJ66",
+    .type = RS485_DEVICE_TYPE_ENCODER,
+    .slave_address = 0,         // WJ66 uses broadcast or specific logic, but address 0 is often used for simple setups
+    .poll_interval_ms = 50,     // 20 Hz
+    .priority = 200,            // High priority
+    .enabled = true,
+    .poll = wj66Poll,
+    .on_response = wj66OnResponse,
+    .last_poll_time_ms = 0,
+    .poll_count = 0,
+    .error_count = 0,
+    .consecutive_errors = 0,
+    .pending_response = false
+};
 
 // PHASE 5.10: Mutex for thread-safe encoder position access
 // Protects wj66_state from torn reads between Encoder task and Motion task
@@ -112,116 +134,65 @@ void wj66Init() {
   wj66_state.status = ENCODER_OK;
   wj66_state.waiting_for_response = false;
   
-  logInfo("[WJ66] Ready @ %lu baud", (unsigned long)final_baud);
+  // Register with RS-485 registry
+  rs485RegisterDevice(&wj66_device);
+  
+  logInfo("[WJ66] Ready @ %lu baud (Registered with RS485 bus)", (unsigned long)final_baud);
 }
 
-void wj66Update() {
-  // CRITICAL FIX: Buffer size must match MAX_RESPONSE_LEN to prevent overflow
-  // Original: buffer[65] with MAX_RESPONSE_LEN=64 creates off-by-one confusion
-  // Fixed: buffer[64] with MAX_RESPONSE_LEN=64 ensures exact match
-  static char response_buffer[64] = {0};
-  static uint8_t buffer_idx = 0;
-  static const uint8_t MAX_RESPONSE_LEN = 64; 
-  
-  uint32_t now = millis();
+static bool wj66Poll(void) {
+    // Request Data
+    return encoderHalSendString("#00\r");
+}
 
-  // --- 1. COMMAND FLOW CONTROL ---
-  // Only send if NOT waiting, or if TIMEOUT happened
-  bool timeout = (wj66_state.waiting_for_response && (now - wj66_state.last_command_time > WJ66_TIMEOUT_MS));
-  bool time_to_poll = (now - wj66_state.last_command_time > WJ66_READ_INTERVAL_MS);
+static bool wj66OnResponse(const uint8_t* data, uint16_t len) {
+    if (len == 0 || data[0] != '!') {
+        return false;
+    }
 
-  if (timeout) {
-      // PHASE 5.10: Protect status/error_count writes with mutex
-      if (xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-        wj66_state.status = ENCODER_TIMEOUT;
-        wj66_state.error_count++;
-        xSemaphoreGive(wj66_mutex);
-      }
-      // Packet lost, reset flag so we can try again next cycle
-      wj66_state.waiting_for_response = false;
-  } 
-  else if (time_to_poll && !wj66_state.waiting_for_response) {
-      Serial1.print("#00\r"); // Request Data
-      wj66_state.last_command_time = now;
-      wj66_state.waiting_for_response = true;
-  }
-  
-  // --- 2. READ LOOP (SAFETY CAPPED) ---
-  int bytes_processed = 0;
-  
-  // FIX: Limit loop to prevent WDT crash
-  while (Serial1.available() > 0 && bytes_processed < MAX_BYTES_PER_CYCLE) {
-    char c = Serial1.read();
-    bytes_processed++;
+    int commas = 0;
+    int32_t values[4] = {0};
+    int32_t current_value = 0;
+    bool is_negative = false;
     
-    // Packet End Detection
-    if (c == '\r') {
-      // Validate Packet Start
-      if (buffer_idx > 0 && response_buffer[0] == '!') {
-        int commas = 0;
-        int32_t values[4] = {0};
-        int32_t current_value = 0;
-        bool is_negative = false;
-        
-        // CSV Parsing Logic (Preserved from your upload)
-        for (uint8_t i = 1; i < buffer_idx; i++) {
-          char ch = response_buffer[i];
-          if (ch == ',') {
+    // CSV Parsing Logic
+    for (uint16_t i = 1; i < len; i++) {
+        char ch = (char)data[i];
+        if (ch == ',') {
             values[commas] = is_negative ? -current_value : current_value;
             current_value = 0; is_negative = false;
             commas++;
             if (commas >= 4) break;
-          } else if (ch == '-') is_negative = true;
-          else if (ch >= '0' && ch <= '9') current_value = current_value * 10 + (ch - '0');
-        }
-        
-        // Final Value & Validation
-        if (commas == 3) {
-          values[3] = is_negative ? -current_value : current_value;
+        } else if (ch == '-') is_negative = true;
+        else if (ch >= '0' && ch <= '9') current_value = current_value * 10 + (ch - '0');
+        else if (ch == '\r' || ch == '\n') break; // End of frame
+    }
+    
+    // Final Value & Validation
+    if (commas == 3) {
+        values[3] = is_negative ? -current_value : current_value;
 
-          // PHASE 5.10: Thread-safe position and status write
-          if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        // PHASE 5.10: Thread-safe position and status write
+        if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             for (int i = 0; i < WJ66_AXES; i++) {
-              wj66_state.position[i] = values[i];
-              wj66_state.last_read[i] = millis();
-              wj66_state.read_count[i]++;
+                wj66_state.position[i] = values[i];
+                wj66_state.last_read[i] = millis();
+                wj66_state.read_count[i]++;
             }
             wj66_state.status = ENCODER_OK;
             xSemaphoreGive(wj66_mutex);
-          } else {
-            logWarning("[WJ66] Mutex timeout writing position update");
-          }
-
-          wj66_state.waiting_for_response = false; // Transaction Complete
-        } else {
-          // PHASE 5.10: Protect status/error_count writes with mutex
-          if (xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        }
+        return true;
+    } else {
+        if (xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             wj66_state.status = ENCODER_CRC_ERROR;
             wj66_state.error_count++;
             xSemaphoreGive(wj66_mutex);
-          }
-          wj66_state.waiting_for_response = false; // Reset to allow retry
         }
-      }
-      // Reset Buffer
-      buffer_idx = 0;
-      memset(response_buffer, 0, sizeof(response_buffer));
-    } 
-    else if (c >= 32 && c < 127) { // Valid ASCII only
-      // CRITICAL FIX: Explicit bounds check to prevent buffer overflow
-      // Ensure buffer_idx stays within [0, MAX_RESPONSE_LEN)
-      if (buffer_idx < MAX_RESPONSE_LEN) {
-        response_buffer[buffer_idx++] = c;
-      } else {
-        // Buffer Overflow Protection: Reset and log error
-        logWarning("[WJ66] Response buffer overflow (idx=%d, max=%d)", buffer_idx, MAX_RESPONSE_LEN);
-        buffer_idx = 0;
-        memset(response_buffer, 0, sizeof(response_buffer));
-        wj66_state.error_count++;
-      }
+        return false;
     }
-  }
 }
+
 
 int32_t wj66GetPosition(uint8_t axis) {
     if (axis >= WJ66_AXES) return 0;
@@ -283,12 +254,12 @@ void wj66SetZero(uint8_t axis) {
 }
 
 void wj66Diagnostics() {
-  Serial.println("\n=== ENCODER STATUS ===");
-  Serial.printf("Status: %d\nErrors: %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
-  Serial.printf("Waiting: %s\n", wj66_state.waiting_for_response ? "YES" : "NO");
+  logPrintln("\n=== ENCODER STATUS ===");
+  logPrintf("Status: %d\nErrors: %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
+  logPrintf("Waiting: %s\n", wj66_state.waiting_for_response ? "YES" : "NO");
   
   for (int i = 0; i < WJ66_AXES; i++) {
-    Serial.printf("  Axis %d: Raw=%ld | Offset=%ld | NET=%ld\n", 
+    logPrintf("  Axis %d: Raw=%ld | Offset=%ld | NET=%ld\n", 
         i, 
         (long)wj66_state.position[i], 
         (long)wj66_state.zero_offset[i],

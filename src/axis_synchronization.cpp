@@ -131,7 +131,7 @@ static jitter_tracker_t z_jitter = {
 // ============================================================================
 
 void axisSynchronizationInit(void) {
-    Serial.println("[AXIS_SYNC] Initializing per-axis motion validation");
+    logInfo("[AXIS_SYNC] Initializing per-axis motion validation");
     initializeAllAxes();
     memset(&x_jitter, 0, sizeof(x_jitter));
     memset(&y_jitter, 0, sizeof(y_jitter));
@@ -141,7 +141,7 @@ void axisSynchronizationInit(void) {
     if (axis_metrics_mutex == NULL) {
         axis_metrics_mutex = xSemaphoreCreateMutex();
         if (axis_metrics_mutex == NULL) {
-            Serial.println("[AXIS_SYNC] [ERR] Failed to create metrics mutex");
+            logError("[AXIS_SYNC] Failed to create metrics mutex");
         }
     }
 
@@ -157,7 +157,7 @@ bool axisSynchronizationLoadConfig(void) {
     sync_config.encoder_stall_threshold_mms = stall_thr / 100.0f;
     sync_config.jitter_threshold_mms = jitter_thr / 100.0f;
 
-    Serial.printf("[AXIS_SYNC] Loaded config: VFD_tol=%.1f%%, Stall_thr=%.2f mm/s, Jitter_thr=%.2f mm/s\n",
+    logInfo("[AXIS_SYNC] Loaded config: VFD_tol=%.1f%%, Stall_thr=%.2f mm/s, Jitter_thr=%.2f mm/s",
                   sync_config.vfd_encoder_tolerance_percent,
                   sync_config.encoder_stall_threshold_mms,
                   sync_config.jitter_threshold_mms);
@@ -172,7 +172,7 @@ void axisSynchronizationSaveConfig(void) {
     configUnifiedFlush();
     configUnifiedSave();
 
-    Serial.println("[AXIS_SYNC] Configuration saved");
+    logInfo("[AXIS_SYNC] Configuration saved");
 }
 
 void axisSynchronizationResetDefaults(void) {
@@ -480,6 +480,7 @@ const char* axisSynchronizationGetStatusString(uint8_t axis) {
 }
 
 void axisSynchronizationPrintSummary(void) {
+    serialLoggerLock();
     Serial.println("\n[AXIS_SYNC] === Per-Axis Motion Quality Summary ===");
     Serial.println("Active Axis: X                    Y                    Z");
 
@@ -514,17 +515,19 @@ void axisSynchronizationPrintSummary(void) {
                   all_axes.z_axis.stalled ? "YES" : "NO");
 
     Serial.println();
+    serialLoggerUnlock();
 }
 
 void axisSynchronizationPrintAxisDiagnostics(uint8_t axis) {
     if (axis >= 3) {
-        Serial.println("[AXIS_SYNC] Invalid axis (0=X, 1=Y, 2=Z)");
+        logError("[AXIS_SYNC] Invalid axis (0=X, 1=Y, 2=Z)");
         return;
     }
 
     const char* axis_name = (axis == 0) ? "X" : (axis == 1) ? "Y" : "Z";
     const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
 
+    serialLoggerLock();
     Serial.printf("\n[AXIS_SYNC] === Axis %s Diagnostics ===\n", axis_name);
     Serial.printf("Status:                  %s (%u/100)\n",
                   axisSynchronizationGetStatusString(axis),
@@ -543,7 +546,7 @@ void axisSynchronizationPrintAxisDiagnostics(uint8_t axis) {
 
     Serial.println("\n[Jitter & Wear]");
     Serial.printf("Current Jitter:          %.3f mm/s\n", metrics->velocity_jitter_mms);
-    Serial.printf("Max Jitter Recorded:     %.3f mm/s (wear trend indicator)\n",
+    Serial.printf("Max Jitter Recorded:     %.3f mm/s\n",
                   metrics->max_jitter_recorded_mms);
     Serial.printf("Jitter Elevated:         %s (threshold: %.2f mm/s)\n",
                   metrics->jitter_elevated ? "YES" : "NO",
@@ -555,6 +558,7 @@ void axisSynchronizationPrintAxisDiagnostics(uint8_t axis) {
     Serial.printf("Active Duration:         %lu ms\n", (unsigned long)metrics->active_duration_ms);
 
     Serial.println();
+    serialLoggerUnlock();
 }
 
 void axisSynchronizationResetAxis(uint8_t axis) {
