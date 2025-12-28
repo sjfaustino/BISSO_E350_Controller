@@ -1,3 +1,6 @@
+<!--
+  settings.html - User preferences, alerts config, motion params, and system settings
+-->
 <div class="settings-page">
     <div class="card-grid">
         <!-- Theme Settings Card -->
@@ -244,29 +247,35 @@
                 <span class="card-status" id="spindle-alarm-status"></span>
             </div>
             <div class="card-content">
-                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                <p
+                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
                     Configure spindle load monitoring alarms for tool breakage and stall detection.
                 </p>
 
                 <!-- Current Alarm Status -->
-                <div class="alarm-status-panel" style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                <div class="alarm-status-panel"
+                    style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div>
                             <span class="card-label">Tool Breakage:</span>
-                            <span class="card-value" id="alarm-toolbreak-status" style="color: var(--color-optimal);">OK</span>
+                            <span class="card-value" id="alarm-toolbreak-status"
+                                style="color: var(--color-optimal);">OK</span>
                         </div>
                         <div>
                             <span class="card-label">Stall Alarm:</span>
-                            <span class="card-value" id="alarm-stall-status" style="color: var(--color-optimal);">OK</span>
+                            <span class="card-value" id="alarm-stall-status"
+                                style="color: var(--color-optimal);">OK</span>
                         </div>
                     </div>
-                    <button class="btn btn-secondary btn-small" id="clear-spindle-alarms-btn" style="margin-top: 10px; width: 100%;">Clear All Alarms</button>
+                    <button class="btn btn-secondary btn-small" id="clear-spindle-alarms-btn"
+                        style="margin-top: 10px; width: 100%;">Clear All Alarms</button>
                 </div>
 
                 <div class="setting-group">
                     <label for="spindle-toolbreak-threshold">Tool Breakage Threshold (sudden current drop):</label>
                     <div class="input-with-value">
-                        <input type="range" id="spindle-toolbreak-threshold" min="1" max="20" step="0.5" value="5" class="slider">
+                        <input type="range" id="spindle-toolbreak-threshold" min="1" max="20" step="0.5" value="5"
+                            class="slider">
                         <span class="input-value"><span id="toolbreak-value">5.0</span> A</span>
                     </div>
                     <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;">
@@ -277,7 +286,8 @@
                 <div class="setting-group">
                     <label for="spindle-stall-threshold">Stall Current Threshold:</label>
                     <div class="input-with-value">
-                        <input type="range" id="spindle-stall-threshold" min="5" max="50" step="1" value="25" class="slider">
+                        <input type="range" id="spindle-stall-threshold" min="5" max="50" step="1" value="25"
+                            class="slider">
                         <span class="input-value"><span id="stall-threshold-value">25</span> A</span>
                     </div>
                     <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;">
@@ -288,7 +298,8 @@
                 <div class="setting-group">
                     <label for="spindle-stall-timeout">Stall Detection Timeout:</label>
                     <div class="input-with-value">
-                        <input type="range" id="spindle-stall-timeout" min="500" max="10000" step="250" value="2000" class="slider">
+                        <input type="range" id="spindle-stall-timeout" min="500" max="10000" step="250" value="2000"
+                            class="slider">
                         <span class="input-value"><span id="stall-timeout-value">2000</span> ms</span>
                     </div>
                     <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;">
@@ -311,7 +322,8 @@
                 <span class="card-status" id="encoder-status"></span>
             </div>
             <div class="card-content">
-                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                <p
+                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
                     Pulses Per Millimeter (PPM) - typically 50-200 depending on encoder gearing
                 </p>
 
@@ -402,11 +414,14 @@
                 <div class="about-text">
                     <p><strong>BISSO E350 Controller</strong></p>
                     <p>Multi-file Web Interface v2.0</p>
-                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-md);">
-                        This control interface provides real-time monitoring and control of the BISSO E350 motion system.
+                    <p
+                        style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-md);">
+                        This control interface provides real-time monitoring and control of the BISSO E350 motion
+                        system.
                         It features a modular architecture, responsive design, and accessibility compliance.
                     </p>
-                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-md);">
+                    <p
+                        style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-md);">
                         © 2025 BISSO Technologies. All rights reserved.
                     </p>
                 </div>
@@ -420,7 +435,8 @@
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 20px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Configuration Presets</h3>
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Configuration
+                        Presets</h3>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
                         <select id="preset-select" class="form-control">
                             <option value="">-- Select a preset --</option>
@@ -435,7 +451,8 @@
                 </div>
 
                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Export Configuration</h3>
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Export
+                        Configuration</h3>
                     <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
                         Download current configuration as JSON file for backup or sharing
                     </p>
@@ -446,12 +463,16 @@
                 </div>
 
                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Import Configuration</h3>
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Import
+                        Configuration</h3>
                     <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
                         Upload a previously saved configuration file to restore settings
                     </p>
-                    <button class="btn btn-secondary" id="import-config-btn" style="width: 100%; margin-bottom: 10px;">Choose File & Import</button>
-                    <div id="import-status" style="font-size: var(--font-size-sm); display: none; padding: 10px; background: var(--bg-secondary); border-radius: 4px; margin-top: 10px;"></div>
+                    <button class="btn btn-secondary" id="import-config-btn"
+                        style="width: 100%; margin-bottom: 10px;">Choose File & Import</button>
+                    <div id="import-status"
+                        style="font-size: var(--font-size-sm); display: none; padding: 10px; background: var(--bg-secondary); border-radius: 4px; margin-top: 10px;">
+                    </div>
                 </div>
 
                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
@@ -460,7 +481,9 @@
                         Compare current settings with a backup file before importing
                     </p>
                     <button class="btn btn-ghost" id="compare-config-btn">Compare with File</button>
-                    <div id="comparison-result" style="font-size: var(--font-size-sm); display: none; margin-top: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 4px; max-height: 200px; overflow-y: auto;"></div>
+                    <div id="comparison-result"
+                        style="font-size: var(--font-size-sm); display: none; margin-top: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 4px; max-height: 200px; overflow-y: auto;">
+                    </div>
                 </div>
             </div>
         </div>
@@ -472,11 +495,13 @@
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 20px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Mock Data Mode</h3>
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Mock Data Mode
+                    </h3>
                     <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
                         Enable mock data for offline preview with simulated realistic device data
                     </p>
-                    <button class="btn btn-secondary" id="toggle-mock-mode-btn" style="width: 100%;">Enable Mock Mode</button>
+                    <button class="btn btn-secondary" id="toggle-mock-mode-btn" style="width: 100%;">Enable Mock
+                        Mode</button>
                     <div style="margin-top: 10px; font-size: var(--font-size-sm); color: var(--text-secondary);">
                         <p style="margin: 5px 0;">💡 Keyboard shortcut: Press <strong>M</strong> to toggle</p>
                         <p style="margin: 5px 0;">🔗 URL parameter: <code>?mock=true</code></p>
@@ -485,8 +510,10 @@
                 </div>
 
                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Development Info</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: var(--font-size-sm);">
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Development
+                        Info</h3>
+                    <div
+                        style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: var(--font-size-sm);">
                         <div>
                             <div class="card-label">Dashboard Version</div>
                             <div class="card-value" style="font-size: 14px;">v3.1</div>
@@ -503,288 +530,288 @@
 </div>
 
 <style>
-.settings-page .setting-group {
-    margin-bottom: var(--space-lg);
-}
+    .settings-page .setting-group {
+        margin-bottom: var(--space-lg);
+    }
 
-.settings-page .setting-group label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: var(--space-sm);
-    font-size: var(--font-size-base);
-}
+    .settings-page .setting-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: var(--space-sm);
+        font-size: var(--font-size-base);
+    }
 
-.settings-page .setting-group span {
-    font-weight: 400;
-}
+    .settings-page .setting-group span {
+        font-weight: 400;
+    }
 
-.settings-page .form-control {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid var(--bg-secondary);
-    border-radius: 4px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: var(--font-size-base);
-}
+    .settings-page .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid var(--bg-secondary);
+        border-radius: 4px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: var(--font-size-base);
+    }
 
-.settings-page .form-control:focus {
-    outline: none;
-    border-color: var(--color-normal);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-}
+    .settings-page .form-control:focus {
+        outline: none;
+        border-color: var(--color-normal);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
 
-.settings-page .theme-selector {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-md);
-    margin-top: var(--space-md);
-}
-
-.settings-page .theme-option {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-md);
-    border: 2px solid transparent;
-    border-radius: 8px;
-    background: var(--bg-secondary);
-    cursor: pointer;
-    transition: all var(--transition-normal);
-}
-
-.settings-page .theme-option:hover {
-    border-color: var(--color-normal);
-}
-
-.settings-page .theme-option.active {
-    border-color: var(--color-normal);
-    background: var(--bg-secondary);
-}
-
-.settings-page .theme-preview {
-    width: 60px;
-    height: 60px;
-    border-radius: 6px;
-    border: 1px solid var(--text-secondary);
-}
-
-.settings-page .theme-preview.light {
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-}
-
-.settings-page .theme-preview.dark {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-}
-
-.settings-page .theme-preview.high-contrast {
-    background: linear-gradient(135deg, #000000 0%, #ffffff 100%);
-}
-
-.settings-page .theme-preview.colorblind {
-    background: linear-gradient(135deg, #0173b2 0%, #de8f05 100%);
-}
-
-.settings-page .slider-container {
-    margin-top: var(--space-md);
-}
-
-.settings-page .slider {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--bg-secondary);
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
-}
-
-.settings-page .slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--color-normal);
-    cursor: pointer;
-    transition: background var(--transition-fast);
-}
-
-.settings-page .slider::-webkit-slider-thumb:hover {
-    background: var(--color-warning);
-}
-
-.settings-page .slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--color-normal);
-    cursor: pointer;
-    border: none;
-    transition: background var(--transition-fast);
-}
-
-.settings-page .slider::-moz-range-thumb:hover {
-    background: var(--color-warning);
-}
-
-.settings-page .slider-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    margin-top: var(--space-xs);
-}
-
-.settings-page .input-with-value {
-    display: flex;
-    gap: var(--space-md);
-    align-items: center;
-}
-
-.settings-page .input-value {
-    min-width: 60px;
-    text-align: right;
-    font-weight: 600;
-}
-
-.settings-page .storage-info {
-    background: var(--bg-secondary);
-    padding: var(--space-md);
-    border-radius: 8px;
-}
-
-.settings-page .storage-stat {
-    display: flex;
-    justify-content: space-between;
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-md);
-}
-
-.settings-page .storage-bar {
-    width: 100%;
-    height: 20px;
-    background: var(--bg-primary);
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.settings-page .storage-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--color-optimal) 0%, var(--color-warning) 100%);
-    transition: width var(--transition-normal);
-}
-
-.settings-page .info-table {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-}
-
-.settings-page .info-row {
-    display: grid;
-    grid-template-columns: 180px 1fr;
-    gap: var(--space-md);
-    padding: var(--space-sm) 0;
-    border-bottom: 1px solid var(--bg-secondary);
-}
-
-.settings-page .info-row:last-child {
-    border-bottom: none;
-}
-
-.settings-page .info-label {
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-
-.settings-page .info-value {
-    font-family: 'Courier New', monospace;
-    color: var(--text-primary);
-}
-
-.settings-page .about-text p {
-    margin: 0;
-    line-height: 1.6;
-}
-
-.settings-page .about-text p:first-child {
-    font-size: var(--font-size-lg);
-    font-weight: 700;
-    margin-bottom: var(--space-md);
-}
-
-.settings-page .btn-danger {
-    background: var(--color-critical);
-    color: white;
-}
-
-.settings-page .btn-danger:hover {
-    opacity: 0.9;
-}
-
-/* Configuration sections styling */
-.settings-page .axis-group,
-.settings-page .encoder-group {
-    margin-bottom: var(--space-lg);
-    padding-bottom: var(--space-lg);
-    border-bottom: 1px solid var(--bg-secondary);
-}
-
-.settings-page .axis-group:last-child,
-.settings-page .encoder-group:last-child {
-    border-bottom: none;
-}
-
-.settings-page .axis-group h3,
-.settings-page .encoder-group h3 {
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    margin-bottom: var(--space-md);
-    color: var(--text-primary);
-}
-
-.settings-page .card-status {
-    font-size: var(--font-size-sm);
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-}
-
-.settings-page .card-status.loaded {
-    background: rgba(34, 197, 94, 0.1);
-    color: var(--color-optimal);
-}
-
-.settings-page .card-status.error {
-    background: rgba(239, 68, 68, 0.1);
-    color: var(--color-critical);
-}
-
-.settings-page .error-message {
-    margin-top: var(--space-md);
-    padding: var(--space-md);
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 4px;
-    color: var(--color-critical);
-    font-size: var(--font-size-sm);
-}
-
-.settings-page .btn-small {
-    padding: 6px 12px;
-    font-size: var(--font-size-sm);
-}
-
-@media (max-width: 768px) {
     .settings-page .theme-selector {
-        grid-template-columns: repeat(2, 1fr);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--space-md);
+        margin-top: var(--space-md);
+    }
+
+    .settings-page .theme-option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        border: 2px solid transparent;
+        border-radius: 8px;
+        background: var(--bg-secondary);
+        cursor: pointer;
+        transition: all var(--transition-normal);
+    }
+
+    .settings-page .theme-option:hover {
+        border-color: var(--color-normal);
+    }
+
+    .settings-page .theme-option.active {
+        border-color: var(--color-normal);
+        background: var(--bg-secondary);
+    }
+
+    .settings-page .theme-preview {
+        width: 60px;
+        height: 60px;
+        border-radius: 6px;
+        border: 1px solid var(--text-secondary);
+    }
+
+    .settings-page .theme-preview.light {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .settings-page .theme-preview.dark {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    }
+
+    .settings-page .theme-preview.high-contrast {
+        background: linear-gradient(135deg, #000000 0%, #ffffff 100%);
+    }
+
+    .settings-page .theme-preview.colorblind {
+        background: linear-gradient(135deg, #0173b2 0%, #de8f05 100%);
+    }
+
+    .settings-page .slider-container {
+        margin-top: var(--space-md);
+    }
+
+    .settings-page .slider {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: var(--bg-secondary);
+        outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    .settings-page .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--color-normal);
+        cursor: pointer;
+        transition: background var(--transition-fast);
+    }
+
+    .settings-page .slider::-webkit-slider-thumb:hover {
+        background: var(--color-warning);
+    }
+
+    .settings-page .slider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--color-normal);
+        cursor: pointer;
+        border: none;
+        transition: background var(--transition-fast);
+    }
+
+    .settings-page .slider::-moz-range-thumb:hover {
+        background: var(--color-warning);
+    }
+
+    .settings-page .slider-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+        margin-top: var(--space-xs);
+    }
+
+    .settings-page .input-with-value {
+        display: flex;
+        gap: var(--space-md);
+        align-items: center;
+    }
+
+    .settings-page .input-value {
+        min-width: 60px;
+        text-align: right;
+        font-weight: 600;
+    }
+
+    .settings-page .storage-info {
+        background: var(--bg-secondary);
+        padding: var(--space-md);
+        border-radius: 8px;
+    }
+
+    .settings-page .storage-stat {
+        display: flex;
+        justify-content: space-between;
+        font-size: var(--font-size-sm);
+        margin-bottom: var(--space-md);
+    }
+
+    .settings-page .storage-bar {
+        width: 100%;
+        height: 20px;
+        background: var(--bg-primary);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .settings-page .storage-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--color-optimal) 0%, var(--color-warning) 100%);
+        transition: width var(--transition-normal);
+    }
+
+    .settings-page .info-table {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
     }
 
     .settings-page .info-row {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: var(--space-md);
+        padding: var(--space-sm) 0;
+        border-bottom: 1px solid var(--bg-secondary);
     }
-}
+
+    .settings-page .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .settings-page .info-label {
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .settings-page .info-value {
+        font-family: 'Courier New', monospace;
+        color: var(--text-primary);
+    }
+
+    .settings-page .about-text p {
+        margin: 0;
+        line-height: 1.6;
+    }
+
+    .settings-page .about-text p:first-child {
+        font-size: var(--font-size-lg);
+        font-weight: 700;
+        margin-bottom: var(--space-md);
+    }
+
+    .settings-page .btn-danger {
+        background: var(--color-critical);
+        color: white;
+    }
+
+    .settings-page .btn-danger:hover {
+        opacity: 0.9;
+    }
+
+    /* Configuration sections styling */
+    .settings-page .axis-group,
+    .settings-page .encoder-group {
+        margin-bottom: var(--space-lg);
+        padding-bottom: var(--space-lg);
+        border-bottom: 1px solid var(--bg-secondary);
+    }
+
+    .settings-page .axis-group:last-child,
+    .settings-page .encoder-group:last-child {
+        border-bottom: none;
+    }
+
+    .settings-page .axis-group h3,
+    .settings-page .encoder-group h3 {
+        font-size: var(--font-size-base);
+        font-weight: 600;
+        margin-bottom: var(--space-md);
+        color: var(--text-primary);
+    }
+
+    .settings-page .card-status {
+        font-size: var(--font-size-sm);
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+    }
+
+    .settings-page .card-status.loaded {
+        background: rgba(34, 197, 94, 0.1);
+        color: var(--color-optimal);
+    }
+
+    .settings-page .card-status.error {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--color-critical);
+    }
+
+    .settings-page .error-message {
+        margin-top: var(--space-md);
+        padding: var(--space-md);
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 4px;
+        color: var(--color-critical);
+        font-size: var(--font-size-sm);
+    }
+
+    .settings-page .btn-small {
+        padding: 6px 12px;
+        font-size: var(--font-size-sm);
+    }
+
+    @media (max-width: 768px) {
+        .settings-page .theme-selector {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .settings-page .info-row {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>

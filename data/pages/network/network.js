@@ -90,8 +90,6 @@ window.NetworkModule = window.NetworkModule || {
 
     updateWiFiStatus() {
         // Fetch real network status from backend
-        if (Utils.isOfflineMode()) return;
-
         fetch('/api/network/status')
             .then(r => r.json())
             .then(data => {
@@ -346,8 +344,6 @@ Packet Loss: 0.2%
 
     loadWiFiConfig() {
         console.log('[Network] Loading WiFi configuration');
-        if (Utils.isOfflineMode()) return;
-
         fetch('/api/config/get?category=2')
             .then(r => r.json())
             .then(data => {

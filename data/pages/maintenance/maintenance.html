@@ -1,3 +1,6 @@
+<!--
+  maintenance.html - Component wear tracking, service history, and predictive maintenance
+-->
 <div class="maintenance-page">
     <div class="card-grid">
         <!-- Wear Prediction Card -->
@@ -11,7 +14,8 @@
                         <div class="metric-label">X Axis Wear</div>
                         <div class="metric-value" id="wear-x-percent">0%</div>
                         <div class="progress-bar">
-                            <div class="progress-fill" id="wear-x-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                            <div class="progress-fill" id="wear-x-bar"
+                                style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
                         <div class="metric-detail" id="wear-x-days">Est. 3650 days</div>
                     </div>
@@ -19,7 +23,8 @@
                         <div class="metric-label">Y Axis Wear</div>
                         <div class="metric-value" id="wear-y-percent">0%</div>
                         <div class="progress-bar">
-                            <div class="progress-fill" id="wear-y-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                            <div class="progress-fill" id="wear-y-bar"
+                                style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
                         <div class="metric-detail" id="wear-y-days">Est. 3650 days</div>
                     </div>
@@ -27,7 +32,8 @@
                         <div class="metric-label">Z Axis Wear</div>
                         <div class="metric-value" id="wear-z-percent">0%</div>
                         <div class="progress-bar">
-                            <div class="progress-fill" id="wear-z-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                            <div class="progress-fill" id="wear-z-bar"
+                                style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
                         <div class="metric-detail" id="wear-z-days">Est. 3650 days</div>
                     </div>
@@ -48,7 +54,8 @@
                             <span id="motor-hours">0</span> / 40000 hrs
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" id="motor-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                            <div class="progress-fill" id="motor-bar"
+                                style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
                     </div>
                     <div class="component-item">
@@ -57,7 +64,8 @@
                             <span id="vfd-hours">0</span> / 120000 hrs
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" id="vfd-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                            <div class="progress-fill" id="vfd-bar"
+                                style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
                     </div>
                     <div class="component-item">
@@ -66,7 +74,8 @@
                             <span id="contactor-ops">0</span> / 500000 ops
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" id="contactor-bar" style="width: 0%; background: var(--color-optimal);"></div>
+                            <div class="progress-fill" id="contactor-bar"
+                                style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
                     </div>
                 </div>
@@ -169,22 +178,26 @@
                     <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('encoder')">
                         <span style="font-size: 20px;">📏</span>
                         <div style="margin-top: 8px;">Encoder Calibration</div>
-                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">10-15 min</div>
+                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">10-15 min
+                        </div>
                     </button>
                     <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('motion')">
                         <span style="font-size: 20px;">🎯</span>
                         <div style="margin-top: 8px;">Motion Accuracy</div>
-                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">15-20 min</div>
+                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">15-20 min
+                        </div>
                     </button>
                     <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('spindle')">
                         <span style="font-size: 20px;">🔄</span>
                         <div style="margin-top: 8px;">Spindle Alignment</div>
-                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">20-30 min</div>
+                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">20-30 min
+                        </div>
                     </button>
                     <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('tuning')">
                         <span style="font-size: 20px;">⚙️</span>
                         <div style="margin-top: 8px;">Auto-Tuning</div>
-                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">10-15 min</div>
+                        <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">10-15 min
+                        </div>
                     </button>
                 </div>
             </div>
@@ -193,158 +206,158 @@
 </div>
 
 <style>
-.maintenance-page .component-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-}
+    .maintenance-page .component-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+    }
 
-.maintenance-page .component-item {
-    padding: var(--space-md);
-    background: var(--bg-secondary);
-    border-radius: 8px;
-}
+    .maintenance-page .component-item {
+        padding: var(--space-md);
+        background: var(--bg-secondary);
+        border-radius: 8px;
+    }
 
-.maintenance-page .component-name {
-    font-weight: 600;
-    margin-bottom: var(--space-xs);
-}
+    .maintenance-page .component-name {
+        font-weight: 600;
+        margin-bottom: var(--space-xs);
+    }
 
-.maintenance-page .component-hours {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--space-sm);
-}
+    .maintenance-page .component-hours {
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+        margin-bottom: var(--space-sm);
+    }
 
-.maintenance-page .service-history-list {
-    margin-bottom: var(--space-lg);
-    max-height: 300px;
-    overflow-y: auto;
-}
+    .maintenance-page .service-history-list {
+        margin-bottom: var(--space-lg);
+        max-height: 300px;
+        overflow-y: auto;
+    }
 
-.maintenance-page .service-entry {
-    padding: var(--space-md);
-    background: var(--bg-secondary);
-    border-radius: 4px;
-    margin-bottom: var(--space-sm);
-    border-left: 3px solid var(--color-normal);
-}
+    .maintenance-page .service-entry {
+        padding: var(--space-md);
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        margin-bottom: var(--space-sm);
+        border-left: 3px solid var(--color-normal);
+    }
 
-.maintenance-page .service-date {
-    font-weight: 600;
-    font-size: var(--font-size-sm);
-}
+    .maintenance-page .service-date {
+        font-weight: 600;
+        font-size: var(--font-size-sm);
+    }
 
-.maintenance-page .service-text {
-    margin: var(--space-xs) 0;
-    color: var(--text-primary);
-}
+    .maintenance-page .service-text {
+        margin: var(--space-xs) 0;
+        color: var(--text-primary);
+    }
 
-.maintenance-page .service-quality {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-}
+    .maintenance-page .service-quality {
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+    }
 
-.maintenance-page .maintenance-schedule {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-}
+    .maintenance-page .maintenance-schedule {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+    }
 
-.maintenance-page .schedule-item {
-    display: flex;
-    gap: var(--space-md);
-    align-items: flex-start;
-    padding: var(--space-md);
-    background: var(--bg-secondary);
-    border-radius: 4px;
-}
+    .maintenance-page .schedule-item {
+        display: flex;
+        gap: var(--space-md);
+        align-items: flex-start;
+        padding: var(--space-md);
+        background: var(--bg-secondary);
+        border-radius: 4px;
+    }
 
-.maintenance-page .schedule-priority {
-    font-size: 20px;
-    min-width: 24px;
-}
+    .maintenance-page .schedule-priority {
+        font-size: 20px;
+        min-width: 24px;
+    }
 
-.maintenance-page .schedule-priority.warning {
-    color: var(--color-warning);
-}
+    .maintenance-page .schedule-priority.warning {
+        color: var(--color-warning);
+    }
 
-.maintenance-page .schedule-priority.normal {
-    color: var(--color-normal);
-}
+    .maintenance-page .schedule-priority.normal {
+        color: var(--color-normal);
+    }
 
-.maintenance-page .schedule-info {
-    flex: 1;
-}
+    .maintenance-page .schedule-info {
+        flex: 1;
+    }
 
-.maintenance-page .schedule-task {
-    font-weight: 600;
-}
+    .maintenance-page .schedule-task {
+        font-weight: 600;
+    }
 
-.maintenance-page .schedule-date {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-}
+    .maintenance-page .schedule-date {
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+    }
 
-.maintenance-page .schedule-detail {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-    margin-top: var(--space-xs);
-    font-style: italic;
-}
+    .maintenance-page .schedule-detail {
+        font-size: var(--font-size-xs);
+        color: var(--text-secondary);
+        margin-top: var(--space-xs);
+        font-style: italic;
+    }
 
-.maintenance-page .uptime-display {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-lg);
-    text-align: center;
-}
-
-.maintenance-page .uptime-stat {
-    padding: var(--space-md);
-    background: var(--bg-secondary);
-    border-radius: 8px;
-}
-
-.maintenance-page .uptime-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--space-xs);
-}
-
-.maintenance-page .uptime-value {
-    font-size: var(--font-size-2xl);
-    font-weight: 700;
-    color: var(--color-normal);
-}
-
-@media (max-width: 768px) {
     .maintenance-page .uptime-display {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-lg);
+        text-align: center;
     }
 
-    .maintenance-page .axes-grid {
-        grid-template-columns: 1fr;
+    .maintenance-page .uptime-stat {
+        padding: var(--space-md);
+        background: var(--bg-secondary);
+        border-radius: 8px;
     }
-}
 
-/* Wizard Button Styling */
-.wizard-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px 15px !important;
-    min-height: 120px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
+    .maintenance-page .uptime-label {
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+        margin-bottom: var(--space-xs);
+    }
 
-.wizard-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-}
+    .maintenance-page .uptime-value {
+        font-size: var(--font-size-2xl);
+        font-weight: 700;
+        color: var(--color-normal);
+    }
 
-.wizard-btn:active {
-    transform: translateY(0);
-}
+    @media (max-width: 768px) {
+        .maintenance-page .uptime-display {
+            grid-template-columns: 1fr;
+        }
+
+        .maintenance-page .axes-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Wizard Button Styling */
+    .wizard-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px 15px !important;
+        min-height: 120px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .wizard-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .wizard-btn:active {
+        transform: translateY(0);
+    }
 </style>

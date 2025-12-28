@@ -10,6 +10,7 @@
 #include "serial_logger.h"
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <functional>  // For std::function in recursive listing
 
 // PHASE 5.10: Local auth helper with rate limiting
 static bool requireAuth(AsyncWebServerRequest *request) {
@@ -90,25 +91,39 @@ static bool isValidFilename(const char* filename) {
 
 void handleFileList(AsyncWebServerRequest *request) {
   // MEMORY FIX: Use StaticJsonDocument + char array to prevent heap
-  // fragmentation Sized for ~10 files with paths up to 32 chars each
+  // fragmentation. Sized for ~30 files with paths up to 64 chars each
   JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
+  
+  // Recursive helper using lambda - captures array by reference
+  std::function<void(const char*)> listDirRecursive = [&](const char* dirname) {
+    File root = LittleFS.open(dirname);
+    if (!root || !root.isDirectory()) return;
+    
+    File file = root.openNextFile();
+    while (file) {
+      String fullPath = String(dirname);
+      if (!fullPath.endsWith("/")) fullPath += "/";
+      fullPath += file.name();
+      
+      if (file.isDirectory()) {
+        // Recurse into subdirectory
+        listDirRecursive(fullPath.c_str());
+      } else {
+        // Add file to list
+        JsonObject obj = array.add<JsonObject>();
+        obj["name"] = fullPath;  // Full path for compatibility
+        obj["path"] = fullPath;  // Also include as path
+        obj["size"] = file.size();
+      }
+      file = root.openNextFile();
+    }
+    root.close();
+  };
+  
+  listDirRecursive("/");
 
-  File root = LittleFS.open("/");
-  File file = root.openNextFile();
-  while (file) {
-    JsonObject obj = array.add<JsonObject>();
-    // MEMORY FIX: Use file.name() directly (returns const char*), no String
-    // conversion
-    obj["name"] = file.name();
-    obj["size"] = file.size();
-    file = root.openNextFile();
-  }
-
-  // PHASE 5.10: Critical fix - Close directory handle to prevent leak
-  root.close();
-
-  char response[1024];
+  char response[2048];  // Increased for more files
   serializeJson(doc, response, sizeof(response));
   request->send(200, "application/json", response);
 }

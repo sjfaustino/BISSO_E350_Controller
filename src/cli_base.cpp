@@ -354,42 +354,37 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
   return true;
 }
 
-// FIX: Added missing implementation
 void cliPrintHelp() {
-  serialLoggerLock();
-  Serial.println("\n=== BISSO E350 CLI Help ===");
-  Serial.println("Grbl Commands:");
-  Serial.println("  $         - Show Grbl settings");
-  Serial.println("  $H        - Run homing cycle");
-  Serial.println("  $G        - Show parser state");
-  Serial.println("  ?         - Real-time status report");
-  Serial.println("  !         - Feed hold");
-  Serial.println("  ~         - Cycle start / resume");
-  Serial.println("  Ctrl-X    - Soft reset");
+  logPrintln("\n=== BISSO E350 CLI Help ===");
+  logPrintln("Grbl Commands:");
+  logPrintln("  $         - Show Grbl settings");
+  logPrintln("  $H        - Run homing cycle");
+  logPrintln("  $G        - Show parser state");
+  logPrintln("  ?         - Real-time status report");
+  logPrintln("  !         - Feed hold");
+  logPrintln("  ~         - Cycle start / resume");
+  logPrintln("  Ctrl-X    - Soft reset");
   
-  Serial.println("\nSystem Commands:");
+  logPrintln("\nSystem Commands:");
   for (int i = 0; i < command_count; i++) {
-    Serial.printf("  %-12s - %s\n", commands[i].command, commands[i].help);
+    logPrintf("  %-12s - %s\r\n", commands[i].command, commands[i].help);
   }
-  Serial.println("==========================\n");
-  serialLoggerUnlock();
+  logPrintln("==========================\n");
 }
 
 // --- COMMANDS ---
 
 void cmd_grbl_settings(int argc, char** argv) {
-    serialLoggerLock();
-    Serial.printf("$100=%.3f\r\n", configGetFloat(KEY_PPM_X, 100.0));
-    Serial.printf("$101=%.3f\r\n", configGetFloat(KEY_PPM_Y, 100.0));
-    Serial.printf("$102=%.3f\r\n", configGetFloat(KEY_PPM_Z, 100.0));
-    Serial.printf("$103=%.3f\r\n", configGetFloat(KEY_PPM_A, 100.0));
-    Serial.printf("$110=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_X, 1000.0));
-    Serial.printf("$111=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_Y, 1000.0));
-    Serial.printf("$112=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_Z, 1000.0));
-    Serial.printf("$113=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_A, 1000.0));
-    Serial.printf("$120=%.3f\r\n", configGetFloat(KEY_DEFAULT_ACCEL, 100.0));
-    Serial.printf("$130=%.3f\r\n", (float)configGetInt(KEY_X_LIMIT_MAX, 500000) / configGetFloat(KEY_PPM_X, 1.0));
-    serialLoggerUnlock();
+    logPrintf("$100=%.3f\r\n", configGetFloat(KEY_PPM_X, 100.0));
+    logPrintf("$101=%.3f\r\n", configGetFloat(KEY_PPM_Y, 100.0));
+    logPrintf("$102=%.3f\r\n", configGetFloat(KEY_PPM_Z, 100.0));
+    logPrintf("$103=%.3f\r\n", configGetFloat(KEY_PPM_A, 100.0));
+    logPrintf("$110=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_X, 1000.0));
+    logPrintf("$111=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_Y, 1000.0));
+    logPrintf("$112=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_Z, 1000.0));
+    logPrintf("$113=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_A, 1000.0));
+    logPrintf("$120=%.3f\r\n", configGetFloat(KEY_DEFAULT_ACCEL, 100.0));
+    logPrintf("$130=%.3f\r\n", (float)configGetInt(KEY_X_LIMIT_MAX, 500000) / configGetFloat(KEY_PPM_X, 1.0));
     logPrintln("ok");
 }
 
@@ -398,7 +393,7 @@ void cmd_grbl_home(int argc, char** argv) { motionHome(0); }
 void cmd_grbl_state(int argc, char** argv) {
     char buf[64];
     gcodeParser.getParserState(buf, sizeof(buf));
-    Serial.println(buf);
+    logPrintln(buf);
 }
 
 

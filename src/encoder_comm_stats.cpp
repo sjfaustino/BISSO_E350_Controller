@@ -101,7 +101,7 @@ baud_detect_result_t encoderDetectBaudRate() {
     delay(10);
     encoder_serial->begin(baud, SERIAL_8N1, ENCODER_SERIAL_RX, ENCODER_SERIAL_TX);
     
-    logPrintf("[ENC_STATS] Probing %lu baud...\n", (unsigned long)baud);
+    logPrintf("[ENC_STATS] Probing %lu baud...\r\n", (unsigned long)baud);
     
     uint8_t query[] = {0x01, 0x00}; 
     encoderSendCommandWithStats(query, 2);
@@ -131,14 +131,12 @@ bool encoderSetBaudRate(uint32_t baud_rate) {
 }
 
 void encoderShowStats() {
-  serialLoggerLock();
-  Serial.println("\n=== ENCODER STATISTICS ===");
-  Serial.printf("Sent: %lu | Recv: %lu | Fail: %lu\n", 
+  logPrintln("\n=== ENCODER STATISTICS ===");
+  logPrintf("Sent: %lu | Recv: %lu | Fail: %lu\r\n", 
     (unsigned long)stats.frames_sent, (unsigned long)stats.frames_received, (unsigned long)stats.frames_failed);
-  Serial.printf("Errors: Cksum=%lu Time=%lu Parse=%lu\n", 
+  logPrintf("Errors: Cksum=%lu Time=%lu Parse=%lu\r\n", 
     (unsigned long)stats.checksum_errors, (unsigned long)stats.timeout_errors, (unsigned long)stats.parse_errors);
-  Serial.printf("Baud: %lu | Success: %.1f%%\n", (unsigned long)current_baud_rate, stats.success_rate);
-  serialLoggerUnlock();
+  logPrintf("Baud: %lu | Success: %.1f%%\r\n", (unsigned long)current_baud_rate, stats.success_rate);
 }
 
 void encoderResetStats() { memset(&stats, 0, sizeof(stats)); }

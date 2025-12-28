@@ -34,6 +34,7 @@
 #include "vfd_current_calibration.h"  // PHASE 5.5: Current calibration
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <functional>  // For std::function in file manager
 
 // Global instance
 WebServerManager webServer(80);
@@ -1522,6 +1523,158 @@ void WebServerManager::setupRoutes() {
     delay(100);
     ESP.restart();
   });
+
+  // ==========================================================================
+  // FILE MANAGER - Simple web-based file editor for development
+  // ==========================================================================
+
+  // GET /filemanager - Simple HTML file manager UI
+  server->on("/filemanager", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    String html = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<title>ESP32 File Manager</title>
+<style>
+body{font-family:sans-serif;margin:20px;background:#1a1a2e;color:#eee}
+h1{color:#10b981}
+.file{display:flex;justify-content:space-between;padding:10px;margin:5px 0;background:#2a2a4e;border-radius:5px}
+.file:hover{background:#3a3a5e}
+.btn{padding:5px 10px;margin:0 2px;border:none;border-radius:3px;cursor:pointer}
+.btn-dl{background:#3b82f6;color:#fff}
+.btn-del{background:#ef4444;color:#fff}
+.upload-form{margin:20px 0;padding:15px;background:#2a2a4e;border-radius:8px}
+input[type=file]{margin:10px 0}
+.btn-upload{background:#10b981;color:#fff;padding:10px 20px}
+a{color:#10b981;text-decoration:none}
+.size{color:#888;font-size:12px}
+</style>
+</head>
+<body>
+<h1>ESP32 File Manager</h1>
+<div class="upload-form">
+<form method="POST" action="/api/files/upload" enctype="multipart/form-data">
+Path: <input type="text" name="path" value="/" style="width:200px;padding:5px">
+<input type="file" name="file" required>
+<button type="submit" class="btn btn-upload">Upload</button>
+</form>
+</div>
+<div id="files">Loading...</div>
+<script>
+fetch('/api/files',{credentials:'include'}).then(r=>r.json()).then(data=>{
+if(!data||!Array.isArray(data)){document.getElementById('files').innerHTML='<p>Error loading files</p>';return;}
+let h='';
+data.forEach(f=>{
+if(f.size>0){
+const path=f.path||f.name;
+h+=`<div class="file"><span><a href="${path}" target="_blank">${path}</a> <span class="size">(${f.size} bytes)</span></span>
+<span><a href="${path}" download class="btn btn-dl">Download</a>
+<button onclick="del('${path}')" class="btn btn-del">Delete</button></span></div>`;
+}
+});
+document.getElementById('files').innerHTML=h||'<p>No files</p>';
+}).catch(e=>{document.getElementById('files').innerHTML='<p>Error: '+e+'</p>';});
+function del(path){if(confirm('Delete '+path+'?'))fetch('/api/files?name='+encodeURIComponent(path),{method:'DELETE',credentials:'include'}).then(()=>location.reload());}
+</script>
+</body>
+</html>
+)rawliteral";
+    request->send(200, "text/html", html);
+  });
+
+  // GET /api/files/list - List all files
+  server->on("/api/files/list", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    
+    String json = "{\"files\":[";
+    bool first = true;
+    
+    // Recursive file listing
+    std::function<void(const char*)> listDir = [&](const char* dirname) {
+      File root = LittleFS.open(dirname);
+      if (!root || !root.isDirectory()) return;
+      
+      File file = root.openNextFile();
+      while (file) {
+        if (file.isDirectory()) {
+          String subdir = String(dirname) + "/" + file.name();
+          listDir(subdir.c_str());
+        } else {
+          if (!first) json += ",";
+          first = false;
+          String path = String(dirname);
+          if (path != "/") path += "/";
+          path += file.name();
+          json += "{\"path\":\"" + path + "\",\"size\":" + String(file.size()) + "}";
+        }
+        file = root.openNextFile();
+      }
+    };
+    
+    listDir("/");
+    json += "]}";
+    request->send(200, "application/json", json);
+  });
+
+  // GET /api/files/download - Download a file
+  server->on("/api/files/download", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    if (!request->hasParam("path")) {
+      request->send(400, "text/plain", "Missing path parameter");
+      return;
+    }
+    String path = request->getParam("path")->value();
+    if (!LittleFS.exists(path)) {
+      request->send(404, "text/plain", "File not found");
+      return;
+    }
+    request->send(LittleFS, path, "application/octet-stream");
+  });
+
+  // DELETE /api/files/delete - Delete a file
+  server->on("/api/files/delete", HTTP_DELETE, [this](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+    if (!request->hasParam("path")) {
+      request->send(400, "application/json", "{\"success\":false,\"error\":\"Missing path\"}");
+      return;
+    }
+    String path = request->getParam("path")->value();
+    if (LittleFS.remove(path)) {
+      request->send(200, "application/json", "{\"success\":true}");
+    } else {
+      request->send(500, "application/json", "{\"success\":false,\"error\":\"Delete failed\"}");
+    }
+  });
+
+  // POST /api/files/upload - Upload a file (multipart)
+  server->on("/api/files/upload", HTTP_POST,
+    [](AsyncWebServerRequest *request) {
+      if (!requireAuth(request)) return;
+      request->send(200, "text/html", "<html><body><h2>Upload complete!</h2><a href='/filemanager'>Back to File Manager</a></body></html>");
+    },
+    [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+      static File uploadFile;
+      String path = "/";
+      if (request->hasParam("path", true)) {
+        path = request->getParam("path", true)->value();
+      }
+      if (path.endsWith("/")) path += filename;
+      else if (path.indexOf('.') < 0) path += "/" + filename;
+      
+      if (index == 0) {
+        logInfo("[FM] Upload: %s", path.c_str());
+        uploadFile = LittleFS.open(path, "w");
+      }
+      if (uploadFile && len) {
+        uploadFile.write(data, len);
+      }
+      if (final && uploadFile) {
+        uploadFile.close();
+        logInfo("[FM] Upload complete: %s (%u bytes)", path.c_str(), index + len);
+      }
+    });
 
   // 1. Static Files (Moved to end to allow API routes to match first)
   // No auth needed for static assets (bundled CSS/JS/HTML)

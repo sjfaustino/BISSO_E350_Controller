@@ -1,49 +1,56 @@
 /**
- * Settings Page Module
+ * settings.js - Settings Page Core Module
  * Manages user preferences, alerts, and system configuration
- * Note: Use window.SettingsModule to avoid "already declared" errors when navigating
+ * Motion/VFD/Encoder config loaded from settings-motion.js
+ * Spindle alarm config loaded from settings-spindle.js
  */
 window.SettingsModule = window.SettingsModule || {
-    // Default settings
     defaults: {
-        theme: 'light',
-        fontSize: 100,
-        autoRefresh: true,
-        qualityThreshold: 50,
-        jitterThreshold: 1.0,
-        tempThreshold: 80,
-        soundAlerts: true,
-        desktopAlerts: true,
-        historyRetention: 24,
-        chartResolution: 1,
-        autoRefreshInterval: 1000
+        theme: 'light', fontSize: 100, autoRefresh: true,
+        qualityThreshold: 50, jitterThreshold: 1.0, tempThreshold: 80,
+        soundAlerts: true, desktopAlerts: true,
+        historyRetention: 24, chartResolution: 1, autoRefreshInterval: 1000
     },
-
     settings: {},
 
     init() {
         console.log('[Settings] Initializing');
         this.loadSettings();
         this.setupEventListeners();
-        this.setupConfigManagement();
         this.updateDisplay();
-        this.loadConfiguration();
+        // Load hardware config modules then load API data
+        this.loadModules().then(() => this.loadConfiguration());
         window.addEventListener('state-changed', () => this.updateSystemInfo());
+    },
+
+    async loadModules() {
+        const base = '/pages/settings/';
+        try {
+            await this.loadScript(base + 'settings-motion.js');
+            await this.loadScript(base + 'settings-spindle.js');
+        } catch (e) { console.warn('[Settings] Module load failed:', e); }
+    },
+
+    loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
     },
 
     setupEventListeners() {
         // Theme buttons
         document.querySelectorAll('.theme-option').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const theme = e.currentTarget.dataset.theme;
-                this.setTheme(theme);
-            });
+            btn.addEventListener('click', e => this.setTheme(e.currentTarget.dataset.theme));
         });
 
         // Font size slider
         const fontSlider = document.getElementById('font-size-slider');
         if (fontSlider) {
-            fontSlider.addEventListener('input', (e) => {
+            fontSlider.addEventListener('input', e => {
                 const size = parseInt(e.target.value);
                 this.setFontSize(size);
                 document.getElementById('font-size-display').textContent = size;
@@ -51,328 +58,167 @@ window.SettingsModule = window.SettingsModule || {
         }
 
         // Alert threshold sliders
-        const qualitySlider = document.getElementById('quality-threshold');
-        if (qualitySlider) {
-            qualitySlider.addEventListener('input', (e) => {
-                const value = parseInt(e.target.value);
-                this.settings.qualityThreshold = value;
-                document.getElementById('quality-value').textContent = value;
-                this.saveSettings();
-            });
-        }
-
-        const jitterSlider = document.getElementById('jitter-threshold');
-        if (jitterSlider) {
-            jitterSlider.addEventListener('input', (e) => {
-                const value = parseFloat(e.target.value);
-                this.settings.jitterThreshold = value;
-                document.getElementById('jitter-value').textContent = value.toFixed(1);
-                this.saveSettings();
-            });
-        }
-
-        const tempSlider = document.getElementById('temp-threshold');
-        if (tempSlider) {
-            tempSlider.addEventListener('input', (e) => {
-                const value = parseInt(e.target.value);
-                this.settings.tempThreshold = value;
-                document.getElementById('temp-value').textContent = value;
-                this.saveSettings();
-            });
-        }
+        this.bindSlider('quality-threshold', 'qualityThreshold', 'quality-value', parseInt);
+        this.bindSlider('jitter-threshold', 'jitterThreshold', 'jitter-value', parseFloat, v => v.toFixed(1));
+        this.bindSlider('temp-threshold', 'tempThreshold', 'temp-value', parseInt);
 
         // Checkboxes
-        document.getElementById('auto-refresh-toggle')?.addEventListener('change', (e) => {
-            this.settings.autoRefresh = e.target.checked;
-            this.saveSettings();
-        });
-
-        document.getElementById('alert-sound-toggle')?.addEventListener('change', (e) => {
-            this.settings.soundAlerts = e.target.checked;
-            this.saveSettings();
-        });
-
-        document.getElementById('alert-desktop-toggle')?.addEventListener('change', (e) => {
-            this.settings.desktopAlerts = e.target.checked;
-            this.saveSettings();
-        });
-
-        // Mock mode toggle button
-        const mockModeBtn = document.getElementById('toggle-mock-mode-btn');
-        if (mockModeBtn) {
-            mockModeBtn.addEventListener('click', () => {
-                if (window.MockMode) {
-                    MockMode.toggle();
-                    this.updateMockModeUI();
-                }
-            });
-            // Initial UI update
-            this.updateMockModeUI();
-        }
+        this.bindCheckbox('auto-refresh-toggle', 'autoRefresh');
+        this.bindCheckbox('alert-sound-toggle', 'soundAlerts');
+        this.bindCheckbox('alert-desktop-toggle', 'desktopAlerts');
 
         // Select menus
-        document.getElementById('history-retention')?.addEventListener('change', (e) => {
-            this.settings.historyRetention = parseInt(e.target.value);
-            this.saveSettings();
-        });
-
-        document.getElementById('chart-resolution')?.addEventListener('change', (e) => {
-            this.settings.chartResolution = parseInt(e.target.value);
-            this.saveSettings();
-        });
+        this.bindSelect('history-retention', 'historyRetention');
+        this.bindSelect('chart-resolution', 'chartResolution');
 
         // Buttons
         document.getElementById('test-alert-btn')?.addEventListener('click', () => {
             AlertManager.add('This is a test alert!', 'warning', 3000);
-            if (this.settings.soundAlerts) {
-                this.playAlertSound();
-            }
+            if (this.settings.soundAlerts) this.playAlertSound();
         });
+        document.getElementById('clear-cache-btn')?.addEventListener('click', () => this.clearCache());
+        document.getElementById('factory-reset-btn')?.addEventListener('click', () => this.factoryReset());
 
-        document.getElementById('clear-cache-btn')?.addEventListener('click', () => {
-            this.clearCache();
-        });
-
-        document.getElementById('factory-reset-btn')?.addEventListener('click', () => {
-            this.factoryReset();
-        });
-
-        // Motion control listeners
-        document.getElementById('save-motion-btn')?.addEventListener('click', () => {
-            this.saveMotionSettings();
-        });
-
-        document.getElementById('reset-motion-btn')?.addEventListener('click', () => {
-            this.resetMotionSettings();
-        });
-
-        // Real-time input updates for motion (display feedback)
+        // Motion config buttons (delegate to module)
+        document.getElementById('save-motion-btn')?.addEventListener('click', () => this.saveMotionSettings?.());
+        document.getElementById('reset-motion-btn')?.addEventListener('click', () => this.resetMotionSettings?.());
         ['x-limit-low', 'x-limit-high', 'y-limit-low', 'y-limit-high', 'z-limit-low', 'z-limit-high'].forEach(id => {
-            document.getElementById(id)?.addEventListener('change', () => {
-                this.hideError('motion');
-            });
+            document.getElementById(id)?.addEventListener('change', () => this.hideError('motion'));
         });
 
-        // VFD parameters listeners
-        document.getElementById('save-vfd-btn')?.addEventListener('click', () => {
-            this.saveVfdSettings();
-        });
+        // VFD config buttons
+        document.getElementById('save-vfd-btn')?.addEventListener('click', () => this.saveVfdSettings?.());
+        document.getElementById('reset-vfd-btn')?.addEventListener('click', () => this.resetVfdSettings?.());
+        this.bindDisplay('vfd-min-speed', 'vfd-min-display', 'vfd');
+        this.bindDisplay('vfd-max-speed', 'vfd-max-display', 'vfd');
+        this.bindDisplay('vfd-acc-time', 'vfd-acc-display', 'vfd');
+        this.bindDisplay('vfd-dec-time', 'vfd-dec-display', 'vfd');
 
-        document.getElementById('reset-vfd-btn')?.addEventListener('click', () => {
-            this.resetVfdSettings();
-        });
+        // Encoder config buttons
+        document.getElementById('calibrate-x-btn')?.addEventListener('click', () => this.calibrateEncoder?.(0));
+        document.getElementById('calibrate-y-btn')?.addEventListener('click', () => this.calibrateEncoder?.(1));
+        document.getElementById('calibrate-z-btn')?.addEventListener('click', () => this.calibrateEncoder?.(2));
+        document.getElementById('reset-encoder-btn')?.addEventListener('click', () => this.resetEncoderSettings?.());
+        this.bindDisplay('x-encoder-ppm', 'x-ppm-display', 'encoder');
+        this.bindDisplay('y-encoder-ppm', 'y-ppm-display', 'encoder');
+        this.bindDisplay('z-encoder-ppm', 'z-ppm-display', 'encoder');
 
-        // Real-time display updates for VFD
-        document.getElementById('vfd-min-speed')?.addEventListener('input', (e) => {
-            document.getElementById('vfd-min-display').textContent = e.target.value;
-            this.hideError('vfd');
-        });
+        // Spindle alarm buttons
+        document.getElementById('save-spindle-alarm-btn')?.addEventListener('click', () => this.saveSpindleAlarmSettings?.());
+        document.getElementById('reset-spindle-alarm-btn')?.addEventListener('click', () => this.resetSpindleAlarmSettings?.());
+        document.getElementById('clear-spindle-alarms-btn')?.addEventListener('click', () => this.clearSpindleAlarms?.());
+        this.bindSpindleDisplay('spindle-toolbreak-threshold', 'toolbreak-value', v => parseFloat(v).toFixed(1));
+        this.bindSpindleDisplay('spindle-stall-threshold', 'stall-threshold-value');
+        this.bindSpindleDisplay('spindle-stall-timeout', 'stall-timeout-value');
+    },
 
-        document.getElementById('vfd-max-speed')?.addEventListener('input', (e) => {
-            document.getElementById('vfd-max-display').textContent = e.target.value;
-            this.hideError('vfd');
+    // Helper: bind slider to settings property
+    bindSlider(id, prop, displayId, parser, formatter = v => v) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', e => {
+            const v = parser(e.target.value);
+            this.settings[prop] = v;
+            document.getElementById(displayId).textContent = formatter(v);
+            this.saveSettings();
         });
+    },
 
-        document.getElementById('vfd-acc-time')?.addEventListener('input', (e) => {
-            document.getElementById('vfd-acc-display').textContent = e.target.value;
-            this.hideError('vfd');
+    bindCheckbox(id, prop) {
+        document.getElementById(id)?.addEventListener('change', e => {
+            this.settings[prop] = e.target.checked;
+            this.saveSettings();
         });
+    },
 
-        document.getElementById('vfd-dec-time')?.addEventListener('input', (e) => {
-            document.getElementById('vfd-dec-display').textContent = e.target.value;
-            this.hideError('vfd');
+    bindSelect(id, prop) {
+        document.getElementById(id)?.addEventListener('change', e => {
+            this.settings[prop] = parseInt(e.target.value);
+            this.saveSettings();
         });
+    },
 
-        // Encoder calibration listeners
-        document.getElementById('calibrate-x-btn')?.addEventListener('click', () => {
-            this.calibrateEncoder(0);
+    bindDisplay(inputId, displayId, section) {
+        document.getElementById(inputId)?.addEventListener('input', e => {
+            document.getElementById(displayId).textContent = e.target.value;
+            this.hideError(section);
         });
+    },
 
-        document.getElementById('calibrate-y-btn')?.addEventListener('click', () => {
-            this.calibrateEncoder(1);
-        });
-
-        document.getElementById('calibrate-z-btn')?.addEventListener('click', () => {
-            this.calibrateEncoder(2);
-        });
-
-        document.getElementById('reset-encoder-btn')?.addEventListener('click', () => {
-            this.resetEncoderSettings();
-        });
-
-        // Real-time display updates for encoder
-        document.getElementById('x-encoder-ppm')?.addEventListener('input', (e) => {
-            document.getElementById('x-ppm-display').textContent = e.target.value;
-            this.hideError('encoder');
-        });
-
-        document.getElementById('y-encoder-ppm')?.addEventListener('input', (e) => {
-            document.getElementById('y-ppm-display').textContent = e.target.value;
-            this.hideError('encoder');
-        });
-
-        document.getElementById('z-encoder-ppm')?.addEventListener('input', (e) => {
-            document.getElementById('z-ppm-display').textContent = e.target.value;
-            this.hideError('encoder');
-        });
-
-        // Spindle Alarm Configuration listeners
-        document.getElementById('spindle-toolbreak-threshold')?.addEventListener('input', (e) => {
-            document.getElementById('toolbreak-value').textContent = parseFloat(e.target.value).toFixed(1);
+    bindSpindleDisplay(inputId, displayId, formatter = v => v) {
+        document.getElementById(inputId)?.addEventListener('input', e => {
+            document.getElementById(displayId).textContent = formatter(e.target.value);
             this.hideError('spindle-alarm');
-        });
-
-        document.getElementById('spindle-stall-threshold')?.addEventListener('input', (e) => {
-            document.getElementById('stall-threshold-value').textContent = e.target.value;
-            this.hideError('spindle-alarm');
-        });
-
-        document.getElementById('spindle-stall-timeout')?.addEventListener('input', (e) => {
-            document.getElementById('stall-timeout-value').textContent = e.target.value;
-            this.hideError('spindle-alarm');
-        });
-
-        document.getElementById('save-spindle-alarm-btn')?.addEventListener('click', () => {
-            this.saveSpindleAlarmSettings();
-        });
-
-        document.getElementById('reset-spindle-alarm-btn')?.addEventListener('click', () => {
-            this.resetSpindleAlarmSettings();
-        });
-
-        document.getElementById('clear-spindle-alarms-btn')?.addEventListener('click', () => {
-            this.clearSpindleAlarms();
         });
     },
 
     updateDisplay() {
-        // Update theme selector
+        // Theme
         document.querySelectorAll('.theme-option').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.theme === this.settings.theme) {
-                btn.classList.add('active');
-            }
+            btn.classList.toggle('active', btn.dataset.theme === this.settings.theme);
         });
 
-        // Update sliders and inputs
-        const fontSizeSlider = document.getElementById('font-size-slider');
-        const fontSizeDisplay = document.getElementById('font-size-display');
+        // Sliders
+        this.setEl('font-size-slider', this.settings.fontSize, 'value');
+        this.setEl('font-size-display', this.settings.fontSize);
+        this.setEl('quality-threshold', this.settings.qualityThreshold, 'value');
+        this.setEl('quality-value', this.settings.qualityThreshold);
+        this.setEl('jitter-threshold', this.settings.jitterThreshold, 'value');
+        this.setEl('jitter-value', this.settings.jitterThreshold.toFixed(1));
+        this.setEl('temp-threshold', this.settings.tempThreshold, 'value');
+        this.setEl('temp-value', this.settings.tempThreshold);
 
-        if (fontSizeSlider) fontSizeSlider.value = this.settings.fontSize;
-        if (fontSizeDisplay) fontSizeDisplay.textContent = this.settings.fontSize;
+        // Checkboxes
+        this.setEl('auto-refresh-toggle', this.settings.autoRefresh, 'checked');
+        this.setEl('alert-sound-toggle', this.settings.soundAlerts, 'checked');
+        this.setEl('alert-desktop-toggle', this.settings.desktopAlerts, 'checked');
 
-        const qualityThreshold = document.getElementById('quality-threshold');
-        const qualityValue = document.getElementById('quality-value');
+        // Selects
+        this.setEl('history-retention', this.settings.historyRetention, 'value');
+        this.setEl('chart-resolution', this.settings.chartResolution, 'value');
 
-        if (qualityThreshold) qualityThreshold.value = this.settings.qualityThreshold;
-        if (qualityValue) qualityValue.textContent = this.settings.qualityThreshold;
-
-        const jitterThreshold = document.getElementById('jitter-threshold');
-        const jitterValue = document.getElementById('jitter-value');
-
-        if (jitterThreshold) jitterThreshold.value = this.settings.jitterThreshold;
-        if (jitterValue) jitterValue.textContent = this.settings.jitterThreshold.toFixed(1);
-
-        const tempThreshold = document.getElementById('temp-threshold');
-        const tempValue = document.getElementById('temp-value');
-
-        if (tempThreshold) tempThreshold.value = this.settings.tempThreshold;
-        if (tempValue) tempValue.textContent = this.settings.tempThreshold;
-
-        // Update checkboxes
-        const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
-        const alertSoundToggle = document.getElementById('alert-sound-toggle');
-        const alertDesktopToggle = document.getElementById('alert-desktop-toggle');
-
-        if (autoRefreshToggle) autoRefreshToggle.checked = this.settings.autoRefresh;
-        if (alertSoundToggle) alertSoundToggle.checked = this.settings.soundAlerts;
-        if (alertDesktopToggle) alertDesktopToggle.checked = this.settings.desktopAlerts;
-
-        // Update selects
-        const historyRetention = document.getElementById('history-retention');
-        const chartResolution = document.getElementById('chart-resolution');
-
-        if (historyRetention) historyRetention.value = this.settings.historyRetention;
-        if (chartResolution) chartResolution.value = this.settings.chartResolution;
-
-        // Update storage info
         this.updateStorageInfo();
         this.updateSystemInfo();
+    },
+
+    setEl(id, val, prop = 'textContent') {
+        const el = document.getElementById(id);
+        if (el) el[prop] = val;
     },
 
     updateStorageInfo() {
         try {
             let used = 0;
-            for (const key in localStorage) {
-                if (localStorage.hasOwnProperty(key)) {
-                    used += localStorage[key].length + key.length;
-                }
+            for (const k in localStorage) if (localStorage.hasOwnProperty(k)) used += localStorage[k].length + k.length;
+            const usedKB = Math.round(used / 1024), limitKB = 5120;
+            this.setEl('storage-used', usedKB);
+            this.setEl('storage-limit', limitKB);
+            const pct = (usedKB / limitKB) * 100;
+            const fill = document.getElementById('storage-fill');
+            if (fill) {
+                fill.style.width = Math.min(100, pct) + '%';
+                fill.style.background = pct > 80 ? 'var(--color-critical)' : pct > 60 ? 'var(--color-warning)' : 'var(--color-optimal)';
             }
-            const usedKB = Math.round(used / 1024);
-            const limitKB = 5120; // 5MB typical browser quota per domain
-
-            const storageUsedEl = document.getElementById('storage-used');
-            const storageLimitEl = document.getElementById('storage-limit');
-
-            if (storageUsedEl) storageUsedEl.textContent = usedKB;
-            if (storageLimitEl) storageLimitEl.textContent = limitKB;
-
-            const percent = (usedKB / limitKB) * 100;
-            const fillElem = document.getElementById('storage-fill');
-            if (fillElem) {
-                fillElem.style.width = Math.min(100, percent) + '%';
-                fillElem.style.background = percent > 80
-                    ? 'var(--color-critical)'
-                    : percent > 60
-                        ? 'var(--color-warning)'
-                        : 'var(--color-optimal)';
-            }
-        } catch (e) {
-            console.warn('[Settings] Could not calculate storage:', e);
-        }
+        } catch (e) { }
     },
 
     updateSystemInfo() {
-        const state = AppState.data;
-
-        // Firmware and hardware versions (from telemetry)
-        const fwVersionEl = document.getElementById('fw-version');
-        const hwVersionEl = document.getElementById('hw-version');
-
-        if (fwVersionEl) fwVersionEl.textContent = state.system?.fw_version || 'Unknown';
-        if (hwVersionEl) hwVersionEl.textContent = state.system?.hw_version || 'E350 Rev A';
-
-        // Uptime
-        const uptimeMs = state.system?.uptime_ms || 0;
-        const days = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((uptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
-
-        const sysUptimeEl = document.getElementById('sys-uptime');
-        if (sysUptimeEl) sysUptimeEl.textContent = `${days}d ${hours}h ${minutes}m`;
-
-        // Free memory
-        const freeHeap = state.system?.free_heap_bytes || 0;
-        const freeMemoryEl = document.getElementById('free-memory');
-        if (freeMemoryEl) freeMemoryEl.textContent = (freeHeap / 1024).toFixed(1) + ' KB';
-
-        // Network signal
-        const rssi = state.network?.rssi || 0;
-        const strength = this.getRssiDescription(rssi);
-        const signalStrengthEl = document.getElementById('signal-strength');
-        if (signalStrengthEl) signalStrengthEl.textContent = `${strength} (${rssi} dBm)`;
-
-        // Last connection (now)
-        const now = new Date();
-        const lastConnectionEl = document.getElementById('last-connection');
-        if (lastConnectionEl) lastConnectionEl.textContent = now.toLocaleTimeString();
+        const s = AppState.data;
+        this.setEl('fw-version', s.system?.fw_version || 'Unknown');
+        this.setEl('hw-version', s.system?.hw_version || 'E350 Rev A');
+        const ms = s.system?.uptime_ms || 0;
+        const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000);
+        this.setEl('sys-uptime', `${d}d ${h}h ${m}m`);
+        this.setEl('free-memory', ((s.system?.free_heap_bytes || 0) / 1024).toFixed(1) + ' KB');
+        const rssi = s.network?.rssi || 0;
+        this.setEl('signal-strength', `${this.getRssiDescription(rssi)} (${rssi} dBm)`);
+        this.setEl('last-connection', new Date().toLocaleTimeString());
     },
 
-    getRssiDescription(rssi) {
-        if (rssi >= -30) return 'Excellent';
-        if (rssi >= -67) return 'Good';
-        if (rssi >= -70) return 'Fair';
-        if (rssi >= -80) return 'Weak';
+    getRssiDescription(r) {
+        if (r >= -30) return 'Excellent';
+        if (r >= -67) return 'Good';
+        if (r >= -70) return 'Fair';
+        if (r >= -80) return 'Weak';
         return 'Very Weak';
     },
 
@@ -380,12 +226,7 @@ window.SettingsModule = window.SettingsModule || {
         this.settings.theme = theme;
         ThemeManager.applyTheme(theme);
         this.saveSettings();
-
-        // Update visual indicator
-        document.querySelectorAll('.theme-option').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        document.querySelector(`[data-theme="${theme}"]`).classList.add('active');
+        document.querySelectorAll('.theme-option').forEach(btn => btn.classList.toggle('active', btn.dataset.theme === theme));
     },
 
     setFontSize(size) {
@@ -395,799 +236,77 @@ window.SettingsModule = window.SettingsModule || {
     },
 
     playAlertSound() {
-        // Create a simple beep using Web Audio API
         try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            oscillator.frequency.value = 800;
-            oscillator.type = 'sine';
-
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.5);
-        } catch (e) {
-            console.warn('[Settings] Could not play alert sound:', e);
-        }
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator(), gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = 800; osc.type = 'sine';
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+            osc.start(); osc.stop(ctx.currentTime + 0.5);
+        } catch (e) { }
     },
 
     clearCache() {
-        if (confirm('Clear cache and history? This will remove all stored data.')) {
-            const keysToKeep = ['themeSettings', 'userSettings'];
-            for (const key in localStorage) {
-                if (localStorage.hasOwnProperty(key) && !keysToKeep.includes(key)) {
-                    localStorage.removeItem(key);
-                }
-            }
-            this.updateStorageInfo();
-            AlertManager.add('Cache cleared successfully', 'success', 2000);
-        }
+        if (!confirm('Clear cache and history?')) return;
+        const keep = ['themeSettings', 'userSettings'];
+        for (const k in localStorage) if (localStorage.hasOwnProperty(k) && !keep.includes(k)) localStorage.removeItem(k);
+        this.updateStorageInfo();
+        AlertManager.add('Cache cleared', 'success', 2000);
     },
 
     factoryReset() {
-        if (confirm('Factory reset will clear ALL settings and data. Continue?') &&
-            confirm('Are you sure? This cannot be undone.')) {
-            localStorage.clear();
-            this.settings = { ...this.defaults };
-            this.saveSettings();
-            location.reload();
-        }
+        if (!confirm('Factory reset will clear ALL settings. Continue?') || !confirm('Are you sure?')) return;
+        localStorage.clear();
+        this.settings = { ...this.defaults };
+        this.saveSettings();
+        location.reload();
     },
 
     loadSettings() {
         try {
-            const stored = JSON.parse(localStorage.getItem('userSettings') || '{}');
-            this.settings = { ...this.defaults, ...stored };
-        } catch (e) {
-            console.warn('[Settings] Failed to load settings:', e);
-            this.settings = { ...this.defaults };
-        }
-
-        // Apply theme and font size immediately
+            this.settings = { ...this.defaults, ...JSON.parse(localStorage.getItem('userSettings') || '{}') };
+        } catch (e) { this.settings = { ...this.defaults }; }
         ThemeManager.applyTheme(this.settings.theme);
         ThemeManager.setFontSize(this.settings.fontSize);
     },
 
     saveSettings() {
-        try {
-            localStorage.setItem('userSettings', JSON.stringify(this.settings));
-        } catch (e) {
-            console.warn('[Settings] Failed to save settings:', e);
-            AlertManager.add('Failed to save settings (storage full)', 'warning');
-        }
+        try { localStorage.setItem('userSettings', JSON.stringify(this.settings)); }
+        catch (e) { AlertManager.add('Failed to save settings', 'warning'); }
     },
-
-    // =====================================================================
-    // CONFIGURATION MANAGEMENT
-    // =====================================================================
 
     loadConfiguration() {
         console.log('[Settings] Loading configuration');
-
-        // Skip API calls in file:// protocol or mock mode - no real device to query
-        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
-            console.log('[Settings] File/mock mode detected - skipping configuration API calls');
-            return;
-        }
-
         Promise.all([
-            this.loadMotionConfig(),
-            this.loadVfdConfig(),
-            this.loadEncoderConfig(),
-            this.loadSpindleAlarmConfig()
-        ]).catch(err => {
-            console.error('[Settings] Failed to load configuration:', err);
-        });
-
+            this.loadMotionConfig?.() || Promise.resolve(),
+            this.loadVfdConfig?.() || Promise.resolve(),
+            this.loadEncoderConfig?.() || Promise.resolve(),
+            this.loadSpindleAlarmConfig?.() || Promise.resolve()
+        ]).catch(e => console.error('[Settings] Config load failed:', e));
     },
 
-    loadMotionConfig() {
-        return fetch('/api/config/get?category=0')
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && data.config) {
-                    const cfg = data.config;
-                    document.getElementById('x-limit-low').value = cfg.soft_limit_low_mm[0];
-                    document.getElementById('x-limit-high').value = cfg.soft_limit_high_mm[0];
-                    document.getElementById('y-limit-low').value = cfg.soft_limit_low_mm[1];
-                    document.getElementById('y-limit-high').value = cfg.soft_limit_high_mm[1];
-                    document.getElementById('z-limit-low').value = cfg.soft_limit_low_mm[2];
-                    document.getElementById('z-limit-high').value = cfg.soft_limit_high_mm[2];
-                    this.setStatusLoaded('motion');
-                }
-            })
-            .catch(err => {
-                console.error('[Settings] Motion config load failed:', err);
-                this.setStatusError('motion', 'Failed to load motion settings');
-            });
-    },
-
-    loadVfdConfig() {
-        return fetch('/api/config/get?category=1')
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && data.config) {
-                    const cfg = data.config;
-                    document.getElementById('vfd-min-speed').value = cfg.min_speed_hz;
-                    document.getElementById('vfd-min-display').textContent = cfg.min_speed_hz;
-                    document.getElementById('vfd-max-speed').value = cfg.max_speed_hz;
-                    document.getElementById('vfd-max-display').textContent = cfg.max_speed_hz;
-                    document.getElementById('vfd-acc-time').value = cfg.acc_time_ms;
-                    document.getElementById('vfd-acc-display').textContent = cfg.acc_time_ms;
-                    document.getElementById('vfd-dec-time').value = cfg.dec_time_ms;
-                    document.getElementById('vfd-dec-display').textContent = cfg.dec_time_ms;
-                    this.setStatusLoaded('vfd');
-                }
-            })
-            .catch(err => {
-                console.error('[Settings] VFD config load failed:', err);
-                this.setStatusError('vfd', 'Failed to load VFD settings');
-            });
-    },
-
-    loadEncoderConfig() {
-        return fetch('/api/config/get?category=2')
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && data.config) {
-                    const cfg = data.config;
-                    document.getElementById('x-encoder-ppm').value = cfg.ppm[0];
-                    document.getElementById('x-ppm-display').textContent = cfg.ppm[0];
-                    document.getElementById('y-encoder-ppm').value = cfg.ppm[1];
-                    document.getElementById('y-ppm-display').textContent = cfg.ppm[1];
-                    document.getElementById('z-encoder-ppm').value = cfg.ppm[2];
-                    document.getElementById('z-ppm-display').textContent = cfg.ppm[2];
-                    this.setStatusLoaded('encoder');
-                }
-            })
-            .catch(err => {
-                console.error('[Settings] Encoder config load failed:', err);
-                this.setStatusError('encoder', 'Failed to load encoder settings');
-            });
-    },
-
-    saveMotionSettings() {
-        console.log('[Settings] Saving motion settings');
-        const x_low = parseInt(document.getElementById('x-limit-low').value);
-        const x_high = parseInt(document.getElementById('x-limit-high').value);
-        const y_low = parseInt(document.getElementById('y-limit-low').value);
-        const y_high = parseInt(document.getElementById('y-limit-high').value);
-        const z_low = parseInt(document.getElementById('z-limit-low').value);
-        const z_high = parseInt(document.getElementById('z-limit-high').value);
-
-        // Validate before saving
-        if (x_low >= x_high || y_low >= y_high || z_low >= z_high) {
-            this.showError('motion', 'Lower limit must be less than upper limit');
-            return;
-        }
-
-        const updates = [
-            this.setConfig(0, 'soft_limit_low_mm[0]', x_low),
-            this.setConfig(0, 'soft_limit_high_mm[0]', x_high),
-            this.setConfig(0, 'soft_limit_low_mm[1]', y_low),
-            this.setConfig(0, 'soft_limit_high_mm[1]', y_high),
-            this.setConfig(0, 'soft_limit_low_mm[2]', z_low),
-            this.setConfig(0, 'soft_limit_high_mm[2]', z_high)
-        ];
-
-        Promise.all(updates)
-            .then(() => {
-                AlertManager.add('Motion settings saved successfully', 'success', 2000);
-                this.setStatusLoaded('motion');
-            })
-            .catch(err => {
-                console.error('[Settings] Motion save failed:', err);
-                this.showError('motion', 'Failed to save motion settings');
-                this.setStatusError('motion', 'Save failed');
-            });
-    },
-
-    resetMotionSettings() {
-        if (!confirm('Reset motion settings to defaults?')) return;
-        const defaults = { low: 0, high: 500 };
-        const updates = [
-            this.setConfig(0, 'soft_limit_low_mm[0]', defaults.low),
-            this.setConfig(0, 'soft_limit_high_mm[0]', defaults.high),
-            this.setConfig(0, 'soft_limit_low_mm[1]', defaults.low),
-            this.setConfig(0, 'soft_limit_high_mm[1]', defaults.high),
-            this.setConfig(0, 'soft_limit_low_mm[2]', defaults.low),
-            this.setConfig(0, 'soft_limit_high_mm[2]', defaults.high)
-        ];
-
-        Promise.all(updates)
-            .then(() => this.loadMotionConfig())
-            .then(() => AlertManager.add('Motion settings reset to defaults', 'success', 2000))
-            .catch(err => {
-                console.error('[Settings] Motion reset failed:', err);
-                this.showError('motion', 'Failed to reset motion settings');
-            });
-    },
-
-    saveVfdSettings() {
-        console.log('[Settings] Saving VFD settings');
-        const min_hz = parseInt(document.getElementById('vfd-min-speed').value);
-        const max_hz = parseInt(document.getElementById('vfd-max-speed').value);
-        const acc_ms = parseInt(document.getElementById('vfd-acc-time').value);
-        const dec_ms = parseInt(document.getElementById('vfd-dec-time').value);
-
-        // Validate
-        if (min_hz >= max_hz) {
-            this.showError('vfd', 'Min speed must be less than max speed');
-            return;
-        }
-        if (min_hz < 1 || max_hz > 105) {
-            this.showError('vfd', 'Speed must be between 1 and 105 Hz');
-            return;
-        }
-        if (acc_ms < 200 || dec_ms < 200) {
-            this.showError('vfd', 'Ramp time must be at least 200 ms');
-            return;
-        }
-
-        const updates = [
-            this.setConfig(1, 'min_speed_hz', min_hz),
-            this.setConfig(1, 'max_speed_hz', max_hz),
-            this.setConfig(1, 'acc_time_ms', acc_ms),
-            this.setConfig(1, 'dec_time_ms', dec_ms)
-        ];
-
-        Promise.all(updates)
-            .then(() => {
-                AlertManager.add('VFD settings saved successfully', 'success', 2000);
-                this.setStatusLoaded('vfd');
-            })
-            .catch(err => {
-                console.error('[Settings] VFD save failed:', err);
-                this.showError('vfd', 'Failed to save VFD settings');
-                this.setStatusError('vfd', 'Save failed');
-            });
-    },
-
-    resetVfdSettings() {
-        if (!confirm('Reset VFD settings to defaults?')) return;
-        const updates = [
-            this.setConfig(1, 'min_speed_hz', 1),
-            this.setConfig(1, 'max_speed_hz', 105),
-            this.setConfig(1, 'acc_time_ms', 600),
-            this.setConfig(1, 'dec_time_ms', 400)
-        ];
-
-        Promise.all(updates)
-            .then(() => this.loadVfdConfig())
-            .then(() => AlertManager.add('VFD settings reset to defaults', 'success', 2000))
-            .catch(err => {
-                console.error('[Settings] VFD reset failed:', err);
-                this.showError('vfd', 'Failed to reset VFD settings');
-            });
-    },
-
-    calibrateEncoder(axis) {
-        const axisNames = ['X', 'Y', 'Z'];
-        const ppmInput = document.getElementById(`${'xyz'[axis]}-encoder-ppm`);
-        const ppm = parseInt(ppmInput.value);
-
-        if (ppm < 50 || ppm > 200) {
-            this.showError('encoder', `PPM must be between 50 and 200`);
-            return;
-        }
-
-        console.log(`[Settings] Calibrating ${axisNames[axis]} encoder with ${ppm} PPM`);
-
-        fetch('/api/encoder/calibrate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ axis, ppm })
-        })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    AlertManager.add(`${axisNames[axis]}-axis calibrated to ${ppm} PPM`, 'success', 2000);
-                    this.setStatusLoaded('encoder');
-                } else {
-                    this.showError('encoder', data.error || 'Calibration failed');
-                    this.setStatusError('encoder', 'Calibration failed');
-                }
-            })
-            .catch(err => {
-                console.error(`[Settings] Calibration failed:`, err);
-                this.showError('encoder', 'Failed to calibrate encoder');
-                this.setStatusError('encoder', 'Error');
-            });
-    },
-
-    resetEncoderSettings() {
-        if (!confirm('Reset all encoders to default (100 PPM)?')) return;
-        const updates = [
-            this.setConfig(2, 'ppm[0]', 100),
-            this.setConfig(2, 'ppm[1]', 100),
-            this.setConfig(2, 'ppm[2]', 100)
-        ];
-
-        Promise.all(updates)
-            .then(() => this.loadEncoderConfig())
-            .then(() => AlertManager.add('Encoder settings reset to defaults', 'success', 2000))
-            .catch(err => {
-                console.error('[Settings] Encoder reset failed:', err);
-                this.showError('encoder', 'Failed to reset encoder settings');
-            });
-    },
-
-    setConfig(category, key, value) {
-        return fetch('/api/config/set', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ category, key, value })
-        })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) {
-                    throw new Error(data.error || 'Set config failed');
-                }
-                return data;
-            });
-    },
-
-    // =====================================================================
-    // SPINDLE ALARM CONFIGURATION
-    // =====================================================================
-
-    loadSpindleAlarmConfig() {
-        return fetch('/api/spindle/alarm')
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    // Update sliders
-                    const toolbreakSlider = document.getElementById('spindle-toolbreak-threshold');
-                    const stallThreshSlider = document.getElementById('spindle-stall-threshold');
-                    const stallTimeoutSlider = document.getElementById('spindle-stall-timeout');
-
-                    if (toolbreakSlider) {
-                        toolbreakSlider.value = data.toolbreak_threshold || 5;
-                        document.getElementById('toolbreak-value').textContent = parseFloat(data.toolbreak_threshold || 5).toFixed(1);
-                    }
-                    if (stallThreshSlider) {
-                        stallThreshSlider.value = data.stall_threshold || 25;
-                        document.getElementById('stall-threshold-value').textContent = data.stall_threshold || 25;
-                    }
-                    if (stallTimeoutSlider) {
-                        stallTimeoutSlider.value = data.stall_timeout_ms || 2000;
-                        document.getElementById('stall-timeout-value').textContent = data.stall_timeout_ms || 2000;
-                    }
-
-                    // Update alarm status
-                    this.updateSpindleAlarmStatus(data);
-                    this.setStatusLoaded('spindle-alarm');
-                }
-            })
-            .catch(err => {
-                console.error('[Settings] Spindle alarm config load failed:', err);
-                this.setStatusError('spindle-alarm', 'Failed to load');
-            });
-    },
-
-    updateSpindleAlarmStatus(data) {
-        const toolbreakEl = document.getElementById('alarm-toolbreak-status');
-        const stallEl = document.getElementById('alarm-stall-status');
-
-        if (toolbreakEl) {
-            if (data.alarm_tool_breakage) {
-                toolbreakEl.textContent = 'ALARM';
-                toolbreakEl.style.color = 'var(--color-critical)';
-            } else {
-                toolbreakEl.textContent = 'OK';
-                toolbreakEl.style.color = 'var(--color-optimal)';
-            }
-        }
-
-        if (stallEl) {
-            if (data.alarm_stall) {
-                stallEl.textContent = 'ALARM';
-                stallEl.style.color = 'var(--color-critical)';
-            } else {
-                stallEl.textContent = 'OK';
-                stallEl.style.color = 'var(--color-optimal)';
-            }
-        }
-    },
-
-    saveSpindleAlarmSettings() {
-        console.log('[Settings] Saving spindle alarm settings');
-
-        const toolbreakThreshold = parseFloat(document.getElementById('spindle-toolbreak-threshold').value);
-        const stallThreshold = parseInt(document.getElementById('spindle-stall-threshold').value);
-        const stallTimeout = parseInt(document.getElementById('spindle-stall-timeout').value);
-
-        fetch('/api/spindle/alarm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                toolbreak_threshold: toolbreakThreshold,
-                stall_threshold: stallThreshold,
-                stall_timeout_ms: stallTimeout
-            })
-        })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    AlertManager.add('Spindle alarm settings saved', 'success', 2000);
-                    this.setStatusLoaded('spindle-alarm');
-                } else {
-                    this.showError('spindle-alarm', data.error || 'Save failed');
-                    this.setStatusError('spindle-alarm', 'Save failed');
-                }
-            })
-            .catch(err => {
-                console.error('[Settings] Spindle alarm save failed:', err);
-                this.showError('spindle-alarm', 'Failed to save settings');
-                this.setStatusError('spindle-alarm', 'Error');
-            });
-    },
-
-    resetSpindleAlarmSettings() {
-        if (!confirm('Reset spindle alarm settings to defaults?')) return;
-
-        // Reset UI to defaults
-        document.getElementById('spindle-toolbreak-threshold').value = 5;
-        document.getElementById('toolbreak-value').textContent = '5.0';
-        document.getElementById('spindle-stall-threshold').value = 25;
-        document.getElementById('stall-threshold-value').textContent = '25';
-        document.getElementById('spindle-stall-timeout').value = 2000;
-        document.getElementById('stall-timeout-value').textContent = '2000';
-
-        // Save defaults
-        this.saveSpindleAlarmSettings();
-    },
-
-    clearSpindleAlarms() {
-        console.log('[Settings] Clearing spindle alarms');
-
-        fetch('/api/spindle/alarm/clear', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    AlertManager.add('Spindle alarms cleared', 'success', 2000);
-                    // Update status display
-                    const toolbreakEl = document.getElementById('alarm-toolbreak-status');
-                    const stallEl = document.getElementById('alarm-stall-status');
-                    if (toolbreakEl) {
-                        toolbreakEl.textContent = 'OK';
-                        toolbreakEl.style.color = 'var(--color-optimal)';
-                    }
-                    if (stallEl) {
-                        stallEl.textContent = 'OK';
-                        stallEl.style.color = 'var(--color-optimal)';
-                    }
-                } else {
-                    AlertManager.add('Failed to clear alarms: ' + (data.error || 'Unknown error'), 'error');
-                }
-            })
-            .catch(err => {
-                console.error('[Settings] Clear alarms failed:', err);
-                AlertManager.add('Failed to clear alarms', 'error');
-            });
-    },
-
-    showError(section, message) {
-        const errorDiv = document.getElementById(`${section}-error`);
-        if (errorDiv) {
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-        console.warn(`[Settings] ${section} error: ${message}`);
+    showError(section, msg) {
+        const el = document.getElementById(`${section}-error`);
+        if (el) { el.textContent = msg; el.style.display = 'block'; }
     },
 
     hideError(section) {
-        const errorDiv = document.getElementById(`${section}-error`);
-        if (errorDiv) {
-            errorDiv.style.display = 'none';
-        }
+        const el = document.getElementById(`${section}-error`);
+        if (el) el.style.display = 'none';
     },
 
     setStatusLoaded(section) {
-        const status = document.getElementById(`${section}-status`);
-        if (status) {
-            status.textContent = '✓ Loaded';
-            status.className = 'card-status loaded';
-        }
+        const el = document.getElementById(`${section}-status`);
+        if (el) { el.textContent = '✓ Loaded'; el.className = 'card-status loaded'; }
     },
 
-    setStatusError(section, message) {
-        const status = document.getElementById(`${section}-status`);
-        if (status) {
-            status.textContent = '✗ ' + message;
-            status.className = 'card-status error';
-        }
+    setStatusError(section, msg) {
+        const el = document.getElementById(`${section}-status`);
+        if (el) { el.textContent = '✗ ' + msg; el.className = 'card-status error'; }
     },
 
-    updateMockModeUI() {
-        const btn = document.getElementById('toggle-mock-mode-btn');
-        const statusText = document.getElementById('mock-status-text');
-        if (!btn || !statusText) return;
-
-        if (window.MockMode?.enabled) {
-            btn.textContent = 'Disable Mock Mode';
-            btn.classList.add('active');
-            statusText.textContent = '✓ Status: Mock Mode Active';
-            statusText.style.color = 'var(--color-optimal)';
-        } else {
-            btn.textContent = 'Enable Mock Mode';
-            btn.classList.remove('active');
-            statusText.textContent = '✗ Status: Offline (Click to enable)';
-            statusText.style.color = 'var(--text-secondary)';
-        }
-    },
-
-    // Configuration Import/Export
-    setupConfigManagement() {
-        // Preset loader
-        const loadPresetBtn = document.getElementById('load-preset-btn');
-        if (loadPresetBtn) {
-            loadPresetBtn.addEventListener('click', () => this.loadPreset());
-        }
-
-        // Export buttons
-        const exportAllBtn = document.getElementById('export-all-btn');
-        if (exportAllBtn) {
-            exportAllBtn.addEventListener('click', () => this.exportConfiguration('all'));
-        }
-
-        const exportMotionBtn = document.getElementById('export-motion-btn');
-        if (exportMotionBtn) {
-            exportMotionBtn.addEventListener('click', () => this.exportConfiguration('motion'));
-        }
-
-        // Import button
-        const importBtn = document.getElementById('import-config-btn');
-        if (importBtn) {
-            importBtn.addEventListener('click', () => this.importConfiguration());
-        }
-
-        // Compare button
-        const compareBtn = document.getElementById('compare-config-btn');
-        if (compareBtn) {
-            compareBtn.addEventListener('click', () => this.compareConfiguration());
-        }
-    },
-
-    getPresets() {
-        return {
-            aluminum: {
-                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
-                vfd: { min_speed: 20, max_speed: 85, acc_time: 600, dec_time: 400 },
-                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
-            },
-            steel: {
-                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
-                vfd: { min_speed: 10, max_speed: 50, acc_time: 800, dec_time: 600 },
-                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
-            },
-            plastic: {
-                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
-                vfd: { min_speed: 30, max_speed: 105, acc_time: 400, dec_time: 300 },
-                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
-            },
-            wood: {
-                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
-                vfd: { min_speed: 25, max_speed: 95, acc_time: 500, dec_time: 350 },
-                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
-            },
-            engraving: {
-                motion: { x_min: -100, x_max: 500, y_min: -100, y_max: 500, z_min: 0, z_max: 100 },
-                vfd: { min_speed: 40, max_speed: 105, acc_time: 300, dec_time: 200 },
-                encoder: { x_ppm: 100, y_ppm: 100, z_ppm: 100, a_ppm: 50 }
-            }
-        };
-    },
-
-    loadPreset() {
-        const select = document.getElementById('preset-select');
-        if (!select || !select.value) {
-            AlertManager.add('Please select a preset', 'warning', 2000);
-            return;
-        }
-
-        const presets = this.getPresets();
-        const preset = presets[select.value];
-
-        if (preset) {
-            // Apply preset values to form fields
-            if (preset.motion) {
-                document.getElementById('x-limit-low').value = preset.motion.x_min;
-                document.getElementById('x-limit-high').value = preset.motion.x_max;
-                document.getElementById('y-limit-low').value = preset.motion.y_min;
-                document.getElementById('y-limit-high').value = preset.motion.y_max;
-                document.getElementById('z-limit-low').value = preset.motion.z_min;
-                document.getElementById('z-limit-high').value = preset.motion.z_max;
-            }
-
-            if (preset.vfd) {
-                document.getElementById('vfd-min-speed').value = preset.vfd.min_speed;
-                document.getElementById('vfd-max-speed').value = preset.vfd.max_speed;
-                document.getElementById('vfd-acc-time').value = preset.vfd.acc_time;
-                document.getElementById('vfd-dec-time').value = preset.vfd.dec_time;
-                document.getElementById('vfd-min-display').textContent = preset.vfd.min_speed;
-                document.getElementById('vfd-max-display').textContent = preset.vfd.max_speed;
-                document.getElementById('vfd-acc-display').textContent = preset.vfd.acc_time;
-                document.getElementById('vfd-dec-display').textContent = preset.vfd.dec_time;
-            }
-
-            AlertManager.add(`Preset '${select.value}' loaded. Review and save changes.`, 'success', 3000);
-        }
-    },
-
-    exportConfiguration(type) {
-        const config = {
-            timestamp: new Date().toISOString(),
-            firmware_version: '3.1.0',
-            type: type,
-            data: {}
-        };
-
-        if (type === 'all' || type === 'motion') {
-            config.data.motion = {
-                x_min: document.getElementById('x-limit-low').value || 0,
-                x_max: document.getElementById('x-limit-high').value || 500,
-                y_min: document.getElementById('y-limit-low').value || 0,
-                y_max: document.getElementById('y-limit-high').value || 500,
-                z_min: document.getElementById('z-limit-low').value || 0,
-                z_max: document.getElementById('z-limit-high').value || 100
-            };
-        }
-
-        if (type === 'all') {
-            config.data.vfd = {
-                min_speed: document.getElementById('vfd-min-speed').value || 1,
-                max_speed: document.getElementById('vfd-max-speed').value || 105,
-                acc_time: document.getElementById('vfd-acc-time').value || 600,
-                dec_time: document.getElementById('vfd-dec-time').value || 400
-            };
-
-            config.data.encoder = {
-                x_ppm: document.getElementById('x-encoder-ppm').value || 100,
-                y_ppm: document.getElementById('y-encoder-ppm').value || 100,
-                z_ppm: document.getElementById('z-encoder-ppm').value || 100,
-                a_ppm: 50
-            };
-        }
-
-        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `config-${type}-${Date.now()}.json`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-
-        AlertManager.add(`Configuration exported as ${a.download}`, 'success', 3000);
-    },
-
-    importConfiguration() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const config = JSON.parse(event.target.result);
-                        this.applyConfiguration(config);
-                    } catch (err) {
-                        AlertManager.add('Invalid configuration file', 'critical', 3000);
-                    }
-                };
-                reader.readAsText(file);
-            }
-        });
-        input.click();
-    },
-
-    applyConfiguration(config) {
-        if (!config || !config.data) {
-            AlertManager.add('Invalid configuration format', 'critical', 3000);
-            return;
-        }
-
-        if (config.data.motion) {
-            document.getElementById('x-limit-low').value = config.data.motion.x_min;
-            document.getElementById('x-limit-high').value = config.data.motion.x_max;
-            document.getElementById('y-limit-low').value = config.data.motion.y_min;
-            document.getElementById('y-limit-high').value = config.data.motion.y_max;
-            document.getElementById('z-limit-low').value = config.data.motion.z_min;
-            document.getElementById('z-limit-high').value = config.data.motion.z_max;
-        }
-
-        if (config.data.vfd) {
-            document.getElementById('vfd-min-speed').value = config.data.vfd.min_speed;
-            document.getElementById('vfd-max-speed').value = config.data.vfd.max_speed;
-            document.getElementById('vfd-acc-time').value = config.data.vfd.acc_time;
-            document.getElementById('vfd-dec-time').value = config.data.vfd.dec_time;
-        }
-
-        if (config.data.encoder) {
-            document.getElementById('x-encoder-ppm').value = config.data.encoder.x_ppm;
-            document.getElementById('y-encoder-ppm').value = config.data.encoder.y_ppm;
-            document.getElementById('z-encoder-ppm').value = config.data.encoder.z_ppm;
-        }
-
-        AlertManager.add('Configuration loaded. Review changes and save.', 'success', 3000);
-
-        const statusDiv = document.getElementById('import-status');
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.innerHTML = `✓ Loaded configuration from ${new Date().toLocaleString()}`;
-        }
-    },
-
-    compareConfiguration() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const fileConfig = JSON.parse(event.target.result);
-                        const currentConfig = this.getCurrentConfiguration();
-                        this.displayComparison(fileConfig, currentConfig);
-                    } catch (err) {
-                        AlertManager.add('Invalid file for comparison', 'critical', 3000);
-                    }
-                };
-                reader.readAsText(file);
-            }
-        });
-        input.click();
-    },
-
-    getCurrentConfiguration() {
-        return {
-            motion: {
-                x_min: document.getElementById('x-limit-low').value || 0,
-                x_max: document.getElementById('x-limit-high').value || 500,
-                y_min: document.getElementById('y-limit-low').value || 0,
-                y_max: document.getElementById('y-limit-high').value || 500
-            },
-            vfd: {
-                min_speed: document.getElementById('vfd-min-speed').value || 1,
-                max_speed: document.getElementById('vfd-max-speed').value || 105
-            }
-        };
-    },
-
-    displayComparison(fileConfig, currentConfig) {
-        const resultDiv = document.getElementById('comparison-result');
-        if (!resultDiv) return;
-
-        let html = '<strong>Configuration Comparison:</strong><br>';
-
-        if (fileConfig.data && fileConfig.data.motion && currentConfig.motion) {
-            html += '<br><strong>Motion Settings:</strong><br>';
-            Object.keys(fileConfig.data.motion).forEach(key => {
-                const fileVal = fileConfig.data.motion[key];
-                const currVal = currentConfig.motion[key];
-                const match = fileVal === currVal;
-                const color = match ? 'green' : 'orange';
-                html += `<span style="color: ${color};">${key}: ${currVal} → ${fileVal}</span><br>`;
-            });
-        }
-
-        resultDiv.innerHTML = html;
-        resultDiv.style.display = 'block';
-    },
-
-    cleanup() {
-        console.log('[Settings] Cleaning up');
-    }
+    cleanup() { console.log('[Settings] Cleaning up'); }
 };
 
 window.currentPageModule = SettingsModule;

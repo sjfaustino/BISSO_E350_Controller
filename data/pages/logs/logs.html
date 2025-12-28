@@ -1,3 +1,6 @@
+<!--
+  logs.html - Fault and operation log viewer with filtering and export
+-->
 <div class="logs-page">
     <div class="card-grid">
         <!-- Log Filters Card -->
@@ -93,164 +96,164 @@
 </div>
 
 <style>
-.logs-page .filter-group {
-    margin-bottom: var(--space-md);
-}
+    .logs-page .filter-group {
+        margin-bottom: var(--space-md);
+    }
 
-.logs-page .filter-group label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: var(--space-xs);
-    font-size: var(--font-size-sm);
-}
+    .logs-page .filter-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: var(--space-xs);
+        font-size: var(--font-size-sm);
+    }
 
-.logs-page .form-control {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid var(--bg-secondary);
-    border-radius: 4px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: var(--font-size-base);
-}
+    .logs-page .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid var(--bg-secondary);
+        border-radius: 4px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: var(--font-size-base);
+    }
 
-.logs-page .form-control:focus {
-    outline: none;
-    border-color: var(--color-normal);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-}
+    .logs-page .form-control:focus {
+        outline: none;
+        border-color: var(--color-normal);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
 
-.logs-page .filter-buttons {
-    display: flex;
-    gap: var(--space-md);
-    margin-top: var(--space-md);
-}
+    .logs-page .filter-buttons {
+        display: flex;
+        gap: var(--space-md);
+        margin-top: var(--space-md);
+    }
 
-.logs-page .btn-sm {
-    padding: 6px 12px;
-    font-size: var(--font-size-sm);
-}
+    .logs-page .btn-sm {
+        padding: 6px 12px;
+        font-size: var(--font-size-sm);
+    }
 
-.logs-page .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-md);
-}
-
-.logs-page .stat-item {
-    text-align: center;
-    padding: var(--space-md);
-    background: var(--bg-secondary);
-    border-radius: 8px;
-}
-
-.logs-page .stat-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--space-xs);
-}
-
-.logs-page .stat-value {
-    font-size: var(--font-size-2xl);
-    font-weight: 700;
-    color: var(--color-normal);
-}
-
-.logs-page .stat-value.critical {
-    color: var(--color-critical);
-}
-
-.logs-page .stat-value.error {
-    color: var(--color-critical);
-}
-
-.logs-page .stat-value.warning {
-    color: var(--color-warning);
-}
-
-.logs-page .log-container {
-    max-height: 500px;
-    overflow-y: auto;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-    padding: var(--space-md);
-}
-
-.logs-page .log-entry {
-    display: grid;
-    grid-template-columns: 140px 70px 80px 1fr;
-    gap: var(--space-sm);
-    padding: var(--space-sm);
-    margin: 2px 0;
-    border-left: 3px solid transparent;
-    border-radius: 2px;
-    word-wrap: break-word;
-}
-
-.logs-page .log-entry.log-info {
-    border-left-color: var(--color-normal);
-    color: var(--color-normal);
-}
-
-.logs-page .log-entry.log-warn {
-    border-left-color: var(--color-warning);
-    color: var(--color-warning);
-}
-
-.logs-page .log-entry.log-error {
-    border-left-color: var(--color-critical);
-    color: var(--color-critical);
-}
-
-.logs-page .log-entry.log-critical {
-    border-left-color: var(--color-critical);
-    color: var(--color-critical);
-    font-weight: 600;
-}
-
-.logs-page .log-time {
-    color: var(--text-secondary);
-    font-size: 11px;
-}
-
-.logs-page .log-level {
-    font-weight: 600;
-    text-align: center;
-}
-
-.logs-page .log-source {
-    font-weight: 500;
-    color: var(--text-secondary);
-    text-align: center;
-}
-
-.logs-page .log-message {
-    word-break: break-word;
-}
-
-@media (max-width: 768px) {
     .logs-page .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--space-md);
+    }
+
+    .logs-page .stat-item {
+        text-align: center;
+        padding: var(--space-md);
+        background: var(--bg-secondary);
+        border-radius: 8px;
+    }
+
+    .logs-page .stat-label {
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+        margin-bottom: var(--space-xs);
+    }
+
+    .logs-page .stat-value {
+        font-size: var(--font-size-2xl);
+        font-weight: 700;
+        color: var(--color-normal);
+    }
+
+    .logs-page .stat-value.critical {
+        color: var(--color-critical);
+    }
+
+    .logs-page .stat-value.error {
+        color: var(--color-critical);
+    }
+
+    .logs-page .stat-value.warning {
+        color: var(--color-warning);
+    }
+
+    .logs-page .log-container {
+        max-height: 500px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        padding: var(--space-md);
     }
 
     .logs-page .log-entry {
-        grid-template-columns: 1fr;
-        gap: 2px;
+        display: grid;
+        grid-template-columns: 140px 70px 80px 1fr;
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+        margin: 2px 0;
+        border-left: 3px solid transparent;
+        border-radius: 2px;
+        word-wrap: break-word;
     }
 
-    .logs-page .log-time,
-    .logs-page .log-level,
-    .logs-page .log-source {
-        display: inline;
+    .logs-page .log-entry.log-info {
+        border-left-color: var(--color-normal);
+        color: var(--color-normal);
     }
 
-    .logs-page .log-time::after,
-    .logs-page .log-level::after,
-    .logs-page .log-source::after {
-        content: ' | ';
+    .logs-page .log-entry.log-warn {
+        border-left-color: var(--color-warning);
+        color: var(--color-warning);
+    }
+
+    .logs-page .log-entry.log-error {
+        border-left-color: var(--color-critical);
+        color: var(--color-critical);
+    }
+
+    .logs-page .log-entry.log-critical {
+        border-left-color: var(--color-critical);
+        color: var(--color-critical);
+        font-weight: 600;
+    }
+
+    .logs-page .log-time {
         color: var(--text-secondary);
+        font-size: 11px;
     }
-}
+
+    .logs-page .log-level {
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .logs-page .log-source {
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-align: center;
+    }
+
+    .logs-page .log-message {
+        word-break: break-word;
+    }
+
+    @media (max-width: 768px) {
+        .logs-page .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .logs-page .log-entry {
+            grid-template-columns: 1fr;
+            gap: 2px;
+        }
+
+        .logs-page .log-time,
+        .logs-page .log-level,
+        .logs-page .log-source {
+            display: inline;
+        }
+
+        .logs-page .log-time::after,
+        .logs-page .log-level::after,
+        .logs-page .log-source::after {
+            content: ' | ';
+            color: var(--text-secondary);
+        }
+    }
 </style>

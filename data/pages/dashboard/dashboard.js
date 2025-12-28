@@ -111,15 +111,6 @@ window.DashboardModule = window.DashboardModule || {
     },
 
     initializeGraphs() {
-        // Check if we're in file:// or mock mode - use MiniChart as fallback
-        const useMiniCharts = (window.location.protocol === 'file:' || window.MockMode?.enabled) && window.MiniChart;
-
-        if (useMiniCharts) {
-            console.log('[Dashboard] Using MiniChart for file:// or mock mode');
-            this.initializeMiniCharts();
-            return;
-        }
-
         // CPU Graph
         try {
             this.graphs.cpu = new GraphVisualizer('cpu-graph', {
@@ -196,107 +187,7 @@ window.DashboardModule = window.DashboardModule || {
         console.log('[Dashboard] Graphs initialized');
     },
 
-    initializeMiniCharts() {
-        // Create container structure for mini charts
-        const chartsSection = document.getElementById('charts-section');
-        if (!chartsSection) {
-            console.warn('[Dashboard] Charts section not found');
-            return;
-        }
 
-        chartsSection.innerHTML = `
-            <h2 style="margin-bottom: 20px;">📊 Real-time Metrics</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                <div class="card">
-                    <div class="card-header"><h3>CPU Usage</h3></div>
-                    <div class="card-content">
-                        <div id="mini-cpu-chart"></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3>Memory</h3></div>
-                    <div class="card-content">
-                        <div id="mini-memory-chart"></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3>Spindle Current</h3></div>
-                    <div class="card-content">
-                        <div id="mini-spindle-chart"></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3>Temperature</h3></div>
-                    <div class="card-content">
-                        <div id="mini-temperature-chart"></div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Initialize MiniChart instances
-        try {
-            this.graphs.cpu = new MiniChart('mini-cpu-chart', {
-                width: 300,
-                height: 120,
-                maxDataPoints: 60,
-                lineColor: '#10b981',
-                fillColor: 'rgba(16, 185, 129, 0.1)',
-                min: 0,
-                max: 100,
-                unit: '%',
-                showGrid: true,
-                showValues: true
-            });
-        } catch (e) { console.warn('Mini CPU chart init failed:', e); }
-
-        try {
-            this.graphs.memory = new MiniChart('mini-memory-chart', {
-                width: 300,
-                height: 120,
-                maxDataPoints: 60,
-                lineColor: '#3b82f6',
-                fillColor: 'rgba(59, 130, 246, 0.1)',
-                min: 0,
-                max: 'auto',
-                unit: ' KB',
-                showGrid: true,
-                showValues: true
-            });
-        } catch (e) { console.warn('Mini Memory chart init failed:', e); }
-
-        try {
-            this.graphs.spindle = new MiniChart('mini-spindle-chart', {
-                width: 300,
-                height: 120,
-                maxDataPoints: 60,
-                lineColor: '#f59e0b',
-                fillColor: 'rgba(245, 158, 11, 0.1)',
-                min: 0,
-                max: 20,
-                unit: ' A',
-                showGrid: true,
-                showValues: true
-            });
-        } catch (e) { console.warn('Mini Spindle chart init failed:', e); }
-
-        try {
-            this.graphs.temperature = new MiniChart('mini-temperature-chart', {
-                width: 300,
-                height: 120,
-                maxDataPoints: 60,
-                lineColor: '#ef4444',
-                fillColor: 'rgba(239, 68, 68, 0.1)',
-                min: 20,
-                max: 80,
-                unit: ' °C',
-                showGrid: true,
-                showValues: true
-            });
-        } catch (e) { console.warn('Mini Temperature chart init failed:', e); }
-
-        console.log('[Dashboard] MiniCharts initialized');
-    },
 
     onStateChanged() {
         const state = AppState.data;

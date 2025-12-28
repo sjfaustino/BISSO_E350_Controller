@@ -1,8 +1,3 @@
-<!--
-  index.html - Main entry point for BISSO E350 CNC Controller Web UI
-  Contains navigation, core JavaScript modules (Utils, AppState, Router, etc.),
-  and page container for dynamically loaded content.
--->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -212,6 +207,14 @@
                 if (hours > 0) return `${hours}h ${minutes % 60}m`;
                 if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
                 return `${seconds}s`;
+            },
+
+            /**
+             * Check if running in file:// protocol or mock mode
+             * @returns {boolean} - True if offline mode
+             */
+            isOfflineMode() {
+                return window.location.protocol === 'file:' || window.MockMode?.enabled;
             },
 
             /**
@@ -619,41 +622,102 @@
                     const route = this.routes[page];
                     const container = document.getElementById('page-container');
 
+                    // Detect file:// protocol - fetch will fail, so skip it and use direct script loading
+                    const isFileProtocol = window.location.protocol === 'file:';
+
                     // Load HTML
-                    const htmlResponse = await fetch(route.file);
-                    if (!htmlResponse.ok) throw new Error(`HTTP ${htmlResponse.status}`);
-                    const html = await htmlResponse.text();
+                    let html;
+                    let fetchFailed = false;
+
+                    // Skip fetch if file:// protocol or mock mode is enabled
+                    if (isFileProtocol || window.MockMode?.enabled) {
+                        fetchFailed = true;
+                        console.log(`[ROUTER] ${isFileProtocol ? 'File protocol detected' : 'Mock mode enabled'} - using fallback HTML for:`, page);
+
+                        // Use FallbackPages module for fallback HTML
+                        html = window.FallbackPages?.getPageHTML(page, isFileProtocol) ||
+                            `<div style="padding: 40px 20px; text-align: center;"><h2>${page} (Fallback)</h2></div>`;
+                    } else {
+                        try {
+                            const htmlResponse = await fetch(route.file);
+                            if (!htmlResponse.ok) throw new Error(`HTTP ${htmlResponse.status}`);
+                            html = await htmlResponse.text();
+                        } catch (fetchError) {
+                            fetchFailed = true;
+                            console.warn(`[ROUTER] Failed to fetch ${route.file}:`, fetchError.message);
+
+                            // If mock mode is enabled after fetch failed, use fallback HTML
+                            if (window.MockMode?.enabled) {
+                                console.log('[ROUTER] Mock mode enabled after fetch failure, generating fallback structure for:', page);
+                                html = window.FallbackPages?.getPageHTML(page, false) ||
+                                    `<div style="padding: 40px 20px; text-align: center;"><h2>${page} (Mock)</h2></div>`;
+                            } else if (!navigator.onLine) {
+                                // Offline but mock mode not enabled - show helpful message
+                                html = window.FallbackPages?.getOfflineHTML() ||
+                                    `<div style="padding: 40px 20px; text-align: center;"><h2>Offline</h2></div>`;
+                                container.innerHTML = html;
+                                this.isLoading = false;
+                                return;
+                            } else {
+                                throw fetchError;
+                            }
+                        }
+                    }
 
                     console.log('[ROUTER] Setting page content, HTML length:', html?.length || 0);
                     container.innerHTML = html;
+                    console.log('[ROUTER] Page content set successfully');
 
-                    // Load CSS if exists
-                    const cssFile = route.file.replace('.html', '.css');
-                    this.loadCSS(cssFile).catch(() => { });
+                    // Load CSS if exists (but don't fail if it doesn't)
+                    if (!fetchFailed) {
+                        const cssFile = route.file.replace('.html', '.css');
+                        this.loadCSS(cssFile).catch(() => {
+                            // CSS not found, that's okay
+                        });
+                    }
 
-                    // Check if module was already loaded via inline script
+                    // Check if module was already loaded via inline script in the HTML
+                    // This eliminates external file loading for pages with embedded JS
                     if (window.currentPageModule) {
-                        console.log('[ROUTER] Module already loaded inline');
+                        console.log('[ROUTER] Module already loaded inline, skipping external JS');
                         this.currentPage = page;
                         this.currentModule = window.currentPageModule;
-                        if (this.currentModule.init) this.currentModule.init();
+
+                        // Call init if exists
+                        if (this.currentModule.init) {
+                            this.currentModule.init();
+                        }
+
+                        // Update nav
                         this.updateNav(page);
                         this.isLoading = false;
                     } else {
-                        // Load JS module externally
+                        // Load JS module externally (fallback for pages without inline JS)
                         console.log('[ROUTER] Loading external JS:', route.js);
                         const script = document.createElement('script');
                         script.src = route.js;
                         script.onload = () => {
                             this.currentPage = page;
                             this.currentModule = window.currentPageModule || {};
-                            if (this.currentModule.init) this.currentModule.init();
+
+                            // Call init if exists
+                            if (this.currentModule.init) {
+                                this.currentModule.init();
+                            }
+
+                            // Update nav
                             this.updateNav(page);
+
                             this.isLoading = false;
                         };
                         script.onerror = () => {
                             console.error(`[ROUTER] Failed to load ${route.js}`);
-                            container.innerHTML = `<div style="color: red; padding: 20px;">Error loading ${page}</div>`;
+
+                            // If JS also fails and we're offline, show error
+                            if (fetchFailed && !navigator.onLine) {
+                                container.innerHTML = window.FallbackPages?.getErrorHTML('Could not load page module') ||
+                                    '<div style="color: red;">Error loading page</div>';
+                            }
                             this.isLoading = false;
                         };
                         document.body.appendChild(script);
@@ -662,7 +726,8 @@
                 } catch (error) {
                     console.error('[ROUTER] Navigation error:', error);
                     const container = document.getElementById('page-container');
-                    container.innerHTML = `<div style="color: red; padding: 20px;">Error: ${error.message}</div>`;
+                    container.innerHTML = window.FallbackPages?.getErrorHTML(error.message) ||
+                        `<div style="color: red;">Error: ${error.message}</div>`;
                     this.isLoading = false;
                 }
             }

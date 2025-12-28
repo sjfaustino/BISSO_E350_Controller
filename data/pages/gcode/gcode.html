@@ -1,3 +1,6 @@
+<!--
+  gcode.html - G-code command input, file upload, and execution interface
+-->
 <div class="gcode-page">
     <!-- G-code Editor Card -->
     <div class="card">
@@ -11,12 +14,9 @@
         <div class="card-content">
             <div class="gcode-editor-container">
                 <div class="line-numbers" id="line-numbers"></div>
-                <textarea
-                    id="gcode-input"
-                    class="gcode-editor"
+                <textarea id="gcode-input" class="gcode-editor"
                     placeholder="Enter G-code commands here...&#10;Example:&#10;G0 X10 Y20 F100&#10;G1 Z5 F50&#10;M117 Hello World"
-                    spellcheck="false"
-                ></textarea>
+                    spellcheck="false"></textarea>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
                 <button class="btn btn-primary" id="send-command">
@@ -89,85 +89,85 @@
 </div>
 
 <style>
-.gcode-editor-container {
-    display: flex;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--bg-secondary);
-    overflow: hidden;
-}
+    .gcode-editor-container {
+        display: flex;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-secondary);
+        overflow: hidden;
+    }
 
-.line-numbers {
-    background: var(--bg-tertiary);
-    color: var(--text-muted);
-    padding: 10px 8px;
-    text-align: right;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 1.5;
-    user-select: none;
-    border-right: 1px solid var(--border-color);
-    min-width: 40px;
-}
+    .line-numbers {
+        background: var(--bg-tertiary);
+        color: var(--text-muted);
+        padding: 10px 8px;
+        text-align: right;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        user-select: none;
+        border-right: 1px solid var(--border-color);
+        min-width: 40px;
+    }
 
-.gcode-editor {
-    flex: 1;
-    min-height: 200px;
-    padding: 10px;
-    border: none;
-    background: transparent;
-    color: var(--text-primary);
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 1.5;
-    resize: vertical;
-    outline: none;
-}
+    .gcode-editor {
+        flex: 1;
+        min-height: 200px;
+        padding: 10px;
+        border: none;
+        background: transparent;
+        color: var(--text-primary);
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        resize: vertical;
+        outline: none;
+    }
 
-.gcode-editor:focus {
-    background: var(--bg-primary);
-}
+    .gcode-editor:focus {
+        background: var(--bg-primary);
+    }
 
-.execution-log {
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    max-height: 300px;
-    overflow-y: auto;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 10px;
-}
+    .execution-log {
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        max-height: 300px;
+        overflow-y: auto;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 10px;
+    }
 
-.log-entry {
-    padding: 4px 0;
-    border-bottom: 1px solid var(--border-color);
-}
+    .log-entry {
+        padding: 4px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
 
-.log-entry:last-child {
-    border-bottom: none;
-}
+    .log-entry:last-child {
+        border-bottom: none;
+    }
 
-.log-entry.success {
-    color: var(--color-optimal);
-}
+    .log-entry.success {
+        color: var(--color-optimal);
+    }
 
-.log-entry.error {
-    color: var(--color-critical);
-}
+    .log-entry.error {
+        color: var(--color-critical);
+    }
 
-.log-entry.info {
-    color: var(--text-muted);
-}
+    .log-entry.info {
+        color: var(--text-muted);
+    }
 
-.log-timestamp {
-    color: var(--text-muted);
-    font-size: 11px;
-    margin-right: 8px;
-}
+    .log-timestamp {
+        color: var(--text-muted);
+        font-size: 11px;
+        margin-right: 8px;
+    }
 
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 </style>

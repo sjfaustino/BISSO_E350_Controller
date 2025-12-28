@@ -30,6 +30,24 @@ static uint32_t telnet_last_activity = 0;
 #define TELNET_LOCKOUT_DURATION_MS 60000 // 1 minute lockout
 #define TELNET_SESSION_TIMEOUT_MS 300000 // 5 minute inactivity timeout
 
+// Telnet protocol commands for password masking
+#define TELNET_IAC  255  // Interpret As Command
+#define TELNET_WILL 251  // Will option
+#define TELNET_WONT 252  // Won't option
+#define TELNET_ECHO 1    // Echo option
+
+// Helper: Suppress client echo (for password entry)
+static void telnetSuppressEcho(WiFiClient& client) {
+    uint8_t cmd[] = { TELNET_IAC, TELNET_WILL, TELNET_ECHO };
+    client.write(cmd, 3);
+}
+
+// Helper: Restore client echo
+static void telnetRestoreEcho(WiFiClient& client) {
+    uint8_t cmd[] = { TELNET_IAC, TELNET_WONT, TELNET_ECHO };
+    client.write(cmd, 3);
+}
+
 NetworkManager::NetworkManager() {
   telnetServer = nullptr;
   dnsServer = nullptr;
@@ -246,6 +264,7 @@ void NetworkManager::update() {
       strncpy(telnet_username_attempt, input.c_str(),
               sizeof(telnet_username_attempt) - 1);
       telnet_username_attempt[sizeof(telnet_username_attempt) - 1] = '\0';
+      telnetSuppressEcho(telnetClient);  // Hide password as user types
       telnetClient.print("Password: ");
       telnet_auth_state = TELNET_AUTH_WAIT_PASSWORD;
       break;
@@ -253,15 +272,16 @@ void NetworkManager::update() {
     case TELNET_AUTH_WAIT_PASSWORD: {
       // PHASE 5.10: Use auth_manager for credential verification (SHA-256)
       // Previously used plain config credentials, now synced with web auth
+      telnetRestoreEcho(telnetClient);  // Restore echo after password entry
       if (authVerifyCredentials(telnet_username_attempt, input.c_str())) {
         // Authentication successful
         telnet_auth_state = TELNET_AUTH_AUTHENTICATED;
         telnet_failed_attempts = 0;
+        // Log to serial first (before telnet gets prompt)
+        Serial.printf("[INFO]  [NET] Telnet Auth SUCCESS for user '%s'\r\n", telnet_username_attempt);
         telnetClient.println("\r\nAuthentication successful.");
         telnetClient.println("Type 'help' for available commands.");
         telnetClient.print("> ");
-        logInfo("[NET] Telnet Auth SUCCESS for user '%s'",
-                      telnet_username_attempt);
       } else {
         // Authentication failed
         telnet_failed_attempts++;
@@ -291,9 +311,10 @@ void NetworkManager::update() {
         telnetClient.println("Goodbye.");
         telnetClient.stop();
         resetTelnetAuthState();
-        logInfo("[NET] Telnet Client Logged Out");
+        Serial.println("[INFO]  [NET] Telnet Client Logged Out");
       } else {
-        logInfo("[NET] Remote Command: %s", input.c_str());
+        // Log to serial only (not mirrored to telnet)
+        Serial.printf("[INFO]  [NET] Remote Command: %s\r\n", input.c_str());
         // Inject into CLI processor
         cliProcessCommand(input.c_str());
         telnetClient.print("> ");
