@@ -214,15 +214,14 @@ void cmd_dio_main(int argc, char** argv) {
         {0x25, "OUTPUTS-AUX", output2_labels, true}
     };
     
-    serialLoggerLock();
-    Serial.println("┌────────┬────────────────┬────────────────────────┐");
-    Serial.println("│ Addr   │ Name           │ State (MSB..LSB)       │");
-    Serial.println("├────────┼────────────────┼────────────────────────┤");
+    logPrintln("+---------+----------------+------------------------+");
+    logPrintln("| Addr    | Name           | State (MSB..LSB)       |");
+    logPrintln("+---------+----------------+------------------------+");
     
     for (int b = 0; b < 4; b++) {
         Wire.beginTransmission(banks[b].addr);
         if (Wire.endTransmission() != 0) {
-            Serial.printf("│ 0x%02X   │ %-14s │ [NOT CONNECTED]        │\n", banks[b].addr, banks[b].name);
+            logPrintf("| 0x%02X    | %-14s | [NOT CONNECTED]        |\r\n", banks[b].addr, banks[b].name);
             continue;
         }
         
@@ -233,26 +232,26 @@ void cmd_dio_main(int argc, char** argv) {
         for (int i = 7; i >= 0; i--) bits[7-i] = (state & (1 << i)) ? '1' : '0';
         bits[8] = '\0';
         
-        Serial.printf("│ 0x%02X   │ %-14s │ %s (0x%02X)        │\n", banks[b].addr, banks[b].name, bits, state);
+        logPrintf("| 0x%02X    | %-14s | %s (0x%02X)        |\r\n", banks[b].addr, banks[b].name, bits, state);
         
         // Show active channels
-        Serial.print("│        │                │ ");
+        char active_buf[64] = "";
+        int pos = 0;
         int count = 0;
         for (int i = 0; i < 8; i++) {
             bool active = banks[b].is_output ? !(state & (1 << i)) : (state & (1 << i));
             if (active) {
-                if (count > 0) Serial.print(", ");
-                Serial.print(banks[b].labels[i]);
+                if (count > 0) pos += snprintf(active_buf + pos, sizeof(active_buf) - pos, ", ");
+                pos += snprintf(active_buf + pos, sizeof(active_buf) - pos, "%s", banks[b].labels[i]);
                 count++;
             }
         }
-        if (count == 0) Serial.print("(none active)");
-        Serial.println("  │");
+        if (count == 0) snprintf(active_buf, sizeof(active_buf), "(none active)");
+        logPrintf("|         |                | %s\r\n", active_buf);
     }
     
-    Serial.println("└────────┴────────────────┴────────────────────────┘");
-    Serial.println("Legend: Inputs=HIGH when active, Outputs=LOW when relay ON");
-    serialLoggerUnlock();
+    logPrintln("+---------+----------------+------------------------+");
+    logPrintln("Legend: Inputs=HIGH when active, Outputs=LOW when relay ON");
 }
 
 // ============================================================================
