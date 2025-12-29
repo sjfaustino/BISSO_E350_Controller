@@ -5,6 +5,9 @@
 #include "serial_logger.h"
 #include "web_server.h"
 #include "auth_manager.h"   // PHASE 5.10: For authVerifyCredentials (SHA-256)
+#include "gcode_parser.h"   // For GCodeParser in telnet status
+#include "motion.h"         // For motion functions
+#include "safety.h"         // For safetyIsAlarmed
 #include <ArduinoOTA.h>
 #include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
 
@@ -40,12 +43,26 @@ static uint32_t telnet_last_activity = 0;
 static void telnetSuppressEcho(WiFiClient& client) {
     uint8_t cmd[] = { TELNET_IAC, TELNET_WILL, TELNET_ECHO };
     client.write(cmd, 3);
+    client.flush();
 }
 
-// Helper: Restore client echo
+// Helper: Restore client echo and discard any IAC response
 static void telnetRestoreEcho(WiFiClient& client) {
     uint8_t cmd[] = { TELNET_IAC, TELNET_WONT, TELNET_ECHO };
     client.write(cmd, 3);
+    client.flush();
+    // Give client time to respond, then discard IAC responses
+    delay(50);
+    while (client.available()) {
+        uint8_t b = client.peek();
+        if (b == TELNET_IAC) {
+            client.read();  // Discard IAC
+            if (client.available()) client.read();  // Discard command
+            if (client.available()) client.read();  // Discard option
+        } else {
+            break;  // Not an IAC sequence, leave it
+        }
+    }
 }
 
 NetworkManager::NetworkManager() {
@@ -312,6 +329,33 @@ void NetworkManager::update() {
         telnetClient.stop();
         resetTelnetAuthState();
         Serial.println("[INFO]  [NET] Telnet Client Logged Out");
+      } else if (input == "?") {
+        // Real-time status query - format Grbl-compatible status
+        const char* state = "Idle";
+        if (motionIsEmergencyStopped()) state = "Alarm";
+        else if (safetyIsAlarmed()) state = "Hold:1";
+        else if (motionIsMoving()) state = "Run";
+        
+        float mPos[4] = { motionGetPositionMM(0), motionGetPositionMM(1), 
+                          motionGetPositionMM(2), motionGetPositionMM(3) };
+        float wPos[4];
+        for (int i = 0; i < 4; i++) wPos[i] = gcodeParser.getWorkPosition(i, mPos[i]);
+        
+        char buf[160];
+        snprintf(buf, sizeof(buf), "<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f>",
+            state, mPos[0], mPos[1], mPos[2], mPos[3], wPos[0], wPos[1], wPos[2], wPos[3]);
+        telnetClient.println(buf);
+        telnetClient.print("> ");
+      } else if (input == "!") {
+        // Feed hold
+        motionPause();
+        telnetClient.println("ok");
+        telnetClient.print("> ");
+      } else if (input == "~") {
+        // Cycle start / resume
+        motionResume();
+        telnetClient.println("ok");
+        telnetClient.print("> ");
       } else {
         // Log to serial only (not mirrored to telnet)
         Serial.printf("[INFO]  [NET] Remote Command: %s\r\n", input.c_str());
@@ -332,13 +376,32 @@ void NetworkManager::update() {
 void NetworkManager::telnetPrint(const char *str) {
   if (telnetClient && telnetClient.connected() &&
       telnet_auth_state == TELNET_AUTH_AUTHENTICATED) {
-    telnetClient.print(str);
+    // Convert LF to CRLF for telnet protocol compliance
+    const char *p = str;
+    while (*p) {
+      if (*p == '\n' && (p == str || *(p-1) != '\r')) {
+        telnetClient.print("\r\n");
+      } else {
+        telnetClient.write(*p);
+      }
+      p++;
+    }
   }
 }
 
 void NetworkManager::telnetPrintln(const char *str) {
   if (telnetClient && telnetClient.connected() &&
       telnet_auth_state == TELNET_AUTH_AUTHENTICATED) {
-    telnetClient.println(str);
+    // Convert LF to CRLF for telnet protocol compliance
+    const char *p = str;
+    while (*p) {
+      if (*p == '\n' && (p == str || *(p-1) != '\r')) {
+        telnetClient.print("\r\n");
+      } else {
+        telnetClient.write(*p);
+      }
+      p++;
+    }
+    telnetClient.print("\r\n");
   }
 }

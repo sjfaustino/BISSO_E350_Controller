@@ -385,7 +385,7 @@ void cmd_grbl_settings(int argc, char** argv) {
     logPrintf("$113=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_A, 1000.0));
     logPrintf("$120=%.3f\r\n", configGetFloat(KEY_DEFAULT_ACCEL, 100.0));
     logPrintf("$130=%.3f\r\n", (float)configGetInt(KEY_X_LIMIT_MAX, 500000) / configGetFloat(KEY_PPM_X, 1.0));
-    logPrintln("ok");
+    // Note: cliProcessCommand adds "ok" after calling handler
 }
 
 void cmd_grbl_home(int argc, char** argv) { motionHome(0); }
@@ -400,7 +400,6 @@ void cmd_grbl_state(int argc, char** argv) {
 void cmd_system_info(int argc, char** argv) {
   char ver[32]; firmwareGetVersionString(ver, 32);
   logPrintf("[VER:1.1h.Gemini:%s]\r\n", ver);
-  logPrintln("ok");
 }
 
 void cmd_system_reset(int argc, char** argv) { bootRebootSystem(); }

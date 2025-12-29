@@ -54,14 +54,9 @@ static void vlogPrint(log_level_t level, const char* prefix, const char* format,
   if (prefix != NULL) offset = snprintf(log_buffer, LOGGER_BUFFER_SIZE, "%s", prefix);
   vsnprintf(log_buffer + offset, LOGGER_BUFFER_SIZE - offset, format, args);
   
-  // Output to Serial (UART)
+  // Output to Serial (UART) only - background logs don't go to telnet
+  // Only explicit CLI output (logPrintf/logPrintln) should mirror to telnet
   Serial.println(log_buffer);
-
-  // Output to Telnet (Network Mirror)
-  // Check if network manager is active (simple check to avoid crash before init)
-  // Ideally, use a safer singleton pattern or check a flag. 
-  // For now, assuming networkManager is global and robust.
-  networkManager.telnetPrintln(log_buffer);
   
   if (locked) releaseSerialMutex();
 }
