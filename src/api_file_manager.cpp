@@ -123,8 +123,15 @@ void handleFileList(AsyncWebServerRequest *request) {
   
   listDirRecursive("/");
 
-  char response[2048];  // Increased for more files
-  serializeJson(doc, response, sizeof(response));
+  // Use larger buffer to prevent truncation with many files
+  static char response[8192];  // Static to avoid stack overflow
+  size_t len = serializeJson(doc, response, sizeof(response));
+  
+  // Check for truncation
+  if (len >= sizeof(response) - 1) {
+    logWarning("[FILE_API] File list response truncated, too many files");
+  }
+  
   request->send(200, "application/json", response);
 }
 
