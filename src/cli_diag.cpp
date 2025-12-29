@@ -73,67 +73,65 @@ void cmd_status_dashboard(int argc, char** argv) {
     uint32_t mins = (uptime_sec % 3600) / 60;
     uint32_t secs = uptime_sec % 60;
     
-    serialLoggerLock();
-    Serial.println("\n╔══════════════════════════════════════════════════════════╗");
-    Serial.println("║           BISSO E350 QUICK STATUS DASHBOARD               ║");
-    Serial.printf( "║  Uptime: %02u:%02u:%02u                                        ║\n", (unsigned int)hours, (unsigned int)mins, (unsigned int)secs);
-    Serial.println("╠══════════════════════════════════════════════════════════╣");
+    logPrintln("\n+============================================================+");
+    logPrintln("|           BISSO E350 QUICK STATUS DASHBOARD               |");
+    logPrintf("|  Uptime: %02u:%02u:%02u                                        |\r\n", (unsigned int)hours, (unsigned int)mins, (unsigned int)secs);
+    logPrintln("+============================================================+");
     
-    Serial.println("║ POSITION (mm)                                             ║");
-    Serial.printf( "║   X: %10.3f    Y: %10.3f                        ║\n",
+    logPrintln("| POSITION (mm)                                             |");
+    logPrintf("|   X: %10.3f    Y: %10.3f                        |\r\n",
                   motionGetPosition(0) / 1000.0f, motionGetPosition(1) / 1000.0f);
-    Serial.printf( "║   Z: %10.3f    A: %10.3f                        ║\n",
+    logPrintf("|   Z: %10.3f    A: %10.3f                        |\r\n",
                   motionGetPosition(2) / 1000.0f, motionGetPosition(3) / 1000.0f);
     
-    Serial.println("╠──────────────────────────────────────────────────────────╣");
-    Serial.println("║ ENCODER FEEDBACK                                          ║");
+    logPrintln("+------------------------------------------------------------+");
+    logPrintln("| ENCODER FEEDBACK                                          |");
     bool fb_active = encoderMotionIsFeedbackActive();
-    Serial.printf( "║   Status: %s                                         ║\n",
+    logPrintf("|   Status: %s                                         |\r\n",
                   fb_active ? "[ON] " : "[OFF]");
     
-    Serial.println("╠──────────────────────────────────────────────────────────╣");
-    Serial.println("║ SPINDLE CURRENT                                           ║");
+    logPrintln("+------------------------------------------------------------+");
+    logPrintln("| SPINDLE CURRENT                                           |");
     const spindle_monitor_state_t* spindle = spindleMonitorGetState();
     if (spindle->enabled) {
-        Serial.printf( "║   Current: %5.1f A  |  Peak: %5.1f A                    ║\n",
+        logPrintf("|   Current: %5.1f A  |  Peak: %5.1f A                    |\r\n",
                       spindle->current_amps, spindle->current_peak_amps);
         const char* alarm = "OK";
         if (spindle->alarm_tool_breakage) alarm = "TOOL BREAK";
         else if (spindle->alarm_stall) alarm = "STALL";
         else if (spindle->alarm_overload) alarm = "OVERLOAD";
-        Serial.printf( "║   Alarm: %-10s                                      ║\n", alarm);
+        logPrintf("|   Alarm: %-10s                                      |\r\n", alarm);
     } else {
-        Serial.println("║   Status: [DISABLED]                                      ║");
+        logPrintln("|   Status: [DISABLED]                                      |");
     }
     
-    Serial.println("╠──────────────────────────────────────────────────────────╣");
-    Serial.println("║ NETWORK                                                   ║");
+    logPrintln("+------------------------------------------------------------+");
+    logPrintln("| NETWORK                                                   |");
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf( "║   WiFi: Connected (%d dBm)                              ║\n", WiFi.RSSI());
-        Serial.printf( "║   IP: %-15s                                   ║\n",
+        logPrintf("|   WiFi: Connected (%d dBm)                              |\r\n", WiFi.RSSI());
+        logPrintf("|   IP: %-15s                                   |\r\n",
                       WiFi.localIP().toString().c_str());
     } else {
-        Serial.println("║   WiFi: [DISCONNECTED]                                    ║");
+        logPrintln("|   WiFi: [DISCONNECTED]                                    |");
     }
     
-    Serial.println("╠──────────────────────────────────────────────────────────╣");
-    Serial.println("║ ACTIVE FAULTS                                             ║");
+    logPrintln("+------------------------------------------------------------+");
+    logPrintln("| ACTIVE FAULTS                                             |");
     fault_stats_t faults = faultGetStats();
     if (faults.total_faults == 0) {
-        Serial.println("║   [NONE] System healthy                                   ║");
+        logPrintln("|   [NONE] System healthy                                   |");
     } else {
-        Serial.printf( "║   Total: %lu  |  Last: %lu sec ago                       ║\n",
+        logPrintf("|   Total: %lu  |  Last: %lu sec ago                       |\r\n",
                       (unsigned long)faults.total_faults,
                       (unsigned long)((millis() - faults.last_fault_time_ms) / 1000));
     }
     
     if (emergencyStopIsActive()) {
-        Serial.println("╠══════════════════════════════════════════════════════════╣");
-        Serial.println("║  E-STOP ACTIVE - MOTION DISABLED                          ║");
+        logPrintln("+============================================================+");
+        logPrintln("|  E-STOP ACTIVE - MOTION DISABLED                          |");
     }
     
-    Serial.println("╚══════════════════════════════════════════════════════════╝");
-    serialLoggerUnlock();
+    logPrintln("+============================================================+");
 }
 
 // ============================================================================
@@ -170,28 +168,26 @@ void cmd_runtime(int argc, char** argv) {
     uint32_t mins = total_mins % 60;
     uint32_t maint_hours = since_maint / 60;
     
-    serialLoggerLock();
-    Serial.println("\n[RUNTIME] === Machine Usage Statistics ===\n");
-    Serial.println("┌─────────────────────────┬────────────────────┐");
-    Serial.println("│ Metric                  │ Value              │");
-    Serial.println("├─────────────────────────┼────────────────────┤");
+    logPrintln("\n[RUNTIME] === Machine Usage Statistics ===\n");
+    logPrintln("+-------------------------+--------------------+");
+    logPrintln("| Metric                  | Value              |");
+    logPrintln("+-------------------------+--------------------+");
     
     char buf[32];
     snprintf(buf, sizeof(buf), "%lu hrs %lu min", (unsigned long)hours, (unsigned long)mins);
-    Serial.printf("│ %-23s │ %-18s │\n", "Total Runtime", buf);
+    logPrintf("| %-23s | %-18s |\r\n", "Total Runtime", buf);
     
     snprintf(buf, sizeof(buf), "%lu", (unsigned long)cycles);
-    Serial.printf("│ %-23s │ %-18s │\n", "Job Cycles Completed", buf);
+    logPrintf("| %-23s | %-18s |\r\n", "Job Cycles Completed", buf);
     
     snprintf(buf, sizeof(buf), "%lu hrs", (unsigned long)maint_hours);
-    Serial.printf("│ %-23s │ %-18s │\n", "Since Last Maintenance", buf);
+    logPrintf("| %-23s | %-18s |\r\n", "Since Last Maintenance", buf);
     
-    Serial.println("└─────────────────────────┴────────────────────┘");
+    logPrintln("+-------------------------+--------------------+");
     
     if (maint_hours >= 100) {
-        Serial.println("\n⚠️  MAINTENANCE RECOMMENDED (100+ hours since last service)");
+        logPrintln("\n[!] MAINTENANCE RECOMMENDED (100+ hours since last service)");
     }
-    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -259,32 +255,28 @@ void cmd_dio_main(int argc, char** argv) {
 // ============================================================================
 static void cmd_spindle_alarm(int argc, char** argv) {
     if (argc < 3) {
-        serialLoggerLock();
-        Serial.println("\n[SPINDLE] Alarm commands:");
-        Serial.println("  spindle alarm status   - Show alarm states");
-        Serial.println("  spindle alarm clear    - Clear all alarms");
-        Serial.println("  spindle alarm toolbreak <amps> - Set threshold (1-20A)");
-        Serial.println("  spindle alarm stall <amps> <ms> - Set stall params");
-        serialLoggerUnlock();
+        logPrintln("\n[SPINDLE] Alarm commands:");
+        logPrintln("  spindle alarm status   - Show alarm states");
+        logPrintln("  spindle alarm clear    - Clear all alarms");
+        logPrintln("  spindle alarm toolbreak <amps> - Set threshold (1-20A)");
+        logPrintln("  spindle alarm stall <amps> <ms> - Set stall params");
         return;
     }
     
     const spindle_monitor_state_t* state = spindleMonitorGetState();
     
     if (strcasecmp(argv[2], "status") == 0) {
-        serialLoggerLock();
-        Serial.println("\n[SPINDLE] === Alarm Status ===");
-        Serial.printf("Tool Breakage: %s (count: %lu)\n", 
+        logPrintln("\n[SPINDLE] === Alarm Status ===");
+        logPrintf("Tool Breakage: %s (count: %lu)\r\n", 
                      state->alarm_tool_breakage ? "ACTIVE" : "OK",
                      (unsigned long)state->tool_breakage_count);
-        Serial.printf("Stall:         %s (count: %lu)\n",
+        logPrintf("Stall:         %s (count: %lu)\r\n",
                      state->alarm_stall ? "ACTIVE" : "OK",
                      (unsigned long)state->stall_count);
-        Serial.printf("Thresholds: %.1f A drop, %.1f A for %lu ms\n", 
+        logPrintf("Thresholds: %.1f A drop, %.1f A for %lu ms\r\n", 
                      state->tool_breakage_drop_amps,
                      state->stall_threshold_amps,
                      (unsigned long)state->stall_timeout_ms);
-        serialLoggerUnlock();
     } else if (strcasecmp(argv[2], "clear") == 0) {
         spindleMonitorClearAlarms();
     } else if (strcasecmp(argv[2], "toolbreak") == 0 && argc >= 4) {
@@ -300,22 +292,20 @@ static void cmd_spindle_alarm(int argc, char** argv) {
 void cmd_selftest(int argc, char** argv) {
     // PHASE 5.2: Enhanced self-test with sub-commands
     if (argc > 1 && strcmp(argv[1], "help") == 0) {
-        serialLoggerLock();
-        Serial.println("\n[SELFTEST] === Self-Test Suite ===");
-        Serial.println("Usage: selftest [command] [options]");
-        Serial.println("  (no args)     Run comprehensive test suite");
-        Serial.println("  quick         Quick health check (fast tests only)");
-        Serial.println("  memory        Memory subsystem tests");
-        Serial.println("  i2c           I2C bus and device tests");
-        Serial.println("  storage       LittleFS and NVS tests");
-        Serial.println("  motion        Motion system tests");
-        Serial.println("  spindle       Spindle monitor tests");
-        Serial.println("  safety        Safety system tests");
-        Serial.println("  network       Network and WiFi tests");
-        Serial.println("  watchdog      Watchdog timer tests");
-        Serial.println("  list          List all available tests");
-        Serial.println("  help          Show this message");
-        serialLoggerUnlock();
+        logPrintln("\n[SELFTEST] === Self-Test Suite ===");
+        logPrintln("Usage: selftest [command] [options]");
+        logPrintln("  (no args)     Run comprehensive test suite");
+        logPrintln("  quick         Quick health check (fast tests only)");
+        logPrintln("  memory        Memory subsystem tests");
+        logPrintln("  i2c           I2C bus and device tests");
+        logPrintln("  storage       LittleFS and NVS tests");
+        logPrintln("  motion        Motion system tests");
+        logPrintln("  spindle       Spindle monitor tests");
+        logPrintln("  safety        Safety system tests");
+        logPrintln("  network       Network and WiFi tests");
+        logPrintln("  watchdog      Watchdog timer tests");
+        logPrintln("  list          List all available tests");
+        logPrintln("  help          Show this message");
         return;
     }
 
@@ -355,7 +345,7 @@ void cmd_selftest(int argc, char** argv) {
     selftestPrintResults(&suite);
 
     // Print summary
-    Serial.println(selftestGetSummary(&suite));
+    logPrintln(selftestGetSummary(&suite));
 
     // Free results
     selftestFreeResults(&suite);
@@ -388,13 +378,11 @@ extern void taskShowAllTasks();
 extern uint8_t taskGetCpuUsage();
 
 void cmd_wdt_test_stall(int argc, char** argv) {
-    serialLoggerLock();
-    Serial.println("\n[WDT TEST] === Watchdog Verification Test ===");
-    Serial.println("[WDT TEST] WARNING: This will deliberately stall for 10 seconds");
-    Serial.println("[WDT TEST] The watchdog should detect this and log a fault");
-    Serial.println("[WDT TEST] System will NOT reboot during this test");
-    Serial.println("\n[WDT TEST] Starting deliberate stall in 3 seconds...");
-    serialLoggerUnlock();
+    logPrintln("\n[WDT TEST] === Watchdog Verification Test ===");
+    logPrintln("[WDT TEST] WARNING: This will deliberately stall for 10 seconds");
+    logPrintln("[WDT TEST] The watchdog should detect this and log a fault");
+    logPrintln("[WDT TEST] System will NOT reboot during this test");
+    logPrintln("\n[WDT TEST] Starting deliberate stall in 3 seconds...");
 
     // Give user time to read warning
     delay(1000); logPrintln("[WDT TEST] 2...");
@@ -428,27 +416,25 @@ void cmd_wdt_test_stall(int argc, char** argv) {
 
     bool test_passed = (timeouts_after > timeouts_before) || (missed_after > missed_before);
 
-    serialLoggerLock();
-    Serial.println("\n[WDT TEST] === Test Results ===");
-    Serial.printf("Timeouts Detected: %lu -> %lu (delta: %lu)\n",
+    logPrintln("\n[WDT TEST] === Test Results ===");
+    logPrintf("Timeouts Detected: %lu -> %lu (delta: %lu)\r\n",
                   (unsigned long)timeouts_before,
                   (unsigned long)timeouts_after,
                   (unsigned long)(timeouts_after - timeouts_before));
-    Serial.printf("Missed Ticks:      %lu -> %lu (delta: %lu)\n",
+    logPrintf("Missed Ticks:      %lu -> %lu (delta: %lu)\r\n",
                   (unsigned long)missed_before,
                   (unsigned long)missed_after,
                   (unsigned long)(missed_after - missed_before));
 
     if (test_passed) {
-        Serial.println("\n[WDT TEST] ✓ PASS - Watchdog successfully detected task stall");
-        Serial.println("[WDT TEST] System fault monitoring is functioning correctly");
+        logPrintln("\n[WDT TEST] [PASS] Watchdog successfully detected task stall");
+        logPrintln("[WDT TEST] System fault monitoring is functioning correctly");
     } else {
-        Serial.println("\n[WDT TEST] ✗ FAIL - Watchdog did NOT detect stall");
-        Serial.println("[WDT TEST] WARNING: Watchdog monitoring may not be working properly");
+        logPrintln("\n[WDT TEST] [FAIL] Watchdog did NOT detect stall");
+        logPrintln("[WDT TEST] WARNING: Watchdog monitoring may not be working properly");
     }
 
-    Serial.println("\n[WDT TEST] Use 'faults show' to view logged faults");
-    serialLoggerUnlock();
+    logPrintln("\n[WDT TEST] Use 'faults show' to view logged faults");
 }
 
 void cmd_wdt_main(int argc, char** argv) {
@@ -548,35 +534,31 @@ void cmd_encoder_config_show(int argc, char** argv) {
         return;
     }
 
-    serialLoggerLock();
-    Serial.printf("Interface:      %s\n", encoderHalGetInterfaceName(config->interface));
-    Serial.printf("Description:    %s\n", encoderHalGetInterfaceDescription(config->interface));
-    Serial.printf("Baud Rate:      %lu\n", (unsigned long)config->baud_rate);
-    Serial.printf("RX Pin:         %u\n", config->rx_pin);
-    Serial.printf("TX Pin:         %u\n", config->tx_pin);
-    Serial.printf("Read Interval:  %lu ms\n", (unsigned long)config->read_interval_ms);
-    Serial.printf("Timeout:        %lu ms\n", (unsigned long)config->timeout_ms);
+    logPrintf("Interface:      %s\r\n", encoderHalGetInterfaceName(config->interface));
+    logPrintf("Description:    %s\r\n", encoderHalGetInterfaceDescription(config->interface));
+    logPrintf("Baud Rate:      %lu\r\n", (unsigned long)config->baud_rate);
+    logPrintf("RX Pin:         %u\r\n", config->rx_pin);
+    logPrintf("TX Pin:         %u\r\n", config->tx_pin);
+    logPrintf("Read Interval:  %lu ms\r\n", (unsigned long)config->read_interval_ms);
+    logPrintf("Timeout:        %lu ms\r\n", (unsigned long)config->timeout_ms);
 
     uint32_t stored_iface = configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS232_HT);
     uint32_t stored_baud = configGetInt(KEY_ENC_BAUD, 9600);
-    Serial.printf("\nStored in NVS:  Interface=%lu, Baud=%lu\n", (unsigned long)stored_iface, (unsigned long)stored_baud);
-    serialLoggerUnlock();
+    logPrintf("\r\nStored in NVS:  Interface=%lu, Baud=%lu\r\n", (unsigned long)stored_iface, (unsigned long)stored_baud);
 }
 
 void cmd_encoder_config_interface(int argc, char** argv) {
     if (argc < 3) {
-        serialLoggerLock();
-        Serial.println("[ENCODER CONFIG] Usage: encoder config interface [RS232_HT | RS485_RXD2 | CUSTOM]");
-        Serial.println("  RS232_HT:    GPIO14/33 (HT1/HT2) - RS232 3.3V (standard)");
-        Serial.println("  RS485_RXD2:  GPIO17/18 (RXD2/TXD2) - RS485 Differential (alternative)");
-        Serial.println("  CUSTOM:      User-defined pins");
+        logPrintln("[ENCODER CONFIG] Usage: encoder config interface [RS232_HT | RS485_RXD2 | CUSTOM]");
+        logPrintln("  RS232_HT:    GPIO14/33 (HT1/HT2) - RS232 3.3V (standard)");
+        logPrintln("  RS485_RXD2:  GPIO17/18 (RXD2/TXD2) - RS485 Differential (alternative)");
+        logPrintln("  CUSTOM:      User-defined pins");
 
         // Show current
         const encoder_hal_config_t* config = encoderHalGetConfig();
         if (config) {
-            Serial.printf("\nCurrent: %s\n", encoderHalGetInterfaceName(config->interface));
+            logPrintf("\r\nCurrent: %s\r\n", encoderHalGetInterfaceName(config->interface));
         }
-        serialLoggerUnlock();
         return;
     }
 
@@ -645,12 +627,10 @@ void cmd_encoder_config_baud(int argc, char** argv) {
 
 void cmd_encoder_config_main(int argc, char** argv) {
     if (argc < 3) {
-        serialLoggerLock();
-        Serial.println("\n[ENCODER CONFIG] Usage: encoder config [show | interface | baud]");
-        Serial.println("  show:       Display current configuration");
-        Serial.println("  interface:  Set encoder interface (RS232_HT or RS485_RXD2)");
-        Serial.println("  baud:       Set baud rate");
-        serialLoggerUnlock();
+        logPrintln("\n[ENCODER CONFIG] Usage: encoder config [show | interface | baud]");
+        logPrintln("  show:       Display current configuration");
+        logPrintln("  interface:  Set encoder interface (RS232_HT or RS485_RXD2)");
+        logPrintln("  baud:       Set baud rate");
         return;
     }
 
@@ -689,24 +669,22 @@ void cmd_spindle_config_show(int argc, char** argv) {
         return;
     }
 
-    serialLoggerLock();
-    Serial.printf("Status:              %s\n", state->enabled ? "ENABLED" : "DISABLED");
-    Serial.printf("JXK-10 Address:      %u\n", state->jxk10_slave_address);
-    Serial.printf("Baud Rate:           %lu bps\n", (unsigned long)state->jxk10_baud_rate);
-    Serial.printf("Overcurrent Thresh:  %.1f A\n", state->overcurrent_threshold_amps);
-    Serial.printf("Poll Interval:       %lu ms\n", (unsigned long)state->poll_interval_ms);
+    logPrintf("Status:              %s\r\n", state->enabled ? "ENABLED" : "DISABLED");
+    logPrintf("JXK-10 Address:      %u\r\n", state->jxk10_slave_address);
+    logPrintf("Baud Rate:           %lu bps\r\n", (unsigned long)state->jxk10_baud_rate);
+    logPrintf("Overcurrent Thresh:  %.1f A\r\n", state->overcurrent_threshold_amps);
+    logPrintf("Poll Interval:       %lu ms\r\n", (unsigned long)state->poll_interval_ms);
 
     uint32_t stored_enabled = configGetInt(KEY_SPINDLE_ENABLED, 1);
     uint32_t stored_addr = configGetInt(KEY_SPINDLE_ADDRESS, 1);
     uint32_t stored_thresh = configGetInt(KEY_SPINDLE_THRESHOLD, 30);
     uint32_t stored_poll = configGetInt(KEY_SPINDLE_POLL_MS, 1000);
 
-    Serial.printf("\nStored in NVS:       Enabled=%lu, Address=%lu, Threshold=%luA, Poll=%lums\n",
+    logPrintf("\r\nStored in NVS:       Enabled=%lu, Address=%lu, Threshold=%luA, Poll=%lums\r\n",
                   (unsigned long)stored_enabled,
                   (unsigned long)stored_addr,
                   (unsigned long)stored_thresh,
                   (unsigned long)stored_poll);
-    serialLoggerUnlock();
 }
 
 void cmd_spindle_config_enable(int argc, char** argv) {
@@ -796,14 +774,12 @@ void cmd_spindle_config_interval(int argc, char** argv) {
 
 void cmd_spindle_config_main(int argc, char** argv) {
     if (argc < 3) {
-        serialLoggerLock();
-        Serial.println("\n[SPINDLE CONFIG] Usage: spindle config [show | enable | address | threshold | interval]");
-        Serial.println("  show:       Display current configuration");
-        Serial.println("  enable:     Enable/disable monitoring (on/off)");
-        Serial.println("  address:    Set JXK-10 Modbus address (1-247)");
-        Serial.println("  threshold:  Set overcurrent threshold (0-50 A)");
-        Serial.println("  interval:   Set poll interval (100-60000 ms)");
-        serialLoggerUnlock();
+        logPrintln("\n[SPINDLE CONFIG] Usage: spindle config [show | enable | address | threshold | interval]");
+        logPrintln("  show:       Display current configuration");
+        logPrintln("  enable:     Enable/disable monitoring (on/off)");
+        logPrintln("  address:    Set JXK-10 Modbus address (1-247)");
+        logPrintln("  threshold:  Set overcurrent threshold (0-50 A)");
+        logPrintln("  interval:   Set poll interval (100-60000 ms)");
         return;
     }
 
