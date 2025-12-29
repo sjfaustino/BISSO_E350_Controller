@@ -23,13 +23,11 @@ void cmd_wifi_scan(int argc, char** argv) {
     int n = WiFi.scanNetworks();
     if (n == 0) logPrintln("[WIFI] No networks found.");
     else {
-        serialLoggerLock();
-        Serial.printf("[WIFI] Found %d networks:\n", n);
+        logPrintf("[WIFI] Found %d networks:\r\n", n);
         for (int i = 0; i < n; ++i) {
-            Serial.printf("  %2d: %-32.32s | %d dBm\n", i+1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
+            logPrintf("  %2d: %-32.32s | %d dBm\r\n", i+1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
             delay(10);
         }
-        serialLoggerUnlock();
     }
     WiFi.scanDelete();
 }
@@ -45,42 +43,36 @@ void cmd_wifi_connect(int argc, char** argv) {
 
     // CRITICAL FIX: Non-blocking connection to prevent freezing motion control
     // WiFi connects in background - don't block CLI task with delay() loops
-    serialLoggerLock();
-    Serial.println("[WIFI] [OK] Connection initiated (non-blocking)");
-    Serial.println("[WIFI] Note: WiFi connects in background during normal operation");
-    Serial.println("[WIFI] Use 'wifi status' to check connection progress");
-    Serial.println();
-    Serial.println("[WIFI] SAFETY: This command does NOT block motion control");
-    Serial.println("[WIFI] Connection will complete within 10-20 seconds");
-    serialLoggerUnlock();
+    logPrintln("[WIFI] [OK] Connection initiated (non-blocking)");
+    logPrintln("[WIFI] Note: WiFi connects in background during normal operation");
+    logPrintln("[WIFI] Use 'wifi status' to check connection progress");
+    logPrintln("");
+    logPrintln("[WIFI] SAFETY: This command does NOT block motion control");
+    logPrintln("[WIFI] Connection will complete within 10-20 seconds");
 
     // Show immediate status
-    logPrintf("[WIFI] Current status: %s\n", wifiGetStatusString(WiFi.status()));
+    logPrintf("[WIFI] Current status: %s\r\n", wifiGetStatusString(WiFi.status()));
 }
 
 void cmd_wifi_status(int argc, char** argv) {
-    serialLoggerLock();
-    Serial.println("\n[WIFI] === Status ===");
-    Serial.printf("  Status: %s\n", wifiGetStatusString(WiFi.status()));
-    Serial.printf("  MAC:    %s\n", WiFi.macAddress().c_str());
+    logPrintln("\n[WIFI] === Status ===");
+    logPrintf("  Status: %s\r\n", wifiGetStatusString(WiFi.status()));
+    logPrintf("  MAC:    %s\r\n", WiFi.macAddress().c_str());
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf("  SSID:   %s\n", WiFi.SSID().c_str());
-        Serial.printf("  IP:     %s\n", WiFi.localIP().toString().c_str());
-        Serial.printf("  RSSI:   %d dBm\n", WiFi.RSSI());
+        logPrintf("  SSID:   %s\r\n", WiFi.SSID().c_str());
+        logPrintf("  IP:     %s\r\n", WiFi.localIP().toString().c_str());
+        logPrintf("  RSSI:   %d dBm\r\n", WiFi.RSSI());
     }
-    serialLoggerUnlock();
 }
 
 void cmd_wifi_ap(int argc, char **argv) {
   if (argc < 3) {
-    serialLoggerLock();
-    Serial.println("\n[WIFI] === AP Mode Management ===");
-    Serial.println("Usage:");
-    Serial.println("  wifi ap on            - Enable AP mode");
-    Serial.println("  wifi ap off           - Disable AP mode");
-    Serial.println("  wifi ap set <s|p> <v> - Set SSID(s) or Password(p)");
-    Serial.println("  wifi ap status        - Show current AP configuration");
-    serialLoggerUnlock();
+    logPrintln("\n[WIFI] === AP Mode Management ===");
+    logPrintln("Usage:");
+    logPrintln("  wifi ap on            - Enable AP mode");
+    logPrintln("  wifi ap off           - Disable AP mode");
+    logPrintln("  wifi ap set <s|p> <v> - Set SSID(s) or Password(p)");
+    logPrintln("  wifi ap status        - Show current AP configuration");
     return;
   }
 
@@ -139,20 +131,18 @@ void cmd_wifi_main(int argc, char **argv) {
 // SECURITY: OTA password management command
 void cmd_ota_setpass(int argc, char** argv) {
     if (argc < 2) {
-        serialLoggerLock();
-        Serial.println("\n[OTA] === OTA Password Management ===");
-        Serial.println("Usage: ota_setpass <new_password>");
-        Serial.println("Note: Password must be at least 8 characters");
-        Serial.println("      Requires reboot to take effect");
+        logPrintln("\n[OTA] === OTA Password Management ===");
+        logPrintln("Usage: ota_setpass <new_password>");
+        logPrintln("Note: Password must be at least 8 characters");
+        logPrintln("      Requires reboot to take effect");
 
         // Show current status
         int ota_pw_changed = configGetInt(KEY_OTA_PW_CHANGED, 0);
         if (ota_pw_changed == 0) {
-            Serial.println("\nCurrent: DEFAULT PASSWORD (insecure!)");
+            logPrintln("\nCurrent: DEFAULT PASSWORD (insecure!)");
         } else {
-            Serial.println("\nCurrent: CUSTOM PASSWORD (secure)");
+            logPrintln("\nCurrent: CUSTOM PASSWORD (secure)");
         }
-        serialLoggerUnlock();
         return;
     }
 

@@ -153,12 +153,10 @@ void cmd_calib_ppmm_start(int argc, char** argv) {
     g_manual_calib.target_mm = distance_mm;
     g_manual_calib.start_counts = wj66GetPosition(axis);
     
-    serialLoggerLock();
-    Serial.println("\n=== MANUAL PPM CALIBRATION ===");
-    Serial.printf("Axis: %c | Target: %.1f mm\n", axis_char, distance_mm);
-    Serial.printf("Start Pos: %ld counts\n", (long)g_manual_calib.start_counts);
-    Serial.printf("\nACTION: Move axis exactly %.1f mm, then type 'calibrate ppmm end'.\n\n", distance_mm);
-    serialLoggerUnlock();
+    logPrintln("\n=== MANUAL PPM CALIBRATION ===");
+    logPrintf("Axis: %c | Target: %.1f mm\r\n", axis_char, distance_mm);
+    logPrintf("Start Pos: %ld counts\r\n", (long)g_manual_calib.start_counts);
+    logPrintf("\r\nACTION: Move axis exactly %.1f mm, then type 'calibrate ppmm end'.\r\n\r\n", distance_mm);
     
     g_manual_calib.state = CALIB_MANUAL_WAIT_MOVE;
 }
@@ -183,12 +181,10 @@ void cmd_calib_ppmm_end(int argc, char** argv) {
     double calculated_ppmm = (double)moved_counts / target_mm;
     encoderCalibrationSetPPM(axis, calculated_ppmm); 
     
-    serialLoggerLock();
-    Serial.println("\n=== CALIBRATION COMPLETE ===");
-    Serial.printf("Measured: %ld counts\n", (long)moved_counts);
-    Serial.printf("Target:   %.1f mm\n", target_mm);
-    Serial.printf("Result:   %.3f pulses/unit\n", calculated_ppmm);
-    serialLoggerUnlock();
+    logPrintln("\n=== CALIBRATION COMPLETE ===");
+    logPrintf("Measured: %ld counts\r\n", (long)moved_counts);
+    logPrintf("Target:   %.1f mm\r\n", target_mm);
+    logPrintf("Result:   %.3f pulses/unit\r\n", calculated_ppmm);
     
     g_manual_calib.state = CALIBRATION_IDLE;
 }
@@ -258,12 +254,10 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     float speed_mm_s = total_distance_mm / avg_time_s;
     float speed_mm_min = speed_mm_s * 60.0f; 
 
-    serialLoggerLock();
-    Serial.println("\n--- SUMMARY ---");
-    Serial.printf("Fwd: %.1f mm in %.2f s\n", (float)run_fwd.counts / MOTION_POSITION_SCALE_FACTOR, (float)run_fwd.time_ms / 1000.0f);
-    Serial.printf("Rev: %.1f mm in %.2f s\n", (float)run_rev.counts / MOTION_POSITION_SCALE_FACTOR, (float)run_rev.time_ms / 1000.0f);
-    Serial.printf("Avg Speed: %.2f mm/s (%.1f mm/min)\n", speed_mm_s, speed_mm_min);
-    serialLoggerUnlock();
+    logPrintln("\n--- SUMMARY ---");
+    logPrintf("Fwd: %.1f mm in %.2f s\r\n", (float)run_fwd.counts / MOTION_POSITION_SCALE_FACTOR, (float)run_fwd.time_ms / 1000.0f);
+    logPrintf("Rev: %.1f mm in %.2f s\r\n", (float)run_rev.counts / MOTION_POSITION_SCALE_FACTOR, (float)run_rev.time_ms / 1000.0f);
+    logPrintf("Avg Speed: %.2f mm/s (%.1f mm/min)\r\n", speed_mm_s, speed_mm_min);
 
     AxisCalibration* cal = getAxisCalPtrForCli(axis);
     if (cal == NULL) {
@@ -311,16 +305,14 @@ static const uint32_t MEASUREMENT_DURATION_MS = 10000;  // 10 seconds per phase
 void cmd_vfd_calib_current(int argc, char** argv) {
     // Help text
     if (argc < 2 || strcmp(argv[1], "help") == 0) {
-        serialLoggerLock();
-        Serial.println("[VFDCAL] === VFD Current Calibration ===");
-        Serial.println("Commands:");
-        Serial.println("  calibrate vfd current start     - Start calibration workflow");
-        Serial.println("  calibrate vfd current status    - Show current status");
-        Serial.println("  calibrate vfd current confirm   - Confirm measurement and continue");
-        Serial.println("  calibrate vfd current abort     - Abort calibration");
-        Serial.println("  calibrate vfd current reset     - Reset all calibration data");
-        Serial.println("  calibrate vfd current show      - Display current calibration values");
-        serialLoggerUnlock();
+        logPrintln("[VFDCAL] === VFD Current Calibration ===");
+        logPrintln("Commands:");
+        logPrintln("  calibrate vfd current start     - Start calibration workflow");
+        logPrintln("  calibrate vfd current status    - Show current status");
+        logPrintln("  calibrate vfd current confirm   - Confirm measurement and continue");
+        logPrintln("  calibrate vfd current abort     - Abort calibration");
+        logPrintln("  calibrate vfd current reset     - Reset all calibration data");
+        logPrintln("  calibrate vfd current show      - Display current calibration values");
         return;
     }
 
@@ -331,15 +323,13 @@ void cmd_vfd_calib_current(int argc, char** argv) {
             return;
         }
 
-        serialLoggerLock();
-        Serial.println("\n[VFDCAL] === Starting VFD Current Calibration ===");
-        Serial.println("This process measures current baselines for stall detection.");
-        Serial.println("You will be guided through three phases:\n");
-        Serial.println("1. IDLE BASELINE: Blade spinning, NO cutting (typically 5-10A)");
-        Serial.println("2. STANDARD CUT: Reference cutting speed (typically 20-25A)");
-        Serial.println("3. HEAVY LOAD: (Optional) High-speed or high-load cutting\n");
-        Serial.println("Each phase will measure for 10 seconds. Press ENTER when ready for phase 1...");
-        serialLoggerUnlock();
+        logPrintln("\n[VFDCAL] === Starting VFD Current Calibration ===");
+        logPrintln("This process measures current baselines for stall detection.");
+        logPrintln("You will be guided through three phases:\n");
+        logPrintln("1. IDLE BASELINE: Blade spinning, NO cutting (typically 5-10A)");
+        logPrintln("2. STANDARD CUT: Reference cutting speed (typically 20-25A)");
+        logPrintln("3. HEAVY LOAD: (Optional) High-speed or high-load cutting\n");
+        logPrintln("Each phase will measure for 10 seconds. Press ENTER when ready for phase 1...");
 
         vfd_calib_state = VFD_CALIB_MEASURING_IDLE;
         vfd_calib_start_time = millis();
@@ -365,12 +355,10 @@ void cmd_vfd_calib_current(int argc, char** argv) {
             if (vfdCalibrationGetMeasurement(&rms, &peak)) {
                 vfdCalibrationStoreMeasurement(1, rms, peak);
                 logPrintf("[VFDCAL] Standard cut phase complete: RMS=%.2f A, Peak=%.2f A\n", rms, peak);
-                serialLoggerLock();
-                Serial.println("\n[VFDCAL] Phase 3: HEAVY LOAD (Optional)");
-                Serial.println("Measure heavy-load scenario for worst-case baseline?");
-                Serial.println("  - Type 'continue' to measure heavy load (10 seconds)");
-                Serial.println("  - Type 'finish' to skip and calculate thresholds");
-                serialLoggerUnlock();
+                logPrintln("\n[VFDCAL] Phase 3: HEAVY LOAD (Optional)");
+                logPrintln("Measure heavy-load scenario for worst-case baseline?");
+                logPrintln("  - Type 'continue' to measure heavy load (10 seconds)");
+                logPrintln("  - Type 'finish' to skip and calculate thresholds");
                 vfd_calib_state = VFD_CALIB_CONFIRM_STD;
             }
 
@@ -451,16 +439,14 @@ void cmd_vfd_calib_current(int argc, char** argv) {
  */
 void cmd_vfd_diagnostics(int argc, char** argv) {
     if (argc < 2 || strcmp(argv[1], "help") == 0) {
-        serialLoggerLock();
-        Serial.println("[VFDDIAG] === VFD Diagnostics ===");
-        Serial.println("Commands:");
-        Serial.println("  vfd diagnostics status    - Show real-time VFD status");
-        Serial.println("  vfd diagnostics thermal   - Show thermal monitoring details");
-        Serial.println("  vfd diagnostics current   - Show motor current measurements");
-        Serial.println("  vfd diagnostics frequency - Show output frequency data");
-        Serial.println("  vfd diagnostics full      - Comprehensive VFD report");
-        Serial.println("  vfd diagnostics calib     - Show calibration details");
-        serialLoggerUnlock();
+        logPrintln("[VFDDIAG] === VFD Diagnostics ===");
+        logPrintln("Commands:");
+        logPrintln("  vfd diagnostics status    - Show real-time VFD status");
+        logPrintln("  vfd diagnostics thermal   - Show thermal monitoring details");
+        logPrintln("  vfd diagnostics current   - Show motor current measurements");
+        logPrintln("  vfd diagnostics frequency - Show output frequency data");
+        logPrintln("  vfd diagnostics full      - Comprehensive VFD report");
+        logPrintln("  vfd diagnostics calib     - Show calibration details");
         return;
     }
 
@@ -475,56 +461,52 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         int32_t warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
         int32_t crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
 
-        serialLoggerLock();
-        Serial.printf("Thermal State:       %d%% (nominal: 100%%)\n", thermal);
-        Serial.printf("Warning Threshold:   >%ld°C (%ld%% state)\n", (long)warn, (long)(warn * 1.3));
-        Serial.printf("Critical Threshold:  >%ld°C (%ld%% state)\n", (long)crit, (long)(crit * 1.4));
+        logPrintf("Thermal State:       %d%% (nominal: 100%%)\r\n", thermal);
+        logPrintf("Warning Threshold:   >%ldC (%ld%% state)\r\n", (long)warn, (long)(warn * 1.3));
+        logPrintf("Critical Threshold:  >%ldC (%ld%% state)\r\n", (long)crit, (long)(crit * 1.4));
 
         if (thermal > (crit * 1.4)) {
-            Serial.println("Status:              CRITICAL - Emergency stop required!");
+            logPrintln("Status:              CRITICAL - Emergency stop required!");
         } else if (thermal > (warn * 1.3)) {
-            Serial.println("Status:              WARNING - Monitor closely");
+            logPrintln("Status:              WARNING - Monitor closely");
         } else {
-            Serial.println("Status:              NORMAL");
+            logPrintln("Status:              NORMAL");
         }
-        Serial.println();
-        serialLoggerUnlock();
+        logPrintln("");
 
     } else if (strcmp(argv[1], "current") == 0) {
         logPrintln("\n[VFDDIAG] === Motor Current Measurements ===");
         float current = altivar31GetCurrentAmps();
         int16_t raw = altivar31GetCurrentRaw();
 
-        serialLoggerLock();
-        Serial.printf("Motor Current:       %.2f A (raw: %d)\n", current, raw);
+        logPrintf("Motor Current:       %.2f A (raw: %d)\r\n", current, raw);
 
         if (vfdCalibrationIsValid()) {
             const vfd_calibration_data_t* calib = vfdCalibrationGetData();
-            Serial.printf("\nCalibrated Baselines:\n");
-            Serial.printf("  Idle (no cut):       %.2f A (RMS) / %.2f A (peak)\n",
+            logPrintln("\r\nCalibrated Baselines:");
+            logPrintf("  Idle (no cut):       %.2f A (RMS) / %.2f A (peak)\r\n",
                           calib->idle_rms_amps, calib->idle_peak_amps);
-            Serial.printf("  Standard Cut:        %.2f A (RMS) / %.2f A (peak)\n",
+            logPrintf("  Standard Cut:        %.2f A (RMS) / %.2f A (peak)\r\n",
                           calib->standard_cut_rms_amps, calib->standard_cut_peak_amps);
             if (calib->heavy_cut_rms_amps > 0.0f) {
-                Serial.printf("  Heavy Load:          %.2f A (RMS) / %.2f A (peak)\n",
+                logPrintf("  Heavy Load:          %.2f A (RMS) / %.2f A (peak)\r\n",
                               calib->heavy_cut_rms_amps, calib->heavy_cut_peak_amps);
             }
-            Serial.printf("\nStall Detection:\n");
-            Serial.printf("  Threshold:           %.2f A\n", calib->stall_threshold_amps);
-            Serial.printf("  Current vs Threshold: %.2f A / %.2f A = %.0f%%\n",
+            logPrintln("\r\nStall Detection:");
+            logPrintf("  Threshold:           %.2f A\r\n", calib->stall_threshold_amps);
+            logPrintf("  Current vs Threshold: %.2f A / %.2f A = %.0f%%\r\n",
                           current, calib->stall_threshold_amps,
                           (calib->stall_threshold_amps > 0) ? (current / calib->stall_threshold_amps * 100.0f) : 0.0f);
 
             if (vfdCalibrationIsStall(current)) {
-                Serial.println("  Status:              STALL DETECTED!");
+                logPrintln("  Status:              STALL DETECTED!");
             } else {
-                Serial.println("  Status:              Normal");
+                logPrintln("  Status:              Normal");
             }
         } else {
-            Serial.println("  Calibration Status:  NOT CALIBRATED");
+            logPrintln("  Calibration Status:  NOT CALIBRATED");
         }
-        Serial.println();
-        serialLoggerUnlock();
+        logPrintln("");
 
     } else if (strcmp(argv[1], "frequency") == 0) {
         logPrintln("\n[VFDDIAG] === Output Frequency ===");
@@ -539,29 +521,25 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         vfdCalibrationPrintSummary();
 
     } else if (strcmp(argv[1], "full") == 0) {
-        serialLoggerLock();
-        Serial.println("\n[VFDDIAG] === Comprehensive VFD Report ===");
-        Serial.println("\n--- Status ---");
-        serialLoggerUnlock();
+        logPrintln("\n[VFDDIAG] === Comprehensive VFD Report ===");
+        logPrintln("\n--- Status ---");
         altivar31PrintDiagnostics();
 
-        serialLoggerLock();
-        Serial.println("\n--- Current Measurements ---");
+        logPrintln("\n--- Current Measurements ---");
         float current = altivar31GetCurrentAmps();
         int32_t raw = altivar31GetCurrentRaw();
-        Serial.printf("Motor Current:       %.2f A (raw: %ld)\n", current, (long)raw);
+        logPrintf("Motor Current:       %.2f A (raw: %ld)\r\n", current, (long)raw);
 
-        Serial.println("\n--- Thermal State ---");
+        logPrintln("\n--- Thermal State ---");
         int16_t thermal = altivar31GetThermalState();
         int32_t warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
         int32_t crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
-        Serial.printf("Thermal State:       %d%% (warn: %ld%%, crit: %ld%%)\n",
+        logPrintf("Thermal State:       %d%% (warn: %ld%%, crit: %ld%%)\r\n",
                       thermal, (long)(warn * 1.3), (long)(crit * 1.4));
 
-        Serial.println("\n--- Frequency ---");
+        logPrintln("\n--- Frequency ---");
         float freq = altivar31GetFrequencyHz();
-        Serial.printf("Output Frequency:    %.1f Hz\n", freq);
-        serialLoggerUnlock();
+        logPrintf("Output Frequency:    %.1f Hz\r\n", freq);
 
         logPrintln("\n--- Calibration ---");
         vfdCalibrationPrintSummary();
@@ -587,16 +565,14 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
  */
 void cmd_vfd_config(int argc, char** argv) {
     if (argc < 2 || strcmp(argv[1], "help") == 0) {
-        serialLoggerLock();
-        Serial.println("[VFDCFG] === VFD Configuration ===");
-        Serial.println("Commands:");
-        Serial.println("  vfd config margin <percent>      - Set stall margin (default 20%)");
-        Serial.println("  vfd config timeout <ms>          - Set stall timeout (default 2000ms)");
-        Serial.println("  vfd config temp warn <C>         - Set temperature warning threshold");
-        Serial.println("  vfd config temp crit <C>         - Set temperature critical threshold");
-        Serial.println("  vfd config enable <on|off>       - Enable/disable VFD stall detection");
-        Serial.println("  vfd config show                  - Display current settings");
-        serialLoggerUnlock();
+        logPrintln("[VFDCFG] === VFD Configuration ===");
+        logPrintln("Commands:");
+        logPrintln("  vfd config margin <percent>      - Set stall margin (default 20%)");
+        logPrintln("  vfd config timeout <ms>          - Set stall timeout (default 2000ms)");
+        logPrintln("  vfd config temp warn <C>         - Set temperature warning threshold");
+        logPrintln("  vfd config temp crit <C>         - Set temperature critical threshold");
+        logPrintln("  vfd config enable <on|off>       - Enable/disable VFD stall detection");
+        logPrintln("  vfd config show                  - Display current settings");
         return;
     }
 
