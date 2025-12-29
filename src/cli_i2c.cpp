@@ -83,36 +83,34 @@ const char* getOptionValue(int argc, char** argv, const char* option) {
 }
 
 void printTableSeparator(int col1, int col2, int col3, int col4) {
-    serialLoggerLock();
-    Serial.print("┌");
-    for (int i = 0; i < col1; i++) Serial.print("─");
-    Serial.print("┬");
-    for (int i = 0; i < col2; i++) Serial.print("─");
-    Serial.print("┬");
-    for (int i = 0; i < col3; i++) Serial.print("─");
-    Serial.print("┬");
-    for (int i = 0; i < col4; i++) Serial.print("─");
-    Serial.println("┐");
-    serialLoggerUnlock();
+    char line[80];
+    int pos = 0;
+    pos += snprintf(line + pos, sizeof(line) - pos, "+");
+    for (int i = 0; i < col1; i++) pos += snprintf(line + pos, sizeof(line) - pos, "-");
+    pos += snprintf(line + pos, sizeof(line) - pos, "+");
+    for (int i = 0; i < col2; i++) pos += snprintf(line + pos, sizeof(line) - pos, "-");
+    pos += snprintf(line + pos, sizeof(line) - pos, "+");
+    for (int i = 0; i < col3; i++) pos += snprintf(line + pos, sizeof(line) - pos, "-");
+    pos += snprintf(line + pos, sizeof(line) - pos, "+");
+    for (int i = 0; i < col4; i++) pos += snprintf(line + pos, sizeof(line) - pos, "-");
+    pos += snprintf(line + pos, sizeof(line) - pos, "+");
+    logPrintln(line);
 }
 
 void printTableRow(const char* col1, const char* col2, const char* col3, const char* col4,
                    int col1_width, int col2_width, int col3_width, int col4_width) {
-    serialLoggerLock();
-    Serial.print("│ ");
-    Serial.print(col1);
-    for (int i = strlen(col1); i < col1_width - 1; i++) Serial.print(" ");
-    Serial.print("│ ");
-    Serial.print(col2);
-    for (int i = strlen(col2); i < col2_width - 1; i++) Serial.print(" ");
-    Serial.print("│ ");
-    Serial.print(col3);
-    for (int i = strlen(col3); i < col3_width - 1; i++) Serial.print(" ");
-    Serial.print("│ ");
-    Serial.print(col4);
-    for (int i = strlen(col4); i < col4_width - 1; i++) Serial.print(" ");
-    Serial.println("│");
-    serialLoggerUnlock();
+    char line[120];
+    int pos = 0;
+    pos += snprintf(line + pos, sizeof(line) - pos, "| %s", col1);
+    for (int i = strlen(col1); i < col1_width - 1; i++) pos += snprintf(line + pos, sizeof(line) - pos, " ");
+    pos += snprintf(line + pos, sizeof(line) - pos, "| %s", col2);
+    for (int i = strlen(col2); i < col2_width - 1; i++) pos += snprintf(line + pos, sizeof(line) - pos, " ");
+    pos += snprintf(line + pos, sizeof(line) - pos, "| %s", col3);
+    for (int i = strlen(col3); i < col3_width - 1; i++) pos += snprintf(line + pos, sizeof(line) - pos, " ");
+    pos += snprintf(line + pos, sizeof(line) - pos, "| %s", col4);
+    for (int i = strlen(col4); i < col4_width - 1; i++) pos += snprintf(line + pos, sizeof(line) - pos, " ");
+    pos += snprintf(line + pos, sizeof(line) - pos, "|");
+    logPrintln(line);
 }
 
 // ============================================================================
@@ -375,19 +373,17 @@ void cmd_i2c_stats(int argc, char** argv) {
     i2c_stats_t stats = i2cGetStats();
 
     if (export_json) {
-        serialLoggerLock();
-        Serial.println("{");
-        Serial.printf("  \"transactions_total\": %lu,\n", (unsigned long)stats.transactions_total);
-        Serial.printf("  \"transactions_success\": %lu,\n", (unsigned long)stats.transactions_success);
-        Serial.printf("  \"transactions_failed\": %lu,\n", (unsigned long)stats.transactions_failed);
-        Serial.printf("  \"success_rate\": %.1f,\n", stats.success_rate);
-        Serial.printf("  \"retries_performed\": %lu,\n", (unsigned long)stats.retries_performed);
-        Serial.printf("  \"bus_recoveries\": %lu,\n", (unsigned long)stats.bus_recoveries);
-        Serial.printf("  \"error_nack\": %lu,\n", (unsigned long)stats.error_nack);
-        Serial.printf("  \"error_timeout\": %lu,\n", (unsigned long)stats.error_timeout);
-        Serial.printf("  \"error_bus\": %lu\n", (unsigned long)stats.error_bus);
-        Serial.println("}");
-        serialLoggerUnlock();
+        logPrintln("{");
+        logPrintf("  \"transactions_total\": %lu,\r\n", (unsigned long)stats.transactions_total);
+        logPrintf("  \"transactions_success\": %lu,\r\n", (unsigned long)stats.transactions_success);
+        logPrintf("  \"transactions_failed\": %lu,\r\n", (unsigned long)stats.transactions_failed);
+        logPrintf("  \"success_rate\": %.1f,\r\n", stats.success_rate);
+        logPrintf("  \"retries_performed\": %lu,\r\n", (unsigned long)stats.retries_performed);
+        logPrintf("  \"bus_recoveries\": %lu,\r\n", (unsigned long)stats.bus_recoveries);
+        logPrintf("  \"error_nack\": %lu,\r\n", (unsigned long)stats.error_nack);
+        logPrintf("  \"error_timeout\": %lu,\r\n", (unsigned long)stats.error_timeout);
+        logPrintf("  \"error_bus\": %lu\r\n", (unsigned long)stats.error_bus);
+        logPrintln("}");
     } else {
         logPrintln("\n[I2C] === Statistics ===");
         logPrintf("Total Transactions: %lu\n", (unsigned long)stats.transactions_total);
@@ -652,23 +648,21 @@ void cmd_i2c_troubleshoot(int argc, char** argv) {
 
 void cmd_i2c_main(int argc, char** argv) {
     if (argc < 2) {
-        serialLoggerLock();
-        Serial.println("\n[I2C] Usage: i2c <command> [options]");
-        Serial.println("\nCommands:");
-        Serial.println("  scan [options]      - Scan for I2C devices");
-        Serial.println("                        Options: -v (verbose), --save, --compare");
-        Serial.println("  test [options]      - Test I2C devices");
-        Serial.println("                        Options: -v (verbose), --stress");
-        Serial.println("  stats [options]     - Show I2C statistics");
-        Serial.println("                        Options: --reset, --export (JSON)");
-        Serial.println("  recover             - Recover stuck I2C bus");
-        Serial.println("  monitor [options]   - Monitor I2C bus");
-        Serial.println("                        Options: --alert, -t <seconds>");
-        Serial.println("  benchmark [-n N]    - Benchmark I2C performance");
-        Serial.println("  health              - Quick health check");
-        Serial.println("  selftest            - Comprehensive system test");
-        Serial.println("  troubleshoot [addr] - Interactive troubleshooting");
-        serialLoggerUnlock();
+        logPrintln("\n[I2C] Usage: i2c <command> [options]");
+        logPrintln("\nCommands:");
+        logPrintln("  scan [options]      - Scan for I2C devices");
+        logPrintln("                        Options: -v (verbose), --save, --compare");
+        logPrintln("  test [options]      - Test I2C devices");
+        logPrintln("                        Options: -v (verbose), --stress");
+        logPrintln("  stats [options]     - Show I2C statistics");
+        logPrintln("                        Options: --reset, --export (JSON)");
+        logPrintln("  recover             - Recover stuck I2C bus");
+        logPrintln("  monitor [options]   - Monitor I2C bus");
+        logPrintln("                        Options: --alert, -t <seconds>");
+        logPrintln("  benchmark [-n N]    - Benchmark I2C performance");
+        logPrintln("  health              - Quick health check");
+        logPrintln("  selftest            - Comprehensive system test");
+        logPrintln("  troubleshoot [addr] - Interactive troubleshooting");
         return;
     }
 
