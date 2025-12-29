@@ -57,34 +57,27 @@ void cliRegisterConfigCommands() {
 
 void cmd_config_main(int argc, char **argv) {
   if (argc < 2) {
-    serialLoggerLock();
-    Serial.println("\n[CONFIG] === Configuration Management ===");
-    Serial.println("[CONFIG] Usage: config [command] <parameter>");
-    Serial.println("[CONFIG] Commands:");
-    Serial.println("  get <key> - Show value of a specific key.");
-    Serial.println("  set       - Set value: config set <key> <val>");
-    Serial.println("  dump      - List ALL configuration keys and values.");
-    Serial.println("  show      - Show diagnostic summary.");
-    Serial.println(
-        "  save      - Force save current configuration cache to NVS.");
-    Serial.println(
-        "  reset     - Reset ALL configuration settings to factory defaults.");
-    Serial.println(
-        "  validate  - Run full consistency validation report on the config.");
-    Serial.println(
-        "  schema    - Show schema version history and key metadata.");
-    Serial.println("  migrate   - Automatically migrate configuration schema "
-                   "to current version.");
-    Serial.println("  rollback  - Rollback schema to a specific version.");
-    Serial.println("\n[PHASE 2] New Commands:");
-    Serial.println("  export    - Export configuration as JSON.");
-    Serial.println("  import    - Import configuration from JSON.");
-    Serial.println("\n[PHASE 5.1] Backup/Restore:");
-    Serial.println("  backup    - Save current configuration to NVS backup.");
-    Serial.println("  restore   - Load configuration from NVS backup.");
-    Serial.println("  showbkp   - Display stored backup configuration.");
-    Serial.println("  clrbkp    - Clear backup from NVS.");
-    serialLoggerUnlock();
+    logPrintln("\n[CONFIG] === Configuration Management ===");
+    logPrintln("[CONFIG] Usage: config [command] <parameter>");
+    logPrintln("[CONFIG] Commands:");
+    logPrintln("  get <key> - Show value of a specific key.");
+    logPrintln("  set       - Set value: config set <key> <val>");
+    logPrintln("  dump      - List ALL configuration keys and values.");
+    logPrintln("  show      - Show diagnostic summary.");
+    logPrintln("  save      - Force save current configuration cache to NVS.");
+    logPrintln("  reset     - Reset ALL configuration settings to factory defaults.");
+    logPrintln("  validate  - Run full consistency validation report on the config.");
+    logPrintln("  schema    - Show schema version history and key metadata.");
+    logPrintln("  migrate   - Automatically migrate configuration schema to current version.");
+    logPrintln("  rollback  - Rollback schema to a specific version.");
+    logPrintln("\n[PHASE 2] New Commands:");
+    logPrintln("  export    - Export configuration as JSON.");
+    logPrintln("  import    - Import configuration from JSON.");
+    logPrintln("\n[PHASE 5.1] Backup/Restore:");
+    logPrintln("  backup    - Save current configuration to NVS backup.");
+    logPrintln("  restore   - Load configuration from NVS backup.");
+    logPrintln("  showbkp   - Display stored backup configuration.");
+    logPrintln("  clrbkp    - Clear backup from NVS.");
     return;
   }
 
@@ -244,9 +237,8 @@ void cmd_config_validate(int argc, char **argv) {
 // ============================================================================
 
 void cmd_config_export(int argc, char **argv) {
-  serialLoggerLock();
-  Serial.println("\n[CONFIG] === Configuration Export (JSON) ===");
-  Serial.println("{\n  \"config\": {");
+  logPrintln("\n[CONFIG] === Configuration Export (JSON) ===");
+  logPrintln("{\n  \"config\": {");
 
   // Export known critical keys in JSON format
   // This is a simplified version - in production, iterate all keys
@@ -262,8 +254,8 @@ void cmd_config_export(int argc, char **argv) {
     snprintf(key, sizeof(key), "speed_cal_%d", i);
     float val = configGetFloat(key, 1000.0f);
     if (!first)
-      Serial.println(",");
-    Serial.printf("    \"%s\": %.2f", key, val);
+      logPrintln(",");
+    logPrintf("    \"%s\": %.2f", key, val);
     first = false;
   }
 
@@ -273,8 +265,8 @@ void cmd_config_export(int argc, char **argv) {
     snprintf(key, sizeof(key), "ppm_%d", i);
     float val = configGetFloat(key, 100.0f);
     if (!first)
-      Serial.println(",");
-    Serial.printf("    \"%s\": %.2f", key, val);
+      logPrintln(",");
+    logPrintf("    \"%s\": %.2f", key, val);
     first = false;
   }
 
@@ -284,14 +276,13 @@ void cmd_config_export(int argc, char **argv) {
     snprintf(key, sizeof(key), "limit_max_%d", i);
     int32_t val = configGetInt(key, 500000);
     if (!first)
-      Serial.println(",");
-    Serial.printf("    \"%s\": %ld", key, (long)val);
+      logPrintln(",");
+    logPrintf("    \"%s\": %ld", key, (long)val);
     first = false;
   }
 
-  Serial.println("\n  }\n}");
-  Serial.println("\n[CONFIG] Export complete. Copy JSON data above to save.");
-  serialLoggerUnlock();
+  logPrintln("\n  }\n}");
+  logPrintln("\n[CONFIG] Export complete. Copy JSON data above to save.");
 }
 
 void cmd_config_import(int argc, char **argv) {

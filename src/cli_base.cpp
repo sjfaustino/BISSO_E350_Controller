@@ -176,15 +176,13 @@ void cliUpdate() {
         float wPos[4];
         for(int i=0; i<4; i++) wPos[i] = gcodeParser.getWorkPosition(i, mPos[i]);
 
-        serialLoggerLock();
-        Serial.printf("<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f|Bf:%d,127|FS:%.0f,0>\r\n",
+        logPrintf("<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f|Bf:%d,127|FS:%.0f,0>\r\n",
             state_str,
             mPos[0], mPos[1], mPos[2], mPos[3],
             wPos[0], wPos[1], wPos[2], wPos[3],
             plan_slots,
             motionPlanner.getFeedOverride() * 100.0f 
         );
-        serialLoggerUnlock();
         return; 
     }
 
@@ -333,7 +331,7 @@ void cliProcessCommand(const char* cmd) {
   char* token = strtok(cmd_copy, " ");
   while (token && argc < CLI_MAX_ARGS) { argv[argc++] = token; token = strtok(NULL, " "); }
   
-  if (argc == 0) { Serial.println("ok"); return; }
+  if (argc == 0) { logPrintln("ok"); return; }
   
   for (int i = 0; i < command_count; i++) {
     if (strcasecmp(commands[i].command, argv[0]) == 0) {
