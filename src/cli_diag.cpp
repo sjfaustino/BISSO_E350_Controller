@@ -885,15 +885,14 @@ void cmd_task_list_detailed(int argc, char** argv) {
     task_stats_t* tasks = taskGetStatsArray();
 
     // Header
-    serialLoggerLock();
-    Serial.println("\nTask Name          | Priority | Stack HWM | Runs    | Time(ms)  | Max(ms)");
-    Serial.println("-------------------|----------|-----------|---------|-----------|--------");
+    logPrintln("\nTask Name          | Priority | Stack HWM | Runs    | Time(ms)  | Max(ms)");
+    logPrintln("-------------------|----------|-----------|---------|-----------|--------");
 
     for (int i = 0; i < task_count; i++) {
         const task_stats_t* task = &tasks[i];
         if (task->handle == NULL) continue;
 
-        Serial.printf("%-18s | %8u | %9u | %7lu | %9lu | %7lu\n",
+        logPrintf("%-18s | %8u | %9u | %7lu | %9lu | %7lu\r\n",
             (task->name ? task->name : "UNKNOWN"),
             (unsigned int)task->priority,
             (unsigned int)task->stack_high_water,
@@ -902,9 +901,8 @@ void cmd_task_list_detailed(int argc, char** argv) {
             (unsigned long)task->max_run_time_ms);
     }
 
-    Serial.println("\nNote: Stack HWM = High Water Mark (bytes still available)");
-    Serial.println("      Time = Total cumulative time");
-    serialLoggerUnlock();
+    logPrintln("\nNote: Stack HWM = High Water Mark (bytes still available)");
+    logPrintln("      Time = Total cumulative time");
 }
 
 void cmd_memory_detailed(int argc, char** argv) {
@@ -925,23 +923,21 @@ void cmd_memory_detailed(int argc, char** argv) {
     uint32_t largest = memoryMonitorGetLargestFreeBlock();
     uint32_t used = total - free;
 
-    serialLoggerLock();
-    Serial.printf("\nHeap Summary:\n");
-    Serial.printf("  Total:      %lu bytes\n", (unsigned long)total);
-    Serial.printf("  Used:       %lu bytes (%.1f%%)\n", (unsigned long)used, (used * 100.0f) / total);
-    Serial.printf("  Free:       %lu bytes (%.1f%%)\n", (unsigned long)free, (free * 100.0f) / total);
-    Serial.printf("  Minimum:    %lu bytes (lowest ever)\n", (unsigned long)min_free);
-    Serial.printf("  Largest Block: %lu bytes (max contiguous)\n", (unsigned long)largest);
+    logPrintf("\r\nHeap Summary:\r\n");
+    logPrintf("  Total:      %lu bytes\r\n", (unsigned long)total);
+    logPrintf("  Used:       %lu bytes (%.1f%%)\r\n", (unsigned long)used, (used * 100.0f) / total);
+    logPrintf("  Free:       %lu bytes (%.1f%%)\r\n", (unsigned long)free, (free * 100.0f) / total);
+    logPrintf("  Minimum:    %lu bytes (lowest ever)\r\n", (unsigned long)min_free);
+    logPrintf("  Largest Block: %lu bytes (max contiguous)\r\n", (unsigned long)largest);
 
     // Fragmentation estimate
     if (largest > 0 && free > 0) {
         float fragmentation = 100.0f * (1.0f - ((float)largest / free));
-        Serial.printf("\nFragmentation: %.1f%%\n", fragmentation);
+        logPrintf("\r\nFragmentation: %.1f%%\r\n", fragmentation);
         if (fragmentation > 50) {
-            Serial.println("[WARN] High memory fragmentation detected!");
+            logPrintln("[WARN] High memory fragmentation detected!");
         }
     }
-    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -1007,12 +1003,10 @@ void cmd_web_config_password(int argc, char** argv) {
 
 void cmd_web_config_main(int argc, char** argv) {
     if (argc < 3) {
-        serialLoggerLock();
-        Serial.println("\n[WEB CONFIG] Usage: web config [show | username | password]");
-        Serial.println("  show:       Display current configuration");
-        Serial.println("  username:   Set web server username (3-32 chars)");
-        Serial.println("  password:   Set web server password (4-64 chars)");
-        serialLoggerUnlock();
+        logPrintln("\n[WEB CONFIG] Usage: web config [show | username | password]");
+        logPrintln("  show:       Display current configuration");
+        logPrintln("  username:   Set web server username (3-32 chars)");
+        logPrintln("  password:   Set web server password (4-64 chars)");
         return;
     }
 
@@ -1083,16 +1077,18 @@ void cmd_config_restore(int argc, char** argv) {
         return;
     }
 
-    serialLoggerLock();
-    Serial.println("[CONFIG] Restoring configuration from backup...");
-    Serial.println("[CONFIG] Backup JSON (first 256 chars):");
+    logPrintln("[CONFIG] Restoring configuration from backup...");
+    logPrintln("[CONFIG] Backup JSON (first 256 chars):");
+    char preview[257];
+    int len = 0;
     for (int i = 0; i < 256 && backup_json[i]; i++) {
-        Serial.write(backup_json[i]);
+        preview[len++] = backup_json[i];
     }
-    Serial.println("\n");
-    Serial.println("[CONFIG] [OK] Backup restored");
-    Serial.println("[CONFIG] Review with: config show");
-    serialLoggerUnlock();
+    preview[len] = '\0';
+    logPrintln(preview);
+    logPrintln("\n");
+    logPrintln("[CONFIG] [OK] Backup restored");
+    logPrintln("[CONFIG] Review with: config show");
 }
 
 void cmd_config_show_backup(int argc, char** argv) {
@@ -1102,11 +1098,9 @@ void cmd_config_show_backup(int argc, char** argv) {
         return;
     }
 
-    serialLoggerLock();
-    Serial.println("\n[CONFIG] === Stored Backup ===");
-    Serial.println(backup);
-    Serial.println("");
-    serialLoggerUnlock();
+    logPrintln("\n[CONFIG] === Stored Backup ===");
+    logPrintln(backup);
+    logPrintln("");
 }
 
 void cmd_config_clear_backup(int argc, char** argv) {
@@ -1129,11 +1123,9 @@ void cmd_api_ratelimit_reset(int argc, char** argv) {
 
 void cmd_api_ratelimit_main(int argc, char** argv) {
     if (argc < 2) {
-        serialLoggerLock();
-        Serial.println("[API] Usage: api [diag | reset]");
-        Serial.println("  diag:   Show rate limiter diagnostics");
-        Serial.println("  reset:  Reset all rate limit counters");
-        serialLoggerUnlock();
+        logPrintln("[API] Usage: api [diag | reset]");
+        logPrintln("  diag:   Show rate limiter diagnostics");
+        logPrintln("  reset:  Reset all rate limit counters");
         return;
     }
 
@@ -1165,13 +1157,11 @@ void cmd_metrics_reset(int argc, char** argv) {
 
 void cmd_metrics_main(int argc, char** argv) {
     if (argc < 2) {
-        serialLoggerLock();
-        Serial.println("[METRICS] === Task Performance Monitoring ===");
-        Serial.println("Usage: metrics [summary | detail | reset]");
-        Serial.println("  summary: Show quick performance summary");
-        Serial.println("  detail:  Show detailed task diagnostics");
-        Serial.println("  reset:   Clear all collected metrics");
-        serialLoggerUnlock();
+        logPrintln("[METRICS] === Task Performance Monitoring ===");
+        logPrintln("Usage: metrics [summary | detail | reset]");
+        logPrintln("  summary: Show quick performance summary");
+        logPrintln("  detail:  Show detailed task diagnostics");
+        logPrintln("  reset:   Clear all collected metrics");
         return;
     }
 
@@ -1201,14 +1191,12 @@ void cmd_ota_cancel(int argc, char** argv) {
 
 void cmd_ota_main(int argc, char** argv) {
     if (argc < 2) {
-        serialLoggerLock();
-        Serial.println("[OTA] === Firmware Update Management ===");
-        Serial.println("Usage: ota [status | cancel]");
-        Serial.println("  status: Show OTA update status");
-        Serial.println("  cancel: Cancel current OTA operation");
-        Serial.println("");
-        Serial.println("NOTE: Binary upload via /api/update endpoint");
-        serialLoggerUnlock();
+        logPrintln("[OTA] === Firmware Update Management ===");
+        logPrintln("Usage: ota [status | cancel]");
+        logPrintln("  status: Show OTA update status");
+        logPrintln("  cancel: Cancel current OTA operation");
+        logPrintln("");
+        logPrintln("NOTE: Binary upload via /api/update endpoint");
         return;
     }
 
@@ -1283,26 +1271,24 @@ void cmd_axis_reset(int argc, char** argv) {
 
 void cmd_axis_main(int argc, char** argv) {
     if (argc < 2) {
-        serialLoggerLock();
-        Serial.println("[AXIS] === Per-Axis Motion Quality Monitoring (PHASE 5.6) ===");
-        Serial.println("Usage: axis [status | detail | reset] [args]");
-        Serial.println("");
-        Serial.println("  status          Show all axes quality summary");
-        Serial.println("  detail X|Y|Z    Show detailed diagnostics for specific axis");
-        Serial.println("  reset X|Y|Z|all Reset quality metrics for axis/all axes");
-        Serial.println("");
-        Serial.println("Metrics Reported:");
-        Serial.println("  Quality Score   0-100 (100 = perfect motion)");
-        Serial.println("  Jitter          Peak-to-peak velocity variation (mm/s)");
-        Serial.println("  Stalled         Motor commanded but not moving");
-        Serial.println("  VFD Error       Encoder vs VFD frequency mismatch (%)");
-        Serial.println("");
-        Serial.println("Quality Thresholds:");
-        Serial.println("  >= 80  Excellent motion");
-        Serial.println("  60-80  Good motion");
-        Serial.println("  40-60  Fair motion (degradation detected)");
-        Serial.println("  < 40   Poor motion (maintenance needed)");
-        serialLoggerUnlock();
+        logPrintln("[AXIS] === Per-Axis Motion Quality Monitoring (PHASE 5.6) ===");
+        logPrintln("Usage: axis [status | detail | reset] [args]");
+        logPrintln("");
+        logPrintln("  status          Show all axes quality summary");
+        logPrintln("  detail X|Y|Z    Show detailed diagnostics for specific axis");
+        logPrintln("  reset X|Y|Z|all Reset quality metrics for axis/all axes");
+        logPrintln("");
+        logPrintln("Metrics Reported:");
+        logPrintln("  Quality Score   0-100 (100 = perfect motion)");
+        logPrintln("  Jitter          Peak-to-peak velocity variation (mm/s)");
+        logPrintln("  Stalled         Motor commanded but not moving");
+        logPrintln("  VFD Error       Encoder vs VFD frequency mismatch (%)");
+        logPrintln("");
+        logPrintln("Quality Thresholds:");
+        logPrintln("  >= 80  Excellent motion");
+        logPrintln("  60-80  Good motion");
+        logPrintln("  40-60  Fair motion (degradation detected)");
+        logPrintln("  < 40   Poor motion (maintenance needed)");
         return;
     }
 
@@ -1327,15 +1313,13 @@ void cmd_telemetry_detail(int argc, char** argv) {
 
 void cmd_telemetry_main(int argc, char** argv) {
     if (argc < 2) {
-        serialLoggerLock();
-        Serial.println("[TELEMETRY] === Comprehensive System Telemetry ===");
-        Serial.println("Usage: telemetry [summary | detail]");
-        Serial.println("  summary: Show brief telemetry snapshot");
-        Serial.println("  detail:  Show complete telemetry data");
-        Serial.println("");
-        Serial.println("Web API: GET /api/telemetry (comprehensive)");
-        Serial.println("         GET /api/telemetry/compact (lightweight)");
-        serialLoggerUnlock();
+        logPrintln("[TELEMETRY] === Comprehensive System Telemetry ===");
+        logPrintln("Usage: telemetry [summary | detail]");
+        logPrintln("  summary: Show brief telemetry snapshot");
+        logPrintln("  detail:  Show complete telemetry data");
+        logPrintln("");
+        logPrintln("Web API: GET /api/telemetry (comprehensive)");
+        logPrintln("         GET /api/telemetry/compact (lightweight)");
         return;
     }
 
