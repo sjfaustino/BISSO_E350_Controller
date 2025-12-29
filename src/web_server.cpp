@@ -410,6 +410,74 @@ void WebServerManager::setupRoutes() {
     request->send(200, "application/json", response);
   });
 
+  // 2.1 Time Sync from Browser (Protected)
+  // Allows setting ESP32 time from the browser when NTP is not available
+  server->on(
+      "/api/time/sync", HTTP_POST,
+      [](AsyncWebServerRequest *request) {
+        // Response sent after body is processed
+      },
+      NULL,
+      [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+         size_t index, size_t total) {
+        if (!requireAuth(request)) return;
+
+        // Parse JSON body with timestamp
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, data, len);
+
+        if (error) {
+          request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+          return;
+        }
+
+        // Expect: { "timestamp": 1703894400 } (Unix timestamp in seconds)
+        if (!doc.containsKey("timestamp")) {
+          request->send(400, "application/json", "{\"error\":\"Missing timestamp\"}");
+          return;
+        }
+
+        time_t timestamp = doc["timestamp"].as<time_t>();
+
+        // Set the ESP32 system time
+        struct timeval tv;
+        tv.tv_sec = timestamp;
+        tv.tv_usec = 0;
+        settimeofday(&tv, NULL);
+
+        // Log the sync
+        struct tm timeinfo;
+        localtime_r(&timestamp, &timeinfo);
+        char buf[32];
+        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        Serial.printf("[TIME] Synced from browser: %s\r\n", buf);
+
+        // Return current time for confirmation
+        char response[128];
+        snprintf(response, sizeof(response),
+                 "{\"success\":true,\"time\":\"%s\"}", buf);
+        request->send(200, "application/json", response);
+      });
+
+  // 2.2 Get Current Time (Protected)
+  server->on("/api/time", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!requireAuth(request)) return;
+
+    time_t now;
+    time(&now);
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+
+    char buf[32];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
+
+    char response[128];
+    snprintf(response, sizeof(response),
+             "{\"timestamp\":%ld,\"formatted\":\"%s\"}",
+             (long)now, buf);
+    request->send(200, "application/json", response);
+  });
+
   // 3. API Jog (Protected, Rate Limited)
   // PHASE 5.10: Auth check moved to request handler (SHA-256 verification)
   server

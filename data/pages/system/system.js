@@ -55,6 +55,12 @@ window.SystemModule = window.SystemModule || {
         if (factoryBtn) {
             factoryBtn.addEventListener('click', () => this.factoryReset());
         }
+
+        // Sync time from browser
+        const syncTimeBtn = document.getElementById('sync-time-btn');
+        if (syncTimeBtn) {
+            syncTimeBtn.addEventListener('click', () => this.syncTimeFromBrowser());
+        }
     },
 
     loadSystemInfo() {
@@ -72,6 +78,9 @@ window.SystemModule = window.SystemModule || {
 
         // Load system status
         this.updateSystemStatus();
+
+        // Load device time
+        this.updateDeviceTime();
     },
 
     updateStorageInfo() {
@@ -147,7 +156,60 @@ window.SystemModule = window.SystemModule || {
         setInterval(() => {
             this.updateStorageInfo();
             this.updateSystemStatus();
+            this.updateDeviceTime();
         }, 10000);
+    },
+
+    async updateDeviceTime() {
+        try {
+            const response = await fetch('/api/time');
+            if (response.ok) {
+                const data = await response.json();
+                const timeEl = document.getElementById('device-time');
+                const sourceEl = document.getElementById('time-source');
+
+                if (timeEl) timeEl.textContent = data.formatted;
+                if (sourceEl) {
+                    // Check if time looks valid (after year 2020)
+                    if (data.timestamp > 1577836800) {
+                        sourceEl.textContent = 'NTP / Browser Sync';
+                        sourceEl.style.color = 'var(--color-optimal)';
+                    } else {
+                        sourceEl.textContent = 'Not Synced';
+                        sourceEl.style.color = 'var(--color-warning)';
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[System] Failed to fetch device time:', e);
+        }
+    },
+
+    async syncTimeFromBrowser() {
+        const btn = document.getElementById('sync-time-btn');
+        if (btn) btn.disabled = true;
+
+        try {
+            const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+            const response = await fetch('/api/time/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timestamp })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                AlertManager.add(`Time synced: ${data.time}`, 'success', 3000);
+                this.updateDeviceTime();
+            } else {
+                const error = await response.json();
+                AlertManager.add(`Sync failed: ${error.error}`, 'critical', 3000);
+            }
+        } catch (e) {
+            AlertManager.add('Time sync failed: Network error', 'critical', 3000);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
     },
 
     checkForUpdates() {

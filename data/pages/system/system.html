@@ -157,6 +157,27 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
+                <h2>Date & Time</h2>
+            </div>
+            <div class="card-content">
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Current Time (Device)</div>
+                    <div class="card-value" id="device-time" style="font-size: 16px;">--:--:--</div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Time Source</div>
+                    <div class="card-value" id="time-source" style="font-size: 12px;">Unknown</div>
+                </div>
+
+                <button class="btn btn-primary" id="sync-time-btn" style="width: 100%; margin-bottom: 10px;">Sync from
+                    Browser</button>
+                <div class="card-subtext" style="text-align: center;">Sets device time to your computer's clock</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
                 <h2>Backups & Restore</h2>
             </div>
             <div class="card-content">

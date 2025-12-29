@@ -10,6 +10,7 @@
 #include "safety.h"         // For safetyIsAlarmed
 #include <ArduinoOTA.h>
 #include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
+#include <time.h>            // For NTP time sync
 
 
 NetworkManager networkManager;
@@ -32,6 +33,15 @@ static uint32_t telnet_last_activity = 0;
 #define TELNET_MAX_FAILED_ATTEMPTS 3
 #define TELNET_LOCKOUT_DURATION_MS 60000 // 1 minute lockout
 #define TELNET_SESSION_TIMEOUT_MS 300000 // 5 minute inactivity timeout
+
+// NTP configuration
+#define NTP_SERVER "pool.ntp.org"
+#define NTP_GMT_OFFSET 0           // UTC offset in seconds (0 = UTC)
+#define NTP_DAYLIGHT_OFFSET 0      // Daylight saving offset in seconds
+#define NTP_SYNC_INTERVAL_MS 3600000 // Resync every hour
+
+static bool ntp_synced = false;
+static uint32_t ntp_last_sync = 0;
 
 // Telnet protocol commands for password masking
 #define TELNET_IAC  255  // Interpret As Command
@@ -63,6 +73,33 @@ static void telnetRestoreEcho(WiFiClient& client) {
             break;  // Not an IAC sequence, leave it
         }
     }
+}
+
+// Helper: Sync time via NTP (called when WiFi connected)
+static void tryNtpSync() {
+    if (WiFi.status() != WL_CONNECTED) return;
+    
+    // Check if it's time to sync
+    uint32_t now = millis();
+    if (ntp_synced && (now - ntp_last_sync) < NTP_SYNC_INTERVAL_MS) return;
+    
+    // Configure NTP
+    configTime(NTP_GMT_OFFSET, NTP_DAYLIGHT_OFFSET, NTP_SERVER);
+    
+    // Wait for time to be set (with timeout)
+    struct tm timeinfo;
+    int retries = 10;
+    while (retries-- > 0) {
+        if (getLocalTime(&timeinfo, 100)) {
+            ntp_synced = true;
+            ntp_last_sync = now;
+            char buf[32];
+            strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
+            Serial.printf("[NTP] Time synced: %s UTC\r\n", buf);
+            return;
+        }
+    }
+    // Sync failed - will retry next update cycle if not yet synced
 }
 
 NetworkManager::NetworkManager() {
@@ -211,6 +248,9 @@ void NetworkManager::update() {
   if (dnsServer) {
     dnsServer->processNextRequest();
   }
+
+  // 1.2 NTP Time Sync (when WiFi connected)
+  tryNtpSync();
 
   // 2. Handle Telnet
   if (telnetServer->hasClient()) {
