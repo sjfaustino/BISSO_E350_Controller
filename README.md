@@ -1,143 +1,92 @@
-# BISSO E350 Motion Controller Firmware: Gemini v1.0.0
+# BISSO E350 Motion Controller Firmware
 
-The BISSO E350 Motion Controller Firmware is a custom embedded solution designed to upgrade and replace obsolete control systems in industrial bridge saw equipment. It leverages modern, high-speed microcontrollers to manage motion control, safety, and human-machine interfaces.
+**Version:** Gemini v1.0.0  
+**Status:** Production Ready
 
-**Current Version:** Gemini v1.0.0 (Base functionality complete)
-**Project Codename:** Gemini
+---
 
-***
+## Overview
 
-## 1. Project Overview and Core Function
+The BISSO E350 Motion Controller Firmware is a custom embedded solution designed to upgrade and replace obsolete control systems in industrial bridge saw equipment. It leverages ESP32-S3 microcontrollers to manage motion control, safety, and human-machine interfaces.
 
-The primary purpose of this firmware is to manage the **single VFD (Variable Frequency Drive) motor** responsible for all primary motion axes (X, Y, Z, and rotational A). The system achieves closed-loop control by integrating high-speed communication with the machine's external I/O.
+### Key Features
 
-### 1.1 Motion Control Strategy: PLC I/O Emulation
+- ✅ **Multi-axis motion control** (X, Y, Z, A) via single VFD
+- ✅ **Web-based dashboard** for real-time monitoring
+- ✅ **Command Line Interface (CLI)** for diagnostics
+- ✅ **Encoder feedback** via WJ66 DRO reader
+- ✅ **Modbus integration** with Altivar 31 VFD
+- ✅ **Fault logging** with NVS persistence
+- ✅ **OTA firmware updates**
 
-This system operates as a **"smart I/O bridge"**, translating high-level digital commands into the low-level binary signals that the machine's legacy PLC (Programmable Logic Controller) expects.
+---
 
-1.  **High-Level Command:** The system receives commands (e.g., `move X 100.5 50.0`) via the Command Line Interface (CLI) or Web interface.
-2.  **Actuation (Output):** The ESP32-S3 communicates with two **PCF8574 I²C I/O expanders** (at addresses `0x20` and `0x21`). These expanders output the specific binary signals (Axis Select, Direction, Speed Profile) to the industrial machine's original PLC input panel, effectively emulating the legacy PLC's control signals.
-3.  **Feedback (Input/Positional Truth):** Motion position is tracked in real-time by querying the **Wayjun WJ66 Digital Readout (DRO) reader** over a dedicated serial port. This WJ66 unit consolidates positional data from **four separate external optical encoders** (one for each axis), serving as the authoritative source of truth for the closed-loop system.
+## Documentation
 
-***
+| Guide | Audience | Description |
+|:------|:---------|:------------|
+| 📘 **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** | Developers | Complete technical reference: architecture, APIs, code style, testing |
+| 📗 **[OPERATOR_GUIDE.md](OPERATOR_GUIDE.md)** | Operators | Step-by-step operation manual: startup, calibration, troubleshooting |
 
-## 2. Hardware and I/O Specification
+---
 
-The firmware is strictly optimized for the following components:
+## Quick Start
 
-### 2.1 Control Board
+### For Developers
 
-| Specification | Detail | Note |
-| :--- | :--- | :--- |
-| **Model** | **KC868-A16 Industrial Controller** | This is the specific ESP32-S3 board used. The pin database and I/O count are based on this model. |
-| **Microcontroller** | ESP32-S3 | Dual-core, highly capable for concurrent tasks. |
-| **I/O Count** | 16 Opto-isolated Inputs (X1-X16), 16 Relay Outputs (Y1-Y16) | The core safety and consensus signals are read/written through these pins or the I²C bus. |
+```bash
+# Clone and build
+git clone <repository-url>
+cd BISSO_E350_Controller
+pio run
 
-### 2.2 Communication Interfaces
+# Upload firmware
+pio run -t upload
 
-| Interface | Component/Protocol | Purpose | Firmware Modules |
-| :--- | :--- | :--- | :--- |
-| **I²C Bus** | PCF8574 I/O Expanders | Output of single-bit control signals: Axis Select, Direction (+/-), and Speed Profiles (SLOW/MED/FAST). | `plc_iface.cpp`, `i2c_bus_recovery.cpp` |
-| **Serial (UART)** | Wayjun WJ66 DRO Reader | Input of real-time, consolidated 4-axis position data (pulses/counts) from the external optical encoders. | `encoder_wj66.cpp`, `tasks_encoder.cpp` |
-| **Non-Volatile Storage (NVS)** | Internal Flash Memory | Persistence for all **Calibration Data** (PPM, speeds) and **Fault History**. | `config_unified.cpp`, `fault_logging.cpp` |
+# Upload web assets
+pio run -t uploadfs
 
-### 2.3 Security Considerations
+# Monitor serial
+pio device monitor -b 115200
+```
 
-⚠️ **CRITICAL SECURITY WARNING**
+### For Operators
 
-This controller provides a web interface for monitoring and control. **IMPORTANT SECURITY REQUIREMENTS:**
+1. Power on the controller
+2. Wait 30 seconds for boot
+3. Navigate to `http://192.168.1.100/` in browser
+4. See [OPERATOR_GUIDE.md](OPERATOR_GUIDE.md) for detailed instructions
 
-#### Network Deployment
-- ✅ **SAFE:** Local network only (192.168.x.x, 10.x.x.x)
-- ⚠️ **CAUTION:** WiFi AP mode (ensure WPA2 encryption enabled)
-- ❌ **NEVER:** Expose directly to the internet without VPN
+---
 
-#### Authentication
-- Default credentials use **HTTP Basic Auth** (base64 encoding, not encryption)
-- Credentials are transmitted in **cleartext** over the network
-- **Only safe on trusted local networks**
-- Change default passwords immediately after deployment
+## Hardware Requirements
 
-#### Remote Access
-If remote access is required:
-- ✅ **RECOMMENDED:** Use VPN (WireGuard, OpenVPN, Tailscale)
-- ✅ **ALTERNATIVE:** Use SSH tunnel (`ssh -L 8080:192.168.1.100:80 user@gateway`)
-- ❌ **NEVER:** Port-forward web interface directly to internet
+| Component | Model | Purpose |
+|:----------|:------|:--------|
+| **Controller** | KC868-A16 | ESP32-S3 industrial controller |
+| **VFD** | Schneider Altivar 31 | Motor frequency control |
+| **Encoders** | WJ66 DRO Reader | 4-axis position feedback |
+| **I/O Expanders** | PCF8574 (x2) | PLC signal control |
 
-#### Password Management
-- Change default **web credentials** immediately (see `config_keys.h`: `KEY_WEB_USERNAME`, `KEY_WEB_PASSWORD`)
-- Change default **OTA password** immediately (see `config_keys.h`: `KEY_OTA_PASSWORD`)
-- Store credentials securely (do not commit to version control)
-- Use strong, unique passwords (minimum 12 characters)
+---
 
-#### Physical Safety Interlocks
-**Primary Safety:** This system relies on a **hardware emergency stop (mushroom button)** that physically cuts all power to motors. Software E-Stop is a secondary safety layer and should NOT be relied upon as the sole safety mechanism.
+## Safety Warning
 
-**Failure to follow these security guidelines can result in unauthorized access to the CNC controller, potentially causing equipment damage, safety hazards, or data loss.**
+⚠️ **CRITICAL**: This controller manages industrial machinery with moving parts.
 
-***
+- **Primary safety**: Hardware E-Stop button (red mushroom switch)
+- **Software E-Stop**: Secondary safety layer only
+- **Network**: Local network only - never expose to internet
+- **Change default passwords immediately after deployment**
 
-## 3. Software Architecture (Developer Deep Dive)
+See [OPERATOR_GUIDE.md](OPERATOR_GUIDE.md) for complete safety procedures.
 
-The system utilizes FreeRTOS for multi-tasking, enforced by a structured Task Manager.
+---
 
-### 3.1 FreeRTOS Task Structure
+## License
 
-| Task Name | Execution Period | Priority | Core | Primary Function |
-| :--- | :--- | :--- | :--- | :--- |
-| **Safety** (`tasks_safety.cpp`) | 5 ms | P24 (CRITICAL) | Core 1 | Enforces E-Stop, monitors motion stalls, and processes safety alarms. |
-| **Motion** (`tasks_motion.cpp`) | 10 ms | P22 (HIGH) | Core 1 | Executes moves, manages the internal axis state machine, and translates commands to PLC I/O. |
-| **Encoder** (`tasks_encoder.cpp`) | 20 ms | P20 | Core 1 | High-speed polling of the **WJ66 DRO** and updates the encoder-motion integration layer. |
-| **PLC_Comm** (`tasks_plc.cpp`) | 50 ms | P18 | Core 1 | Low-frequency I²C writes/reads to external I/O expanders for stability. |
-| **Monitor** (`tasks_monitor.cpp`) | 1000 ms | P12 | Core 1 | Background check of memory usage, task execution times, and periodic config saving. |
+Proprietary - BISSO Industrial Controls
 
-### 3.2 Contextual Fault Logging API
+---
 
-All system errors are routed through the central, thread-safe `faultLogEntry` function. This provides **critical diagnostic context** that is persisted in NVS:
-
-```c
-void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis, int32_t value, const char* format, ...);
-````
-
-  * **`severity`**: Determines the required system action (e.g., `FAULT_CRITICAL` triggers an E-Stop).
-  * **`axis`**: The axis index affected (0-3) or -1 for system-wide faults.
-  * **`value`**: The raw metric associated with the fault (e.g., memory threshold, I²C address, encoder count deviation).
-  * **`format, ...`**: A `printf`-style message string for detailed, human-readable description.
-
------
-
-## 4\. Command Line Interface (CLI) Reference
-
-The CLI is the primary debugging, configuration, and maintenance interface.
-
-### 4.1 Global and Utility Commands
-
-| Command | Usage | Description | Example Output |
-| :--- | :--- | :--- | :--- |
-| **`help`** | `help` | Displays a summary of all registered CLI commands. | `...move - Move axes...` |
-| **`info`** | `info` | Displays critical system and software status. | `Firmware: Gemini v1.0.0` |
-| **`reset`** | `reset` | Executes a software-triggered reboot of the entire system. | |
-| **`faults`** | `faults` | Displays the history of all logged Warnings, Errors, and Critical faults persisted in NVS. | `FAULT [2]: I2C transaction failed...` |
-| **`faults_clear`**| `faults_clear` | Clears the NVS-stored fault history. | |
-| **`debug`** | `debug` | Runs a comprehensive system diagnostic dump (Boot, Motion, Encoder, PLC, Memory). | |
-
-### 4.2 Motion Control Commands
-
-| Command | Usage | Description | Example Usage |
-| :--- | :--- | :--- | :--- |
-| **`motion`** | `motion` | Displays the current motion subsystem status, active axis, and state. | `motion` |
-| **`move`** | `move [AXIS] [POS_MM] [SPEED_MM/S]` | Executes an absolute move command for a single axis. | `move X 100.5 50.0` |
-| **`stop`** | `stop` | Commands a controlled stop (deceleration) of any active motion. | `stop` |
-| **`limits`** | `limits [AXIS] [MIN_MM] [MAX_MM]` | Sets the soft limits (safety travel boundaries) for a specified axis. | `limits Y -10.0 500.0` |
-
-### 4.3 Calibration Commands
-
-Calibration is **critical** for accurate motion. These commands interact with the NVS-stored `MachineCalibration` struct.
-
-| Command | Usage | Description | Example Usage |
-| :--- | :--- | :--- | :--- |
-| **`calibrate ppmm`**| `calibrate ppmm [AXIS] [DISTANCE_MM]` | **Manual PPM start.** Initiates a manual Pulses-Per-Millimeter (PPM) measurement. Prompts the operator to move the axis physically. | `calibrate ppmm Z 50.0` |
-| **`calibrate ppmm end`**| `calibrate ppmm end` | **Manual PPM finish.** Calculates and saves the new PPM value based on the encoder difference detected since the start command. | `calibrate ppmm end` |
-| **`calibrate ppmm X reset`**| `calibrate ppmm [AXIS] reset` | Resets the PPM/PPD calibration for the specified axis to the factory default scale factor (`1000` pulses/unit). | `calibrate ppmm X reset` |
-| **`calibrate speed`**| `calibrate speed [AXIS] [PROFILE] [DISTANCE_MM]` | **Auto Speed Calibration.** Measures the true speed achieved by the VFD at a specific profile setting (SLOW, MEDIUM, or FAST) and saves the result in NVS. | `calibrate speed Y FAST 500.0` |
-| **`calibrate speed X reset`**| `calibrate speed [AXIS] reset` | Resets the speed profiles (SLOW, MEDIUM, FAST) for the specified axis to machine defaults. | `calibrate speed X reset` |
+**Last Updated:** December 2025
