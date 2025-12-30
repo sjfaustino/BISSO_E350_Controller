@@ -620,28 +620,24 @@ void WebServerManager::setupRoutes() {
   });
 
   // 4.8 Digital I/O Status API (Protected)
+  // Note: Limit switches are wired directly to PLC, not readable by ESP32
+  // Spindle is controlled by separate VFD with PLC interlock
   server.on("/api/io/status", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
     if (requireAuth(request, response) != ESP_OK) return ESP_OK;
     
     JsonDocument doc;
     doc["success"] = true;
     
-    // Input states - use existing safety APIs where available
+    // Input states readable by ESP32
     doc["estop"] = emergencyStopIsActive();
-    doc["door"] = false;   // Placeholder - no door sensor implemented
-    doc["probe"] = false;  // Placeholder - probe input
-    doc["limit_x"] = false; // Placeholder - limit switches
-    doc["limit_y"] = false;
-    doc["limit_z"] = false;
     
-    // Output states - placeholders for now
-    // These could be connected to actual output tracking if available
-    doc["spindle_on"] = false;
-    doc["coolant_on"] = false;
-    doc["vacuum_on"] = false;
-    doc["alarm_on"] = emergencyStopIsActive(); // Alarm mirrors e-stop
+    // Note: Spindle run status is indicated by PLC lamp on control panel
+    // Limit switch status is handled by PLC, not visible to ESP32
+    // PLC auto-stops spindle in non-manual mode if no commands received
     
-    char responseBuffer[256];
+    doc["alarm_on"] = emergencyStopIsActive(); // Alarm mirrors e-stop state
+    
+    char responseBuffer[128];
     serializeJson(doc, responseBuffer, sizeof(responseBuffer));
     return response->send(200, "application/json", responseBuffer);
   });
