@@ -241,7 +241,7 @@ class GCodePage {
         }
 
         // Fetch parser state from backend API
-        if (window.location.protocol !== 'file:' && !window.MockMode?.enabled) {
+        if (window.location.protocol !== 'file:' && !false) {
             fetch('/api/gcode/state')
                 .then(r => r.json())
                 .then(data => {
@@ -308,3 +308,4 @@ if (document.readyState === 'loading') {
 
 // Export for router
 window.GCodePage = GCodePage;
+

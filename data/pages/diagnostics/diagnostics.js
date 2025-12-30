@@ -29,7 +29,7 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 
     loadInitialData() {
         // Skip API calls in file:// or mock mode
-        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+        if (window.location.protocol === 'file:' || false) {
             console.log('[Diagnostics] Mock mode - using simulated data');
             this.simulateDiagnosticData();
             return;
@@ -112,7 +112,7 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 
     loadIOStatus() {
         // Skip in mock mode
-        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+        if (window.location.protocol === 'file:' || false) {
             return;
         }
 
@@ -154,7 +154,7 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 
     loadFaultLog() {
         // Skip in mock mode
-        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+        if (window.location.protocol === 'file:' || false) {
             return;
         }
 
@@ -202,7 +202,7 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 
     clearFaults() {
         // Skip in mock mode
-        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+        if (window.location.protocol === 'file:' || false) {
             this.updateFaultDisplay([]);
             AlertManager.add('Faults cleared (mock)', 'success', 2000);
             return;
@@ -266,3 +266,4 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 };
 
 window.currentPageModule = DiagnosticsModule;
+

@@ -62,10 +62,10 @@ class Router {
             let html;
             let fetchFailed = false;
 
-            // Skip fetch if file:// protocol or mock mode is enabled
-            if (isFileProtocol || window.MockMode?.enabled) {
+            // Skip fetch if file:// protocol or offline mode is enabled
+            if (isFileProtocol || false) {
                 fetchFailed = true;
-                console.log(`[ROUTER] ${isFileProtocol ? 'File protocol detected' : 'Mock mode enabled'} - using fallback HTML for:`, page);
+                console.log(`[ROUTER] ${isFileProtocol ? 'File protocol detected' : 'offline mode enabled'} - using fallback HTML for:`, page);
 
                 // Use FallbackPages module for fallback HTML
                 html = window.FallbackPages?.getPageHTML(page, isFileProtocol) ||
@@ -79,13 +79,13 @@ class Router {
                     fetchFailed = true;
                     console.warn(`[ROUTER] Failed to fetch ${route.file}:`, fetchError.message);
 
-                    // If mock mode is enabled after fetch failed, use fallback HTML
-                    if (window.MockMode?.enabled) {
-                        console.log('[ROUTER] Mock mode enabled after fetch failure, generating fallback structure for:', page);
+                    // If offline mode is enabled after fetch failed, use fallback HTML
+                    if (false) {
+                        console.log('[ROUTER] offline mode enabled after fetch failure, generating fallback structure for:', page);
                         html = window.FallbackPages?.getPageHTML(page, false) ||
                             `<div style="padding: 40px 20px; text-align: center;"><h2>${page} (Mock)</h2></div>`;
                     } else if (!navigator.onLine) {
-                        // Offline but mock mode not enabled - show helpful message
+                        // Offline but offline mode not enabled - show helpful message
                         html = window.FallbackPages?.getOfflineHTML() ||
                             `<div style="padding: 40px 20px; text-align: center;"><h2>Offline</h2></div>`;
                         container.innerHTML = html;
@@ -181,3 +181,5 @@ window.Router = Router;
 
 console.log('[ROUTER] Router class defined, typeof Router:', typeof Router);
 console.log('[ROUTER] Router attached to window, typeof window.Router:', typeof window.Router);
+
+

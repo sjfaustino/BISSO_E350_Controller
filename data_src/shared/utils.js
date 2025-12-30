@@ -137,11 +137,11 @@ const Utils = {
     },
 
     /**
-     * Check if running in file:// protocol or mock mode
+     * Check if running in file:// protocol or offline mode
      * @returns {boolean} - True if offline mode
      */
     isOfflineMode() {
-        return window.location.protocol === 'file:' || window.MockMode?.enabled;
+        return window.location.protocol === 'file:' || false;
     },
 
     /**
@@ -230,3 +230,5 @@ const Utils = {
 
 // Expose globally
 window.Utils = Utils;
+
+

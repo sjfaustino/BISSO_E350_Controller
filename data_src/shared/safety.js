@@ -76,9 +76,9 @@ class SafetyManager {
 
     static async checkAlarms() {
         try {
-            // Skip API calls in file:// mode or mock mode - no real device to check
-            if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
-                // In mock mode, assume no alarms for simplicity
+            // Skip API calls in file:// mode or offline mode - no real device to check
+            if (window.location.protocol === 'file:' || false) {
+                // In offline mode, assume no alarms for simplicity
                 this.estopActive = false;
                 this.updateEstopButton();
                 this.hideAlarm();
@@ -183,8 +183,8 @@ class SafetyManager {
     }
 
     static async triggerEstop() {
-        // In file:// or mock mode, these are non-functional
-        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+        // In file:// or offline mode, these are non-functional
+        if (window.location.protocol === 'file:' || false) {
             AlertManager.add('E-stop not available in offline mode', 'warning', 3000);
             return;
         }
@@ -209,8 +209,8 @@ class SafetyManager {
     }
 
     static async resetEstop() {
-        // In file:// or mock mode, these are non-functional
-        if (window.location.protocol === 'file:' || window.MockMode?.enabled) {
+        // In file:// or offline mode, these are non-functional
+        if (window.location.protocol === 'file:' || false) {
             AlertManager.add('E-stop reset not available in offline mode', 'warning', 3000);
             return;
         }
@@ -439,3 +439,5 @@ if (document.readyState === 'loading') {
 }
 
 window.SafetyManager = SafetyManager;
+
+
