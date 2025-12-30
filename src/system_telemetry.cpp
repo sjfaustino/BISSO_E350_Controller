@@ -20,6 +20,7 @@
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <string.h>
 #include <stdio.h>
+#include <cmath>
 #include <Arduino.h>
 #include <WiFi.h>
 
@@ -354,6 +355,106 @@ size_t telemetryExportBinary(telemetry_packet_t* packet) {
     packet->wifi_signal = t.wifi_signal_strength;
 
     return sizeof(telemetry_packet_t);
+}
+
+// Delta telemetry support - tracks previous values
+static system_telemetry_t delta_baseline = {0};
+static bool delta_initialized = false;
+
+size_t telemetryExportDeltaJSON(char* buffer, size_t buffer_size, bool full_update) {
+    if (!buffer || buffer_size < 128) return 0;
+
+    system_telemetry_t current = telemetryGetSnapshot();
+    size_t offset = 0;
+    bool first_field = true;
+
+    // Start JSON object
+    offset += snprintf(buffer + offset, buffer_size - offset, "{");
+
+    // Reset baseline if requested or first call
+    if (full_update || !delta_initialized) {
+        delta_baseline = current;
+        delta_initialized = true;
+        // Return compact version for full update
+        offset += snprintf(buffer + offset, buffer_size - offset,
+            "\"full\":true,\"health\":\"%s\",\"uptime\":%lu,\"cpu\":%u,\"heap\":%lu,"
+            "\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"a\":%.2f,"
+            "\"estop\":%s,\"moving\":%s,\"wifi\":%s}",
+            telemetryGetHealthStatusString(current.health_status),
+            (unsigned long)current.uptime_seconds,
+            current.cpu_usage_percent,
+            (unsigned long)current.free_heap_bytes,
+            current.axis_x_mm, current.axis_y_mm, current.axis_z_mm, current.axis_a_mm,
+            current.estop_active ? "true" : "false",
+            current.motion_moving ? "true" : "false",
+            current.wifi_connected ? "true" : "false");
+        return offset;
+    }
+
+    // Helper macro to add changed field
+    #define ADD_DELTA_INT(name, field) \
+        if (current.field != delta_baseline.field) { \
+            offset += snprintf(buffer + offset, buffer_size - offset, \
+                "%s\"%s\":%ld", first_field ? "" : ",", name, (long)current.field); \
+            first_field = false; \
+        }
+
+    #define ADD_DELTA_UINT(name, field) \
+        if (current.field != delta_baseline.field) { \
+            offset += snprintf(buffer + offset, buffer_size - offset, \
+                "%s\"%s\":%lu", first_field ? "" : ",", name, (unsigned long)current.field); \
+            first_field = false; \
+        }
+
+    #define ADD_DELTA_BOOL(name, field) \
+        if (current.field != delta_baseline.field) { \
+            offset += snprintf(buffer + offset, buffer_size - offset, \
+                "%s\"%s\":%s", first_field ? "" : ",", name, current.field ? "true" : "false"); \
+            first_field = false; \
+        }
+
+    #define ADD_DELTA_FLOAT(name, field, precision) \
+        if (fabs(current.field - delta_baseline.field) > 0.01f) { \
+            offset += snprintf(buffer + offset, buffer_size - offset, \
+                "%s\"%s\":%." #precision "f", first_field ? "" : ",", name, current.field); \
+            first_field = false; \
+        }
+
+    // Compare and add only changed fields
+    if (current.health_status != delta_baseline.health_status) {
+        offset += snprintf(buffer + offset, buffer_size - offset,
+            "%s\"health\":\"%s\"", first_field ? "" : ",",
+            telemetryGetHealthStatusString(current.health_status));
+        first_field = false;
+    }
+
+    ADD_DELTA_UINT("uptime", uptime_seconds);
+    ADD_DELTA_UINT("cpu", cpu_usage_percent);
+    ADD_DELTA_UINT("heap", free_heap_bytes);
+    ADD_DELTA_BOOL("moving", motion_moving);
+    ADD_DELTA_BOOL("estop", estop_active);
+    ADD_DELTA_BOOL("alarm", alarm_active);
+    ADD_DELTA_BOOL("wifi", wifi_connected);
+    ADD_DELTA_UINT("signal", wifi_signal_strength);
+    ADD_DELTA_FLOAT("x", axis_x_mm, 2);
+    ADD_DELTA_FLOAT("y", axis_y_mm, 2);
+    ADD_DELTA_FLOAT("z", axis_z_mm, 2);
+    ADD_DELTA_FLOAT("a", axis_a_mm, 2);
+    ADD_DELTA_FLOAT("spindle_a", spindle_current_amps, 2);
+    ADD_DELTA_UINT("faults", faults_logged);
+
+    #undef ADD_DELTA_INT
+    #undef ADD_DELTA_UINT
+    #undef ADD_DELTA_BOOL
+    #undef ADD_DELTA_FLOAT
+
+    // Close JSON
+    offset += snprintf(buffer + offset, buffer_size - offset, "}");
+
+    // Update baseline for next call
+    delta_baseline = current;
+
+    return offset;
 }
 
 

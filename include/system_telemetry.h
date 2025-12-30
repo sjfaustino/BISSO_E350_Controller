@@ -173,6 +173,15 @@ size_t telemetryExportCompactJSON(char* buffer, size_t buffer_size);
 size_t telemetryExportBinary(telemetry_packet_t* packet);
 
 /**
+ * Export delta telemetry - only includes fields changed since last call
+ * @param buffer Output buffer
+ * @param buffer_size Maximum buffer size
+ * @param full_update If true, return all fields (reset baseline)
+ * @return Number of bytes written
+ */
+size_t telemetryExportDeltaJSON(char* buffer, size_t buffer_size, bool full_update);
+
+/**
  * Print human-readable telemetry summary
  */
 void telemetryPrintSummary();

@@ -802,6 +802,33 @@ void WebServerManager::setupRoutes() {
     return response->send(200, "application/octet-stream", (uint8_t*)&packet, written);
   });
 
+  // 7.6 Delta Telemetry - Only changed fields for bandwidth optimization
+  server.on("/api/telemetry/delta", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+
+    // Rate limiting
+    if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+      return response->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+    }
+
+    // Check if full update requested via ?full=1 parameter
+    bool full_update = false;
+    if (request->hasParam("full")) {
+      String fullParam = request->getParam("full")->value();
+      full_update = (fullParam == "1" || fullParam == "true");
+    }
+
+    // Stack allocation - delta is smaller than full
+    char delta_buffer[512];
+    size_t written = telemetryExportDeltaJSON(delta_buffer, sizeof(delta_buffer), full_update);
+    
+    if (written == 0 || written >= sizeof(delta_buffer) - 1) {
+      return response->send(500, "application/json", "{\"error\":\"Export failed\"}");
+    }
+
+    return response->send(200, "application/json", delta_buffer);
+  });
+
   // 8. API Endpoint Discovery (Unprotected for auto-discovery) - PHASE 5.2
   // AUDIT FIX: Initialize mutex if needed (lazy init for static buffers)
   if (!endpoints_buffer_mutex) {
