@@ -17,6 +17,7 @@
 #include "rs485_device_registry.h"
 #include "i2c_bus_recovery.h"
 #include <Wire.h>
+#include <WiFi.h>  // For WiFi.status() in status dashboard
 #include "task_manager.h"
 #include "watchdog_manager.h"
 #include "timeout_manager.h"

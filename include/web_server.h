@@ -1,15 +1,16 @@
 /**
  * @file web_server.h
- * @brief Async Web Server manager with WebSockets, Auth, and File Management
- * @project Gemini v1.3.0
+ * @brief PsychicHttp Web Server manager with WebSockets, Auth, and File Management
+ * @project Gemini v3.6.0
  * @author Sergio Faustino - sjfaustino@gmail.com
+ * @note Migrated from ESPAsyncWebServer to PsychicHttp for stability
  */
 
 #ifndef WEB_SERVER_H
 #define WEB_SERVER_H
 
 #include <Arduino.h>
-#include <ESPAsyncWebServer.h>
+#include <PsychicHttp.h>
 #include <SPIFFS.h>
 #include "config_unified.h"
 #include "system_constants.h" 
@@ -23,7 +24,7 @@ public:
     void init();
     void begin();
 
-    // Legacy support (No-op in Async mode)
+    // Legacy support (No-op in PsychicHttp mode)
     void handleClient();
 
     // Telemetry & State
@@ -53,9 +54,12 @@ public:
     bool isPasswordChangeRequired();
     void setPassword(const char* new_password);
 
+    // PsychicHttp WebSocket handler (public for callbacks)
+    PsychicWebSocketHandler* getWebSocketHandler() { return &wsHandler; }
+
 private:
-    AsyncWebServer* server;
-    AsyncWebSocket* ws;
+    PsychicHttpServer server;
+    PsychicWebSocketHandler wsHandler;
     uint16_t port;
     
     // Internal State Cache
@@ -86,14 +90,20 @@ private:
 
     // Handlers
     void setupRoutes();
-    void handleJogBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
-    void handleFirmwareUpload(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total);
-    void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+    
+    // PsychicHttp handler signatures
+    esp_err_t handleJogBody(PsychicRequest *request);
+    esp_err_t handleFirmwareUpload(PsychicRequest *request, const String& filename, 
+                                    uint64_t index, uint8_t *data, size_t len, bool final);
+    
+    // WebSocket callbacks
+    void onWsOpen(PsychicWebSocketClient *client);
+    esp_err_t onWsFrame(PsychicWebSocketRequest *request, httpd_ws_frame *frame);
+    void onWsClose(PsychicWebSocketClient *client);
 
     // File Manager Handlers
-    void handleFileList(AsyncWebServerRequest *request);
-    void handleFileDelete(AsyncWebServerRequest *request);
-    void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
+    esp_err_t handleFileList(PsychicRequest *request);
+    esp_err_t handleFileDelete(PsychicRequest *request);
 };
 
 extern WebServerManager webServer;

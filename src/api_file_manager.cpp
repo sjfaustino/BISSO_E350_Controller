@@ -1,47 +1,45 @@
 /**
  * @file api_file_manager.cpp
- * @brief Implementation of File Management API Routes
- * @project Gemini v3.1.0
+ * @brief Implementation of File Management API Routes (PsychicHttp)
+ * @project Gemini v3.6.0
  */
 
 #include "api_file_manager.h"
 #include "auth_manager.h"  // PHASE 5.10: SHA-256 authentication
-#include "web_server.h" // For WEB_BUFFER_SIZE, though not ideal dependency
 #include "serial_logger.h"
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <functional>  // For std::function in recursive listing
 
-// PHASE 5.10: Local auth helper with rate limiting
-static bool requireAuth(AsyncWebServerRequest *request) {
+// PHASE 5.10: Local auth helper with rate limiting for PsychicHttp
+// Returns ESP_OK if authenticated, ESP_FAIL otherwise (caller should return early)
+static esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response) {
   // Get client IP address for rate limiting
   String client_ip = request->client()->remoteIP().toString();
   const char* ip_address = client_ip.c_str();
 
   // Check rate limit (brute force protection)
   if (!authCheckRateLimit(ip_address)) {
-    request->send(429, "text/plain", "Too many authentication attempts. Please try again later.");
-    return false;
+    response->send(429, "text/plain", "Too many authentication attempts. Please try again later.");
+    return ESP_FAIL;
   }
 
+  // Check for Authorization header
   if (!request->hasHeader("Authorization")) {
-    request->requestAuthentication();
-    return false;
+    return request->requestAuthentication(BASIC_AUTH, "BISSO E350", "Authentication required");
   }
 
-  // CRITICAL FIX: Store String before calling c_str() to prevent dangling pointer
-  const AsyncWebHeader* authHeader = request->getHeader("Authorization");
-  String auth_value = authHeader->value();
+  // Get authorization header value
+  String auth_value = request->header("Authorization");
   const char* auth = auth_value.c_str();
 
   if (!authVerifyHTTPBasicAuth(auth)) {
     authRecordFailedAttempt(ip_address);
-    request->requestAuthentication();
-    return false;
+    return request->requestAuthentication(BASIC_AUTH, "BISSO E350", "Invalid credentials");
   }
 
   authClearRateLimit(ip_address);
-  return true;
+  return ESP_OK;
 }
 
 
@@ -87,9 +85,16 @@ static bool isValidFilename(const char* filename) {
   return true;
 }
 
-// --- Extracted Implementations ---
+// --- Handler Implementations ---
 
-void handleFileList(AsyncWebServerRequest *request) {
+static esp_err_t handleFileList(PsychicRequest *request) {
+  PsychicResponse response(request);
+  
+  // Auth check
+  if (requireAuth(request, &response) != ESP_OK) {
+    return ESP_OK;  // Response already sent
+  }
+  
   // MEMORY FIX: Use StaticJsonDocument + char array to prevent heap
   // fragmentation. Sized for ~30 files with paths up to 64 chars each
   JsonDocument doc;
@@ -124,109 +129,58 @@ void handleFileList(AsyncWebServerRequest *request) {
   listDirRecursive("/");
 
   // Use larger buffer to prevent truncation with many files
-  static char response[8192];  // Static to avoid stack overflow
-  size_t len = serializeJson(doc, response, sizeof(response));
+  static char responseBuffer[8192];  // Static to avoid stack overflow
+  size_t len = serializeJson(doc, responseBuffer, sizeof(responseBuffer));
   
   // Check for truncation
-  if (len >= sizeof(response) - 1) {
+  if (len >= sizeof(responseBuffer) - 1) {
     logWarning("[FILE_API] File list response truncated, too many files");
   }
   
-  request->send(200, "application/json", response);
+  return response.send(200, "application/json", responseBuffer);
 }
 
-void handleFileDelete(AsyncWebServerRequest *request) {
+static esp_err_t handleFileDelete(PsychicRequest *request) {
+  PsychicResponse response(request);
+  
+  // Auth check
+  if (requireAuth(request, &response) != ESP_OK) {
+    return ESP_OK;  // Response already sent
+  }
+  
   if (!request->hasParam("name")) {
-    request->send(400, "text/plain", "Missing name param");
-    return;
+    return response.send(400, "text/plain", "Missing name param");
   }
 
-  // MEMORY FIX: Use const char* directly instead of String
-  const char *path = request->getParam("name")->value().c_str();
+  // Get param value
+  String pathStr = request->getParam("name")->value();
+  const char *path = pathStr.c_str();
 
   // PHASE 5.10: Security - Validate filename before deletion (path traversal prevention)
   if (!isValidFilename(path)) {
     logWarning("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s", path);
-    request->send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
-    return;
+    return response.send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
   }
 
   if (LittleFS.exists(path)) {
     LittleFS.remove(path);
-    request->send(200, "text/plain", "Deleted");
+    return response.send(200, "text/plain", "Deleted");
   } else {
-    request->send(404, "text/plain", "File not found");
-  }
-}
-
-void handleFileUpload(AsyncWebServerRequest *request, String filename,
-                      size_t index, uint8_t *data, size_t len, bool final) {
-  // PHASE 5.10: Security - Validate filename first (path traversal prevention)
-  if (!isValidFilename(filename.c_str())) {
-    if (index == 0) {
-      logWarning("[FILE_API] [SECURITY] Rejected unsafe filename: %s", filename.c_str());
-      request->send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
-    }
-    return;
-  }
-
-  // Security: Filter extensions
-  if (!filename.endsWith(".nc") && !filename.endsWith(".gcode") &&
-      !filename.endsWith(".txt")) {
-    if (index == 0) {
-      logWarning("[FILE_API] Blocked upload of non-GCode file");
-      request->send(400, "text/plain", "Invalid file type: only .nc, .gcode, .txt allowed");
-    }
-    return;
-  }
-
-  if (!index) {
-    if (!filename.startsWith("/"))
-      filename = "/" + filename;
-    request->_tempFile = LittleFS.open(filename, "w");
-  }
-
-  if (request->_tempFile) {
-    request->_tempFile.write(data, len);
-  }
-
-  if (final) {
-    if (request->_tempFile)
-      request->_tempFile.close();
-    logInfo("[FILE_API] Upload Complete: %s (%u bytes)",
-                  filename.c_str(), index + len);
-    request->send(200, "text/plain", "Upload complete");
+    return response.send(404, "text/plain", "File not found");
   }
 }
 
 // --- Registration ---
 
 // PHASE 5.10: Removed username/password parameters - using SHA-256 auth
-void apiRegisterFileRoutes(AsyncWebServer *server) {
+void apiRegisterFileRoutes(PsychicHttpServer& server) {
   // API: List Files (Protected)
-  server->on("/api/files", HTTP_GET,
-             [](AsyncWebServerRequest *request) {
-               if (!requireAuth(request)) return;
-               handleFileList(request);
-             });
+  server.on("/api/files", HTTP_GET, handleFileList);
 
-  // API: Delete File (Protected)
-  server->on("/api/files", HTTP_DELETE,
-             [](AsyncWebServerRequest *request) {
-               if (!requireAuth(request)) return;
-               handleFileDelete(request);
-             });
+  // API: Delete File (Protected)  
+  server.on("/api/files", HTTP_DELETE, handleFileDelete);
 
-  // API: Upload File (Protected)
-  server->on(
-      "/api/upload", HTTP_POST,
-      [](AsyncWebServerRequest *request) {
-        // PHASE 5.10: Auth check only - response sent by body handler on final chunk
-        if (!requireAuth(request)) return;
-        // Response removed to prevent double-send (body handler responds on completion/error)
-      },
-      [](AsyncWebServerRequest *request, String filename,
-         size_t index, uint8_t *data, size_t len, bool final) {
-        handleFileUpload(request, filename, index, data, len, final);
-      });
+  // NOTE: File upload requires PsychicUploadHandler which is configured separately
+  // in web_server.cpp since it requires different handler type
+  logInfo("[FILE_API] File routes registered (PsychicHttp)");
 }

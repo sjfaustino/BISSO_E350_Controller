@@ -9,7 +9,7 @@
 #include "motion.h"         // For motion functions
 #include "safety.h"         // For safetyIsAlarmed
 #include <ArduinoOTA.h>
-#include <ESPAsyncWiFiManager.h> // Includes AsyncWiFiManager class
+#include <DNSServer.h>  // For captive portal (used directly, not via ESPAsyncWiFiManager)
 #include <time.h>            // For NTP time sync
 
 

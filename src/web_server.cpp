@@ -110,44 +110,42 @@ static SemaphoreHandle_t openapi_buffer_mutex = NULL;
 
 /**
  * @brief Check authentication and send 401 if failed
- * @param request The async web request
- * @return true if authenticated, false if authentication was requested
+ * @param request The PsychicHttp request
+ * @param response The PsychicHttp response (for sending error responses)
+ * @return ESP_OK if authenticated, ESP_FAIL if auth was requested (caller should return early)
  * @note PHASE 5.10: SHA-256 password verification + rate limiting (5 attempts/min)
  */
-static bool requireAuth(AsyncWebServerRequest *request) {
+static esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response) {
   // Get client IP address for rate limiting
   String client_ip = request->client()->remoteIP().toString();
   const char* ip_address = client_ip.c_str();
 
   // Check for Authorization header
   if (!request->hasHeader("Authorization")) {
-    // CRITICAL FIX: Explicitly request BASIC auth (not Digest)
-    request->requestAuthentication("Login Required", false);  // false = BASIC auth
-    return false;
+    // Request BASIC auth
+    return request->requestAuthentication(BASIC_AUTH, "BISSO E350", "Login Required");
   }
 
   // Get auth header
-  const AsyncWebHeader* authHeader = request->getHeader("Authorization");
-  String auth_value = authHeader->value();
+  String auth_value = request->header("Authorization");
   const char* auth = auth_value.c_str();
 
   // Check rate limit
   if (!authCheckRateLimit(ip_address)) {
     logWarning("[WEB] Rate limit blocked auth from %s", ip_address);
-    request->send(429, "text/plain", "Too many authentication attempts. Please try again later.");
-    return false;
+    response->send(429, "text/plain", "Too many authentication attempts. Please try again later.");
+    return ESP_FAIL;
   }
 
   // Verify credentials
   if (!authVerifyHTTPBasicAuth(auth)) {
     authRecordFailedAttempt(ip_address);
-    request->requestAuthentication("Login Required", false);
-    return false;
+    return request->requestAuthentication(BASIC_AUTH, "BISSO E350", "Login Required");
   }
 
   // Success
   authClearRateLimit(ip_address);
-  return true;
+  return ESP_OK;
 }
 
 /**
@@ -221,7 +219,7 @@ static bool assembleChunkedRequest(uint8_t *data, size_t len, size_t index,
 static char json_response_buffer[WEB_BUFFER_SIZE];
 
 WebServerManager::WebServerManager(uint16_t port)
-    : server(nullptr), ws(nullptr), port(port) {
+    : port(port) {
   memset(&current_status, 0, sizeof(current_status));
   safe_strcpy(current_status.status, sizeof(current_status.status),
               "INITIALIZING");
@@ -246,10 +244,7 @@ WebServerManager::WebServerManager(uint16_t port)
 }
 
 WebServerManager::~WebServerManager() {
-  if (server)
-    delete server;
-  if (ws)
-    delete ws;
+  // PsychicHttp server and wsHandler are stack-allocated members, no delete needed
 }
 
 // PHASE 5.10: Credentials now managed by auth_manager.cpp
@@ -299,30 +294,32 @@ void WebServerManager::init() {
   // PHASE 5.2: Initialize API endpoint registry
   apiEndpointsInit();
 
-  server = new AsyncWebServer(port);
-  ws = new AsyncWebSocket("/ws");
+  // PsychicHttp: Configure server for ~40 endpoints
+  server.config.max_uri_handlers = 50;
 
-  // WebSocket Event Handler
-  ws->onEvent([this](AsyncWebSocket *server, AsyncWebSocketClient *client,
-                     AwsEventType type, void *arg, uint8_t *data, size_t len) {
-    this->onWsEvent(server, client, type, arg, data, len);
+  // PsychicHttp: Setup WebSocket handler
+  wsHandler.onOpen([this](PsychicWebSocketClient *client) {
+    this->onWsOpen(client);
   });
-  server->addHandler(ws);
+  wsHandler.onFrame([this](PsychicWebSocketRequest *request, httpd_ws_frame *frame) {
+    return this->onWsFrame(request, frame);
+  });
+  wsHandler.onClose([this](PsychicWebSocketClient *client) {
+    this->onWsClose(client);
+  });
 
   setupRoutes();
 
-  logInfo("[WEB] [OK] Async Server initialized");
+  logInfo("[WEB] [OK] PsychicHttp Server initialized");
 }
 
 void WebServerManager::begin() {
-  if (server) {
-    server->begin();
-    logInfo("[WEB] [OK] Started");
-  }
+  server.listen(port);
+  logInfo("[WEB] [OK] PsychicHttp Started on port %d", port);
 }
 
 void WebServerManager::handleClient() {
-  // No-op for AsyncWebServer, kept for compatibility
+  // No-op for PsychicHttp, kept for compatibility
 }
 
 void WebServerManager::setupRoutes() {
@@ -333,10 +330,11 @@ void WebServerManager::setupRoutes() {
 
   // 1.1 Custom 404 Handler
   // PHASE 5.9: Security - Only expose filesystem debug info in debug builds
-  server->onNotFound([this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.defaultEndpoint->setHandler([this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-    logWarning("[WEB] [404] %s", request->url().c_str());
+    logWarning("[WEB] [404] %s", request->uri().c_str());
 
     String message = "<h1>404 Not Found</h1>";
     message += "<p>The requested URL was not found on this server.</p>";
@@ -349,18 +347,18 @@ void WebServerManager::setupRoutes() {
     }
     #endif
 
-    request->send(404, "text/html", message);
+    return response.send(404, "text/html", message.c_str());
   });
 
   // 2. API Status (Protected, Rate Limited)
-  server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/status", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     // PHASE 5.1: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-      request->send(429, "application/json",
+      return response.send(429, "application/json",
                     "{\"error\":\"Rate limit exceeded\"}");
-      return;
     }
 
     // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
@@ -377,14 +375,15 @@ void WebServerManager::setupRoutes() {
     doc["uptime"] = current_status.uptime_sec;
     // Or if real-time needed: doc["uptime"] = taskGetUptime();
 
-    char response[256];
-    serializeJson(doc, response, sizeof(response));
-    request->send(200, "application/json", response);
+    char responseBuffer[256];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // 2.5 Network Status API (Protected)
-  server->on("/api/network/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/network/status", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     JsonDocument doc;
     
@@ -405,63 +404,57 @@ void WebServerManager::setupRoutes() {
     // Uptime
     doc["uptime_ms"] = millis();
     
-    char response[384];
-    serializeJson(doc, response, sizeof(response));
-    request->send(200, "application/json", response);
+    char responseBuffer[384];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // 2.1 Time Sync from Browser (Protected)
   // Allows setting ESP32 time from the browser when NTP is not available
-  server->on(
-      "/api/time/sync", HTTP_POST,
-      [](AsyncWebServerRequest *request) {
-        // Response sent after body is processed
-      },
-      NULL,
-      [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-         size_t index, size_t total) {
-        if (!requireAuth(request)) return;
+  // PsychicHttp: Body is auto-loaded for requests < 16KB via request->body()
+  server.on("/api/time/sync", HTTP_POST, [](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-        // Parse JSON body with timestamp
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, data, len);
+    // Parse JSON body with timestamp
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, request->body());
 
-        if (error) {
-          request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-          return;
-        }
+    if (error) {
+      return response.send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+    }
 
-        // Expect: { "timestamp": 1703894400 } (Unix timestamp in seconds)
-        if (!doc.containsKey("timestamp")) {
-          request->send(400, "application/json", "{\"error\":\"Missing timestamp\"}");
-          return;
-        }
+    // Expect: { "timestamp": 1703894400 } (Unix timestamp in seconds)
+    if (!doc.containsKey("timestamp")) {
+      return response.send(400, "application/json", "{\"error\":\"Missing timestamp\"}");
+    }
 
-        time_t timestamp = doc["timestamp"].as<time_t>();
+    time_t timestamp = doc["timestamp"].as<time_t>();
 
-        // Set the ESP32 system time
-        struct timeval tv;
-        tv.tv_sec = timestamp;
-        tv.tv_usec = 0;
-        settimeofday(&tv, NULL);
+    // Set the ESP32 system time
+    struct timeval tv;
+    tv.tv_sec = timestamp;
+    tv.tv_usec = 0;
+    settimeofday(&tv, NULL);
 
-        // Log the sync
-        struct tm timeinfo;
-        localtime_r(&timestamp, &timeinfo);
-        char buf[32];
-        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
-        Serial.printf("[TIME] Synced from browser: %s\r\n", buf);
+    // Log the sync
+    struct tm timeinfo;
+    localtime_r(&timestamp, &timeinfo);
+    char buf[32];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
+    Serial.printf("[TIME] Synced from browser: %s\r\n", buf);
 
-        // Return current time for confirmation
-        char response[128];
-        snprintf(response, sizeof(response),
-                 "{\"success\":true,\"time\":\"%s\"}", buf);
-        request->send(200, "application/json", response);
-      });
+    // Return current time for confirmation
+    char responseBuffer[128];
+    snprintf(responseBuffer, sizeof(responseBuffer),
+             "{\"success\":true,\"time\":\"%s\"}", buf);
+    return response.send(200, "application/json", responseBuffer);
+  });
 
   // 2.2 Get Current Time (Protected)
-  server->on("/api/time", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/time", HTTP_GET, [](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     time_t now;
     time(&now);
@@ -471,27 +464,44 @@ void WebServerManager::setupRoutes() {
     char buf[32];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
 
-    char response[128];
-    snprintf(response, sizeof(response),
+    char responseBuffer[128];
+    snprintf(responseBuffer, sizeof(responseBuffer),
              "{\"timestamp\":%ld,\"formatted\":\"%s\"}",
              (long)now, buf);
-    request->send(200, "application/json", response);
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // 3. API Jog (Protected, Rate Limited)
-  // PHASE 5.10: Auth check moved to request handler (SHA-256 verification)
-  server
-      ->on(
-          "/api/jog", HTTP_POST,
-          [](AsyncWebServerRequest *request) {
-            if (!requireAuth(request)) return;
-            request->send(200);
-          },
-          NULL,
-          [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-                 size_t index, size_t total) {
-            this->handleJogBody(request, data, len, index, total);
-          });
+  // PsychicHttp: Body auto-loaded, handled in single callback
+  server.on("/api/jog", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
+
+    // Parse jog command from body
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, request->body());
+    
+    if (error) {
+      return response.send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+    }
+
+    // Rate limiting
+    if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) {
+      return response.send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
+    }
+
+    // Extract jog parameters
+    float x = doc["x"] | 0.0f;
+    float y = doc["y"] | 0.0f;
+    float z = doc["z"] | 0.0f;
+    float a = doc["a"] | 0.0f;
+    float speed = doc["speed"] | 1000.0f;
+
+    // Execute jog
+    motionJog(x, y, z, a, speed);
+    
+    return response.send(200, "application/json", "{\"success\":true}");
+  });
 
   // 4. API Spindle Telemetry (Protected, Rate Limited) - PHASE 5.1
   server->on("/api/spindle", HTTP_GET, [this](AsyncWebServerRequest *request) {
