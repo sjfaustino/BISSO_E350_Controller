@@ -87,11 +87,9 @@ static bool isValidFilename(const char* filename) {
 
 // --- Handler Implementations ---
 
-static esp_err_t handleFileList(PsychicRequest *request) {
-  PsychicResponse response(request);
-  
+static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *response) {
   // Auth check
-  if (requireAuth(request, &response) != ESP_OK) {
+  if (requireAuth(request, response) != ESP_OK) {
     return ESP_OK;  // Response already sent
   }
   
@@ -137,19 +135,17 @@ static esp_err_t handleFileList(PsychicRequest *request) {
     logWarning("[FILE_API] File list response truncated, too many files");
   }
   
-  return response.send(200, "application/json", responseBuffer);
+  return response->send(200, "application/json", responseBuffer);
 }
 
-static esp_err_t handleFileDelete(PsychicRequest *request) {
-  PsychicResponse response(request);
-  
+static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *response) {
   // Auth check
-  if (requireAuth(request, &response) != ESP_OK) {
+  if (requireAuth(request, response) != ESP_OK) {
     return ESP_OK;  // Response already sent
   }
   
   if (!request->hasParam("name")) {
-    return response.send(400, "text/plain", "Missing name param");
+    return response->send(400, "text/plain", "Missing name param");
   }
 
   // Get param value
@@ -159,14 +155,14 @@ static esp_err_t handleFileDelete(PsychicRequest *request) {
   // PHASE 5.10: Security - Validate filename before deletion (path traversal prevention)
   if (!isValidFilename(path)) {
     logWarning("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s", path);
-    return response.send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
+    return response->send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
   }
 
   if (LittleFS.exists(path)) {
     LittleFS.remove(path);
-    return response.send(200, "text/plain", "Deleted");
+    return response->send(200, "text/plain", "Deleted");
   } else {
-    return response.send(404, "text/plain", "File not found");
+    return response->send(404, "text/plain", "File not found");
   }
 }
 
