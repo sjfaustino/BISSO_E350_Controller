@@ -88,6 +88,7 @@ void motionUpdate();
 bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
 bool motionMoveRelative(float dx, float dy, float dz, float da,
                         float speed_mm_s);
+bool motionJog(float dx, float dy, float dz, float da, float speed_mm_s); // Web API jog
 bool motionHome(uint8_t axis);
 bool motionSetPosition(float x, float y, float z,
                        float a); // Set position without moving (for G92)

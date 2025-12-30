@@ -492,11 +492,13 @@ void WebServerManager::setupRoutes() {
     float a = doc["a"] | 0.0f;
     float speed = doc["speed"] | 1000.0f;
 
-    // Execute jog - function not yet implemented, log intent
-    logInfo("[WEB] Jog request: X=%.2f Y=%.2f Z=%.2f A=%.2f speed=%.1f", x, y, z, a, speed);
-    // TODO: Implement motionJog(x, y, z, a, speed) when motion jogging is needed
-    
-    return response->send(200, "application/json", "{\"success\":true}");
+    // Execute jog via motion control API
+    bool success = motionJog(x, y, z, a, speed);
+    if (success) {
+      return response->send(200, "application/json", "{\"success\":true}");
+    } else {
+      return response->send(400, "application/json", "{\"success\":false,\"error\":\"Jog failed - check system state\"}");
+    }
   });
 
   // 4. API Spindle Telemetry (Protected, Rate Limited) - PHASE 5.1

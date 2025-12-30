@@ -714,6 +714,13 @@ bool motionMoveRelative(float dx, float dy, float dz, float da,
                             speed_mm_s);
 }
 
+bool motionJog(float dx, float dy, float dz, float da, float speed_mm_s) {
+  // Web API jog command - logs intent and calls motionMoveRelative
+  logInfo("[JOG] Request: X=%.2f Y=%.2f Z=%.2f A=%.2f @ %.1f mm/s", 
+          dx, dy, dz, da, speed_mm_s);
+  return motionMoveRelative(dx, dy, dz, da, speed_mm_s);
+}
+
 bool motionSetPosition(float x, float y, float z, float a) {
   // G92 - Set current position without moving
   // This is used for calibration and work offset setting
