@@ -504,14 +504,14 @@ void WebServerManager::setupRoutes() {
   });
 
   // 4. API Spindle Telemetry (Protected, Rate Limited) - PHASE 5.1
-  server->on("/api/spindle", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/spindle", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     // PHASE 5.1: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_SPINDLE, 0)) {
-      request->send(429, "application/json",
+      return response.send(429, "application/json",
                     "{\"error\":\"Rate limit exceeded\"}");
-      return;
     }
 
     // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
@@ -547,19 +547,19 @@ void WebServerManager::setupRoutes() {
       doc["overcurrent"] = spindleMonitorIsOvercurrent();
     }
 
-    char response[512];
+    char responseBuffer[512];
     // PHASE 5.10: Check serializeJson return value for truncation
-    size_t written = serializeJson(doc, response, sizeof(response));
-    if (written >= sizeof(response)) {
-      request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
-      return;
+    size_t written = serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    if (written >= sizeof(responseBuffer)) {
+      return response.send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
     }
-    request->send(200, "application/json", response);
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // 4.5 Spindle Alarm Configuration API (Protected)
-  server->on("/api/spindle/alarm", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/spindle/alarm", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     JsonDocument doc;
     const spindle_monitor_state_t *state = spindleMonitorGetState();
@@ -577,61 +577,58 @@ void WebServerManager::setupRoutes() {
       doc["error"] = "Spindle monitor not initialized";
     }
     
-    char response[256];
-    serializeJson(doc, response, sizeof(response));
-    request->send(200, "application/json", response);
+    char responseBuffer[256];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // 4.6 Spindle Alarm Configuration POST (Protected)
-  server->on("/api/spindle/alarm", HTTP_POST, 
-    [](AsyncWebServerRequest *request) {
-      if (!requireAuth(request)) return;
-      request->send(200);
-    },
-    NULL,
-    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-           size_t index, size_t total) {
-      JsonDocument doc;
-      DeserializationError err = deserializeJson(doc, data, len);
-      
-      if (err) {
-        request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
-        return;
-      }
-      
-      bool changed = false;
-      
-      if (doc["toolbreak_threshold"].is<float>()) {
-        float val = doc["toolbreak_threshold"].as<float>();
-        spindleMonitorSetToolBreakageThreshold(val);
-        changed = true;
-      }
-      
-      if (doc["stall_threshold"].is<float>() && doc["stall_timeout_ms"].is<uint32_t>()) {
-        float thresh = doc["stall_threshold"].as<float>();
-        uint32_t timeout = doc["stall_timeout_ms"].as<uint32_t>();
-        spindleMonitorSetStallParams(thresh, timeout);
-        changed = true;
-      }
-      
-      if (changed) {
-        request->send(200, "application/json", "{\"success\":true}");
-      } else {
-        request->send(400, "application/json", "{\"success\":false,\"error\":\"No parameters provided\"}");
-      }
-    });
+  server.on("/api/spindle/alarm", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
+    
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, request->body());
+    
+    if (err) {
+      return response.send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
+    }
+    
+    bool changed = false;
+    
+    if (doc["toolbreak_threshold"].is<float>()) {
+      float val = doc["toolbreak_threshold"].as<float>();
+      spindleMonitorSetToolBreakageThreshold(val);
+      changed = true;
+    }
+    
+    if (doc["stall_threshold"].is<float>() && doc["stall_timeout_ms"].is<uint32_t>()) {
+      float thresh = doc["stall_threshold"].as<float>();
+      uint32_t timeout = doc["stall_timeout_ms"].as<uint32_t>();
+      spindleMonitorSetStallParams(thresh, timeout);
+      changed = true;
+    }
+    
+    if (changed) {
+      return response.send(200, "application/json", "{\"success\":true}");
+    } else {
+      return response.send(400, "application/json", "{\"success\":false,\"error\":\"No parameters provided\"}");
+    }
+  });
 
   // 4.7 Spindle Alarm Clear (Protected)
-  server->on("/api/spindle/alarm/clear", HTTP_POST, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/spindle/alarm/clear", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     spindleMonitorClearAlarms();
-    request->send(200, "application/json", "{\"success\":true}");
+    return response.send(200, "application/json", "{\"success\":true}");
   });
 
   // 4.8 Digital I/O Status API (Protected)
-  server->on("/api/io/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/io/status", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     JsonDocument doc;
     doc["success"] = true;
@@ -651,14 +648,15 @@ void WebServerManager::setupRoutes() {
     doc["vacuum_on"] = false;
     doc["alarm_on"] = emergencyStopIsActive(); // Alarm mirrors e-stop
     
-    char response[256];
-    serializeJson(doc, response, sizeof(response));
-    request->send(200, "application/json", response);
+    char responseBuffer[256];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // 4.9 Fault Log API (Protected)
-  server->on("/api/faults", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/faults", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     JsonDocument doc;
     doc["success"] = true;
@@ -680,22 +678,24 @@ void WebServerManager::setupRoutes() {
       }
     }
     
-    char response[512];
-    serializeJson(doc, response, sizeof(response));
-    request->send(200, "application/json", response);
+    char responseBuffer[512];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // 4.10 Fault Log Clear API (Protected)
-  server->on("/api/faults/clear", HTTP_POST, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/faults/clear", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     faultClearHistory();
-    request->send(200, "application/json", "{\"success\":true}");
+    return response.send(200, "application/json", "{\"success\":true}");
   });
 
   // 4.11 G-code Parser State API (Protected)
-  server->on("/api/gcode/state", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/gcode/state", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     JsonDocument doc;
     doc["success"] = true;
@@ -709,127 +709,117 @@ void WebServerManager::setupRoutes() {
     doc["coolant"] = false;       // M8/M9 state
     doc["units_mm"] = true;       // G20/G21 state
     
-    char response[256];
-    serializeJson(doc, response, sizeof(response));
-    request->send(200, "application/json", response);
+    char responseBuffer[256];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // 5. API Task Performance Metrics (Protected, Rate Limited) - PHASE 5.1
-  server->on("/api/metrics", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/metrics", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     // PHASE 5.1: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-      request->send(429, "application/json",
+      return response.send(429, "application/json",
                     "{\"error\":\"Rate limit exceeded\"}");
-      return;
     }
 
     // MEMORY FIX: Stack allocation - 2KB is safe for async handlers (8KB stack)
     char metrics_buffer[2048];
     size_t metrics_size = perfMonitorExportJSON(metrics_buffer, sizeof(metrics_buffer));
     if (metrics_size == 0) {
-      request->send(500, "application/json",
+      return response.send(500, "application/json",
                     "{\"error\":\"Failed to export metrics\"}");
-      return;
     }
 
-    request->send(200, "application/json", metrics_buffer);
+    return response.send(200, "application/json", metrics_buffer);
   });
 
   // 6. API OTA Firmware Update (Protected, Large Upload) - PHASE 5.1
-  server->on("/api/update/status", HTTP_GET,
-             [this](AsyncWebServerRequest *request) {
-               if (!requireAuth(request)) return;
+  server.on("/api/update/status", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-               // Stack allocation - 512 bytes is safe for async handlers
-               char status_buffer[512];
-               // PHASE 5.10: Check export function return value for truncation
-               size_t written = otaUpdaterExportJSON(status_buffer, sizeof(status_buffer));
-               if (written == 0 || written >= sizeof(status_buffer) - 1) {
-                 request->send(500, "application/json", "{\"error\":\"Failed to export OTA status\"}");
-                 return;
-               }
-               request->send(200, "application/json", status_buffer);
-             });
+    // Stack allocation - 512 bytes is safe for async handlers
+    char status_buffer[512];
+    // PHASE 5.10: Check export function return value for truncation
+    size_t written = otaUpdaterExportJSON(status_buffer, sizeof(status_buffer));
+    if (written == 0 || written >= sizeof(status_buffer) - 1) {
+      return response.send(500, "application/json", "{\"error\":\"Failed to export OTA status\"}");
+    }
+    return response.send(200, "application/json", status_buffer);
+  });
 
-  // PHASE 5.10: Auth check moved to request handler (SHA-256 verification)
-  server
-      ->on(
-          "/api/update", HTTP_POST,
-          [](AsyncWebServerRequest *request) {
-            // PHASE 5.10: Auth check only - response sent by body handler
-            if (!requireAuth(request)) return;
-            // Response removed to prevent double-send (body handler responds on final chunk)
-          },
-          NULL,
-          [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-                 size_t index, size_t total) {
-            this->handleFirmwareUpload(request, data, len, index, total);
-          });
+  // PHASE 5.10: OTA update POST - body handled inline in PsychicHttp
+  // NOTE: Large file uploads (>16KB) require PsychicUploadHandler - simplified for now
+  server.on("/api/update", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
+
+    // For large OTA updates, we'd need PsychicUploadHandler
+    // For now, return error indicating this feature needs migration
+    return response.send(501, "application/json", 
+      "{\"error\":\"OTA upload requires dedicated handler - use ArduinoOTA instead\"}");
+  });
 
   // 7. API Comprehensive System Telemetry (Protected, Rate Limited) - PHASE 5.1
-  server->on(
-      "/api/telemetry", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        if (!requireAuth(request)) return;
+  server.on("/api/telemetry", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-        // PHASE 5.1: Rate limiting check
-        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-          request->send(429, "application/json",
-                        "{\"error\":\"Rate limit exceeded\"}");
-          return;
-        }
+    // PHASE 5.1: Rate limiting check
+    if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+      return response.send(429, "application/json",
+                    "{\"error\":\"Rate limit exceeded\"}");
+    }
 
-        // MEMORY FIX: Stack allocation - 3KB is safe for async handlers (8KB stack)
-        char telemetry_buffer[3072];
-        size_t telemetry_size = telemetryExportJSON(telemetry_buffer, sizeof(telemetry_buffer));
-        if (telemetry_size == 0) {
-          request->send(500, "application/json",
-                        "{\"error\":\"Failed to export telemetry\"}");
-          return;
-        }
+    // MEMORY FIX: Stack allocation - 3KB is safe for async handlers (8KB stack)
+    char telemetry_buffer[3072];
+    size_t telemetry_size = telemetryExportJSON(telemetry_buffer, sizeof(telemetry_buffer));
+    if (telemetry_size == 0) {
+      return response.send(500, "application/json",
+                    "{\"error\":\"Failed to export telemetry\"}");
+    }
 
-        request->send(200, "application/json", telemetry_buffer);
-      });
+    return response.send(200, "application/json", telemetry_buffer);
+  });
 
   // Lightweight telemetry for high-frequency polling
-  server->on("/api/telemetry/compact", HTTP_GET,
-             [this](AsyncWebServerRequest *request) {
-               if (!requireAuth(request)) return;
+  server.on("/api/telemetry/compact", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-               // Stack allocation - 512 bytes is safe for async handlers
-               char compact_buffer[512];
-               // PHASE 5.10: Check export function return value for truncation
-               size_t written = telemetryExportCompactJSON(compact_buffer,
-                                          sizeof(compact_buffer));
-               if (written == 0 || written >= sizeof(compact_buffer) - 1) {
-                 request->send(500, "application/json", "{\"error\":\"Failed to export telemetry\"}");
-                 return;
-               }
-                request->send(200, "application/json", compact_buffer);
-             });
+    // Stack allocation - 512 bytes is safe for async handlers
+    char compact_buffer[512];
+    // PHASE 5.10: Check export function return value for truncation
+    size_t written = telemetryExportCompactJSON(compact_buffer,
+                                  sizeof(compact_buffer));
+    if (written == 0 || written >= sizeof(compact_buffer) - 1) {
+      return response.send(500, "application/json", "{\"error\":\"Failed to export telemetry\"}");
+    }
+    return response.send(200, "application/json", compact_buffer);
+  });
   
   // 7.5. API Binary Telemetry (Compressed, Ultra-Low Latency) - PHASE 5.10
-  server->on("/api/telemetry/binary", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/telemetry/binary", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     // PHASE 5.1: Rate limiting check (using status bucket)
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-      request->send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
-      return;
+      return response.send(429, "application/json", "{\"error\":\"Rate limit exceeded\"}");
     }
 
     telemetry_packet_t packet;
     size_t written = telemetryExportBinary(&packet);
 
     if (written == 0) {
-      request->send(500, "application/json", "{\"error\":\"Export failed\"}");
-      return;
+      return response.send(500, "application/json", "{\"error\":\"Export failed\"}");
     }
 
     // Send binary packet with appropriate content type
-    // ESPAsyncWebServer copies the buffer into its own internal management
-    request->send(200, "application/octet-stream", (uint8_t*)&packet, written);
+    return response.send(200, "application/octet-stream", (uint8_t*)&packet, written);
   });
 
   // 8. API Endpoint Discovery (Unprotected for auto-discovery) - PHASE 5.2
@@ -837,74 +827,72 @@ void WebServerManager::setupRoutes() {
   if (!endpoints_buffer_mutex) {
     endpoints_buffer_mutex = xSemaphoreCreateMutex();
   }
-  server->on(
-      "/api/endpoints", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        // AUDIT FIX: Use static buffer with mutex protection instead of malloc
-        if (!endpoints_buffer_mutex || xSemaphoreTake(endpoints_buffer_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-          request->send(503, "application/json",
-                        "{\"error\":\"Resource busy, try again\"}");
-          return;
-        }
+  server.on("/api/endpoints", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    // AUDIT FIX: Use static buffer with mutex protection instead of malloc
+    if (!endpoints_buffer_mutex || xSemaphoreTake(endpoints_buffer_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+      return response.send(503, "application/json",
+                    "{\"error\":\"Resource busy, try again\"}");
+    }
 
-        size_t endpoints_size = apiEndpointsExportJSON(endpoints_static_buffer, ENDPOINTS_BUFFER_SIZE);
-        if (endpoints_size == 0) {
-          xSemaphoreGive(endpoints_buffer_mutex);
-          request->send(500, "application/json",
-                        "{\"error\":\"Failed to export endpoints\"}");
-          return;
-        }
+    size_t endpoints_size = apiEndpointsExportJSON(endpoints_static_buffer, ENDPOINTS_BUFFER_SIZE);
+    if (endpoints_size == 0) {
+      xSemaphoreGive(endpoints_buffer_mutex);
+      return response.send(500, "application/json",
+                    "{\"error\":\"Failed to export endpoints\"}");
+    }
 
-        request->send(200, "application/json", endpoints_static_buffer);
-        xSemaphoreGive(endpoints_buffer_mutex);
-      });
+    esp_err_t result = response.send(200, "application/json", endpoints_static_buffer);
+    xSemaphoreGive(endpoints_buffer_mutex);
+    return result;
+  });
 
   // 8.5. OpenAPI Specification (Unprotected for Swagger UI) - PHASE 6
   // AUDIT FIX: Initialize mutex if needed (lazy init for static buffers)
   if (!openapi_buffer_mutex) {
     openapi_buffer_mutex = xSemaphoreCreateMutex();
   }
-  server->on(
-      "/api/openapi.json", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        // AUDIT FIX: Use static buffer with mutex protection instead of malloc
-        if (!openapi_buffer_mutex || xSemaphoreTake(openapi_buffer_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-          request->send(503, "application/json",
-                        "{\"error\":\"Resource busy, try again\"}");
-          return;
-        }
+  server.on("/api/openapi.json", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    // AUDIT FIX: Use static buffer with mutex protection instead of malloc
+    if (!openapi_buffer_mutex || xSemaphoreTake(openapi_buffer_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+      return response.send(503, "application/json",
+                    "{\"error\":\"Resource busy, try again\"}");
+    }
 
-        size_t openapi_size = openAPIGenerateJSON(openapi_static_buffer, OPENAPI_BUFFER_SIZE);
-        if (openapi_size == 0) {
-          xSemaphoreGive(openapi_buffer_mutex);
-          request->send(500, "application/json",
-                        "{\"error\":\"Failed to generate OpenAPI spec\"}");
-          return;
-        }
+    size_t openapi_size = openAPIGenerateJSON(openapi_static_buffer, OPENAPI_BUFFER_SIZE);
+    if (openapi_size == 0) {
+      xSemaphoreGive(openapi_buffer_mutex);
+      return response.send(500, "application/json",
+                    "{\"error\":\"Failed to generate OpenAPI spec\"}");
+    }
 
-        if (!openAPIValidate(openapi_static_buffer)) {
-          xSemaphoreGive(openapi_buffer_mutex);
-          request->send(500, "application/json",
-                        "{\"error\":\"Generated invalid OpenAPI spec\"}");
-          return;
-        }
+    if (!openAPIValidate(openapi_static_buffer)) {
+      xSemaphoreGive(openapi_buffer_mutex);
+      return response.send(500, "application/json",
+                    "{\"error\":\"Generated invalid OpenAPI spec\"}");
+    }
 
-        request->send(200, "application/json", openapi_static_buffer);
-        xSemaphoreGive(openapi_buffer_mutex);
-      });
+    esp_err_t result = response.send(200, "application/json", openapi_static_buffer);
+    xSemaphoreGive(openapi_buffer_mutex);
+    return result;
+  });
 
   // 8.6. Swagger UI Documentation (Unprotected for discovery) - PHASE 6
-  server->on("/api/docs", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/pages/swagger-ui.html", "text/html");
+  server.on("/api/docs", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    // PsychicHttp: Serve file from LittleFS
+    return request->reply(LittleFS, "/pages/swagger-ui.html");
   });
 
   // 9. API Health Check (Protected, Rate Limited) - PHASE 5.2
-  server->on("/api/health", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/health", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     // PHASE 5.2: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-      request->send(429, "application/json",
+      return response.send(429, "application/json",
                     "{\"error\":\"Rate limit exceeded\"}");
-      return;
     }
 
     // Build health check response
@@ -934,47 +922,43 @@ void WebServerManager::setupRoutes() {
              (unsigned long)millis());
 
     if (written < 0 || written >= (int)sizeof(health_buffer)) {
-      request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
-      return;
+      return response.send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
     }
 
-    request->send(200, "application/json", health_buffer);
+    return response.send(200, "application/json", health_buffer);
   });
 
   // 10. PHASE 5.3: API Encoder Diagnostics (Protected, Rate Limited)
-  server->on(
-      "/api/encoder/diagnostics", HTTP_GET,
-      [this](AsyncWebServerRequest *request) {
-        if (!requireAuth(request)) return;
-
-        // PHASE 5.3: Rate limiting check
-        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-          request->send(429, "application/json",
-                        "{\"error\":\"Rate limit exceeded\"}");
-          return;
-        }
-
-        // MEMORY FIX: Stack allocation - 2KB is safe for async handlers (8KB stack)
-        char diag_buffer[2048];
-        size_t diag_size = encoderDiagnosticsExportJSON(diag_buffer, sizeof(diag_buffer));
-        if (diag_size == 0) {
-          request->send(500, "application/json",
-                        "{\"error\":\"Failed to export encoder diagnostics\"}");
-          return;
-        }
-
-        request->send(200, "application/json", diag_buffer);
-      });
-
-  // 11. PHASE 5.3: API Load Status (Protected, Rate Limited)
-  server->on("/api/load", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/encoder/diagnostics", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     // PHASE 5.3: Rate limiting check
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-      request->send(429, "application/json",
+      return response.send(429, "application/json",
                     "{\"error\":\"Rate limit exceeded\"}");
-      return;
+    }
+
+    // MEMORY FIX: Stack allocation - 2KB is safe for async handlers (8KB stack)
+    char diag_buffer[2048];
+    size_t diag_size = encoderDiagnosticsExportJSON(diag_buffer, sizeof(diag_buffer));
+    if (diag_size == 0) {
+      return response.send(500, "application/json",
+                    "{\"error\":\"Failed to export encoder diagnostics\"}");
+    }
+
+    return response.send(200, "application/json", diag_buffer);
+  });
+
+  // 11. PHASE 5.3: API Load Status (Protected, Rate Limited)
+  server.on("/api/load", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
+
+    // PHASE 5.3: Rate limiting check
+    if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+      return response.send(429, "application/json",
+                    "{\"error\":\"Rate limit exceeded\"}");
     }
 
     char load_buffer[512];
@@ -998,39 +982,35 @@ void WebServerManager::setupRoutes() {
              load_status.emergency_estop_initiated ? "true" : "false");
 
     if (written < 0 || written >= (int)sizeof(load_buffer)) {
-      request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
-      return;
+      return response.send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
     }
 
-    request->send(200, "application/json", load_buffer);
+    return response.send(200, "application/json", load_buffer);
   });
 
   // 12. PHASE 5.3: API Dashboard Metrics (Protected, for Web UI)
-  server->on(
-      "/api/dashboard/metrics", HTTP_GET,
-      [this](AsyncWebServerRequest *request) {
-        if (!requireAuth(request)) return;
+  server.on("/api/dashboard/metrics", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-        // PHASE 5.3: Rate limiting check (less strict for dashboard updates)
-        if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-          request->send(429, "application/json",
-                        "{\"error\":\"Rate limit exceeded\"}");
-          return;
-        }
+    // PHASE 5.3: Rate limiting check (less strict for dashboard updates)
+    if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
+      return response.send(429, "application/json",
+                    "{\"error\":\"Rate limit exceeded\"}");
+    }
 
-        // Stack allocation - 512 bytes is safe for async handlers
-        char metrics_buffer[512];
-        size_t metrics_size =
-            dashboardMetricsExportJSON(metrics_buffer, sizeof(metrics_buffer));
-        // PHASE 5.10: Check for both failure and truncation
-        if (metrics_size == 0 || metrics_size >= sizeof(metrics_buffer) - 1) {
-          request->send(500, "application/json",
-                        "{\"error\":\"Failed to export dashboard metrics\"}");
-          return;
-        }
+    // Stack allocation - 512 bytes is safe for async handlers
+    char metrics_buffer[512];
+    size_t metrics_size =
+        dashboardMetricsExportJSON(metrics_buffer, sizeof(metrics_buffer));
+    // PHASE 5.10: Check for both failure and truncation
+    if (metrics_size == 0 || metrics_size >= sizeof(metrics_buffer) - 1) {
+      return response.send(500, "application/json",
+                    "{\"error\":\"Failed to export dashboard metrics\"}");
+    }
 
-        request->send(200, "application/json", metrics_buffer);
-      });
+    return response.send(200, "application/json", metrics_buffer);
+  });
 
   // 13. DELEGATE FILE MANAGEMENT
   // Registers /api/files (GET, DELETE) and /api/upload (POST)
