@@ -8,6 +8,7 @@
  */
 
 #include "web_server.h"
+#include <WiFi.h>  // For WiFi.status(), SSID, etc. in network endpoints
 #include "altivar31_modbus.h"  // PHASE 5.5: VFD current monitoring
 #include "api_config.h"        // PHASE 5.6: Configuration API for web settings
 #include "api_endpoints.h"     // PHASE 5.2: API endpoint discovery
@@ -314,7 +315,7 @@ void WebServerManager::init() {
 }
 
 void WebServerManager::begin() {
-  server.listen(port);
+  server.begin();
   logInfo("[WEB] [OK] PsychicHttp Started on port %d", port);
 }
 
@@ -1140,235 +1141,170 @@ void WebServerManager::setupRoutes() {
   });
 
   // POST /api/config/validate - Validate configuration change
-  server->on("/api/config/validate", HTTP_POST, nullptr, nullptr,
-             [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-                    size_t index, size_t total) {
-               if (!requireAuth(request)) return;
+  server.on("/api/config/validate", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-               // INPUT VALIDATION: Check body size to prevent overflow
-               if (!validateBodySize(len, total)) {
-                 request->send(413, "application/json",
-                               "{\"error\":\"Request body too large\"}");
-                 return;
-               }
+    // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
+    // heap fragmentation
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, request->body());
 
-               // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
-               uint8_t *complete_data = nullptr;
-               size_t complete_len = 0;
-               if (!assembleChunkedRequest(data, len, index, total,
-                                          &complete_data, &complete_len)) {
-                 return; // Still accumulating chunks or error
-               }
+    if (error) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"JSON parse failed\"}");
+    }
 
-               // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
-               // heap fragmentation
-               JsonDocument doc;
-               DeserializationError error = deserializeJson(doc, complete_data, complete_len);
+    int category = doc["category"] | -1;
+    const char *key = doc["key"];
+    JsonVariant value = doc["value"];
 
-               if (error) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"JSON parse failed\"}");
-                 return;
-               }
+    if (category < 0 || !key) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Missing required fields\"}");
+    }
 
-               int category = doc["category"] | -1;
-               const char *key = doc["key"];
-               JsonVariant value = doc["value"];
+    char error_msg[256];
+    if (!apiConfigValidate((config_category_t)category, key, value,
+                           error_msg, sizeof(error_msg))) {
+      // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
+      // heap fragmentation
+      JsonDocument respDoc;
+      respDoc["valid"] = false;
+      respDoc["error"] = error_msg;
+      char response_str[256];
+      serializeJson(respDoc, response_str, sizeof(response_str));
+      return response.send(200, "application/json", response_str);
+    }
 
-               if (category < 0 || !key) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Missing required fields\"}");
-                 return;
-               }
-
-               char error_msg[256];
-               if (!apiConfigValidate((config_category_t)category, key, value,
-                                      error_msg, sizeof(error_msg))) {
-                 // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
-                 // heap fragmentation
-                 JsonDocument response;
-                 response["valid"] = false;
-                 response["error"] = error_msg;
-                 char response_str[256];
-                 serializeJson(response, response_str, sizeof(response_str));
-                 request->send(200, "application/json", response_str);
-                 return;
-               }
-
-               request->send(200, "application/json", "{\"valid\":true}");
-             });
+    return response.send(200, "application/json", "{\"valid\":true}");
+  });
 
   // GET /api/config/schema?category=<N> - Get configuration schema
-  server->on(
-      "/api/config/schema", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        if (!requireAuth(request)) return;
+  server.on("/api/config/schema", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-        const AsyncWebParameter *categoryParam = request->getParam("category");
-        if (!categoryParam) {
-          request->send(400, "application/json",
-                        "{\"error\":\"Missing category parameter\"}");
-          return;
-        }
+    if (!request->hasParam("category")) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Missing category parameter\"}");
+    }
 
-        int category = atoi(categoryParam->value().c_str());
-        // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
-        // fragmentation
-        JsonDocument doc;
+    int category = atoi(request->getParam("category")->value().c_str());
+    // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
+    // fragmentation
+    JsonDocument doc;
 
-        if (!apiConfigGetSchema((config_category_t)category, doc)) {
-          request->send(400, "application/json",
-                        "{\"error\":\"Invalid category\"}");
-          return;
-        }
+    if (!apiConfigGetSchema((config_category_t)category, doc)) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Invalid category\"}");
+    }
 
-        char response[512];
-        // PHASE 5.10: Check serializeJson return value for truncation
-        size_t written = serializeJson(doc, response, sizeof(response));
-        if (written >= sizeof(response)) {
-          request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
-          return;
-        }
-        request->send(200, "application/json", response);
-      });
+    char responseBuffer[512];
+    // PHASE 5.10: Check serializeJson return value for truncation
+    size_t written = serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    if (written >= sizeof(responseBuffer)) {
+      return response.send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+    }
+    return response.send(200, "application/json", responseBuffer);
+  });
 
   // POST /api/encoder/calibrate - Calibrate encoder axis
-  server->on("/api/encoder/calibrate", HTTP_POST, nullptr, nullptr,
-             [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-                    size_t index, size_t total) {
-               if (!requireAuth(request)) return;
+  server.on("/api/encoder/calibrate", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-               // INPUT VALIDATION: Check body size to prevent overflow
-               if (!validateBodySize(len, total)) {
-                 request->send(413, "application/json",
-                               "{\"error\":\"Request body too large\"}");
-                 return;
-               }
+    if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
+      return response.send(429, "application/json",
+                    "{\"error\":\"Rate limit exceeded\"}");
+    }
 
-               // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
-               uint8_t *complete_data = nullptr;
-               size_t complete_len = 0;
-               if (!assembleChunkedRequest(data, len, index, total,
-                                          &complete_data, &complete_len)) {
-                 return; // Still accumulating chunks or error
-               }
+    // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
+    // heap fragmentation
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, request->body());
 
-               if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
-                 request->send(429, "application/json",
-                               "{\"error\":\"Rate limit exceeded\"}");
-                 return;
-               }
+    if (error) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"JSON parse failed\"}");
+    }
 
-               // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
-               // heap fragmentation
-               JsonDocument doc;
-               DeserializationError error = deserializeJson(doc, complete_data, complete_len);
+    int axis = doc["axis"] | -1;
+    int ppm = doc["ppm"] | 0;
 
-               if (error) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"JSON parse failed\"}");
-                 return;
-               }
+    if (axis < 0 || axis > 2 || ppm < 50 || ppm > 200) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Invalid axis or PPM value\"}");
+    }
 
-               int axis = doc["axis"] | -1;
-               int ppm = doc["ppm"] | 0;
+    if (!apiConfigCalibrateEncoder((uint8_t)axis, (uint16_t)ppm)) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Failed to calibrate encoder\"}");
+    }
 
-               if (axis < 0 || axis > 2 || ppm < 50 || ppm > 200) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Invalid axis or PPM value\"}");
-                 return;
-               }
+    if (!apiConfigSave()) {
+      return response.send(500, "application/json",
+                    "{\"error\":\"Failed to save configuration\"}");
+    }
 
-               if (!apiConfigCalibrateEncoder((uint8_t)axis, (uint16_t)ppm)) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Failed to calibrate encoder\"}");
-                 return;
-               }
-
-               if (!apiConfigSave()) {
-                 request->send(500, "application/json",
-                               "{\"error\":\"Failed to save configuration\"}");
-                 return;
-               }
-
-               request->send(200, "application/json", "{\"success\":true}");
-             });
+    return response.send(200, "application/json", "{\"success\":true}");
+  });
 
   // POST /api/gcode - Execute G-code command
-  server->on(
-      "/api/gcode", HTTP_POST, nullptr, nullptr,
-      [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-             size_t index, size_t total) {
-        if (!requireAuth(request)) return;
+  server.on("/api/gcode", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-        // INPUT VALIDATION: Check body size to prevent overflow
-        if (!validateBodySize(len, total)) {
-          request->send(413, "application/json",
-                        "{\"error\":\"Request body too large\"}");
-          return;
-        }
+    if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) { // Reuse jog rate limit
+      return response.send(429, "application/json",
+                    "{\"error\":\"Rate limit exceeded\"}");
+    }
 
-        // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
-        uint8_t *complete_data = nullptr;
-        size_t complete_len = 0;
-        if (!assembleChunkedRequest(data, len, index, total,
-                                   &complete_data, &complete_len)) {
-          return; // Still accumulating chunks or error
-        }
+    // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
+    // fragmentation
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, request->body());
 
-        if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) { // Reuse jog rate limit
-          request->send(429, "application/json",
-                        "{\"error\":\"Rate limit exceeded\"}");
-          return;
-        }
+    if (error) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"JSON parse failed\"}");
+    }
 
-        // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
-        // fragmentation
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, complete_data, complete_len);
+    const char *command = doc["command"];
+    if (!command || strlen(command) == 0) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Missing or empty command\"}");
+    }
 
-        if (error) {
-          request->send(400, "application/json",
-                        "{\"error\":\"JSON parse failed\"}");
-          return;
-        }
+    // SECURITY FIX: Validate command against whitelist to prevent injection
+    if (!isValidGcodeCommand(command)) {
+      logWarning("[WEB] [SECURITY] Rejected invalid G-code command: %s", command);
+      return response.send(400, "application/json",
+                    "{\"error\":\"Invalid or unauthorized G-code command\"}");
+    }
 
-        const char *command = doc["command"];
-        if (!command || strlen(command) == 0) {
-          request->send(400, "application/json",
-                        "{\"error\":\"Missing or empty command\"}");
-          return;
-        }
+    // Execute G-code command
+    bool success = gcodeParser.processCommand(command);
 
-        // SECURITY FIX: Validate command against whitelist to prevent injection
-        if (!isValidGcodeCommand(command)) {
-          logWarning("[WEB] [SECURITY] Rejected invalid G-code command: %s", command);
-          request->send(400, "application/json",
-                        "{\"error\":\"Invalid or unauthorized G-code command\"}");
-          return;
-        }
+    // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
+    // fragmentation
+    JsonDocument respDoc;
+    respDoc["success"] = success;
+    respDoc["command"] = command;
 
-        // Execute G-code command
-        bool success = gcodeParser.processCommand(command);
-
-        // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
-        // fragmentation
-        JsonDocument response;
-        response["success"] = success;
-        response["command"] = command;
-
-        char response_buffer[256];
-        serializeJson(response, response_buffer, sizeof(response_buffer));
-        request->send(success ? 200 : 400, "application/json", response_buffer);
-      });
+    char response_buffer[256];
+    serializeJson(respDoc, response_buffer, sizeof(response_buffer));
+    return response.send(success ? 200 : 400, "application/json", response_buffer);
+  });
 
   // GET /api/alarms - Get active alarms and fault history
-  server->on("/api/alarms", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/alarms", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     if (!apiRateLimiterCheck(API_ENDPOINT_STATUS, 0)) {
-      request->send(429, "application/json",
+      return response.send(429, "application/json",
                     "{\"error\":\"Rate limit exceeded\"}");
-      return;
     }
 
     // MEMORY FIX: Use StaticJsonDocument as allocator sized for fault array +
@@ -1402,38 +1338,38 @@ void WebServerManager::setupRoutes() {
     doc["stats"]["motion"] = stats.motion_faults;
     doc["stats"]["safety"] = stats.safety_faults;
 
-    char response[2048];
-    serializeJson(doc, response, sizeof(response));
-    request->send(200, "application/json", response);
+    char responseBuffer[2048];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // POST /api/estop/trigger - Trigger emergency stop
-  server->on("/api/estop/trigger", HTTP_POST,
-             [this](AsyncWebServerRequest *request) {
-               if (!requireAuth(request)) return;
+  server.on("/api/estop/trigger", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-               emergencyStopSetActive(true);
-               request->send(200, "application/json",
-                             "{\"success\":true,\"estop_active\":true}");
-             });
+    emergencyStopSetActive(true);
+    return response.send(200, "application/json",
+                  "{\"success\":true,\"estop_active\":true}");
+  });
 
   // POST /api/estop/reset - Request E-stop recovery
-  server->on("/api/estop/reset", HTTP_POST,
-             [this](AsyncWebServerRequest *request) {
-               if (!requireAuth(request)) return;
+  server.on("/api/estop/reset", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-               bool success = emergencyStopRequestRecovery();
+    bool success = emergencyStopRequestRecovery();
 
-               // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
-               // heap fragmentation
-               JsonDocument doc;
-               doc["success"] = success;
-               doc["estop_active"] = emergencyStopIsActive();
+    // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
+    // heap fragmentation
+    JsonDocument doc;
+    doc["success"] = success;
+    doc["estop_active"] = emergencyStopIsActive();
 
-               char response[128];
-               serializeJson(doc, response, sizeof(response));
-               request->send(success ? 200 : 400, "application/json", response);
-             });
+    char responseBuffer[128];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response.send(success ? 200 : 400, "application/json", responseBuffer);
+  });
 
   // PHASE 5.10: Security - 404 handler already registered at line 224 with auth
   // Duplicate handler removed to prevent auth bypass
@@ -1443,8 +1379,9 @@ void WebServerManager::setupRoutes() {
   // ============================================================================
 
   // GET /api/hardware/pins - Get all pins and signal definitions
-  server->on("/api/hardware/pins", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/hardware/pins", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     JsonDocument doc;
     doc["success"] = true;
@@ -1477,70 +1414,61 @@ void WebServerManager::setupRoutes() {
       }
     }
 
-    char response[4096];
-    size_t written = serializeJson(doc, response, sizeof(response));
-    if (written >= sizeof(response)) {
-      request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
-      return;
+    char responseBuffer[4096];
+    size_t written = serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    if (written >= sizeof(responseBuffer)) {
+      return response.send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
     }
-    request->send(200, "application/json", response);
+    return response.send(200, "application/json", responseBuffer);
   });
 
   // POST /api/hardware/pins - Set a pin assignment
-  server->on("/api/hardware/pins", HTTP_POST, 
-    [](AsyncWebServerRequest *request) {
-      if (!requireAuth(request)) return;
-      request->send(200);
-    },
-    NULL,
-    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-           size_t index, size_t total) {
-      if (!validateBodySize(len, total)) {
-        request->send(413, "application/json", "{\"error\":\"Request too large\"}");
-        return;
-      }
+  server.on("/api/hardware/pins", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-      JsonDocument doc;
-      DeserializationError err = deserializeJson(doc, data, len);
-      
-      if (err) {
-        request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
-        return;
-      }
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, request->body());
+    
+    if (err) {
+      return response.send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
+    }
 
-      const char* key = doc["key"] | "";
-      int8_t pin = doc["pin"] | -1;
+    const char* key = doc["key"] | "";
+    int8_t pin = doc["pin"] | -1;
 
-      if (strlen(key) == 0 || pin < 0) {
-        request->send(400, "application/json", "{\"success\":false,\"error\":\"Missing key or pin\"}");
-        return;
-      }
+    if (strlen(key) == 0 || pin < 0) {
+      return response.send(400, "application/json", "{\"success\":false,\"error\":\"Missing key or pin\"}");
+    }
 
-      bool success = setPin(key, pin);
-      
-      JsonDocument resp;
-      resp["success"] = success;
-      if (!success) {
-        resp["error"] = "Invalid pin assignment (conflict or type mismatch)";
-      }
+    bool success = setPin(key, pin);
+    
+    JsonDocument resp;
+    resp["success"] = success;
+    if (!success) {
+      resp["error"] = "Invalid pin assignment (conflict or type mismatch)";
+    }
 
-      char response[128];
-      serializeJson(resp, response, sizeof(response));
-      request->send(success ? 200 : 400, "application/json", response);
-    });
+    char responseBuffer[128];
+    serializeJson(resp, responseBuffer, sizeof(responseBuffer));
+    return response.send(success ? 200 : 400, "application/json", responseBuffer);
+  });
 
   // POST /api/hardware/pins/save - Persist config and reboot
-  server->on("/api/hardware/pins/save", HTTP_POST, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/hardware/pins/save", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-    request->send(200, "application/json", "{\"success\":true,\"message\":\"Rebooting...\"}");
+    esp_err_t result = response.send(200, "application/json", "{\"success\":true,\"message\":\"Rebooting...\"}");
     delay(100);
     ESP.restart();
+    return result;
   });
 
   // POST /api/hardware/pins/reset - Reset all pins to defaults
-  server->on("/api/hardware/pins/reset", HTTP_POST, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/hardware/pins/reset", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
     for (size_t i = 0; i < SIGNAL_COUNT; i++) {
       char nvs_key[40];
@@ -1549,9 +1477,10 @@ void WebServerManager::setupRoutes() {
     }
     configUnifiedSave();
 
-    request->send(200, "application/json", "{\"success\":true,\"message\":\"Reset to defaults. Rebooting...\"}");
+    esp_err_t result = response.send(200, "application/json", "{\"success\":true,\"message\":\"Reset to defaults. Rebooting...\"}");
     delay(100);
     ESP.restart();
+    return result;
   });
 
   // ==========================================================================
@@ -1559,8 +1488,9 @@ void WebServerManager::setupRoutes() {
   // ==========================================================================
 
   // GET /filemanager - Simple HTML file manager UI
-  server->on("/filemanager", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/filemanager", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     String html = R"rawliteral(
 <!DOCTYPE html>
@@ -1611,12 +1541,13 @@ function del(path){if(confirm('Delete '+path+'?'))fetch('/api/files?name='+encod
 </body>
 </html>
 )rawliteral";
-    request->send(200, "text/html", html);
+    return response.send(200, "text/html", html.c_str());
   });
 
   // GET /api/files/list - List all files
-  server->on("/api/files/list", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/files/list", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     
     String json = "{\"files\":[";
     bool first = true;
@@ -1645,195 +1576,73 @@ function del(path){if(confirm('Delete '+path+'?'))fetch('/api/files?name='+encod
     
     listDir("/");
     json += "]}";
-    request->send(200, "application/json", json);
+    return response.send(200, "application/json", json.c_str());
   });
 
   // GET /api/files/download - Download a file
-  server->on("/api/files/download", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/files/download", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     if (!request->hasParam("path")) {
-      request->send(400, "text/plain", "Missing path parameter");
-      return;
+      return response.send(400, "text/plain", "Missing path parameter");
     }
     String path = request->getParam("path")->value();
     if (!LittleFS.exists(path)) {
-      request->send(404, "text/plain", "File not found");
-      return;
+      return response.send(404, "text/plain", "File not found");
     }
-    request->send(LittleFS, path, "application/octet-stream");
+    return request->reply(LittleFS, path.c_str());
   });
 
   // DELETE /api/files/delete - Delete a file
-  server->on("/api/files/delete", HTTP_DELETE, [this](AsyncWebServerRequest *request) {
-    if (!requireAuth(request)) return;
+  server.on("/api/files/delete", HTTP_DELETE, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
     if (!request->hasParam("path")) {
-      request->send(400, "application/json", "{\"success\":false,\"error\":\"Missing path\"}");
-      return;
+      return response.send(400, "application/json", "{\"success\":false,\"error\":\"Missing path\"}");
     }
     String path = request->getParam("path")->value();
     if (LittleFS.remove(path)) {
-      request->send(200, "application/json", "{\"success\":true}");
+      return response.send(200, "application/json", "{\"success\":true}");
     } else {
-      request->send(500, "application/json", "{\"success\":false,\"error\":\"Delete failed\"}");
+      return response.send(500, "application/json", "{\"success\":false,\"error\":\"Delete failed\"}");
     }
   });
 
   // POST /api/files/upload - Upload a file (multipart)
-  server->on("/api/files/upload", HTTP_POST,
-    [](AsyncWebServerRequest *request) {
-      if (!requireAuth(request)) return;
-      request->send(200, "text/html", "<html><body><h2>Upload complete!</h2><a href='/filemanager'>Back to File Manager</a></body></html>");
-    },
-    [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-      static File uploadFile;
-      String path = "/";
-      if (request->hasParam("path", true)) {
-        path = request->getParam("path", true)->value();
-      }
-      if (path.endsWith("/")) path += filename;
-      else if (path.indexOf('.') < 0) path += "/" + filename;
-      
-      if (index == 0) {
-        logInfo("[FM] Upload: %s", path.c_str());
-        uploadFile = LittleFS.open(path, "w");
-      }
-      if (uploadFile && len) {
-        uploadFile.write(data, len);
-      }
-      if (final && uploadFile) {
-        uploadFile.close();
-        logInfo("[FM] Upload complete: %s (%u bytes)", path.c_str(), index + len);
-      }
-    });
+  // NOTE: PsychicHttp requires PsychicUploadHandler for multipart uploads
+  // For now, return an informative error
+  server.on("/api/files/upload", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
+    return response.send(501, "application/json", 
+      "{\"success\":false,\"error\":\"File uploads via web require PsychicUploadHandler - use CLI or firmware flash instead\"}");
+  });
 
   // 1. Static Files (Moved to end to allow API routes to match first)
   // No auth needed for static assets (bundled CSS/JS/HTML)
-  server->serveStatic("/", LittleFS, "/")
-      .setDefaultFile("index.html");
+  // PsychicHttp: Use serveStatic with default file
+  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 }
 
-// --- Handlers ---
+// --- PsychicHttp WebSocket Handlers ---
 
-void WebServerManager::handleJogBody(AsyncWebServerRequest *request,
-                                     uint8_t *data, size_t len, size_t index,
-                                     size_t total) {
-  // INPUT VALIDATION: Check body size to prevent overflow
-  if (!validateBodySize(len, total)) {
-    request->send(413, "application/json",
-                  "{\"error\":\"Request body too large\"}");
-    return;
-  }
-
-  // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
-  uint8_t *complete_data = nullptr;
-  size_t complete_len = 0;
-  if (!assembleChunkedRequest(data, len, index, total,
-                              &complete_data, &complete_len)) {
-    return; // Still accumulating chunks or error
-  }
-
-  // PHASE 5.1: Rate limiting check
-  if (!apiRateLimiterCheck(API_ENDPOINT_JOG, 0)) {
-    request->send(429, "application/json",
-                  "{\"error\":\"Rate limit exceeded\"}");
-    return;
-  }
-
-  // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
-  // fragmentation
-  JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, complete_data, complete_len);
-
-  if (error) {
-    logError("[WEB] JSON parse failed: %s", error.c_str());
-    return;
-  }
-
-  const char *direction = doc["direction"];
-  float distance = doc["distance"] | 10.0f;
-  float speed = doc["speed"] | 50.0f;
-
-  if (!direction)
-    return;
-
-  logDebug("[WEB] Jog: %s, %.1f mm, %.1f mm/s", direction, distance,
-                speed);
-
-  // Map direction strings to Motion API calls
-  if (strcmp(direction, "X+") == 0)
-    motionMoveRelative(distance, 0, 0, 0, speed);
-  else if (strcmp(direction, "X-") == 0)
-    motionMoveRelative(-distance, 0, 0, 0, speed);
-  else if (strcmp(direction, "Y+") == 0)
-    motionMoveRelative(0, distance, 0, 0, speed);
-  else if (strcmp(direction, "Y-") == 0)
-    motionMoveRelative(0, -distance, 0, 0, speed);
-  else if (strcmp(direction, "Z+") == 0)
-    motionMoveRelative(0, 0, distance, 0, speed);
-  else if (strcmp(direction, "Z-") == 0)
-    motionMoveRelative(0, 0, -distance, 0, speed);
-  else if (strcmp(direction, "A+") == 0)
-    motionMoveRelative(0, 0, 0, distance, speed);
-  else if (strcmp(direction, "A-") == 0)
-    motionMoveRelative(0, 0, 0, -distance, speed);
-  else if (strcmp(direction, "STOP") == 0)
-    motionStop();
+void WebServerManager::onWsOpen(PsychicWebSocketClient *client) {
+  logInfo("[WEB] WS Client connected");
+  broadcastState();
 }
 
-void WebServerManager::handleFirmwareUpload(AsyncWebServerRequest *request,
-                                            uint8_t *data, size_t len,
-                                            size_t index, size_t total) {
-  // PHASE 5.1: Handle firmware upload for OTA update
-
-  // First chunk - start the update
-  if (index == 0) {
-    logInfo("[WEB] [OTA] Starting firmware upload: %zu bytes", total);
-
-    if (!otaUpdaterStartUpdate(total, "firmware.bin")) {
-      request->send(400, "application/json",
-                    "{\"error\":\"Failed to start OTA update\"}");
-      return;
-    }
-  }
-
-  // Receive and write chunk
-  if (!otaUpdaterReceiveChunk(data, len)) {
-    request->send(400, "application/json",
-                  "{\"error\":\"Failed to write firmware chunk\"}");
-    otaUpdaterCancel();
-    return;
-  }
-
-  // Last chunk - finalize update
-  if (index + len >= total) {
-    logInfo("[WEB] [OTA] Firmware upload complete, finalizing...");
-
-    if (otaUpdaterFinalize()) {
-      // Response will be sent after reboot timer expires
-      request->send(200, "application/json",
-                    "{\"status\":\"Firmware installed. Rebooting...\"}");
-    } else {
-      request->send(400, "application/json",
-                    "{\"error\":\"Firmware validation failed\"}");
-    }
-  }
+void WebServerManager::onWsFrame(PsychicWebSocketRequest *request, httpd_ws_frame_t *frame) {
+  // Handle incoming WebSocket frames if needed
+  // For real-time status updates, clients mostly receive data
+  logDebug("[WEB] WS Frame received: %d bytes", frame->len);
 }
 
-void WebServerManager::onWsEvent(AsyncWebSocket *server,
-                                 AsyncWebSocketClient *client,
-                                 AwsEventType type, void *arg, uint8_t *data,
-                                 size_t len) {
-  if (type == WS_EVT_CONNECT) {
-    logInfo("[WEB] WS Client #%u connected from %s", client->id(),
-                  client->remoteIP().toString().c_str());
-    broadcastState();
-  } else if (type == WS_EVT_DISCONNECT) {
-    logInfo("[WEB] WS Client #%u disconnected", client->id());
-  }
+void WebServerManager::onWsClose(PsychicWebSocketClient *client) {
+  logInfo("[WEB] WS Client disconnected");
 }
 
 void WebServerManager::broadcastState() {
-  if (ws->count() == 0)
+  if (wsHandler.count() == 0)
     return;
 
   // PHASE 5.10: Make atomic snapshot of current_status under spinlock
@@ -1887,7 +1696,8 @@ void WebServerManager::broadcastState() {
 
   size_t len =
       serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
-  ws->textAll(json_response_buffer, len);
+  // PsychicHttp: Use sendAll() to broadcast to all WebSocket clients
+  wsHandler.sendAll(json_response_buffer);
 }
 
 void WebServerManager::setSystemStatus(const char *status) {
