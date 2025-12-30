@@ -1131,6 +1131,21 @@ void WebServerManager::setupRoutes() {
       }
     }
 
+    // FULL SCHEMA VALIDATION: Validate type, range, and constraints before saving
+    // Prevents invalid configuration from being persisted to NVS
+    char validation_error[128];
+    if (!apiConfigValidate((config_category_t)category, key, value,
+                           validation_error, sizeof(validation_error))) {
+      JsonDocument errorDoc;
+      errorDoc["error"] = "Validation failed";
+      errorDoc["details"] = validation_error;
+      errorDoc["key"] = key;
+      char error_response[256];
+      serializeJson(errorDoc, error_response, sizeof(error_response));
+      logWarning("[WEB] Config validation failed for %s: %s", key, validation_error);
+      return response->send(400, "application/json", error_response);
+    }
+
     if (!apiConfigSet((config_category_t)category, key, value)) {
       return response->send(400, "application/json",
                     "{\"error\":\"Failed to set configuration\"}");
@@ -1141,6 +1156,7 @@ void WebServerManager::setupRoutes() {
                     "{\"error\":\"Failed to save configuration\"}");
     }
 
+    logInfo("[WEB] Config saved: %s", key);
     return response->send(200, "application/json", "{\"success\":true}");
   });
 
