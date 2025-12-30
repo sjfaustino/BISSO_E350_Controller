@@ -1019,153 +1019,125 @@ void WebServerManager::setupRoutes() {
 
   // 14. PHASE 5.6: CONFIGURATION API (Protected, Rate Limited)
   // GET /api/config/get?category=<N> - Retrieve configuration by category
-  server->on(
-      "/api/config/get", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        if (!requireAuth(request)) return;
+  server.on("/api/config/get", HTTP_GET, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-        if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
-          request->send(429, "application/json",
-                        "{\"error\":\"Rate limit exceeded\"}");
-          return;
-        }
+    if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
+      return response.send(429, "application/json",
+                    "{\"error\":\"Rate limit exceeded\"}");
+    }
 
-        const AsyncWebParameter *categoryParam = request->getParam("category");
-        if (!categoryParam) {
-          request->send(400, "application/json",
-                        "{\"error\":\"Missing category parameter\"}");
-          return;
-        }
+    if (!request->hasParam("category")) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Missing category parameter\"}");
+    }
 
-        int category = atoi(categoryParam->value().c_str());
-        // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
-        // fragmentation
-        JsonDocument doc;
+    int category = atoi(request->getParam("category")->value().c_str());
+    // MEMORY FIX: Use StaticJsonDocument as allocator to prevent heap
+    // fragmentation
+    JsonDocument doc;
 
-        if (!apiConfigGet((config_category_t)category, doc)) {
-          request->send(400, "application/json",
-                        "{\"error\":\"Invalid category\"}");
-          return;
-        }
+    if (!apiConfigGet((config_category_t)category, doc)) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Invalid category\"}");
+    }
 
-        char response[512];
-        // PHASE 5.10: Check serializeJson return value for truncation
-        size_t written = serializeJson(doc, response, sizeof(response));
-        if (written >= sizeof(response)) {
-          request->send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
-          return;
-        }
-        request->send(200, "application/json", response);
-      });
+    char responseBuffer[512];
+    // PHASE 5.10: Check serializeJson return value for truncation
+    size_t written = serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    if (written >= sizeof(responseBuffer)) {
+      return response.send(500, "application/json", "{\"error\":\"Buffer overflow\"}");
+    }
+    return response.send(200, "application/json", responseBuffer);
+  });
 
   // POST /api/config/set - Set configuration value
-  server->on("/api/config/set", HTTP_POST, nullptr, nullptr,
-             [this](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-                    size_t index, size_t total) {
-               if (!requireAuth(request)) return;
+  // PsychicHttp: Body auto-loaded for requests < 16KB
+  server.on("/api/config/set", HTTP_POST, [this](PsychicRequest *request) -> esp_err_t {
+    PsychicResponse response(request);
+    if (requireAuth(request, &response) != ESP_OK) return ESP_OK;
 
-               // INPUT VALIDATION: Check body size to prevent overflow
-               if (!validateBodySize(len, total)) {
-                 request->send(413, "application/json",
-                               "{\"error\":\"Request body too large\"}");
-                 return;
-               }
+    if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
+      return response.send(429, "application/json",
+                    "{\"error\":\"Rate limit exceeded\"}");
+    }
 
-               // PHASE 5.10: Assemble chunked requests (supports multi-chunk POST)
-               uint8_t *complete_data = nullptr;
-               size_t complete_len = 0;
-               if (!assembleChunkedRequest(data, len, index, total,
-                                          &complete_data, &complete_len)) {
-                 return; // Still accumulating chunks or error
-               }
+    // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
+    // heap fragmentation
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, request->body());
 
-               if (!apiRateLimiterCheck(API_ENDPOINT_CONFIG, 0)) {
-                 request->send(429, "application/json",
-                               "{\"error\":\"Rate limit exceeded\"}");
-                 return;
-               }
+    if (error) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"JSON parse failed\"}");
+    }
 
-               // MEMORY FIX: Use StaticJsonDocument as allocator to prevent
-               // heap fragmentation
-               JsonDocument doc;
-               DeserializationError error = deserializeJson(doc, complete_data, complete_len);
+    int category = doc["category"] | -1;
+    const char *key = doc["key"];
+    JsonVariant value = doc["value"];
 
-               if (error) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"JSON parse failed\"}");
-                 return;
-               }
+    if (category < 0 || !key) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Missing required fields\"}");
+    }
 
-               int category = doc["category"] | -1;
-               const char *key = doc["key"];
-               JsonVariant value = doc["value"];
+    // INPUT VALIDATION: Check key length
+    if (strlen(key) > MAX_CONFIG_KEY_LENGTH) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Config key too long\"}");
+    }
 
-               if (category < 0 || !key) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Missing required fields\"}");
-                 return;
-               }
+    // SECURITY FIX: Whitelist validation for allowed configuration keys
+    // Defense-in-depth: Explicit whitelist check before processing
+    static const char* ALLOWED_CONFIG_KEYS[] = {
+      // Motion category
+      "soft_limit_x_low", "soft_limit_x_high",
+      "soft_limit_y_low", "soft_limit_y_high",
+      "soft_limit_z_low", "soft_limit_z_high",
+      // VFD category
+      "min_speed_hz", "max_speed_hz",
+      "acc_time_ms", "dec_time_ms",
+      // Encoder category
+      "ppm_x", "ppm_y", "ppm_z",
+      NULL  // Terminator
+    };
 
-               // INPUT VALIDATION: Check key length
-               if (strlen(key) > MAX_CONFIG_KEY_LENGTH) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Config key too long\"}");
-                 return;
-               }
+    bool key_allowed = false;
+    for (int i = 0; ALLOWED_CONFIG_KEYS[i] != NULL; i++) {
+      if (strcmp(key, ALLOWED_CONFIG_KEYS[i]) == 0) {
+        key_allowed = true;
+        break;
+      }
+    }
 
-               // SECURITY FIX: Whitelist validation for allowed configuration keys
-               // Defense-in-depth: Explicit whitelist check before processing
-               static const char* ALLOWED_CONFIG_KEYS[] = {
-                 // Motion category
-                 "soft_limit_x_low", "soft_limit_x_high",
-                 "soft_limit_y_low", "soft_limit_y_high",
-                 "soft_limit_z_low", "soft_limit_z_high",
-                 // VFD category
-                 "min_speed_hz", "max_speed_hz",
-                 "acc_time_ms", "dec_time_ms",
-                 // Encoder category
-                 "ppm_x", "ppm_y", "ppm_z",
-                 NULL  // Terminator
-               };
+    if (!key_allowed) {
+      logWarning("[WEB] [SECURITY] Rejected unauthorized config key: %s", key);
+      return response.send(403, "application/json",
+                    "{\"error\":\"Configuration key not allowed\"}");
+    }
 
-               bool key_allowed = false;
-               for (int i = 0; ALLOWED_CONFIG_KEYS[i] != NULL; i++) {
-                 if (strcmp(key, ALLOWED_CONFIG_KEYS[i]) == 0) {
-                   key_allowed = true;
-                   break;
-                 }
-               }
+    // INPUT VALIDATION: Check string value length if applicable
+    if (value.is<const char *>()) {
+      const char *strValue = value.as<const char *>();
+      if (strValue && strlen(strValue) > MAX_CONFIG_VALUE_LENGTH) {
+        return response.send(400, "application/json",
+                      "{\"error\":\"Config value too long\"}");
+      }
+    }
 
-               if (!key_allowed) {
-                 logWarning("[WEB] [SECURITY] Rejected unauthorized config key: %s", key);
-                 request->send(403, "application/json",
-                               "{\"error\":\"Configuration key not allowed\"}");
-                 return;
-               }
+    if (!apiConfigSet((config_category_t)category, key, value)) {
+      return response.send(400, "application/json",
+                    "{\"error\":\"Failed to set configuration\"}");
+    }
 
-               // INPUT VALIDATION: Check string value length if applicable
-               if (value.is<const char *>()) {
-                 const char *strValue = value.as<const char *>();
-                 if (strValue && strlen(strValue) > MAX_CONFIG_VALUE_LENGTH) {
-                   request->send(400, "application/json",
-                                 "{\"error\":\"Config value too long\"}");
-                   return;
-                 }
-               }
+    if (!apiConfigSave()) {
+      return response.send(500, "application/json",
+                    "{\"error\":\"Failed to save configuration\"}");
+    }
 
-               if (!apiConfigSet((config_category_t)category, key, value)) {
-                 request->send(400, "application/json",
-                               "{\"error\":\"Failed to set configuration\"}");
-                 return;
-               }
-
-               if (!apiConfigSave()) {
-                 request->send(500, "application/json",
-                               "{\"error\":\"Failed to save configuration\"}");
-                 return;
-               }
-
-               request->send(200, "application/json", "{\"success\":true}");
-             });
+    return response.send(200, "application/json", "{\"success\":true}");
+  });
 
   // POST /api/config/validate - Validate configuration change
   server->on("/api/config/validate", HTTP_POST, nullptr, nullptr,
