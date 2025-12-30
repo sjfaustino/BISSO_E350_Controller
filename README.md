@@ -7,7 +7,7 @@
 
 ## Overview
 
-The BISSO E350 Motion Controller Firmware is a custom embedded solution designed to upgrade and replace obsolete control systems in industrial bridge saw equipment. It leverages ESP32-S3 microcontrollers to manage motion control, safety, and human-machine interfaces.
+The BISSO E350 Motion Controller Firmware is a custom embedded solution designed to upgrade and replace obsolete control systems in industrial bridge saw equipment. It leverages ESP32 microcontrollers to manage motion control, safety, and human-machine interfaces.
 
 ### Key Features
 
@@ -63,10 +63,10 @@ pio device monitor -b 115200
 
 | Component | Model | Purpose |
 |:----------|:------|:--------|
-| **Controller** | KC868-A16 | ESP32-S3 industrial controller |
+| **Controller** | KC868-A16 | ESP32 industrial controller |
 | **VFD** | Schneider Altivar 31 | Motor frequency control |
 | **Encoders** | WJ66 DRO Reader | 4-axis position feedback |
-| **I/O Expanders** | PCF8574 (x2) | PLC signal control |
+| **I/O Expanders** | PCF8574 (x4) | 2 input + 2 output expanders |
 
 ---
 

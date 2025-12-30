@@ -30,21 +30,21 @@
 
 ### 1.1 Purpose
 
-The BISSO E350 Motion Controller Firmware is a custom embedded solution designed to upgrade and replace obsolete control systems in industrial bridge saw equipment. It leverages modern ESP32-S3 microcontrollers to manage motion control, safety, and human-machine interfaces.
+The BISSO E350 Motion Controller Firmware is a custom embedded solution designed to upgrade and replace obsolete control systems in industrial bridge saw equipment. It leverages modern ESP32 microcontrollers to manage motion control, safety, and human-machine interfaces.
 
 **Project Codename:** Gemini
 
 ### 1.2 Core Function
 
-The primary purpose is to manage a **single VFD (Variable Frequency Drive) motor** responsible for all primary motion axes (X, Y, Z, and rotational A). The system achieves closed-loop control by integrating high-speed communication with the machine's external I/O.
+The primary purpose is to manage a **single VFD (Variable Frequency Drive) motor** responsible for the primary motion axes (X, Y, Z). The A axis has an optical encoder for position monitoring but is **not motorized**. The system achieves closed-loop control by integrating high-speed communication with the machine's external I/O.
 
 ### 1.3 Motion Control Strategy: PLC I/O Emulation
 
 This system operates as a **"smart I/O bridge"**, translating high-level digital commands into low-level binary signals that the machine's legacy PLC expects:
 
 1. **High-Level Command:** System receives commands via CLI or Web interface
-2. **Actuation (Output):** ESP32-S3 communicates with PCF8574 I²C I/O expanders (addresses `0x20`, `0x21`) to output binary signals
-3. **Feedback (Input):** Position tracked via Wayjun WJ66 DRO reader over dedicated serial port
+2. **Actuation (Output):** ESP32 communicates with 2 PCF8574 I²C output expanders to control PLC signals (axis select, direction, speed profile)
+3. **Feedback (Input):** Position tracked via Wayjun WJ66 DRO reader; additional inputs via 2 PCF8574 I²C input expanders
 
 ### 1.4 Repository Structure
 
@@ -69,9 +69,6 @@ BISSO_E350_Controller/
 │   ├── bundle.css.gz     # Compressed CSS
 │   └── pages/            # Additional pages
 ├── data_src/             # Uncompressed web assets (development)
-├── docs/                 # Design documentation
-│   ├── GEMINI_FINAL_AUDIT.md
-│   └── ...
 ├── test/                 # Unit tests
 ├── platformio.ini        # Build configuration
 └── optimize_assets.py    # Asset build script
@@ -86,8 +83,8 @@ BISSO_E350_Controller/
 | Specification | Detail |
 |:---|:---|
 | **Model** | KC868-A16 Industrial Controller |
-| **Microcontroller** | ESP32-S3 (Dual-core, 240 MHz) |
-| **I/O Count** | 16 Opto-isolated Inputs (X1-X16), 16 Relay Outputs (Y1-Y16) |
+| **Microcontroller** | ESP32 (Dual-core, 240 MHz) |
+| **I/O Count** | 16 Opto-isolated Inputs (X1-X16), 16 Digital Outputs (Y1-Y16) |
 | **Flash** | 16 MB (3.1 MB for firmware, remainder for filesystem) |
 | **RAM** | 320 KB SRAM |
 
@@ -95,7 +92,7 @@ BISSO_E350_Controller/
 
 | Interface | Component/Protocol | Purpose | Firmware Modules |
 |:---|:---|:---|:---|
-| **I²C Bus** | PCF8574 I/O Expanders (0x20, 0x21) | Axis Select, Direction, Speed Profiles | `plc_iface.cpp`, `i2c_bus_recovery.cpp` |
+| **I²C Bus** | PCF8574 I/O Expanders (x4) | 2 input + 2 output expanders for PLC signals | `plc_iface.cpp`, `i2c_bus_recovery.cpp` |
 | **Serial (UART)** | Wayjun WJ66 DRO Reader | 4-axis position data from optical encoders | `encoder_wj66.cpp`, `tasks_encoder.cpp` |
 | **RS-485/Modbus** | Altivar 31 VFD, JXK10 Current Sensor, YH-TC05 | VFD telemetry, spindle monitoring | `altivar31_modbus.cpp`, `jxk10_modbus.cpp` |
 | **WiFi** | ESP32 onboard | Web interface, OTA updates | `network_manager.cpp`, `web_server.cpp` |
@@ -580,11 +577,7 @@ Hardware mocks in `lib/TestMocks/`:
 - `MockI2C` - Simulates I2C bus
 - `MockVFD` - Simulates Altivar 31
 
-### 10.4 Mock Data Mode (Web UI)
 
-Press **M** key in dashboard to toggle mock mode for UI testing without hardware.
-
----
 
 ## 11. Configuration System
 
