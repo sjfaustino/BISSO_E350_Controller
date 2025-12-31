@@ -216,6 +216,52 @@
                 <div class="device-note">Operator panel buttons via KC868-A16 inputs</div>
             </div>
         </div>
+
+        <!-- Tower Light Card -->
+        <div class="card device-card">
+            <div class="card-header device-header tower-light">
+                <h3>🚦 Tower Light</h3>
+                <span class="device-protocol">Outputs</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>🟢 Green (Idle):</label>
+                    <select class="pin-select" id="output_tower_green" data-signal="output_tower_green"></select>
+                </div>
+                <div class="pin-row">
+                    <label>🟡 Yellow (Run):</label>
+                    <select class="pin-select" id="output_tower_yellow" data-signal="output_tower_yellow"></select>
+                </div>
+                <div class="pin-row">
+                    <label>🔴 Red (Fault):</label>
+                    <select class="pin-select" id="output_tower_red" data-signal="output_tower_red"></select>
+                </div>
+                <div class="pin-row" style="margin-top: 10px;">
+                    <label>Enabled:</label>
+                    <input type="checkbox" id="tower_enabled" data-config="tower_en">
+                </div>
+                <div class="device-note">Visual status indicator via KC868-A16 outputs</div>
+            </div>
+        </div>
+
+        <!-- Buzzer Card -->
+        <div class="card device-card">
+            <div class="card-header device-header buzzer">
+                <h3>🔔 Audible Alarm</h3>
+                <span class="device-protocol">Output</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>Buzzer Output:</label>
+                    <select class="pin-select" id="output_buzzer" data-signal="output_buzzer"></select>
+                </div>
+                <div class="pin-row" style="margin-top: 10px;">
+                    <label>Enabled:</label>
+                    <input type="checkbox" id="buzzer_enabled" data-config="buzzer_en" checked>
+                </div>
+                <div class="device-note">Audible alerts for job complete, warnings, faults</div>
+            </div>
+        </div>
     </div>
 
     <!-- Pin Summary Table -->
@@ -397,6 +443,14 @@
 
     .hardware-page .device-header.switches {
         background: linear-gradient(135deg, #ec4899, #db2777);
+    }
+
+    .hardware-page .device-header.tower-light {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+    }
+
+    .hardware-page .device-header.buzzer {
+        background: linear-gradient(135deg, #f97316, #ea580c);
     }
 
     /* Pin Rows */

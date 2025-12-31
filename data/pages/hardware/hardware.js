@@ -1,8 +1,11 @@
 /**
  * Hardware Configuration Page Module
+ * Complete implementation with pin dropdown population and save functionality
  */
 window.HardwareModule = window.HardwareModule || {
     ioInterval: null,
+    pinData: null,
+    signalData: null,
 
     init() {
         console.log('[Hardware] Initializing');
@@ -25,56 +28,229 @@ window.HardwareModule = window.HardwareModule || {
             .then(response => response.json())
             .then(data => {
                 console.log('[Hardware] Pin configuration loaded:', data);
+                this.pinData = data.pins || [];
+                this.signalData = data.signals || [];
                 this.renderPinConfiguration(data);
+                this.loadConfigValues();
             })
             .catch(error => {
                 console.error('[Hardware] Failed to load pin configuration:', error);
-                if (window.AlertManager) {
-                    window.AlertManager.add('Failed to load hardware configuration', 'error');
-                }
+                this.showStatus('Failed to load hardware configuration', 'error');
             });
     },
 
     renderPinConfiguration(config) {
-        // This function would populate the UI with pin assignments
-        // The HTML should already contain the structure
         console.log('[Hardware] Rendering pin configuration');
+
+        // Get all pin select dropdowns
+        const selects = document.querySelectorAll('.pin-select');
+
+        selects.forEach(select => {
+            const signalKey = select.dataset.signal;
+
+            // Clear existing options
+            select.innerHTML = '<option value="">-- Select Pin --</option>';
+
+            // Add output pin options (1-16) for output signals
+            if (signalKey && signalKey.startsWith('output_')) {
+                for (let i = 1; i <= 16; i++) {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = `OUT ${i}`;
+                    select.appendChild(opt);
+                }
+            }
+            // Add input pin options (1-16) for input signals
+            else if (signalKey && signalKey.startsWith('input_')) {
+                for (let i = 1; i <= 16; i++) {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = `IN ${i}`;
+                    select.appendChild(opt);
+                }
+            }
+            // Use GPIO pins from API data
+            else if (this.pinData.length > 0) {
+                this.pinData.forEach(pin => {
+                    const opt = document.createElement('option');
+                    opt.value = pin.gpio;
+                    opt.textContent = `GPIO ${pin.gpio} (${pin.silk || pin.note || ''})`;
+                    select.appendChild(opt);
+                });
+            }
+
+            // Set current value from signal data
+            if (this.signalData) {
+                const signal = this.signalData.find(s => s.key === signalKey);
+                if (signal && signal.current_pin) {
+                    select.value = signal.current_pin;
+                }
+            }
+        });
+
+        // Render pin summary table
+        this.renderPinSummary();
+    },
+
+    renderPinSummary() {
+        const container = document.getElementById('pin-summary-table');
+        if (!container) return;
+
+        let html = `
+            <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--bg-secondary);">
+                        <th style="padding: 8px; text-align: left;">Signal</th>
+                        <th style="padding: 8px; text-align: left;">Pin</th>
+                        <th style="padding: 8px; text-align: left;">Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        if (this.signalData) {
+            this.signalData.forEach(sig => {
+                html += `
+                    <tr style="border-bottom: 1px solid var(--border-subtle);">
+                        <td style="padding: 6px 8px;">${sig.name || sig.key}</td>
+                        <td style="padding: 6px 8px;">${sig.current_pin || sig.default_pin || '--'}</td>
+                        <td style="padding: 6px 8px;">${sig.type || '--'}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    },
+
+    loadConfigValues() {
+        // Load checkbox states for enable/disable options
+        fetch('/api/config')
+            .then(r => r.json())
+            .then(config => {
+                // Tower light enabled
+                const towerEn = document.getElementById('tower_enabled');
+                if (towerEn) {
+                    towerEn.checked = config.tower_en === 1 || config.tower_en === "1";
+                }
+
+                // Buzzer enabled
+                const buzzerEn = document.getElementById('buzzer_enabled');
+                if (buzzerEn) {
+                    buzzerEn.checked = config.buzzer_en !== 0 && config.buzzer_en !== "0";
+                }
+            })
+            .catch(err => console.warn('[Hardware] Config load error:', err));
     },
 
     setupEventListeners() {
         // Setup save button handler
-        const saveBtn = document.getElementById('save-config-btn');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.saveConfiguration());
-        }
+        document.getElementById('save-config-btn')?.addEventListener('click', () => {
+            this.saveConfiguration();
+        });
+
+        // Setup reload button handler
+        document.getElementById('reload-config-btn')?.addEventListener('click', () => {
+            this.loadPinConfiguration();
+            this.showStatus('Configuration reloaded', 'info');
+        });
 
         // Setup reset button handler
-        const resetBtn = document.getElementById('reset-config-btn');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => this.resetConfiguration());
-        }
+        document.getElementById('reset-defaults-btn')?.addEventListener('click', () => {
+            this.resetConfiguration();
+        });
     },
 
     saveConfiguration() {
         console.log('[Hardware] Saving configuration...');
-        // Implement save logic
-        if (window.AlertManager) {
-            window.AlertManager.add('Hardware configuration saved. System will reboot.', 'success');
-        }
+        this.showStatus('Saving...', 'info');
+
+        // Collect all pin assignments
+        const assignments = {};
+        document.querySelectorAll('.pin-select').forEach(select => {
+            if (select.dataset.signal && select.value) {
+                assignments[select.dataset.signal] = parseInt(select.value);
+            }
+        });
+
+        // Collect config checkboxes
+        const configUpdates = {};
+        document.querySelectorAll('input[data-config]').forEach(input => {
+            configUpdates[input.dataset.config] = input.checked ? 1 : 0;
+        });
+
+        // Save pin assignments
+        fetch('/api/hardware/pins', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(assignments)
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success || data.ok) {
+                    // Also save config values
+                    return this.saveConfigValues(configUpdates);
+                } else {
+                    throw new Error(data.error || 'Save failed');
+                }
+            })
+            .then(() => {
+                this.showStatus('Configuration saved! Reboot required for some changes.', 'success');
+            })
+            .catch(err => {
+                console.error('[Hardware] Save error:', err);
+                this.showStatus('Save failed: ' + err.message, 'error');
+            });
+    },
+
+    saveConfigValues(updates) {
+        // Save each config value
+        const promises = Object.entries(updates).map(([key, value]) => {
+            return fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value: String(value) })
+            });
+        });
+        return Promise.all(promises);
     },
 
     resetConfiguration() {
         console.log('[Hardware] Resetting configuration...');
-        if (confirm('Reset all hardware pins to defaults? This will reboot the system.')) {
-            fetch('/api/hardware/pins/reset', { method: 'POST' })
-                .then(() => {
-                    if (window.AlertManager) {
-                        window.AlertManager.add('Configuration reset. Rebooting...', 'info');
-                    }
-                })
-                .catch(error => {
-                    console.error('[Hardware] Reset failed:', error);
-                });
+        if (!confirm('Reset all hardware pins to defaults? This will reboot the system.')) {
+            return;
+        }
+
+        this.showStatus('Resetting...', 'info');
+
+        fetch('/api/hardware/pins/reset', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    this.showStatus('Configuration reset. Rebooting...', 'success');
+                    setTimeout(() => location.reload(), 3000);
+                } else {
+                    throw new Error(data.error || 'Reset failed');
+                }
+            })
+            .catch(error => {
+                console.error('[Hardware] Reset failed:', error);
+                this.showStatus('Reset failed: ' + error.message, 'error');
+            });
+    },
+
+    showStatus(message, type) {
+        const el = document.getElementById('status-message');
+        if (el) {
+            el.textContent = message;
+            el.className = 'status-message ' + type;
+            el.style.display = 'block';
+
+            // Auto-hide after 5 seconds for non-error messages
+            if (type !== 'error') {
+                setTimeout(() => { el.style.display = 'none'; }, 5000);
+            }
         }
     },
 
