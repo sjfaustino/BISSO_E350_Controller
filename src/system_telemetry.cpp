@@ -358,7 +358,7 @@ size_t telemetryExportBinary(telemetry_packet_t* packet) {
 }
 
 // Delta telemetry support - tracks previous values
-static system_telemetry_t delta_baseline = {0};
+static system_telemetry_t delta_baseline = {};  // C++ value-initialization
 static bool delta_initialized = false;
 
 size_t telemetryExportDeltaJSON(char* buffer, size_t buffer_size, bool full_update) {

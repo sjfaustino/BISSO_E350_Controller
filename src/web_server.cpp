@@ -31,6 +31,7 @@
 #include "spindle_current_monitor.h" // PHASE 5.1: Spindle telemetry
 #include "string_safety.h"           // Safe string operations
 #include "system_telemetry.h" // PHASE 5.1: Comprehensive system telemetry
+#include "task_manager.h"      // For taskGetUptime()
 #include "task_performance_monitor.h" // PHASE 5.1: Task performance metrics
 #include "vfd_current_calibration.h"  // PHASE 5.5: Current calibration
 #include <ArduinoJson.h>
