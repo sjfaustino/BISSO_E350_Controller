@@ -66,6 +66,10 @@
 #define KEY_TOWER_YELLOW "tower_yel"    // Yellow output pin (1-16, default 14)
 #define KEY_TOWER_RED "tower_red"       // Red output pin (1-16, default 15)
 
+// --- SPINDLE AUTO-PAUSE ---
+#define KEY_SPINDL_PAUSE_EN "sp_pause"  // Auto-pause on overload (1=on, 0=off, default 1)
+#define KEY_SPINDL_PAUSE_THR "sp_pthr"  // Pause threshold amps (default 25, less than shutdown)
+
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"
 #define KEY_X_LIMIT_MAX "x_limit_max"

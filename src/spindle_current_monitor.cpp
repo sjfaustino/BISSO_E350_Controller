@@ -9,6 +9,8 @@
 #include "jxk10_modbus.h"
 #include "motion.h"
 #include "serial_logger.h"
+#include "config_unified.h"
+#include "config_keys.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -26,6 +28,10 @@ static spindle_monitor_state_t monitor_state = {
     .tool_breakage_drop_amps = 5.0f,
     .stall_threshold_amps = 25.0f,
     .stall_timeout_ms = 2000,
+    .auto_pause_enabled = true,
+    .auto_pause_threshold_amps = 25.0f,
+    .auto_paused = false,
+    .auto_pause_count = 0,
     .alarm_tool_breakage = false,
     .alarm_stall = false,
     .alarm_overload = false,
@@ -57,11 +63,20 @@ bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
   monitor_state.overcurrent_threshold_amps = threshold_amps;
   monitor_state.poll_interval_ms = 1000;
   monitor_state.last_poll_time_ms = millis();
+  
+  // Load auto-pause config
+  monitor_state.auto_pause_enabled = (configGetInt(KEY_SPINDL_PAUSE_EN, 1) != 0);
+  monitor_state.auto_pause_threshold_amps = (float)configGetInt(KEY_SPINDL_PAUSE_THR, 25);
+  monitor_state.auto_paused = false;
 
   logInfo("[SPINDLE] Initialized (JXK-10 ID: %u, Threshold: %.1f A)",
                 jxk10_address, threshold_amps);
+  if (monitor_state.auto_pause_enabled) {
+    logInfo("[SPINDLE] Auto-pause enabled at %.1f A", monitor_state.auto_pause_threshold_amps);
+  }
   return true;
 }
+
 
 void spindleMonitorSetEnabled(bool enable) {
   monitor_state.enabled = enable;
@@ -116,7 +131,33 @@ bool spindleMonitorUpdate(void) {
       monitor_state.current_peak_amps = current;
   }
 
-  // Check for overcurrent condition
+  // Auto-pause feature: Pause motion before hitting critical threshold
+  // This protects blades by pausing instead of triggering E-Stop
+  if (monitor_state.auto_pause_enabled && !monitor_state.auto_paused) {
+    if (current > monitor_state.auto_pause_threshold_amps && 
+        current < monitor_state.overcurrent_threshold_amps) {
+      // Overload but not critical - pause and alert
+      motionPause();
+      monitor_state.auto_paused = true;
+      monitor_state.auto_pause_count++;
+      
+      logWarning("[SPINDLE] AUTO-PAUSE: Current %.1f A exceeds %.1f A threshold",
+                 current, monitor_state.auto_pause_threshold_amps);
+      logInfo("[SPINDLE] Motion paused. Reduce load and use 'resume' to continue.");
+      
+      // Alert operator
+      extern void alertWarning(void);
+      alertWarning();
+    }
+  }
+  
+  // Auto-recovery: If we auto-paused and current dropped, log it
+  if (monitor_state.auto_paused && current < (monitor_state.auto_pause_threshold_amps * 0.8f)) {
+    logInfo("[SPINDLE] Current normalized (%.1f A). Use 'resume' to continue.", current);
+    // Don't auto-resume - let operator decide
+  }
+
+  // Check for critical overcurrent condition (E-Stop threshold)
   if (current > monitor_state.overcurrent_threshold_amps) {
       monitor_state.overload_count++;
       spindleMonitorTriggerShutdown();

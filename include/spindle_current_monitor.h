@@ -34,6 +34,12 @@ typedef struct {
     float stall_threshold_amps;         // Current threshold for stall (default 25A)
     uint32_t stall_timeout_ms;          // Duration before stall triggers (default 2000ms)
     
+    // Auto-pause on overload (softer than E-Stop)
+    bool auto_pause_enabled;            // Enable auto-pause feature
+    float auto_pause_threshold_amps;    // Pause threshold (lower than shutdown)
+    bool auto_paused;                   // Currently paused due to overload
+    uint32_t auto_pause_count;          // Number of auto-pause events
+    
     // Alarm states
     bool alarm_tool_breakage;           // Tool breakage detected (sudden drop)
     bool alarm_stall;                   // Stall detected (prolonged overload)
