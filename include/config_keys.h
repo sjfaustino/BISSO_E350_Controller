@@ -52,6 +52,20 @@
 #define KEY_ETH_MASK "eth_mask"         // Subnet mask (e.g. "255.255.255.0")
 #define KEY_ETH_DNS "eth_dns"           // DNS server (e.g. "8.8.8.8")
 
+// --- POWER LOSS RECOVERY ---
+#define KEY_RECOV_EN "recov_en"         // Enable job recovery (1=on, 0=off, default 1)
+#define KEY_RECOV_INTERVAL "recov_intv" // Save every N lines (default 50)
+
+// --- AUDIBLE ALARM (Buzzer) ---
+#define KEY_BUZZER_EN "buzzer_en"       // Enable buzzer (1=on, 0=off, default 1)
+#define KEY_BUZZER_PIN "buzzer_pin"     // Output pin number (1-16, default 16)
+
+// --- TOWER LIGHT ---
+#define KEY_TOWER_EN "tower_en"         // Enable tower light (1=on, 0=off, default 0)
+#define KEY_TOWER_GREEN "tower_grn"     // Green output pin (1-16, default 13)
+#define KEY_TOWER_YELLOW "tower_yel"    // Yellow output pin (1-16, default 14)
+#define KEY_TOWER_RED "tower_red"       // Red output pin (1-16, default 15)
+
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"
 #define KEY_X_LIMIT_MAX "x_limit_max"

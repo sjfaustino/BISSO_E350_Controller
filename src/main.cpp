@@ -25,6 +25,8 @@
 #include "load_manager.h"  // PHASE 5.3: Graceful degradation under load
 #include "dashboard_metrics.h"  // PHASE 5.3: Web UI dashboard metrics
 #include "axis_synchronization.h"  // PHASE 5.6: Axis synchronization validation
+#include "job_recovery.h"  // Power loss recovery
+#include "operator_alerts.h"  // Buzzer and tower light
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -94,6 +96,10 @@ bool init_dashboard_wrapper() { dashboardMetricsInit(); return true; }
 // PHASE 5.6: Initialize axis synchronization validation
 bool init_axis_sync_wrapper() { axisSynchronizationInit(); return true; }
 
+// Operator features: Power loss recovery, buzzer, tower light
+bool init_recovery_wrapper() { recoveryInit(); return true; }
+bool init_alerts_wrapper() { buzzerInit(); towerLightInit(); return true; }
+
 #define BOOT_INIT(name, func, code) \
   do { if (func()) { logInfo("[BOOT] Init %s [OK]", name); bootMarkInitialized(name); } \
        else { logError("[BOOT] Init %s [FAIL]", name); bootMarkFailed(name, "Init failed", code); } } while (0)
@@ -132,6 +138,8 @@ void setup() {
   BOOT_INIT("Load Manager", init_load_mgr_wrapper, (boot_status_code_t)16);
   BOOT_INIT("Dashboard", init_dashboard_wrapper, (boot_status_code_t)17);
   BOOT_INIT("Axis Sync", init_axis_sync_wrapper, (boot_status_code_t)18);
+  BOOT_INIT("Recovery", init_recovery_wrapper, (boot_status_code_t)21);
+  BOOT_INIT("Alerts", init_alerts_wrapper, (boot_status_code_t)22);
 
   logInfo("[BOOT] Validating system health...");
   if (!bootValidateAllSystems()) {
