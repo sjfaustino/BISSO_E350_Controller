@@ -44,6 +44,9 @@
 #define KEY_WIFI_AP_SSID "wifi_ap_ssid" // AP broadcast SSID
 #define KEY_WIFI_AP_PASS "wifi_ap_pass" // AP password (min 8 chars)
 
+// --- ETHERNET CONFIGURATION (KC868-A16 LAN8720) ---
+#define KEY_ETH_ENABLED "eth_en"        // Ethernet enable (1=on, 0=off, default 1)
+
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"
 #define KEY_X_LIMIT_MAX "x_limit_max"

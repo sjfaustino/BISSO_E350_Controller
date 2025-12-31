@@ -1,6 +1,6 @@
 #include "network_manager.h"
 #include "cli.h"
-#include "config_keys.h"    // For KEY_OTA_PASSWORD
+#include "config_keys.h"    // For KEY_OTA_PASSWORD, KEY_ETH_ENABLED
 #include "config_unified.h" // For OTA password from NVS
 #include "serial_logger.h"
 #include "web_server.h"
@@ -11,7 +11,14 @@
 #include <ArduinoOTA.h>
 #include <DNSServer.h>  // For captive portal (used directly, not via ESPAsyncWiFiManager)
 #include <time.h>            // For NTP time sync
+#include <ETH.h>             // KC868-A16 Ethernet (LAN8720)
 
+// KC868-A16 LAN8720 Ethernet PHY Configuration
+#define ETH_PHY_TYPE    ETH_PHY_LAN8720
+#define ETH_PHY_ADDR    0
+#define ETH_PHY_MDC     23
+#define ETH_PHY_MDIO    18
+#define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT
 
 NetworkManager networkManager;
 
@@ -106,6 +113,8 @@ NetworkManager::NetworkManager() {
   telnetServer = nullptr;
   dnsServer = nullptr;
   clientConnected = false;
+  ethernetConnected = false;
+  ethernetLinkSpeed = 0;
 }
 
 NetworkManager::~NetworkManager() {
@@ -130,8 +139,71 @@ static void resetTelnetAuthState() {
   memset(telnet_username_attempt, 0, sizeof(telnet_username_attempt));
 }
 
+// Ethernet event handler - called by WiFi event system
+static void onEthernetEvent(WiFiEvent_t event) {
+  switch (event) {
+    case ARDUINO_EVENT_ETH_START:
+      logInfo("[ETH] Ethernet started");
+      ETH.setHostname("bisso-e350");
+      break;
+    case ARDUINO_EVENT_ETH_CONNECTED:
+      logInfo("[ETH] Ethernet link up");
+      break;
+    case ARDUINO_EVENT_ETH_GOT_IP:
+      logInfo("[ETH] [OK] IP: %s, Speed: %dMbps, %s", 
+              ETH.localIP().toString().c_str(),
+              ETH.linkSpeed(),
+              ETH.fullDuplex() ? "Full Duplex" : "Half Duplex");
+      networkManager.ethernetConnected = true;
+      networkManager.ethernetLinkSpeed = ETH.linkSpeed();
+      break;
+    case ARDUINO_EVENT_ETH_DISCONNECTED:
+      logWarning("[ETH] Ethernet disconnected");
+      networkManager.ethernetConnected = false;
+      networkManager.ethernetLinkSpeed = 0;
+      break;
+    case ARDUINO_EVENT_ETH_STOP:
+      logInfo("[ETH] Ethernet stopped");
+      networkManager.ethernetConnected = false;
+      break;
+    default:
+      break;
+  }
+}
+
+String NetworkManager::getEthernetIP() const {
+  if (ethernetConnected) {
+    return ETH.localIP().toString();
+  }
+  return String("");
+}
+
+void NetworkManager::initEthernet() {
+  int eth_enabled = configGetInt(KEY_ETH_ENABLED, 1);  // Default: enabled
+  
+  if (!eth_enabled) {
+    logInfo("[ETH] Ethernet disabled in config");
+    return;
+  }
+  
+  logInfo("[ETH] Initializing LAN8720 Ethernet PHY...");
+  
+  // Register event handler before starting ETH
+  WiFi.onEvent(onEthernetEvent);
+  
+  // Start Ethernet with KC868-A16 pin configuration
+  if (ETH.begin(ETH_PHY_ADDR, -1, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE)) {
+    logInfo("[ETH] [OK] Ethernet initialization queued");
+  } else {
+    logError("[ETH] Failed to initialize Ethernet");
+  }
+}
+
 void NetworkManager::init() {
   logPrintln("[NET] Initializing Network Stack...");
+
+  // 0. Ethernet Initialization (KC868-A16 LAN8720) - runs in parallel with WiFi
+  initEthernet();
 
   // 1. WiFi Initialization (Non-blocking to allow boot to continue)
   int ap_enabled = configGetInt(KEY_WIFI_AP_EN, 1); // Phase 5.8: Configurable AP

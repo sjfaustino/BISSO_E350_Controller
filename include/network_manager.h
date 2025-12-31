@@ -1,6 +1,6 @@
 /**
  * @file network_manager.h
- * @brief Handles WiFi Provisioning, OTA, and Telnet
+ * @brief Handles WiFi Provisioning, Ethernet, OTA, and Telnet
  * @project Gemini v1.2.0
  */
 
@@ -27,6 +27,15 @@ public:
     void telnetPrint(const char* str);
     void telnetPrintln(const char* str);
 
+    // Ethernet status (KC868-A16 LAN8720)
+    bool isEthernetConnected() const { return ethernetConnected; }
+    String getEthernetIP() const;
+    uint8_t getEthernetLinkSpeed() const { return ethernetLinkSpeed; }
+    
+    // Public for event handler access
+    bool ethernetConnected;
+    uint8_t ethernetLinkSpeed;  // 10 or 100 Mbps
+
 private:
     WiFiServer* telnetServer;
     WiFiClient telnetClient;
@@ -35,6 +44,7 @@ private:
 
     void handleOTA();
     void handleTelnet();
+    void initEthernet();
 };
 
 extern NetworkManager networkManager;
