@@ -792,6 +792,100 @@ void WebServerManager::setupRoutes() {
     return response->send(200, "application/json", responseBuffer);
   });
 
+  // 4.16 Hardware I/O Diagnostics API (Protected)
+  // Shows I/O expander register values for debugging
+  server.on("/api/hardware/io", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    
+    JsonDocument doc;
+    doc["success"] = true;
+    
+    // Read current input states (16 inputs from 2x PCF8574)
+    JsonArray inputs = doc["inputs"].to<JsonArray>();
+    for (int i = 0; i < 16; i++) {
+      JsonObject inp = inputs.add<JsonObject>();
+      inp["pin"] = i + 1;
+      // In production, read from actual I/O expander via I2C
+      inp["state"] = false; // Placeholder - replace with actual read
+      inp["label"] = i < 8 ? "Input Bank A" : "Input Bank B";
+    }
+    
+    // Read current output states (16 outputs from 2x PCF8574)
+    JsonArray outputs = doc["outputs"].to<JsonArray>();
+    for (int i = 0; i < 16; i++) {
+      JsonObject outp = outputs.add<JsonObject>();
+      outp["pin"] = i + 1;
+      // In production, read from actual I/O expander via I2C
+      outp["state"] = false; // Placeholder - replace with actual read
+      outp["label"] = i < 8 ? "Output Bank A" : "Output Bank B";
+    }
+    
+    // E-Stop state (actual value from safety system)
+    doc["estop"] = emergencyStopIsActive();
+    doc["timestamp_ms"] = millis();
+    
+    char responseBuffer[1024];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response->send(200, "application/json", responseBuffer);
+  });
+
+  // 4.17 Telemetry History API (for trend charts)
+  // Returns last 60 samples of telemetry data
+  server.on("/api/history/telemetry", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    
+    // Use static circular buffer for history (60 samples = 1 minute at 1 sample/sec)
+    static const int HISTORY_SIZE = 60;
+    static struct {
+      uint32_t timestamp;
+      uint8_t cpu;
+      uint32_t heap;
+      float spindle_amps;
+    } history[HISTORY_SIZE];
+    static int historyIndex = 0;
+    static uint32_t lastSampleTime = 0;
+    static bool initialized = false;
+    
+    // Sample once per second
+    uint32_t now = millis();
+    if (!initialized || (now - lastSampleTime >= 1000)) {
+      system_telemetry_t t = telemetryGetSnapshot();
+      history[historyIndex].timestamp = now;
+      history[historyIndex].cpu = t.cpu_usage_percent;
+      history[historyIndex].heap = t.free_heap_bytes;
+      history[historyIndex].spindle_amps = t.spindle_current_amps;
+      historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+      lastSampleTime = now;
+      initialized = true;
+    }
+    
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["sample_interval_ms"] = 1000;
+    doc["max_samples"] = HISTORY_SIZE;
+    
+    // Output arrays for each metric
+    JsonArray cpuArr = doc["cpu"].to<JsonArray>();
+    JsonArray heapArr = doc["heap"].to<JsonArray>();
+    JsonArray spindleArr = doc["spindle_amps"].to<JsonArray>();
+    JsonArray timeArr = doc["timestamps"].to<JsonArray>();
+    
+    // Read from circular buffer in order (oldest to newest)
+    for (int i = 0; i < HISTORY_SIZE; i++) {
+      int idx = (historyIndex + i) % HISTORY_SIZE;
+      if (history[idx].timestamp > 0) {
+        cpuArr.add(history[idx].cpu);
+        heapArr.add(history[idx].heap);
+        spindleArr.add(history[idx].spindle_amps);
+        timeArr.add(history[idx].timestamp);
+      }
+    }
+    
+    char responseBuffer[2048];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response->send(200, "application/json", responseBuffer);
+  });
+
   // 5. API Task Performance Metrics (Protected, Rate Limited) - PHASE 5.1
   server.on("/api/metrics", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
     if (requireAuth(request, response) != ESP_OK) return ESP_OK;

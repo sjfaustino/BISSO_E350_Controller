@@ -4,6 +4,7 @@
  */
 window.DiagnosticsModule = window.DiagnosticsModule || {
     updateInterval: null,
+    trendInterval: null,
 
     init() {
         console.log('[Diagnostics] Initializing');
@@ -13,6 +14,10 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 
         // Start periodic updates for I/O and faults
         this.updateInterval = setInterval(() => this.loadIOStatus(), 2000);
+
+        // Start trend chart updates
+        this.loadTrendData();
+        this.trendInterval = setInterval(() => this.loadTrendData(), 5000);
     },
 
     setupEventListeners() {
@@ -256,11 +261,109 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         this.updateFaultDisplay([]);
     },
 
+    // Trend chart functions
+    loadTrendData() {
+        if (window.location.protocol === 'file:') return;
+
+        fetch('/api/history/telemetry')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    this.renderTrendCharts(data);
+                }
+            })
+            .catch(err => {
+                console.warn('[Diagnostics] Failed to load trend data:', err);
+            });
+    },
+
+    renderTrendCharts(data) {
+        // CPU Chart
+        if (data.cpu && data.cpu.length > 0) {
+            this.drawLineChart('chart-cpu', data.cpu, 0, 100, '#3b82f6');
+            const current = data.cpu[data.cpu.length - 1];
+            const avg = data.cpu.reduce((a, b) => a + b, 0) / data.cpu.length;
+            const max = Math.max(...data.cpu);
+            document.getElementById('cpu-current').textContent = current;
+            document.getElementById('cpu-avg').textContent = avg.toFixed(0);
+            document.getElementById('cpu-max').textContent = max;
+        }
+
+        // Memory Chart (convert bytes to KB)
+        if (data.heap && data.heap.length > 0) {
+            const heapKB = data.heap.map(v => v / 1024);
+            const minHeap = Math.min(...heapKB);
+            const maxHeap = Math.max(...heapKB);
+            this.drawLineChart('chart-memory', heapKB, minHeap * 0.9, maxHeap * 1.1, '#10b981');
+            const current = heapKB[heapKB.length - 1];
+            document.getElementById('mem-current').textContent = current.toFixed(0);
+            document.getElementById('mem-min').textContent = minHeap.toFixed(0);
+        }
+
+        // Spindle Current Chart
+        if (data.spindle_amps && data.spindle_amps.length > 0) {
+            const maxAmps = Math.max(...data.spindle_amps, 5);
+            this.drawLineChart('chart-spindle', data.spindle_amps, 0, maxAmps * 1.2, '#f59e0b');
+            const current = data.spindle_amps[data.spindle_amps.length - 1];
+            const peak = Math.max(...data.spindle_amps);
+            document.getElementById('spindle-current').textContent = current.toFixed(1);
+            document.getElementById('spindle-peak').textContent = peak.toFixed(1);
+        }
+    },
+
+    drawLineChart(canvasId, data, minVal, maxVal, color) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const padding = 5;
+
+        // Clear canvas
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-tertiary') || '#1e293b';
+        ctx.fillRect(0, 0, width, height);
+
+        if (data.length < 2) return;
+
+        // Draw line
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+
+        const range = maxVal - minVal || 1;
+        for (let i = 0; i < data.length; i++) {
+            const x = padding + (i / (data.length - 1)) * (width - 2 * padding);
+            const y = height - padding - ((data[i] - minVal) / range) * (height - 2 * padding);
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+
+        // Draw gradient fill
+        ctx.lineTo(width - padding, height - padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.closePath();
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, color + '40');
+        gradient.addColorStop(1, color + '00');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    },
+
     cleanup() {
         console.log('[Diagnostics] Cleaning up');
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
             this.updateInterval = null;
+        }
+        if (this.trendInterval) {
+            clearInterval(this.trendInterval);
+            this.trendInterval = null;
         }
     }
 };

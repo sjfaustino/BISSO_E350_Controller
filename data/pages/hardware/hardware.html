@@ -239,9 +239,80 @@
 
     <!-- Status Message -->
     <div id="status-message" class="status-message" style="display: none;"></div>
+
+    <!-- I/O Expander Diagnostics Card -->
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-header">
+            <h3>🔌 I/O Expander Diagnostics</h3>
+            <button class="btn btn-small btn-secondary" id="refresh-io-diag-btn">Refresh</button>
+        </div>
+        <div class="card-content">
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
+                Live status of PCF8574 I/O expander registers (2 input + 2 output banks)
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Input Bank -->
+                <div>
+                    <h4 style="margin-bottom: 10px; font-size: 14px;">Inputs (Read-Only)</h4>
+                    <div id="io-input-grid" class="io-diag-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Output Bank -->
+                <div>
+                    <h4 style="margin-bottom: 10px; font-size: 14px;">Outputs (Active)</h4>
+                    <div id="io-output-grid" class="io-diag-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
+                <span style="font-size: 12px; color: var(--text-secondary);">
+                    E-Stop: <strong id="hw-estop-state">--</strong> |
+                    Last Update: <strong id="io-last-update">--</strong>
+                </span>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
+    .io-diag-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 5px;
+    }
+
+    .io-diag-pin {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 4px;
+        background: var(--bg-secondary);
+        border-radius: 6px;
+        font-size: 10px;
+    }
+
+    .io-diag-pin .pin-led {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #333;
+        margin-bottom: 4px;
+    }
+
+    .io-diag-pin .pin-led.on {
+        background: #22c55e;
+        box-shadow: 0 0 8px #22c55e;
+    }
+
+    .io-diag-pin .pin-led.off {
+        background: #555;
+    }
+
     .hardware-page {
         padding: var(--space-md);
     }
