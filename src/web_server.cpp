@@ -45,6 +45,7 @@ WebServerManager webServer(80);
 // See auth_manager.cpp for secure credential storage
 
 // Security Constants
+#undef MAX_REQUEST_BODY_SIZE  // Avoid redefinition warning from PsychicHttp
 #define MAX_REQUEST_BODY_SIZE 8192  // Maximum size for POST body (8KB)
 #define MAX_CONFIG_KEY_LENGTH 64    // Maximum length for config keys
 #define MAX_CONFIG_VALUE_LENGTH 256 // Maximum length for config values
@@ -156,6 +157,7 @@ static esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response)
  * @param total Total expected body size
  * @return true if valid, false if too large
  */
+__attribute__((unused))
 static bool validateBodySize(size_t len, size_t total) {
   return total <= MAX_REQUEST_BODY_SIZE;
 }
@@ -172,6 +174,7 @@ static bool validateBodySize(size_t len, size_t total) {
  * @note For single-chunk requests, returns immediately with original data pointer.
  *       For multi-chunk requests, accumulates into static buffer with mutex protection.
  */
+__attribute__((unused))
 static bool assembleChunkedRequest(uint8_t *data, size_t len, size_t index,
                                     size_t total, uint8_t **complete_data,
                                     size_t *complete_len) {
@@ -423,7 +426,7 @@ void WebServerManager::setupRoutes() {
     }
 
     // Expect: { "timestamp": 1703894400 } (Unix timestamp in seconds)
-    if (!doc.containsKey("timestamp")) {
+    if (doc["timestamp"].isNull()) {
       return response->send(400, "application/json", "{\"error\":\"Missing timestamp\"}");
     }
 
@@ -723,8 +726,8 @@ void WebServerManager::setupRoutes() {
       doc["never_backed_up"] = true;
       doc["days_since_backup"] = -1;
     } else {
-      // Use uptime as rough current time (ESP32 doesn't have RTC)
-      uint32_t uptime = taskGetUptime();
+      // ESP32 doesn't have RTC, would need NTP for accurate days
+      (void)taskGetUptime();  // Keep for future NTP implementation
       doc["never_backed_up"] = false;
       doc["days_since_backup"] = 0; // Would need NTP for accurate days
     }
@@ -1908,8 +1911,8 @@ void WebServerManager::broadcastState() {
   z_metrics["vfd_error_percent"] =
       status_snapshot.axis_metrics[2].vfd_error_percent;
 
-  size_t len =
-      serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
+  // Serialize JSON (result length unused as sendAll handles it)
+  serializeJson(doc, json_response_buffer, sizeof(json_response_buffer));
   // PsychicHttp: Use sendAll() to broadcast to all WebSocket clients
   wsHandler.sendAll(json_response_buffer);
 }

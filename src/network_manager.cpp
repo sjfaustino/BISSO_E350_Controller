@@ -18,6 +18,7 @@
 #define ETH_PHY_ADDR    0
 #define ETH_PHY_MDC     23
 #define ETH_PHY_MDIO    18
+#undef ETH_CLK_MODE  // Avoid redefinition warning from ETH.h
 #define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT
 
 NetworkManager networkManager;
