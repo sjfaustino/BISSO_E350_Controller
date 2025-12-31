@@ -140,6 +140,26 @@ window.HardwareModule = window.HardwareModule || {
                 if (buzzerEn) {
                     buzzerEn.checked = config.buzzer_en !== 0 && config.buzzer_en !== "0";
                 }
+
+                // VFD enabled and address
+                const vfdEn = document.getElementById('vfd_enabled');
+                if (vfdEn) {
+                    vfdEn.checked = config.vfd_en !== 0 && config.vfd_en !== "0";
+                }
+                const vfdAddr = document.getElementById('vfd_addr');
+                if (vfdAddr && config.vfd_addr) {
+                    vfdAddr.value = config.vfd_addr;
+                }
+
+                // JXK-10 enabled and address
+                const jxk10En = document.getElementById('jxk10_enabled');
+                if (jxk10En) {
+                    jxk10En.checked = config.jxk10_en !== 0 && config.jxk10_en !== "0";
+                }
+                const jxk10Addr = document.getElementById('jxk10_addr');
+                if (jxk10Addr && config.jxk10_addr) {
+                    jxk10Addr.value = config.jxk10_addr;
+                }
             })
             .catch(err => console.warn('[Hardware] Config load error:', err));
     },
@@ -174,10 +194,16 @@ window.HardwareModule = window.HardwareModule || {
             }
         });
 
-        // Collect config checkboxes
+        // Collect config checkboxes and number inputs
         const configUpdates = {};
         document.querySelectorAll('input[data-config]').forEach(input => {
-            configUpdates[input.dataset.config] = input.checked ? 1 : 0;
+            if (input.type === 'checkbox') {
+                configUpdates[input.dataset.config] = input.checked ? 1 : 0;
+            } else if (input.type === 'number') {
+                configUpdates[input.dataset.config] = parseInt(input.value) || 0;
+            } else {
+                configUpdates[input.dataset.config] = input.value;
+            }
         });
 
         // Save pin assignments
