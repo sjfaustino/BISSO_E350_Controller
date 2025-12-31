@@ -5,6 +5,7 @@
 
 #include "system_telemetry.h"
 #include "serial_logger.h"
+#include "altivar31_modbus.h"  // VFD run status
 #include "motion.h"
 #include "motion_state.h"
 #include "safety.h"
@@ -106,6 +107,7 @@ void telemetryUpdate() {
 
     // Spindle
     bool sp_en = false;
+    bool sp_running = false;    // Actual motor running state from VFD
     float sp_current = 0.0f;
     float sp_peak = 0.0f;
     uint32_t sp_errors = 0;
@@ -120,6 +122,8 @@ void telemetryUpdate() {
         sp_overcurrent = spindleMonitorIsOvercurrent();
         sp_fault = spindleMonitorIsFault();
     }
+    // Get actual run status from VFD Modbus status word
+    sp_running = altivar31IsRunning();
 
     // RPM Sensor (YH-TC05)
     bool rpm_en = false;
@@ -192,6 +196,7 @@ void telemetryUpdate() {
     telemetry_cache.axis_z_mm = ax_z;
     telemetry_cache.axis_a_mm = ax_a;
     telemetry_cache.spindle_enabled = sp_en;
+    telemetry_cache.spindle_running = sp_running;
     telemetry_cache.spindle_current_amps = sp_current;
     telemetry_cache.spindle_current_peak_amps = sp_peak;
     telemetry_cache.spindle_errors = sp_errors;
@@ -251,7 +256,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u},"
         "\"memory\":{\"free_bytes\":%lu,\"stack_used\":%lu},"
         "\"motion\":{\"enabled\":%s,\"moving\":%s,\"x_mm\":%.2f,\"y_mm\":%.2f,\"z_mm\":%.2f,\"a_mm\":%.2f},"
-        "\"spindle\":{\"enabled\":%s,\"current_amps\":%.2f,\"peak_amps\":%.2f,\"errors\":%lu,"
+        "\"spindle\":{\"enabled\":%s,\"running\":%s,\"current_amps\":%.2f,\"peak_amps\":%.2f,\"errors\":%lu,"
         "\"overcurrent\":%s,\"fault\":%s},"
         "\"safety\":{\"estop\":%s,\"alarm\":%s,\"faults\":%lu,\"critical\":%lu},"
         "\"rpm_sensor\":{\"enabled\":%s,\"rpm\":%u,\"stall_detected\":%s},"
@@ -267,6 +272,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         t.motion_moving ? "true" : "false",
         t.axis_x_mm, t.axis_y_mm, t.axis_z_mm, t.axis_a_mm,
         t.spindle_enabled ? "true" : "false",
+        t.spindle_running ? "true" : "false",
         t.spindle_current_amps,
         t.spindle_current_peak_amps,
         (unsigned long)t.spindle_errors,

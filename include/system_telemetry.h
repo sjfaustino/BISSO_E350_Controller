@@ -53,7 +53,8 @@ typedef struct {
     uint32_t motion_errors;
 
     // Spindle
-    bool spindle_enabled;
+    bool spindle_enabled;       // Spindle monitoring enabled
+    bool spindle_running;       // Motor actually running (from VFD Modbus status)
     float spindle_current_amps;
     float spindle_current_peak_amps;
     uint32_t spindle_errors;
