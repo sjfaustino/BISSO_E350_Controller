@@ -101,6 +101,10 @@
 #define KEY_RUNTIME_MINS "rt_mins"       // Total runtime in minutes
 #define KEY_CYCLE_COUNT "cycles"         // Total job cycles completed
 #define KEY_LAST_MAINT_MINS "maint_mins" // Runtime at last maintenance
+#define KEY_BACKUP_TS "backup_ts"        // Last config backup timestamp (Unix epoch)
+#define KEY_DIST_X_M "dist_x_m"          // Total X axis distance traveled (meters)
+#define KEY_DIST_Y_M "dist_y_m"          // Total Y axis distance traveled (meters)
+#define KEY_DIST_Z_M "dist_z_m"          // Total Z axis distance traveled (meters)
 
 // --- PREDEFINED POSITIONS (G30) ---
 #define KEY_POS_SAFE_X "pos_safe_x" // Safe position X coordinate in mm

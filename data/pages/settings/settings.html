@@ -434,6 +434,22 @@
                 <h2>Configuration Management</h2>
             </div>
             <div class="card-content">
+                <!-- Backup Status Banner -->
+                <div id="backup-status-banner"
+                    style="margin-bottom: 20px; padding: 12px; border-radius: 8px; background: var(--bg-secondary);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-weight: 600;">Last Backup:</span>
+                            <span id="last-backup-text" style="margin-left: 8px;">Never</span>
+                        </div>
+                        <span id="backup-status-icon" style="font-size: 1.2em;">⚠️</span>
+                    </div>
+                    <div id="backup-warning"
+                        style="margin-top: 8px; font-size: var(--font-size-sm); color: var(--color-warning); display: none;">
+                        It's recommended to backup your configuration regularly.
+                    </div>
+                </div>
+
                 <div style="margin-bottom: 20px;">
                     <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Configuration
                         Presets</h3>

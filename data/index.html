@@ -11,6 +11,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="BISSO E350 CNC Control System Dashboard">
     <meta name="theme-color" content="#3b82f6">
+
+    <!-- PWA Support -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BISSO E350">
+
     <title>BISSO E350 Dashboard</title>
     <link rel="stylesheet" href="bundle.css?v=1766770416">
 </head>
@@ -38,6 +45,7 @@
             <li><a href="#dashboard" class="nav-item active" data-icon="📊"><span>Dashboard</span></a></li>
             <li><a href="#gcode" class="nav-item" data-icon="📝"><span>G-Code</span></a></li>
             <li><a href="#motion" class="nav-item" data-icon="🎮"><span>Motion</span></a></li>
+            <li><a href="#homing" class="nav-item" data-icon="🏠"><span>Homing</span></a></li>
             <li><a href="#diagnostics" class="nav-item" data-icon="🔍"><span>Diagnostics</span></a></li>
             <li><a href="#network" class="nav-item" data-icon="🌐"><span>Network</span></a></li>
             <li><a href="#system" class="nav-item" data-icon="ℹ️"><span>System</span></a></li>
@@ -720,6 +728,13 @@
             if (window.Router) {
                 window.Router.init();
             }
+        }
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('[PWA] Service Worker registered'))
+                .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
         }
     </script>
 </body>

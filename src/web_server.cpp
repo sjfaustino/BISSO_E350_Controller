@@ -700,6 +700,98 @@ void WebServerManager::setupRoutes() {
     return response->send(200, "application/json", responseBuffer);
   });
 
+  // 4.12 Config Backup Status API (Protected)
+  server.on("/api/config/backup-status", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    
+    JsonDocument doc;
+    doc["success"] = true;
+    
+    // Get last backup timestamp from NVS
+    uint32_t lastBackup = configGetInt(KEY_BACKUP_TS, 0);
+    doc["last_backup_ts"] = lastBackup;
+    
+    // Calculate days since backup
+    if (lastBackup == 0) {
+      doc["never_backed_up"] = true;
+      doc["days_since_backup"] = -1;
+    } else {
+      // Use uptime as rough current time (ESP32 doesn't have RTC)
+      uint32_t uptime = taskGetUptime();
+      doc["never_backed_up"] = false;
+      doc["days_since_backup"] = 0; // Would need NTP for accurate days
+    }
+    
+    char responseBuffer[128];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response->send(200, "application/json", responseBuffer);
+  });
+
+  // 4.13 Config Backup Timestamp Update (called when export happens)
+  server.on("/api/config/backup-mark", HTTP_POST, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    
+    // Mark current time as backup timestamp (using uptime as reference)
+    uint32_t now = taskGetUptime();
+    configSetInt(KEY_BACKUP_TS, now);
+    configUnifiedSave();
+    
+    logInfo("[WEB] Config backup marked at uptime %lu seconds", (unsigned long)now);
+    return response->send(200, "application/json", "{\"success\":true}");
+  });
+
+  // 4.14 Network Ping API (for latency measurement)
+  server.on("/api/network/ping", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    
+    JsonDocument doc;
+    doc["success"] = true;
+    doc["server_time_ms"] = millis();
+    doc["uptime_sec"] = taskGetUptime();
+    
+    // Include WiFi signal strength
+    if (WiFi.status() == WL_CONNECTED) {
+      doc["rssi"] = WiFi.RSSI();
+      doc["wifi_connected"] = true;
+    } else {
+      doc["wifi_connected"] = false;
+    }
+    
+    char responseBuffer[128];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response->send(200, "application/json", responseBuffer);
+  });
+
+  // 4.15 Runtime Statistics API (machine odometer)
+  server.on("/api/stats/runtime", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    
+    JsonDocument doc;
+    doc["success"] = true;
+    
+    // Runtime tracking
+    uint32_t runtimeMins = configGetInt(KEY_RUNTIME_MINS, 0);
+    uint32_t currentUptime = taskGetUptime() / 60; // Convert to minutes
+    doc["total_runtime_hrs"] = (runtimeMins + currentUptime) / 60.0;
+    doc["current_session_hrs"] = currentUptime / 60.0;
+    
+    // Cycle count
+    doc["total_cycles"] = configGetInt(KEY_CYCLE_COUNT, 0);
+    
+    // Distance traveled per axis (in meters)
+    doc["distance_x_m"] = configGetInt(KEY_DIST_X_M, 0) / 1000.0;
+    doc["distance_y_m"] = configGetInt(KEY_DIST_Y_M, 0) / 1000.0;
+    doc["distance_z_m"] = configGetInt(KEY_DIST_Z_M, 0) / 1000.0;
+    
+    // Last maintenance
+    uint32_t lastMaint = configGetInt(KEY_LAST_MAINT_MINS, 0);
+    doc["hrs_since_maintenance"] = (runtimeMins + currentUptime - lastMaint) / 60.0;
+    
+    char responseBuffer[256];
+    serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+    return response->send(200, "application/json", responseBuffer);
+  });
+
   // 5. API Task Performance Metrics (Protected, Rate Limited) - PHASE 5.1
   server.on("/api/metrics", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
     if (requireAuth(request, response) != ESP_OK) return ESP_OK;
