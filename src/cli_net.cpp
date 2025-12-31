@@ -2,9 +2,16 @@
 #include "serial_logger.h"
 #include "watchdog_manager.h"
 #include "config_unified.h"  // For OTA password config
-#include "config_keys.h"     // For KEY_OTA_PASSWORD
+#include "config_keys.h"     // For KEY_OTA_PASSWORD, KEY_ETH_*
+#include "network_manager.h" // For Ethernet status
 #include <WiFi.h>
+#include <ETH.h>
 #include <Arduino.h>
+
+// Ethernet statistics
+static uint32_t eth_connect_time = 0;
+static uint32_t eth_error_count = 0;
+static uint32_t eth_reconnect_count = 0;
 
 static const char* wifiGetStatusString(wl_status_t status) {
     switch (status) {
@@ -128,6 +135,132 @@ void cmd_wifi_main(int argc, char **argv) {
     logWarning("[WIFI] Unknown parameter '%s'.", argv[1]);
 }
 
+// =============================================================================
+// ETHERNET CLI COMMANDS
+// =============================================================================
+
+void cmd_eth_status(int argc, char** argv) {
+    logPrintln("\n[ETH] === Ethernet Status ===");
+    
+    int enabled = configGetInt(KEY_ETH_ENABLED, 1);
+    int dhcp = configGetInt(KEY_ETH_DHCP, 1);
+    
+    logPrintf("  Enabled:     %s\n", enabled ? "YES" : "NO");
+    logPrintf("  Mode:        %s\n", dhcp ? "DHCP" : "Static IP");
+    
+    if (networkManager.isEthernetConnected()) {
+        logPrintf("  Status:      CONNECTED\n");
+        logPrintf("  IP:          %s\n", ETH.localIP().toString().c_str());
+        logPrintf("  Gateway:     %s\n", ETH.gatewayIP().toString().c_str());
+        logPrintf("  Subnet:      %s\n", ETH.subnetMask().toString().c_str());
+        logPrintf("  DNS:         %s\n", ETH.dnsIP().toString().c_str());
+        logPrintf("  MAC:         %s\n", ETH.macAddress().c_str());
+        logPrintf("  Link Speed:  %d Mbps\n", networkManager.getEthernetLinkSpeed());
+        logPrintf("  Duplex:      %s\n", ETH.fullDuplex() ? "Full" : "Half");
+        
+        // Uptime
+        if (eth_connect_time > 0) {
+            uint32_t uptime_sec = (millis() - eth_connect_time) / 1000;
+            uint32_t hours = uptime_sec / 3600;
+            uint32_t mins = (uptime_sec % 3600) / 60;
+            uint32_t secs = uptime_sec % 60;
+            logPrintf("  Uptime:      %02d:%02d:%02d\n", hours, mins, secs);
+        }
+    } else {
+        logPrintf("  Status:      DISCONNECTED\n");
+    }
+    
+    logPrintf("  Reconnects:  %lu\n", (unsigned long)eth_reconnect_count);
+    logPrintf("  Errors:      %lu\n", (unsigned long)eth_error_count);
+    
+    // Static IP config if set
+    if (!dhcp) {
+        logPrintln("\n  Static Configuration:");
+        logPrintf("    IP:      %s\n", configGetString(KEY_ETH_IP, "not set"));
+        logPrintf("    Gateway: %s\n", configGetString(KEY_ETH_GW, "not set"));
+        logPrintf("    Mask:    %s\n", configGetString(KEY_ETH_MASK, "255.255.255.0"));
+        logPrintf("    DNS:     %s\n", configGetString(KEY_ETH_DNS, "8.8.8.8"));
+    }
+}
+
+void cmd_eth_main(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("\n[ETH] === Ethernet Management ===");
+        logPrintln("Usage:");
+        logPrintln("  eth status                  - Show Ethernet status");
+        logPrintln("  eth on                      - Enable Ethernet");
+        logPrintln("  eth off                     - Disable Ethernet");
+        logPrintln("  eth dhcp                    - Use DHCP (default)");
+        logPrintln("  eth static <ip> <gw> [mask] - Set static IP");
+        logPrintln("  eth dns <dns_ip>            - Set DNS server");
+        logPrintln("\nExamples:");
+        logPrintln("  eth static 192.168.1.100 192.168.1.1");
+        logPrintln("  eth static 192.168.1.100 192.168.1.1 255.255.255.0");
+        return;
+    }
+    
+    if (strcasecmp(argv[1], "status") == 0) {
+        cmd_eth_status(argc, argv);
+    }
+    else if (strcasecmp(argv[1], "on") == 0) {
+        configSetInt(KEY_ETH_ENABLED, 1);
+        configUnifiedSave();
+        logInfo("[ETH] [OK] Ethernet enabled. Reboot required.");
+    }
+    else if (strcasecmp(argv[1], "off") == 0) {
+        configSetInt(KEY_ETH_ENABLED, 0);
+        configUnifiedSave();
+        logInfo("[ETH] [OK] Ethernet disabled. Reboot required.");
+    }
+    else if (strcasecmp(argv[1], "dhcp") == 0) {
+        configSetInt(KEY_ETH_DHCP, 1);
+        configUnifiedSave();
+        logInfo("[ETH] [OK] DHCP mode enabled. Reboot required.");
+    }
+    else if (strcasecmp(argv[1], "static") == 0) {
+        if (argc < 4) {
+            logError("[ETH] Usage: eth static <ip> <gateway> [mask]");
+            return;
+        }
+        configSetString(KEY_ETH_IP, argv[2]);
+        configSetString(KEY_ETH_GW, argv[3]);
+        if (argc >= 5) {
+            configSetString(KEY_ETH_MASK, argv[4]);
+        } else {
+            configSetString(KEY_ETH_MASK, "255.255.255.0");
+        }
+        configSetInt(KEY_ETH_DHCP, 0);
+        configUnifiedSave();
+        logInfo("[ETH] [OK] Static IP configured:");
+        logPrintf("  IP:      %s\n", argv[2]);
+        logPrintf("  Gateway: %s\n", argv[3]);
+        logPrintf("  Mask:    %s\n", argc >= 5 ? argv[4] : "255.255.255.0");
+        logWarning("[ETH] Reboot required for changes to take effect.");
+    }
+    else if (strcasecmp(argv[1], "dns") == 0) {
+        if (argc < 3) {
+            logError("[ETH] Usage: eth dns <dns_ip>");
+            return;
+        }
+        configSetString(KEY_ETH_DNS, argv[2]);
+        configUnifiedSave();
+        logInfo("[ETH] [OK] DNS set to %s. Reboot required.", argv[2]);
+    }
+    else {
+        logWarning("[ETH] Unknown command '%s'. Use 'eth' for help.", argv[1]);
+    }
+}
+
+// Track Ethernet connect/disconnect for uptime
+void ethTrackConnect() {
+    eth_connect_time = millis();
+    if (eth_connect_time > 0) eth_reconnect_count++;
+}
+
+void ethTrackError() {
+    eth_error_count++;
+}
+
 // SECURITY: OTA password management command
 void cmd_ota_setpass(int argc, char** argv) {
     if (argc < 2) {
@@ -166,5 +299,6 @@ void cmd_ota_setpass(int argc, char** argv) {
 
 void cliRegisterWifiCommands() {
     cliRegisterCommand("wifi", "WiFi management", cmd_wifi_main);
+    cliRegisterCommand("eth", "Ethernet management (KC868-A16)", cmd_eth_main);
     cliRegisterCommand("ota_setpass", "Set OTA update password", cmd_ota_setpass);
 }

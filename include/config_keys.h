@@ -46,6 +46,11 @@
 
 // --- ETHERNET CONFIGURATION (KC868-A16 LAN8720) ---
 #define KEY_ETH_ENABLED "eth_en"        // Ethernet enable (1=on, 0=off, default 1)
+#define KEY_ETH_DHCP "eth_dhcp"         // Use DHCP (1=dhcp, 0=static, default 1)
+#define KEY_ETH_IP "eth_ip"             // Static IP address (e.g. "192.168.1.100")
+#define KEY_ETH_GW "eth_gw"             // Gateway address (e.g. "192.168.1.1")
+#define KEY_ETH_MASK "eth_mask"         // Subnet mask (e.g. "255.255.255.0")
+#define KEY_ETH_DNS "eth_dns"           // DNS server (e.g. "8.8.8.8")
 
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"

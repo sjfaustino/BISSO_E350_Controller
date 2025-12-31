@@ -194,6 +194,28 @@ void NetworkManager::initEthernet() {
   // Start Ethernet with KC868-A16 pin configuration
   if (ETH.begin(ETH_PHY_ADDR, -1, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE)) {
     logInfo("[ETH] [OK] Ethernet initialization queued");
+    
+    // Configure static IP if DHCP disabled
+    int use_dhcp = configGetInt(KEY_ETH_DHCP, 1);  // Default: DHCP
+    if (!use_dhcp) {
+      const char* ip_str = configGetString(KEY_ETH_IP, "");
+      const char* gw_str = configGetString(KEY_ETH_GW, "");
+      const char* mask_str = configGetString(KEY_ETH_MASK, "255.255.255.0");
+      const char* dns_str = configGetString(KEY_ETH_DNS, "8.8.8.8");
+      
+      if (strlen(ip_str) > 0 && strlen(gw_str) > 0) {
+        IPAddress ip, gateway, subnet, dns;
+        if (ip.fromString(ip_str) && gateway.fromString(gw_str) &&
+            subnet.fromString(mask_str) && dns.fromString(dns_str)) {
+          ETH.config(ip, gateway, subnet, dns);
+          logInfo("[ETH] Static IP configured: %s", ip_str);
+        } else {
+          logError("[ETH] Invalid static IP configuration - using DHCP");
+        }
+      } else {
+        logWarning("[ETH] Static IP mode but no IP configured - using DHCP");
+      }
+    }
   } else {
     logError("[ETH] Failed to initialize Ethernet");
   }
