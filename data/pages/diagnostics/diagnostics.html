@@ -206,6 +206,118 @@
     </div>
 </div>
 
+<!-- Real-time Saw Blade Current Graph -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h2>🪚 Saw Blade Current (Real-time)</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span id="spindle-status-badge" class="badge badge-success">OK</span>
+            <button class="btn btn-small btn-secondary" id="spindle-graph-pause">Pause</button>
+        </div>
+    </div>
+    <div class="card-content">
+        <div class="spindle-graph-container">
+            <div class="spindle-graph-main">
+                <canvas id="spindle-current-chart" width="600" height="200"></canvas>
+            </div>
+            <div class="spindle-graph-stats">
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">Current</span>
+                    <span class="spindle-stat-value" id="spindle-current-now">0.0 A</span>
+                </div>
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">Peak</span>
+                    <span class="spindle-stat-value" id="spindle-current-peak">0.0 A</span>
+                </div>
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">Pause Threshold</span>
+                    <span class="spindle-stat-value warning" id="spindle-threshold-pause">25 A</span>
+                </div>
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">E-Stop Threshold</span>
+                    <span class="spindle-stat-value danger" id="spindle-threshold-estop">30 A</span>
+                </div>
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">Auto-Pauses</span>
+                    <span class="spindle-stat-value" id="spindle-pause-count">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .spindle-graph-container {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .spindle-graph-main {
+        flex: 1;
+        min-width: 300px;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    .spindle-graph-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 150px;
+    }
+
+    .spindle-stat {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: var(--bg-secondary);
+        border-radius: 6px;
+    }
+
+    .spindle-stat-label {
+        color: var(--text-secondary);
+        font-size: 12px;
+    }
+
+    .spindle-stat-value {
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .spindle-stat-value.warning {
+        color: var(--warning);
+    }
+
+    .spindle-stat-value.danger {
+        color: var(--danger);
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-success {
+        background: var(--success);
+        color: white;
+    }
+
+    .badge-warning {
+        background: var(--warning);
+        color: black;
+    }
+
+    .badge-danger {
+        background: var(--danger);
+        color: white;
+    }
+</style>
+
 <!-- Trend Charts Card -->
 <div class="card" style="margin-top: 20px;">
     <div class="card-header">

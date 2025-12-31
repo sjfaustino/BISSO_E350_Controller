@@ -543,6 +543,12 @@ void WebServerManager::setupRoutes() {
       }
 
       doc["overcurrent"] = spindleMonitorIsOvercurrent();
+      
+      // Auto-pause fields for real-time graph
+      doc["auto_pause_enabled"] = spindle_state->auto_pause_enabled;
+      doc["auto_pause_threshold"] = spindle_state->auto_pause_threshold_amps;
+      doc["auto_paused"] = spindle_state->auto_paused;
+      doc["auto_pause_count"] = spindle_state->auto_pause_count;
     }
 
     char responseBuffer[512];

@@ -5,6 +5,10 @@
 window.DiagnosticsModule = window.DiagnosticsModule || {
     updateInterval: null,
     trendInterval: null,
+    spindleInterval: null,
+    spindleData: [],
+    spindlePaused: false,
+    spindleMaxPoints: 120,  // 60 seconds at 500ms intervals
 
     init() {
         console.log('[Diagnostics] Initializing');
@@ -18,6 +22,10 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         // Start trend chart updates
         this.loadTrendData();
         this.trendInterval = setInterval(() => this.loadTrendData(), 5000);
+
+        // Start spindle current graph updates (500ms for smooth real-time)
+        this.loadSpindleData();
+        this.spindleInterval = setInterval(() => this.loadSpindleData(), 500);
     },
 
     setupEventListeners() {
@@ -29,6 +37,18 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         // Clear Faults button
         document.getElementById('clear-faults-btn')?.addEventListener('click', () => {
             this.clearFaults();
+        });
+
+        // Trend refresh button
+        document.getElementById('refresh-trends-btn')?.addEventListener('click', () => {
+            this.loadTrendData();
+        });
+
+        // Spindle graph pause button
+        document.getElementById('spindle-graph-pause')?.addEventListener('click', () => {
+            this.spindlePaused = !this.spindlePaused;
+            const btn = document.getElementById('spindle-graph-pause');
+            if (btn) btn.textContent = this.spindlePaused ? 'Resume' : 'Pause';
         });
     },
 
@@ -355,6 +375,138 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         ctx.fill();
     },
 
+    // Spindle current real-time chart
+    loadSpindleData() {
+        if (this.spindlePaused) return;
+
+        fetch('/api/spindle')
+            .then(response => response.json())
+            .then(data => {
+                // Add new data point
+                this.spindleData.push({
+                    time: Date.now(),
+                    current: data.current_amps || 0,
+                    peak: data.peak_amps || 0,
+                    threshold: data.threshold_amps || 30,
+                    autoPauseThreshold: data.auto_pause_threshold || 25,
+                    autoPauseCount: data.auto_pause_count || 0,
+                    overcurrent: data.overcurrent || false
+                });
+
+                // Keep buffer size limited
+                while (this.spindleData.length > this.spindleMaxPoints) {
+                    this.spindleData.shift();
+                }
+
+                // Update stats display
+                const latest = this.spindleData[this.spindleData.length - 1];
+                document.getElementById('spindle-current-now').textContent = latest.current.toFixed(1) + ' A';
+                document.getElementById('spindle-current-peak').textContent = latest.peak.toFixed(1) + ' A';
+                document.getElementById('spindle-threshold-pause').textContent = latest.autoPauseThreshold + ' A';
+                document.getElementById('spindle-threshold-estop').textContent = latest.threshold + ' A';
+                document.getElementById('spindle-pause-count').textContent = latest.autoPauseCount;
+
+                // Update status badge
+                const badge = document.getElementById('spindle-status-badge');
+                if (badge) {
+                    if (latest.overcurrent || latest.current > latest.threshold) {
+                        badge.className = 'badge badge-danger';
+                        badge.textContent = 'OVERLOAD';
+                    } else if (latest.current > latest.autoPauseThreshold) {
+                        badge.className = 'badge badge-warning';
+                        badge.textContent = 'HIGH';
+                    } else {
+                        badge.className = 'badge badge-success';
+                        badge.textContent = 'OK';
+                    }
+                }
+
+                // Draw chart
+                this.drawSpindleChart();
+            })
+            .catch(err => console.error('[Diagnostics] Spindle fetch error:', err));
+    },
+
+    drawSpindleChart() {
+        const canvas = document.getElementById('spindle-current-chart');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        const data = this.spindleData;
+
+        // Get thresholds
+        const pauseThreshold = data.length > 0 ? data[data.length - 1].autoPauseThreshold : 25;
+        const estopThreshold = data.length > 0 ? data[data.length - 1].threshold : 30;
+        const maxY = Math.max(estopThreshold * 1.2, 35);
+
+        // Clear
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, w, h);
+
+        // Draw grid lines
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= 5; i++) {
+            const y = h - (i / 5) * h;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(w, y);
+            ctx.stroke();
+
+            // Y-axis labels
+            ctx.fillStyle = '#888';
+            ctx.font = '10px sans-serif';
+            ctx.fillText((maxY * i / 5).toFixed(0) + 'A', 5, y - 2);
+        }
+
+        // Draw pause threshold line (orange dashed)
+        const pauseY = h - (pauseThreshold / maxY) * h;
+        ctx.strokeStyle = '#ff9800';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(0, pauseY);
+        ctx.lineTo(w, pauseY);
+        ctx.stroke();
+
+        // Draw E-Stop threshold line (red dashed)
+        const estopY = h - (estopThreshold / maxY) * h;
+        ctx.strokeStyle = '#f44336';
+        ctx.beginPath();
+        ctx.moveTo(0, estopY);
+        ctx.lineTo(w, estopY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw current line
+        if (data.length < 2) return;
+
+        ctx.strokeStyle = '#4ade80';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+
+        for (let i = 0; i < data.length; i++) {
+            const x = (i / (this.spindleMaxPoints - 1)) * w;
+            const y = h - (data[i].current / maxY) * h;
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+
+        // Fill area under curve
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(74, 222, 128, 0.2)';
+        ctx.fill();
+    },
+
     cleanup() {
         console.log('[Diagnostics] Cleaning up');
         if (this.updateInterval) {
@@ -365,6 +517,11 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
             clearInterval(this.trendInterval);
             this.trendInterval = null;
         }
+        if (this.spindleInterval) {
+            clearInterval(this.spindleInterval);
+            this.spindleInterval = null;
+        }
+        this.spindleData = [];
     }
 };
 
