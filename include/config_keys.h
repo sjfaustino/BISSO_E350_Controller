@@ -70,6 +70,14 @@
 #define KEY_SPINDL_PAUSE_EN "sp_pause"  // Auto-pause on overload (1=on, 0=off, default 1)
 #define KEY_SPINDL_PAUSE_THR "sp_pthr"  // Pause threshold amps (default 25, less than shutdown)
 
+// --- VFD (ALTIVAR31) CONFIGURATION ---
+#define KEY_VFD_EN "vfd_en"             // Enable VFD communication (1=on, 0=off, default 1)
+#define KEY_VFD_ADDR "vfd_addr"         // Modbus slave address (1-247, default 2)
+
+// --- JXK-10 CURRENT MONITOR ---
+#define KEY_JXK10_EN "jxk10_en"         // Enable JXK-10 (1=on, 0=off, default 1)
+#define KEY_JXK10_ADDR "jxk10_addr"     // Modbus slave address (1-247, default 1)
+
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"
 #define KEY_X_LIMIT_MAX "x_limit_max"

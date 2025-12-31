@@ -3,6 +3,8 @@
 #include "encoder_hal.h"
 #include "rs485_device_registry.h"
 #include "serial_logger.h"
+#include "config_unified.h"
+#include "config_keys.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -127,12 +129,23 @@ static bool altivar31OnResponse(const uint8_t* data, uint16_t len) {
 // ============================================================================
 
 bool altivar31ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
-    altivar31_state.slave_address = slave_address;
+    // Check if VFD is enabled in configuration
+    if (configGetInt(KEY_VFD_EN, 1) == 0) {
+        logInfo("[ALTIVAR31] VFD disabled in configuration");
+        altivar31_state.enabled = false;
+        altivar31_device.enabled = false;
+        return true;  // Not an error, just disabled
+    }
+    
+    // Use address from config if available
+    uint8_t cfg_addr = (uint8_t)configGetInt(KEY_VFD_ADDR, slave_address);
+    
+    altivar31_state.slave_address = cfg_addr;
     altivar31_state.baud_rate = baud_rate;
     altivar31_state.enabled = true;  // Mark sensor as enabled
     
     // Update registry descriptor
-    altivar31_device.slave_address = slave_address;
+    altivar31_device.slave_address = cfg_addr;
     altivar31_device.enabled = true;
     
     // Register with centralized bus manager
@@ -142,7 +155,7 @@ bool altivar31ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
     }
 
     logInfo("[ALTIVAR31] Initialized and registered (Addr: %u, Baud: %lu)",
-            slave_address, (unsigned long)baud_rate);
+            cfg_addr, (unsigned long)baud_rate);
     return true;
 }
 

@@ -3,6 +3,8 @@
 #include "encoder_hal.h"
 #include "rs485_device_registry.h"
 #include "serial_logger.h"
+#include "config_unified.h"
+#include "config_keys.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -94,12 +96,23 @@ static bool jxk10OnResponse(const uint8_t* data, uint16_t len) {
 // ============================================================================
 
 bool jxk10ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
-    jxk10_state.slave_address = slave_address;
+    // Check if JXK-10 is enabled in configuration
+    if (configGetInt(KEY_JXK10_EN, 1) == 0) {
+        logInfo("[JXK10] JXK-10 current monitor disabled in configuration");
+        jxk10_state.enabled = false;
+        jxk10_device.enabled = false;
+        return true;  // Not an error, just disabled
+    }
+    
+    // Use address from config if available
+    uint8_t cfg_addr = (uint8_t)configGetInt(KEY_JXK10_ADDR, slave_address);
+    
+    jxk10_state.slave_address = cfg_addr;
     jxk10_state.baud_rate = baud_rate;
     jxk10_state.enabled = true;  // Mark sensor as enabled
     
     // Update registry descriptor
-    jxk10_device.slave_address = slave_address;
+    jxk10_device.slave_address = cfg_addr;
     jxk10_device.enabled = true;
     
     // Register with centralized bus manager
@@ -109,7 +122,7 @@ bool jxk10ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
     }
 
     logInfo("[JXK10] Initialized and registered (Addr: %u, Baud: %lu)",
-            slave_address, (unsigned long)baud_rate);
+            cfg_addr, (unsigned long)baud_rate);
     return true;
 }
 
