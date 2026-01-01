@@ -201,4 +201,8 @@
 #define KEY_OTA_PW_CHANGED                                                     \
   "ota_pw_chg" // Flag: OTA password changed from default (1=changed, 0=default)
 
+
+// --- LCD DISPLAY (PHASE 4.0) ---
+#define KEY_LCD_EN "lcd_en"             // Enable LCD display (1=on, 0=off, default 1)
+
 #endif

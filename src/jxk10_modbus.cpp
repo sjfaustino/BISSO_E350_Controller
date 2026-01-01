@@ -18,13 +18,10 @@ static jxk10_state_t jxk10_state = {
     .baud_rate = 9600,
     .current_raw = 0,
     .current_amps = 0.0f,
-    .device_status = 0,
     .last_read_time_ms = 0,
     .last_error_time_ms = 0,
     .read_count = 0,
     .error_count = 0,
-    .is_overload = false,
-    .is_fault = false,
     .consecutive_errors = 0
 };
 
@@ -57,32 +54,36 @@ static rs485_device_t jxk10_device = {
 // ============================================================================
 
 static bool jxk10Poll(void) {
-    // Read 2 registers: Current (0x0000) and Status (0x0001)
+    // Read 1 register: PV Current at 0x000E per PDF manual
     uint16_t tx_len = modbusReadRegistersRequest(jxk10_state.slave_address,
-                                                  JXK10_REG_CURRENT, 2, modbus_tx_buffer);
+                                                  JXK10_REG_CURRENT, 1, modbus_tx_buffer);
 
     return encoderHalSend(modbus_tx_buffer, tx_len);
 }
 
 static bool jxk10OnResponse(const uint8_t* data, uint16_t len) {
-    uint16_t regs[2];
-    uint8_t err = modbusParseReadResponse(data, len, 2, regs);
+    uint16_t regs[1];
+    uint8_t err = modbusParseReadResponse(data, len, 1, regs);
     
     if (err != MODBUS_ERR_NONE) {
         jxk10_state.last_error_time_ms = millis();
+        jxk10_state.error_count++;
+        jxk10_state.consecutive_errors++;
         return false;
     }
 
-    // Extract current value (big-endian conversion)
-    // The JXK-10 returns Big-Endian, modbusParseReadResponse handles it but check if it's already swapped
-    // modbusParseReadResponse extracts 16-bit values from the buffer (big-endian network order)
-    
+    // Extract current value per PDF manual
     jxk10_state.current_raw = (int16_t)regs[0];
-    jxk10_state.current_amps = jxk10_state.current_raw / 100.0f;
     
-    jxk10_state.device_status = regs[1];
-    jxk10_state.is_overload = (jxk10_state.device_status & JXK10_STATUS_OVERLOAD) != 0;
-    jxk10_state.is_fault = (jxk10_state.device_status & JXK10_STATUS_FAULT) != 0;
+    // Scaling per PDF: raw <= 3000 -> divide by 100 (2 decimals)
+    //                  raw > 3000 -> divide by 10 (1 decimal)
+    // For 0-50A model, max raw would be 5000 (50.00A with 2 decimals)
+    // But for larger ranges, scaling changes
+    if (jxk10_state.current_raw <= 3000) {
+        jxk10_state.current_amps = jxk10_state.current_raw / 100.0f;
+    } else {
+        jxk10_state.current_amps = jxk10_state.current_raw / 10.0f;
+    }
 
     jxk10_state.read_count++;
     jxk10_state.last_read_time_ms = millis();
@@ -149,16 +150,10 @@ int16_t jxk10GetCurrentRaw(void) {
     return jxk10_state.current_raw;
 }
 
-bool jxk10IsOverload(void) {
-    return jxk10_state.is_overload;
-}
-
-bool jxk10IsFault(void) {
-    return jxk10_state.is_fault;
-}
 
 bool jxk10ModbusSetSlaveAddress(uint8_t new_address) {
-    if (new_address < 1 || new_address > 247) return false;
+    // Per PDF: Address range is 0x00 to 0xFE (0-254), power cycle required after change
+    if (new_address > 254) return false;
 
     // Direct write (bypass scheduler temporarily or wait for bus)
     if (!rs485IsBusAvailable()) return false;
@@ -175,13 +170,8 @@ bool jxk10ModbusSetSlaveAddress(uint8_t new_address) {
     uint8_t rx_len = sizeof(rx_data);
     if (encoderHalReceive(rx_data, &rx_len) && rx_len >= 8) {
         if (modbusParseWriteResponse(rx_data, rx_len, JXK10_REG_SLAVE_ADDR, new_address) == 0) {
-            // Success, now save
-            tx_len = modbusWriteSingleRegisterRequest(jxk10_state.slave_address,
-                                                       JXK10_REG_SAVE_CONFIG, 1,
-                                                       modbus_tx_buffer);
-            encoderHalSend(modbus_tx_buffer, tx_len);
-            delay(100);
-            
+            // Success - note: power cycle required for change to take effect
+            logInfo("[JXK10] Address changed to %u - POWER CYCLE REQUIRED", new_address);
             jxk10_state.slave_address = new_address;
             jxk10_device.slave_address = new_address;
             return true;
@@ -218,10 +208,6 @@ void jxk10PrintDiagnostics(void) {
     Serial.printf("Slave Address:       %u\n", jxk10_state.slave_address);
     Serial.printf("Baud Rate:           %lu bps\n", (unsigned long)jxk10_state.baud_rate);
     Serial.printf("Current:             %.2f A (raw: %d)\n", jxk10_state.current_amps, jxk10_state.current_raw);
-    Serial.printf("Status:              0x%04X (Overload: %s, Fault: %s)\n",
-                  jxk10_state.device_status,
-                  jxk10_state.is_overload ? "YES" : "NO",
-                  jxk10_state.is_fault ? "YES" : "NO");
     Serial.printf("Read Count:          %lu\n", (unsigned long)jxk10_device.poll_count);
     Serial.printf("Error Count:         %lu\n", (unsigned long)jxk10_device.error_count);
     Serial.printf("Consecutive Errors:  %lu\n", (unsigned long)jxk10_device.consecutive_errors);

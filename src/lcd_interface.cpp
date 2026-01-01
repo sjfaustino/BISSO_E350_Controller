@@ -12,6 +12,8 @@
 #include "system_constants.h"
 #include "task_manager.h"
 #include "encoder_wj66.h"
+#include "config_unified.h"
+#include "config_keys.h"
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 #include <stdio.h>
@@ -97,7 +99,14 @@ void lcdInterfaceInit() {
     taskUnlockMutex(lcd_mutex);
   }
 
-  logInfo("[LCD] [OK] Ready");
+  // PHASE 4.0: Respect LCD_EN setting
+  if (configGetInt(KEY_LCD_EN, 1) == 0) {
+    logInfo("[LCD] Disabled via configuration");
+    lcdInterfaceSetMode(LCD_MODE_NONE);
+    lcdInterfaceBacklight(false);
+  } else {
+    logInfo("[LCD] [OK] Ready");
+  }
 }
 
 void lcdInterfaceCleanup() {

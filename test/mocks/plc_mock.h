@@ -36,6 +36,19 @@ typedef struct {
     uint8_t z_select_gpio;           // GPIO state to select Z axis
     uint8_t motor_run_relay;         // GPIO state for VFD run relay (r1)
 
+    // =====================================================================
+    // BIT-LEVEL OUTPUT CAPTURE (for testing new PLC API)
+    // =====================================================================
+    uint8_t output_register;         // Raw 8-bit output (mirrors shadow register)
+    uint8_t last_output_register;    // Previous output for change detection
+    uint32_t output_write_count;     // Number of I2C writes to output
+    
+    // Decoded output bits (for test assertions)
+    uint8_t axis_select;             // 0=X, 1=Y, 2=Z, 255=none
+    uint8_t direction_positive;      // 1=Y4 active (forward)
+    uint8_t direction_negative;      // 1=Y5 active (reverse)
+    uint8_t speed_profile;           // 0=fast, 1=medium, 2=slow, 255=none
+
     // Switching timing
     uint32_t last_switch_time_ms;    // Timestamp of last contactor switch
     uint16_t switch_settling_ms;     // Time to wait after switch (~50ms typical)
@@ -146,5 +159,51 @@ extern void plc_mock_reset_operation_count(plc_mock_state_t* plc);
  * @param buffer_size Size of output buffer
  */
 extern void plc_mock_get_status(plc_mock_state_t* plc, char* buffer, size_t buffer_size);
+
+// =====================================================================
+// BIT-LEVEL OUTPUT CAPTURE API (for testing new PLC interface)
+// =====================================================================
+
+/**
+ * @brief Simulate an I2C write to the output register
+ * This intercepts what would be written to the PCF8574 @ 0x24
+ *
+ * @param plc Pointer to PLC state
+ * @param value 8-bit value written (active-low: 0=ON, 1=OFF)
+ */
+extern void plc_mock_write_output(plc_mock_state_t* plc, uint8_t value);
+
+/**
+ * @brief Get the raw output register value
+ *
+ * @param plc Pointer to PLC state
+ * @return Raw 8-bit output register
+ */
+extern uint8_t plc_mock_get_output_register(plc_mock_state_t* plc);
+
+/**
+ * @brief Get the decoded axis selection (0=X, 1=Y, 2=Z, 255=none)
+ */
+extern uint8_t plc_mock_get_axis_select(plc_mock_state_t* plc);
+
+/**
+ * @brief Get the decoded direction (1=positive, 0=negative, 255=none)
+ */
+extern uint8_t plc_mock_get_direction(plc_mock_state_t* plc);
+
+/**
+ * @brief Get the decoded speed profile (0=fast, 1=medium, 2=slow, 255=none)
+ */
+extern uint8_t plc_mock_get_speed_profile(plc_mock_state_t* plc);
+
+/**
+ * @brief Get the I2C write count for verification
+ */
+extern uint32_t plc_mock_get_write_count(plc_mock_state_t* plc);
+
+/**
+ * @brief Reset the mock for a new test
+ */
+extern void plc_mock_reset(plc_mock_state_t* plc);
 
 #endif // PLC_MOCK_H

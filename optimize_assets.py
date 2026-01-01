@@ -6,7 +6,8 @@ import shutil
 DATA_DIR = r"c:\data\BISSO_E350_Controller\data"
 
 def restore_files():
-    print("Restoring files from .gz...")
+    print("Restoring files from .gz and data_src...")
+    # Restore from .gz
     for root, dirs, files in os.walk(DATA_DIR):
         for file in files:
             if file.endswith(".gz"):
@@ -16,7 +17,19 @@ def restore_files():
                     with gzip.open(gz_path, 'rb') as f_in:
                         with open(original_path, 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
-                    print(f"Restored {os.path.basename(original_path)}")
+                    print(f"Restored {os.path.basename(original_path)} from .gz")
+
+    # Restore from data_src
+    src_dir = r"c:\data\BISSO_E350_Controller\data_src"
+    if os.path.exists(src_dir):
+        for root, dirs, files in os.walk(src_dir):
+            for file in files:
+                rel_path = os.path.relpath(os.path.join(root, file), src_dir)
+                dest_path = os.path.join(DATA_DIR, rel_path)
+                if not os.path.exists(dest_path):
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    shutil.copy2(os.path.join(root, file), dest_path)
+                    print(f"Restored {rel_path} from data_src")
 
 def bundle_assets():
     print("\nBundling Assets...")
@@ -243,7 +256,7 @@ def move_sources_to_src():
 
 if __name__ == "__main__":
     restore_files()
-    bundle_assets()
-    update_index_html()
-    gzip_bundles()
-    move_sources_to_src()
+    # bundle_assets()
+    # update_index_html()
+    # gzip_bundles()
+    # move_sources_to_src()

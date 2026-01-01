@@ -1,0 +1,84 @@
+/**
+ * @file cli_lcd.cpp
+ * @brief LCD control CLI commands (Gemini v4.1.0)
+ */
+
+#include "cli.h"
+#include "lcd_interface.h"
+#include "lcd_sleep.h"
+#include "config_unified.h"
+#include "config_keys.h"
+#include "serial_logger.h"
+#include <string.h>
+#include <stdlib.h>
+
+void cmd_lcd_on() {
+    configSetInt(KEY_LCD_EN, 1);
+    lcdInterfaceSetMode(LCD_MODE_I2C);
+    lcdInterfaceBacklight(true);
+    logInfo("[LCD] Enabled");
+}
+
+void cmd_lcd_off() {
+    configSetInt(KEY_LCD_EN, 0);
+    lcdInterfaceBacklight(false);
+    lcdInterfaceSetMode(LCD_MODE_NONE);
+    logInfo("[LCD] Disabled");
+}
+
+void cmd_lcd_backlight(int argc, char** argv) {
+    if (argc < 3) {
+        logPrintln("Usage: lcd backlight [on|off]");
+        return;
+    }
+    bool on = (strcasecmp(argv[2], "on") == 0);
+    lcdInterfaceBacklight(on);
+    logInfo("[LCD] Backlight %s", on ? "ON" : "OFF");
+}
+
+void cmd_lcd_timeout(int argc, char** argv) {
+    if (argc < 3) {
+        logPrintf("Current timeout: %lu seconds\r\n", (unsigned long)lcdSleepGetTimeout());
+        logPrintln("Usage: lcd timeout <seconds>");
+        return;
+    }
+    uint32_t seconds = strtoul(argv[2], NULL, 10);
+    lcdSleepSetTimeout(seconds);
+}
+
+void cmd_lcd_main(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("\n[LCD] === LCD Control ===");
+        logPrintln("Usage: lcd [on|off|backlight|sleep|wakeup|timeout|status]");
+        logPrintln("  on        - Enable LCD and save setting");
+        logPrintln("  off       - Disable LCD and save setting");
+        logPrintln("  backlight - Control backlight (on/off)");
+        logPrintln("  sleep     - Force display to sleep");
+        logPrintln("  wakeup    - Force display to wake up");
+        logPrintln("  timeout   - Set sleep timeout in seconds (0=never)");
+        logPrintln("  status    - Show LCD status");
+        return;
+    }
+
+    if (strcasecmp(argv[1], "on") == 0) {
+        cmd_lcd_on();
+    } else if (strcasecmp(argv[1], "off") == 0) {
+        cmd_lcd_off();
+    } else if (strcasecmp(argv[1], "backlight") == 0) {
+        cmd_lcd_backlight(argc, argv);
+    } else if (strcasecmp(argv[1], "sleep") == 0) {
+        lcdSleepSleep();
+    } else if (strcasecmp(argv[1], "wakeup") == 0) {
+        lcdSleepWakeup();
+    } else if (strcasecmp(argv[1], "timeout") == 0) {
+        cmd_lcd_timeout(argc, argv);
+    } else if (strcasecmp(argv[1], "status") == 0) {
+        logPrintln("\n[LCD] === Status ===");
+        logPrintf("Enabled:   %s\r\n", configGetInt(KEY_LCD_EN, 1) ? "YES" : "NO");
+        logPrintf("Mode:      %d\r\n", (int)lcdInterfaceGetMode());
+        logPrintf("Sleeping:  %s\r\n", lcdSleepIsAsleep() ? "YES" : "NO");
+        logPrintf("Timeout:   %lu sec\r\n", (unsigned long)lcdSleepGetTimeout());
+    } else {
+        logWarning("[LCD] Unknown subcommand: %s", argv[1]);
+    }
+}

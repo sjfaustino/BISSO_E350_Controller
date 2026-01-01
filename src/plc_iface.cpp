@@ -161,101 +161,179 @@ void elboInit() {
 }
 
 // ============================================================================
-// OUTPUT CONTROL
+// OUTPUT CONTROL - NEW API (Matches Actual Hardware Wiring)
 // ============================================================================
 
-void elboSetDirection(uint8_t axis, bool forward) {
-  if (axis >= 4)
-    return;
-
-  // PHASE 5.7: Gemini Fix - Use retry helper instead of simple timeout
-  // Prevents shadow register desynchronization on mutex timeout
+/**
+ * @brief Set which axis is selected for motion
+ * @param axis 0=X (Y1), 1=Y (Y2), 2=Z (Y3), 255=none
+ */
+void plcSetAxisSelect(uint8_t axis) {
   if (!plcAcquireShadowMutex()) {
-    // All retries failed - critical error
-    // Dirty flag is set by helper, will be recovered on next successful write
-    logError("[PLC] SetDirection FAILED for axis %d (shadow register dirty)",
-             axis);
+    logError("[PLC] plcSetAxisSelect FAILED (shadow register dirty)");
     return;
   }
 
-  // Use standard shift. Relays 0-3 are X,Y,Z,A Directions
-  // Active-low: 0 = relay ON, 1 = relay OFF
-  uint8_t mask = (1 << axis);
+  // Clear all axis select bits first (bits 0-2)
+  q73_shadow_register |= ((1 << PLC_OUT_AXIS_X_SELECT) |
+                          (1 << PLC_OUT_AXIS_Y_SELECT) |
+                          (1 << PLC_OUT_AXIS_Z_SELECT));
 
-  if (forward) {
-    q73_shadow_register &= ~mask; // Clear bit = ON (active-low)
-  } else {
-    q73_shadow_register |= mask; // Set bit = OFF (active-low)
+  // Set the selected axis (active-low: clear bit = ON)
+  if (axis == 0) {
+    q73_shadow_register &= ~(1 << PLC_OUT_AXIS_X_SELECT);
+  } else if (axis == 1) {
+    q73_shadow_register &= ~(1 << PLC_OUT_AXIS_Y_SELECT);
+  } else if (axis == 2) {
+    q73_shadow_register &= ~(1 << PLC_OUT_AXIS_Z_SELECT);
   }
+  // axis == 255 means no axis selected (all OFF)
 
-  // Make a copy for I2C write before releasing mutex
   uint8_t register_copy = q73_shadow_register;
-
   xSemaphoreGive(plc_shadow_mutex);
 
-  // Do NOT modify Enable bit here.
+  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Axis");
+}
+
+/**
+ * @brief Set movement direction
+ * @param positive true=Y4 (forward/+), false=Y5 (reverse/-)
+ */
+void plcSetDirection(bool positive) {
+  if (!plcAcquireShadowMutex()) {
+    logError("[PLC] plcSetDirection FAILED (shadow register dirty)");
+    return;
+  }
+
+  // Clear both direction bits first (bits 3-4)
+  q73_shadow_register |= ((1 << PLC_OUT_DIR_POSITIVE) |
+                          (1 << PLC_OUT_DIR_NEGATIVE));
+
+  // Set the selected direction (active-low: clear bit = ON)
+  if (positive) {
+    q73_shadow_register &= ~(1 << PLC_OUT_DIR_POSITIVE);
+  } else {
+    q73_shadow_register &= ~(1 << PLC_OUT_DIR_NEGATIVE);
+  }
+
+  uint8_t register_copy = q73_shadow_register;
+  xSemaphoreGive(plc_shadow_mutex);
+
   plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Direction");
 }
 
-void elboSetSpeedProfile(uint8_t profile_index) {
-  // PHASE 5.7: Gemini Fix - Use retry helper instead of simple timeout
+/**
+ * @brief Set speed profile
+ * @param speed_profile 0=slow (Y8), 1=medium (Y7), 2=fast (Y6)
+ * @note Mapping: SPEED_PROFILE_1(0)=slowest, SPEED_PROFILE_3(2)=fastest
+ *       Hardware: Y6=FAST, Y7=MEDIUM, Y8=SLOW
+ *       So we invert: profile 0→SLOW(Y8), profile 2→FAST(Y6)
+ */
+void plcSetSpeed(uint8_t speed_profile) {
   if (!plcAcquireShadowMutex()) {
-    logError(
-        "[PLC] SetSpeedProfile FAILED for profile %d (shadow register dirty)",
-        profile_index);
+    logError("[PLC] plcSetSpeed FAILED (shadow register dirty)");
     return;
   }
 
-  // Clear Speed bits (4, 5, 6) = all speed relays OFF (active-low: set bits)
-  q73_shadow_register |= ((1 << ELBO_Q73_SPEED_1) | (1 << ELBO_Q73_SPEED_2) |
-                          (1 << ELBO_Q73_SPEED_3));
+  // Clear all speed bits first (bits 5-7)
+  q73_shadow_register |= ((1 << PLC_OUT_SPEED_FAST) |
+                          (1 << PLC_OUT_SPEED_MEDIUM) |
+                          (1 << PLC_OUT_SPEED_SLOW));
 
-  // Active-low: clear the bit to turn ON the selected speed relay
-  switch (profile_index) {
-  case 0:
-    q73_shadow_register &= ~(1 << ELBO_Q73_SPEED_1);
-    break;
-  case 1:
-    q73_shadow_register &= ~(1 << ELBO_Q73_SPEED_2);
-    break;
-  case 2:
-    q73_shadow_register &= ~(1 << ELBO_Q73_SPEED_3);
-    break;
-  default:
-    break;
+  // CRITICAL FIX: Invert mapping to match semantic meaning
+  // Profile 0 = slowest speed request → Y8 (SLOW hardware)
+  // Profile 1 = medium speed request → Y7 (MEDIUM hardware)
+  // Profile 2 = fastest speed request → Y6 (FAST hardware)
+  switch (speed_profile) {
+    case 0:  // SPEED_PROFILE_1 = slowest
+      q73_shadow_register &= ~(1 << PLC_OUT_SPEED_SLOW);  // Y8
+      break;
+    case 1:  // SPEED_PROFILE_2 = medium
+      q73_shadow_register &= ~(1 << PLC_OUT_SPEED_MEDIUM);  // Y7
+      break;
+    case 2:  // SPEED_PROFILE_3 = fastest
+      q73_shadow_register &= ~(1 << PLC_OUT_SPEED_FAST);  // Y6
+      break;
+    default:
+      break;
   }
 
-  // Make a copy for I2C write before releasing mutex
   uint8_t register_copy = q73_shadow_register;
-
   xSemaphoreGive(plc_shadow_mutex);
 
   plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Speed");
 }
 
+/**
+ * @brief Clear all outputs (safe stop)
+ */
+void plcClearAllOutputs() {
+  if (!plcAcquireShadowMutex()) {
+    logError("[PLC] plcClearAllOutputs FAILED (shadow register dirty)");
+    return;
+  }
+
+  q73_shadow_register = 0xFF; // All OFF (active-low)
+
+  uint8_t register_copy = q73_shadow_register;
+  xSemaphoreGive(plc_shadow_mutex);
+
+  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Clear All");
+}
+
+/**
+ * @brief Force write shadow register to hardware (for recovery)
+ */
+void plcCommitOutputs() {
+  if (!plcAcquireShadowMutex()) {
+    logError("[PLC] plcCommitOutputs FAILED (shadow register dirty)");
+    return;
+  }
+
+  uint8_t register_copy = q73_shadow_register;
+  xSemaphoreGive(plc_shadow_mutex);
+
+  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Commit");
+}
+
+// ============================================================================
+// LEGACY API (Redirects to new API for backward compatibility)
+// ============================================================================
+
+void elboSetDirection(uint8_t axis, bool forward) {
+  // Legacy function - now sets BOTH axis and direction
+  // This maintains old API behavior
+  plcSetAxisSelect(axis);
+  plcSetDirection(forward);
+}
+
+void elboSetSpeedProfile(uint8_t profile_index) {
+  // Redirect to new API
+  plcSetSpeed(profile_index);
+}
+
 // PHASE 3.1: Added getter to read current speed profile
 // Allows LCD and diagnostics to display active speed profile
 uint8_t elboGetSpeedProfile() {
-  // Read speed profile bits (4, 5, 6) from shadow register
-  // FIXED: Now using mutex for thread-safe read operation
+  // Read speed profile bits (5, 6, 7) from shadow register
   if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
     logWarning("[PLC] Failed to acquire shadow mutex for GetSpeedProfile");
-    return 0xFF; // Return error on mutex timeout
+    return 0xFF;
   }
 
-  uint8_t speed_bits = (q73_shadow_register >> ELBO_Q73_SPEED_1) & 0x07;
-
+  uint8_t reg = q73_shadow_register;
   xSemaphoreGive(plc_shadow_mutex);
 
-  // Decode speed bits to profile index
-  if (speed_bits & (1 << (ELBO_Q73_SPEED_1 - ELBO_Q73_SPEED_1)))
-    return 0; // Profile 0
-  if (speed_bits & (1 << (ELBO_Q73_SPEED_2 - ELBO_Q73_SPEED_1)))
-    return 1; // Profile 1
-  if (speed_bits & (1 << (ELBO_Q73_SPEED_3 - ELBO_Q73_SPEED_1)))
-    return 2; // Profile 2
+  // Active-low: bit cleared = speed active
+  // Check in order: fast (5), medium (6), slow (7)
+  if (!(reg & (1 << PLC_OUT_SPEED_FAST)))
+    return 0; // Fast
+  if (!(reg & (1 << PLC_OUT_SPEED_MEDIUM)))
+    return 1; // Medium
+  if (!(reg & (1 << PLC_OUT_SPEED_SLOW)))
+    return 2; // Slow
 
-  return 0xFF; // No profile set or error
+  return 0xFF; // No speed set
 }
 
 void elboQ73SetRelay(uint8_t relay_bit, bool state) {

@@ -63,9 +63,9 @@ static const encoder_interface_config_t INTERFACE_TABLE[] = {
     },
     {
         ENCODER_INTERFACE_RS485_RXD2,
-        "RS485-RXD2",
-        "GPIO17/18 (RXD2/TXD2) - RS485 Differential - Alternative",
-        17, 18, 2
+        "RS485",
+        "GPIO16/13 (RS485 RXD/TXD) - RS485 Differential - KC868-A16",
+        16, 13, 2
     },
     {
         ENCODER_INTERFACE_CUSTOM,

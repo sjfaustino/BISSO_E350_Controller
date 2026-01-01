@@ -42,21 +42,10 @@ static esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response)
   return ESP_OK;
 }
 
-
-// External definitions from motion_commands needed to complete API
-extern void motionMoveAbsolute(float x, float y, float z, float a,
-                               float speed_mm_s);
-
 // --- Helper Functions ---
 
 /**
  * @brief Validates filename to prevent path traversal attacks
- * @param filename The filename to validate
- * @return true if filename is safe, false if it contains malicious patterns
- *
- * PHASE 5.10: Security - Path Traversal Prevention
- * Blocks: "..", absolute paths, special characters
- * Allows: alphanumeric, underscore, dot, dash
  */
 static bool isValidFilename(const char* filename) {
   if (!filename || filename[0] == '\0') {
@@ -67,19 +56,6 @@ static bool isValidFilename(const char* filename) {
   if (strstr(filename, "..") != NULL) {
     logWarning("[FILE_API] [SECURITY] Blocked path traversal: %s", filename);
     return false;
-  }
-
-  // Block absolute paths (should be relative to LittleFS root)
-  if (filename[0] == '/') {
-    filename++;  // Skip leading slash for validation
-  }
-
-  // Whitelist: alphanumeric + underscore + dot + dash
-  for (const char* p = filename; *p; p++) {
-    if (!isalnum(*p) && *p != '_' && *p != '.' && *p != '-' && *p != '/') {
-      logWarning("[FILE_API] [SECURITY] Blocked invalid character in filename: %s", filename);
-      return false;
-    }
   }
 
   return true;
@@ -93,12 +69,14 @@ static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *respon
     return ESP_OK;  // Response already sent
   }
   
-  // MEMORY FIX: Use StaticJsonDocument + char array to prevent heap
-  // fragmentation. Sized for ~30 files with paths up to 64 chars each
-  JsonDocument doc;
-  JsonArray array = doc.to<JsonArray>();
+  // Use a reserved string to prevent heap fragmentation during construction
+  String json;
+  json.reserve(2048);
+  json = "[";
   
-  // Recursive helper using lambda - captures array by reference
+  bool first = true;
+  
+  // Recursive helper
   std::function<void(const char*)> listDirRecursive = [&](const char* dirname) {
     File root = LittleFS.open(dirname);
     if (!root || !root.isDirectory()) return;
@@ -110,14 +88,12 @@ static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *respon
       fullPath += file.name();
       
       if (file.isDirectory()) {
-        // Recurse into subdirectory
         listDirRecursive(fullPath.c_str());
       } else {
-        // Add file to list
-        JsonObject obj = array.add<JsonObject>();
-        obj["name"] = fullPath;  // Full path for compatibility
-        obj["path"] = fullPath;  // Also include as path
-        obj["size"] = file.size();
+        if (!first) json += ",";
+        first = false;
+        
+        json += "{\"path\":\"" + fullPath + "\",\"size\":" + String(file.size()) + "}";
       }
       file = root.openNextFile();
     }
@@ -125,17 +101,9 @@ static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *respon
   };
   
   listDirRecursive("/");
-
-  // Use larger buffer to prevent truncation with many files
-  static char responseBuffer[8192];  // Static to avoid stack overflow
-  size_t len = serializeJson(doc, responseBuffer, sizeof(responseBuffer));
+  json += "]";
   
-  // Check for truncation
-  if (len >= sizeof(responseBuffer) - 1) {
-    logWarning("[FILE_API] File list response truncated, too many files");
-  }
-  
-  return response->send(200, "application/json", responseBuffer);
+  return response->send(200, "application/json", json.c_str());
 }
 
 static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *response) {
@@ -149,13 +117,12 @@ static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *resp
   }
 
   // Get param value
-  String pathStr = request->getParam("name")->value();
-  const char *path = pathStr.c_str();
+  String path = request->getParam("name")->value();
 
-  // PHASE 5.10: Security - Validate filename before deletion (path traversal prevention)
-  if (!isValidFilename(path)) {
-    logWarning("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s", path);
-    return response->send(400, "text/plain", "Invalid filename: path traversal or illegal characters");
+  // PHASE 5.10: Security - Validate filename before deletion
+  if (!isValidFilename(path.c_str())) {
+    logWarning("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s", path.c_str());
+    return response->send(400, "text/plain", "Invalid filename");
   }
 
   if (LittleFS.exists(path)) {
@@ -168,7 +135,6 @@ static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *resp
 
 // --- Registration ---
 
-// PHASE 5.10: Removed username/password parameters - using SHA-256 auth
 void apiRegisterFileRoutes(PsychicHttpServer& server) {
   // API: List Files (Protected)
   server.on("/api/files", HTTP_GET, handleFileList);
@@ -176,7 +142,5 @@ void apiRegisterFileRoutes(PsychicHttpServer& server) {
   // API: Delete File (Protected)  
   server.on("/api/files", HTTP_DELETE, handleFileDelete);
 
-  // NOTE: File upload requires PsychicUploadHandler which is configured separately
-  // in web_server.cpp since it requires different handler type
   logInfo("[FILE_API] File routes registered (PsychicHttp)");
 }

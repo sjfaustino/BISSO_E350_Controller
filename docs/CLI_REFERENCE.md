@@ -159,6 +159,33 @@ estop off               # Clear E-Stop (if safe)
 
 ---
 
+### `lcd` - LCD Display Control
+
+**Description:** Configure and control the 20x4 LCD display and backlight.
+
+**Syntax:**
+```
+lcd                     # Show help
+lcd on                  # Enable LCD and save setting
+lcd off                 # Disable LCD and save setting
+lcd backlight <on|off>  # Control backlight
+lcd sleep               # Force display to sleep
+lcd wakeup              # Force display to wake up
+lcd timeout <seconds>   # Set sleep timeout (0=never)
+lcd status              # Show LCD configuration status
+```
+
+**Example Output (status):**
+```
+[LCD] === Status ===
+  Enabled:   YES
+  Mode:      0
+  Sleeping:  NO
+  Timeout:   300 sec
+```
+
+---
+
 ### `limit` - Set Soft Limits
 
 **Description:** Configure software travel limits for an axis.
@@ -646,6 +673,46 @@ rs485                   # Show help
 rs485 status            # Show registered devices
 rs485 scan              # Scan for devices
 ```
+
+---
+
+### `jxk10` - JXK-10 Current Sensor
+
+**Description:** Control and monitor the JXK-10 Hall effect current sensor on RS-485 bus.
+
+**Syntax:**
+```
+jxk10                   # Show help
+jxk10 read              # Read current value
+jxk10 info              # Show device info (address, baud, stats)
+jxk10 addr <new>        # Change slave address (0-254, power cycle required)
+jxk10 status            # Show full diagnostics
+jxk10 enable            # Enable sensor in config
+jxk10 disable           # Disable sensor in config
+```
+
+**Example Output (read):**
+```
+[JXK10] === Current Reading ===
+Current:    15.25 A
+Raw Value:  1525
+Last Read:  50 ms ago
+```
+
+**Example Output (info):**
+```
+[JXK10] === Device Info ===
+Enabled:       YES
+Slave Address: 1 (0x01)
+Baud Rate:     9600 bps
+Read Count:    12345
+Error Count:   2
+```
+
+**Notes:**
+- Default address: 1, default baud: 9600
+- Address change requires power cycle to take effect
+- Scaling: raw ≤ 3000 → ÷100 (2 decimals), raw > 3000 → ÷10 (1 decimal)
 
 ---
 

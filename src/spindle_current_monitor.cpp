@@ -16,11 +16,16 @@
 
 
 // Global monitor state (disabled by default for testing without VFD)
+// Default thresholds tuned for FIMET M 180L4 motor:
+//   - 22kW, 1460 RPM, cos φ 0.85
+//   - Rated current: 24.5A @ 400V (Star), 42A @ 230V (Delta)
+//   - Overcurrent threshold: 30A (122% of rated, allows startup surge)
+//   - Stall threshold: 25A (102% of rated)
 static spindle_monitor_state_t monitor_state = {
     .enabled = false,
     .poll_interval_ms = 1000,
     .last_poll_time_ms = 0,
-    .overcurrent_threshold_amps = 30.0f,
+    .overcurrent_threshold_amps = 30.0f,  // 122% of 24.5A rated
     .current_amps = 0.0f,
     .current_peak_amps = 0.0f,
     .current_average_amps = 0.0f,
@@ -177,9 +182,10 @@ bool spindleMonitorIsOvercurrent(void) {
           monitor_state.overcurrent_threshold_amps);
 }
 
-bool spindleMonitorIsOverload(void) { return jxk10IsOverload(); }
+// NOTE: Status register not documented in JXK-10 PDF, these always return false
+bool spindleMonitorIsOverload(void) { return false; }
 
-bool spindleMonitorIsFault(void) { return jxk10IsFault(); }
+bool spindleMonitorIsFault(void) { return false; }
 
 void spindleMonitorTriggerShutdown(void) {
   monitor_state.shutdown_count++;

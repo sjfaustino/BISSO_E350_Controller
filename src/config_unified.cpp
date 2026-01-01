@@ -64,7 +64,8 @@ static const char *critical_keys[] = {
     KEY_WEB_PW_CHANGED, // Security Critical
     KEY_WIFI_AP_EN,    // WiFi AP Mode
     KEY_WIFI_AP_SSID,
-    KEY_WIFI_AP_PASS
+    KEY_WIFI_AP_PASS,
+    KEY_LCD_EN         // Display Enable
 };
 
 static bool isCriticalKey(const char *key) {
@@ -352,6 +353,8 @@ void configSetDefaults() {
     prefs.putString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
   if (!prefs.isKey(KEY_WIFI_AP_PASS))
     prefs.putString(KEY_WIFI_AP_PASS, "password");
+  if (!prefs.isKey(KEY_LCD_EN))
+    prefs.putInt(KEY_LCD_EN, 1);
 }
 
 void configUnifiedLoad() {

@@ -679,16 +679,17 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
 
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus) {
   if (!enable || axis >= MOTION_AXES) {
-    elboSetDirection(0, false);
-    elboQ73SetRelay(ELBO_Q73_ENABLE, false);
+    // Stop: clear all outputs
+    plcClearAllOutputs();
     return;
   }
-  elboSetDirection(axis, is_plus);
-  elboQ73SetRelay(ELBO_Q73_ENABLE, true);
+  // Set axis, direction, and speed in correct order
+  plcSetAxisSelect(axis);
+  plcSetDirection(is_plus);
 }
 
 void motionSetPLCSpeedProfile(speed_profile_t profile) {
-  elboSetSpeedProfile((uint8_t)profile);
+  plcSetSpeed((uint8_t)profile);
 }
 
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed) {

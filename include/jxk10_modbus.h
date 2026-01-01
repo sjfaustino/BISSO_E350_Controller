@@ -16,47 +16,39 @@
 extern "C" {
 #endif
 
-// Modbus register addresses (decimal)
-#define JXK10_REG_CURRENT        0x0000   // Measured current (INT16, ×100, e.g., 3000 = 30.00A)
-#define JXK10_REG_STATUS         0x0001   // Device status (bit 0=overload, bit 1=fault)
-#define JXK10_REG_SLAVE_ADDR     0x0002   // Slave address (1-247, default 1)
-#define JXK10_REG_BAUD_RATE      0x0003   // Baud rate code (9600=4, default)
-#define JXK10_REG_RANGE_CONFIG   0x0004   // Range config (0=0-50A, 1=0-100A, etc.)
-#define JXK10_REG_SAVE_CONFIG    0x0005   // Save config (write 1 to save to EEPROM)
-#define JXK10_REG_RAW_ADC        0x4000   // Raw ADC value (diagnostic, 12-bit)
+// Modbus register addresses per JXK-10 PDF manual
+#define JXK10_REG_CURRENT        0x000E   // PV - Measured current (INT16, see scaling note)
+#define JXK10_REG_SLAVE_ADDR     0x0004   // Slave address (1-254, default 1)
+#define JXK10_REG_BAUD_RATE      0x0005   // Baud rate code (see table below)
 
-// Current sensor status bits
-#define JXK10_STATUS_OVERLOAD    (1 << 0)
-#define JXK10_STATUS_FAULT       (1 << 1)
+// NOTE: Status register not documented in official PDF, removed
+// NOTE: Scaling: raw ≤ 3000 → divide by 100 (2 decimals), raw > 3000 → divide by 10 (1 decimal)
 
-// Baud rate codes for register 0x0003
-#define JXK10_BAUD_1200          1
-#define JXK10_BAUD_2400          2
-#define JXK10_BAUD_4800          3
-#define JXK10_BAUD_9600          4    // Default
-#define JXK10_BAUD_19200         5
-#define JXK10_BAUD_38400         6
-#define JXK10_BAUD_57600         7
-#define JXK10_BAUD_115200        10
+// Baud rate codes per PDF manual (hex values)
+#define JXK10_BAUD_1200          0x0C     // 1200 bps
+#define JXK10_BAUD_2400          0x18     // 2400 bps
+#define JXK10_BAUD_4800          0x30     // 4800 bps
+#define JXK10_BAUD_9600          0x60     // 9600 bps (default)
+#define JXK10_BAUD_19200         0xC0     // 19200 bps
+#define JXK10_BAUD_38400         0x180    // 38400 bps
+#define JXK10_BAUD_57600         0x240    // 57600 bps
+#define JXK10_BAUD_115200        0x480    // 115200 bps
 
-// Range configuration codes
+// Range configuration (for reference, not a register)
 #define JXK10_RANGE_0_50A        0
 #define JXK10_RANGE_0_100A       1
 
 // JXK-10 device state
 typedef struct {
     bool enabled;                       // Device enabled/connected flag
-    uint8_t slave_address;              // Modbus slave ID (1-247, default 1)
+    uint8_t slave_address;              // Modbus slave ID (1-254, default 1)
     uint32_t baud_rate;                 // Baud rate in bps
-    int16_t current_raw;                // Raw Modbus register value (×100)
+    int16_t current_raw;                // Raw Modbus register value
     float current_amps;                 // Calculated current in amperes
-    uint16_t device_status;             // Status register value
     uint32_t last_read_time_ms;         // Timestamp of last successful read
     uint32_t last_error_time_ms;        // Timestamp of last error
     uint32_t read_count;                // Statistics: successful reads
     uint32_t error_count;               // Statistics: read errors
-    bool is_overload;                   // Overload flag (bit 0 of status)
-    bool is_fault;                      // Fault flag (bit 1 of status)
     uint32_t consecutive_errors;        // Count of consecutive communication failures
 } jxk10_state_t;
 
@@ -102,17 +94,6 @@ float jxk10GetCurrentAmps(void);
  */
 int16_t jxk10GetCurrentRaw(void);
 
-/**
- * @brief Check if device is reporting overload condition
- * @return true if overload bit is set, false otherwise
- */
-bool jxk10IsOverload(void);
-
-/**
- * @brief Check if device is reporting fault condition
- * @return true if fault bit is set, false otherwise
- */
-bool jxk10IsFault(void);
 
 /**
  * @brief Change slave address on device
