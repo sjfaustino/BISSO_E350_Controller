@@ -14,6 +14,9 @@ class SharedWebSocket {
     static currentReconnectDelay = 1000;
     static reconnectTimer = null;
     static listeners = [];
+    static packetsSent = 0;
+    static packetsReceived = 0;
+    static dataReceivedBytes = 0;
 
     static connect() {
         // Clear any pending reconnect timer
@@ -53,6 +56,8 @@ class SharedWebSocket {
             };
 
             this.ws.onmessage = (event) => {
+                this.packetsReceived++;
+                if (event.data) this.dataReceivedBytes += event.data.length;
                 try {
                     const data = JSON.parse(event.data);
                     this.broadcast('telemetry', data);
@@ -144,6 +149,7 @@ class SharedWebSocket {
     static send(message) {
         if (this.ws && this.isConnected && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
+            this.packetsSent++;
             return true;
         }
         console.warn('[WS] Not connected, message not sent');

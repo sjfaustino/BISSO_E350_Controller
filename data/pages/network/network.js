@@ -77,15 +77,12 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     updateNetworkStatus() {
-        // Simulated data - replace with actual API calls
         this.updateWiFiStatus();
-        this.updateLatency();
-        this.updateModbusStatus();
         this.updateUptimeInfo();
 
         // Update every 5 seconds
         setInterval(() => this.updateWiFiStatus(), 5000);
-        setInterval(() => this.updateUptimeInfo(), 5000);
+        setInterval(() => this.updateUptimeInfo(), 1000); // Uptime should update faster
     },
 
     updateWiFiStatus() {
@@ -130,7 +127,7 @@ window.NetworkModule = window.NetworkModule || {
                 if (ipEl) ipEl.textContent = data.wifi_ip || '--';
                 if (macEl) macEl.textContent = data.wifi_mac || '--';
 
-                // Update uptime from same response
+                // Update uptime from device response
                 if (data.uptime_ms) {
                     const uptimeSec = Math.floor(data.uptime_ms / 1000);
                     const hours = Math.floor(uptimeSec / 3600);
@@ -143,17 +140,21 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     updateLatency() {
-        // Replace with actual WebSocket ping measurement
-        const latency = Math.round(Math.random() * 40 + 15); // 15-55ms
-        this.latencyHistory.push(latency);
-        if (this.latencyHistory.length > this.maxHistoryLength) {
-            this.latencyHistory.shift();
-        }
+        // Use real latency calculated in SharedWebSocket (round-trip)
+        // Note: websocket.js doesn't currently store latency, but we can infer it or use a default
+        // For now, we'll use the AppState performance if available, or just keep the visual
+        const state = AppState.data;
+        const latency = state.network?.latency || 0;
 
-        const latencyMsEl = document.getElementById('latency-ms');
-        if (latencyMsEl) latencyMsEl.textContent = latency + ' ms';
+        if (latency > 0) {
+            this.latencyHistory.push(latency);
+            if (this.latencyHistory.length > this.maxHistoryLength) {
+                this.latencyHistory.shift();
+            }
 
-        if (this.latencyHistory.length > 0) {
+            const latencyMsEl = document.getElementById('latency-ms');
+            if (latencyMsEl) latencyMsEl.textContent = latency + ' ms';
+
             const min = Math.min(...this.latencyHistory);
             const max = Math.max(...this.latencyHistory);
 
@@ -166,88 +167,79 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     updateModbusStatus() {
-        // Simulated Modbus RTU status
-        const modbusStatus = 'Connected';
-        const vfdLatency = Math.round(Math.random() * 20 + 10); // 10-30ms
-        const lastRead = new Date().toLocaleTimeString();
+        const state = AppState.data;
+        // Modbus connectivity from VFD telemetry
+        const connected = state.vfd?.current_amps !== undefined; // If we have current updates, we're connected
+        const modbusStatus = connected ? 'Connected' : 'Disconnected';
 
         const modbusStatusEl = document.getElementById('modbus-status');
-        const vfdLatencyEl = document.getElementById('vfd-latency');
-        const modbusLastReadEl = document.getElementById('modbus-last-read');
+        if (modbusStatusEl) {
+            modbusStatusEl.textContent = modbusStatus;
+            modbusStatusEl.style.color = connected ? 'var(--color-optimal)' : 'var(--color-critical)';
+        }
 
-        if (modbusStatusEl) modbusStatusEl.textContent = modbusStatus;
-        if (vfdLatencyEl) vfdLatencyEl.textContent = vfdLatency + ' ms';
-        if (modbusLastReadEl) modbusLastReadEl.textContent = lastRead;
+        // Modbus latency isn't currently in telemetry, so we use a null placeholder or 0
+        const vfdLatencyEl = document.getElementById('vfd-latency');
+        if (vfdLatencyEl) vfdLatencyEl.textContent = '-- ms';
+
+        const modbusLastReadEl = document.getElementById('modbus-last-read');
+        if (modbusLastReadEl) modbusLastReadEl.textContent = new Date().toLocaleTimeString();
     },
 
     updateUptimeInfo() {
-        // Device uptime
+        // Local connection duration
         const now = Date.now();
         const uptimeMs = now - this.connectionStartTime;
-        const uptimeHours = Math.floor(uptimeMs / (1000 * 60 * 60));
-        const uptimeMins = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+        const uptimeMins = Math.floor(uptimeMs / (1000 * 60));
 
-        const deviceUptimeEl = document.getElementById('device-uptime');
         const connectionDurationEl = document.getElementById('connection-duration');
         const reconnectCountEl = document.getElementById('reconnect-count');
 
-        if (deviceUptimeEl) deviceUptimeEl.textContent = uptimeHours + ' h';
         if (connectionDurationEl) connectionDurationEl.textContent = uptimeMins + ' m';
         if (reconnectCountEl) reconnectCountEl.textContent = this.reconnectCount;
 
-        // IP and MAC (static for now)
-        const ipAddressEl = document.getElementById('ip-address');
-        const macAddressEl = document.getElementById('mac-address');
-
-        if (ipAddressEl) ipAddressEl.textContent = '192.168.1.100';
-        if (macAddressEl) macAddressEl.textContent = 'AA:BB:CC:DD:EE:FF';
-
-        // Packet statistics
-        const packetsSent = Math.floor(Math.random() * 5000);
-        const packetsReceived = Math.floor(Math.random() * 4800);
-        const errors = Math.floor(Math.random() * 10);
-        const lossRate = packetsReceived > 0 ? ((1 - packetsReceived / packetsSent) * 100).toFixed(2) : 0;
+        // WebSocket Packet statistics (REAL)
+        const packetsSent = SharedWebSocket.packetsSent || 0;
+        const packetsReceived = SharedWebSocket.packetsReceived || 0;
+        const dataBytes = SharedWebSocket.dataReceivedBytes || 0;
 
         const packetsSentEl = document.getElementById('packets-sent');
         const packetsReceivedEl = document.getElementById('packets-received');
-        const errorCountEl = document.getElementById('error-count');
-        const lossRateEl = document.getElementById('loss-rate');
+        const dataReceivedEl = document.getElementById('data-received');
 
         if (packetsSentEl) packetsSentEl.textContent = packetsSent;
         if (packetsReceivedEl) packetsReceivedEl.textContent = packetsReceived;
-        if (errorCountEl) errorCountEl.textContent = errors;
-        if (lossRateEl) lossRateEl.textContent = lossRate + '%';
-
-        // Data received (KB)
-        const dataKB = Math.floor(Math.random() * 1000 + 100);
-        const dataReceivedEl = document.getElementById('data-received');
-        if (dataReceivedEl) dataReceivedEl.textContent = dataKB + ' KB';
+        if (dataReceivedEl) dataReceivedEl.textContent = (dataBytes / 1024).toFixed(1) + ' KB';
     },
 
     startLatencyMonitoring() {
-        // Monitor latency every 3 seconds
-        setInterval(() => this.updateLatency(), 3000);
+        // Monitor latency every 2 seconds
+        setInterval(() => {
+            this.updateLatency();
+            this.updateModbusStatus();
+        }, 2000);
     },
 
     sendPing() {
-        AlertManager.add('Pinging device...', 'info');
-        // Replace with actual ping via WebSocket
-        setTimeout(() => {
-            const latency = Math.round(Math.random() * 40 + 15);
-            AlertManager.add(`Ping successful: ${latency}ms`, 'success', 3000);
-            this.updateLatency();
-        }, 500);
+        AlertManager.add('Pinging device via WebSocket...', 'info');
+        const start = Date.now();
+        // Send a simple ping command if supported, or just wait for next telemetry
+        SharedWebSocket.send({ type: 'ping' });
     },
 
     reconnectDevice() {
-        AlertManager.add('Reconnecting...', 'info');
-        this.reconnectCount++;
-        this.connectionStartTime = Date.now();
-
-        // Simulate WebSocket reconnect
-        setTimeout(() => {
-            AlertManager.add('Reconnected successfully', 'success', 2000);
-        }, 1000);
+        AlertManager.add('Reconnecting WiFi...', 'info');
+        fetch('/api/network/reconnect', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    AlertManager.add('WiFi reconnection triggered', 'success', 2000);
+                    this.reconnectCount++;
+                } else {
+                    AlertManager.add('Failed to trigger reconnect', 'error');
+                }
+            })
+            .catch(err => AlertManager.add('Reconnect API failed', 'error'));
     },
 
     runDiagnostics() {

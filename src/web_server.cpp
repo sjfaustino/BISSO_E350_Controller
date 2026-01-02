@@ -100,11 +100,39 @@ void WebServerManager::init() {
     // GET /api/network/status
     server.on("/api/network/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
         JsonDocument doc;
-        doc["wifi_connected"] = WiFi.isConnected();
-        doc["ssid"] = WiFi.SSID();
-        doc["ip"] = WiFi.localIP().toString();
-        doc["rssi"] = WiFi.RSSI();
-        doc["mac"] = WiFi.macAddress();
+        bool connected = WiFi.isConnected();
+        doc["wifi_connected"] = connected;
+        doc["wifi_ssid"] = connected ? WiFi.SSID() : "--";
+        doc["wifi_ip"] = connected ? WiFi.localIP().toString() : "0.0.0.0";
+        doc["wifi_rssi"] = connected ? WiFi.RSSI() : -100;
+        doc["wifi_mac"] = WiFi.macAddress();
+        doc["wifi_gateway"] = connected ? WiFi.gatewayIP().toString() : "0.0.0.0";
+        doc["wifi_dns"] = connected ? WiFi.dnsIP().toString() : "0.0.0.0";
+        
+        // Calculate signal quality percentage (maps -100..-50 to 0..100)
+        int rssi = WiFi.RSSI();
+        int quality = 0;
+        if (rssi <= -100) quality = 0;
+        else if (rssi >= -50) quality = 100;
+        else quality = 2 * (rssi + 100);
+        doc["signal_quality"] = quality;
+        
+        // System uptime in ms
+        doc["uptime_ms"] = millis();
+        
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+
+    // POST /api/network/reconnect
+    server.on("/api/network/reconnect", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        WiFi.disconnect();
+        WiFi.begin(); // Re-trigger connection using current credentials
+        
+        JsonDocument doc;
+        doc["success"] = true;
+        doc["message"] = "Reconnection triggered";
         
         String json;
         serializeJson(doc, json);
