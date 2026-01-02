@@ -9,7 +9,7 @@
  * - Critical configuration constants
  */
 
-#include "test/unity/unity.h"
+#include <unity.h>
 #include <cstdint>
 #include <cstring>
 
@@ -133,8 +133,9 @@ void test_default_encoder_ppr_reasonable(void) {
 
 // @test Deadband default is positive and small
 void test_default_deadband_small(void) {
-    TEST_ASSERT_GREATER_THAN(0.0f, DEFAULT_DEADBAND_MM);
-    TEST_ASSERT_LESS_THAN(10.0f, DEFAULT_DEADBAND_MM);
+    // Use float-aware assertions
+    TEST_ASSERT_TRUE(DEFAULT_DEADBAND_MM > 0.0f);
+    TEST_ASSERT_TRUE(DEFAULT_DEADBAND_MM < 10.0f);
 }
 
 // @test Baud rate default is standard value

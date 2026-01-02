@@ -12,7 +12,7 @@
  * @note These tests verify the RS485 pin fix made on 2026-01-01
  */
 
-#include "test/unity/unity.h"
+#include <unity.h>
 #include <cstdint>
 #include <cstring>
 

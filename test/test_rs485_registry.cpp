@@ -10,7 +10,7 @@
  * - Error counter management
  */
 
-#include "test/unity/unity.h"
+#include <unity.h>
 #include <cstdint>
 #include <cstring>
 
@@ -138,6 +138,20 @@ static rs485_device_t* registry_find_by_address(uint8_t addr) {
     return NULL;
 }
 
+// Helper to create device struct (C++ compatible)
+static rs485_device_t make_device(const char* name, rs485_device_type_t type,
+                                   uint8_t addr, uint8_t priority) {
+    rs485_device_t dev;
+    memset(&dev, 0, sizeof(dev));
+    dev.name = name;
+    dev.type = type;
+    dev.slave_address = addr;
+    dev.priority = priority;
+    dev.poll_interval_ms = 100;
+    dev.enabled = true;
+    return dev;
+}
+
 // ============================================================================
 // DEVICE REGISTRATION TESTS
 // ============================================================================
@@ -152,14 +166,7 @@ void test_registry_starts_empty(void) {
 void test_registry_add_device(void) {
     registry_reset();
     
-    rs485_device_t dev = {
-        .name = "TestDevice",
-        .type = RS485_DEVICE_TYPE_ENCODER,
-        .slave_address = 1,
-        .priority = 5,
-        .poll_interval_ms = 100,
-        .enabled = true
-    };
+    rs485_device_t dev = make_device("TestDevice", RS485_DEVICE_TYPE_ENCODER, 1, 5);
     
     bool result = registry_add_device(&dev);
     
@@ -171,8 +178,8 @@ void test_registry_add_device(void) {
 void test_registry_rejects_duplicate_address(void) {
     registry_reset();
     
-    rs485_device_t dev1 = {.name = "Dev1", .slave_address = 1, .priority = 5};
-    rs485_device_t dev2 = {.name = "Dev2", .slave_address = 1, .priority = 3};
+    rs485_device_t dev1 = make_device("Dev1", RS485_DEVICE_TYPE_GENERIC, 1, 5);
+    rs485_device_t dev2 = make_device("Dev2", RS485_DEVICE_TYPE_GENERIC, 1, 3);
     
     registry_add_device(&dev1);
     bool result = registry_add_device(&dev2);
@@ -206,7 +213,7 @@ void test_registry_max_devices_limit(void) {
 void test_registry_remove_device(void) {
     registry_reset();
     
-    rs485_device_t dev = {.name = "Dev", .slave_address = 1, .priority = 5};
+    rs485_device_t dev = make_device("Dev", RS485_DEVICE_TYPE_GENERIC, 1, 5);
     registry_add_device(&dev);
     
     bool result = registry_remove_device(&dev);
@@ -223,9 +230,9 @@ void test_registry_remove_device(void) {
 void test_registry_priority_sorting(void) {
     registry_reset();
     
-    rs485_device_t low = {.name = "Low", .slave_address = 1, .priority = 1};
-    rs485_device_t high = {.name = "High", .slave_address = 2, .priority = 10};
-    rs485_device_t med = {.name = "Med", .slave_address = 3, .priority = 5};
+    rs485_device_t low = make_device("Low", RS485_DEVICE_TYPE_GENERIC, 1, 1);
+    rs485_device_t high = make_device("High", RS485_DEVICE_TYPE_GENERIC, 2, 10);
+    rs485_device_t med = make_device("Med", RS485_DEVICE_TYPE_GENERIC, 3, 5);
     
     registry_add_device(&low);
     registry_add_device(&high);
@@ -245,10 +252,8 @@ void test_registry_priority_sorting(void) {
 void test_registry_find_by_type(void) {
     registry_reset();
     
-    rs485_device_t encoder = {.name = "Encoder", .slave_address = 1, 
-                              .type = RS485_DEVICE_TYPE_ENCODER, .priority = 5};
-    rs485_device_t vfd = {.name = "VFD", .slave_address = 2,
-                          .type = RS485_DEVICE_TYPE_VFD, .priority = 3};
+    rs485_device_t encoder = make_device("Encoder", RS485_DEVICE_TYPE_ENCODER, 1, 5);
+    rs485_device_t vfd = make_device("VFD", RS485_DEVICE_TYPE_VFD, 2, 3);
     
     registry_add_device(&encoder);
     registry_add_device(&vfd);
@@ -263,8 +268,8 @@ void test_registry_find_by_type(void) {
 void test_registry_find_by_address(void) {
     registry_reset();
     
-    rs485_device_t dev1 = {.name = "Dev1", .slave_address = 5, .priority = 5};
-    rs485_device_t dev2 = {.name = "Dev2", .slave_address = 10, .priority = 3};
+    rs485_device_t dev1 = make_device("Dev1", RS485_DEVICE_TYPE_GENERIC, 5, 5);
+    rs485_device_t dev2 = make_device("Dev2", RS485_DEVICE_TYPE_GENERIC, 10, 3);
     
     registry_add_device(&dev1);
     registry_add_device(&dev2);

@@ -13,7 +13,7 @@
  *       to fix the signal mapping to match KC868-A16 hardware wiring.
  */
 
-#include "test/unity/unity.h"
+#include <unity.h>
 #include "test/mocks/plc_mock.h"
 
 // Global mock instance for tests

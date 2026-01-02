@@ -11,7 +11,7 @@
  * @note These tests verify the I2C recovery infrastructure works correctly
  */
 
-#include "test/unity/unity.h"
+#include <unity.h>
 #include <cstdint>
 #include <cstring>
 #include <cmath>
@@ -183,7 +183,7 @@ void test_custom_retry_config(void) {
 // ============================================================================
 
 // @test Stats initialize to zero
-void test_stats_initialize_zero(void) {
+void test_i2c_stats_initialize_zero(void) {
     reset_mock();
     
     TEST_ASSERT_EQUAL_UINT32(0, g_stats.transactions_total);
@@ -296,7 +296,7 @@ void run_i2c_recovery_tests(void) {
     RUN_TEST(test_custom_retry_config);
     
     // Statistics
-    RUN_TEST(test_stats_initialize_zero);
+    RUN_TEST(test_i2c_stats_initialize_zero);
     RUN_TEST(test_success_rate_calculation);
     RUN_TEST(test_success_rate_no_transactions);
     RUN_TEST(test_error_counters_independent);

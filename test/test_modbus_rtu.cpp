@@ -10,7 +10,7 @@
  * - Frame length calculations
  */
 
-#include "test/unity/unity.h"
+#include <unity.h>
 #include <cstdint>
 #include <cstring>
 
@@ -33,24 +33,20 @@
 #define MODBUS_ERR_FRAME_ERROR              0x82
 
 // ============================================================================
-// CRC-16 IMPLEMENTATION (for testing without linking actual code)
+// CRC-16 IMPLEMENTATION (standard Modbus polynomial 0xA001)
 // ============================================================================
-
-static const uint16_t crc16_table[256] = {
-    0x0000, 0xCC01, 0xD801, 0x1400, 0xF001, 0x3C00, 0x2800, 0xE401,
-    0xA001, 0x6C00, 0x7800, 0xB401, 0x5000, 0x9C01, 0x8801, 0x4400,
-    0x0400, 0xC801, 0xDC01, 0x1000, 0xF401, 0x3800, 0x2C00, 0xE001,
-    0xA401, 0x6800, 0x7C00, 0xB001, 0x5400, 0x9801, 0x8C01, 0x4000,
-    0x0C00, 0xC001, 0xD401, 0x1800, 0xFC01, 0x3000, 0x2400, 0xE801,
-    0xAC01, 0x6000, 0x7400, 0xB801, 0x5C00, 0x9001, 0x8401, 0x4800,
-    0x0800, 0xC401, 0xD001, 0x1C00, 0xF801, 0x3400, 0x2000, 0xEC01,
-    0xA801, 0x6400, 0x7000, 0xBC01, 0x5801, 0x9400, 0x8001, 0x4C00
-};
 
 static uint16_t modbusCrc16(const uint8_t* data, uint16_t length) {
     uint16_t crc = 0xFFFF;
     for (uint16_t i = 0; i < length; i++) {
-        crc = (crc >> 8) ^ crc16_table[(crc ^ data[i]) & 0xFF];
+        crc ^= data[i];
+        for (int j = 0; j < 8; j++) {
+            if (crc & 0x0001) {
+                crc = (crc >> 1) ^ 0xA001;
+            } else {
+                crc >>= 1;
+            }
+        }
     }
     return crc;
 }
@@ -110,13 +106,15 @@ void test_crc16_known_pattern(void) {
     // Standard Modbus test: slave 1, FC03, addr 0, count 1
     uint8_t data[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x01};
     uint16_t crc = modbusCrc16(data, 6);
-    // Known CRC for this pattern
-    TEST_ASSERT_EQUAL_HEX16(0x840A, crc);
+    // Our algorithm produces 0x0A84 (standard Modbus CRC for this pattern)
+    // When transmitted on wire: low byte 0x84 first, then high byte 0x0A
+    TEST_ASSERT_EQUAL_HEX16(0x0A84, crc);
 }
 
 // @test CRC verification passes for valid frame
 void test_crc_verify_valid_frame(void) {
-    uint8_t frame[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x84};
+    // Frame with CRC 0x0A84: low byte 0x84 first, then high byte 0x0A
+    uint8_t frame[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x01, 0x84, 0x0A};
     bool valid = modbusVerifyCrc(frame, 8);
     TEST_ASSERT_TRUE(valid);
 }

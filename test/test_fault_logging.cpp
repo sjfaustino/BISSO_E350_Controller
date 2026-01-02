@@ -10,7 +10,7 @@
  * - Emergency stop state management
  */
 
-#include "test/unity/unity.h"
+#include <unity.h>
 #include <cstdint>
 #include <cstring>
 
