@@ -305,7 +305,8 @@ void WebServerManager::init() {
     Serial.println("[WEB] WebSocket handler registered at /ws");
     
     // Serve static files from root (MUST be after API routes)
-    server.serveStatic("/", LittleFS, "/", "no-store, max-age=0");
+    // PHASE 6: Enable browser caching to reduce load on LittleFS
+    server.serveStatic("/", LittleFS, "/", "public, max-age=3600");
     
     // Initialize status cache
     memset(&current_status, 0, sizeof(current_status));
@@ -314,6 +315,12 @@ void WebServerManager::init() {
 
 void WebServerManager::begin() {
     Serial.println("[WEB] Starting Server");
+    
+    // PHASE 6: Performance tuning for concurrent browser requests
+    // Increase concurrent connections to prevent ERR_INCOMPLETE_CHUNKED_ENCODING
+    server.config.max_open_sockets = 12;
+    server.config.max_uri_handlers = 40;
+    
     server.start(); 
 }
 
