@@ -327,7 +327,8 @@ void test_max_devices_defined(void) {
 
 // @test Device error counters initialize to zero
 void test_device_error_counters_init(void) {
-    rs485_device_t dev = {0};
+    rs485_device_t dev;
+    memset(&dev, 0, sizeof(dev));
     
     TEST_ASSERT_EQUAL_UINT32(0, dev.poll_count);
     TEST_ASSERT_EQUAL_UINT32(0, dev.error_count);

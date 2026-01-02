@@ -182,7 +182,8 @@ void test_fault_entry_value_signed(void) {
 
 // @test Stats structure initializes to zero
 void test_stats_initialize_zero(void) {
-    fault_stats_t stats = {0};
+    fault_stats_t stats;
+    memset(&stats, 0, sizeof(stats));
     
     TEST_ASSERT_EQUAL_UINT32(0, stats.total_faults);
     TEST_ASSERT_EQUAL_UINT32(0, stats.encoder_faults);
@@ -196,7 +197,8 @@ void test_stats_initialize_zero(void) {
 
 // @test Stats has time tracking fields
 void test_stats_has_time_fields(void) {
-    fault_stats_t stats = {0};
+    fault_stats_t stats;
+    memset(&stats, 0, sizeof(stats));
     stats.first_fault_time_ms = 1000;
     stats.last_fault_time_ms = 5000;
     
