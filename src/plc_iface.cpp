@@ -451,3 +451,7 @@ bool elboIsShadowRegisterDirty() { return q73_shadow_dirty; }
 
 // Hardware presence check - allows monitor tasks to skip I2C when no hardware
 bool plcIsHardwarePresent() { return g_plc_hardware_present; }
+
+uint8_t elboI73GetRawState() { return i73_input_shadow; }
+
+uint8_t elboQ73GetRawState() { return q73_shadow_register; }

@@ -224,3 +224,5 @@ void boardInputsDiagnostics() {
                 resume ? "PRESSED" : "RELEASED");
   serialLoggerUnlock();
 }
+
+uint8_t boardInputsGetRawState() { return input_cache; }

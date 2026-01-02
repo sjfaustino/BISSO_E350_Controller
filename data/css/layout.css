@@ -51,13 +51,27 @@ header h1 {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
 }
 
 @keyframes pulse-warning {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
 }
 
 /* Navigation */
@@ -71,7 +85,8 @@ nav {
     height: 100vh;
     overflow-y: auto;
     z-index: var(--z-fixed);
-    padding-top: 80px; /* Space for header */
+    padding-top: 80px;
+    /* Space for header */
 }
 
 nav ul {
@@ -114,13 +129,42 @@ nav li {
     min-height: 100vh;
 }
 
+/* App container for sidebar layout */
+.app-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar logo */
+.sidebar .logo {
+    padding: var(--space-lg);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-normal);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Main content area - offset for fixed sidebar */
+.main-content {
+    margin-left: 250px;
+    padding: var(--space-lg);
+    flex: 1;
+    min-height: 100vh;
+    width: calc(100% - 250px);
+}
+
 #page-container {
     animation: fadeIn var(--transition-normal);
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 /* Footer */
@@ -197,7 +241,9 @@ footer {
 
 /* Mobile responsive */
 @media (max-width: 768px) {
-    nav {
+
+    nav,
+    .sidebar {
         width: 100%;
         height: auto;
         position: relative;
@@ -206,19 +252,27 @@ footer {
         padding-top: 0;
     }
 
-    nav ul {
+    nav ul,
+    .nav-menu {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-sm);
+        padding: var(--space-sm);
     }
 
     nav li {
         margin-bottom: 0;
     }
 
-    .container {
+    .container,
+    .main-content {
         margin-left: 0;
         padding: var(--space-md);
+        width: 100%;
+    }
+
+    .app-container {
+        flex-direction: column;
     }
 
     header {

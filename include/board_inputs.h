@@ -28,4 +28,7 @@ button_state_t boardInputsUpdate();
 // Print diagnostic status to Serial
 void boardInputsDiagnostics();
 
+// Raw state getter
+uint8_t boardInputsGetRawState();
+
 #endif // BOARD_INPUTS_H

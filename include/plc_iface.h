@@ -87,5 +87,7 @@ void elboDiagnostics();
 uint32_t elboGetMutexTimeoutCount();
 bool elboIsShadowRegisterDirty();
 bool plcIsHardwarePresent();  // Returns false if PLC I2C board not detected at boot
+uint8_t elboI73GetRawState(); // Returns current input byte
+uint8_t elboQ73GetRawState(); // Returns current output byte shadow
 
 #endif // PLC_IFACE_H

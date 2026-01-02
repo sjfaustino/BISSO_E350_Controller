@@ -17,31 +17,38 @@
 </head>
 
 <body>
-    <div class="container">
-        <h1>BISSO E350 Controller</h1>
-        <p>Debug Mode - Unbundled Assets</p>
+    <div class="app-container">
+        <!-- Navigation Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">BISSO E350</div>
+            <ul class="nav-menu">
+                <li><a href="#dashboard" class="nav-item">Dashboard</a></li>
+                <li><a href="#motion" class="nav-item">Motion</a></li>
+                <li><a href="#gcode" class="nav-item">G-Code</a></li>
+                <li><a href="#homing" class="nav-item">Homing</a></li>
+                <li><a href="#diagnostics" class="nav-item">Diagnostics</a></li>
+                <li><a href="#network" class="nav-item">Network</a></li>
+                <li><a href="#system" class="nav-item">System</a></li>
+                <li><a href="#maintenance" class="nav-item">Maintenance</a></li>
+                <li><a href="#logs" class="nav-item">Logs</a></li>
+                <li><a href="#hardware" class="nav-item">Hardware</a></li>
+                <li><a href="#settings" class="nav-item">Settings</a></li>
+            </ul>
+        </nav>
 
-        <div class="grid">
-            <div class="card">
-                <h2>System Status</h2>
-                <div id="status-display">Initializing...</div>
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div id="page-container">
+                <div class="loading">Loading...</div>
             </div>
-
-            <div class="card">
-                <h2>Navigation</h2>
-                <ul>
-                    <li><a href="#dashboard">Dashboard</a></li>
-                    <li><a href="#motion">Motion</a></li>
-                    <li><a href="#settings">Settings</a></li>
-                </ul>
-            </div>
-        </div>
+        </main>
     </div>
 
-    <!-- JS - Individual Files -->
-    <script src="shared/utils.js"></script>
-    <script src="shared/state.js"></script>
-    <script src="shared/theme.js"></script>
+    <!-- JS - Shared modules (load before core.js) -->
+    <script src="shared/graphs.js"></script>
+    <script src="shared/websocket.js"></script>
+
+    <!-- JS - Core contains Utils, AppState, ThemeManager, Router -->
     <script src="core.js"></script>
 </body>
 
