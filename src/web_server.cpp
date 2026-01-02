@@ -1,11 +1,15 @@
 /**
  * @file web_server.cpp
- * @brief Minimal Web Server Implementation
- * @details Implements minimal static file serving matching the WebServerManager interface.
+ * @brief Web Server Implementation with REST API
+ * @details Implements static file serving and REST API for configuration.
  */
 
 #include "web_server.h"
 #include <LittleFS.h>
+#include <ArduinoJson.h>
+#include <WiFi.h>
+#include "api_config.h"
+#include "serial_logger.h"
 
 // Instantiate the global webServer object declared extern in web_server.h
 WebServerManager webServer;
@@ -21,7 +25,7 @@ WebServerManager::~WebServerManager() {
 
 // Initialization
 void WebServerManager::init() {
-    Serial.println("[WEB] Minimal Init (Tuned)");
+    Serial.println("[WEB] Init with REST API");
     
     // TUNE: Increase stack size and enable LRU purge for concurrency
     server.config.stack_size = 8192;
@@ -41,7 +45,102 @@ void WebServerManager::init() {
         Serial.println("[WEB] LittleFS formatted and mounted");
     }
     
-    // Serve static files from root, disable caching to force reload of index.html
+    // --- API Routes (must be registered before static file serving) ---
+    
+    // GET /api/config/get?category=N
+    server.on("/api/config/get", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        int category = 0;
+        if (request->hasParam("category")) {
+            category = request->getParam("category")->value().toInt();
+        }
+        
+        JsonDocument doc;
+        if (apiConfigGet((config_category_t)category, doc)) {
+            String json;
+            serializeJson(doc, json);
+            return response->send(200, "application/json", json.c_str());
+        }
+        return response->send(400, "application/json", "{\"error\":\"Invalid category\"}");
+    });
+    
+    // POST /api/config/set
+    server.on("/api/config/set", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        String body = request->body();
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        if (error) {
+            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        }
+        
+        int category = doc["category"] | 0;
+        const char* key = doc["key"] | "";
+        JsonVariant value = doc["value"];
+        
+        char error_msg[128] = {0};
+        if (!apiConfigValidate((config_category_t)category, key, value, error_msg, sizeof(error_msg))) {
+            JsonDocument resp;
+            resp["error"] = error_msg;
+            String json;
+            serializeJson(resp, json);
+            return response->send(400, "application/json", json.c_str());
+        }
+        
+        if (apiConfigSet((config_category_t)category, key, value)) {
+            apiConfigSave();
+            return response->send(200, "application/json", "{\"success\":true}");
+        }
+        return response->send(500, "application/json", "{\"error\":\"Failed to set config\"}");
+    });
+    
+    // GET /api/network/status
+    server.on("/api/network/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        JsonDocument doc;
+        doc["wifi_connected"] = WiFi.isConnected();
+        doc["ssid"] = WiFi.SSID();
+        doc["ip"] = WiFi.localIP().toString();
+        doc["rssi"] = WiFi.RSSI();
+        doc["mac"] = WiFi.macAddress();
+        
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+    
+    // GET /api/spindle/alarm - stub for now
+    server.on("/api/spindle/alarm", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        JsonDocument doc;
+        doc["enabled"] = false;
+        doc["threshold_amps"] = 0.0f;
+        doc["alarm_active"] = false;
+        
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+    
+    // POST /api/encoder/calibrate
+    server.on("/api/encoder/calibrate", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        String body = request->body();
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        if (error) {
+            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        }
+        
+        uint8_t axis = doc["axis"] | 0;
+        uint16_t ppm = doc["ppm"] | 0;
+        
+        if (apiConfigCalibrateEncoder(axis, ppm)) {
+            return response->send(200, "application/json", "{\"success\":true}");
+        }
+        return response->send(400, "application/json", "{\"error\":\"Calibration failed\"}");
+    });
+    
+    Serial.println("[WEB] API routes registered");
+    
+    // Serve static files from root (MUST be after API routes)
     server.serveStatic("/", LittleFS, "/", "no-store, max-age=0");
 }
 
