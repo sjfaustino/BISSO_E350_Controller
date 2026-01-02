@@ -199,7 +199,24 @@ window.DashboardModule = window.DashboardModule || {
         if (state.system) {
             const cpu = state.system.cpu_percent || 0;
             const mem = state.system.free_heap_bytes || 0;
+            const health = state.system.health || 'UNKNOWN';
+            const status = state.system.status || 'IDLE';
 
+            // System Health Card
+            const healthValueEl = document.getElementById('health-value');
+            if (healthValueEl) {
+                healthValueEl.textContent = health;
+                healthValueEl.className = 'card-value ' + health.toLowerCase();
+            }
+            const healthDetailEl = document.getElementById('health-detail');
+            if (healthDetailEl) healthDetailEl.textContent = 'Status: ' + status;
+
+            const healthBar = document.getElementById('health-bar');
+            if (healthBar) {
+                healthBar.className = 'progress-fill ' + health.toLowerCase();
+            }
+
+            // CPU Usage Card
             const cpuValueEl = document.getElementById('cpu-value');
             if (cpuValueEl) cpuValueEl.textContent = cpu + '%';
 
@@ -211,12 +228,16 @@ window.DashboardModule = window.DashboardModule || {
                 if (cpu > 95) cpuBar.classList.add('critical');
             }
 
+            // Memory Card
             const memValueEl = document.getElementById('mem-value');
             if (memValueEl) memValueEl.textContent = (mem / 1024).toFixed(0) + ' KB';
 
             const memBar = document.getElementById('mem-bar');
             if (memBar) {
-                memBar.style.width = Math.min(100, (mem / 50000) * 100) + '%';
+                // Assuming 320KB internal heap for scaling (typical ESP32)
+                const totalHeap = 320000;
+                const percent = Math.min(100, (mem / totalHeap) * 100);
+                memBar.style.width = percent + '%';
             }
         }
 

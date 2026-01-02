@@ -13,6 +13,7 @@
 #include "hardware_config.h"
 #include "plc_iface.h"
 #include "board_inputs.h"
+#include "system_telemetry.h"
 
 // Instantiate the global webServer object declared extern in web_server.h
 WebServerManager webServer;
@@ -414,11 +415,14 @@ void WebServerManager::broadcastState() {
     // Build JSON telemetry payload
     JsonDocument doc;
     
+    system_telemetry_t telemetry = telemetryGetSnapshot();
+    
     portENTER_CRITICAL(&statusSpinlock);
     doc["system"]["status"] = current_status.status;
+    doc["system"]["health"] = telemetryGetHealthStatusString(telemetry.health_status);
     doc["system"]["uptime_seconds"] = current_status.uptime_sec;
-    doc["system"]["cpu_percent"] = 0;  // TODO: Implement CPU usage tracking
-    doc["system"]["free_heap_bytes"] = ESP.getFreeHeap();
+    doc["system"]["cpu_percent"] = telemetry.cpu_usage_percent;
+    doc["system"]["free_heap_bytes"] = telemetry.free_heap_bytes;
     
     doc["motion"]["position"]["x"] = current_status.x_pos;
     doc["motion"]["position"]["y"] = current_status.y_pos;
