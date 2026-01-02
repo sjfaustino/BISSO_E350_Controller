@@ -169,37 +169,41 @@ class Router {
         if (!this.routes[page]) { window.location.hash = '#dashboard'; return; }
         if (this.isLoading) return;
         this.isLoading = true;
+
+        // CRITICAL FIX: Clear old page state before navigation starts
+        // This prevents the new HTML from having the "old" module's init() called on it
+        if (this.currentModule && this.currentModule.cleanup) this.currentModule.cleanup();
+        this.currentModule = null;
+        window.currentPageModule = null;
+
         try {
-            if (this.currentModule && this.currentModule.cleanup) this.currentModule.cleanup();
             const route = this.routes[page];
             const container = document.getElementById('page-container');
-            const htmlResponse = await fetch(route.file);
+
+            // Asset Versioning for Cache-Busting
+            const version = Date.now();
+
+            const htmlResponse = await fetch(`${route.file}?v=${version}`);
             if (!htmlResponse.ok) throw new Error(`HTTP ${htmlResponse.status}`);
             container.innerHTML = await htmlResponse.text();
+
             const cssFile = route.file.replace('.html', '.css');
-            this.loadCSS(cssFile).catch(() => { });
-            if (window.currentPageModule) {
+            this.loadCSS(`${cssFile}?v=${version}`).catch(() => { });
+
+            const script = document.createElement('script');
+            script.src = `${route.js}?v=${version}`;
+            script.onload = () => {
                 this.currentPage = page;
-                this.currentModule = window.currentPageModule;
+                this.currentModule = window.currentPageModule || {};
                 if (this.currentModule.init) this.currentModule.init();
                 this.updateNav(page);
                 this.isLoading = false;
-            } else {
-                const script = document.createElement('script');
-                script.src = route.js;
-                script.onload = () => {
-                    this.currentPage = page;
-                    this.currentModule = window.currentPageModule || {};
-                    if (this.currentModule.init) this.currentModule.init();
-                    this.updateNav(page);
-                    this.isLoading = false;
-                };
-                script.onerror = () => {
-                    container.innerHTML = `<div style="color: red; padding: 20px;">Error loading ${page}</div>`;
-                    this.isLoading = false;
-                };
-                document.body.appendChild(script);
-            }
+            };
+            script.onerror = () => {
+                container.innerHTML = `<div style="color: red; padding: 20px;">Error loading ${page}</div>`;
+                this.isLoading = false;
+            };
+            document.body.appendChild(script);
         } catch (error) {
             document.getElementById('page-container').innerHTML = `<div style="color: red; padding: 20px;">Error: ${error.message}</div>`;
             this.isLoading = false;
@@ -207,9 +211,23 @@ class Router {
     }
     static loadCSS(href) {
         return new Promise((resolve, reject) => {
-            if (document.querySelector(`link[href="${href}"]`)) { resolve(); return; }
+            // Check for existing link with this href (ignoring version for check)
+            const cleanHref = href.split('?')[0];
+            const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+                .find(l => l.getAttribute('href').startsWith(cleanHref));
+
+            if (existing) {
+                // If it exists, update it with the new versioned URL to force reload
+                existing.href = href;
+                resolve();
+                return;
+            }
+
             const link = document.createElement('link');
-            link.rel = 'stylesheet'; link.href = href; link.onload = resolve; link.onerror = reject;
+            link.rel = 'stylesheet';
+            link.href = href;
+            link.onload = resolve;
+            link.onerror = reject;
             document.head.appendChild(link);
         });
     }

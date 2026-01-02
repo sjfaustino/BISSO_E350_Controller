@@ -334,7 +334,7 @@ void WebServerManager::init() {
     
     // Serve static files from root (MUST be after API routes)
     // PHASE 6: Enable browser caching to reduce load on LittleFS
-    server.serveStatic("/", LittleFS, "/", "public, max-age=3600");
+    server.serveStatic("/", LittleFS, "/", "public, max-age=60");
     
     // Initialize status cache
     memset(&current_status, 0, sizeof(current_status));

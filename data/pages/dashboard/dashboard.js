@@ -112,77 +112,89 @@ window.DashboardModule = window.DashboardModule || {
 
     initializeGraphs() {
         // CPU Graph
-        try {
-            this.graphs.cpu = new GraphVisualizer('cpu-graph', {
-                title: 'CPU Usage (%)',
-                yMin: 0,
-                yMax: 100,
-                unit: '%',
-                timeWindow: this.currentTimeRange
-            });
-            this.graphs.cpu.addSeries('CPU', '#10b981');
-        } catch (e) { console.warn('CPU graph init failed:', e); }
+        if (document.getElementById('cpu-graph')) {
+            try {
+                this.graphs.cpu = new GraphVisualizer('cpu-graph', {
+                    title: 'CPU Usage (%)',
+                    yMin: 0,
+                    yMax: 100,
+                    unit: '%',
+                    timeWindow: this.currentTimeRange
+                });
+                this.graphs.cpu.addSeries('CPU', '#10b981');
+            } catch (e) { console.warn('CPU graph init failed:', e); }
+        }
 
         // Memory Graph
-        try {
-            this.graphs.memory = new GraphVisualizer('memory-graph', {
-                title: 'Free Memory (KB)',
-                yMin: 0,
-                yMax: 360000,
-                unit: ' KB',
-                timeWindow: this.currentTimeRange
-            });
-            this.graphs.memory.addSeries('Memory', '#3b82f6');
-        } catch (e) { console.warn('Memory graph init failed:', e); }
+        if (document.getElementById('memory-graph')) {
+            try {
+                this.graphs.memory = new GraphVisualizer('memory-graph', {
+                    title: 'Free Memory (KB)',
+                    yMin: 0,
+                    yMax: 360000,
+                    unit: ' KB',
+                    timeWindow: this.currentTimeRange
+                });
+                this.graphs.memory.addSeries('Memory', '#3b82f6');
+            } catch (e) { console.warn('Memory graph init failed:', e); }
+        }
 
         // Spindle Current Graph
-        try {
-            this.graphs.spindle = new GraphVisualizer('spindle-graph', {
-                title: 'Spindle Current (A)',
-                yMin: 0,
-                yMax: 20,
-                unit: ' A',
-                timeWindow: this.currentTimeRange
-            });
-            this.graphs.spindle.addSeries('Current', '#f59e0b');
-        } catch (e) { console.warn('Spindle graph init failed:', e); }
+        if (document.getElementById('spindle-graph')) {
+            try {
+                this.graphs.spindle = new GraphVisualizer('spindle-graph', {
+                    title: 'Spindle Current (A)',
+                    yMin: 0,
+                    yMax: 20,
+                    unit: ' A',
+                    timeWindow: this.currentTimeRange
+                });
+                this.graphs.spindle.addSeries('Current', '#f59e0b');
+            } catch (e) { console.warn('Spindle graph init failed:', e); }
+        }
 
         // Temperature Graph
-        try {
-            this.graphs.temperature = new GraphVisualizer('temperature-graph', {
-                title: 'System Temperature (°C)',
-                yMin: 20,
-                yMax: 80,
-                unit: ' °C',
-                timeWindow: this.currentTimeRange
-            });
-            this.graphs.temperature.addSeries('Temp', '#ef4444');
-        } catch (e) { console.warn('Temperature graph init failed:', e); }
+        if (document.getElementById('temperature-graph')) {
+            try {
+                this.graphs.temperature = new GraphVisualizer('temperature-graph', {
+                    title: 'System Temperature (°C)',
+                    yMin: 20,
+                    yMax: 80,
+                    unit: ' °C',
+                    timeWindow: this.currentTimeRange
+                });
+                this.graphs.temperature.addSeries('Temp', '#ef4444');
+            } catch (e) { console.warn('Temperature graph init failed:', e); }
+        }
 
         // Latency Graph
-        try {
-            this.graphs.latency = new GraphVisualizer('latency-graph', {
-                title: 'WebSocket Latency (ms)',
-                yMin: 0,
-                yMax: 100,
-                unit: ' ms',
-                timeWindow: this.currentTimeRange
-            });
-            this.graphs.latency.addSeries('Latency', '#8b5cf6');
-        } catch (e) { console.warn('Latency graph init failed:', e); }
+        if (document.getElementById('latency-graph')) {
+            try {
+                this.graphs.latency = new GraphVisualizer('latency-graph', {
+                    title: 'WebSocket Latency (ms)',
+                    yMin: 0,
+                    yMax: 100,
+                    unit: ' ms',
+                    timeWindow: this.currentTimeRange
+                });
+                this.graphs.latency.addSeries('Latency', '#8b5cf6');
+            } catch (e) { console.warn('Latency graph init failed:', e); }
+        }
 
         // Motion Load Graph
-        try {
-            this.graphs.motion = new GraphVisualizer('motion-load-graph', {
-                title: 'Motion System Load',
-                yMin: 0,
-                yMax: 100,
-                unit: '%',
-                timeWindow: this.currentTimeRange
-            });
-            this.graphs.motion.addSeries('Quality', '#10b981');
-            this.graphs.motion.addSeries('Jitter', '#f59e0b');
-        } catch (e) { console.warn('Motion graph init failed:', e); }
+        if (document.getElementById('motion-load-graph')) {
+            try {
+                this.graphs.motion = new GraphVisualizer('motion-load-graph', {
+                    title: 'Motion System Load',
+                    yMin: 0,
+                    yMax: 100,
+                    unit: '%',
+                    timeWindow: this.currentTimeRange
+                });
+                this.graphs.motion.addSeries('Quality', '#10b981');
+                this.graphs.motion.addSeries('Jitter', '#f59e0b');
+            } catch (e) { console.warn('Motion graph init failed:', e); }
+        }
 
         console.log('[Dashboard] Graphs initialized');
     },
