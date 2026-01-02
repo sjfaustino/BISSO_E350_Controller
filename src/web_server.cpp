@@ -27,10 +27,18 @@ void WebServerManager::init() {
     server.config.stack_size = 8192;
     server.config.lru_purge_enable = true;
 
-    // Mount Filesystem
-    if (!LittleFS.begin()) {
-        Serial.println("[WEB] Failed to mount LittleFS");
-        return;
+    // Mount Filesystem (format on first failure for new/corrupted flash)
+    if (!LittleFS.begin(false)) {
+        Serial.println("[WEB] LittleFS mount failed, formatting...");
+        if (!LittleFS.format()) {
+            Serial.println("[WEB] LittleFS format failed!");
+            return;
+        }
+        if (!LittleFS.begin(false)) {
+            Serial.println("[WEB] Failed to mount LittleFS after format");
+            return;
+        }
+        Serial.println("[WEB] LittleFS formatted and mounted");
     }
     
     // Serve static files from root, disable caching to force reload of index.html

@@ -54,7 +54,10 @@ void taskMonitorFunction(void* parameter) {
     // This was previously in motion_control.cpp running every 10ms, causing real-time delays
     static uint32_t last_i2c_check_ms = 0;
     static uint32_t last_timeout_count = 0;
-    if (millis() - last_i2c_check_ms > 1000) {
+    static uint8_t persistent_failure_count = 0;  // Track hardware missing
+    static bool i2c_hardware_disabled = false;    // Flag to disable I2C checks when no hardware
+    
+    if (!i2c_hardware_disabled && millis() - last_i2c_check_ms > 1000) {
       // ROBUSTNESS FIX: 3-retry I2C bus recovery before escalating to E-STOP
       // Single I2C glitches should not cause permanent emergency stop
       if (elboIsShadowRegisterDirty()) {
@@ -64,27 +67,43 @@ void taskMonitorFunction(void* parameter) {
         for (int retry = 0; retry < 3; retry++) {
           logWarning("[MONITOR] I2C shadow register dirty - attempting recovery %d/3", retry + 1);
 
+          // Feed watchdog BEFORE potentially blocking I2C operations
+          watchdogFeed("Monitor");
+          
           // Attempt bus recovery
           i2cRecoverBus();
 
           // Wait with exponential backoff: 50ms, 100ms, 200ms
           uint32_t backoff_ms = 50 << retry;
           vTaskDelay(pdMS_TO_TICKS(backoff_ms));
+          
+          // Feed watchdog after delay
+          watchdogFeed("Monitor");
 
           // Check if recovery succeeded
           if (!elboIsShadowRegisterDirty()) {
             recovery_success = true;
+            persistent_failure_count = 0;  // Reset counter on success
             logInfo("[MONITOR] [OK] I2C bus recovery successful on attempt %d/3", retry + 1);
             faultLogWarning(FAULT_I2C_ERROR, "I2C bus recovered after retry");
             break;
           }
         }
 
-        // All recovery attempts failed - trigger E-STOP
+        // All recovery attempts failed
         if (!recovery_success) {
-          logError("[MONITOR] CRITICAL: PLC I2C failure - all 3 recovery attempts exhausted");
-          faultLogCritical(FAULT_I2C_ERROR, "PLC I2C failure after 3 recovery attempts - emergency stop");
-          motionEmergencyStop();
+          persistent_failure_count++;
+          
+          // After 3 consecutive full-failure cycles, assume hardware is missing
+          if (persistent_failure_count >= 3) {
+            logWarning("[MONITOR] I2C hardware not present - disabling I2C monitoring");
+            i2c_hardware_disabled = true;
+            // Don't trigger E-STOP when hardware is simply not connected
+          } else {
+            logError("[MONITOR] CRITICAL: PLC I2C failure - all 3 recovery attempts exhausted");
+            faultLogCritical(FAULT_I2C_ERROR, "PLC I2C failure after 3 recovery attempts - emergency stop");
+            motionEmergencyStop();
+          }
         }
       }
 
