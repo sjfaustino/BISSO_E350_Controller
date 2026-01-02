@@ -318,7 +318,8 @@ void WebServerManager::begin() {
     
     // PHASE 6: Performance tuning for concurrent browser requests
     // Increase concurrent connections to prevent ERR_INCOMPLETE_CHUNKED_ENCODING
-    server.config.max_open_sockets = 12;
+    // Reduced to 6 for heap stability (preventing 500 errors)
+    server.config.max_open_sockets = 6;
     server.config.max_uri_handlers = 40;
     
     server.start(); 
