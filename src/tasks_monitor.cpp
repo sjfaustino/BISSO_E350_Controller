@@ -56,6 +56,16 @@ void taskMonitorFunction(void* parameter) {
     static uint32_t last_timeout_count = 0;
     static uint8_t persistent_failure_count = 0;  // Track hardware missing
     static bool i2c_hardware_disabled = false;    // Flag to disable I2C checks when no hardware
+    static bool checked_hardware_at_boot = false; // One-time check
+    
+    // Skip I2C monitoring entirely if hardware was not detected at boot
+    if (!checked_hardware_at_boot) {
+      checked_hardware_at_boot = true;
+      if (!plcIsHardwarePresent()) {
+        logInfo("[MONITOR] PLC I2C hardware not present at boot - disabling I2C monitoring");
+        i2c_hardware_disabled = true;
+      }
+    }
     
     if (!i2c_hardware_disabled && millis() - last_i2c_check_ms > 1000) {
       // ROBUSTNESS FIX: 3-retry I2C bus recovery before escalating to E-STOP

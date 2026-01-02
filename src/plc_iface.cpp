@@ -47,6 +47,9 @@ static SemaphoreHandle_t plc_shadow_mutex = NULL;
 static bool q73_shadow_dirty = false;
 static uint32_t q73_mutex_timeout_count = 0;
 
+// Hardware presence flag - set at boot, checked by monitor tasks
+static bool g_plc_hardware_present = true;  // Optimistic default
+
 #define I2C_RETRIES 3
 #define SHADOW_MUTEX_TIMEOUT_MS 100
 #define SHADOW_MUTEX_RETRIES 3
@@ -155,8 +158,10 @@ void elboInit() {
 
   if (plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Init Q73")) {
     logInfo("[PLC] Q73 Output Board OK (Addr 0x%02X)", ADDR_Q73_OUTPUT);
+    g_plc_hardware_present = true;
   } else {
     logError("[PLC] [CRITICAL] Q73 Output Board Missing!");
+    g_plc_hardware_present = false;  // Mark hardware as not present
   }
 }
 
@@ -443,3 +448,6 @@ void elboDiagnostics() {
 uint32_t elboGetMutexTimeoutCount() { return q73_mutex_timeout_count; }
 
 bool elboIsShadowRegisterDirty() { return q73_shadow_dirty; }
+
+// Hardware presence check - allows monitor tasks to skip I2C when no hardware
+bool plcIsHardwarePresent() { return g_plc_hardware_present; }
