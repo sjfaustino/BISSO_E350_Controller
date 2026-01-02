@@ -156,8 +156,19 @@ void elboInit() {
   // KC868-A16 uses active-low relay outputs: 0xFF = all OFF, 0x00 = all ON
   q73_shadow_register = 0xFF;
 
-  if (plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Init Q73")) {
-    logInfo("[PLC] Q73 Output Board OK (Addr 0x%02X)", ADDR_Q73_OUTPUT);
+  // ROBUSTNESS FIX: Retry board detection with delay to handle slow power-on
+  bool board_detected = false;
+  for (int i = 0; i < 3; i++) {
+      if (plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Init Q73")) {
+          logInfo("[PLC] Q73 Output Board OK (Addr 0x%02X)", ADDR_Q73_OUTPUT);
+          board_detected = true;
+          break;
+      }
+      logWarning("[PLC] Q73 Board detection attempt %d/3 failed, retrying...", i + 1);
+      delay(50); // Give hardware time to settle
+  }
+
+  if (board_detected) {
     g_plc_hardware_present = true;
   } else {
     logError("[PLC] [CRITICAL] Q73 Output Board Missing!");

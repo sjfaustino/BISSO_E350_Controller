@@ -75,7 +75,7 @@ void wj66Init() {
 
   // 1. Load saved baud rate
   Preferences p;
-  p.begin("wj66_config", true);
+  p.begin("wj66_config", false); // Read-write to allow creation on first boot
   uint32_t saved_baud = p.getUInt("baud_rate", 0);
   p.end();
 

@@ -33,7 +33,7 @@ static uint32_t getTimestamp(void) {
 }
 
 static bool loadFromNVS(void) {
-    if (!recoveryPrefs.begin(RECOVERY_NS, true)) {  // Read-only
+    if (!recoveryPrefs.begin(RECOVERY_NS, false)) {  // Read-write to allow creation on first boot
         return false;
     }
     

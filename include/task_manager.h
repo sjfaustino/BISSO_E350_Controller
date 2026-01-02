@@ -44,7 +44,7 @@
   3072 // Increased from 2048 - handling bus recovery depth
 #define TASK_STACK_CLI                                                         \
   3072 // Increased from 2048 - CLI parses complex commands with snprintf
-#define TASK_STACK_FAULT_LOG 2048
+#define TASK_STACK_FAULT_LOG 3072
 #define TASK_STACK_MONITOR 2048
 #define TASK_STACK_TELEMETRY                                                   \
   3072 // Increased from 2048 - collects comprehensive system state
