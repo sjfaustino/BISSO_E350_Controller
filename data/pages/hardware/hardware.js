@@ -102,7 +102,7 @@ window.HardwareModule = window.HardwareModule || {
                 <thead>
                     <tr style="background: var(--bg-secondary);">
                         <th style="padding: 8px; text-align: left;">Signal</th>
-                        <th style="padding: 8px; text-align: left;">Pin</th>
+                        <th style="padding: 8px; text-align: left;">Pin Label</th>
                         <th style="padding: 8px; text-align: left;">Type</th>
                     </tr>
                 </thead>
@@ -111,10 +111,13 @@ window.HardwareModule = window.HardwareModule || {
 
         if (this.signalData) {
             this.signalData.forEach(sig => {
+                const pinVal = sig.current_pin !== undefined ? sig.current_pin : sig.default_pin;
+                const label = this.getPinLabel(pinVal);
+
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-subtle);">
                         <td style="padding: 6px 8px;">${sig.name || sig.key}</td>
-                        <td style="padding: 6px 8px;">${sig.current_pin || sig.default_pin || '--'}</td>
+                        <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: var(--accent-primary);">${label}</td>
                         <td style="padding: 6px 8px;">${sig.type || '--'}</td>
                     </tr>
                 `;
@@ -123,6 +126,26 @@ window.HardwareModule = window.HardwareModule || {
 
         html += '</tbody></table>';
         container.innerHTML = html;
+    },
+
+    getPinLabel(gpio) {
+        if (gpio === undefined || gpio === null) return '--';
+
+        // Find in pinData
+        const pin = this.pinData.find(p => p.gpio === gpio);
+        if (pin) {
+            return pin.silk || pin.note || `GPIO ${gpio}`;
+        }
+
+        // Fallback for virtual pins if they aren't in pinData for some reason
+        if (gpio >= 100 && gpio <= 115) return `X${gpio - 99}`;
+        if (gpio >= 116 && gpio <= 131) return `Y${gpio - 115}`;
+        if (gpio === 36) return 'CH1';
+        if (gpio === 34) return 'CH2';
+        if (gpio === 35) return 'CH3';
+        if (gpio === 39) return 'CH4';
+
+        return `GPIO ${gpio}`;
     },
 
     loadConfigValues() {
