@@ -153,7 +153,7 @@ window.DashboardModule = window.DashboardModule || {
                 this.graphs.memory = new GraphVisualizer('memory-graph', {
                     title: 'Free Memory (KB)',
                     yMin: 0,
-                    yMax: 360000,
+                    yMax: 350, // ~350 KB typical free heap, auto-scales if exceeded
                     unit: ' KB',
                     timeWindow: this.currentTimeRange
                 });
