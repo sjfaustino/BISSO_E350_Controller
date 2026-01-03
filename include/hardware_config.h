@@ -13,7 +13,7 @@ BoardType detectBoard();
 extern const BoardType BOARD;
 
 struct PinInfo {
-    int8_t   gpio;
+    int16_t  gpio;  // Changed to int16_t for virtual pins 100+
     const char* silk;
     const char* type;
     const char* voltage;
@@ -22,49 +22,54 @@ struct PinInfo {
 };
 
 constexpr PinInfo pinDatabase[] = {
-    {0,  "X1",  "input",  "5-24V",  "10mA", "Opto input"},
-    {1,  "X2",  "input",  "5-24V",  "10mA", "Opto input"},
-    {2,  "X3",  "input",  "5-24V",  "10mA", "Opto input"},
-    {3,  "X4",  "input",  "5-24V",  "10mA", "Opto input"},
-    {4,  "X5",  "input",  "5-24V",  "10mA", "Opto input"},
-    {5,  "X6",  "input",  "5-24V",  "10mA", "Opto input"},
-    {6,  "X7",  "input",  "5-24V",  "10mA", "Opto input"},
-    {7,  "X8",  "input",  "5-24V",  "10mA", "Opto input"},
-    {8,  "X9",  "input",  "5-24V",  "10mA", "Opto input"},
-    {9,  "X10", "input",  "5-24V",  "10mA", "Opto input"},
-    {10, "X11", "input",  "5-24V",  "10mA", "Opto input"},
-    {11, "X12", "input",  "5-24V",  "10mA", "Opto input"},
-    {12, "X13", "input",  "5-24V",  "10mA", "Opto input"},
-    {13, "X14", "input",  "5-24V",  "10mA", "Opto input"},
-    {14, "X15", "input",  "5-24V",  "10mA", "Opto input"},
-    {15, "X16", "input",  "5-24V",  "10mA", "Opto input"},
+    // I2C Expander Inputs (Virtual 100-115) - X1-X16 on KC868-A16
+    {100, "X1",  "input",  "5-24V",  "10mA", "Opto input"},
+    {101, "X2",  "input",  "5-24V",  "10mA", "Opto input"},
+    {102, "X3",  "input",  "5-24V",  "10mA", "Opto input"},
+    {103, "X4",  "input",  "5-24V",  "10mA", "Opto input"},
+    {104, "X5",  "input",  "5-24V",  "10mA", "Opto input"},
+    {105, "X6",  "input",  "5-24V",  "10mA", "Opto input"},
+    {106, "X7",  "input",  "5-24V",  "10mA", "Opto input"},
+    {107, "X8",  "input",  "5-24V",  "10mA", "Opto input"},
+    {108, "X9",  "input",  "5-24V",  "10mA", "Opto input"},
+    {109, "X10", "input",  "5-24V",  "10mA", "Opto input"},
+    {110, "X11", "input",  "5-24V",  "10mA", "Opto input"},
+    {111, "X12", "input",  "5-24V",  "10mA", "Opto input"},
+    {112, "X13", "input",  "5-24V",  "10mA", "Opto input"},
+    {113, "X14", "input",  "5-24V",  "10mA", "Opto input"},
+    {114, "X15", "input",  "5-24V",  "10mA", "Opto input"},
+    {115, "X16", "input",  "5-24V",  "10mA", "Opto input"},
 
-    {16, "Y1",  "output", "12-30V", "10A", "Output"},
-    {17, "Y2",  "output", "12-30V", "10A", "Output"},
-    {18, "Y3",  "output", "12-30V", "10A", "Output"},
-    {19, "Y4",  "output", "12-30V", "10A", "Output"},
-    {20, "Y5",  "output", "12-30V", "10A", "Output"},
-    {21, "Y6",  "output", "12-30V", "10A", "Output"},
-    {22, "Y7",  "output", "12-30V", "10A", "Output"},
-    {23, "Y8",  "output", "12-30V", "10A", "Output"},
-    {24, "Y9",  "output", "12-30V", "10A", "A32 only"},
-    {25, "Y10", "output", "12-30V", "10A", "A32 only"},
-    {26, "Y11", "output", "12-30V", "10A", "A32 only"},
-    {27, "Y12", "output", "12-30V", "10A", "A32 only"},
-    {28, "Y13", "output", "12-30V", "10A", "A32 only"},
-    {29, "Y14", "output", "12-30V", "10A", "A32 only"},
-    {30, "Y15", "output", "12-30V", "10A", "A32 only"},
-    {31, "Y16", "output", "12-30V", "10A", "A32 only"},
+    // I2C Expander Outputs (Virtual 116-131) - Y1-Y16 on KC868-A16
+    {116, "Y1",  "output", "12-30V", "10A", "Relay output"},
+    {117, "Y2",  "output", "12-30V", "10A", "Relay output"},
+    {118, "Y3",  "output", "12-30V", "10A", "Relay output"},
+    {119, "Y4",  "output", "12-30V", "10A", "Relay output"},
+    {120, "Y5",  "output", "12-30V", "10A", "Relay output"},
+    {121, "Y6",  "output", "12-30V", "10A", "Relay output"},
+    {122, "Y7",  "output", "12-30V", "10A", "Relay output"},
+    {123, "Y8",  "output", "12-30V", "10A", "Relay output"},
+    {124, "Y9",  "output", "12-30V", "10A", "A32 only"},
+    {125, "Y10", "output", "12-30V", "10A", "A32 only"},
+    {126, "Y11", "output", "12-30V", "10A", "A32 only"},
+    {127, "Y12", "output", "12-30V", "10A", "A32 only"},
+    {128, "Y13", "output", "12-30V", "10A", "A32 only"},
+    {129, "Y14", "output", "12-30V", "10A", "A32 only"},
+    {130, "Y15", "output", "12-30V", "10A", "A32 only"},
+    {131, "Y16", "output", "12-30V", "10A", "A32 only"},
 
+    // Direct GPIO pins (actual ESP32 GPIO numbers)
     {14, "HT1", "both", "3.3V", "5mA", "GPIO14 – WJ66 RX"},
     {33, "HT2", "both", "3.3V", "5mA", "GPIO33 – WJ66 TX"},
     {32, "HT3", "both", "3.3V", "5mA", "GPIO32 – Free"},
     {16, "RS485_RX", "input", "3.3V", "5mA", "GPIO16 – RS485 RXD"},
     {13, "RS485_TX", "output", "3.3V", "5mA", "GPIO13 – RS485 TXD"},
-    {37, "IN1", "input", "0-20mA", "20mA", "Current loop"},
-    {38, "IN2", "input", "0-20mA", "20mA", "Current loop"},
-    {39, "IN3", "input", "0-5V", "1mA", "Analog 0-5V"},
-    {40, "IN4", "input", "0-5V", "1mA", "Analog 0-5V"}
+
+    // Analog channels (actual ESP32 ADC GPIOs) - CH1-CH4 on KC868-A16 silkscreen
+    {36, "CH1", "analog", "0-20mA", "20mA", "GPIO36 – Current loop ADC"},
+    {34, "CH2", "analog", "0-20mA", "20mA", "GPIO34 – Current loop ADC"},
+    {35, "CH3", "analog", "0-5V",   "1mA",  "GPIO35 – Voltage ADC"},
+    {39, "CH4", "analog", "0-5V",   "1mA",  "GPIO39 – Voltage ADC"}
 };
 
 constexpr size_t PIN_COUNT = sizeof(pinDatabase)/sizeof(pinDatabase[0]);
@@ -73,27 +78,29 @@ struct SignalDef {
     const char* key;
     const char* name;
     const char* desc;
-    int8_t     default_gpio;
+    int16_t     default_gpio;  // Changed to int16_t for virtual pins 100+
     const char* type;
 };
 
 const SignalDef signalDefinitions[] = {
-    {"input_c",        "PLC Input C",        "C mode consenso",        0, "input"},
-    {"input_t",        "PLC Input T",        "T mode consenso",        1, "input"},
-    {"input_ct",       "PLC Input C+T",      "C+T mode consenso",       2, "input"},
-    {"input_manual",   "PLC Input Manual",   "Manual mode",           3, "input"},
-    {"input_estop",    "E-Stop Input",       "Emergency stop",        4, "input"},
-    {"input_pause",    "Pause Button",       "Pause operation",       5, "input"},
-    {"input_resume",   "Resume Button",      "Resume operation",      6, "input"},
+    // PLC Inputs (X1-X16, Virtual 100-115)
+    {"input_c",        "PLC Input C",        "C mode consenso",       100, "input"},
+    {"input_t",        "PLC Input T",        "T mode consenso",       101, "input"},
+    {"input_ct",       "PLC Input C+T",      "C+T mode consenso",     102, "input"},
+    {"input_manual",   "PLC Input Manual",   "Manual mode",           103, "input"},
+    {"input_estop",    "E-Stop Input",       "Emergency stop",        104, "input"},
+    {"input_pause",    "Pause Button",       "Pause operation",       105, "input"},
+    {"input_resume",   "Resume Button",      "Resume operation",      106, "input"},
 
-    {"output_axis_x",     "Axis X Select",     "Select X axis",        16, "output"},
-    {"output_axis_y",     "Axis Y Select",     "Select Y axis",        17, "output"},
-    {"output_axis_z",     "Axis Z Select",     "Select Z axis",        18, "output"},
-    {"output_dir_plus",   "Direction +",       "Positive direction",          19, "output"},
-    {"output_dir_minus",  "Direction -",       "Negative direction",    20, "output"},
-    {"output_speed_fast", "Speed Fast",        "Fast speed",           21, "output"},
-    {"output_speed_med",  "Speed Medium",      "Medium speed",        22, "output"},
-    {"output_speed_slow", "Speed Slow",        "Slow speed",           23, "output"}
+    // PLC Outputs (Y1-Y16, Virtual 116-131)
+    {"output_axis_x",     "Axis X Select",     "Select X axis",        116, "output"},
+    {"output_axis_y",     "Axis Y Select",     "Select Y axis",        117, "output"},
+    {"output_axis_z",     "Axis Z Select",     "Select Z axis",        118, "output"},
+    {"output_dir_plus",   "Direction +",       "Positive direction",   119, "output"},
+    {"output_dir_minus",  "Direction -",       "Negative direction",   120, "output"},
+    {"output_speed_fast", "Speed Fast",        "Fast speed",           121, "output"},
+    {"output_speed_med",  "Speed Medium",      "Medium speed",         122, "output"},
+    {"output_speed_slow", "Speed Slow",        "Slow speed",           123, "output"}
 };
 
 constexpr size_t SIGNAL_COUNT = sizeof(signalDefinitions)/sizeof(signalDefinitions[0]);
@@ -119,7 +126,7 @@ struct MachineCalibration {
 extern MachineCalibration machineCal;
 
 // Helper functions
-const PinInfo* getPinInfo(int8_t gpio);
-const char* checkPinConflict(int8_t gpio, const char* currentKey = nullptr);
-bool setPin(const char* key, int8_t gpio);
-int8_t getPin(const char* key);
+const PinInfo* getPinInfo(int16_t gpio);
+const char* checkPinConflict(int16_t gpio, const char* currentKey = nullptr);
+bool setPin(const char* key, int16_t gpio);
+int16_t getPin(const char* key);

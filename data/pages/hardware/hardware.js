@@ -51,30 +51,31 @@ window.HardwareModule = window.HardwareModule || {
             // Clear existing options
             select.innerHTML = '<option value="">-- Select Pin --</option>';
 
-            // Add output pin options (1-16) for output signals
+            // Add output pin options (Y1-Y16 = Virtual 116-131) for output signals
             if (signalKey && signalKey.startsWith('output_')) {
                 for (let i = 1; i <= 16; i++) {
                     const opt = document.createElement('option');
-                    opt.value = i;
-                    opt.textContent = `OUT ${i}`;
+                    opt.value = 115 + i;  // Virtual pins 116-131
+                    opt.textContent = `Y${i}`;  // Match KC868 silkscreen
                     select.appendChild(opt);
                 }
             }
-            // Add input pin options (1-16) for input signals
+            // Add input pin options (X1-X16 = Virtual 100-115) for input signals
             else if (signalKey && signalKey.startsWith('input_')) {
                 for (let i = 1; i <= 16; i++) {
                     const opt = document.createElement('option');
-                    opt.value = i;
-                    opt.textContent = `IN ${i}`;
+                    opt.value = 99 + i;  // Virtual pins 100-115
+                    opt.textContent = `X${i}`;  // Match KC868 silkscreen
                     select.appendChild(opt);
                 }
             }
-            // Use GPIO pins from API data
-            else if (this.pinData.length > 0) {
-                this.pinData.forEach(pin => {
+            // For other signals (WJ66, etc.), use filtered GPIO list
+            else if (this.pinData && this.pinData.length > 0) {
+                // Only show direct GPIO pins (< 100) for non-PLC signals
+                this.pinData.filter(pin => pin.gpio < 100).forEach(pin => {
                     const opt = document.createElement('option');
                     opt.value = pin.gpio;
-                    opt.textContent = `GPIO ${pin.gpio} (${pin.silk || pin.note || ''})`;
+                    opt.textContent = `${pin.silk} (GPIO ${pin.gpio})`;
                     select.appendChild(opt);
                 });
             }

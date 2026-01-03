@@ -20,7 +20,7 @@ BoardType detectBoard() {
     return BoardType::A16;
 }
 
-const PinInfo* getPinInfo(int8_t gpio) {
+const PinInfo* getPinInfo(int16_t gpio) {
     for (size_t i = 0; i < PIN_COUNT; i++) {
         if (pinDatabase[i].gpio == gpio) {
             return &pinDatabase[i];
@@ -29,7 +29,7 @@ const PinInfo* getPinInfo(int8_t gpio) {
     return nullptr;
 }
 
-int8_t getPin(const char* key) {
+int16_t getPin(const char* key) {
     if (!key) return -1;
 
     // 1. Check NVS for a user override
@@ -38,7 +38,7 @@ int8_t getPin(const char* key) {
     if (safe_snprintf(nvs_key, sizeof(nvs_key), "pin_%s", key) > 0) {
         int32_t stored_val = configGetInt(nvs_key, -1);
         if (stored_val != -1) {
-            return (int8_t)stored_val;
+            return (int16_t)stored_val;
         }
     }
 
@@ -51,12 +51,12 @@ int8_t getPin(const char* key) {
     return -1;
 }
 
-const char* checkPinConflict(int8_t gpio, const char* currentKey) {
+const char* checkPinConflict(int16_t gpio, const char* currentKey) {
     for (size_t i = 0; i < SIGNAL_COUNT; i++) {
         const char* checkKey = signalDefinitions[i].key;
         if (currentKey && strcmp(checkKey, currentKey) == 0) continue;
 
-        int8_t assignedPin = getPin(checkKey);
+        int16_t assignedPin = getPin(checkKey);
         if (assignedPin == gpio) {
             return checkKey; 
         }
@@ -64,7 +64,7 @@ const char* checkPinConflict(int8_t gpio, const char* currentKey) {
     return nullptr; 
 }
 
-bool setPin(const char* key, int8_t gpio) {
+bool setPin(const char* key, int16_t gpio) {
     // 1. Validate Key
     bool keyExists = false;
     const char* signalType = "unknown";
@@ -88,21 +88,26 @@ bool setPin(const char* key, int8_t gpio) {
     }
 
     // 3. I/O Type Check (Input vs Output)
-    // On KC868-A16:
-    // Pins 0-15  (X1-X16) are PHYSICAL INPUTS (Opto)
-    // Pins 16-31 (Y1-Y16) are PHYSICAL OUTPUTS (Relay/Mosfet)
-    bool isInputPin = (gpio >= 0 && gpio <= 15);
-    bool isOutputPin = (gpio >= 16 && gpio <= 31);
+    // Virtual Pin Scheme for KC868-A16:
+    // Pins 100-115 (X1-X16) are PHYSICAL INPUTS (Opto via I2C)
+    // Pins 116-131 (Y1-Y16) are PHYSICAL OUTPUTS (Relay via I2C)
+    // CH1-CH4 are analog inputs using GPIO 34-39
+    // Direct GPIO (13, 14, 16, 32, 33) for RS485/WJ66
+    bool isVirtualInputPin = (gpio >= 100 && gpio <= 115);
+    bool isVirtualOutputPin = (gpio >= 116 && gpio <= 131);
+    bool isAnalogPin = (gpio == 34 || gpio == 35 || gpio == 36 || gpio == 39);
+    bool isDirectGpio = (gpio < 100 && !isAnalogPin);  // Real ESP32 GPIO numbers
     
     bool isInputSignal = (strcmp(signalType, "input") == 0);
     bool isOutputSignal = (strcmp(signalType, "output") == 0);
 
-    if (isInputPin && isOutputSignal) {
-        logError("[HAL] Hard Hardware Mismatch: Pin %d is PHYSICALLY AN INPUT", gpio);
+    // Only validate I2C virtual pins for I/O mismatch
+    if (isVirtualInputPin && isOutputSignal) {
+        logError("[HAL] Hardware Mismatch: Virtual Pin %d (X%d) is PHYSICALLY AN INPUT", gpio, gpio - 99);
         return false;
     }
-    if (isOutputPin && isInputSignal) {
-        logError("[HAL] Hard Hardware Mismatch: Pin %d is PHYSICALLY AN OUTPUT", gpio);
+    if (isVirtualOutputPin && isInputSignal) {
+        logError("[HAL] Hardware Mismatch: Virtual Pin %d (Y%d) is PHYSICALLY AN OUTPUT", gpio, gpio - 115);
         return false;
     }
 

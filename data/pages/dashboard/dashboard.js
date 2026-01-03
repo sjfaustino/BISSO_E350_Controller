@@ -625,17 +625,28 @@ window.DashboardModule = window.DashboardModule || {
                 this.graphs.cpu?.addDataPoint('CPU', cpu);
             }
 
-            // Update CPU stats (only if elements exist and using GraphVisualizer)
-            if (!isMiniChart) {
-                const cpuStats = this.graphs.cpu?.getStats('CPU');
-                if (cpuStats) {
-                    const cpuCurrentEl = document.getElementById('cpu-current');
-                    const cpuAvgEl = document.getElementById('cpu-stat-avg');
-                    const cpuMaxEl = document.getElementById('cpu-stat-max');
+            // Update CPU stats - always calculate from history
+            {
+                let cpuStats = this.graphs.cpu?.getStats('CPU');
 
-                    if (cpuCurrentEl) cpuCurrentEl.textContent = cpu.toFixed(1) + '%';
-                    if (cpuAvgEl) cpuAvgEl.textContent = cpuStats.avg.toFixed(1) + '%';
-                    if (cpuMaxEl) cpuMaxEl.textContent = cpuStats.max.toFixed(1) + '%';
+                // Fallback: calculate stats from history if getStats returns null
+                if (!cpuStats && this.history.cpu.length > 0) {
+                    const values = this.history.cpu;
+                    cpuStats = {
+                        avg: values.reduce((a, b) => a + b, 0) / values.length,
+                        max: Math.max(...values),
+                        current: cpu
+                    };
+                }
+
+                if (cpuStats) {
+                    const cpuValueEl = document.getElementById('cpu-value');
+                    const cpuAvgEl = document.getElementById('cpu-avg');
+                    const cpuMaxEl = document.getElementById('cpu-max');
+
+                    if (cpuValueEl) cpuValueEl.textContent = cpu.toFixed(1) + '%';
+                    if (cpuAvgEl) cpuAvgEl.textContent = cpuStats.avg.toFixed(1);
+                    if (cpuMaxEl) cpuMaxEl.textContent = cpuStats.max.toFixed(1);
                 }
             }
         }
