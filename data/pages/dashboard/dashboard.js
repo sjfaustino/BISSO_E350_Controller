@@ -233,6 +233,46 @@ window.DashboardModule = window.DashboardModule || {
         }
 
         console.log('[Dashboard] Graphs initialized');
+
+        // Restore historical data to graphs if we have any
+        this.restoreHistoricalData();
+    },
+
+    restoreHistoricalData() {
+        // If we have historical data, restore it to the newly created graphs
+        const now = Date.now();
+        const timeStep = 1000; // Assume 1 second intervals
+
+        if (this.history.cpu.length > 0) {
+            console.log(`[Dashboard] Restoring ${this.history.cpu.length} historical data points`);
+
+            // For each data point, we need to calculate a timestamp
+            // Work backwards from now
+            for (let i = 0; i < this.history.cpu.length; i++) {
+                const age = (this.history.cpu.length - 1 - i) * timeStep;
+                const timestamp = now - age;
+
+                // Add data to each graph if it exists
+                if (this.graphs.cpu && this.history.cpu[i] !== undefined) {
+                    this.graphs.cpu.addDataPoint('CPU', this.history.cpu[i], timestamp);
+                }
+                if (this.graphs.memory && this.history.memory[i] !== undefined) {
+                    this.graphs.memory.addDataPoint('Memory', this.history.memory[i], timestamp);
+                }
+                if (this.graphs.spindle && this.history.spindle[i] !== undefined) {
+                    this.graphs.spindle.addDataPoint('Current', this.history.spindle[i], timestamp);
+                }
+                if (this.graphs.temperature && this.history.temperature[i] !== undefined) {
+                    this.graphs.temperature.addDataPoint('Temp', this.history.temperature[i], timestamp);
+                }
+                if (this.graphs.latency && this.history.latency[i] !== undefined) {
+                    this.graphs.latency.addDataPoint('Latency', this.history.latency[i], timestamp);
+                }
+                if (this.graphs.wifi && this.history.wifi[i] !== undefined) {
+                    this.graphs.wifi.addDataPoint('Signal', this.history.wifi[i], timestamp);
+                }
+            }
+        }
     },
 
 
