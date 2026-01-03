@@ -13,7 +13,32 @@
 #include "hardware_config.h"
 #include "plc_iface.h"
 #include "board_inputs.h"
+#include "gcode_parser.h"
 #include "system_telemetry.h"
+#include "fault_logging.h"
+#include "spindle_current_monitor.h"
+
+// Telemetry History Buffer (last 60 samples, sampled every 5s = 5mins)
+#define HISTORY_BUFFER_SIZE 60
+struct history_sample_t {
+    uint8_t cpu;
+    uint32_t heap;
+    float spindle;
+};
+static history_sample_t telemetry_history[HISTORY_BUFFER_SIZE];
+static int history_head = 0;
+static int history_count = 0;
+static uint32_t last_history_sample_ms = 0;
+
+static void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
+    uint32_t now = millis();
+    if (now - last_history_sample_ms < 5000) return; // Sample every 5s
+    last_history_sample_ms = now;
+
+    telemetry_history[history_head] = {cpu, heap, spindle};
+    history_head = (history_head + 1) % HISTORY_BUFFER_SIZE;
+    if (history_count < HISTORY_BUFFER_SIZE) history_count++;
+}
 
 // Instantiate the global webServer object declared extern in web_server.h
 WebServerManager webServer;
@@ -150,6 +175,24 @@ void WebServerManager::init() {
         serializeJson(doc, json);
         return response->send(200, "application/json", json.c_str());
     });
+
+    // GET /api/gcode/state
+    server.on("/api/gcode/state", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        JsonDocument doc;
+        doc["success"] = true;
+        doc["absolute_mode"] = (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE);
+        // doc["wcs"] = (54 + gcodeParser.currentWCS); // currentWCS is private, but getParserState uses it
+        doc["feedrate"] = gcodeParser.getCurrentFeedRate();
+        
+        // Use getParserState to get the full grbl-style state string if needed
+        char buffer[64];
+        gcodeParser.getParserState(buffer, sizeof(buffer));
+        doc["state_str"] = buffer;
+
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
     
     // POST /api/encoder/calibrate
     server.on("/api/encoder/calibrate", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
@@ -169,7 +212,152 @@ void WebServerManager::init() {
         }
         return response->send(400, "application/json", "{\"error\":\"Calibration failed\"}");
     });
-    
+    // --- Time API ---
+    server.on("/api/time", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        time_t now;
+        struct tm timeinfo;
+        time(&now);
+        localtime_r(&now, &timeinfo);
+
+        char buf[64];
+        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
+
+        JsonDocument doc;
+        doc["timestamp"] = (uint32_t)now;
+        doc["formatted"] = buf;
+        doc["synced"] = (timeinfo.tm_year > (2020 - 1900));
+
+        String output;
+        serializeJson(doc, output);
+        return response->send(200, "application/json", output.c_str());
+    });
+
+    server.on("/api/time/sync", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, request->body());
+        
+        if (error) {
+            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        }
+
+        if (!doc.containsKey("timestamp")) {
+            return response->send(400, "application/json", "{\"error\":\"Missing timestamp\"}");
+        }
+
+        uint32_t timestamp = doc["timestamp"];
+        struct timeval tv;
+        tv.tv_sec = timestamp;
+        tv.tv_usec = 0;
+        settimeofday(&tv, NULL);
+
+        time_t now = timestamp;
+        struct tm* timeinfo = localtime(&now);
+        char buf[64];
+        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", timeinfo);
+
+        String out = String("{\"status\":\"success\",\"time\":\"") + buf + "\"}";
+        return response->send(200, "application/json", out.c_str());
+    });
+
+    // --- Diagnostics & Monitoring API ---
+
+    // GET /api/io/status
+    server.on("/api/io/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        doc["success"] = true;
+        
+        uint8_t in_bits = elboI73GetRawState();
+        uint8_t board_in = boardInputsGetRawState();
+        uint8_t out_bits = elboQ73GetRawState();
+        
+        // Map fields expected by diagnostics.js
+        doc["estop"] = (board_in & 0x08) != 0; 
+        doc["door"] = (board_in & 0x10) != 0;
+        doc["probe"] = (board_in & 0x20) != 0;
+        doc["limit_x"] = (board_in & 0x01) != 0;
+        doc["limit_y"] = (board_in & 0x02) != 0;
+        doc["limit_z"] = (board_in & 0x04) != 0;
+        
+        doc["spindle_on"] = (out_bits & 0x01) == 0; // Active-low
+        doc["coolant_on"] = (out_bits & 0x02) == 0;
+        doc["vacuum_on"] = (out_bits & 0x04) == 0;
+        doc["alarm_on"] = (out_bits & 0x80) == 0;
+
+        // Raw values for power users
+        doc["raw_in"] = in_bits;
+        doc["raw_out"] = out_bits;
+        doc["raw_board"] = board_in;
+
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+
+    // GET /api/faults
+    server.on("/api/faults", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        uint8_t count = faultGetRingBufferEntryCount();
+        JsonArray faults = doc["faults"].to<JsonArray>();
+
+        for (uint8_t i = 0; i < count; i++) {
+            const fault_entry_t* entry = faultGetRingBufferEntry(i);
+            if (entry) {
+                JsonObject f = faults.add<JsonObject>();
+                f["code"] = entry->code;
+                f["description"] = faultCodeToString(entry->code);
+                f["severity"] = faultSeverityToString(entry->severity);
+                f["timestamp"] = entry->timestamp;
+            }
+        }
+
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+
+    // POST /api/faults/clear
+    server.on("/api/faults/clear", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        faultClearHistory();
+        return response->send(200, "application/json", "{\"success\":true}");
+    });
+
+    // GET /api/spindle
+    server.on("/api/spindle", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        const spindle_monitor_state_t* state = spindleMonitorGetState();
+        JsonDocument doc;
+        doc["current_amps"] = state->current_amps;
+        doc["peak_amps"] = state->current_peak_amps;
+        doc["threshold_amps"] = state->overcurrent_threshold_amps;
+        doc["auto_pause_threshold"] = state->auto_pause_threshold_amps;
+        doc["auto_pause_count"] = state->auto_pause_count;
+        doc["overcurrent"] = state->alarm_overload;
+
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+
+    // GET /api/history/telemetry
+    server.on("/api/history/telemetry", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        doc["success"] = true;
+        JsonArray cpu_arr = doc["cpu"].to<JsonArray>();
+        JsonArray heap_arr = doc["heap"].to<JsonArray>();
+        JsonArray spindle_arr = doc["spindle_amps"].to<JsonArray>();
+
+        // Reconstruct chronological order from circular buffer
+        for (int i = 0; i < history_count; i++) {
+            int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
+            cpu_arr.add(telemetry_history[idx].cpu);
+            heap_arr.add(telemetry_history[idx].heap);
+            spindle_arr.add(telemetry_history[idx].spindle);
+        }
+
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+
     // --- Hardware API Routes ---
 
     // GET /api/hardware/pins
@@ -345,9 +533,9 @@ void WebServerManager::begin() {
     Serial.println("[WEB] Starting Server");
     
     // PHASE 6: Performance tuning for concurrent browser requests
-    // Increase concurrent connections to prevent ERR_INCOMPLETE_CHUNKED_ENCODING
-    // Reduced to 6 for heap stability (preventing 500 errors)
-    server.config.max_open_sockets = 6;
+    // Reduced to 2 for heap stability (preventing OOM when serving large files)
+    // Browser will queue additional requests; prevents ESP32 crash
+    server.config.max_open_sockets = 2;
     server.config.max_uri_handlers = 40;
     
     server.start(); 
@@ -414,6 +602,30 @@ void WebServerManager::setVFDCalibrationValid(bool is_valid) {
     portEXIT_CRITICAL(&statusSpinlock);
 }
 
+void WebServerManager::setVFDConnected(bool is_connected) {
+    portENTER_CRITICAL(&statusSpinlock);
+    current_status.vfd_connected = is_connected;
+    portEXIT_CRITICAL(&statusSpinlock);
+}
+
+void WebServerManager::setDROConnected(bool is_connected) {
+    portENTER_CRITICAL(&statusSpinlock);
+    current_status.dro_connected = is_connected;
+    portEXIT_CRITICAL(&statusSpinlock);
+}
+
+void WebServerManager::setSpindleRPM(float rpm) {
+    portENTER_CRITICAL(&statusSpinlock);
+    current_status.spindle_rpm = rpm;
+    portEXIT_CRITICAL(&statusSpinlock);
+}
+
+void WebServerManager::setSpindleSpeed(float speed_m_s) {
+    portENTER_CRITICAL(&statusSpinlock);
+    current_status.spindle_speed_m_s = speed_m_s;
+    portEXIT_CRITICAL(&statusSpinlock);
+}
+
 void WebServerManager::setAxisQualityScore(uint8_t axis, uint32_t quality_score) {
     if (axis < 3) {
         portENTER_CRITICAL(&statusSpinlock);
@@ -459,11 +671,13 @@ void WebServerManager::broadcastState() {
     doc["system"]["uptime_seconds"] = current_status.uptime_sec;
     doc["system"]["cpu_percent"] = telemetry.cpu_usage_percent;
     doc["system"]["free_heap_bytes"] = telemetry.free_heap_bytes;
+    doc["system"]["temperature"] = telemetry.temperature;
     
     doc["motion"]["position"]["x"] = current_status.x_pos;
     doc["motion"]["position"]["y"] = current_status.y_pos;
     doc["motion"]["position"]["z"] = current_status.z_pos;
     doc["motion"]["position"]["a"] = current_status.a_pos;
+    doc["motion"]["dro_connected"] = current_status.dro_connected;
     
     doc["vfd"]["current_amps"] = current_status.vfd_current_amps;
     doc["vfd"]["frequency_hz"] = current_status.vfd_frequency_hz;
@@ -471,6 +685,25 @@ void WebServerManager::broadcastState() {
     doc["vfd"]["fault_code"] = current_status.vfd_fault_code;
     doc["vfd"]["stall_threshold"] = current_status.vfd_threshold_amps;
     doc["vfd"]["calibration_valid"] = current_status.vfd_calibration_valid;
+    doc["vfd"]["calibration_valid"] = current_status.vfd_calibration_valid;
+    doc["vfd"]["connected"] = current_status.vfd_connected;
+    doc["vfd"]["rpm"] = current_status.spindle_rpm;
+    doc["vfd"]["speed_m_s"] = current_status.spindle_speed_m_s;
+    
+    // Axis Metrics
+    for (int i = 0; i < 3; i++) {
+        const char* axis_names[] = {"x", "y", "z"};
+        doc["axis"][axis_names[i]]["quality"] = current_status.axis_metrics[i].quality_score;
+        doc["axis"][axis_names[i]]["jitter_mms"] = current_status.axis_metrics[i].jitter_mms;
+        doc["axis"][axis_names[i]]["vfd_error_percent"] = current_status.axis_metrics[i].vfd_error_percent;
+        doc["axis"][axis_names[i]]["stalled"] = (current_status.axis_metrics[i].quality_score < 10); // Simple stall heuristic for UI
+    }
+    
+    // Network Status
+    doc["network"]["wifi_connected"] = telemetry.wifi_connected;
+    doc["network"]["signal_percent"] = telemetry.wifi_signal_strength;
+    doc["network"]["latency"] = 0; // Placeholder for future ping/roundtrip tracking
+    
     portEXIT_CRITICAL(&statusSpinlock);
     
     String json;
@@ -478,6 +711,9 @@ void WebServerManager::broadcastState() {
     
     // Send to all connected WebSocket clients
     wsHandler.sendAll(json.c_str());
+
+    // Update history tracking
+    updateHistory(telemetry.cpu_usage_percent, telemetry.free_heap_bytes, current_status.vfd_current_amps);
 }
 
 // --- Credentials Stubs ---

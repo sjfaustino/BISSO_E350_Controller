@@ -6,12 +6,17 @@ window.MotionModule = window.MotionModule || {
     stepSize: 10,
     isMoving: false,
     positionViz: null,
+    unsubscribe: null,
+    keydownHandler: null,
 
     init() {
         console.log('[Motion] Initializing');
         this.setupPositionVisualization();
         this.setupEventListeners();
-        window.addEventListener('state-changed', () => this.onStateChanged());
+
+        // Properly subscribe and store unsubscribe function
+        this.unsubscribe = AppState.subscribe(() => this.onStateChanged());
+        this.onStateChanged(); // Initial update
     },
 
     setupPositionVisualization() {
@@ -72,8 +77,8 @@ window.MotionModule = window.MotionModule || {
             });
         }
 
-        // Keyboard controls
-        window.addEventListener('keydown', (e) => {
+        // Keyboard controls - Store handler for cleanup
+        this.keydownHandler = (e) => {
             if (e.ctrlKey || e.metaKey) return;
 
             const directions = {
@@ -90,7 +95,8 @@ window.MotionModule = window.MotionModule || {
                 e.preventDefault();
                 this.sendJog(directions[e.key]);
             }
-        });
+        };
+        window.addEventListener('keydown', this.keydownHandler);
     },
 
     sendJog(direction) {
@@ -98,14 +104,27 @@ window.MotionModule = window.MotionModule || {
             SharedWebSocket.send({ cmd: 'stop' });
             AlertManager.add('Motion stopped', 'info', 2000);
         } else {
-            const distance = this.stepSize;
+            // Get axis-specific step size
+            let distance = this.stepSize; // Default from XY selector
+            let unit = 'mm';
+
+            if (direction.startsWith('Z')) {
+                const zStep = document.getElementById('z-step-size');
+                if (zStep) distance = parseFloat(zStep.value);
+            } else if (direction.startsWith('A')) {
+                const aStep = document.getElementById('a-step-size');
+                if (aStep) distance = parseFloat(aStep.value);
+                unit = '°';
+            }
+            // X and Y use the main step-size selector (this.stepSize)
+
             SharedWebSocket.send({
                 cmd: 'jog',
                 direction,
                 distance,
                 speed: 100
             });
-            AlertManager.add(`Jog: ${direction} ${distance}mm`, 'info', 1000);
+            AlertManager.add(`Jog: ${direction} ${distance}${unit}`, 'info', 1000);
         }
     },
 
@@ -138,10 +157,16 @@ window.MotionModule = window.MotionModule || {
             const z = state.motion.position?.z || 0;
             const a = state.motion.position?.a || 0;
 
-            document.getElementById('pos-x').textContent = x.toFixed(2) + ' mm';
-            document.getElementById('pos-y').textContent = y.toFixed(2) + ' mm';
-            document.getElementById('pos-z').textContent = z.toFixed(2) + ' mm';
-            document.getElementById('pos-a').textContent = a.toFixed(2) + ' °';
+            // SAFETY: Check for element existence before updating
+            const posX = document.getElementById('pos-x');
+            const posY = document.getElementById('pos-y');
+            const posZ = document.getElementById('pos-z');
+            const posA = document.getElementById('pos-a');
+
+            if (posX) posX.textContent = x.toFixed(2) + ' mm';
+            if (posY) posY.textContent = y.toFixed(2) + ' mm';
+            if (posZ) posZ.textContent = z.toFixed(2) + ' mm';
+            if (posA) posA.textContent = a.toFixed(2) + ' °';
 
             // Update position visualization
             if (this.positionViz) {
@@ -154,6 +179,19 @@ window.MotionModule = window.MotionModule || {
 
     cleanup() {
         console.log('[Motion] Cleaning up');
+
+        // Remove AppState listener
+        if (this.unsubscribe) {
+            this.unsubscribe();
+            this.unsubscribe = null;
+        }
+
+        // Remove keyboard listener
+        if (this.keydownHandler) {
+            window.removeEventListener('keydown', this.keydownHandler);
+            this.keydownHandler = null;
+        }
+
         if (this.positionViz) {
             this.positionViz.destroy();
             this.positionViz = null;
@@ -161,4 +199,4 @@ window.MotionModule = window.MotionModule || {
     }
 };
 
-window.currentPageModule = MotionModule;
+window.currentPageModule = window.MotionModule;

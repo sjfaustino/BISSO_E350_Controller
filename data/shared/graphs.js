@@ -167,7 +167,7 @@ class GraphVisualizer {
 
     valueToCanvasY(value, yMin, yMax) {
         const padding = 60; // pixels
-        const graphHeight = this.height - padding - 40; // 40px for legend
+        const graphHeight = this.height - padding - 60; // 60px for bottom area (labels + legend)
         const normalized = (value - yMin) / (yMax - yMin);
         return padding + graphHeight - (normalized * graphHeight);
     }
@@ -233,13 +233,19 @@ class GraphVisualizer {
         this.ctx.lineWidth = 1;
         this.ctx.globalAlpha = 0.3;
 
-        // Vertical grid lines (time)
-        const timeStep = 60000; // 1 minute
-        for (let t = Math.ceil(minTime / timeStep) * timeStep; t <= maxTime; t += timeStep) {
+        // Vertical grid lines (time) - FIXED RELATIVE GRID
+        let timeStep = 60000; // Default 1 minute
+        if (this.config.timeWindow > 300000) timeStep = 180000;  // > 5m -> 3m
+        if (this.config.timeWindow > 900000) timeStep = 300000;  // > 15m -> 5m
+        if (this.config.timeWindow > 1800000) timeStep = 600000; // > 30m -> 10m
+
+        // Iterate from 0 (Now) back to timeWindow
+        for (let offset = 0; offset < this.config.timeWindow; offset += timeStep) {
+            const t = maxTime - offset;
             const x = this.timeToCanvasX(t, minTime, maxTime);
             this.ctx.beginPath();
             this.ctx.moveTo(x, 50);
-            this.ctx.lineTo(x, this.height - 40);
+            this.ctx.lineTo(x, this.height - 60);
             this.ctx.stroke();
         }
 
@@ -260,10 +266,19 @@ class GraphVisualizer {
 
     getGridStep(min, max) {
         const range = max - min;
-        let step = 10;
-        if (range > 100) step = 20;
-        if (range > 200) step = 50;
-        if (range > 500) step = 100;
+        if (range === 0) return 1;
+
+        // Target roughly 5-8 grid lines
+        const targetStep = range / 6;
+        const magnitude = Math.pow(10, Math.floor(Math.log10(targetStep)));
+        const normalized = targetStep / magnitude;
+
+        let step;
+        if (normalized < 1.5) step = 1 * magnitude;
+        else if (normalized < 3.5) step = 2 * magnitude;
+        else if (normalized < 7.5) step = 5 * magnitude;
+        else step = 10 * magnitude;
+
         return step;
     }
 
@@ -289,15 +304,23 @@ class GraphVisualizer {
         this.ctx.textAlign = 'center';
         this.ctx.globalAlpha = 0.7;
 
-        const timeStep = 60000; // 1 minute
-        const now = Date.now();
+        let timeStep = 60000; // Default 1 minute
+        if (this.config.timeWindow > 300000) timeStep = 180000;  // > 5m -> 3m
+        if (this.config.timeWindow > 900000) timeStep = 300000;  // > 15m -> 5m
+        if (this.config.timeWindow > 1800000) timeStep = 600000; // > 30m -> 10m
 
-        for (let t = Math.ceil(minTime / timeStep) * timeStep; t <= maxTime; t += timeStep) {
+        // Iterate from 0 (Now) back to timeWindow - STATIC LABELS
+        for (let offset = 0; offset <= this.config.timeWindow; offset += timeStep) {
+            const t = maxTime - offset;
             const x = this.timeToCanvasX(t, minTime, maxTime);
-            const secondsAgo = Math.round((now - t) / 1000);
+
+            // Convert offset to label
+            const secondsAgo = Math.round(offset / 1000);
             let label = '';
 
-            if (secondsAgo < 60) {
+            if (secondsAgo === 0) {
+                label = 'Now';
+            } else if (secondsAgo < 60) {
                 label = secondsAgo + 's ago';
             } else if (secondsAgo < 3600) {
                 label = Math.round(secondsAgo / 60) + 'm ago';
@@ -305,7 +328,8 @@ class GraphVisualizer {
                 label = Math.round(secondsAgo / 3600) + 'h ago';
             }
 
-            this.ctx.fillText(label, x, this.height - 15);
+            // Draw label above legend
+            this.ctx.fillText(label, x, this.height - 42);
         }
 
         this.ctx.globalAlpha = 1;
@@ -318,13 +342,13 @@ class GraphVisualizer {
         // Y-axis
         this.ctx.beginPath();
         this.ctx.moveTo(50, 50);
-        this.ctx.lineTo(50, this.height - 40);
+        this.ctx.lineTo(50, this.height - 60);
         this.ctx.stroke();
 
         // X-axis
         this.ctx.beginPath();
-        this.ctx.moveTo(50, this.height - 40);
-        this.ctx.lineTo(this.width - 20, this.height - 40);
+        this.ctx.moveTo(50, this.height - 60);
+        this.ctx.lineTo(this.width - 20, this.height - 60);
         this.ctx.stroke();
     }
 
@@ -368,7 +392,7 @@ class GraphVisualizer {
 
     drawLegend(yMin, yMax) {
         const legendX = 60;
-        const legendY = this.height - 25;
+        const legendY = this.height - 30; // Moved up to tighten spacing (was -20)
         const spacing = 120;
 
         let index = 0;

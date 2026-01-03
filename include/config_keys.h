@@ -108,6 +108,10 @@
   "spindl_thr" // Overcurrent threshold in integer amperes (30 = 30A)
 #define KEY_SPINDLE_POLL_MS                                                    \
   "spindl_poll" // Poll interval in milliseconds (default 1000)
+#define KEY_SPINDLE_RATED_RPM                                                  \
+  "spindl_rpm"  // Rated Spindle RPM (default 1400)
+#define KEY_BLADE_DIAMETER_MM                                                  \
+  "blade_dia"   // Saw Blade Diameter in mm (default 350)
 
 // --- VFD CURRENT CALIBRATION (PHASE 5.5) ---
 #define KEY_VFD_IDLE_RMS                                                       \

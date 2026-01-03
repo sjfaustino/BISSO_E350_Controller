@@ -111,6 +111,8 @@ bool jxk10ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
     jxk10_state.slave_address = cfg_addr;
     jxk10_state.baud_rate = baud_rate;
     jxk10_state.enabled = true;  // Mark sensor as enabled
+    // Force stale state at startup so it shows Disconnected until valid data arrives
+    jxk10_state.last_read_time_ms = (millis() > 60000) ? (millis() - 60000) : 0;
     
     // Update registry descriptor
     jxk10_device.slave_address = cfg_addr;
@@ -189,7 +191,11 @@ bool jxk10ModbusSetBaudRate(uint32_t baud_rate) {
 
 const jxk10_state_t* jxk10GetState(void) {
     // Sync statistics from registry to state for legacy diagnostic compatibility
-    jxk10_state.read_count = jxk10_device.poll_count;
+    // Fix: Do NOT overwrite read_count with poll_count (which counts attempts, not successes)
+    // jxk10_state.read_count is managed by OnResponse (successes only)
+    
+    // jxk10_state.read_count = jxk10_device.poll_count; // REMOVED
+    
     jxk10_state.error_count = jxk10_device.error_count;
     jxk10_state.consecutive_errors = jxk10_device.consecutive_errors;
     return &jxk10_state;

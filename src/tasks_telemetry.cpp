@@ -8,10 +8,13 @@
  */
 
 #include "altivar31_modbus.h"     // PHASE 5.5: VFD current monitoring
+#include "jxk10_modbus.h"         // PHASE 5.0: JXK-10 Spindle Current
 #include "axis_synchronization.h" // PHASE 5.6: Axis validation
 #include "cutting_analytics.h"    // Stone cutting analytics
 #include "dashboard_metrics.h"    // PHASE 5.3: Web UI dashboard metrics
 #include "encoder_diagnostics.h"  // PHASE 5.3: Encoder health monitoring
+#include "encoder_wj66.h"         // Fix: Include for ENCODER_OK
+#include "config_keys.h"          // Helper for config keys
 #include "load_manager.h"         // PHASE 5.3: Graceful degradation under load
 #include "motion.h"
 #include "motion_state.h"
@@ -65,11 +68,37 @@ void taskTelemetryFunction(void *parameter) {
 
     // Push VFD telemetry to web UI (PHASE 5.5k)
     // CRITICAL: Sanitize sensor data before sending to web UI
-    // Replace NaN/invalid values with safe defaults (0.0) to prevent UI
-    // corruption
-    float vfd_current = altivar31GetCurrentAmps();
+    // Replace NaN/invalid values with safe defaults (0.0) to prevent UI corruption
+    // NOTE: Spindle Current comes from JXK-10, Frequency/Thermal from Altivar (Axis VFD)
+    float vfd_current = jxk10GetCurrentAmps();
     float vfd_frequency = altivar31GetFrequencyHz();
     int16_t vfd_thermal = altivar31GetThermalState();
+
+    // Check connection health (heuristic: < 5 consecutive errors AND recent data AND multiple successful reads)
+    // For Spindle Card, we check JXK-10 connection status since it provides the primary metric (Current)
+    const jxk10_state_t* jxk_state = jxk10GetState();
+    bool vfd_alive = jxk_state 
+                     && jxk_state->enabled 
+                     && (jxk_state->read_count > 5) // Require >5 successful reads to rule out noise
+                     && (jxk_state->consecutive_errors < 5)
+                     && (millis() - jxk_state->last_read_time_ms < 5000); // 5s timeout
+
+    // Spindle RPM & Surface Speed Logic (Inferred from Current)
+    // TODO: Future: Use YH-TC05 sensor via yhtc05GetRPM() when hardware is installed.
+    // If current > 1.0A (running), assume Rated RPM
+    int rated_rpm = configGetInt(KEY_SPINDLE_RATED_RPM, 1400);
+    int blade_dia = configGetInt(KEY_BLADE_DIAMETER_MM, 350);
+    
+    float current_rpm = 0.0f;
+    if (vfd_alive && vfd_current > 1.0f) {
+        current_rpm = (float)rated_rpm;
+    }
+    
+    // speed (m/s) = (RPM * PI * Dia_mm) / 60000
+    float current_speed = (current_rpm * 3.14159f * (float)blade_dia) / 60000.0f;
+    
+    webServer.setSpindleRPM(current_rpm);
+    webServer.setSpindleSpeed(current_speed);
 
     webServer.setVFDCurrent(
         isnan(vfd_current) || vfd_current < 0.0f ? 0.0f : vfd_current);
@@ -80,6 +109,13 @@ void taskTelemetryFunction(void *parameter) {
     webServer.setVFDFaultCode(altivar31GetFaultCode());
     webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
     webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
+    
+    webServer.setVFDConnected(vfd_alive);
+
+    // Check DRO connection health using staleness (timeout)
+    // wj66IsStale(0) checks if last successful read was > 500ms ago
+    bool dro_alive = !wj66IsStale(0);
+    webServer.setDROConnected(dro_alive);
 
     // 4. PHASE 5.6: Axis Synchronization Validation (Per-axis multiplexed
     // VFD) Update axis metrics for active axis only BUGFIX: Use motion

@@ -324,14 +324,28 @@ void axisSynchronizationUpdate(uint8_t active_axis,
             active->good_motion_samples = 0;
             active->bad_motion_samples = 0;
             active->stalled = false;
+            
+            // BUGFIX: If not moving and VFD is idle, jitter should be 0, not residual baseline
+            if (active->vfd_frequency_hz < 0.5f) {
+                active->velocity_jitter_mms = 0.0f;
+            }
         }
 
         // Calculate quality score
         uint32_t score = 100;
-        if (active->stalled) score -= 40;
-        if (active->vfd_encoder_error_percent > sync_config.vfd_encoder_tolerance_percent) score -= 25;
-        if (active->jitter_elevated) score -= 15;
-        if (active->bad_motion_samples >= sync_config.bad_samples_for_alert) score -= 10;
+
+        // BUGFIX: Detect if encoders are physically missing/floating
+        // If current velocity is exactly 0.0 and we are commanded to move, or we have 0 signal quality
+        // we should treat the quality as 0. 
+        // For a Vanilla ESP32 (no encoders), velocity will always be 0.
+        if (active->is_moving == false && active->vfd_frequency_hz > 5.0f) {
+            score = 0; 
+        } else {
+            if (active->stalled) score -= 40;
+            if (active->vfd_encoder_error_percent > sync_config.vfd_encoder_tolerance_percent) score -= 25;
+            if (active->jitter_elevated) score -= 15;
+            if (active->bad_motion_samples >= sync_config.bad_samples_for_alert) score -= 10;
+        }
 
         active->quality_score = (score > 0) ? score : 0;
     }

@@ -25,13 +25,21 @@
     gap: var(--space-md);
 }
 
-.card h2 {
+.card h2,
+.card h3 {
     font-size: var(--font-size-lg);
     font-weight: 600;
     text-transform: uppercase;
     color: var(--text-secondary);
     letter-spacing: 0.5px;
     margin: 0;
+    flex-grow: 1;
+    text-align: center;
+}
+
+.card h3 {
+    font-size: var(--font-size-base);
+    /* Slightly smaller for h3 */
 }
 
 .card-toggle {

@@ -67,6 +67,10 @@ void GCodeParser::getWCO(float* wco_array) {
     for(int i=0; i<4; i++) wco_array[i] = wcs_offsets[currentWCS][i];
 }
 
+float GCodeParser::getCurrentFeedRate() {
+    return currentFeedRate;
+}
+
 void GCodeParser::getParserState(char* buffer, size_t len) {
     // Standard Grbl response string
     snprintf(buffer, len, "[GC:G%d G%d %s G94 M5]",

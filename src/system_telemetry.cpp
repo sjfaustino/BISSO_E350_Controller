@@ -94,6 +94,7 @@ void telemetryUpdate() {
 
     // CPU & Memory
     uint8_t cpu = taskGetCpuUsage();
+    float soc_temp = temperatureRead();
     uint32_t free_heap = memoryMonitorGetFreeHeap();
     uint32_t stack_used = (TASK_STACK_BOOT * 4) - (uxTaskGetStackHighWaterMark(NULL) * 4);
 
@@ -187,6 +188,7 @@ void telemetryUpdate() {
     telemetry_cache.uptime_seconds = uptime;
     telemetry_cache.loop_cycle_count = cycles;
     telemetry_cache.cpu_usage_percent = cpu;
+    telemetry_cache.temperature = soc_temp;
     telemetry_cache.free_heap_bytes = free_heap;
     telemetry_cache.stack_used_bytes = stack_used;
     telemetry_cache.motion_enabled = motion_en;

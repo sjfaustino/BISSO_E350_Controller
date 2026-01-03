@@ -3,7 +3,7 @@
  * Note: Use window.DashboardModule to avoid "already declared" errors when navigating
  */
 window.DashboardModule = window.DashboardModule || {
-    history: { cpu: [], memory: [], spindle: [], temperature: [], latency: [], motion: [], timestamps: [] },
+    history: { cpu: [], memory: [], spindle: [], temperature: [], latency: [], motion: [], wifi: [], timestamps: [] },
     maxHistory: 300,
     currentTimeRange: 300000, // 5 minutes
     chart: null,
@@ -12,6 +12,20 @@ window.DashboardModule = window.DashboardModule || {
     stateChangeHandler: null, // Store bound event handler for cleanup
     updateInterval: null, // Store interval ID for cleanup
     historicalDataLoaded: false, // Track if historical data has been bulk-loaded
+
+    // Helper to set N/A values with red styling (only n/a is red, suffix is normal)
+    setNA(element, suffix = '') {
+        if (!element) return;
+        element.classList.remove('value-na'); // Ensure parent doesn't inherit red
+        element.innerHTML = '<span class="value-na">n/a</span>' + suffix;
+    },
+
+    // Helper to set normal value and remove N/A styling
+    setValue(element, value) {
+        if (!element) return;
+        element.textContent = value;
+        element.classList.remove('value-na');
+    },
 
     init() {
         console.log('[Dashboard] Initializing');
@@ -46,6 +60,14 @@ window.DashboardModule = window.DashboardModule || {
             timeRangeSelect.addEventListener('change', (e) => {
                 this.currentTimeRange = parseInt(e.target.value) * 1000;
                 console.log('[Dashboard] Time range changed to', this.currentTimeRange / 1000, 'seconds');
+
+                // Update all active graphs with new time window
+                Object.values(this.graphs).forEach(graph => {
+                    if (graph && graph.config) {
+                        graph.config.timeWindow = this.currentTimeRange;
+                        if (typeof graph.draw === 'function') graph.draw(); // Trigger immediate redraw
+                    }
+                });
             });
         }
 
@@ -196,6 +218,20 @@ window.DashboardModule = window.DashboardModule || {
             } catch (e) { console.warn('Motion graph init failed:', e); }
         }
 
+        // WiFi Signal Graph
+        if (document.getElementById('wifi-graph')) {
+            try {
+                this.graphs.wifi = new GraphVisualizer('wifi-graph', {
+                    title: 'WiFi Signal Quality (%)',
+                    yMin: 0,
+                    yMax: 100,
+                    unit: '%',
+                    timeWindow: this.currentTimeRange
+                });
+                this.graphs.wifi.addSeries('Signal', '#3b82f6');
+            } catch (e) { console.warn('WiFi graph init failed:', e); }
+        }
+
         console.log('[Dashboard] Graphs initialized');
     },
 
@@ -218,6 +254,7 @@ window.DashboardModule = window.DashboardModule || {
             const healthValueEl = document.getElementById('health-value');
             if (healthValueEl) {
                 healthValueEl.textContent = health;
+                // Apply classes for colors (optimal, normal, warning, critical)
                 healthValueEl.className = 'card-value ' + health.toLowerCase();
             }
             const healthDetailEl = document.getElementById('health-detail');
@@ -268,18 +305,35 @@ window.DashboardModule = window.DashboardModule || {
             const safetyStatusEl = document.getElementById('safety-status');
             if (safetyStatusEl) safetyStatusEl.textContent = safetyText;
         }
-
-        // VFD status
+        // VFD status (Spindle)
         if (state.vfd) {
-            const motorStatus = state.vfd.frequency_hz > 0.5 ? 'RUNNING' : 'IDLE';
             const vfdStatusEl = document.getElementById('vfd-status');
-            if (vfdStatusEl) vfdStatusEl.textContent = motorStatus;
+            const vfdRpmEl = document.getElementById('spindle-rpm');
+            const vfdSpeedEl = document.getElementById('spindle-speed');
+            const vfdCurrentEl = document.getElementById('spindle-current');
 
-            const vfdFreqEl = document.getElementById('vfd-freq');
-            if (vfdFreqEl) vfdFreqEl.textContent = state.vfd.frequency_hz.toFixed(1) + ' Hz';
+            if (state.vfd.connected) {
+                const motorStatus = (state.vfd.rpm > 0) ? 'RUNNING' : 'IDLE';
+                if (vfdStatusEl) vfdStatusEl.textContent = motorStatus;
 
-            const vfdCurrentEl = document.getElementById('vfd-current');
-            if (vfdCurrentEl) vfdCurrentEl.textContent = state.vfd.current_amps.toFixed(1) + ' A';
+                if (vfdRpmEl) vfdRpmEl.textContent = (state.vfd.rpm || 0).toFixed(0);
+                if (vfdSpeedEl) vfdSpeedEl.textContent = (state.vfd.speed_m_s || 0).toFixed(1) + ' m/s';
+                if (vfdCurrentEl) vfdCurrentEl.textContent = (state.vfd.current_amps || 0).toFixed(2) + ' A';
+
+                const bar = document.getElementById('spindle-bar');
+                if (bar) {
+                    const pct = Math.min(100, ((state.vfd.current_amps || 0) / 30.0) * 100);
+                    bar.style.width = pct + '%';
+                }
+            } else {
+                if (vfdStatusEl) vfdStatusEl.textContent = 'DISCONNECTED';
+                this.setNA(vfdRpmEl);
+                this.setNA(vfdSpeedEl, ' m/s');
+                this.setNA(vfdCurrentEl, ' A');
+
+                const bar = document.getElementById('spindle-bar');
+                if (bar) bar.style.width = '0%';
+            }
         }
 
         // Network status
@@ -308,8 +362,11 @@ window.DashboardModule = window.DashboardModule || {
         this.history.cpu.push(state.system?.cpu_percent || 0);
         this.history.memory.push((state.system?.free_heap_bytes || 0) / 1024);
         this.history.spindle.push(state.vfd?.current_amps || 0);
-        this.history.temperature.push(state.system?.temperature || 25);
-        this.history.latency.push(state.network?.latency || 0);
+        this.history.temperature.push(state.system?.temperature || 0);
+        this.history.latency.push(SharedWebSocket.latency || 0);
+
+        // Network signal
+        this.history.wifi.push(state.network?.signal_percent || 0);
 
         // Motion load from average axis quality
         let avgQuality = 80;
@@ -344,6 +401,7 @@ window.DashboardModule = window.DashboardModule || {
             this.history.temperature.shift();
             this.history.latency.shift();
             this.history.motion.shift();
+            this.history.wifi.shift();
             this.history.timestamps.shift();
         }
 
@@ -353,23 +411,34 @@ window.DashboardModule = window.DashboardModule || {
     updateAxisCard(axis, metrics) {
         if (!metrics) return;
 
+        const connected = AppState.data.motion?.dro_connected ?? false;
         const prefix = `axis-${axis}`;
 
         const qualityEl = document.getElementById(`${prefix}-quality`);
-        if (qualityEl) qualityEl.textContent = metrics.quality || 0;
+        if (connected) this.setValue(qualityEl, metrics.quality || 0);
+        else this.setNA(qualityEl);
 
         const barEl = document.getElementById(`${prefix}-bar`);
-        if (barEl) barEl.style.width = (metrics.quality || 0) + '%';
+        if (barEl) barEl.style.width = connected ? ((metrics.quality || 0) + '%') : '0%';
+        if (barEl) {
+            if (!connected) barEl.classList.add('offline'); // Optional styling
+            else barEl.classList.remove('offline');
+        }
 
         const jitterEl = document.getElementById(`${prefix}-jitter`);
-        if (jitterEl) jitterEl.textContent = (metrics.jitter_mms || 0).toFixed(3) + ' mm/s';
+        if (connected) this.setValue(jitterEl, (metrics.jitter_mms || 0).toFixed(3) + ' mm/s');
+        else this.setNA(jitterEl);
 
         const errorEl = document.getElementById(`${prefix}-error`);
-        if (errorEl) errorEl.textContent = (metrics.vfd_error_percent || 0).toFixed(1) + '%';
+        if (connected) this.setValue(errorEl, (metrics.vfd_error_percent || 0).toFixed(1) + '%');
+        else this.setNA(errorEl);
 
         const stalledEl = document.getElementById(`${prefix}-stalled`);
         if (stalledEl) {
-            if (metrics.stalled) {
+            if (!connected) {
+                stalledEl.textContent = 'OFFLINE';
+                stalledEl.style.color = 'var(--color-critical)'; // Red for Offline
+            } else if (metrics.stalled) {
                 stalledEl.textContent = '⚠️ STALLED';
                 stalledEl.style.color = 'var(--color-critical)';
             } else {
@@ -381,24 +450,36 @@ window.DashboardModule = window.DashboardModule || {
 
     updateDRO(axisData) {
         const axes = ['x', 'y', 'z', 'a'];
+        // Check connection status from motion state
+        // Default to false (Offline) to prevent "Live" flicker on boot before data arrives
+        const connected = AppState.data.motion?.dro_connected ?? false;
 
         axes.forEach(axis => {
             const el = document.getElementById(`dro-${axis}`);
             if (el) {
-                // Get position from axis data (position_mm or position field)
-                const pos = axisData[axis]?.position_mm ?? axisData[axis]?.position ?? 0;
-                el.textContent = pos.toFixed(3);
-
-                // Add negative class for styling
-                el.classList.toggle('negative', pos < 0);
+                if (!connected) {
+                    this.setNA(el);
+                    el.classList.remove('negative');
+                } else {
+                    // Get position from axis data (position_mm or position field)
+                    const pos = axisData[axis]?.position_mm ?? axisData[axis]?.position ?? 0;
+                    el.textContent = pos.toFixed(3);
+                    // Add negative class for styling
+                    el.classList.toggle('negative', pos < 0);
+                }
             }
         });
 
         // Update live status indicator
         const statusEl = document.getElementById('dro-status');
         if (statusEl) {
-            statusEl.textContent = 'Live';
-            statusEl.classList.remove('offline');
+            if (!connected) {
+                statusEl.textContent = 'Offline';
+                statusEl.classList.add('offline');
+            } else {
+                statusEl.textContent = 'Live';
+                statusEl.classList.remove('offline');
+            }
         }
     },
 
@@ -426,13 +507,13 @@ window.DashboardModule = window.DashboardModule || {
         const visibleSpindle = this.history.spindle.slice(-sampleSize);
 
         // Draw lines
-        const drawLine = (data, color, scale) => {
-            ctx.strokeStyle = color;
+        const drawLine = (data, color, scale, fallbackColor = '#888') => {
+            ctx.strokeStyle = color || fallbackColor;
             ctx.lineWidth = 2;
             ctx.beginPath();
 
             for (let i = 0; i < data.length; i++) {
-                const value = Math.min(100, data[i] / scale);
+                const value = Math.max(0, Math.min(100, (data[i] / scale) * 100));
                 const x = padding + (i / Math.max(1, data.length - 1)) * width;
                 const y = canvas.height - padding - (value / 100) * height;
 
@@ -442,13 +523,17 @@ window.DashboardModule = window.DashboardModule || {
             ctx.stroke();
         };
 
-        const cpuColor = getComputedStyle(document.documentElement).getPropertyValue('--chart-cpu').trim();
-        const memColor = getComputedStyle(document.documentElement).getPropertyValue('--chart-mem').trim();
-        const spindleColor = getComputedStyle(document.documentElement).getPropertyValue('--chart-spindle').trim();
+        const cpuColor = getComputedStyle(document.documentElement).getPropertyValue('--chart-cpu').trim() || '#10b981';
+        const memColor = getComputedStyle(document.documentElement).getPropertyValue('--chart-mem').trim() || '#3b82f6';
+        const spindleColor = getComputedStyle(document.documentElement).getPropertyValue('--chart-spindle').trim() || '#f59e0b';
 
-        drawLine(visibleCpu, cpuColor, 1);
-        drawLine(visibleMem, memColor, 1000);
-        drawLine(visibleSpindle, spindleColor, 25);
+        // Visibility check and scaling:
+        // CPU: 0-100%, skip division
+        // Memory: data is in KB, scale by total (320KB typical free)
+        // Spindle: data is in Amps, scale by 30A
+        drawLine(visibleCpu, cpuColor, 100);
+        drawLine(visibleMem, memColor, 320);
+        drawLine(visibleSpindle, spindleColor, 30);
 
         // Draw axes
         ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim();
@@ -530,15 +615,20 @@ window.DashboardModule = window.DashboardModule || {
                     const memCurrentEl = document.getElementById('mem-current');
                     const memAvgEl = document.getElementById('mem-stat-avg');
                     const memMaxEl = document.getElementById('mem-stat-max');
+                    const memMinEl = document.getElementById('mem-min'); // Added
 
                     if (memCurrentEl) memCurrentEl.textContent = mem.toFixed(0) + ' KB';
                     if (memAvgEl) memAvgEl.textContent = memStats.avg.toFixed(0) + ' KB';
                     if (memMaxEl) memMaxEl.textContent = memStats.max.toFixed(0) + ' KB';
+                    if (memMinEl) memMinEl.textContent = memStats.min.toFixed(0) + ' KB'; // Added
                 }
             }
         }
 
-        if (this.history.spindle.length > 0) {
+        // Only update spindle graph and display if VFD is connected
+        const vfdConnected = this.lastTelemetry?.vfd?.connected;
+
+        if (this.history.spindle.length > 0 && vfdConnected) {
             const spindle = this.history.spindle[this.history.spindle.length - 1];
 
             if (isMiniChart) {
@@ -634,14 +724,41 @@ window.DashboardModule = window.DashboardModule || {
 
         if (this.history.motion.length > 0 && !isMiniChart) {
             const motion = this.history.motion[this.history.motion.length - 1];
-            this.graphs.motion?.addDataPoint('Quality', motion.quality || 80);
-            this.graphs.motion?.addDataPoint('Jitter', motion.jitter || 0.5);
+            const connected = AppState.data.motion?.dro_connected ?? false; // Check connection
+
+            // Use 0 if offline, otherwise use value (default 0)
+            const quality = connected ? (motion.quality || 0) : 0;
+            const jitter = connected ? (motion.jitter || 0) : 0;
+
+            this.graphs.motion?.addDataPoint('Quality', quality);
+            this.graphs.motion?.addDataPoint('Jitter', jitter);
 
             const motionQualityEl = document.getElementById('motion-quality');
             const motionJitterEl = document.getElementById('motion-jitter');
 
-            if (motionQualityEl) motionQualityEl.textContent = (motion.quality || 80).toFixed(0) + '%';
-            if (motionJitterEl) motionJitterEl.textContent = (motion.jitter || 0.5).toFixed(2) + ' mm/s';
+            if (connected) {
+                this.setValue(motionQualityEl, quality.toFixed(0) + '%');
+                this.setValue(motionJitterEl, jitter.toFixed(2) + ' mm/s');
+            } else {
+                this.setNA(motionQualityEl);
+                this.setNA(motionJitterEl);
+            }
+        }
+
+        if (this.history.wifi.length > 0 && !isMiniChart) {
+            const signal = this.history.wifi[this.history.wifi.length - 1];
+            this.graphs.wifi?.addDataPoint('Signal', signal);
+
+            const wifiStats = this.graphs.wifi?.getStats('Signal');
+            if (wifiStats) {
+                const wifiCurrentEl = document.getElementById('wifi-current');
+                const wifiAvgEl = document.getElementById('wifi-stat-avg');
+                const wifiMaxEl = document.getElementById('wifi-stat-max');
+
+                if (wifiCurrentEl) wifiCurrentEl.textContent = signal.toFixed(0) + '%';
+                if (wifiAvgEl) wifiAvgEl.textContent = wifiStats.avg.toFixed(0) + '%';
+                if (wifiMaxEl) wifiMaxEl.textContent = wifiStats.max.toFixed(0) + '%';
+            }
         }
     },
 

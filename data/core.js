@@ -180,18 +180,15 @@ class Router {
             const route = this.routes[page];
             const container = document.getElementById('page-container');
 
-            // Asset Versioning for Cache-Busting
-            const version = Date.now();
-
-            const htmlResponse = await fetch(`${route.file}?v=${version}`);
+            const htmlResponse = await fetch(route.file);
             if (!htmlResponse.ok) throw new Error(`HTTP ${htmlResponse.status}`);
             container.innerHTML = await htmlResponse.text();
 
             const cssFile = route.file.replace('.html', '.css');
-            this.loadCSS(`${cssFile}?v=${version}`).catch(() => { });
+            this.loadCSS(cssFile).catch(() => { });
 
             const script = document.createElement('script');
-            script.src = `${route.js}?v=${version}`;
+            script.src = route.js;
             script.onload = () => {
                 this.currentPage = page;
                 this.currentModule = window.currentPageModule || {};
@@ -211,23 +208,9 @@ class Router {
     }
     static loadCSS(href) {
         return new Promise((resolve, reject) => {
-            // Check for existing link with this href (ignoring version for check)
-            const cleanHref = href.split('?')[0];
-            const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-                .find(l => l.getAttribute('href').startsWith(cleanHref));
-
-            if (existing) {
-                // If it exists, update it with the new versioned URL to force reload
-                existing.href = href;
-                resolve();
-                return;
-            }
-
+            if (document.querySelector(`link[href="${href}"]`)) { resolve(); return; }
             const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = href;
-            link.onload = resolve;
-            link.onerror = reject;
+            link.rel = 'stylesheet'; link.href = href; link.onload = resolve; link.onerror = reject;
             document.head.appendChild(link);
         });
     }

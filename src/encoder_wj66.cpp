@@ -129,7 +129,8 @@ void wj66Init() {
   for (int i = 0; i < WJ66_AXES; i++) {
     wj66_state.position[i] = 0;
     wj66_state.zero_offset[i] = 0;
-    wj66_state.last_read[i] = millis();
+    // Set last_read to past timestamp to ensure IsStale() returns true (disconnected) until first response
+    wj66_state.last_read[i] = (millis() > 60000) ? (millis() - 60000) : 0;
   }
   wj66_state.status = ENCODER_OK;
   wj66_state.waiting_for_response = false;
@@ -233,7 +234,8 @@ void wj66Reset() {
   for (int i = 0; i < WJ66_AXES; i++) {
     wj66_state.position[i] = 0;
     wj66_state.zero_offset[i] = 0;
-    wj66_state.last_read[i] = millis();
+    // Set last_read to past timestamp to ensure IsStale() returns true (disconnected) until first response
+    wj66_state.last_read[i] = (millis() > 60000) ? (millis() - 60000) : 0;
   }
   wj66_state.error_count = 0;
   wj66_state.waiting_for_response = false;

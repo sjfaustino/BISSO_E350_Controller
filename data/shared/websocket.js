@@ -17,6 +17,9 @@ class SharedWebSocket {
     static packetsSent = 0;
     static packetsReceived = 0;
     static dataReceivedBytes = 0;
+    static latency = 0;
+    static lastPingTime = 0;
+    static pingInterval = null;
 
     static connect() {
         // Clear any pending reconnect timer
@@ -53,6 +56,9 @@ class SharedWebSocket {
                 if (typeof AlertManager !== 'undefined' && this.reconnectAttempts > 0) {
                     AlertManager.add('WebSocket reconnected', 'success', 2000);
                 }
+
+                // Start pinging for latency
+                this.startLatencyTracking();
             };
 
             this.ws.onmessage = (event) => {
@@ -60,6 +66,13 @@ class SharedWebSocket {
                 if (event.data) this.dataReceivedBytes += event.data.length;
                 try {
                     const data = JSON.parse(event.data);
+
+                    // Handle pong response
+                    if (data.type === 'pong') {
+                        this.latency = Date.now() - this.lastPingTime;
+                        return;
+                    }
+
                     this.broadcast('telemetry', data);
                 } catch (e) {
                     console.error('[WS] Parse error:', e);
@@ -177,6 +190,24 @@ class SharedWebSocket {
             this.ws = null;
         }
         this.isConnected = false;
+        this.stopLatencyTracking();
+    }
+
+    static startLatencyTracking() {
+        this.stopLatencyTracking();
+        this.pingInterval = setInterval(() => {
+            if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
+                this.lastPingTime = Date.now();
+                this.ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 5000); // Check latency every 5 seconds
+    }
+
+    static stopLatencyTracking() {
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+        }
     }
 
     /**

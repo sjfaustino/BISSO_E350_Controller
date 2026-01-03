@@ -101,259 +101,261 @@
         </div>
     </div>
 
-    <!-- Enhanced Encoder Status Card -->
-    <div class="card">
+    <!-- Encoder and Fault Status Section -->
+    <div class="card-grid">
+        <!-- Enhanced Encoder Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Encoder Status</h2>
+            </div>
+            <div class="card-content">
+                <div class="encoder-row">
+                    <span class="encoder-axis">X</span>
+                    <div class="encoder-details">
+                        <div class="encoder-stat">
+                            <span class="stat-label">Position Error:</span>
+                            <span class="stat-value" id="enc-x-error">-- mm</span>
+                        </div>
+                        <div class="encoder-stat">
+                            <span class="stat-label">Feedback:</span>
+                            <span class="stat-value" id="enc-x-feedback">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="encoder-row">
+                    <span class="encoder-axis">Y</span>
+                    <div class="encoder-details">
+                        <div class="encoder-stat">
+                            <span class="stat-label">Position Error:</span>
+                            <span class="stat-value" id="enc-y-error">-- mm</span>
+                        </div>
+                        <div class="encoder-stat">
+                            <span class="stat-label">Feedback:</span>
+                            <span class="stat-value" id="enc-y-feedback">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="encoder-row">
+                    <span class="encoder-axis">Z</span>
+                    <div class="encoder-details">
+                        <div class="encoder-stat">
+                            <span class="stat-label">Position Error:</span>
+                            <span class="stat-value" id="enc-z-error">-- mm</span>
+                        </div>
+                        <div class="encoder-stat">
+                            <span class="stat-label">Feedback:</span>
+                            <span class="stat-value" id="enc-z-feedback">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="encoder-row">
+                    <span class="encoder-axis">A</span>
+                    <div class="encoder-details">
+                        <div class="encoder-stat">
+                            <span class="stat-label">Position Error:</span>
+                            <span class="stat-value" id="enc-a-error">-- °</span>
+                        </div>
+                        <div class="encoder-stat">
+                            <span class="stat-label">Feedback:</span>
+                            <span class="stat-value" id="enc-a-feedback">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fault Log Viewer Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Fault Log</h2>
+                <button class="btn btn-small btn-secondary" id="clear-faults-btn">Clear</button>
+            </div>
+            <div class="card-content">
+                <div class="fault-summary" style="margin-bottom: 15px;">
+                    <span class="fault-count" id="fault-count">0</span>
+                    <span class="fault-label">Active Faults</span>
+                </div>
+                <div class="fault-list" id="fault-list">
+                    <div class="fault-empty">No faults recorded</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>VFD Diagnostics</h2>
+            </div>
+            <div class="card-content">
+                <div class="metric-card">
+                    <div class="metric-label">Current Draw</div>
+                    <div class="metric-value" id="diag-vfd-current">-- A</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Frequency</div>
+                    <div class="metric-value" id="diag-vfd-freq">-- Hz</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Thermal State</div>
+                    <div class="metric-value" id="diag-vfd-thermal">--%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Fault Code</div>
+                    <div class="metric-value" id="diag-vfd-fault">0x0000</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Saw Blade Current Graph -->
+    <div class="card" style="margin-top: 20px;">
         <div class="card-header">
-            <h2>Encoder Status</h2>
+            <h2>🪚 Saw Blade Current (Real-time)</h2>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span id="spindle-status-badge" class="badge badge-success">OK</span>
+                <button class="btn btn-small btn-secondary" id="spindle-graph-pause">Pause</button>
+            </div>
         </div>
         <div class="card-content">
-            <div class="encoder-row">
-                <span class="encoder-axis">X</span>
-                <div class="encoder-details">
-                    <div class="encoder-stat">
-                        <span class="stat-label">Position Error:</span>
-                        <span class="stat-value" id="enc-x-error">-- mm</span>
-                    </div>
-                    <div class="encoder-stat">
-                        <span class="stat-label">Feedback:</span>
-                        <span class="stat-value" id="enc-x-feedback">--</span>
-                    </div>
+            <div class="spindle-graph-container">
+                <div class="spindle-graph-main">
+                    <canvas id="spindle-current-chart" width="600" height="200"></canvas>
                 </div>
-            </div>
-            <div class="encoder-row">
-                <span class="encoder-axis">Y</span>
-                <div class="encoder-details">
-                    <div class="encoder-stat">
-                        <span class="stat-label">Position Error:</span>
-                        <span class="stat-value" id="enc-y-error">-- mm</span>
+                <div class="spindle-graph-stats">
+                    <div class="spindle-stat">
+                        <span class="spindle-stat-label">Current</span>
+                        <span class="spindle-stat-value" id="spindle-current-now">0.0 A</span>
                     </div>
-                    <div class="encoder-stat">
-                        <span class="stat-label">Feedback:</span>
-                        <span class="stat-value" id="enc-y-feedback">--</span>
+                    <div class="spindle-stat">
+                        <span class="spindle-stat-label">Peak</span>
+                        <span class="spindle-stat-value" id="spindle-current-peak">0.0 A</span>
                     </div>
-                </div>
-            </div>
-            <div class="encoder-row">
-                <span class="encoder-axis">Z</span>
-                <div class="encoder-details">
-                    <div class="encoder-stat">
-                        <span class="stat-label">Position Error:</span>
-                        <span class="stat-value" id="enc-z-error">-- mm</span>
+                    <div class="spindle-stat">
+                        <span class="spindle-stat-label">Pause Threshold</span>
+                        <span class="spindle-stat-value warning" id="spindle-threshold-pause">25 A</span>
                     </div>
-                    <div class="encoder-stat">
-                        <span class="stat-label">Feedback:</span>
-                        <span class="stat-value" id="enc-z-feedback">--</span>
+                    <div class="spindle-stat">
+                        <span class="spindle-stat-label">E-Stop Threshold</span>
+                        <span class="spindle-stat-value danger" id="spindle-threshold-estop">30 A</span>
                     </div>
-                </div>
-            </div>
-            <div class="encoder-row">
-                <span class="encoder-axis">A</span>
-                <div class="encoder-details">
-                    <div class="encoder-stat">
-                        <span class="stat-label">Position Error:</span>
-                        <span class="stat-value" id="enc-a-error">-- °</span>
-                    </div>
-                    <div class="encoder-stat">
-                        <span class="stat-label">Feedback:</span>
-                        <span class="stat-value" id="enc-a-feedback">--</span>
+                    <div class="spindle-stat">
+                        <span class="spindle-stat-label">Auto-Pauses</span>
+                        <span class="spindle-stat-value" id="spindle-pause-count">0</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Fault Log Viewer Card -->
-    <div class="card">
+    <style>
+        .spindle-graph-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .spindle-graph-main {
+            flex: 1;
+            min-width: 300px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .spindle-graph-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 150px;
+        }
+
+        .spindle-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+        }
+
+        .spindle-stat-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .spindle-stat-value {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .spindle-stat-value.warning {
+            color: var(--warning);
+        }
+
+        .spindle-stat-value.danger {
+            color: var(--danger);
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .badge-warning {
+            background: var(--warning);
+            color: black;
+        }
+
+        .badge-danger {
+            background: var(--danger);
+            color: white;
+        }
+    </style>
+
+    <!-- Trend Charts Card -->
+    <div class="card" style="margin-top: 20px;">
         <div class="card-header">
-            <h2>Fault Log</h2>
-            <button class="btn btn-small btn-secondary" id="clear-faults-btn">Clear</button>
+            <h2>📈 Trend Charts (Last 60 Seconds)</h2>
+            <button class="btn btn-small btn-secondary" id="refresh-trends-btn">Refresh</button>
         </div>
         <div class="card-content">
-            <div class="fault-summary" style="margin-bottom: 15px;">
-                <span class="fault-count" id="fault-count">0</span>
-                <span class="fault-label">Active Faults</span>
-            </div>
-            <div class="fault-list" id="fault-list">
-                <div class="fault-empty">No faults recorded</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="card-grid">
-    <div class="card">
-        <div class="card-header">
-            <h2>VFD Diagnostics</h2>
-        </div>
-        <div class="card-content">
-            <div class="metric-card">
-                <div class="metric-label">Current Draw</div>
-                <div class="metric-value" id="diag-vfd-current">-- A</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Frequency</div>
-                <div class="metric-value" id="diag-vfd-freq">-- Hz</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Thermal State</div>
-                <div class="metric-value" id="diag-vfd-thermal">--%</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Fault Code</div>
-                <div class="metric-value" id="diag-vfd-fault">0x0000</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Real-time Saw Blade Current Graph -->
-<div class="card" style="margin-top: 20px;">
-    <div class="card-header">
-        <h2>🪚 Saw Blade Current (Real-time)</h2>
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <span id="spindle-status-badge" class="badge badge-success">OK</span>
-            <button class="btn btn-small btn-secondary" id="spindle-graph-pause">Pause</button>
-        </div>
-    </div>
-    <div class="card-content">
-        <div class="spindle-graph-container">
-            <div class="spindle-graph-main">
-                <canvas id="spindle-current-chart" width="600" height="200"></canvas>
-            </div>
-            <div class="spindle-graph-stats">
-                <div class="spindle-stat">
-                    <span class="spindle-stat-label">Current</span>
-                    <span class="spindle-stat-value" id="spindle-current-now">0.0 A</span>
+            <div class="trend-charts-grid">
+                <div class="trend-chart-container">
+                    <h4>CPU Usage (%)</h4>
+                    <canvas id="chart-cpu" width="300" height="100"></canvas>
+                    <div class="chart-stats">
+                        <span>Current: <strong id="cpu-current">--</strong>%</span>
+                        <span>Avg: <strong id="cpu-avg">--</strong>%</span>
+                        <span>Max: <strong id="cpu-max">--</strong>%</span>
+                    </div>
                 </div>
-                <div class="spindle-stat">
-                    <span class="spindle-stat-label">Peak</span>
-                    <span class="spindle-stat-value" id="spindle-current-peak">0.0 A</span>
+                <div class="trend-chart-container">
+                    <h4>Free Memory (KB)</h4>
+                    <canvas id="chart-memory" width="300" height="100"></canvas>
+                    <div class="chart-stats">
+                        <span>Current: <strong id="mem-current">--</strong> KB</span>
+                        <span>Min: <strong id="mem-min">--</strong> KB</span>
+                    </div>
                 </div>
-                <div class="spindle-stat">
-                    <span class="spindle-stat-label">Pause Threshold</span>
-                    <span class="spindle-stat-value warning" id="spindle-threshold-pause">25 A</span>
-                </div>
-                <div class="spindle-stat">
-                    <span class="spindle-stat-label">E-Stop Threshold</span>
-                    <span class="spindle-stat-value danger" id="spindle-threshold-estop">30 A</span>
-                </div>
-                <div class="spindle-stat">
-                    <span class="spindle-stat-label">Auto-Pauses</span>
-                    <span class="spindle-stat-value" id="spindle-pause-count">0</span>
+                <div class="trend-chart-container">
+                    <h4>Spindle Current (A)</h4>
+                    <canvas id="chart-spindle" width="300" height="100"></canvas>
+                    <div class="chart-stats">
+                        <span>Current: <strong id="spindle-current">--</strong> A</span>
+                        <span>Peak: <strong id="spindle-peak">--</strong> A</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-
-<style>
-    .spindle-graph-container {
-        display: flex;
-        gap: 20px;
-        flex-wrap: wrap;
-    }
-
-    .spindle-graph-main {
-        flex: 1;
-        min-width: 300px;
-        background: var(--bg-secondary);
-        border-radius: 8px;
-        padding: 10px;
-    }
-
-    .spindle-graph-stats {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        min-width: 150px;
-    }
-
-    .spindle-stat {
-        display: flex;
-        justify-content: space-between;
-        padding: 8px 12px;
-        background: var(--bg-secondary);
-        border-radius: 6px;
-    }
-
-    .spindle-stat-label {
-        color: var(--text-secondary);
-        font-size: 12px;
-    }
-
-    .spindle-stat-value {
-        font-weight: 600;
-        font-size: 14px;
-    }
-
-    .spindle-stat-value.warning {
-        color: var(--warning);
-    }
-
-    .spindle-stat-value.danger {
-        color: var(--danger);
-    }
-
-    .badge {
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-
-    .badge-success {
-        background: var(--success);
-        color: white;
-    }
-
-    .badge-warning {
-        background: var(--warning);
-        color: black;
-    }
-
-    .badge-danger {
-        background: var(--danger);
-        color: white;
-    }
-</style>
-
-<!-- Trend Charts Card -->
-<div class="card" style="margin-top: 20px;">
-    <div class="card-header">
-        <h2>📈 Trend Charts (Last 60 Seconds)</h2>
-        <button class="btn btn-small btn-secondary" id="refresh-trends-btn">Refresh</button>
-    </div>
-    <div class="card-content">
-        <div class="trend-charts-grid">
-            <div class="trend-chart-container">
-                <h4>CPU Usage (%)</h4>
-                <canvas id="chart-cpu" width="300" height="100"></canvas>
-                <div class="chart-stats">
-                    <span>Current: <strong id="cpu-current">--</strong>%</span>
-                    <span>Avg: <strong id="cpu-avg">--</strong>%</span>
-                    <span>Max: <strong id="cpu-max">--</strong>%</span>
-                </div>
-            </div>
-            <div class="trend-chart-container">
-                <h4>Free Memory (KB)</h4>
-                <canvas id="chart-memory" width="300" height="100"></canvas>
-                <div class="chart-stats">
-                    <span>Current: <strong id="mem-current">--</strong> KB</span>
-                    <span>Min: <strong id="mem-min">--</strong> KB</span>
-                </div>
-            </div>
-            <div class="trend-chart-container">
-                <h4>Spindle Current (A)</h4>
-                <canvas id="chart-spindle" width="300" height="100"></canvas>
-                <div class="chart-stats">
-                    <span>Current: <strong id="spindle-current">--</strong> A</span>
-                    <span>Peak: <strong id="spindle-peak">--</strong> A</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 </div>
 
 <style>

@@ -39,6 +39,11 @@ public:
     void setVFDFaultCode(uint16_t fault_code);
     void setVFDCalibrationThreshold(float threshold_amps);
     void setVFDCalibrationValid(bool is_valid);
+    void setVFDConnected(bool is_connected);
+    void setDROConnected(bool is_connected);
+    // Spindle Metrics (RPM, Surface Speed)
+    void setSpindleRPM(float rpm);
+    void setSpindleSpeed(float speed_m_s);
 
     // Axis Metrics (PHASE 5.6: Per-axis motion validation)
     void setAxisQualityScore(uint8_t axis, uint32_t quality_score);
@@ -75,6 +80,10 @@ private:
         uint16_t vfd_fault_code;
         float vfd_threshold_amps;
         bool vfd_calibration_valid;
+        bool vfd_connected;
+        bool dro_connected;
+        float spindle_rpm;
+        float spindle_speed_m_s;
 
         // Axis metrics (PHASE 5.6) - per-axis
         struct {

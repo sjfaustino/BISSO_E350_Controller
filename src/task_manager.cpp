@@ -455,14 +455,27 @@ void taskShowAllTasks() {
   logPrintln("");
 }
 
+extern volatile uint32_t accumulated_loop_count;
+
 uint8_t taskGetCpuUsage() {
-  uint32_t total = 0;
-  uint32_t elapsed = millis() - boot_time_ms;
-  if (elapsed == 0)
-    return 0;
-  for (int i = 0; i < stats_count; i++)
-    total += task_stats[i].last_run_time_ms;
-  return (uint8_t)((total * 100) / elapsed);
+    static uint32_t last_count = 0;
+    static uint32_t last_time = 0;
+    static uint8_t cpu = 0;
+    
+    uint32_t now = millis();
+    if (now - last_time >= 1000) {
+        uint32_t current = accumulated_loop_count;
+        uint32_t delta = current - last_count;
+        last_count = current;
+        last_time = now;
+        
+        // Max theoretical loops = 100 (due to delay(10) in loop)
+        // Cap delta at 100 to prevent overflow results
+        if (delta > 100) delta = 100;
+        
+        cpu = (uint8_t)(100 - delta);
+    }
+    return cpu;
 }
 
 uint32_t taskGetUptime() { return (millis() - boot_time_ms) / 1000; }

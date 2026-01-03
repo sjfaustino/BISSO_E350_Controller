@@ -27,6 +27,7 @@
 #include "axis_synchronization.h"  // PHASE 5.6: Axis synchronization validation
 #include "job_recovery.h"  // Power loss recovery
 #include "operator_alerts.h"  // Buzzer and tower light
+#include "spindle_current_monitor.h" // PHASE 5.0
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -99,6 +100,8 @@ bool init_axis_sync_wrapper() { axisSynchronizationInit(); return true; }
 // Operator features: Power loss recovery, buzzer, tower light
 bool init_recovery_wrapper() { recoveryInit(); return true; }
 bool init_alerts_wrapper() { buzzerInit(); towerLightInit(); return true; }
+// PHASE 5.0: Initialize Spindle Monitor with default JXK-10 address (1) and threshold (30A)
+bool init_spindle_wrapper() { return spindleMonitorInit(1, 30.0f); }
 
 #define BOOT_INIT(name, func, code) \
   do { if (func()) { logInfo("[BOOT] Init %s [OK]", name); bootMarkInitialized(name); } \
@@ -140,6 +143,8 @@ void setup() {
   BOOT_INIT("Axis Sync", init_axis_sync_wrapper, (boot_status_code_t)18);
   BOOT_INIT("Recovery", init_recovery_wrapper, (boot_status_code_t)21);
   BOOT_INIT("Alerts", init_alerts_wrapper, (boot_status_code_t)22);
+  // PHASE 5.0: Spindle Current Monitor
+  BOOT_INIT("Spindle Mon", init_spindle_wrapper, (boot_status_code_t)23);
 
   logInfo("[BOOT] Validating system health...");
   if (!bootValidateAllSystems()) {
@@ -153,7 +158,10 @@ void setup() {
   logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
 }
 
+volatile uint32_t accumulated_loop_count = 0;
+
 void loop() {
   networkManager.update();
+  accumulated_loop_count++;
   delay(10); 
 }

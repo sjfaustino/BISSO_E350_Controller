@@ -31,6 +31,7 @@ public:
 
     // Status Reporting
     gcode_distance_mode_t getDistanceMode();
+    float getCurrentFeedRate();
     void getParserState(char* buffer, size_t len); // Signature fixed
 
     // WCS Helpers

@@ -93,6 +93,7 @@ typedef struct {
     const char* primary_fault_message;
     uint32_t loop_cycle_count;
     uint32_t watchdog_resets;
+    float temperature;
 } system_telemetry_t;
 
 /**
@@ -125,6 +126,7 @@ typedef struct {
     uint32_t slowest_us;
     
     uint8_t wifi_signal;      // percentage
+    uint8_t temperature;      // scale 0-100C
 } telemetry_packet_t;
 #pragma pack(pop)
 
