@@ -59,7 +59,10 @@ void WebServerManager::init() {
     
     // TUNE: Increase stack size and enable LRU purge for concurrency
     server.config.stack_size = 8192;
+    server.config.max_open_sockets = 10; // Increase from default (4) to handle parallel browser requests
     server.config.lru_purge_enable = true;
+    server.config.send_wait_timeout = 2; // Increase send timeout (default is often small)
+    server.config.recv_wait_timeout = 2;
 
     // Mount Filesystem (format on first failure for new/corrupted flash)
     if (!LittleFS.begin(false)) {
