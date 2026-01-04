@@ -17,6 +17,7 @@
 #include "system_telemetry.h"
 #include "fault_logging.h"
 #include "spindle_current_monitor.h"
+#include "encoder_wj66.h"
 
 // Telemetry History Buffer (last 60 samples, sampled every 5s = 5mins)
 #define HISTORY_BUFFER_SIZE 60
@@ -54,7 +55,7 @@ WebServerManager::~WebServerManager() {
 
 // Initialization
 void WebServerManager::init() {
-    Serial.println("[WEB] Init with REST API");
+    logPrintln("[WEB] Init with REST API");
     
     // TUNE: Increase stack size and enable LRU purge for concurrency
     server.config.stack_size = 8192;
@@ -62,16 +63,16 @@ void WebServerManager::init() {
 
     // Mount Filesystem (format on first failure for new/corrupted flash)
     if (!LittleFS.begin(false)) {
-        Serial.println("[WEB] LittleFS mount failed, formatting...");
+        logPrintln("[WEB] LittleFS mount failed, formatting...");
         if (!LittleFS.format()) {
-            Serial.println("[WEB] LittleFS format failed!");
+            logPrintln("[WEB] LittleFS format failed!");
             return;
         }
         if (!LittleFS.begin(false)) {
-            Serial.println("[WEB] Failed to mount LittleFS after format");
+            logPrintln("[WEB] Failed to mount LittleFS after format");
             return;
         }
-        Serial.println("[WEB] LittleFS formatted and mounted");
+        logPrintln("[WEB] LittleFS formatted and mounted");
     }
     
     // --- API Routes (must be registered before static file serving) ---
@@ -212,6 +213,36 @@ void WebServerManager::init() {
         }
         return response->send(400, "application/json", "{\"error\":\"Calibration failed\"}");
     });
+
+    // POST /api/hardware/wj66/baud
+    server.on("/api/hardware/wj66/baud", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        String body = request->body();
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        if (error) return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        
+        uint32_t baud = doc["baud"] | 0;
+        if (wj66SetBaud(baud)) {
+            return response->send(200, "application/json", "{\"success\":true}");
+        }
+        return response->send(400, "application/json", "{\"error\":\"Invalid baud rate\"}");
+    });
+
+    // POST /api/hardware/wj66/detect
+    server.on("/api/hardware/wj66/detect", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        // Don't block the web server - spawn a background task
+        xTaskCreate([](void* param) {
+            logInfo("[WJ66] Autodetect task starting...");
+            wj66Autodetect();
+            logInfo("[WJ66] Autodetect task complete");
+            vTaskDelete(NULL);
+        }, "wj66_detect", 4096, NULL, 1, NULL);
+        
+        // Return immediately
+        return response->send(200, "application/json", "{\"success\":true,\"message\":\"Detection started\"}");
+    });
+
     // --- Time API ---
     server.on("/api/time", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         time_t now;
@@ -400,14 +431,20 @@ void WebServerManager::init() {
 
         JsonObject assignments = doc.as<JsonObject>();
         bool all_ok = true;
+        int count = 0;
         for (JsonPair kv : assignments) {
-            if (!setPin(kv.key().c_str(), kv.value().as<int8_t>())) {
+            // Pass skip_save=true to defer NVS flush
+            if (!setPin(kv.key().c_str(), kv.value().as<int8_t>(), true)) {
                 all_ok = false;
             }
+            count++;
         }
 
+        // Single flush for all pin changes
+        configUnifiedSave();
+        logInfo("[WEB] Batch pin save: %d pins", count);
+
         if (all_ok) {
-            configUnifiedSave();
             return response->send(200, "application/json", "{\"success\":true}");
         }
         return response->send(400, "application/json", "{\"error\":\"One or more assignments failed\"}");
@@ -496,29 +533,64 @@ void WebServerManager::init() {
         return response->send(400, "application/json", "{\"error\":\"Missing key/value\"}");
     });
 
-    Serial.println("[WEB] Hardware API routes registered");
+    // Batch config save - reduces NVS wear by setting all values then flushing once
+    server.on("/api/config/batch", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, request->body());
+        if (err) {
+            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        }
+        
+        int count = 0;
+        JsonObject obj = doc.as<JsonObject>();
+        for (JsonPair kv : obj) {
+            const char* key = kv.key().c_str();
+            JsonVariant val = kv.value();
+            
+            if (val.is<int>() || val.is<long>()) {
+                configSetInt(key, val.as<int32_t>());
+            } else if (val.is<float>() || val.is<double>()) {
+                configSetFloat(key, val.as<float>());
+            } else if (val.is<const char*>()) {
+                const char* strVal = val.as<const char*>();
+                if (strchr(strVal, '.')) configSetFloat(key, atof(strVal));
+                else configSetInt(key, atoi(strVal));
+            }
+            count++;
+        }
+        
+        // Single flush for all changes
+        configUnifiedSave();
+        logInfo("[WEB] Batch config saved %d keys", count);
+        
+        char resp[64];
+        snprintf(resp, sizeof(resp), "{\"success\":true,\"count\":%d}", count);
+        return response->send(200, "application/json", resp);
+    });
+
+    logPrintln("[WEB] Hardware API routes registered");
     
     // --- WebSocket Handler for real-time telemetry ---
     wsHandler.onOpen([this](PsychicWebSocketClient *client) {
-        Serial.printf("[WS] Client connected: %s\n", client->remoteIP().toString().c_str());
+        logPrintf("[WS] Client connected: %s\n", client->remoteIP().toString().c_str());
     });
     
     wsHandler.onClose([this](PsychicWebSocketClient *client) {
-        Serial.printf("[WS] Client disconnected: %s\n", client->remoteIP().toString().c_str());
+        logPrintf("[WS] Client disconnected: %s\n", client->remoteIP().toString().c_str());
     });
     
     wsHandler.onFrame([this](PsychicWebSocketRequest *request, httpd_ws_frame *frame) {
         // Handle incoming messages (commands from web UI)
         if (frame->type == HTTPD_WS_TYPE_TEXT) {
             String msg = String((char*)frame->payload, frame->len);
-            Serial.printf("[WS] Received: %s\n", msg.c_str());
+            logPrintf("[WS] Received: %s\n", msg.c_str());
             // Could parse commands here if needed
         }
         return ESP_OK;
     });
     
     server.on("/ws", &wsHandler);
-    Serial.println("[WEB] WebSocket handler registered at /ws");
+    logPrintln("[WEB] WebSocket handler registered at /ws");
     
     // Serve static files from root (MUST be after API routes)
     // PHASE 6: Enable browser caching to reduce load on LittleFS
@@ -530,7 +602,7 @@ void WebServerManager::init() {
 }
 
 void WebServerManager::begin() {
-    Serial.println("[WEB] Starting Server");
+    logPrintln("[WEB] Starting Server");
     
     // PHASE 6: Performance tuning for concurrent browser requests
     // Reduced to 2 for heap stability (preventing OOM when serving large files)

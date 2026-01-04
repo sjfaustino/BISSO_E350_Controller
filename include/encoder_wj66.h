@@ -29,6 +29,8 @@ bool wj66IsStale(uint8_t axis);
 // Commands
 void wj66Reset(); 
 void wj66SetZero(uint8_t axis); 
+bool wj66SetBaud(uint32_t baud);
+uint32_t wj66Autodetect(); 
 
 void wj66Diagnostics();
 

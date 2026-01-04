@@ -35,6 +35,20 @@
                         <option value="32">HT3 (GPIO32)</option>
                     </select>
                 </div>
+                <div class="pin-row">
+                    <label>Baud Rate:</label>
+                    <select class="config-select" id="wj66_baud" data-config="enc_baud" style="width: auto;">
+                        <option value="1200">1200</option>
+                        <option value="2400">2400</option>
+                        <option value="4800">4800</option>
+                        <option value="9600">9600</option>
+                        <option value="19200">19200</option>
+                        <option value="38400">38400</option>
+                        <option value="57600">57600</option>
+                        <option value="115200">115200</option>
+                    </select>
+                    <button id="btn-detect-baud" class="btn btn-sm" style="margin-left: 10px;">Autodetect</button>
+                </div>
                 <div class="device-note">Absolute rotary encoder for position feedback</div>
             </div>
         </div>
@@ -171,7 +185,7 @@
         <div class="card device-card wide-card">
             <div class="card-header device-header plc-input">
                 <h3>← PLC → ESP32 (Inputs)</h3>
-                <span class="device-protocol">Digital Opto</span>
+                <span class="device-protocol">Digital Inputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-grid-4col">
@@ -196,11 +210,35 @@
             </div>
         </div>
 
+
+        <!-- Operator Panel Switches Card -->
+        <div class="card device-card">
+            <div class="card-header device-header switches">
+                <h3>🎚️ Operator Panel</h3>
+                <span class="device-protocol">Digital Inputs</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>E-Stop:</label>
+                    <select class="pin-select" id="input_estop" data-signal="input_estop"></select>
+                </div>
+                <div class="pin-row">
+                    <label>Pause Button:</label>
+                    <select class="pin-select" id="input_pause" data-signal="input_pause"></select>
+                </div>
+                <div class="pin-row">
+                    <label>Resume Button:</label>
+                    <select class="pin-select" id="input_resume" data-signal="input_resume"></select>
+                </div>
+                <div class="device-note">Operator panel buttons via KC868-A16 inputs</div>
+            </div>
+        </div>
+
         <!-- ESP32 → PLC (Outputs) Card -->
         <div class="card device-card wide-card">
             <div class="card-header device-header plc-output">
                 <h3>→ ESP32 → PLC (Outputs)</h3>
-                <span class="device-protocol">Digital Relay</span>
+                <span class="device-protocol">Digital Outputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-grid-4col">
@@ -241,34 +279,13 @@
             </div>
         </div>
 
-        <!-- Operator Panel Switches Card -->
-        <div class="card device-card">
-            <div class="card-header device-header switches">
-                <h3>🎚️ Operator Panel</h3>
-                <span class="device-protocol">Digital Inputs</span>
-            </div>
-            <div class="card-content">
-                <div class="pin-row">
-                    <label>E-Stop:</label>
-                    <select class="pin-select" id="input_estop" data-signal="input_estop"></select>
-                </div>
-                <div class="pin-row">
-                    <label>Pause Button:</label>
-                    <select class="pin-select" id="input_pause" data-signal="input_pause"></select>
-                </div>
-                <div class="pin-row">
-                    <label>Resume Button:</label>
-                    <select class="pin-select" id="input_resume" data-signal="input_resume"></select>
-                </div>
-                <div class="device-note">Operator panel buttons via KC868-A16 inputs</div>
-            </div>
-        </div>
+
 
         <!-- Tower Light Card -->
         <div class="card device-card">
             <div class="card-header device-header status-light">
                 <h3>🚦 Status Light</h3>
-                <span class="device-protocol">Outputs</span>
+                <span class="device-protocol">Digital Outputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
@@ -295,7 +312,7 @@
         <div class="card device-card">
             <div class="card-header device-header buzzer">
                 <h3>🔔 Audible Alarm</h3>
-                <span class="device-protocol">Output</span>
+                <span class="device-protocol">Digital Outputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
@@ -317,7 +334,7 @@
             <h3>📋 KC868-A16 Pin Summary</h3>
         </div>
         <div class="card-content">
-            <div class="pin-summary-grid" id="pin-summary-table">
+            <div id="pin-summary-table">
                 <!-- Populated by JS -->
             </div>
         </div>
@@ -493,6 +510,11 @@
     /* Pin Summary Table */
     .hardware-page .pin-summary-card {
         margin-bottom: var(--space-lg);
+    }
+
+    .hardware-page .pin-summary-card .card-content {
+        max-height: none;
+        overflow: visible;
     }
 
     .hardware-page .pin-summary-grid {

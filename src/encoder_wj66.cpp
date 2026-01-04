@@ -11,8 +11,11 @@
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "encoder_comm_stats.h" 
+#include "encoder_hal.h"
 #include "system_constants.h"
 #include <Preferences.h>
+#include "config_unified.h"
+#include "config_keys.h"
 
 // Safety Constants
 // BUFFER SIZE VERIFICATION (Gemini Audit):
@@ -59,6 +62,10 @@ static rs485_device_t wj66_device = {
 // Protects wj66_state from torn reads between Encoder task and Motion task
 static SemaphoreHandle_t wj66_mutex = NULL;
 
+
+
+
+
 void wj66Init() {
   logInfo("[WJ66] Initializing...");
 
@@ -70,66 +77,25 @@ void wj66Init() {
     }
   }
 
-  uint32_t final_baud = WJ66_BAUD;
-  bool confirmed = false;
+  // 1. Load configuration
+  uint32_t config_baud = configGetInt(KEY_ENC_BAUD, WJ66_BAUD);
+  // Sanity check
+  if (config_baud < 1200 || config_baud > 115200) config_baud = 9600;
 
-  // 1. Load saved baud rate
-  Preferences p;
-  p.begin("wj66_config", false); // Read-write to allow creation on first boot
-  uint32_t saved_baud = p.getUInt("baud_rate", 0);
-  p.end();
-
-  if (saved_baud > 0) {
-      logInfo("[WJ66] Trying saved baud: %lu...", (unsigned long)saved_baud);
-      Serial1.begin(saved_baud, SERIAL_8N1, 14, 33); // Ensure pins match your board
-
-      // WATCHDOG SAFETY FIX: Add timeout to Serial flush loop
-      // Prevents infinite hang if Serial1 continuously receives data
-      uint32_t flush_start = millis();
-      while(Serial1.available() && (millis() - flush_start) < 100) {
-          Serial1.read();
-      } 
-      
-      // Attempt handshake
-      uint8_t q[] = {0x01, 0x00}; // Adjust handshake packet if needed
-      // Note: encoderSendCommandWithStats needs to be defined or replaced with Serial1.write
-      // Assuming basic write for now if helper missing:
-      Serial1.write(q, 2); 
-      
-      delay(100); // Simple wait for init check
-      if (Serial1.available()) {
-          logInfo("[WJ66] Saved baud verified.");
-          final_baud = saved_baud;
-          confirmed = true;
-      } else {
-          Serial1.end();
-          delay(100);
-      }
-  }
-
-  // 2. Auto-detect (Fallback)
-  if (!confirmed) {
-      logInfo("[WJ66] Auto-detecting...");
-      baud_detect_result_t res = encoderDetectBaudRate();
-      
-      if (res.detected) {
-          final_baud = res.baud_rate;
-          p.begin("wj66_config", false);
-          p.putUInt("baud_rate", final_baud);
-          p.end();
-      } else {
-          logError("[WJ66] Auto-detect failed. Using default.");
-          Serial1.begin(WJ66_BAUD, SERIAL_8N1, 14, 33);
-      }
-  } else {
-      if (!Serial1) Serial1.begin(final_baud, SERIAL_8N1, 14, 33);
+  logInfo("[WJ66] Configuring @ %lu baud...", (unsigned long)config_baud);
+  
+  // Initialize via HAL to ensure internal state (serial_port pointer) is set
+  // This prevents crash when encoderHalSendString is called
+  if (!encoderHalInit(ENCODER_INTERFACE_RS232_HT, config_baud)) {
+      logError("[WJ66] HAL Init Failed!");
+      // Fallback
+      Serial1.begin(config_baud, SERIAL_8N1, 14, 33);
   }
 
   // Init State
   for (int i = 0; i < WJ66_AXES; i++) {
     wj66_state.position[i] = 0;
     wj66_state.zero_offset[i] = 0;
-    // Set last_read to past timestamp to ensure IsStale() returns true (disconnected) until first response
     wj66_state.last_read[i] = (millis() > 60000) ? (millis() - 60000) : 0;
   }
   wj66_state.status = ENCODER_OK;
@@ -138,11 +104,92 @@ void wj66Init() {
   // Register with RS-485 registry
   rs485RegisterDevice(&wj66_device);
   
-  logInfo("[WJ66] Ready @ %lu baud (Registered with RS485 bus)", (unsigned long)final_baud);
+  logInfo("[WJ66] Ready (Registered with RS485 bus)");
+}
+
+// Flag to prevent race conditions check (Legacy)
+static volatile bool wj66_maintenance_mode = false;
+
+bool wj66SetBaud(uint32_t baud) {
+    if (baud < 1200 || baud > 115200) return false;
+    
+    logInfo("[WJ66] Setting baud rate to %lu...", (unsigned long)baud);
+    
+    // Critical Section: Shutdown HAL to prevent EncoderTask from accessing Serial1
+    encoderHalEnd();
+    delay(50); // Ensure any pending ISRs/Tasks clear
+
+    // Re-initialize with new baud
+    // This atomically sets up Serial1 AND enables HAL flags
+    bool ok = encoderHalInit(ENCODER_INTERFACE_RS232_HT, baud);
+    
+    if (ok) {
+        // Save to NVS only if init successful
+        configSetInt(KEY_ENC_BAUD, baud);
+        configUnifiedSave();
+    } else {
+        logError("[WJ66] Failed to set baud via HAL!");
+    }
+    
+    return ok;
+}
+
+uint32_t wj66Autodetect() {
+    logInfo("[WJ66] Starting Auto-detect...");
+    
+    // Lock out polling using maintenance mode flag
+    wj66_maintenance_mode = true;
+    vTaskDelay(100 / portTICK_PERIOD_MS); // Let any current poll finish
+    
+    const uint32_t rates[] = {9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200};
+    uint32_t found_rate = 0;
+
+    for (uint32_t rate : rates) {
+        vTaskDelay(20 / portTICK_PERIOD_MS); // Feed WDT
+        
+        logInfo("[WJ66] Trying %lu...", (unsigned long)rate);
+        Serial1.updateBaudRate(rate);
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+        
+        // Flush RX buffer (limited to prevent infinite loop)
+        for (int i = 0; i < 200 && Serial1.available(); i++) Serial1.read();
+        
+        // Send query
+        Serial1.write((uint8_t)0x01);
+        Serial1.write((uint8_t)0x00);
+        Serial1.flush();
+        
+        // Wait for response
+        uint32_t start = millis();
+        while (millis() - start < 150) {
+            if (Serial1.available()) {
+                logInfo("[WJ66] Found @ %lu baud!", (unsigned long)rate);
+                found_rate = rate;
+                break;
+            }
+            vTaskDelay(5 / portTICK_PERIOD_MS);
+        }
+        if (found_rate) break;
+    }
+    
+    // Restore to found or saved rate
+    uint32_t final_rate = found_rate ? found_rate : configGetInt(KEY_ENC_BAUD, WJ66_BAUD);
+    Serial1.updateBaudRate(final_rate);
+    
+    if (found_rate) {
+        configSetInt(KEY_ENC_BAUD, found_rate);
+        configUnifiedSave();
+    } else {
+        logError("[WJ66] Autodetect failed");
+    }
+    
+    wj66_maintenance_mode = false;
+    return found_rate;
 }
 
 static bool wj66Poll(void) {
-    // Request Data
+    if (wj66_maintenance_mode) return false;
+    // Just call HAL. If HAL is uninitialized (during autodetect), it returns false safely.
     return encoderHalSendString("#00\r");
 }
 

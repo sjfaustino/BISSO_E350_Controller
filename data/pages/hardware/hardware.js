@@ -160,11 +160,11 @@ window.HardwareModule = window.HardwareModule || {
         // Add Dynamic Signals
         if (this.signalData) {
             this.signalData.forEach(sig => {
-                // Check enabled state for specific groups
-                if (sig.key.includes('status') && !statusEnabled) return;
-                if (sig.key.includes('buzzer') && !buzzerEnabled) return;
-                if (sig.key.includes('vfd') && !vfdEnabled) return;
-                if (sig.key.includes('jxk10') && !jxk10Enabled) return;
+                // Check enabled state for specific groups - REMOVED per user request
+                // if (sig.key.includes('status') && !statusEnabled) return;
+                // if (sig.key.includes('buzzer') && !buzzerEnabled) return;
+                // if (sig.key.includes('vfd') && !vfdEnabled) return;
+                // if (sig.key.includes('jxk10') && !jxk10Enabled) return;
 
                 const pinVal = sig.current_pin !== undefined ? sig.current_pin : sig.default_pin;
                 if (pinVal !== undefined) {
@@ -174,38 +174,39 @@ window.HardwareModule = window.HardwareModule || {
         }
 
         // Add Fixed/Enabled Devices
-        if (ethEnabled) {
-            addUsage(23, 'Ethernet MDC');
-            addUsage(18, 'Ethernet MDIO');
-            addUsage(17, 'Ethernet CLK/Pwr');
-            // Standard RMII (Assuming generic usage for completeness if desired, or just the key ones)
-            addUsage(19, 'Ethernet TXD0');
-            addUsage(21, 'Ethernet TX_EN');
-            addUsage(22, 'Ethernet TXD1');
-            addUsage(25, 'Ethernet RXD0');
-            addUsage(26, 'Ethernet RXD1');
-            addUsage(27, 'Ethernet CRS_DV');
-        }
-        if (lcdEnabled) {
-            addUsage(4, 'LCD Display (SDA)');
-            addUsage(5, 'LCD Display (SCL)');
-        }
-        if (vfdEnabled) {
-            addUsage(16, 'VFD (Altivar31)');
-            addUsage(13, 'VFD (Altivar31)');
-        }
-        if (jxk10Enabled) {
-            addUsage(16, 'JXK-10 Current Monitor');
-            addUsage(13, 'JXK-10 Current Monitor');
-        }
+        // Always show fixed devices even if disabled
+        // if (ethEnabled) {
+        addUsage(23, 'Ethernet MDC');
+        addUsage(18, 'Ethernet MDIO');
+        addUsage(17, 'Ethernet CLK/Pwr');
+        // Standard RMII
+        addUsage(19, 'Ethernet TXD0');
+        addUsage(21, 'Ethernet TX_EN');
+        addUsage(22, 'Ethernet TXD1');
+        addUsage(25, 'Ethernet RXD0');
+        addUsage(26, 'Ethernet RXD1');
+        addUsage(27, 'Ethernet CRS_DV');
+        // }
+        // if (lcdEnabled) {
+        addUsage(4, 'LCD Display (SDA)');
+        addUsage(5, 'LCD Display (SCL)');
+        // }
+        // if (vfdEnabled) {
+        addUsage(16, 'VFD (Altivar31)');
+        addUsage(13, 'VFD (Altivar31)');
+        // }
+        // if (jxk10Enabled) {
+        addUsage(16, 'JXK-10 Current Monitor');
+        addUsage(13, 'JXK-10 Current Monitor');
+        // }
 
         // 3. Render Table
         let html = `
             <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
                 <thead>
                     <tr style="background: var(--bg-secondary);">
-                        <th style="padding: 8px; text-align: left; width: 80px;">Pin Label</th>
-                        <th style="padding: 8px; text-align: left; width: 120px;">Type</th>
+                        <th style="padding: 8px; text-align: left; width: 70px;">Pin Label</th>
+                        <th style="padding: 8px; text-align: left; width: 100px;">Type</th>
                         <th style="padding: 8px; text-align: left;">Connected Function</th>
                     </tr>
                 </thead>
@@ -226,10 +227,9 @@ window.HardwareModule = window.HardwareModule || {
             const usageStyle = uniqueUsages.length > 0 ? 'font-weight: 500; color: var(--text-primary);' : '';
 
             html += `
-                <tr style="${rowStyle}">
                     <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: var(--accent-primary);">${entry.label}</td>
                     <td style="padding: 6px 8px;">${entry.type}</td>
-                    <td style="padding: 6px 8px; ${usageStyle}">${usageText || '-'}</td>
+                    <td style="padding: 6px 8px; ${usageStyle} white-space: normal; word-break: break-word;">${usageText || '-'}</td>
                 </tr>
             `;
         });
@@ -307,6 +307,12 @@ window.HardwareModule = window.HardwareModule || {
                     jxk10Addr.value = config.jxk10_addr;
                 }
 
+                // WJ66 Baud Rate
+                const baudSelect = document.getElementById('wj66_baud');
+                if (baudSelect) {
+                    baudSelect.value = config.enc_baud || '9600';
+                }
+
                 // Update Pin Summary now that config (enabled states) is loaded
                 this.renderPinSummary();
             })
@@ -314,6 +320,24 @@ window.HardwareModule = window.HardwareModule || {
     },
 
     setupEventListeners() {
+        // WJ66 Autodetect Button
+        const detectBtn = document.getElementById('btn-detect-baud');
+        if (detectBtn) {
+            detectBtn.onclick = () => {
+                detectBtn.textContent = 'Detecting...';
+                detectBtn.disabled = true;
+
+                fetch('/api/hardware/wj66/detect', { method: 'POST' })
+                    .then(() => {
+                        setTimeout(() => location.reload(), 8000);
+                    })
+                    .catch(() => {
+                        detectBtn.textContent = 'Autodetect';
+                        detectBtn.disabled = false;
+                    });
+            };
+        }
+
         // Setup save button handler
         document.getElementById('save-config-btn')?.addEventListener('click', () => {
             this.saveConfiguration();
@@ -349,7 +373,7 @@ window.HardwareModule = window.HardwareModule || {
         // Collect all pin assignments
         const assignments = {};
         document.querySelectorAll('.pin-select').forEach(select => {
-            if (select.dataset.signal && select.value) {
+            if (select.dataset.signal && select.value && !select.disabled) {
                 assignments[select.dataset.signal] = parseInt(select.value);
             }
         });
@@ -361,9 +385,15 @@ window.HardwareModule = window.HardwareModule || {
                 configUpdates[input.dataset.config] = input.checked ? 1 : 0;
             } else if (input.type === 'number') {
                 configUpdates[input.dataset.config] = parseInt(input.value) || 0;
+            } else if (input.tagName === 'SELECT') { // Handle selects with data-config
+                configUpdates[input.dataset.config] = input.value;
             } else {
                 configUpdates[input.dataset.config] = input.value;
             }
+        });
+        // Handle selects explicitly if querySelectorAll didn't catch them above (it checks input[data-config])
+        document.querySelectorAll('select[data-config]').forEach(select => {
+            configUpdates[select.dataset.config] = select.value;
         });
 
         // Save pin assignments
@@ -391,15 +421,17 @@ window.HardwareModule = window.HardwareModule || {
     },
 
     saveConfigValues(updates) {
-        // Save each config value
-        const promises = Object.entries(updates).map(([key, value]) => {
-            return fetch('/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key, value: String(value) })
-            });
+        // Batch save all config values in one request (reduces NVS wear)
+        return fetch('/api/config/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        }).then(r => r.json()).then(data => {
+            if (!data.success && !data.ok) {
+                console.error('[Hardware] Batch save error:', data.error);
+            }
+            return data;
         });
-        return Promise.all(promises);
     },
 
     resetConfiguration() {

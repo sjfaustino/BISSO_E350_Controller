@@ -77,4 +77,8 @@ int32_t configGetIntValidated(const char* key, int32_t default_val, int32_t min_
  */
 float configGetFloatValidated(const char* key, float default_val, float min_val, float max_val);
 
+// NVS Space Management
+void configLogNvsStats();
+bool configEraseNvs();
+
 #endif

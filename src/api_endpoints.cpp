@@ -208,6 +208,24 @@ static const api_endpoint_t api_endpoints[] = {
         .rate_limit_info = "50 requests/min",
         .response_type = "application/json"
     },
+    {
+        .path = "/api/hardware/wj66/baud",
+        .methods = HTTP_POST,
+        .description = "Set WJ66 encoder baud rate",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "20 requests/min",
+        .response_type = "application/json"
+    },
+    {
+        .path = "/api/hardware/wj66/detect",
+        .methods = HTTP_POST,
+        .description = "Autodetect WJ66 encoder baud rate",
+        .requires_auth = true,
+        .rate_limited = true,
+        .rate_limit_info = "10 requests/min", // Low rate limit (slow operation)
+        .response_type = "application/json"
+    },
 };
 
 static const int endpoint_count = sizeof(api_endpoints) / sizeof(api_endpoint_t);

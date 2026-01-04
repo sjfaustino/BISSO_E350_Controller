@@ -78,6 +78,9 @@ void cmd_config_main(int argc, char **argv) {
     logPrintln("  restore   - Load configuration from NVS backup.");
     logPrintln("  showbkp   - Display stored backup configuration.");
     logPrintln("  clrbkp    - Clear backup from NVS.");
+    logPrintln("\n[NVS Management]:");
+    logPrintln("  nvs stats - Show NVS storage usage.");
+    logPrintln("  nvs erase - DANGER: Erase all NVS data and reboot.");
     return;
   }
 
@@ -111,6 +114,22 @@ void cmd_config_main(int argc, char **argv) {
     cmd_config_show_backup(argc, argv);
   else if (strcasecmp(argv[1], "clrbkp") == 0)
     cmd_config_clear_backup(argc, argv);
+  else if (strcasecmp(argv[1], "nvs") == 0) {
+    if (argc < 3) {
+      logPrintln("[CONFIG] Usage: config nvs <stats|erase>");
+      return;
+    }
+    if (strcasecmp(argv[2], "stats") == 0) {
+      configLogNvsStats();
+    } else if (strcasecmp(argv[2], "erase") == 0) {
+      logWarning("[NVS] This will ERASE ALL configuration and REBOOT!");
+      logWarning("[NVS] Press Ctrl+C within 3 seconds to abort...");
+      delay(3000);
+      configEraseNvs();
+    } else {
+      logWarning("[NVS] Unknown nvs command: %s", argv[2]);
+    }
+  }
   else if (strcasecmp(argv[1], "rollback") == 0) {
     if (argc < 3) {
       logError("[CONFIG] Usage: config rollback <version>");

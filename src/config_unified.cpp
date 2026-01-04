@@ -14,6 +14,7 @@
 #include <Preferences.h>
 #include <math.h>
 #include <string.h>
+#include <nvs_flash.h>
 
 // NVS Persistence Object
 static Preferences prefs;
@@ -136,7 +137,7 @@ static int findConfigEntry(const char *key) {
 
   // Acquire mutex for safe cache access
   if (config_cache_mutex != NULL) {
-    if (xSemaphoreTake(config_cache_mutex,
+    if (xSemaphoreTakeRecursive(config_cache_mutex,
                        pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) == pdTRUE) {
       for (int i = 0; i < config_count; i++) {
         if (strcmp(config_table[i].key, key) == 0) {
@@ -144,7 +145,7 @@ static int findConfigEntry(const char *key) {
           break;
         }
       }
-      xSemaphoreGive(config_cache_mutex);
+      xSemaphoreGiveRecursive(config_cache_mutex);
     } else {
       // Mutex timeout - log warning but still try unprotected for robustness
       logWarning("[CONFIG] Cache mutex timeout - accessing without lock");
@@ -176,7 +177,7 @@ static void addToCacheInt(const char *key, int32_t val) {
   bool mutex_held = false;
   if (config_cache_mutex != NULL) {
     mutex_held =
-        (xSemaphoreTake(config_cache_mutex,
+        (xSemaphoreTakeRecursive(config_cache_mutex,
                         pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) == pdTRUE);
   }
 
@@ -188,7 +189,7 @@ static void addToCacheInt(const char *key, int32_t val) {
   config_table[idx].is_set = true;
 
   if (mutex_held)
-    xSemaphoreGive(config_cache_mutex);
+    xSemaphoreGiveRecursive(config_cache_mutex);
 }
 
 static void addToCacheFloat(const char *key, float val) {
@@ -199,7 +200,7 @@ static void addToCacheFloat(const char *key, float val) {
   bool mutex_held = false;
   if (config_cache_mutex != NULL) {
     mutex_held =
-        (xSemaphoreTake(config_cache_mutex,
+        (xSemaphoreTakeRecursive(config_cache_mutex,
                         pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) == pdTRUE);
   }
 
@@ -211,7 +212,7 @@ static void addToCacheFloat(const char *key, float val) {
   config_table[idx].is_set = true;
 
   if (mutex_held)
-    xSemaphoreGive(config_cache_mutex);
+    xSemaphoreGiveRecursive(config_cache_mutex);
 }
 
 // ----------------------------------------------------------------------------
@@ -382,7 +383,7 @@ void configUnifiedInit() {
 
   // Create mutex for thread-safe cache access
   if (config_cache_mutex == NULL) {
-    config_cache_mutex = xSemaphoreCreateMutex();
+    config_cache_mutex = xSemaphoreCreateRecursiveMutex();
     if (config_cache_mutex == NULL) {
       logError("[CONFIG] [CRITICAL] Failed to create cache mutex!");
     }
@@ -400,6 +401,9 @@ void configUnifiedInit() {
   configSetDefaults();
   configUnifiedLoad();
   logInfo("[CONFIG] Ready. Loaded %d entries.", config_count);
+  
+  // Log NVS space usage on boot
+  configLogNvsStats();
 }
 
 /**
@@ -498,7 +502,7 @@ void configSetInt(const char *key, int32_t value) {
 
   // PHASE 5.10: Protect config_table writes with mutex
   if (config_cache_mutex != NULL) {
-    if (xSemaphoreTake(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
+    if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
       logWarning("[CONFIG] Mutex timeout in configSetInt");
       return;
     }
@@ -507,7 +511,7 @@ void configSetInt(const char *key, int32_t value) {
   int idx = findConfigEntry(key);
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
-      if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+      if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
       return;
     }
     idx = config_count++;
@@ -517,7 +521,7 @@ void configSetInt(const char *key, int32_t value) {
   }
 
   if (config_table[idx].is_set && config_table[idx].value.int_val == value) {
-    if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+    if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
     return;
   }
 
@@ -526,7 +530,7 @@ void configSetInt(const char *key, int32_t value) {
   config_dirty = true;
   last_nvs_save = millis();
 
-  if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
 
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putInt(key, value);
@@ -549,7 +553,7 @@ void configSetFloat(const char *key, float value) {
 
   // PHASE 5.10: Protect config_table writes with mutex
   if (config_cache_mutex != NULL) {
-    if (xSemaphoreTake(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
+    if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
       logWarning("[CONFIG] Mutex timeout in configSetFloat");
       return;
     }
@@ -558,7 +562,7 @@ void configSetFloat(const char *key, float value) {
   int idx = findConfigEntry(key);
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
-      if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+      if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
       return;
     }
     idx = config_count++;
@@ -569,7 +573,7 @@ void configSetFloat(const char *key, float value) {
 
   if (config_table[idx].is_set &&
       fabsf(config_table[idx].value.float_val - value) < 0.0001f) {
-    if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+    if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
     return;
   }
 
@@ -578,7 +582,7 @@ void configSetFloat(const char *key, float value) {
   config_dirty = true;
   last_nvs_save = millis();
 
-  if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
 
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putFloat(key, value);
@@ -603,7 +607,7 @@ void configSetString(const char *key, const char *value) {
 
   // PHASE 5.10: Protect config_table writes with mutex
   if (config_cache_mutex != NULL) {
-    if (xSemaphoreTake(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
+    if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
       logWarning("[CONFIG] Mutex timeout in configSetString");
       return;
     }
@@ -612,7 +616,7 @@ void configSetString(const char *key, const char *value) {
   int idx = findConfigEntry(key);
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
-      if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+      if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
       return;
     }
     idx = config_count++;
@@ -624,7 +628,7 @@ void configSetString(const char *key, const char *value) {
   if (config_table[idx].is_set &&
       strncmp(config_table[idx].value.str_val, validated_value,
               CONFIG_VALUE_LEN) == 0) {
-    if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+    if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
     return;
   }
 
@@ -635,7 +639,7 @@ void configSetString(const char *key, const char *value) {
   config_dirty = true;
   last_nvs_save = millis();
 
-  if (config_cache_mutex != NULL) xSemaphoreGive(config_cache_mutex);
+  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
 
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putString(key, validated_value);
@@ -665,6 +669,16 @@ void configUnifiedFlush() {
 
 void configUnifiedSave() {
   logInfo("[CONFIG] Flushing NVS...");
+
+  // PHASE 5.10: Protect config_table read during save
+  if (config_cache_mutex != NULL) {
+    if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
+      logWarning("[CONFIG] Mutex timeout in configUnifiedSave");
+      // Proceeding anyway might be dangerous if list is changing, but stopping save is also bad.
+      // For now, we try to proceed but this is risky.
+    }
+  }
+
   for (int i = 0; i < config_count; i++) {
     if (!config_table[i].is_set)
       continue;
@@ -686,6 +700,11 @@ void configUnifiedSave() {
     }
   }
   config_dirty = false;
+  
+  if (config_cache_mutex != NULL) {
+    xSemaphoreGiveRecursive(config_cache_mutex);
+  }
+  
   logInfo("[CONFIG] Flush Complete.");
 }
 
@@ -802,4 +821,40 @@ void configUnifiedPrintAll() {
     Serial.println();
   }
   serialLoggerUnlock();
+}
+
+// ============================================================================
+// NVS SPACE MANAGEMENT
+// ============================================================================
+
+void configLogNvsStats() {
+  nvs_stats_t nvs_stats;
+  esp_err_t err = nvs_get_stats(NULL, &nvs_stats);
+  if (err == ESP_OK) {
+    uint32_t used_pct = (nvs_stats.used_entries * 100) / nvs_stats.total_entries;
+    logInfo("[NVS] Entries: %d/%d used (%d%%), Free: %d", 
+            nvs_stats.used_entries, nvs_stats.total_entries, 
+            used_pct, nvs_stats.free_entries);
+    
+    if (used_pct > 80) {
+      logWarning("[NVS] WARNING: Storage >80%% full! Consider erasing unused keys.");
+    }
+  } else {
+    logError("[NVS] Failed to get stats: %d", err);
+  }
+}
+
+bool configEraseNvs() {
+  logWarning("[NVS] Erasing all NVS data...");
+  prefs.end();
+  esp_err_t err = nvs_flash_erase();
+  if (err == ESP_OK) {
+    logInfo("[NVS] Erase complete. Rebooting in 2 seconds...");
+    delay(2000);
+    ESP.restart();
+    return true;
+  } else {
+    logError("[NVS] Erase failed: %d", err);
+    return false;
+  }
 }

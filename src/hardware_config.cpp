@@ -33,9 +33,16 @@ int16_t getPin(const char* key) {
     if (!key) return -1;
 
     // 1. Check NVS for a user override
-    // Stores virtual pin mappings (e.g. "pin_output_axis_x" -> 16)
-    char nvs_key[40];
-    if (safe_snprintf(nvs_key, sizeof(nvs_key), "pin_%s", key) > 0) {
+    // Stores virtual pin mappings using short key (e.g. "o_axis_x" -> 16)
+    const char* nvs_key = nullptr;
+    for (size_t i = 0; i < SIGNAL_COUNT; i++) {
+        if (strcmp(signalDefinitions[i].key, key) == 0) {
+            nvs_key = signalDefinitions[i].nvs_key;
+            break;
+        }
+    }
+
+    if (nvs_key) {
         int32_t stored_val = configGetInt(nvs_key, -1);
         if (stored_val != -1) {
             return (int16_t)stored_val;
@@ -64,7 +71,7 @@ const char* checkPinConflict(int16_t gpio, const char* currentKey) {
     return nullptr; 
 }
 
-bool setPin(const char* key, int16_t gpio) {
+bool setPin(const char* key, int16_t gpio, bool skip_save) {
     // 1. Validate Key
     bool keyExists = false;
     const char* signalType = "unknown";
@@ -95,8 +102,8 @@ bool setPin(const char* key, int16_t gpio) {
     // Direct GPIO (13, 14, 16, 32, 33) for RS485/WJ66
     bool isVirtualInputPin = (gpio >= 100 && gpio <= 115);
     bool isVirtualOutputPin = (gpio >= 116 && gpio <= 131);
-    bool isAnalogPin = (gpio == 34 || gpio == 35 || gpio == 36 || gpio == 39);
-    bool isDirectGpio = (gpio < 100 && !isAnalogPin);  // Real ESP32 GPIO numbers
+    // bool isAnalogPin = (gpio == 34 || gpio == 35 || gpio == 36 || gpio == 39); // Unused
+    // bool isDirectGpio = (gpio < 100 && !isAnalogPin);  // Unused
     
     bool isInputSignal = (strcmp(signalType, "input") == 0);
     bool isOutputSignal = (strcmp(signalType, "output") == 0);
@@ -118,11 +125,24 @@ bool setPin(const char* key, int16_t gpio) {
         return false;
     }
 
-    // 5. Save Mapping
-    char nvs_key[40];
-    safe_snprintf(nvs_key, sizeof(nvs_key), "pin_%s", key);
-    configSetInt(nvs_key, gpio);
-    configUnifiedSave();
+    // 5. Save Mapping using short NVS key
+    const char* nvs_key = nullptr;
+    for (size_t i = 0; i < SIGNAL_COUNT; i++) {
+        if (strcmp(signalDefinitions[i].key, key) == 0) {
+            nvs_key = signalDefinitions[i].nvs_key;
+            break;
+        }
+    }
+
+    if (nvs_key) {
+        configSetInt(nvs_key, gpio);
+        if (!skip_save) {
+            configUnifiedSave();
+        }
+    } else {
+        logError("[HAL] Save failed: No NVS key for %s", key);
+        return false;
+    }
 
     logInfo("[HAL] [OK] Mapped %s -> Virtual Pin %d (%s)", key, gpio, info->silk);
     return true;

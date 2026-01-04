@@ -16,20 +16,14 @@ static bool mutex_initialized = false;
 /**
  * @brief Initialize the serial mutex (called lazily)
  */
-static void ensureMutexInitialized() {
-  if (!mutex_initialized) {
-    serial_mutex = xSemaphoreCreateMutex();
-    mutex_initialized = true;
-  }
-}
+
 
 /**
  * @brief Acquire serial mutex with timeout
  * @return true if acquired, false if timeout
  */
 static bool acquireSerialMutex() {
-  ensureMutexInitialized();
-  if (!serial_mutex) return true;  // No mutex, proceed without lock
+  if (!mutex_initialized || !serial_mutex) return false;
   
   // Use 50ms timeout to avoid deadlocks
   return xSemaphoreTake(serial_mutex, pdMS_TO_TICKS(50)) == pdTRUE;
@@ -48,22 +42,30 @@ static void vlogPrint(log_level_t level, const char* prefix, const char* format,
   if (level > current_log_level) return;
   
   // Acquire mutex for thread-safe output
-  bool locked = acquireSerialMutex();
+  // CRITICAL FIX: If we can't get the lock, we MUST NOT touch the static buffer
+  if (!acquireSerialMutex()) {
+      // Optional: Print a minimal marker using ROM functions to indicate drop, 
+      // or just silently drop to prevent corruption.
+      // ets_printf("!"); 
+      return; 
+  }
   
   int offset = 0;
   if (prefix != NULL) offset = snprintf(log_buffer, LOGGER_BUFFER_SIZE, "%s", prefix);
   vsnprintf(log_buffer + offset, LOGGER_BUFFER_SIZE - offset, format, args);
   
-  // Output to Serial (UART) only - background logs don't go to telnet
-  // Only explicit CLI output (logPrintf/logPrintln) should mirror to telnet
+  // Output to Serial (UART) only
   Serial.println(log_buffer);
   
-  if (locked) releaseSerialMutex();
+  releaseSerialMutex();
 }
 
 void serialLoggerInit(log_level_t log_level) {
-  // Initialize mutex early
-  ensureMutexInitialized();
+  // Initialize mutex explicitly
+  if (!mutex_initialized) {
+    serial_mutex = xSemaphoreCreateMutex();
+    mutex_initialized = true;
+  }
   
   current_log_level = log_level;
   
@@ -110,25 +112,34 @@ void logVerbose(const char* format, ...) {
 }
 
 void logPrintf(const char* format, ...) {
-  bool locked = acquireSerialMutex();
+  // CRITICAL FIX: If we can't get the lock, we MUST NOT touch the static buffer
+  if (!acquireSerialMutex()) {
+      return; 
+  }
   
   va_list args; va_start(args, format);
   vsnprintf(log_buffer, LOGGER_BUFFER_SIZE, format, args); va_end(args);
   Serial.print(log_buffer);
-  networkManager.telnetPrint(log_buffer); // Mirror raw prints
   
-  if (locked) releaseSerialMutex();
+  // Note: Telnet mirroring might be unsafe if networkManager locks too.
+  // Ideally, use a queue for telnet. For now, this is kept but protected by serial_mutex.
+  networkManager.telnetPrint(log_buffer); 
+  
+  releaseSerialMutex();
 }
 
 void logPrintln(const char* format, ...) {
-  bool locked = acquireSerialMutex();
+  // CRITICAL FIX: If we can't get the lock, we MUST NOT touch the static buffer
+  if (!acquireSerialMutex()) {
+      return; 
+  }
   
   va_list args; va_start(args, format);
   vsnprintf(log_buffer, LOGGER_BUFFER_SIZE, format, args); va_end(args);
   Serial.println(log_buffer);
   networkManager.telnetPrintln(log_buffer); // Mirror raw prints
   
-  if (locked) releaseSerialMutex();
+  releaseSerialMutex();
 }
 
 char* serialLoggerGetBuffer() { return log_buffer; }

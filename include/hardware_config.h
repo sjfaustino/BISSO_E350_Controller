@@ -78,35 +78,40 @@ struct SignalDef {
     const char* key;
     const char* name;
     const char* desc;
-    int16_t     default_gpio;  // Changed to int16_t for virtual pins 100+
+    int16_t     default_gpio;
     const char* type;
+    const char* nvs_key; // Short key for NVS (max 15 chars)
 };
 
 const SignalDef signalDefinitions[] = {
     // PLC Inputs (X1-X16, Virtual 100-115)
-    {"input_c",        "PLC Input C",        "C mode consenso",       100, "input"},
-    {"input_t",        "PLC Input T",        "T mode consenso",       101, "input"},
-    {"input_ct",       "PLC Input C+T",      "C+T mode consenso",     102, "input"},
-    {"input_manual",   "PLC Input Manual",   "Manual mode",           103, "input"},
-    {"input_estop",    "E-Stop Input",       "Emergency stop",        104, "input"},
-    {"input_pause",    "Pause Button",       "Pause operation",       105, "input"},
-    {"input_resume",   "Resume Button",      "Resume operation",      106, "input"},
+    {"input_c",        "PLC Input C",        "C mode consenso",       100, "input", "i_c"},
+    {"input_t",        "PLC Input T",        "T mode consenso",       101, "input", "i_t"},
+    {"input_ct",       "PLC Input C+T",      "C+T mode consenso",     102, "input", "i_ct"},
+    {"input_manual",   "PLC Input Manual",   "Manual mode",           103, "input", "i_man"},
+    {"input_estop",    "E-Stop Input",       "Emergency stop",        104, "input", "i_estop"},
+    {"input_pause",    "Pause Button",       "Pause operation",       105, "input", "i_pause"},
+    {"input_resume",   "Resume Button",      "Resume operation",      106, "input", "i_resume"},
 
     // PLC Outputs (Y1-Y16, Virtual 116-131)
-    {"output_axis_x",     "Axis X Select",     "Select X axis",        116, "output"},
-    {"output_axis_y",     "Axis Y Select",     "Select Y axis",        117, "output"},
-    {"output_axis_z",     "Axis Z Select",     "Select Z axis",        118, "output"},
-    {"output_dir_plus",   "Direction +",       "Positive direction",   119, "output"},
-    {"output_dir_minus",  "Direction -",       "Negative direction",   120, "output"},
-    {"output_speed_fast", "Speed Fast",        "Fast speed",           121, "output"},
-    {"output_speed_med",  "Speed Medium",      "Medium speed",         122, "output"},
-    {"output_speed_slow", "Speed Slow",        "Slow speed",           123, "output"},
+    {"output_axis_x",     "Axis X Select",     "Select X axis",        116, "output", "o_axis_x"},
+    {"output_axis_y",     "Axis Y Select",     "Select Y axis",        117, "output", "o_axis_y"},
+    {"output_axis_z",     "Axis Z Select",     "Select Z axis",        118, "output", "o_axis_z"},
+    {"output_dir_plus",   "Direction +",       "Positive direction",   119, "output", "o_dir_p"},
+    {"output_dir_minus",  "Direction -",       "Negative direction",   120, "output", "o_dir_m"},
+    {"output_speed_fast", "Speed Fast",        "Fast speed",           121, "output", "o_spd_fst"},
+    {"output_speed_med",  "Speed Medium",      "Medium speed",         122, "output", "o_spd_med"},
+    {"output_speed_slow", "Speed Slow",        "Slow speed",           123, "output", "o_spd_slo"},
     
     // Status Light (Tower Light)
-    {"output_status_green",  "Status Green",      "Status light green",   124, "output"},
-    {"output_status_yellow", "Status Yellow",     "Status light yellow",  125, "output"},
-    {"output_status_red",    "Status Red",        "Status light red",     126, "output"},
-    {"output_buzzer",        "Buzzer",            "Audible alarm",        127, "output"}
+    {"output_status_green",  "Status Green",      "Status light green",   124, "output", "o_st_grn"},
+    {"output_status_yellow", "Status Yellow",     "Status light yellow",  125, "output", "o_st_yel"},
+    {"output_status_red",    "Status Red",        "Status light red",     126, "output", "o_st_red"},
+    {"output_buzzer",        "Buzzer",            "Audible alarm",        127, "output", "o_buzz"},
+
+    // WJ66 Encoder (RS232)
+    {"wj66_rx", "WJ66 RX", "Encoder RX", 14, "input", "wj66_rx"},
+    {"wj66_tx", "WJ66 TX", "Encoder TX", 33, "output", "wj66_tx"}
 };
 
 constexpr size_t SIGNAL_COUNT = sizeof(signalDefinitions)/sizeof(signalDefinitions[0]);
@@ -134,5 +139,5 @@ extern MachineCalibration machineCal;
 // Helper functions
 const PinInfo* getPinInfo(int16_t gpio);
 const char* checkPinConflict(int16_t gpio, const char* currentKey = nullptr);
-bool setPin(const char* key, int16_t gpio);
+bool setPin(const char* key, int16_t gpio, bool skip_save = false);
 int16_t getPin(const char* key);
