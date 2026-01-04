@@ -1,0 +1,49 @@
+name: Build and Release Firmware
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tags like v1.0.0, v1.0.1, etc.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build Firmware
+        run: pio run
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            .pio/build/esp32dev/firmware.bin
+          body: |
+            ## Firmware Release ${{ steps.get_version.outputs.VERSION }}
+            
+            **Download `firmware.bin` and upload via the web UI or use the built-in OTA updater.**
+            
+            ### Installation
+            1. Visit the device's web interface
+            2. The update notification will appear automatically
+            3. Click "Install Now" to update
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

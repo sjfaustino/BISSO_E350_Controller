@@ -18,6 +18,9 @@
 #include "fault_logging.h"
 #include "spindle_current_monitor.h"
 #include "encoder_wj66.h"
+#include "rs485_autodetect.h"
+#include "config_keys.h"
+#include "ota_manager.h"
 
 // Telemetry History Buffer (last 60 samples, sampled every 5s = 5mins)
 #define HISTORY_BUFFER_SIZE 60
@@ -56,6 +59,7 @@ WebServerManager::~WebServerManager() {
 // Initialization
 void WebServerManager::init() {
     logPrintln("[WEB] Init with REST API");
+    otaInit();
     
     // TUNE: Increase stack size and enable LRU purge for concurrency
     server.config.stack_size = 8192;
@@ -501,6 +505,66 @@ void WebServerManager::init() {
         }
         configUnifiedSave();
         return response->send(200, "application/json", "{\"success\":true}");
+    });
+
+    // Detect RS485 Baud Rate
+    server.on("/api/config/detect-rs485", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        int32_t baud = rs485AutodetectBaud();
+        
+        char json[128];
+        if (baud > 0) {
+            snprintf(json, sizeof(json), "{\"success\":true, \"baud\": %lu}", (unsigned long)baud);
+            return response->send(200, "application/json", json);
+        } else if (baud == -1) {
+            return response->send(200, "application/json", "{\"success\":false, \"error\": \"No RS485 devices are enabled. Please enable VFD or Current Monitor first.\"}");
+        } else {
+            return response->send(200, "application/json", "{\"success\":false, \"error\": \"No RS485 devices found (check wiring/power)\"}");
+        }
+    });
+
+    // --- GitHub OTA Update API ---
+    
+    // Check for updates (returns cached result from background check)
+    server.on("/api/ota/check", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        const UpdateCheckResult* res = otaGetCachedResult();
+        
+        JsonDocument doc;
+        doc["check_complete"] = otaCheckComplete();
+        doc["available"] = res->available;
+        doc["latest_version"] = res->latest_version;
+        doc["url"] = res->download_url;
+        doc["notes"] = res->release_notes;
+        
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+    
+    // Perform update
+    server.on("/api/ota/update", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        deserializeJson(doc, request->body());
+        
+        if (doc["url"].is<const char*>()) {
+            const char* url = doc["url"];
+            if (otaPerformUpdate(url)) {
+                return response->send(200, "application/json", "{\"success\":true, \"message\":\"Update started in background\"}");
+            } else {
+                return response->send(400, "application/json", "{\"success\":false, \"error\":\"Update already in progress or failed to start\"}");
+            }
+        }
+        return response->send(400, "application/json", "{\"error\":\"Missing URL\"}");
+    });
+    
+    // Get update status
+    server.on("/api/ota/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        doc["updating"] = otaIsUpdating();
+        doc["progress"] = otaGetProgress();
+        
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
     });
 
     // --- Config API Aliases (for hardware.js compatibility) ---

@@ -8,7 +8,6 @@
 #include "yhtc05_modbus.h"
 #include "modbus_rtu.h"
 #include "rs485_device_registry.h"
-#include "encoder_hal.h"
 #include "serial_logger.h"
 #include <Arduino.h>
 #include <string.h>
@@ -120,8 +119,8 @@ bool yhtc05ModbusReadRPM(void) {
         modbus_tx_buffer
     );
     
-    // Send via encoder HAL (shared RS485)
-    return encoderHalSend(modbus_tx_buffer, (uint8_t)frame_len);
+    // Send via RS485 bus (shared)
+    return rs485Send(modbus_tx_buffer, (uint8_t)frame_len);
 }
 
 bool yhtc05ModbusOnResponse(const uint8_t* data, uint16_t len) {

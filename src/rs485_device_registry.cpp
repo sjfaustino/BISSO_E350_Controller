@@ -6,10 +6,13 @@
  */
 
 #include "rs485_device_registry.h"
-#include "encoder_hal.h"
+#include "rs485_device_registry.h"
 #include "serial_logger.h"
 #include <Arduino.h>
 #include <string.h>
+
+// Use Serial2 for RS485 Bus (pins 16/13 on KC868-A16)
+static HardwareSerial* bus_serial = &Serial2;
 
 // ============================================================================
 // MODULE STATE
@@ -31,11 +34,16 @@ static rs485_registry_state_t registry = {
 // ============================================================================
 
 bool rs485RegistryInit(uint32_t baud_rate) {
+    if (baud_rate == 0) baud_rate = RS485_DEFAULT_BAUD_RATE;
+    
     memset(&registry, 0, sizeof(registry));
     registry.baud_rate = baud_rate;
     registry.last_switch_time_ms = millis();
     
-    logInfo("[RS485] Registry initialized (baud: %lu, max devices: %d)",
+    // Initialize RS485 UART
+    bus_serial->begin(baud_rate, SERIAL_8N1, 16, 13);
+    
+    logInfo("[RS485] Registry initialized on Serial2 (baud: %lu, max devices: %d)",
             (unsigned long)baud_rate, RS485_MAX_DEVICES);
     return true;
 }
@@ -247,15 +255,14 @@ void rs485HandleBus(void) {
     if (registry.bus_busy) {
         uint32_t now = millis();
         
-        // Read available bytes from HAL
+        // Read available bytes from UART
         uint8_t b;
-        uint8_t len = 1;
-        while (encoderHalReceive(&b, &len)) {
+        while (bus_serial->available()) {
+            b = bus_serial->read();
             if (bus_rx_idx < sizeof(bus_rx_buffer)) {
                 bus_rx_buffer[bus_rx_idx++] = b;
                 last_byte_time_ms = now;
             }
-            len = 1;
         }
         
         // Check for frame completion (5ms silence or buffer full)
@@ -278,8 +285,8 @@ void rs485HandleBus(void) {
         }
     } else {
         // Bus is idle, clear any stale data
-        if (encoderHalAvailable() > 0) {
-            encoderHalClearBuffer();
+        if (bus_serial->available() > 0) {
+            while (bus_serial->available()) bus_serial->read();
         }
         bus_rx_idx = 0;
     }
@@ -304,13 +311,49 @@ bool rs485RequestImmediatePoll(rs485_device_t* device) {
 // ============================================================================
 
 bool rs485SetBaudRate(uint32_t baud_rate) {
+    if (baud_rate == 0) return false;
+    
     registry.baud_rate = baud_rate;
-    logInfo("[RS485] Baud rate set to %lu", (unsigned long)baud_rate);
+    bus_serial->updateBaudRate(baud_rate);
+    
+    logInfo("[RS485] Baud rate updated to %lu", (unsigned long)baud_rate);
     return true;
 }
 
 uint32_t rs485GetBaudRate(void) {
     return registry.baud_rate;
+}
+
+// ============================================================================
+// BUS I/O API implementation
+// ============================================================================
+
+bool rs485Send(const uint8_t* data, uint8_t len) {
+    if (!bus_serial || !data) return false;
+    return (bus_serial->write(data, len) == len);
+}
+
+int rs485Available(void) {
+    return bus_serial ? bus_serial->available() : 0;
+}
+
+bool rs485Receive(uint8_t* data, uint8_t* len) {
+    if (!bus_serial || !data || !len) return false;
+    int avail = bus_serial->available();
+    if (avail == 0) {
+        *len = 0;
+        return false;
+    }
+    int to_read = (avail < (int)*len) ? avail : *len;
+    int bytes_read = bus_serial->readBytes(data, to_read);
+    *len = (uint8_t)bytes_read;
+    return (bytes_read > 0);
+}
+
+void rs485ClearBuffer(void) {
+    if (bus_serial) {
+        while (bus_serial->available()) bus_serial->read();
+    }
 }
 
 void rs485SetDeviceEnabled(rs485_device_t* device, bool enabled) {

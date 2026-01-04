@@ -1,4 +1,4 @@
-// hardware_config.h — Gemini v1.0.0 FINAL PRODUCTION VERSION
+// hardware_config.h — BISSO E350 Controller Hardware Abstraction
 
 #pragma once
 #include <Arduino.h>
@@ -89,7 +89,7 @@ const SignalDef signalDefinitions[] = {
     {"input_t",        "PLC Input T",        "T mode consenso",       101, "input", "i_t"},
     {"input_ct",       "PLC Input C+T",      "C+T mode consenso",     102, "input", "i_ct"},
     {"input_manual",   "PLC Input Manual",   "Manual mode",           103, "input", "i_man"},
-    {"input_estop",    "E-Stop Input",       "Emergency stop",        104, "input", "i_estop"},
+    {"input_estop",    "E-Stop Button",      "Emergency stop",        104, "input", "i_estop"},
     {"input_pause",    "Pause Button",       "Pause operation",       105, "input", "i_pause"},
     {"input_resume",   "Resume Button",      "Resume operation",      106, "input", "i_resume"},
 

@@ -1,6 +1,5 @@
 #include "jxk10_modbus.h"
 #include "modbus_rtu.h"
-#include "encoder_hal.h"
 #include "rs485_device_registry.h"
 #include "serial_logger.h"
 #include "config_unified.h"
@@ -58,7 +57,7 @@ static bool jxk10Poll(void) {
     uint16_t tx_len = modbusReadRegistersRequest(jxk10_state.slave_address,
                                                   JXK10_REG_CURRENT, 1, modbus_tx_buffer);
 
-    return encoderHalSend(modbus_tx_buffer, tx_len);
+    return rs485Send(modbus_tx_buffer, tx_len);
 }
 
 static bool jxk10OnResponse(const uint8_t* data, uint16_t len) {
@@ -164,13 +163,13 @@ bool jxk10ModbusSetSlaveAddress(uint8_t new_address) {
                                                         JXK10_REG_SLAVE_ADDR, new_address,
                                                         modbus_tx_buffer);
 
-    if (!encoderHalSend(modbus_tx_buffer, tx_len)) return false;
+    if (!rs485Send(modbus_tx_buffer, tx_len)) return false;
 
     // Wait for response (blocking since this is a config change)
     delay(100);
     uint8_t rx_data[32];
     uint8_t rx_len = sizeof(rx_data);
-    if (encoderHalReceive(rx_data, &rx_len) && rx_len >= 8) {
+    if (rs485Receive(rx_data, &rx_len) && rx_len >= 8) {
         if (modbusParseWriteResponse(rx_data, rx_len, JXK10_REG_SLAVE_ADDR, new_address) == 0) {
             // Success - note: power cycle required for change to take effect
             logInfo("[JXK10] Address changed to %u - POWER CYCLE REQUIRED", new_address);

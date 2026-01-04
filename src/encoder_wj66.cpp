@@ -79,17 +79,23 @@ void wj66Init() {
 
   // 1. Load configuration
   uint32_t config_baud = configGetInt(KEY_ENC_BAUD, WJ66_BAUD);
+  uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS232_HT);
+  
   // Sanity check
   if (config_baud < 1200 || config_baud > 115200) config_baud = 9600;
 
-  logInfo("[WJ66] Configuring @ %lu baud...", (unsigned long)config_baud);
+  logInfo("[WJ66] Configuring @ %lu baud, Interface: %d", (unsigned long)config_baud, config_iface);
   
   // Initialize via HAL to ensure internal state (serial_port pointer) is set
   // This prevents crash when encoderHalSendString is called
-  if (!encoderHalInit(ENCODER_INTERFACE_RS232_HT, config_baud)) {
+  if (!encoderHalInit((encoder_interface_t)config_iface, config_baud)) {
       logError("[WJ66] HAL Init Failed!");
       // Fallback
-      Serial1.begin(config_baud, SERIAL_8N1, 14, 33);
+      if (config_iface == ENCODER_INTERFACE_RS232_HT) {
+          Serial1.begin(config_baud, SERIAL_8N1, 14, 33);
+      } else {
+          Serial2.begin(config_baud, SERIAL_8N1, 16, 13);
+      }
   }
 
   // Init State
@@ -143,26 +149,28 @@ uint32_t wj66Autodetect() {
     
     const uint32_t rates[] = {9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200};
     uint32_t found_rate = 0;
+    uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, 0);
+    HardwareSerial* s = (config_iface == 1) ? &Serial2 : &Serial1;
 
     for (uint32_t rate : rates) {
         vTaskDelay(20 / portTICK_PERIOD_MS); // Feed WDT
         
         logInfo("[WJ66] Trying %lu...", (unsigned long)rate);
-        Serial1.updateBaudRate(rate);
+        s->updateBaudRate(rate);
         vTaskDelay(50 / portTICK_PERIOD_MS);
         
         // Flush RX buffer (limited to prevent infinite loop)
-        for (int i = 0; i < 200 && Serial1.available(); i++) Serial1.read();
+        for (int i = 0; i < 200 && s->available(); i++) s->read();
         
         // Send query
-        Serial1.write((uint8_t)0x01);
-        Serial1.write((uint8_t)0x00);
-        Serial1.flush();
+        s->write((uint8_t)0x01);
+        s->write((uint8_t)0x00);
+        s->flush();
         
         // Wait for response
         uint32_t start = millis();
         while (millis() - start < 150) {
-            if (Serial1.available()) {
+            if (s->available()) {
                 logInfo("[WJ66] Found @ %lu baud!", (unsigned long)rate);
                 found_rate = rate;
                 break;
@@ -174,7 +182,7 @@ uint32_t wj66Autodetect() {
     
     // Restore to found or saved rate
     uint32_t final_rate = found_rate ? found_rate : configGetInt(KEY_ENC_BAUD, WJ66_BAUD);
-    Serial1.updateBaudRate(final_rate);
+    s->updateBaudRate(final_rate);
     
     if (found_rate) {
         configSetInt(KEY_ENC_BAUD, found_rate);
@@ -189,7 +197,13 @@ uint32_t wj66Autodetect() {
 
 static bool wj66Poll(void) {
     if (wj66_maintenance_mode) return false;
-    // Just call HAL. If HAL is uninitialized (during autodetect), it returns false safely.
+    
+    // Check if we are on RS485 (Interface 1)
+    if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
+        return rs485Send((const uint8_t*)"#00\r", 4);
+    }
+    
+    // Otherwise use Standard UART (Serial1)
     return encoderHalSendString("#00\r");
 }
 

@@ -220,7 +220,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
 // ============================================================================
 
 void motionInit() {
-  logInfo("[MOTION] Init v3.5.19...");
+  logInfo("[MOTION] Init...");
   m_state.strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
 
   for (int i = 0; i < MOTION_AXES; i++) {

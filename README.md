@@ -1,6 +1,6 @@
 # BISSO E350 Motion Controller Firmware
 
-**Version:** Gemini v1.0.0  
+**Version:** See `include/firmware_version.h`  
 **Status:** Production Ready
 
 ---
@@ -26,7 +26,8 @@ The BISSO E350 is an industrial **stone bridge saw** used for cutting:
 - ✅ **Modbus monitoring** of Altivar 31 VFD (read-only)
 - ✅ **Spindle current monitoring** via JXK-10 sensor
 - ✅ **Fault logging** with NVS persistence
-- ✅ **OTA firmware updates**
+- ✅ **GitHub-Based OTA Updates** (auto-check, one-click install)
+- ✅ **RS485 Auto-detection** for VFD and current monitor
 
 ---
 
@@ -103,4 +104,4 @@ Proprietary - BISSO Industrial Controls
 
 ---
 
-**Last Updated:** December 2025
+**Last Updated:** January 2026

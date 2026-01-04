@@ -11,8 +11,6 @@ window.HardwareModule = window.HardwareModule || {
         console.log('[Hardware] Initializing');
         this.loadPinConfiguration();
         this.setupEventListeners();
-
-        this.setupEventListeners();
     },
 
     loadPinConfiguration() {
@@ -23,7 +21,6 @@ window.HardwareModule = window.HardwareModule || {
                 console.log('[Hardware] Pin configuration loaded:', data);
                 this.pinData = data.pins || [];
                 this.signalData = data.signals || [];
-                this.renderPinConfiguration(data);
                 this.renderPinConfiguration(data);
                 // loadConfigValues will call renderPinSummary after loading
                 this.loadConfigValues();
@@ -192,12 +189,12 @@ window.HardwareModule = window.HardwareModule || {
         addUsage(5, 'LCD Display (SCL)');
         // }
         // if (vfdEnabled) {
-        addUsage(16, 'VFD (Altivar31)');
-        addUsage(13, 'VFD (Altivar31)');
+        addUsage(16, 'VFD (Altivar31) (RS485 A)');
+        addUsage(13, 'VFD (Altivar31) (RS485 B)');
         // }
         // if (jxk10Enabled) {
-        addUsage(16, 'JXK-10 Current Monitor');
-        addUsage(13, 'JXK-10 Current Monitor');
+        addUsage(16, 'JXK-10 Current Monitor (RS485 A)');
+        addUsage(13, 'JXK-10 Current Monitor (RS485 B)');
         // }
 
         // 3. Render Table
@@ -313,6 +310,12 @@ window.HardwareModule = window.HardwareModule || {
                     baudSelect.value = config.enc_baud || '9600';
                 }
 
+                // RS485 Baud Rate
+                const rs485Baud = document.getElementById('rs485_baud');
+                if (rs485Baud) {
+                    rs485Baud.value = config.rs485_baud || '9600';
+                }
+
                 // Update Pin Summary now that config (enabled states) is loaded
                 this.renderPinSummary();
             })
@@ -329,30 +332,73 @@ window.HardwareModule = window.HardwareModule || {
 
                 fetch('/api/hardware/wj66/detect', { method: 'POST' })
                     .then(() => {
+                        window.Toast?.info('Detection started. Reloading in 8s...');
                         setTimeout(() => location.reload(), 8000);
                     })
                     .catch(() => {
-                        detectBtn.textContent = 'Autodetect';
+                        window.Toast?.error('Autodetect failed');
+                        detectBtn.textContent = 'Detect';
                         detectBtn.disabled = false;
                     });
             };
         }
 
+        // RS485 Bus Autodetect Button
+        const rs485DetectBtn = document.getElementById('btn-detect-rs485');
+        if (rs485DetectBtn) {
+            rs485DetectBtn.onclick = () => {
+                // Pre-flight check: At least one device must be enabled
+                const vfdEn = document.getElementById('vfd_enabled')?.checked;
+                const jxk10En = document.getElementById('jxk10_enabled')?.checked;
+
+                if (!vfdEn && !jxk10En) {
+                    window.Toast?.error('Please enable at least one RS485 device (VFD or Current Monitor) before scanning');
+                    return;
+                }
+
+                rs485DetectBtn.textContent = 'Searching...';
+                rs485DetectBtn.disabled = true;
+                window.Toast?.info('Scanning RS485 bus for devices...');
+
+                fetch('/api/config/detect-rs485', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.Toast?.success(`Found Modbus device @ ${data.baud} baud!`);
+                            const rs485Baud = document.getElementById('rs485_baud');
+                            if (rs485Baud) rs485Baud.value = data.baud;
+                        } else {
+                            window.Toast?.error(data.error || 'Autodetect failed');
+                        }
+                    })
+                    .catch(() => window.Toast?.error('Communication error'))
+                    .finally(() => {
+                        rs485DetectBtn.textContent = 'Detect';
+                        rs485DetectBtn.disabled = false;
+                    });
+            };
+        }
+
         // Setup save button handler
-        document.getElementById('save-config-btn')?.addEventListener('click', () => {
-            this.saveConfiguration();
-        });
+        const saveBtn = document.getElementById('save-config-btn');
+        if (saveBtn) {
+            saveBtn.onclick = () => this.saveConfiguration();
+        }
 
         // Setup reload button handler
-        document.getElementById('reload-config-btn')?.addEventListener('click', () => {
-            this.loadPinConfiguration();
-            this.showStatus('Configuration reloaded', 'info');
-        });
+        const reloadBtn = document.getElementById('reload-config-btn');
+        if (reloadBtn) {
+            reloadBtn.onclick = () => {
+                this.loadPinConfiguration();
+                this.showStatus('Configuration reloaded', 'info');
+            };
+        }
 
         // Setup reset button handler
-        document.getElementById('reset-defaults-btn')?.addEventListener('click', () => {
-            this.resetConfiguration();
-        });
+        const resetBtn = document.getElementById('reset-defaults-btn');
+        if (resetBtn) {
+            resetBtn.onclick = () => this.resetConfiguration();
+        }
     },
 
     saveConfiguration() {
@@ -378,17 +424,16 @@ window.HardwareModule = window.HardwareModule || {
             }
         });
 
-        // Collect config checkboxes and number inputs
+        // Collect config values from various elements
         const configUpdates = {};
-        document.querySelectorAll('input[data-config]').forEach(input => {
-            if (input.type === 'checkbox') {
-                configUpdates[input.dataset.config] = input.checked ? 1 : 0;
-            } else if (input.type === 'number') {
-                configUpdates[input.dataset.config] = parseInt(input.value) || 0;
-            } else if (input.tagName === 'SELECT') { // Handle selects with data-config
-                configUpdates[input.dataset.config] = input.value;
+        document.querySelectorAll('[data-config]').forEach(elem => {
+            if (elem.type === 'checkbox') {
+                configUpdates[elem.dataset.config] = elem.checked ? 1 : 0;
+            } else if (elem.type === 'number') {
+                configUpdates[elem.dataset.config] = parseInt(elem.value) || 0;
             } else {
-                configUpdates[input.dataset.config] = input.value;
+                // select or regular text input
+                configUpdates[elem.dataset.config] = elem.value;
             }
         });
         // Handle selects explicitly if querySelectorAll didn't catch them above (it checks input[data-config])
@@ -459,16 +504,13 @@ window.HardwareModule = window.HardwareModule || {
     },
 
     showStatus(message, type) {
-        const el = document.getElementById('status-message');
-        if (el) {
-            el.textContent = message;
-            el.className = 'status-message ' + type;
-            el.style.display = 'block';
-
-            // Auto-hide after 5 seconds for non-error messages
-            if (type !== 'error') {
-                setTimeout(() => { el.style.display = 'none'; }, 5000);
-            }
+        if (window.Toast) {
+            // Map 'info' to 'info', 'success' to 'success', 'error' to 'error'
+            // Ensure priority messages (errors) stay longer or until clicked
+            const duration = type === 'error' ? 0 : 5000;
+            window.Toast.show(message, type, duration);
+        } else {
+            console.log(`[Hardware Status] ${type.toUpperCase()}: ${message}`);
         }
     },
 

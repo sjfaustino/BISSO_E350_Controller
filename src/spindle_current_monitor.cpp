@@ -7,6 +7,7 @@
 #include "spindle_current_monitor.h"
 #include "fault_logging.h"
 #include "jxk10_modbus.h"
+#include "altivar31_modbus.h"
 #include "motion.h"
 #include "serial_logger.h"
 #include "config_unified.h"
@@ -55,16 +56,23 @@ static spindle_monitor_state_t monitor_state = {
 static uint32_t last_check_time_ms = 0;
 
 bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
+  // Load global RS485 baud for all Modbus devices
+  uint32_t rs485_baud = configGetInt(KEY_RS485_BAUD, 9600);
+  
   // Initialize JXK-10 driver (registry registration happens here)
-  if (!jxk10ModbusInit(jxk10_address, 9600)) {
+  if (!jxk10ModbusInit(jxk10_address, rs485_baud)) {
     logError("[SPINDLE] Failed to initialize JXK-10 driver");
     return false;
   }
 
+  // Initialize VFD driver (registry registration happens here)
+  uint8_t vfd_address = (uint8_t)configGetInt(KEY_VFD_ADDR, 2);
+  altivar31ModbusInit(vfd_address, rs485_baud);
+
   // Set monitor parameters
   monitor_state.enabled = true;
   monitor_state.jxk10_slave_address = jxk10_address;
-  monitor_state.jxk10_baud_rate = 9600;
+  monitor_state.jxk10_baud_rate = rs485_baud;
   monitor_state.overcurrent_threshold_amps = threshold_amps;
   monitor_state.poll_interval_ms = 1000;
   monitor_state.last_poll_time_ms = millis();

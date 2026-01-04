@@ -1054,4 +1054,4 @@ The CLI supports limited Grbl-compatible commands:
 
 ---
 
-*Document generated for BISSO E350 CNC Controller Firmware v1.0.0 (Gemini)*
+*Document generated for BISSO E350 CNC Controller Firmware v1.0.0 (PosiPro)*

@@ -98,6 +98,7 @@
 #define KEY_ENC_INTERFACE                                                      \
   "enc_iface" // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)
 #define KEY_ENC_BAUD "enc_baud" // WJ66 baud rate
+#define KEY_RS485_BAUD "rs485_baud" // Global RS-485 bus baud rate
 
 // --- SPINDLE CURRENT SENSOR ---
 #define KEY_SPINDLE_ENABLED                                                    \

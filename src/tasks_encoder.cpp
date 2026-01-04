@@ -5,6 +5,8 @@
 #include "watchdog_manager.h"
 #include "system_constants.h"
 #include "rs485_device_registry.h"
+#include "config_unified.h"
+#include "config_keys.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -13,8 +15,9 @@ void taskEncoderFunction(void* parameter) {
 
   logInfo("[ENCODER_TASK] [OK] Started on core 1");
 
-  // Initialize RS-485 Registry with default baud
-  rs485RegistryInit(WJ66_BAUD);
+  // Initialize RS-485 Registry with baud from config
+  uint32_t rs485_baud = configGetInt(KEY_RS485_BAUD, 9600);
+  rs485RegistryInit(rs485_baud);
 
   // Diagnostic: Measure stack high water mark
   UBaseType_t stack_hwm_initial = uxTaskGetStackHighWaterMark(NULL);

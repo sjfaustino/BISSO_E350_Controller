@@ -28,6 +28,122 @@ class Router {
         console.log('[ROUTER] Initializing router');
         window.addEventListener('hashchange', () => this.navigate());
         this.navigate();
+
+        // Check for firmware updates on load
+        setTimeout(() => this.checkForUpdates(), 2000);
+    }
+
+    static async checkForUpdates() {
+        const banner = document.getElementById('ota-update-banner');
+        if (!banner) return;
+
+        try {
+            const response = await fetch('/api/ota/check');
+            const data = await response.json();
+
+            // If background check hasn't completed yet, retry in 3 seconds
+            if (!data.check_complete) {
+                console.log('[OTA] Background check not complete, retrying...');
+                setTimeout(() => this.checkForUpdates(), 3000);
+                return;
+            }
+
+            if (data.available) {
+                this.showUpdateBanner(data);
+            } else {
+                console.log('[OTA] Firmware is up to date');
+            }
+        } catch (err) {
+            console.warn('[OTA] Failed to check for updates:', err);
+        }
+    }
+
+    static showUpdateBanner(data) {
+        const banner = document.getElementById('ota-update-banner');
+        if (!banner) return;
+
+        banner.innerHTML = `
+            <div class="ota-content">
+                <span class="ota-icon">🚀</span>
+                <div class="ota-text">
+                    New version <strong>${data.latest_version}</strong> is available!
+                </div>
+            </div>
+            <div class="ota-actions">
+                <button class="ota-btn ota-btn-update" id="ota-install-btn">Install Now</button>
+                <button class="ota-btn ota-btn-dismiss" id="ota-dismiss-btn">Later</button>
+            </div>
+        `;
+        banner.classList.remove('hidden');
+
+        document.getElementById('ota-dismiss-btn').onclick = () => {
+            banner.classList.add('hidden');
+        };
+
+        document.getElementById('ota-install-btn').onclick = () => {
+            this.startUpdate(data.url);
+        };
+    }
+
+    static async startUpdate(url) {
+        const banner = document.getElementById('ota-update-banner');
+        if (!banner) return;
+
+        if (!confirm('The device will reboot after updating. Proceed?')) return;
+
+        try {
+            const response = await fetch('/api/ota/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                banner.innerHTML = `
+                    <div class="ota-content">
+                        <span class="ota-icon">📥</span>
+                        <div class="ota-text">Downloading update... do not power off</div>
+                        <div class="ota-progress-container">
+                            <div class="ota-progress-bar" id="ota-progress" style="width: 10%"></div>
+                        </div>
+                    </div>
+                `;
+                this.pollUpdateStatus();
+            } else {
+                window.Toast?.error(data.error || 'Update failed to start');
+            }
+        } catch (err) {
+            window.Toast?.error('Communication error during update');
+        }
+    }
+
+    static async pollUpdateStatus() {
+        const progressBar = document.getElementById('ota-progress');
+        const interval = setInterval(async () => {
+            try {
+                const response = await fetch('/api/ota/status');
+                const data = await response.json();
+
+                if (data.updating) {
+                    if (progressBar) progressBar.style.width = `${Math.max(10, data.progress)}%`;
+                } else {
+                    clearInterval(interval);
+                    // If no longer updating, either it failed or it's rebooting.
+                    // The backend reboots 2s after success, so if we can still poll, it might have failed.
+                }
+            } catch (err) {
+                // Connection lost usually means it's rebooting
+                clearInterval(interval);
+                document.getElementById('ota-update-banner').innerHTML = `
+                    <div class="ota-content">
+                        <span class="ota-icon">🔄</span>
+                        <div class="ota-text">Update complete! Reconnecting...</div>
+                    </div>
+                `;
+                setTimeout(() => window.location.reload(), 5000);
+            }
+        }, 1000);
     }
 
     static async navigate(page = null) {

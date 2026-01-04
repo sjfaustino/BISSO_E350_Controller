@@ -50,13 +50,16 @@ textarea {
 
 .toast-container {
     position: fixed;
-    top: 80px;
-    right: 20px;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 10000;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 10px;
-    max-width: 400px;
+    width: 100%;
+    max-width: 500px;
     pointer-events: none;
 }
 
@@ -64,26 +67,29 @@ textarea {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 16px;
-    border-radius: 8px;
-    background: var(--bg-primary);
+    padding: 12px 20px;
+    border-radius: 12px;
+    background: rgba(var(--bg-primary-rgb, 255, 255, 255), 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     opacity: 0;
-    transform: translateX(400px);
-    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transform: translateY(-20px);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     pointer-events: auto;
-    max-width: 100%;
+    width: fit-content;
+    min-width: 300px;
 }
 
 .toast-show {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
 }
 
 .toast-hide {
     opacity: 0;
-    transform: translateX(400px);
+    transform: translateY(-20px) scale(0.95);
 }
 
 .toast-icon {
@@ -106,25 +112,24 @@ textarea {
 }
 
 .toast-close {
-    background: none;
+    background: var(--bg-tertiary);
     border: none;
-    font-size: 24px;
-    line-height: 1;
-    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
     cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    transition: background-color 0.2s;
+    padding: 4px 12px;
+    border-radius: 6px;
+    transition: all 0.2s;
     flex-shrink: 0;
 }
 
 .toast-close:hover {
-    background-color: var(--bg-tertiary);
+    background-color: var(--color-primary);
+    color: white;
+    transform: scale(1.05);
 }
 
 /* Toast types */
@@ -737,4 +742,87 @@ html {
 .value-na {
     color: var(--color-critical, #dc3545) !important;
     font-style: italic;
+}
+
+/* =====================================================================
+   OTA UPDATE BANNER
+   ===================================================================== */
+
+.ota-banner {
+    background: linear-gradient(90deg, #6366f1, #3b82f6);
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-md);
+    animation: slideDown 0.4s ease-out;
+}
+
+.ota-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.ota-icon {
+    font-size: 20px;
+}
+
+.ota-text {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.ota-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.ota-btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.ota-btn-update {
+    background: white;
+    color: #4f46e5;
+}
+
+.ota-btn-update:hover {
+    background: #f8f9fa;
+    transform: translateY(-1px);
+}
+
+.ota-btn-dismiss {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.ota-btn-dismiss:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.ota-progress-container {
+    flex: 1;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.ota-progress-bar {
+    height: 100%;
+    background: white;
+    transition: width 0.3s ease;
 }

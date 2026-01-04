@@ -12,6 +12,7 @@
 #include <DNSServer.h>  // For captive portal (used directly, not via ESPAsyncWiFiManager)
 #include <time.h>            // For NTP time sync
 #include <ETH.h>             // KC868-A16 Ethernet (LAN8720)
+#include "ota_manager.h"     // For otaStartBackgroundCheck
 
 // KC868-A16 LAN8720 Ethernet PHY Configuration
 #define ETH_PHY_TYPE    ETH_PHY_LAN8720
@@ -334,6 +335,9 @@ void NetworkManager::init() {
   telnetServer->begin();
   telnetServer->setNoDelay(true);
   logPrintln("[NET] Telnet Server Started on Port 23 (Authentication Required)");
+  
+  // 4. Start background OTA update check (non-blocking)
+  otaStartBackgroundCheck();
 }
 
 void NetworkManager::update() {

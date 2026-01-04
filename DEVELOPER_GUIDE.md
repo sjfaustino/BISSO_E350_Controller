@@ -1,8 +1,8 @@
 # BISSO E350 Controller - Developer Guide
 
-**Version:** 1.0  
-**Last Updated:** December 30, 2025  
-**Firmware Version:** Gemini v3.5.x  
+**Version:** 1.1  
+**Last Updated:** January 4, 2026  
+**Firmware Version:** See `include/firmware_version.h`  
 
 > **For operators:** See [OPERATOR_QUICKSTART.md](OPERATOR_QUICKSTART.md) for operation instructions.
 
@@ -740,4 +740,90 @@ Before deployment:
 ---
 
 **Document maintained by:** BISSO Development Team  
-**Last audit:** December 2025
+**Last audit:** January 2026
+
+---
+
+## Appendix C: GitHub OTA Updates
+
+### Overview
+The firmware includes an automatic update checker that queries the GitHub Releases API.
+
+### How it Works
+1.  **Auto-check on load:** When the web UI is opened, the `router.js` fetches `/api/ota/check`.
+2.  **Version comparison:** The backend compares the GitHub `tag_name` with the current firmware version.
+3.  **User notification:** If a newer version is found, a banner appears at the top of the dashboard.
+4.  **One-click update:** The user clicks "Install Now", triggering a POST to `/api/ota/update`.
+5.  **Safe flash:** The new firmware is written to the inactive OTA partition (`ota_1`), and the device reboots.
+
+### Key Files
+- `include/ota_manager.h`, `src/ota_manager.cpp`: Core logic.
+- `src/web_server.cpp`: API endpoints (`/api/ota/check`, `/api/ota/update`, `/api/ota/status`).
+- `data/shared/router.js`: Frontend notification logic.
+
+---
+
+## Appendix D: RS485 Baud Rate Autodetect
+
+### Overview
+The RS485 autodetect feature scans common baud rates (4800-115200) to find connected Modbus devices.
+
+### Usage
+1.  Enable VFD or JXK-10 on the Hardware page.
+2.  Click "Detect" next to the RS485 Baud Rate dropdown.
+3.  The system will probe for devices and set the baud rate automatically.
+
+### Key Files
+- `include/rs485_autodetect.h`, `src/rs485_autodetect.cpp`: Scan logic.
+- `src/web_server.cpp`: API endpoint (`/api/config/detect-rs485`).
+- `data/pages/hardware/hardware.js`: Frontend button handler.
+
+---
+
+## Appendix E: Custom Partition Layout
+
+The device uses a custom `partitions.csv` for the 4MB flash:
+
+| Partition | Size | Purpose |
+|:---|:---|:---|
+| `nvs` | 64 KB | Configuration storage |
+| `otadata` | 8 KB | OTA boot selection |
+| `ota_0` | 1,408 KB | Firmware Slot A (active) |
+| `ota_1` | 1,408 KB | Firmware Slot B (for updates) |
+| `spiffs` | 1,152 KB | LittleFS for web UI assets |
+
+To modify, edit `partitions.csv` in the project root. Note that changing the partition table will erase all data.
+
+---
+
+## Appendix F: Automated Releases via GitHub Actions
+
+### Overview
+The project includes a GitHub Actions workflow (`.github/workflows/release.yml`) that automatically builds and publishes firmware releases.
+
+### How to Create a Release
+
+1.  **Update version** in `include/firmware_version.h`:
+    ```cpp
+    #define FIRMWARE_VERSION_MAJOR      1
+    #define FIRMWARE_VERSION_MINOR      0 
+    #define FIRMWARE_VERSION_PATCH      1  // Bump this
+    ```
+
+2.  **Commit and tag:**
+    ```bash
+    git add .
+    git commit -m "Release v1.0.1"
+    git tag v1.0.1
+    git push origin main --tags
+    ```
+
+3.  **GitHub Actions will automatically:**
+    - Build the firmware using PlatformIO
+    - Create a GitHub Release named `v1.0.1`
+    - Attach `firmware.bin` to the release
+
+4.  **Devices** running older firmware will detect the new release via the OTA checker.
+
+### Workflow File
+Located at `.github/workflows/release.yml`. Triggered by tags matching `v*`.

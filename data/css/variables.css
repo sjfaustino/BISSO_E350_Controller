@@ -4,6 +4,7 @@
 :root {
     /* Colors */
     --bg-primary: #ffffff;
+    --bg-primary-rgb: 255, 255, 255;
     --bg-secondary: #f8fafc;
     --bg-tertiary: #f1f5f9;
     --text-primary: #0f172a;
@@ -66,6 +67,7 @@
 /* Dark theme */
 body.dark-theme {
     --bg-primary: #1e293b;
+    --bg-primary-rgb: 30, 41, 59;
     --bg-secondary: #0f172a;
     --bg-tertiary: #1e293b;
     --text-primary: #f1f5f9;

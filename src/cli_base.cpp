@@ -1,6 +1,6 @@
 /**
  * @file cli_base.cpp
- * @brief CLI Core with Safe Grbl Jogging & WCS (Gemini v3.5.25)
+ * @brief CLI Core with Safe Grbl Jogging & WCS
  * @details Fixed Linker Error: Added missing implementation of cliPrintHelp().
  */
 
@@ -401,7 +401,7 @@ void cmd_grbl_state(int argc, char** argv) {
 
 void cmd_system_info(int argc, char** argv) {
   char ver[32]; firmwareGetVersionString(ver, 32);
-  logPrintf("[VER:1.1h.Gemini:%s]\r\n", ver);
+  logPrintf("[VER:1.1h.PosiPro:%s]\r\n", ver);
 }
 
 void cmd_system_reset(int argc, char** argv) { bootRebootSystem(); }

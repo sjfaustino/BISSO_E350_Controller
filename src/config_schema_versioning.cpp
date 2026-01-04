@@ -15,7 +15,7 @@ static Preferences schema_prefs;
 static const schema_record_t schema_history[] = {
   {0, "Initial schema (v0.1)", "Base motion control", 0},
   {1, "Enhanced schema (v4.2)", "Speed calibration, NVS persistence", 1700000000},
-  {2, "Gemini v3.5.x", "Motion Buffering, Enhanced Security & Compressed Telemetry", 1735000000}
+  {2, "PosiPro v1.0.0", "Motion Buffering, Enhanced Security & Compressed Telemetry", 1735000000}
 };
 
 static const config_key_metadata_t key_metadata[] = {

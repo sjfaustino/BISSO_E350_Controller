@@ -14,6 +14,50 @@
     <!-- Device Cards Grid -->
     <div class="device-grid">
 
+        <!-- Serial Communications Card -->
+        <div class="card device-card">
+            <div class="card-header device-header serial-comm">
+                <h3>📟 Serial Communications</h3>
+                <span class="device-protocol">UART/RS485</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>Encoder Baud (RS232):</label>
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                        <select class="config-select" id="wj66_baud" data-config="enc_baud" style="flex: 1;">
+                            <option value="1200">1200</option>
+                            <option value="2400">2400</option>
+                            <option value="4800">4800</option>
+                            <option value="9600">9600</option>
+                            <option value="19200">19200</option>
+                            <option value="38400">38400</option>
+                            <option value="57600">57600</option>
+                            <option value="115200">115200</option>
+                        </select>
+                        <button id="btn-detect-baud" class="btn btn-sm"
+                            title="Autodetect encoder baud rate">Detect</button>
+                    </div>
+                </div>
+                <div class="pin-row"
+                    style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <label>RS485 Bus Baud:</label>
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                        <select class="config-select" id="rs485_baud" data-config="rs485_baud" style="flex: 1;">
+                            <option value="4800">4800</option>
+                            <option value="9600">9600</option>
+                            <option value="19200">19200</option>
+                            <option value="38400">38400</option>
+                            <option value="57600">57600</option>
+                            <option value="115200">115200</option>
+                        </select>
+                        <button id="btn-detect-rs485" class="btn btn-sm"
+                            title="Autodetect RS485 bus baud rate">Detect</button>
+                    </div>
+                </div>
+                <div class="device-note">Centralized timing for all serial devices</div>
+            </div>
+        </div>
+
         <!-- WJ66 Encoder Card -->
         <div class="card device-card">
             <div class="card-header device-header wj66">
@@ -35,21 +79,6 @@
                         <option value="32">HT3 (GPIO32)</option>
                     </select>
                 </div>
-                <div class="pin-row">
-                    <label>Baud Rate:</label>
-                    <select class="config-select" id="wj66_baud" data-config="enc_baud" style="width: auto;">
-                        <option value="1200">1200</option>
-                        <option value="2400">2400</option>
-                        <option value="4800">4800</option>
-                        <option value="9600">9600</option>
-                        <option value="19200">19200</option>
-                        <option value="38400">38400</option>
-                        <option value="57600">57600</option>
-                        <option value="115200">115200</option>
-                    </select>
-                    <button id="btn-detect-baud" class="btn btn-sm" style="margin-left: 10px;">Autodetect</button>
-                </div>
-                <div class="device-note">Absolute rotary encoder for position feedback</div>
             </div>
         </div>
 
@@ -211,15 +240,15 @@
         </div>
 
 
-        <!-- Operator Panel Switches Card -->
+        <!-- Operator Buttons Card -->
         <div class="card device-card">
             <div class="card-header device-header switches">
-                <h3>🎚️ Operator Panel</h3>
+                <h3>🎚️ Operator Buttons</h3>
                 <span class="device-protocol">Digital Inputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label>E-Stop:</label>
+                    <label>E-Stop Button:</label>
                     <select class="pin-select" id="input_estop" data-signal="input_estop"></select>
                 </div>
                 <div class="pin-row">
@@ -347,7 +376,7 @@
         <button class="btn btn-danger" id="reset-defaults-btn">⚠️ Reset to Defaults</button>
     </div>
 
-    <div id="status-message" class="status-message" style="display: none;"></div>
+
 </div>
 
 <style>
@@ -407,6 +436,10 @@
         padding: 2px 8px;
         border-radius: 10px;
         font-size: var(--font-size-sm);
+    }
+
+    .hardware-page .device-header.serial-comm {
+        background: linear-gradient(135deg, #6366f1, #3b82f6);
     }
 
     .hardware-page .device-header.wj66 {
@@ -558,31 +591,7 @@
         color: white;
     }
 
-    /* Status Message */
-    .hardware-page .status-message {
-        margin-top: var(--space-md);
-        padding: var(--space-md);
-        border-radius: var(--radius-md);
-        text-align: center;
-    }
 
-    .hardware-page .status-message.success {
-        background: rgba(16, 185, 129, 0.1);
-        color: #10b981;
-        border: 1px solid #10b981;
-    }
-
-    .hardware-page .status-message.error {
-        background: rgba(239, 68, 68, 0.1);
-        color: #ef4444;
-        border: 1px solid #ef4444;
-    }
-
-    .hardware-page .status-message.info {
-        background: rgba(59, 130, 246, 0.1);
-        color: #3b82f6;
-        border: 1px solid #3b82f6;
-    }
 
     @media (max-width: 900px) {
         .hardware-page .wide-card {

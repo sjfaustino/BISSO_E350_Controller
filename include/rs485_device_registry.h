@@ -153,6 +153,37 @@ bool rs485Update(void);
  */
 void rs485HandleBus(void);
 
+// ============================================================================
+// BUS I/O API (Abstraction for registered devices)
+// ============================================================================
+
+/**
+ * @brief Send raw data to the RS-485 bus
+ * @param data Data buffer
+ * @param len Length to send
+ * @return true if successful
+ */
+bool rs485Send(const uint8_t* data, uint8_t len);
+
+/**
+ * @brief Check available bytes on the RS-485 bus
+ * @return number of bytes available
+ */
+int rs485Available(void);
+
+/**
+ * @brief Receive data from the RS-485 bus
+ * @param data Buffer to fill
+ * @param len Output: bytes received
+ * @return true if any data received
+ */
+bool rs485Receive(uint8_t* data, uint8_t* len);
+
+/**
+ * @brief Clear the RX buffer
+ */
+void rs485ClearBuffer(void);
+
 /**
  * @brief Process received response for current device
  * @param data Received data buffer

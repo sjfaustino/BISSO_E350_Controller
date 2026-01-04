@@ -1,6 +1,5 @@
 #include "altivar31_modbus.h"
 #include "modbus_rtu.h"
-#include "encoder_hal.h"
 #include "rs485_device_registry.h"
 #include "serial_logger.h"
 #include "config_unified.h"
@@ -76,7 +75,7 @@ static bool altivar31Poll(void) {
     uint16_t tx_len = modbusReadRegistersRequest(altivar31_state.slave_address,
                                                   modbus_pending_register, 1, modbus_tx_buffer);
 
-    return encoderHalSend(modbus_tx_buffer, tx_len);
+    return rs485Send(modbus_tx_buffer, tx_len);
 }
 
 static bool altivar31OnResponse(const uint8_t* data, uint16_t len) {

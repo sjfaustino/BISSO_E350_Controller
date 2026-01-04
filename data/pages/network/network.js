@@ -168,14 +168,20 @@ window.NetworkModule = window.NetworkModule || {
 
     updateModbusStatus() {
         const state = AppState.data;
-        // Modbus connectivity from VFD telemetry
-        const connected = state.vfd?.current_amps !== undefined; // If we have current updates, we're connected
+        // Use real connectivity flag from telemetry
+        const connected = state.vfd?.connected === true;
         const modbusStatus = connected ? 'Connected' : 'Disconnected';
 
         const modbusStatusEl = document.getElementById('modbus-status');
         if (modbusStatusEl) {
             modbusStatusEl.textContent = modbusStatus;
             modbusStatusEl.style.color = connected ? 'var(--color-optimal)' : 'var(--color-critical)';
+        }
+
+        // Dynamic (N/A) label logic
+        const naLabel = document.getElementById('vfd-na');
+        if (naLabel) {
+            naLabel.style.display = connected ? 'none' : 'inline';
         }
 
         // Modbus latency isn't currently in telemetry, so we use a null placeholder or 0

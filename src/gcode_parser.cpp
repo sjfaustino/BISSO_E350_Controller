@@ -16,6 +16,7 @@
 #include "plc_iface.h"    // PHASE 4.0: M226 pin state reading
 #include "board_inputs.h"  // PHASE 4.0: M226 board input reading
 #include "hardware_config.h"  // For MachineCalibration in handleM114()
+#include "firmware_version.h" // For M115 version reporting
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -437,8 +438,11 @@ void GCodeParser::handleM115() {
     // Standard Grbl response format
 
     // Build firmware info response
+    char ver_buf[32];
+    firmwareGetVersionString(ver_buf, sizeof(ver_buf));
+    
     serialLoggerLock();
-    Serial.println("[VER:Gemini v4.0.0 BISSO-E350]");
+    Serial.printf("[VER:%s BISSO-E350]\n", ver_buf);
     Serial.println("[OPT:B#,M,T#]");  // Options: Block #, Messages, Real-time status
 
     // Report capabilities

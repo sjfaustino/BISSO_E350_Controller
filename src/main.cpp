@@ -3,6 +3,7 @@
 #include "cli.h"
 #include "config_schema_versioning.h"
 #include "config_unified.h"
+#include "config_keys.h"
 #include "encoder_calibration.h"
 #include "encoder_wj66.h"
 #include "fault_logging.h"
@@ -101,7 +102,11 @@ bool init_axis_sync_wrapper() { axisSynchronizationInit(); return true; }
 bool init_recovery_wrapper() { recoveryInit(); return true; }
 bool init_alerts_wrapper() { buzzerInit(); statusLightInit(); return true; }
 // PHASE 5.0: Initialize Spindle Monitor with default JXK-10 address (1) and threshold (30A)
-bool init_spindle_wrapper() { return spindleMonitorInit(1, 30.0f); }
+bool init_spindle_wrapper() { 
+    uint8_t addr = (uint8_t)configGetInt(KEY_JXK10_ADDR, 1);
+    float thr = (float)configGetInt(KEY_SPINDL_PAUSE_THR, 30);
+    return spindleMonitorInit(addr, thr); 
+}
 
 #define BOOT_INIT(name, func, code) \
   do { if (func()) { logInfo("[BOOT] Init %s [OK]", name); bootMarkInitialized(name); } \

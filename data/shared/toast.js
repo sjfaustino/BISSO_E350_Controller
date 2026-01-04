@@ -33,6 +33,15 @@ const Toast = {
     show(message, type = 'info', duration = 3000) {
         if (!this.container) this.init();
 
+        // Clear existing toasts if it's a transient message (not error)
+        // or clear if we already have too many to prevent blocking the screen
+        if (type !== 'error') {
+            const existing = this.container.querySelectorAll('.toast');
+            existing.forEach(t => {
+                if (!t.classList.contains('toast-error')) this.remove(t);
+            });
+        }
+
         // Create toast element
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
@@ -49,7 +58,7 @@ const Toast = {
         toast.innerHTML = `
             <div class="toast-icon">${icon}</div>
             <div class="toast-message">${Utils.escapeHtml(message)}</div>
-            <button class="toast-close" aria-label="Close">×</button>
+            <button class="toast-close" aria-label="Close">OK</button>
         `;
 
         // Close button
