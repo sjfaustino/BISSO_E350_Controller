@@ -685,7 +685,6 @@ void WebServerManager::broadcastState() {
     doc["vfd"]["fault_code"] = current_status.vfd_fault_code;
     doc["vfd"]["stall_threshold"] = current_status.vfd_threshold_amps;
     doc["vfd"]["calibration_valid"] = current_status.vfd_calibration_valid;
-    doc["vfd"]["calibration_valid"] = current_status.vfd_calibration_valid;
     doc["vfd"]["connected"] = current_status.vfd_connected;
     doc["vfd"]["rpm"] = current_status.spindle_rpm;
     doc["vfd"]["speed_m_s"] = current_status.spindle_speed_m_s;
