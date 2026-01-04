@@ -11,7 +11,7 @@
 #include <stdbool.h>
 
 // =============================================================================
-// SYSTEM STATE (for tower light)
+// SYSTEM STATE (for status light)
 // =============================================================================
 
 typedef enum {
@@ -38,37 +38,37 @@ typedef enum {
 } buzzer_pattern_t;
 
 // =============================================================================
-// API - TOWER LIGHT
+// API - STATUS LIGHT
 // =============================================================================
 
 /**
- * @brief Initialize tower light system
+ * @brief Initialize status light system
  * Reads config for enabled state and pin assignments
  */
-void towerLightInit(void);
+void statusLightInit(void);
 
 /**
- * @brief Set tower light state based on system condition
+ * @brief Set status light state based on system condition
  * @param state Current system state
  */
-void towerLightSetState(system_display_state_t state);
+void statusLightSetState(system_display_state_t state);
 
 /**
- * @brief Update tower light (call from main loop for blink handling)
+ * @brief Update status light (call from main loop for blink handling)
  * Should be called every 100ms
  */
-void towerLightUpdate(void);
+void statusLightUpdate(void);
 
 /**
- * @brief Test tower light outputs
+ * @brief Test status light outputs
  * Cycles through all colors
  */
-void towerLightTest(void);
+void statusLightTest(void);
 
 /**
- * @brief Get current tower light state
+ * @brief Get current status light state
  */
-system_display_state_t towerLightGetState(void);
+system_display_state_t statusLightGetState(void);
 
 // =============================================================================
 // API - BUZZER

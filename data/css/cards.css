@@ -30,7 +30,7 @@
     font-size: var(--font-size-lg);
     font-weight: 600;
     text-transform: uppercase;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     letter-spacing: 0.5px;
     margin: 0;
     flex-grow: 1;

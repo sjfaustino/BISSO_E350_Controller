@@ -60,11 +60,11 @@
 #define KEY_BUZZER_EN "buzzer_en"       // Enable buzzer (1=on, 0=off, default 1)
 #define KEY_BUZZER_PIN "buzzer_pin"     // Output pin number (1-16, default 16)
 
-// --- TOWER LIGHT ---
-#define KEY_TOWER_EN "tower_en"         // Enable tower light (1=on, 0=off, default 0)
-#define KEY_TOWER_GREEN "tower_grn"     // Green output pin (1-16, default 13)
-#define KEY_TOWER_YELLOW "tower_yel"    // Yellow output pin (1-16, default 14)
-#define KEY_TOWER_RED "tower_red"       // Red output pin (1-16, default 15)
+// --- STATUS LIGHT ---
+#define KEY_STATUS_LIGHT_EN "status_light_en"     // Enable status light (1=on, 0=off, default 0)
+#define KEY_STATUS_LIGHT_GREEN "status_light_grn" // Green output pin (1-16, default 13)
+#define KEY_STATUS_LIGHT_YELLOW "status_light_yel"// Yellow output pin (1-16, default 14)
+#define KEY_STATUS_LIGHT_RED "status_light_red"   // Red output pin (1-16, default 15)
 
 // --- SPINDLE AUTO-PAUSE ---
 #define KEY_SPINDL_PAUSE_EN "sp_pause"  // Auto-pause on overload (1=on, 0=off, default 1)

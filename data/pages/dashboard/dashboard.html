@@ -6,7 +6,7 @@
     <div class="dro-container">
         <div class="card dro-card">
             <div class="card-header">
-                <h2>🎯 Position (DRO)</h2>
+                <h2 id="header-dro">🎯 Position (DRO)</h2>
                 <div class="dro-controls">
                     <button class="btn btn-small btn-secondary" id="dro-zero-all" title="Zero all axes">Zero
                         All</button>
@@ -155,7 +155,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>X Axis Quality</h2>
+                <h2 id="header-axis-x">X Axis Quality</h2>
                 <button class="card-toggle" data-toggle="axis-x">−</button>
             </div>
             <div class="card-content">
@@ -190,7 +190,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Y Axis Quality</h2>
+                <h2 id="header-axis-y">Y Axis Quality</h2>
                 <button class="card-toggle" data-toggle="axis-y">−</button>
             </div>
             <div class="card-content">
@@ -225,7 +225,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Z Axis Quality</h2>
+                <h2 id="header-axis-z">Z Axis Quality</h2>
                 <button class="card-toggle" data-toggle="axis-z">−</button>
             </div>
             <div class="card-content">
@@ -263,7 +263,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>Motion Status</h2>
+                <h2 id="header-motion">Motion Status</h2>
                 <button class="card-toggle" data-toggle="motion">−</button>
             </div>
             <div class="card-content">
@@ -282,7 +282,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Axis Drive</h2>
+                <h2 id="header-vfd">Axis Drive</h2>
                 <button class="card-toggle" data-toggle="vfd">−</button>
             </div>
             <div class="card-content">
@@ -372,14 +372,14 @@
             <!-- VFD Current Graph -->
             <div class="card">
                 <div class="card-header">
-                    <h3 style="margin: 0;">Spindle Current Trend</h3>
+                    <h3 id="header-spindle-trend" style="margin: 0;">Spindle Current Trend</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
                     <canvas id="spindle-graph"
                         style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
                     <div
                         style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
-                        Current: <span id="spindle-current" style="font-weight: 600;">-- A</span> |
+                        Current: <span id="spindle-stat-current" style="font-weight: 600;">-- A</span> |
                         Avg: <span id="spindle-stat-avg" style="font-weight: 600;">-- A</span> |
                         Max: <span id="spindle-stat-max" style="font-weight: 600;">-- A</span>
                     </div>
@@ -389,7 +389,7 @@
             <!-- System Temperature Graph -->
             <div class="card">
                 <div class="card-header">
-                    <h3 style="margin: 0;">Temperature Trend</h3>
+                    <h3 style="margin: 0;">CPU Temperature Trend</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
                     <canvas id="temperature-graph"
@@ -423,7 +423,7 @@
             <!-- Motion Load Graph -->
             <div class="card">
                 <div class="card-header">
-                    <h3 style="margin: 0;">Motion System Load</h3>
+                    <h3 id="header-motion-load" style="margin: 0;">Motion System Load</h3>
                 </div>
                 <div class="card-content" style="padding: 0;">
                     <canvas id="motion-load-graph"

@@ -20,6 +20,17 @@ window.DashboardModule = window.DashboardModule || {
         element.innerHTML = '<span class="value-na">n/a</span>' + suffix;
     },
 
+    // Helper to add/remove (N/A) in red to card titles
+    updateHeaderNA(headerId, originalTitle, isPresent) {
+        const header = document.getElementById(headerId);
+        if (!header) return;
+        if (isPresent) {
+            header.innerHTML = originalTitle;
+        } else {
+            header.innerHTML = `${originalTitle} <span class="value-na" style="font-size: 0.8em; margin-left: 8px;">(N/A)</span>`;
+        }
+    },
+
     // Helper to set normal value and remove N/A styling
     setValue(element, value) {
         if (!element) return;
@@ -42,6 +53,8 @@ window.DashboardModule = window.DashboardModule || {
             this.onStateChanged();
             this.updateGraphs();
         }, 1000);
+
+        this.loadHistoryData();
     },
 
     setupEventListeners() {
@@ -115,6 +128,33 @@ window.DashboardModule = window.DashboardModule || {
         }
     },
 
+    loadHistoryData() {
+        if (window.location.protocol === 'file:') return;
+
+        fetch('/api/history/telemetry')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('[Dashboard] Loading', data.cpu?.length, 'history samples');
+
+                    // Populate history arrays
+                    if (data.cpu) this.history.cpu = data.cpu;
+                    if (data.heap) this.history.memory = data.heap.map(v => v / 1024);
+                    if (data.spindle_amps) this.history.spindle = data.spindle_amps;
+
+                    // Create dummy timestamps if not provided (spaced 5s apart)
+                    if (data.cpu && data.cpu.length > 0) {
+                        const now = Date.now();
+                        this.history.timestamps = data.cpu.map((_, i) => now - (data.cpu.length - 1 - i) * 5000);
+                    }
+
+                    this.historicalDataLoaded = false; // Trigger bulk-load on next updateGraphs
+                    this.updateGraphs();
+                }
+            })
+            .catch(err => console.warn('[Dashboard] Failed to load history:', err));
+    },
+
     // Update Work Coordinate Mode UI
     updateCoordModeUI() {
         const modeBtn = document.getElementById('dro-coord-mode');
@@ -179,7 +219,7 @@ window.DashboardModule = window.DashboardModule || {
         if (document.getElementById('temperature-graph')) {
             try {
                 this.graphs.temperature = new GraphVisualizer('temperature-graph', {
-                    title: 'System Temperature (°C)',
+                    title: 'CPU Temperature (°C)',
                     yMin: 20,
                     yMax: 80,
                     unit: ' °C',
@@ -307,7 +347,7 @@ window.DashboardModule = window.DashboardModule || {
 
             // CPU Usage Card
             const cpuValueEl = document.getElementById('cpu-value');
-            if (cpuValueEl) cpuValueEl.textContent = cpu + '%';
+            if (cpuValueEl) cpuValueEl.textContent = cpu.toFixed(1) + '%';
 
             const cpuBar = document.getElementById('cpu-bar');
             if (cpuBar) {
@@ -330,23 +370,45 @@ window.DashboardModule = window.DashboardModule || {
             }
         }
 
-        // Motion status
+        const plcPresent = state.system?.plc_hardware_present !== false; // Default true if field missing for backward compatibility
+
+        // Update Motion Header
+        this.updateHeaderNA('header-motion', 'Motion Status', plcPresent);
+        this.updateHeaderNA('header-motion-load', 'Motion System Load', plcPresent);
+
         if (state.motion) {
-            const status = state.motion.moving ? '🔄 Moving' : '⏸️ Stopped';
             const motionStatusEl = document.getElementById('motion-status');
-            if (motionStatusEl) motionStatusEl.textContent = status;
+            if (motionStatusEl) {
+                if (!plcPresent) {
+                    this.setNA(motionStatusEl);
+                } else {
+                    motionStatusEl.textContent = state.motion.moving ? '🔄 Moving' : '⏸️ Stopped';
+                    motionStatusEl.style.color = '';
+                }
+            }
         }
 
         // Safety status
         if (state.safety) {
-            let safetyText = '✓ OK';
-            if (state.safety.estop) safetyText = '🛑 E-STOP';
-            else if (state.safety.alarm) safetyText = '⚠️ ALARM';
             const safetyStatusEl = document.getElementById('safety-status');
-            if (safetyStatusEl) safetyStatusEl.textContent = safetyText;
+            if (safetyStatusEl) {
+                if (!plcPresent) {
+                    this.setNA(safetyStatusEl);
+                } else {
+                    let safetyText = '✓ OK';
+                    if (state.safety.estop) safetyText = '🛑 E-STOP';
+                    else if (state.safety.alarm) safetyText = '⚠️ ALARM';
+                    safetyStatusEl.textContent = safetyText;
+                    safetyStatusEl.style.color = '';
+                }
+            }
         }
         // VFD status (Spindle)
         if (state.vfd) {
+            // Update VFD Headers
+            this.updateHeaderNA('header-vfd', 'Axis Drive', state.vfd.connected);
+            this.updateHeaderNA('header-spindle-trend', 'Spindle Current Trend', state.vfd.connected);
+
             const vfdStatusEl = document.getElementById('vfd-status');
             const vfdRpmEl = document.getElementById('spindle-rpm');
             const vfdSpeedEl = document.getElementById('spindle-speed');
@@ -373,6 +435,14 @@ window.DashboardModule = window.DashboardModule || {
 
                 const bar = document.getElementById('spindle-bar');
                 if (bar) bar.style.width = '0%';
+            }
+
+            // Axis Drive Card (Middle section)
+            const vfdFreqEl = document.getElementById('vfd-freq');
+            if (state.vfd.connected) {
+                if (vfdFreqEl) vfdFreqEl.textContent = (state.vfd.frequency_hz || 0).toFixed(1) + ' Hz';
+            } else {
+                this.setNA(vfdFreqEl, ' Hz');
             }
         }
 
@@ -453,6 +523,8 @@ window.DashboardModule = window.DashboardModule || {
 
         const connected = AppState.data.motion?.dro_connected ?? false;
         const prefix = `axis-${axis}`;
+        const axisTitle = axis.toUpperCase() + ' Axis Quality';
+        this.updateHeaderNA(`header-axis-${axis}`, axisTitle, connected);
 
         const qualityEl = document.getElementById(`${prefix}-quality`);
         if (connected) this.setValue(qualityEl, metrics.quality || 0);
@@ -493,6 +565,9 @@ window.DashboardModule = window.DashboardModule || {
         // Check connection status from motion state
         // Default to false (Offline) to prevent "Live" flicker on boot before data arrives
         const connected = AppState.data.motion?.dro_connected ?? false;
+
+        // Update Header (N/A)
+        this.updateHeaderNA('header-dro', '🎯 Position (DRO)', connected);
 
         axes.forEach(axis => {
             const el = document.getElementById(`dro-${axis}`);
@@ -589,29 +664,32 @@ window.DashboardModule = window.DashboardModule || {
         // Detect if we're using MiniChart (single-arg addDataPoint) or GraphVisualizer (two-arg)
         const isMiniChart = this.graphs.cpu && this.graphs.cpu.constructor.name === 'MiniChart';
 
-        // If using MiniCharts and we have historical data that hasn't been loaded yet, bulk-load it
-        if (isMiniChart && !this.historicalDataLoaded && this.history.cpu.length > 1) {
-            console.log('[Dashboard] Bulk-loading', this.history.cpu.length, 'historical data points to charts');
+        // Bulk-load historical data to charts if not already loaded
+        if (!this.historicalDataLoaded && this.history.cpu.length > 1) {
+            console.log(`[Dashboard] Bulk-loading ${this.history.cpu.length} points to charts`);
 
-            // Bulk load all historical data points
             for (let i = 0; i < this.history.cpu.length; i++) {
                 if (this.history.cpu[i] !== undefined) {
-                    this.graphs.cpu?.addDataPoint(this.history.cpu[i]);
+                    if (isMiniChart) this.graphs.cpu?.addDataPoint(this.history.cpu[i]);
+                    else this.graphs.cpu?.addDataPoint('CPU', this.history.cpu[i]);
                 }
                 if (this.history.memory[i] !== undefined) {
-                    this.graphs.memory?.addDataPoint(this.history.memory[i]);
+                    if (isMiniChart) this.graphs.memory?.addDataPoint(this.history.memory[i]);
+                    else this.graphs.memory?.addDataPoint('Memory', this.history.memory[i]);
                 }
                 if (this.history.spindle[i] !== undefined) {
-                    this.graphs.spindle?.addDataPoint(this.history.spindle[i]);
+                    if (isMiniChart) this.graphs.spindle?.addDataPoint(this.history.spindle[i]);
+                    else this.graphs.spindle?.addDataPoint('Spindle', this.history.spindle[i]);
                 }
                 if (this.history.temperature[i] !== undefined) {
-                    this.graphs.temperature?.addDataPoint(this.history.temperature[i]);
+                    if (isMiniChart) this.graphs.temperature?.addDataPoint(this.history.temperature[i]);
+                    else this.graphs.temperature?.addDataPoint('Temperature', this.history.temperature[i]);
                 }
             }
 
             this.historicalDataLoaded = true;
-            console.log('[Dashboard] Historical data bulk-load complete');
-            return; // Don't add the last point again
+            console.log('[Dashboard] Bulk-load complete');
+            return;
         }
 
         // Add data points to graphs from history
@@ -647,6 +725,15 @@ window.DashboardModule = window.DashboardModule || {
                     if (cpuValueEl) cpuValueEl.textContent = cpu.toFixed(1) + '%';
                     if (cpuAvgEl) cpuAvgEl.textContent = cpuStats.avg.toFixed(1);
                     if (cpuMaxEl) cpuMaxEl.textContent = cpuStats.max.toFixed(1);
+
+                    // Update Advanced section
+                    const advCpuCurrent = document.getElementById('cpu-current');
+                    const advCpuAvg = document.getElementById('cpu-stat-avg');
+                    const advCpuMax = document.getElementById('cpu-stat-max');
+
+                    if (advCpuCurrent) advCpuCurrent.textContent = cpu.toFixed(1) + '%';
+                    if (advCpuAvg) advCpuAvg.textContent = cpuStats.avg.toFixed(1) + '%';
+                    if (advCpuMax) advCpuMax.textContent = cpuStats.max.toFixed(1) + '%';
                 }
             }
         }
@@ -663,15 +750,20 @@ window.DashboardModule = window.DashboardModule || {
             if (!isMiniChart) {
                 const memStats = this.graphs.memory?.getStats('Memory');
                 if (memStats) {
-                    const memCurrentEl = document.getElementById('mem-current');
-                    const memAvgEl = document.getElementById('mem-stat-avg');
-                    const memMaxEl = document.getElementById('mem-stat-max');
-                    const memMinEl = document.getElementById('mem-min'); // Added
+                    const memCurrentEl = document.getElementById('mem-value'); // Fixed ID
+                    const memMinEl = document.getElementById('mem-min');
 
                     if (memCurrentEl) memCurrentEl.textContent = mem.toFixed(0) + ' KB';
-                    if (memAvgEl) memAvgEl.textContent = memStats.avg.toFixed(0) + ' KB';
-                    if (memMaxEl) memMaxEl.textContent = memStats.max.toFixed(0) + ' KB';
-                    if (memMinEl) memMinEl.textContent = memStats.min.toFixed(0) + ' KB'; // Added
+                    if (memMinEl) memMinEl.textContent = memStats.min.toFixed(0);
+
+                    // Update Advanced section
+                    const advMemCurrent = document.getElementById('mem-current');
+                    const advMemAvg = document.getElementById('mem-stat-avg');
+                    const advMemMax = document.getElementById('mem-stat-max');
+
+                    if (advMemCurrent) advMemCurrent.textContent = mem.toFixed(0) + ' KB';
+                    if (advMemAvg) advMemAvg.textContent = memStats.avg.toFixed(0) + ' KB';
+                    if (advMemMax) advMemMax.textContent = memStats.max.toFixed(0) + ' KB';
                 }
             }
         }
@@ -725,13 +817,21 @@ window.DashboardModule = window.DashboardModule || {
                         }
                     }
 
-                    // Legacy stat fields (if they exist)
+                    // Legacy/Advanced stat fields
+                    const statCurrent = document.getElementById('spindle-stat-current');
                     const statAvg = document.getElementById('spindle-stat-avg');
                     const statMax = document.getElementById('spindle-stat-max');
+
+                    if (statCurrent) statCurrent.textContent = spindle.toFixed(2) + ' A';
                     if (statAvg) statAvg.textContent = spindleStats.avg.toFixed(2) + ' A';
                     if (statMax) statMax.textContent = spindleStats.max.toFixed(2) + ' A';
                 }
             }
+        } else if (!vfdConnected) {
+            // Handle N/A for Advanced section if disconnected
+            this.setNA(document.getElementById('spindle-stat-current'), ' A');
+            this.setNA(document.getElementById('spindle-stat-avg'), ' A');
+            this.setNA(document.getElementById('spindle-stat-max'), ' A');
         }
 
         if (this.history.temperature.length > 0) {
@@ -776,6 +876,9 @@ window.DashboardModule = window.DashboardModule || {
         if (this.history.motion.length > 0 && !isMiniChart) {
             const motion = this.history.motion[this.history.motion.length - 1];
             const connected = AppState.data.motion?.dro_connected ?? false; // Check connection
+
+            // Update Header (N/A)
+            this.updateHeaderNA('header-motion-load', 'Motion System Load', connected);
 
             // Use 0 if offline, otherwise use value (default 0)
             const quality = connected ? (motion.quality || 0) : 0;

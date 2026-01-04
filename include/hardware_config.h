@@ -62,8 +62,8 @@ constexpr PinInfo pinDatabase[] = {
     {14, "HT1", "both", "3.3V", "5mA", "GPIO14 – WJ66 RX"},
     {33, "HT2", "both", "3.3V", "5mA", "GPIO33 – WJ66 TX"},
     {32, "HT3", "both", "3.3V", "5mA", "GPIO32 – Free"},
-    {16, "RS485_RX", "input", "3.3V", "5mA", "GPIO16 – RS485 RXD"},
-    {13, "RS485_TX", "output", "3.3V", "5mA", "GPIO13 – RS485 TXD"},
+    {16, "RS485_A", "input", "3.3V", "5mA", "GPIO16 – RS485 RXD"},
+    {13, "RS485_B", "output", "3.3V", "5mA", "GPIO13 – RS485 TXD"},
 
     // Analog channels (actual ESP32 ADC GPIOs) - CH1-CH4 on KC868-A16 silkscreen
     {36, "CH1", "analog", "0-20mA", "20mA", "GPIO36 – Current loop ADC"},
@@ -100,7 +100,13 @@ const SignalDef signalDefinitions[] = {
     {"output_dir_minus",  "Direction -",       "Negative direction",   120, "output"},
     {"output_speed_fast", "Speed Fast",        "Fast speed",           121, "output"},
     {"output_speed_med",  "Speed Medium",      "Medium speed",         122, "output"},
-    {"output_speed_slow", "Speed Slow",        "Slow speed",           123, "output"}
+    {"output_speed_slow", "Speed Slow",        "Slow speed",           123, "output"},
+    
+    // Status Light (Tower Light)
+    {"output_status_green",  "Status Green",      "Status light green",   124, "output"},
+    {"output_status_yellow", "Status Yellow",     "Status light yellow",  125, "output"},
+    {"output_status_red",    "Status Red",        "Status light red",     126, "output"},
+    {"output_buzzer",        "Buzzer",            "Audible alarm",        127, "output"}
 };
 
 constexpr size_t SIGNAL_COUNT = sizeof(signalDefinitions)/sizeof(signalDefinitions[0]);

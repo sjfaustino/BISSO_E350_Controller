@@ -39,6 +39,39 @@
             </div>
         </div>
 
+        <!-- Ethernet LAN8270A Card -->
+        <div class="card device-card">
+            <div class="card-header device-header ethernet">
+                <h3>🌐 Ethernet LAN8270A</h3>
+                <span class="device-protocol">RMII</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label>MDC Pin:</label>
+                    <select class="pin-select" disabled>
+                        <option>GPIO 23 (Fixed)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>MDIO Pin:</label>
+                    <select class="pin-select" disabled>
+                        <option>GPIO 18 (Fixed)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>Power/Clk:</label>
+                    <select class="pin-select" disabled>
+                        <option>GPIO 17 (Fixed)</option>
+                    </select>
+                </div>
+                <div class="pin-row" style="margin-top: 10px;">
+                    <label>Enabled:</label>
+                    <input type="checkbox" id="eth_enabled" data-config="eth_en" checked>
+                </div>
+                <div class="device-note">Standard ESP32 RMII Interface (Fixed)</div>
+            </div>
+        </div>
+
         <!-- LCD Display Card -->
         <div class="card device-card">
             <div class="card-header device-header lcd">
@@ -62,6 +95,10 @@
                     <label>I2C Address:</label>
                     <input type="text" class="pin-input" id="lcd_addr" data-config="lcd_addr" value="0x27">
                 </div>
+                <div class="pin-row" style="margin-top: 10px;">
+                    <label>Enabled:</label>
+                    <input type="checkbox" id="lcd_enabled" data-config="lcd_en" checked>
+                </div>
                 <div class="device-note">20x4 character LCD via PCF8574</div>
             </div>
         </div>
@@ -76,13 +113,13 @@
                 <div class="pin-row">
                     <label>RS485 A:</label>
                     <select class="pin-select" id="vfd_rs485_a" data-signal="vfd_rs485_a" disabled>
-                        <option value="16">RXD2 (GPIO16)</option>
+                        <option value="16">RS485_A (GPIO16)</option>
                     </select>
                 </div>
                 <div class="pin-row">
                     <label>RS485 B:</label>
                     <select class="pin-select" id="vfd_rs485_b" data-signal="vfd_rs485_b" disabled>
-                        <option value="13">TXD2 (GPIO13)</option>
+                        <option value="13">RS485_B (GPIO13)</option>
                     </select>
                 </div>
                 <div class="pin-row">
@@ -108,13 +145,13 @@
                 <div class="pin-row">
                     <label>RS485 A:</label>
                     <select class="pin-select" id="jxk10_rs485_a" data-signal="jxk10_rs485_a" disabled>
-                        <option value="16">RXD2 (GPIO16)</option>
+                        <option value="16">RS485_A (GPIO16)</option>
                     </select>
                 </div>
                 <div class="pin-row">
                     <label>RS485 B:</label>
                     <select class="pin-select" id="jxk10_rs485_b" data-signal="jxk10_rs485_b" disabled>
-                        <option value="13">TXD2 (GPIO13)</option>
+                        <option value="13">RS485_B (GPIO13)</option>
                     </select>
                 </div>
                 <div class="pin-row">
@@ -229,26 +266,26 @@
 
         <!-- Tower Light Card -->
         <div class="card device-card">
-            <div class="card-header device-header tower-light">
-                <h3>🚦 Tower Light</h3>
+            <div class="card-header device-header status-light">
+                <h3>🚦 Status Light</h3>
                 <span class="device-protocol">Outputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
                     <label>🟢 Green (Idle):</label>
-                    <select class="pin-select" id="output_tower_green" data-signal="output_tower_green"></select>
+                    <select class="pin-select" id="output_status_green" data-signal="output_status_green"></select>
                 </div>
                 <div class="pin-row">
                     <label>🟡 Yellow (Run):</label>
-                    <select class="pin-select" id="output_tower_yellow" data-signal="output_tower_yellow"></select>
+                    <select class="pin-select" id="output_status_yellow" data-signal="output_status_yellow"></select>
                 </div>
                 <div class="pin-row">
                     <label>🔴 Red (Fault):</label>
-                    <select class="pin-select" id="output_tower_red" data-signal="output_tower_red"></select>
+                    <select class="pin-select" id="output_status_red" data-signal="output_status_red"></select>
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
                     <label>Enabled:</label>
-                    <input type="checkbox" id="tower_enabled" data-config="tower_en">
+                    <input type="checkbox" id="status_light_enabled" data-config="status_light_en">
                 </div>
                 <div class="device-note">Visual status indicator via KC868-A16 outputs</div>
             </div>
@@ -293,82 +330,10 @@
         <button class="btn btn-danger" id="reset-defaults-btn">⚠️ Reset to Defaults</button>
     </div>
 
-    <!-- Status Message -->
     <div id="status-message" class="status-message" style="display: none;"></div>
-
-    <!-- I/O Expander Diagnostics Card -->
-    <div class="card" style="margin-top: 20px;">
-        <div class="card-header">
-            <h3>🔌 I/O Expander Diagnostics</h3>
-            <button class="btn btn-small btn-secondary" id="refresh-io-diag-btn">Refresh</button>
-        </div>
-        <div class="card-content">
-            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
-                Live status of PCF8574 I/O expander registers (2 input + 2 output banks)
-            </p>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <!-- Input Bank -->
-                <div>
-                    <h4 style="margin-bottom: 10px; font-size: 14px;">Inputs (Read-Only)</h4>
-                    <div id="io-input-grid" class="io-diag-grid">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-                <!-- Output Bank -->
-                <div>
-                    <h4 style="margin-bottom: 10px; font-size: 14px;">Outputs (Active)</h4>
-                    <div id="io-output-grid" class="io-diag-grid">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-            </div>
-
-            <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
-                <span style="font-size: 12px; color: var(--text-secondary);">
-                    E-Stop: <strong id="hw-estop-state">--</strong> |
-                    Last Update: <strong id="io-last-update">--</strong>
-                </span>
-            </div>
-        </div>
-    </div>
 </div>
 
 <style>
-    .io-diag-grid {
-        display: grid;
-        grid-template-columns: repeat(8, 1fr);
-        gap: 5px;
-    }
-
-    .io-diag-pin {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 8px 4px;
-        background: var(--bg-secondary);
-        border-radius: 6px;
-        font-size: 10px;
-    }
-
-    .io-diag-pin .pin-led {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: #333;
-        margin-bottom: 4px;
-    }
-
-    .io-diag-pin .pin-led.on {
-        background: #22c55e;
-        box-shadow: 0 0 8px #22c55e;
-    }
-
-    .io-diag-pin .pin-led.off {
-        background: #555;
-    }
-
     .hardware-page {
         padding: var(--space-md);
     }
@@ -455,8 +420,12 @@
         background: linear-gradient(135deg, #ec4899, #db2777);
     }
 
-    .hardware-page .device-header.tower-light {
+    .hardware-page .device-header.status-light {
         background: linear-gradient(135deg, #22c55e, #16a34a);
+    }
+
+    .hardware-page .device-header.ethernet {
+        background: linear-gradient(135deg, #3b82f6, #06b6d4);
     }
 
     .hardware-page .device-header.buzzer {
@@ -474,7 +443,7 @@
 
     .hardware-page .pin-row label {
         font-weight: 500;
-        min-width: 100px;
+        min-width: 130px;
     }
 
     .hardware-page .pin-select,

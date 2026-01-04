@@ -99,7 +99,7 @@ bool init_axis_sync_wrapper() { axisSynchronizationInit(); return true; }
 
 // Operator features: Power loss recovery, buzzer, tower light
 bool init_recovery_wrapper() { recoveryInit(); return true; }
-bool init_alerts_wrapper() { buzzerInit(); towerLightInit(); return true; }
+bool init_alerts_wrapper() { buzzerInit(); statusLightInit(); return true; }
 // PHASE 5.0: Initialize Spindle Monitor with default JXK-10 address (1) and threshold (30A)
 bool init_spindle_wrapper() { return spindleMonitorInit(1, 30.0f); }
 

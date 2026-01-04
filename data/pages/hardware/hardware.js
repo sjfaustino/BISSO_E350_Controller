@@ -12,14 +12,7 @@ window.HardwareModule = window.HardwareModule || {
         this.loadPinConfiguration();
         this.setupEventListeners();
 
-        // Load I/O diagnostics
-        this.loadIODiagnostics();
-        this.ioInterval = setInterval(() => this.loadIODiagnostics(), 2000);
-
-        // Setup refresh button
-        document.getElementById('refresh-io-diag-btn')?.addEventListener('click', () => {
-            this.loadIODiagnostics();
-        });
+        this.setupEventListeners();
     },
 
     loadPinConfiguration() {
@@ -31,6 +24,8 @@ window.HardwareModule = window.HardwareModule || {
                 this.pinData = data.pins || [];
                 this.signalData = data.signals || [];
                 this.renderPinConfiguration(data);
+                this.renderPinConfiguration(data);
+                // loadConfigValues will call renderPinSummary after loading
                 this.loadConfigValues();
             })
             .catch(error => {
@@ -46,6 +41,9 @@ window.HardwareModule = window.HardwareModule || {
         const selects = document.querySelectorAll('.pin-select');
 
         selects.forEach(select => {
+            // Skip fixed/disabled pins (preserve HTML hardcoding)
+            if (select.disabled) return;
+
             const signalKey = select.dataset.signal;
 
             // Clear existing options
@@ -87,42 +85,154 @@ window.HardwareModule = window.HardwareModule || {
                     select.value = signal.current_pin;
                 }
             }
+
+            // Apply defaults if no value selected (User Request)
+            if (!select.value) {
+                switch (signalKey) {
+                    case 'wj66_rx': select.value = 14; break; // HT1
+                    case 'wj66_tx': select.value = 33; break; // HT2
+                    case 'output_status_green': select.value = 124; break; // Y9 (115+9)
+                    case 'output_status_yellow': select.value = 125; break; // Y10
+                    case 'output_status_red': select.value = 126; break; // Y11
+                    case 'output_buzzer': select.value = 127; break; // Y12
+                }
+            }
         });
 
-        // Render pin summary table
-        this.renderPinSummary();
+        // renderPinSummary will be called after config load
     },
 
     renderPinSummary() {
         const container = document.getElementById('pin-summary-table');
         if (!container) return;
 
+        // Enabled states
+        const ethEnabled = document.getElementById('eth_enabled')?.checked;
+        const lcdEnabled = document.getElementById('lcd_enabled')?.checked;
+        const vfdEnabled = document.getElementById('vfd_enabled')?.checked;
+        const jxk10Enabled = document.getElementById('jxk10_enabled')?.checked;
+        const statusEnabled = document.getElementById('status_light_enabled')?.checked;
+        const buzzerEnabled = document.getElementById('buzzer_enabled')?.checked;
+
+        // 1. Define Master Pin List (KC868-A16)
+        const masterPinList = [
+            // Digital Inputs
+            ...Array.from({ length: 16 }, (_, i) => ({
+                label: `X${i + 1}`,
+                type: 'Digital Input',
+                pin: 100 + i // Virtual 100-115
+            })),
+            // Digital Outputs
+            ...Array.from({ length: 16 }, (_, i) => ({
+                label: `Y${i + 1}`,
+                type: 'Digital Output',
+                pin: 116 + i // Virtual 116-131
+            })),
+            // Analog Inputs
+            { label: 'CH1', type: '4/20mA Input', pin: 36 },
+            { label: 'CH2', type: '4/20mA Input', pin: 34 },
+            { label: 'CH3', type: '0-5V Input', pin: 35 },
+            { label: 'CH4', type: '0-5V Input', pin: 39 },
+            // Sensors / IO
+            { label: 'HT1', type: 'Sensor/GPIO', pin: 14 },
+            { label: 'HT2', type: 'Sensor/GPIO', pin: 33 }, // Typically TX
+            { label: 'HT3', type: 'Sensor/GPIO', pin: 32 },
+            // Comm
+            { label: 'RS485_A', type: 'RS485', pin: 16 }, // RXD2
+            { label: 'RS485_B', type: 'RS485', pin: 13 }, // TXD2
+            { label: 'I2C_SDA', type: 'I2C', pin: 4 },
+            { label: 'I2C_SCL', type: 'I2C', pin: 5 },
+            // RF (Placeholder logic: if signals use them, they map here. Using -1 will show row but empty unless signal uses it)
+            { label: '433MHz_RX', type: 'RF Input', pin: -1 },
+            { label: '433MHz_TX', type: 'RF Output', pin: -1 }
+        ];
+
+        // 2. Build Usage Map
+        const usageMap = new Map(); // pin -> [descriptions]
+
+        // Helper to add usage
+        const addUsage = (pin, desc) => {
+            if (pin < 0) return;
+            if (!usageMap.has(pin)) usageMap.set(pin, []);
+            usageMap.get(pin).push(desc);
+        };
+
+        // Add Dynamic Signals
+        if (this.signalData) {
+            this.signalData.forEach(sig => {
+                // Check enabled state for specific groups
+                if (sig.key.includes('status') && !statusEnabled) return;
+                if (sig.key.includes('buzzer') && !buzzerEnabled) return;
+                if (sig.key.includes('vfd') && !vfdEnabled) return;
+                if (sig.key.includes('jxk10') && !jxk10Enabled) return;
+
+                const pinVal = sig.current_pin !== undefined ? sig.current_pin : sig.default_pin;
+                if (pinVal !== undefined) {
+                    addUsage(pinVal, sig.name || sig.key);
+                }
+            });
+        }
+
+        // Add Fixed/Enabled Devices
+        if (ethEnabled) {
+            addUsage(23, 'Ethernet MDC');
+            addUsage(18, 'Ethernet MDIO');
+            addUsage(17, 'Ethernet CLK/Pwr');
+            // Standard RMII (Assuming generic usage for completeness if desired, or just the key ones)
+            addUsage(19, 'Ethernet TXD0');
+            addUsage(21, 'Ethernet TX_EN');
+            addUsage(22, 'Ethernet TXD1');
+            addUsage(25, 'Ethernet RXD0');
+            addUsage(26, 'Ethernet RXD1');
+            addUsage(27, 'Ethernet CRS_DV');
+        }
+        if (lcdEnabled) {
+            addUsage(4, 'LCD Display (SDA)');
+            addUsage(5, 'LCD Display (SCL)');
+        }
+        if (vfdEnabled) {
+            addUsage(16, 'VFD (Altivar31)');
+            addUsage(13, 'VFD (Altivar31)');
+        }
+        if (jxk10Enabled) {
+            addUsage(16, 'JXK-10 Current Monitor');
+            addUsage(13, 'JXK-10 Current Monitor');
+        }
+
+        // 3. Render Table
         let html = `
             <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
                 <thead>
                     <tr style="background: var(--bg-secondary);">
-                        <th style="padding: 8px; text-align: left;">Signal</th>
-                        <th style="padding: 8px; text-align: left;">Pin Label</th>
-                        <th style="padding: 8px; text-align: left;">Type</th>
+                        <th style="padding: 8px; text-align: left; width: 80px;">Pin Label</th>
+                        <th style="padding: 8px; text-align: left; width: 120px;">Type</th>
+                        <th style="padding: 8px; text-align: left;">Connected Function</th>
                     </tr>
                 </thead>
                 <tbody>
         `;
 
-        if (this.signalData) {
-            this.signalData.forEach(sig => {
-                const pinVal = sig.current_pin !== undefined ? sig.current_pin : sig.default_pin;
-                const label = this.getPinLabel(pinVal);
+        masterPinList.forEach((entry, index) => {
+            const usages = usageMap.get(entry.pin) || [];
+            // Remove duplicates
+            const uniqueUsages = [...new Set(usages)];
+            const usageText = uniqueUsages.length > 0 ? uniqueUsages.join(' + ') : '';
 
-                html += `
-                    <tr style="border-bottom: 1px solid var(--border-subtle);">
-                        <td style="padding: 6px 8px;">${sig.name || sig.key}</td>
-                        <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: var(--accent-primary);">${label}</td>
-                        <td style="padding: 6px 8px;">${sig.type || '--'}</td>
-                    </tr>
-                `;
-            });
-        }
+            // Styling for used vs unused
+            const rowStyle = uniqueUsages.length > 0
+                ? 'border-bottom: 1px solid var(--border-subtle);'
+                : 'border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); opacity: 0.6;';
+
+            const usageStyle = uniqueUsages.length > 0 ? 'font-weight: 500; color: var(--text-primary);' : '';
+
+            html += `
+                <tr style="${rowStyle}">
+                    <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: var(--accent-primary);">${entry.label}</td>
+                    <td style="padding: 6px 8px;">${entry.type}</td>
+                    <td style="padding: 6px 8px; ${usageStyle}">${usageText || '-'}</td>
+                </tr>
+            `;
+        });
 
         html += '</tbody></table>';
         container.innerHTML = html;
@@ -153,10 +263,22 @@ window.HardwareModule = window.HardwareModule || {
         fetch('/api/config')
             .then(r => r.json())
             .then(config => {
-                // Tower light enabled
-                const towerEn = document.getElementById('tower_enabled');
-                if (towerEn) {
-                    towerEn.checked = config.tower_en === 1 || config.tower_en === "1";
+                // Status light enabled
+                const statusLightEn = document.getElementById('status_light_enabled');
+                if (statusLightEn) {
+                    statusLightEn.checked = config.status_light_en === 1 || config.status_light_en === "1";
+                }
+
+                // Ethernet enabled
+                const ethEn = document.getElementById('eth_enabled');
+                if (ethEn) {
+                    ethEn.checked = config.eth_en !== 0 && config.eth_en !== "0";
+                }
+
+                // LCD enabled
+                const lcdEn = document.getElementById('lcd_enabled');
+                if (lcdEn) {
+                    lcdEn.checked = config.lcd_en !== 0 && config.lcd_en !== "0";
                 }
 
                 // Buzzer enabled
@@ -184,6 +306,9 @@ window.HardwareModule = window.HardwareModule || {
                 if (jxk10Addr && config.jxk10_addr) {
                     jxk10Addr.value = config.jxk10_addr;
                 }
+
+                // Update Pin Summary now that config (enabled states) is loaded
+                this.renderPinSummary();
             })
             .catch(err => console.warn('[Hardware] Config load error:', err));
     },
@@ -209,6 +334,17 @@ window.HardwareModule = window.HardwareModule || {
     saveConfiguration() {
         console.log('[Hardware] Saving configuration...');
         this.showStatus('Saving...', 'info');
+
+        // Validate RS485 addresses (User Request)
+        const vfdEn = document.getElementById('vfd_enabled')?.checked;
+        const jxk10En = document.getElementById('jxk10_enabled')?.checked;
+        const vfdAddr = parseInt(document.getElementById('vfd_addr')?.value || 0);
+        const jxk10Addr = parseInt(document.getElementById('jxk10_addr')?.value || 0);
+
+        if (vfdEn && jxk10En && vfdAddr === jxk10Addr) {
+            this.showStatus('Error: VFD and JXK-10 cannot have the same Modbus Address', 'error');
+            return;
+        }
 
         // Collect all pin assignments
         const assignments = {};
@@ -304,70 +440,8 @@ window.HardwareModule = window.HardwareModule || {
         }
     },
 
-    loadIODiagnostics() {
-        // Initialize grids with empty LEDs
-        const inputGrid = document.getElementById('io-input-grid');
-        const outputGrid = document.getElementById('io-output-grid');
-
-        if (inputGrid && inputGrid.children.length === 0) {
-            for (let i = 1; i <= 16; i++) {
-                inputGrid.innerHTML += `
-                    <div class="io-diag-pin">
-                        <div class="pin-led off" id="io-in-${i}"></div>
-                        <span>IN${i}</span>
-                    </div>`;
-            }
-        }
-
-        if (outputGrid && outputGrid.children.length === 0) {
-            for (let i = 1; i <= 16; i++) {
-                outputGrid.innerHTML += `
-                    <div class="io-diag-pin">
-                        <div class="pin-led off" id="io-out-${i}"></div>
-                        <span>OUT${i}</span>
-                    </div>`;
-            }
-        }
-
-        // Fetch actual I/O states
-        fetch('/api/hardware/io')
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    // Update input LEDs
-                    data.inputs?.forEach((inp, idx) => {
-                        const led = document.getElementById(`io-in-${idx + 1}`);
-                        if (led) {
-                            led.classList.remove('on', 'off');
-                            led.classList.add(inp.state ? 'on' : 'off');
-                        }
-                    });
-
-                    // Update output LEDs
-                    data.outputs?.forEach((outp, idx) => {
-                        const led = document.getElementById(`io-out-${idx + 1}`);
-                        if (led) {
-                            led.classList.remove('on', 'off');
-                            led.classList.add(outp.state ? 'on' : 'off');
-                        }
-                    });
-
-                    // Update E-Stop and timestamp
-                    const estopEl = document.getElementById('hw-estop-state');
-                    const timestampEl = document.getElementById('io-last-update');
-                    if (estopEl) estopEl.textContent = data.estop ? '⚠️ ACTIVE' : '✅ OK';
-                    if (timestampEl) timestampEl.textContent = new Date().toLocaleTimeString();
-                }
-            })
-            .catch(err => console.warn('[Hardware] Failed to load I/O status:', err));
-    },
-
     cleanup() {
         console.log('[Hardware] Cleaning up');
-        if (this.ioInterval) {
-            clearInterval(this.ioInterval);
-            this.ioInterval = null;
-        }
     }
 };
 

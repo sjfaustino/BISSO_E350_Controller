@@ -35,6 +35,7 @@ typedef struct {
     system_health_t health_status;
     uint32_t uptime_seconds;
     uint32_t boot_failures;  // Number of boot attempts before success
+    bool plc_hardware_present; // PHASE 5.11: Detected at boot
 
     // CPU & Memory
     uint8_t cpu_usage_percent;
@@ -110,6 +111,7 @@ typedef struct {
     uint32_t free_heap;       // bytes
     
     uint8_t flags;            // [0]:motion_en, [1]:moving, [2]:spindle_en, [3]:overcurrent, [4]:fault, [5]:wifi_conn, [6]:estop, [7]:alarm
+    uint8_t flags2;           // [0]:plc_present
 
     float axis_x;             // mm
     float axis_y;             // mm

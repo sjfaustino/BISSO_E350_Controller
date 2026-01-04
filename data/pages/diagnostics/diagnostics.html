@@ -5,7 +5,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>Axis X Diagnostics</h2>
+                <h2 id="diag-header-axis-x">Axis X Diagnostics</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -29,7 +29,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Axis Y Diagnostics</h2>
+                <h2 id="diag-header-axis-y">Axis Y Diagnostics</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -53,7 +53,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Axis Z Diagnostics</h2>
+                <h2 id="diag-header-axis-z">Axis Z Diagnostics</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -106,7 +106,7 @@
         <!-- Enhanced Encoder Status Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Encoder Status</h2>
+                <h2 id="diag-header-encoder">Encoder Status</h2>
             </div>
             <div class="card-content">
                 <div class="encoder-row">
@@ -185,7 +185,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>VFD Diagnostics</h2>
+                <h2 id="diag-header-vfd">VFD Diagnostics</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -211,7 +211,7 @@
     <!-- Real-time Saw Blade Current Graph -->
     <div class="card" style="margin-top: 20px;">
         <div class="card-header">
-            <h2>🪚 Saw Blade Current (Real-time)</h2>
+            <h2 id="diag-header-spindle-rt">🪚 Saw Blade Current (Real-time)</h2>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <span id="spindle-status-badge" class="badge badge-success">OK</span>
                 <button class="btn btn-small btn-secondary" id="spindle-graph-pause">Pause</button>
@@ -244,6 +244,44 @@
                         <span class="spindle-stat-value" id="spindle-pause-count">0</span>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- I/O Expander Diagnostics Card -->
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-header">
+            <h3>🔌 I/O Expander Diagnostics</h3>
+            <button class="btn btn-small btn-secondary" id="refresh-io-diag-btn">Refresh</button>
+        </div>
+        <div class="card-content">
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
+                Live status of PCF8574 I/O expander registers (2 input + 2 output banks)
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Input Bank -->
+                <div>
+                    <h4 style="margin-bottom: 10px; font-size: 14px;">Inputs (Read-Only)</h4>
+                    <div id="io-input-grid" class="io-diag-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Output Bank -->
+                <div>
+                    <h4 style="margin-bottom: 10px; font-size: 14px;">Outputs (Active)</h4>
+                    <div id="io-output-grid" class="io-diag-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
+                <span style="font-size: 12px; color: var(--text-secondary);">
+                    E-Stop: <strong id="hw-estop-state">--</strong> |
+                    Last Update: <strong id="io-last-update">--</strong>
+                </span>
             </div>
         </div>
     </div>
@@ -332,25 +370,26 @@
                     <h4>CPU Usage (%)</h4>
                     <canvas id="chart-cpu" width="300" height="100"></canvas>
                     <div class="chart-stats">
-                        <span>Current: <strong id="cpu-current">--</strong>%</span>
-                        <span>Avg: <strong id="cpu-avg">--</strong>%</span>
-                        <span>Max: <strong id="cpu-max">--</strong>%</span>
+                        <span>Current: <strong id="diag-cpu-current">--</strong>%</span>
+                        <span>Avg: <strong id="diag-cpu-avg">--</strong>%</span>
+                        <span>Max: <strong id="diag-cpu-max">--</strong>%</span>
                     </div>
                 </div>
                 <div class="trend-chart-container">
                     <h4>Free Memory (KB)</h4>
                     <canvas id="chart-memory" width="300" height="100"></canvas>
                     <div class="chart-stats">
-                        <span>Current: <strong id="mem-current">--</strong> KB</span>
-                        <span>Min: <strong id="mem-min">--</strong> KB</span>
+                        <span>Current: <strong id="diag-mem-current">--</strong> KB</span>
+                        <span>Min: <strong id="diag-mem-min">--</strong> KB</span>
                     </div>
                 </div>
                 <div class="trend-chart-container">
-                    <h4>Spindle Current (A)</h4>
+                    <h4 id="diag-header-spindle-trend">Spindle Current (A)</h4>
                     <canvas id="chart-spindle" width="300" height="100"></canvas>
                     <div class="chart-stats">
-                        <span>Current: <strong id="spindle-current">--</strong> A</span>
-                        <span>Peak: <strong id="spindle-peak">--</strong> A</span>
+                        <span>Current: <strong id="diag-spindle-current">--</strong> A</span>
+                        <span>Avg: <strong id="diag-spindle-avg">--</strong> A</span>
+                        <span>Max: <strong id="diag-spindle-max">--</strong> A</span>
                     </div>
                 </div>
             </div>
@@ -554,5 +593,39 @@
             flex-direction: column;
             gap: 5px;
         }
+    }
+
+    /* I/O Diagnostics Grid */
+    .io-diag-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 5px;
+    }
+
+    .io-diag-pin {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 4px;
+        background: var(--bg-secondary);
+        border-radius: 6px;
+        font-size: 10px;
+    }
+
+    .io-diag-pin .pin-led {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #333;
+        margin-bottom: 4px;
+    }
+
+    .io-diag-pin .pin-led.on {
+        background: #22c55e;
+        box-shadow: 0 0 8px #22c55e;
+    }
+
+    .io-diag-pin .pin-led.off {
+        background: #555;
     }
 </style>

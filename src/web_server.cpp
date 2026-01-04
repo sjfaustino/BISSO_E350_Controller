@@ -672,6 +672,7 @@ void WebServerManager::broadcastState() {
     doc["system"]["cpu_percent"] = telemetry.cpu_usage_percent;
     doc["system"]["free_heap_bytes"] = telemetry.free_heap_bytes;
     doc["system"]["temperature"] = telemetry.temperature;
+    doc["system"]["plc_hardware_present"] = telemetry.plc_hardware_present;
     
     doc["motion"]["position"]["x"] = current_status.x_pos;
     doc["motion"]["position"]["y"] = current_status.y_pos;

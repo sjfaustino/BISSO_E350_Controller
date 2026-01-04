@@ -19,11 +19,11 @@ extern void elboQ73SetRelay(uint8_t relay_bit, bool state);
 // STATE VARIABLES
 // =============================================================================
 
-// Tower light state
-static bool tower_enabled = false;
-static uint8_t tower_pin_green = 13;   // Output 13 (0-indexed: 12)
-static uint8_t tower_pin_yellow = 14;  // Output 14
-static uint8_t tower_pin_red = 15;     // Output 15
+// Status light state
+static bool status_light_enabled = false;
+static uint8_t status_light_pin_green = 13;   // Output 13 (0-indexed: 12)
+static uint8_t status_light_pin_yellow = 14;  // Output 14
+static uint8_t status_light_pin_red = 15;     // Output 15
 static system_display_state_t current_state = SYSTEM_STATE_IDLE;
 static uint32_t last_blink_time = 0;
 static bool blink_state = false;
@@ -52,35 +52,35 @@ static void setOutput(uint8_t pin, bool state) {
     }
 }
 
-static void updateTowerOutputs(bool green, bool yellow, bool red) {
-    if (!tower_enabled) return;
-    setOutput(tower_pin_green, green);
-    setOutput(tower_pin_yellow, yellow);
-    setOutput(tower_pin_red, red);
+static void updateStatusLightOutputs(bool green, bool yellow, bool red) {
+    if (!status_light_enabled) return;
+    setOutput(status_light_pin_green, green);
+    setOutput(status_light_pin_yellow, yellow);
+    setOutput(status_light_pin_red, red);
 }
 
 // =============================================================================
-// TOWER LIGHT API
+// STATUS LIGHT API
 // =============================================================================
 
-void towerLightInit(void) {
-    tower_enabled = configGetInt(KEY_TOWER_EN, 0) != 0;  // Default: disabled
-    tower_pin_green = configGetInt(KEY_TOWER_GREEN, 13);
-    tower_pin_yellow = configGetInt(KEY_TOWER_YELLOW, 14);
-    tower_pin_red = configGetInt(KEY_TOWER_RED, 15);
+void statusLightInit(void) {
+    status_light_enabled = configGetInt(KEY_STATUS_LIGHT_EN, 0) != 0;  // Default: disabled
+    status_light_pin_green = configGetInt(KEY_STATUS_LIGHT_GREEN, 13);
+    status_light_pin_yellow = configGetInt(KEY_STATUS_LIGHT_YELLOW, 14);
+    status_light_pin_red = configGetInt(KEY_STATUS_LIGHT_RED, 15);
     
-    if (tower_enabled) {
-        logInfo("[TOWER] Tower light ENABLED (G:%d Y:%d R:%d)", 
-                tower_pin_green, tower_pin_yellow, tower_pin_red);
+    if (status_light_enabled) {
+        logInfo("[STATUS] Status light ENABLED (G:%d Y:%d R:%d)", 
+                status_light_pin_green, status_light_pin_yellow, status_light_pin_red);
         // Start in idle state (green)
-        towerLightSetState(SYSTEM_STATE_IDLE);
+        statusLightSetState(SYSTEM_STATE_IDLE);
     } else {
-        logDebug("[TOWER] Tower light disabled");
+        logDebug("[STATUS] Status light disabled");
     }
 }
 
-void towerLightSetState(system_display_state_t state) {
-    if (!tower_enabled) return;
+void statusLightSetState(system_display_state_t state) {
+    if (!status_light_enabled) return;
     
     current_state = state;
     blink_state = true;  // Reset blink phase
@@ -89,28 +89,28 @@ void towerLightSetState(system_display_state_t state) {
     // Set initial output state
     switch (state) {
         case SYSTEM_STATE_IDLE:
-            updateTowerOutputs(true, false, false);  // Green only
+            updateStatusLightOutputs(true, false, false);  // Green only
             break;
         case SYSTEM_STATE_RUNNING:
-            updateTowerOutputs(false, true, false);  // Yellow only
+            updateStatusLightOutputs(false, true, false);  // Yellow only
             break;
         case SYSTEM_STATE_PAUSED:
-            updateTowerOutputs(true, true, false);   // Green + Yellow
+            updateStatusLightOutputs(true, true, false);   // Green + Yellow
             break;
         case SYSTEM_STATE_ESTOP:
-            updateTowerOutputs(false, false, true);  // Red only
+            updateStatusLightOutputs(false, false, true);  // Red only
             break;
         case SYSTEM_STATE_FAULT:
-            updateTowerOutputs(false, false, true);  // Red (will blink)
+            updateStatusLightOutputs(false, false, true);  // Red (will blink)
             break;
         case SYSTEM_STATE_HOMING:
-            updateTowerOutputs(false, true, false);  // Yellow (will blink)
+            updateStatusLightOutputs(false, true, false);  // Yellow (will blink)
             break;
     }
 }
 
-void towerLightUpdate(void) {
-    if (!tower_enabled) return;
+void statusLightUpdate(void) {
+    if (!status_light_enabled) return;
     
     uint32_t now = millis();
     if (now - last_blink_time >= BLINK_INTERVAL_MS) {
@@ -121,15 +121,15 @@ void towerLightUpdate(void) {
         switch (current_state) {
             case SYSTEM_STATE_PAUSED:
                 // Green solid, Yellow blink
-                setOutput(tower_pin_yellow, blink_state);
+                setOutput(status_light_pin_yellow, blink_state);
                 break;
             case SYSTEM_STATE_FAULT:
                 // Red blink
-                setOutput(tower_pin_red, blink_state);
+                setOutput(status_light_pin_red, blink_state);
                 break;
             case SYSTEM_STATE_HOMING:
                 // Yellow blink
-                setOutput(tower_pin_yellow, blink_state);
+                setOutput(status_light_pin_yellow, blink_state);
                 break;
             default:
                 // No blinking needed
@@ -138,44 +138,44 @@ void towerLightUpdate(void) {
     }
 }
 
-void towerLightTest(void) {
-    if (!tower_enabled) {
-        logWarning("[TOWER] Tower light not enabled");
+void statusLightTest(void) {
+    if (!status_light_enabled) {
+        logWarning("[STATUS] Status light not enabled");
         return;
     }
     
-    logInfo("[TOWER] Testing outputs...");
+    logInfo("[STATUS] Testing outputs...");
     
     // All off
-    updateTowerOutputs(false, false, false);
+    updateStatusLightOutputs(false, false, false);
     delay(500);
     
     // Green
     logPrintln("  GREEN");
-    updateTowerOutputs(true, false, false);
+    updateStatusLightOutputs(true, false, false);
     delay(1000);
     
     // Yellow
     logPrintln("  YELLOW");
-    updateTowerOutputs(false, true, false);
+    updateStatusLightOutputs(false, true, false);
     delay(1000);
     
     // Red
     logPrintln("  RED");
-    updateTowerOutputs(false, false, true);
+    updateStatusLightOutputs(false, false, true);
     delay(1000);
     
     // All on
     logPrintln("  ALL");
-    updateTowerOutputs(true, true, true);
+    updateStatusLightOutputs(true, true, true);
     delay(1000);
     
     // Return to current state
-    towerLightSetState(current_state);
-    logInfo("[TOWER] Test complete");
+    statusLightSetState(current_state);
+    logInfo("[STATUS] Test complete");
 }
 
-system_display_state_t towerLightGetState(void) {
+system_display_state_t statusLightGetState(void) {
     return current_state;
 }
 
@@ -304,19 +304,19 @@ bool buzzerIsActive(void) {
 // =============================================================================
 
 void alertJobComplete(void) {
-    towerLightSetState(SYSTEM_STATE_IDLE);
+    statusLightSetState(SYSTEM_STATE_IDLE);
     buzzerPlay(BUZZER_JOB_COMPLETE);
     logInfo("[ALERT] Job complete");
 }
 
 void alertFault(void) {
-    towerLightSetState(SYSTEM_STATE_FAULT);
+    statusLightSetState(SYSTEM_STATE_FAULT);
     buzzerPlay(BUZZER_ALARM_CONTINUOUS);
     logError("[ALERT] FAULT CONDITION");
 }
 
 void alertEstop(void) {
-    towerLightSetState(SYSTEM_STATE_ESTOP);
+    statusLightSetState(SYSTEM_STATE_ESTOP);
     buzzerPlay(BUZZER_ALARM_CONTINUOUS);
     logError("[ALERT] E-STOP ACTIVE");
 }
@@ -336,12 +336,12 @@ void alertsPrintStatus(void) {
         logPrintf("  Active:  %s\n", buzzerIsActive() ? "YES" : "NO");
     }
     
-    logPrintln("\nTower Light:");
-    logPrintf("  Enabled: %s\n", tower_enabled ? "YES" : "NO");
-    if (tower_enabled) {
-        logPrintf("  Green:   Output %d\n", tower_pin_green);
-        logPrintf("  Yellow:  Output %d\n", tower_pin_yellow);
-        logPrintf("  Red:     Output %d\n", tower_pin_red);
+    logPrintln("\nStatus Light:");
+    logPrintf("  Enabled: %s\n", status_light_enabled ? "YES" : "NO");
+    if (status_light_enabled) {
+        logPrintf("  Green:   Output %d\n", status_light_pin_green);
+        logPrintf("  Yellow:  Output %d\n", status_light_pin_yellow);
+        logPrintf("  Red:     Output %d\n", status_light_pin_red);
         
         const char* state_str = "UNKNOWN";
         switch (current_state) {

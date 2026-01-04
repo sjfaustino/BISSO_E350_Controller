@@ -12,6 +12,7 @@
 #include "spindle_current_monitor.h"
 #include "yhtc05_modbus.h"  // YH-TC05 RPM sensor
 #include "fault_logging.h"
+#include "plc_iface.h"  // For plcIsHardwarePresent()
 #include "memory_monitor.h"
 #include "task_manager.h"
 #include "task_performance_monitor.h"
@@ -217,6 +218,7 @@ void telemetryUpdate() {
     telemetry_cache.wifi_signal_strength = wifi_signal;
     telemetry_cache.config_version = cfg_ver;
     telemetry_cache.config_is_default = cfg_default;
+    telemetry_cache.plc_hardware_present = plcIsHardwarePresent();
 
     portEXIT_CRITICAL(&telemetrySpinlock);
 
@@ -255,7 +257,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
     size_t offset = 0;
 
     offset += snprintf(buffer + offset, buffer_size - offset,
-        "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u},"
+        "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"plc_hardware_present\":%s},"
         "\"memory\":{\"free_bytes\":%lu,\"stack_used\":%lu},"
         "\"motion\":{\"enabled\":%s,\"moving\":%s,\"x_mm\":%.2f,\"y_mm\":%.2f,\"z_mm\":%.2f,\"a_mm\":%.2f},"
         "\"spindle\":{\"enabled\":%s,\"running\":%s,\"current_amps\":%.2f,\"peak_amps\":%.2f,\"errors\":%lu,"
@@ -268,6 +270,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         telemetryGetHealthStatusString(t.health_status),
         (unsigned long)t.uptime_seconds,
         t.cpu_usage_percent,
+        t.plc_hardware_present ? "true" : "false",
         (unsigned long)t.free_heap_bytes,
         (unsigned long)t.stack_used_bytes,
         t.motion_enabled ? "true" : "false",
@@ -345,6 +348,9 @@ size_t telemetryExportBinary(telemetry_packet_t* packet) {
     if (t.wifi_connected)   packet->flags |= (1 << 5);
     if (t.estop_active)     packet->flags |= (1 << 6);
     if (t.alarm_active)     packet->flags |= (1 << 7);
+
+    packet->flags2 = 0;
+    if (t.plc_hardware_present) packet->flags2 |= (1 << 0);
 
     packet->axis_x = t.axis_x_mm;
     packet->axis_y = t.axis_y_mm;

@@ -10,6 +10,23 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
     spindlePaused: false,
     spindleMaxPoints: 120,  // 60 seconds at 500ms intervals
 
+    // Helper to set N/A values with red styling
+    setNA(element, suffix = '') {
+        if (!element) return;
+        element.innerHTML = '<span class="value-na">n/a</span>' + suffix;
+    },
+
+    // Helper to add/remove (N/A) in red to card titles
+    updateHeaderNA(headerId, originalTitle, isPresent) {
+        const header = document.getElementById(headerId);
+        if (!header) return;
+        if (isPresent) {
+            header.innerHTML = originalTitle;
+        } else {
+            header.innerHTML = `${originalTitle} <span class="value-na" style="font-size: 0.8em; margin-left: 8px;">(N/A)</span>`;
+        }
+    },
+
     init() {
         console.log('[Diagnostics] Initializing');
         window.addEventListener('state-changed', () => this.onStateChanged());
@@ -26,6 +43,10 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         // Start spindle current graph updates (500ms for smooth real-time)
         this.loadSpindleData();
         this.spindleInterval = setInterval(() => this.loadSpindleData(), 500);
+
+        // Start I/O Diagnostics updates
+        this.loadIODiagnostics();
+        this.ioDiagInterval = setInterval(() => this.loadIODiagnostics(), 2000);
     },
 
     setupEventListeners() {
@@ -42,6 +63,11 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         // Trend refresh button
         document.getElementById('refresh-trends-btn')?.addEventListener('click', () => {
             this.loadTrendData();
+        });
+
+        // I/O Diagnostics refresh button
+        document.getElementById('refresh-io-diag-btn')?.addEventListener('click', () => {
+            this.loadIODiagnostics();
         });
 
         // Spindle graph pause button
@@ -70,16 +96,28 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         // Axis diagnostics (X, Y, Z)
         ['x', 'y', 'z'].forEach((axis) => {
             const metrics = state.axis?.[axis];
-            if (metrics) {
-                const qualityEl = document.getElementById(`diag-${axis}-quality`);
-                const jitterEl = document.getElementById(`diag-${axis}-jitter`);
-                const stallsEl = document.getElementById(`diag-${axis}-stalls`);
-                const activeEl = document.getElementById(`diag-${axis}-active`);
+            const connected = state.motion?.dro_connected ?? false;
 
-                if (qualityEl) qualityEl.textContent = metrics.quality?.toFixed(0) || '--';
+            // Update Header (N/A)
+            const axisTitle = 'Axis ' + axis.toUpperCase() + ' Diagnostics';
+            this.updateHeaderNA(`diag-header-axis-${axis}`, axisTitle, connected);
+            if (axis === 'x') this.updateHeaderNA('diag-header-encoder', 'Encoder Status', connected);
+
+            const qualityEl = document.getElementById(`diag-${axis}-quality`);
+            const jitterEl = document.getElementById(`diag-${axis}-jitter`);
+            const stallsEl = document.getElementById(`diag-${axis}-stalls`);
+            const activeEl = document.getElementById(`diag-${axis}-active`);
+
+            if (connected && metrics) {
+                if (qualityEl) qualityEl.textContent = (metrics.quality || 0).toFixed(0);
                 if (jitterEl) jitterEl.textContent = (metrics.jitter_mms || 0).toFixed(3) + ' mm/s';
-                if (stallsEl) stallsEl.textContent = metrics.stalled ? '⚠ STALL' : '0';
+                if (stallsEl) stallsEl.textContent = metrics.stalled ? '⚠️ STALL' : '0';
                 if (activeEl) activeEl.textContent = '--';
+            } else {
+                this.setNA(qualityEl);
+                this.setNA(jitterEl, ' mm/s');
+                this.setNA(stallsEl);
+                if (activeEl) this.setNA(activeEl); // Also set active to N/A if not connected/metrics
             }
         });
 
@@ -88,15 +126,27 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 
         // VFD diagnostics
         if (state.vfd) {
+            // Update VFD Headers (N/A)
+            this.updateHeaderNA('diag-header-vfd', 'VFD Diagnostics', state.vfd.connected);
+            this.updateHeaderNA('diag-header-spindle-rt', '🪚 Saw Blade Current (Real-time)', state.vfd.connected);
+            this.updateHeaderNA('diag-header-spindle-trend', 'Spindle Current (A)', state.vfd.connected);
+
             const currentEl = document.getElementById('diag-vfd-current');
             const freqEl = document.getElementById('diag-vfd-freq');
             const thermalEl = document.getElementById('diag-vfd-thermal');
             const faultEl = document.getElementById('diag-vfd-fault');
 
-            if (currentEl) currentEl.textContent = (state.vfd.current_amps || 0).toFixed(1) + ' A';
-            if (freqEl) freqEl.textContent = (state.vfd.frequency_hz || 0).toFixed(1) + ' Hz';
-            if (thermalEl) thermalEl.textContent = (state.vfd.thermal_percent || 0) + '%';
-            if (faultEl) faultEl.textContent = '0x' + ((state.vfd.fault_code || 0).toString(16).padStart(4, '0')).toUpperCase();
+            if (state.vfd.connected) {
+                if (currentEl) currentEl.textContent = (state.vfd.current_amps || 0).toFixed(1) + ' A';
+                if (freqEl) freqEl.textContent = (state.vfd.frequency_hz || 0).toFixed(1) + ' Hz';
+                if (thermalEl) thermalEl.textContent = (state.vfd.thermal_percent || 0) + '%';
+                if (faultEl) faultEl.textContent = '0x' + ((state.vfd.fault_code || 0).toString(16).padStart(4, '0')).toUpperCase();
+            } else {
+                if (currentEl) currentEl.textContent = 'N/A';
+                if (freqEl) freqEl.textContent = 'N/A';
+                if (thermalEl) thermalEl.textContent = 'N/A';
+                if (faultEl) faultEl.textContent = 'N/A';
+            }
         }
 
         // E-Stop and safety from state
@@ -304,9 +354,13 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
             const current = data.cpu[data.cpu.length - 1];
             const avg = data.cpu.reduce((a, b) => a + b, 0) / data.cpu.length;
             const max = Math.max(...data.cpu);
-            document.getElementById('cpu-current').textContent = current;
-            document.getElementById('cpu-avg').textContent = avg.toFixed(0);
-            document.getElementById('cpu-max').textContent = max;
+            document.getElementById('diag-cpu-current').textContent = current;
+            document.getElementById('diag-cpu-avg').textContent = avg.toFixed(0);
+            document.getElementById('diag-cpu-max').textContent = max;
+        } else {
+            this.setNA(document.getElementById('diag-cpu-current'));
+            this.setNA(document.getElementById('diag-cpu-avg'));
+            this.setNA(document.getElementById('diag-cpu-max'));
         }
 
         // Memory Chart (convert bytes to KB)
@@ -316,18 +370,34 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
             const maxHeap = Math.max(...heapKB);
             this.drawLineChart('chart-memory', heapKB, minHeap * 0.9, maxHeap * 1.1, '#10b981');
             const current = heapKB[heapKB.length - 1];
-            document.getElementById('mem-current').textContent = current.toFixed(0);
-            document.getElementById('mem-min').textContent = minHeap.toFixed(0);
+            document.getElementById('diag-mem-current').textContent = current.toFixed(0);
+            document.getElementById('diag-mem-min').textContent = minHeap.toFixed(0);
+        } else {
+            this.setNA(document.getElementById('diag-mem-current'));
+            this.setNA(document.getElementById('diag-mem-min'));
         }
 
         // Spindle Current Chart
-        if (data.spindle_amps && data.spindle_amps.length > 0) {
+        const vfdConnected = AppState.data.vfd?.connected;
+        if (vfdConnected && data.spindle_amps && data.spindle_amps.length > 0) {
             const maxAmps = Math.max(...data.spindle_amps, 5);
             this.drawLineChart('chart-spindle', data.spindle_amps, 0, maxAmps * 1.2, '#f59e0b');
             const current = data.spindle_amps[data.spindle_amps.length - 1];
-            const peak = Math.max(...data.spindle_amps);
-            document.getElementById('spindle-current').textContent = current.toFixed(1);
-            document.getElementById('spindle-peak').textContent = peak.toFixed(1);
+            const avg = data.spindle_amps.reduce((a, b) => a + b, 0) / data.spindle_amps.length;
+            const max = Math.max(...data.spindle_amps);
+            document.getElementById('diag-spindle-current').textContent = current.toFixed(1);
+            document.getElementById('diag-spindle-avg').textContent = avg.toFixed(1);
+            document.getElementById('diag-spindle-max').textContent = max.toFixed(1);
+        } else {
+            this.setNA(document.getElementById('diag-spindle-current'));
+            this.setNA(document.getElementById('diag-spindle-avg'));
+            this.setNA(document.getElementById('diag-spindle-max'));
+            // Clear chart if disconnected
+            const canvas = document.getElementById('chart-spindle');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
         }
     },
 
@@ -522,6 +592,69 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
             this.spindleInterval = null;
         }
         this.spindleData = [];
+
+        if (this.ioDiagInterval) {
+            clearInterval(this.ioDiagInterval);
+            this.ioDiagInterval = null;
+        }
+    },
+
+    loadIODiagnostics() {
+        // Initialize grids with empty LEDs
+        const inputGrid = document.getElementById('io-input-grid');
+        const outputGrid = document.getElementById('io-output-grid');
+
+        if (inputGrid && inputGrid.children.length === 0) {
+            for (let i = 1; i <= 16; i++) {
+                inputGrid.innerHTML += `
+                    <div class="io-diag-pin">
+                        <div class="pin-led off" id="io-in-${i}"></div>
+                        <span>IN${i}</span>
+                    </div>`;
+            }
+        }
+
+        if (outputGrid && outputGrid.children.length === 0) {
+            for (let i = 1; i <= 16; i++) {
+                outputGrid.innerHTML += `
+                    <div class="io-diag-pin">
+                        <div class="pin-led off" id="io-out-${i}"></div>
+                        <span>OUT${i}</span>
+                    </div>`;
+            }
+        }
+
+        // Fetch actual I/O states
+        fetch('/api/hardware/io')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Update input LEDs
+                    data.inputs?.forEach((inp, idx) => {
+                        const led = document.getElementById(`io-in-${idx + 1}`);
+                        if (led) {
+                            led.classList.remove('on', 'off');
+                            led.classList.add(inp.state ? 'on' : 'off');
+                        }
+                    });
+
+                    // Update output LEDs
+                    data.outputs?.forEach((outp, idx) => {
+                        const led = document.getElementById(`io-out-${idx + 1}`);
+                        if (led) {
+                            led.classList.remove('on', 'off');
+                            led.classList.add(outp.state ? 'on' : 'off');
+                        }
+                    });
+
+                    // Update E-Stop and timestamp
+                    const estopEl = document.getElementById('hw-estop-state');
+                    const timestampEl = document.getElementById('io-last-update');
+                    if (estopEl) estopEl.textContent = data.estop ? '⚠️ ACTIVE' : '✅ OK';
+                    if (timestampEl) timestampEl.textContent = new Date().toLocaleTimeString();
+                }
+            })
+            .catch(err => console.warn('[Diagnostics] Failed to load I/O diagnostics:', err));
     }
 };
 
