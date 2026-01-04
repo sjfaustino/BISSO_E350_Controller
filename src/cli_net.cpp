@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <ETH.h>
 #include <Arduino.h>
+#include <ESP32Ping.h>
 
 // Ethernet statistics
 static uint32_t eth_connect_time = 0;
@@ -295,8 +296,56 @@ void cmd_ota_setpass(int argc, char** argv) {
     logPrintln("[OTA] Use command: reboot");
 }
 
+void cmd_ping(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("[PING] Usage: ping <host> [count]");
+        return;
+    }
+
+    const char* host = argv[1];
+    int count = (argc >= 3) ? atoi(argv[2]) : 4;
+    
+    if (count <= 0) count = 4;
+    if (count > 20) count = 20;
+
+    logPrintf("[PING] Pinging %s (%d times)...\n", host, count);
+
+    int successful = 0;
+    float total_time = 0;
+    float min_time = 99999;
+    float max_time = 0;
+
+    for (int i = 0; i < count; i++) {
+        // Feed watchdog during ping sequence
+        watchdogFeed("cli");
+        
+        bool success = Ping.ping(host, 1);
+        if (success) {
+            float time = Ping.averageTime();
+            logPrintf("  Reply from %s: time=%.1fms\n", host, time);
+            successful++;
+            total_time += time;
+            if (time < min_time) min_time = time;
+            if (time > max_time) max_time = time;
+        } else {
+            logPrintf("  Request timed out.\n");
+        }
+        delay(100);
+    }
+
+    if (successful > 0) {
+        logPrintf("[PING] Statistics: Sent=%d, Received=%d, Lost=%d (%.0f%% loss)\n", 
+                  count, successful, count - successful, (float)(count - successful) / count * 100);
+        logPrintf("[PING] Round trip times: min=%.1fms, max=%.1fms, avg=%.1fms\n", 
+                  min_time, max_time, total_time / successful);
+    } else {
+        logPrintf("[PING] Failed: %s is unreachable.\n", host);
+    }
+}
+
 void cliRegisterWifiCommands() {
     cliRegisterCommand("wifi", "WiFi management", cmd_wifi_main);
     cliRegisterCommand("eth", "Ethernet management (KC868-A16)", cmd_eth_main);
     cliRegisterCommand("ota_setpass", "Set OTA update password", cmd_ota_setpass);
+    cliRegisterCommand("ping", "Ping a host", cmd_ping);
 }
