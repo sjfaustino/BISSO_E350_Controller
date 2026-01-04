@@ -25,7 +25,7 @@ static bool migration_initialized = false;
 // Default values for new configuration keys
 // These are applied when upgrading to a version that adds new keys
 static const config_default_t default_values[] = {
-  // PHASE 5.10: Gemini v2.0 Keys
+  // PHASE 5.10: PosiPro v2.0 Keys
   {KEY_MOTION_BUFFER_ENABLE, "1", "int32", true},
   {KEY_WIFI_SSID, "BISSO-E350-Setup", "string", true},
   {KEY_WIFI_PASSWORD, "password", "string", true},
@@ -205,7 +205,7 @@ bool configMigrationBackup(uint8_t version) {
   // Since Preferences doesn't easily expose all keys, we back up the most critical ones
   // as defined in the unified config's critical_keys list.
   
-  // For Gemini v2.0, we represent the backup as a successful log entry
+  // For PosiPro v2.0, we represent the backup as a successful log entry
   // since NVS key iteration is non-trivial without low-level NVS access.
   logInfo("[MIGRATION] Configuration backup created in namespace: %s", namespace_name);
   

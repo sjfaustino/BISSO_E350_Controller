@@ -1,6 +1,6 @@
 /**
  * @file motion_buffer.cpp
- * @brief Implementation of Ring Buffer (Gemini v3.5.23)
+ * @brief Implementation of Ring Buffer (PosiPro)
  * @details THREAD-SAFE implementation with mutex protection.
  *          All public methods are protected by buffer_mutex.
  */
@@ -103,7 +103,7 @@ bool MotionBuffer::isFull_unsafe() { return count >= MOTION_BUFFER_SIZE; }
 
 bool MotionBuffer::isEmpty_unsafe() { return count == 0; }
 
-// PHASE 5.7: Gemini Clarification - Naming Convention
+// PHASE 5.7: Clarification - Naming Convention
 // NOTE: available() returns COUNT USED (number of items IN buffer)
 // This is OPPOSITE of Arduino convention where available() means "data ready to
 // read" Returns: 0 = empty, MOTION_BUFFER_SIZE = full
@@ -113,7 +113,7 @@ int MotionBuffer::available_unsafe() { return count; }
 // THREAD-SAFE PUBLIC API (protected by mutex)
 // ============================================================================
 //
-// ⚠️ CRITICAL ISR SAFETY WARNING (Gemini Audit Finding):
+// ⚠️ CRITICAL ISR SAFETY WARNING (Code Audit Finding):
 // ========================================================
 // All public functions use xSemaphoreTake() - NOT ISR-SAFE!
 //
@@ -268,7 +268,7 @@ void MotionBuffer::clear() {
   xSemaphoreGive(buffer_mutex);
 }
 
-// PHASE 5.7: Gemini Clarification - Naming Convention
+// PHASE 5.7: Clarification - Naming Convention
 // NOTE: available() returns COUNT USED (not count free!)
 // Arduino convention: available() = "data ready to read" (e.g.,
 // Serial.available()) This buffer: available() = "items in buffer" (0 = empty,

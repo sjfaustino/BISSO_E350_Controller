@@ -1,7 +1,7 @@
 /**
  * @file cli_motion.cpp
  * @brief Motion CLI Commands
- * @project Gemini v3.5.0
+ * @project PosiPro
  */
 
 #include "cli.h"

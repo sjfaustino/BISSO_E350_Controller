@@ -392,7 +392,7 @@ void configUnifiedInit() {
   memset(config_table, 0, sizeof(config_table));
   config_count = 0;
 
-  if (!prefs.begin("gemini_cfg", false)) {
+  if (!prefs.begin("PosiPro_cfg", false)) {
     logError("[CONFIG] NVS Mount Failed!");
     return;
   }

@@ -1,6 +1,6 @@
 /**
  * @file motion_control.cpp
- * @brief Real-Time Hardware Execution Layer (Gemini v3.5.19)
+ * @brief Real-Time Hardware Execution Layer (PosiPro)
  * @details Final Polish: Encapsulation, Configurable Timeouts, Stall Logic.
  * @author Sergio Faustino
  */
@@ -1009,15 +1009,15 @@ bool motionWaitPin(uint8_t pin_id, uint8_t pin_type, uint8_t state,
 }
 
 void motionEmergencyStop() {
-  // PHASE 5.7: E-Stop Latency Monitoring (Gemini Recommendation)
+  // PHASE 5.7: E-Stop Latency Monitoring (Recommendation)
   // Track E-Stop response time to detect priority inversion issues
   // Target: <50ms (ISO 13849 PLd), Warn if >50ms
   uint32_t estop_start_us = micros();
 
-  // CRITICAL: Deadlock Prevention (Gemini Audit)
+  // CRITICAL: Deadlock Prevention (Code Audit)
   // Use 10ms timeout to prevent deadlock if Motion task holds mutex while
   // blocked on I2C If timeout occurs, E-stop still succeeds via hardware PLC
-  // I/O (independent of mutex) See: docs/GEMINI_FINAL_AUDIT.md for complete
+  // I/O (independent of mutex) See: docs/PosiPro_FINAL_AUDIT.md for complete
   // deadlock analysis
   bool got_mutex = taskLockMutex(taskGetMotionMutex(), 10);
 
@@ -1042,7 +1042,7 @@ void motionEmergencyStop() {
   if (got_mutex)
     taskUnlockMutex(taskGetMotionMutex());
 
-  // PHASE 5.7: E-Stop Latency Monitoring (Gemini Recommendation)
+  // PHASE 5.7: E-Stop Latency Monitoring (Recommendation)
   // Measure and log E-Stop response time
   // Safety limits: IEC 61508 SIL2 (<100ms), ISO 13849 PLd (<50ms)
   uint32_t estop_latency_us = micros() - estop_start_us;

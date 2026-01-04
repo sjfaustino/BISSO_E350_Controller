@@ -1,7 +1,7 @@
 /**
  * @file system_constants.h
  * @brief System-wide constants and pin definitions
- * @project Gemini v1.0.0
+ * @project PosiPro
  * @author Sergio Faustino - sjfaustino@gmail.com
  */
 

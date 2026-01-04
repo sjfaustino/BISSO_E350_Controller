@@ -1,7 +1,7 @@
 /**
  * @file api_file_manager.cpp
  * @brief Implementation of File Management API Routes (PsychicHttp)
- * @project Gemini v3.6.0
+ * @project PosiPro
  */
 
 #include "api_file_manager.h"

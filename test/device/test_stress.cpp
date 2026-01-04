@@ -2,7 +2,7 @@
  * @file test_stress.cpp
  * @brief Edge Case Stress Testing Suite
  * @details Tests system robustness under abnormal conditions
- * @project Gemini CNC Controller
+ * @project PosiPro CNC Controller
  *
  * ROBUSTNESS FIX: Validates system behavior under stress
  *

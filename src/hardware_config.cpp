@@ -1,7 +1,7 @@
 /**
  * @file hardware_config.cpp
  * @brief Hardware Abstraction Layer - Virtual Pin Mapping for KC868-A16
- * @project Gemini v1.0.0
+ * @project PosiPro
  * @author Sergio Faustino
  */
 
@@ -16,7 +16,7 @@
 const BoardType BOARD = detectBoard();
 
 BoardType detectBoard() {
-    // Strictly enforce KC868-A16 for Gemini v1.0.0
+    // Strictly enforce KC868-A16 for PosiPro
     return BoardType::A16;
 }
 

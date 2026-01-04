@@ -1,6 +1,6 @@
 /**
  * @file motion_buffer.h
- * @brief Ring Buffer for Motion Commands (Gemini v3.5.23)
+ * @brief Ring Buffer for Motion Commands (PosiPro)
  * @details Thread-safe implementation with mutex protection for multi-task access
  */
 

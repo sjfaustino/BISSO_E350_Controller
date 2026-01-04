@@ -309,12 +309,12 @@ void taskEncoderCreate() {
   }
 }
 void taskPlcCommCreate() {
-  // PHASE 5.7: Ghost Task Removed (Gemini Optimization)
+  // PHASE 5.7: Ghost Task Removed (Optimization)
   // CRITICAL: This task did NOTHING except feed watchdog every 50ms
   // Waste: 2KB RAM (TASK_STACK_PLC_COMM = 2048 bytes)
   // Fix: Watchdog feed moved to Motion task (Motion already uses PLC I/O)
   // Impact: Saves 2KB RAM, reduces task switching overhead
-  // See: docs/GEMINI_IMPROVEMENT_ROADMAP.md and docs/GEMINI_FINAL_AUDIT.md
+  // See: docs/PosiPro_IMPROVEMENT_ROADMAP.md and docs/PosiPro_FINAL_AUDIT.md
 
   // ❌ DISABLED: Ghost task creation
   // if(xTaskCreatePinnedToCore(taskPlcCommFunction, "PLC_Comm",

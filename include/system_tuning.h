@@ -2,7 +2,7 @@
  * @file system_tuning.h
  * @brief System-wide tuning parameters and thresholds
  * @details Centralizes magic numbers for easy tuning and maintainability
- * @project Gemini CNC Controller
+ * @project PosiPro Controller
  *
  * MAINTAINABILITY FIX: All hardcoded thresholds and timeouts centralized here
  * Benefits:

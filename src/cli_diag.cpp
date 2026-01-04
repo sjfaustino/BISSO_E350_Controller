@@ -1,7 +1,7 @@
 /**
  * @file cli_diag.cpp
  * @brief Diagnostic CLI commands implementation
- * @project Gemini v3.3.1
+ * @project PosiPro
  * @details Fully updated to match Modular Architecture (v3.x)
  */
 

@@ -1,6 +1,6 @@
 /**
  * @file encoder_motion_integration.cpp
- * @brief Logic to cross-check encoder feedback against planner target (Gemini v3.5.19)
+ * @brief Logic to cross-check encoder feedback against planner target (PosiPro)
  */
 
 #include "encoder_motion_integration.h"

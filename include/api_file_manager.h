@@ -1,7 +1,7 @@
 /**
  * @file api_file_manager.h
  * @brief Handles all protected File API Routes (PsychicHttp)
- * @project Gemini v3.6.0
+ * @project PosiPro
  */
 
 #ifndef API_FILE_MANAGER_H

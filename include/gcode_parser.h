@@ -1,6 +1,6 @@
 /**
  * @file gcode_parser.h
- * @brief G-Code Parser with WCS Support (Gemini v3.5.24)
+ * @brief G-Code Parser with WCS Support (PosiPro)
  */
 
 #ifndef GCODE_PARSER_H

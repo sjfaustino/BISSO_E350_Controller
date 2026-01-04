@@ -1,12 +1,12 @@
 /**
  * @file plc_iface.cpp
- * @brief Hardware Abstraction Layer for ELBO PLC (Gemini v3.5.21)
+ * @brief Hardware Abstraction Layer for ELBO PLC (PosiPro)
  * @details Implements robust I2C drivers with error checking.
  *          CRITICAL FIX: Added MUTEX protection for shadow register access
  *          to prevent race conditions when multiple tasks modify the relay
  * states.
  *
- *          ARCHITECTURE: Spinlock vs Mutex Decision (Gemini Audit Compliant)
+ *          ARCHITECTURE: Spinlock vs Mutex Decision (Code Audit Compliant)
  *          - Shadow registers: Protected by MUTEX (not spinlock)
  *          - I2C operations: NEVER called inside mutex (copy-before-release
  * pattern)
@@ -40,7 +40,7 @@ static uint8_t q73_shadow_register = 0xFF; // All OFF (active-low: 1=OFF, 0=ON)
 //   3. More efficient for multi-task synchronization
 static SemaphoreHandle_t plc_shadow_mutex = NULL;
 
-// PHASE 5.7: Gemini Fix - Shadow Register Dirty Flag (Mutex Timeout Handling)
+// PHASE 5.7: Fix - Shadow Register Dirty Flag (Mutex Timeout Handling)
 // If mutex timeout occurs, shadow register is NOT updated but hardware might be
 // fine Dirty flag tracks when shadow register is out of sync with hardware Next
 // successful I2C write will re-sync by writing the full shadow register
@@ -59,7 +59,7 @@ static bool g_plc_hardware_present = true;  // Optimistic default
 // ============================================================================
 
 /**
- * @brief Safely acquire shadow register mutex with retry logic (Gemini Fix)
+ * @brief Safely acquire shadow register mutex with retry logic (Fix)
  * @details Implements retry mechanism to prevent shadow register desync
  *          If all retries fail, sets dirty flag for later recovery
  * @return true if mutex acquired, false if all retries failed
@@ -114,7 +114,7 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char *context) {
   taskUnlockMutex(taskGetI2cPlcMutex());
 
   if (res == I2C_RESULT_OK) {
-    // PHASE 5.7: Gemini Fix - Clear dirty flag on successful I2C write
+    // PHASE 5.7: Fix - Clear dirty flag on successful I2C write
     // Shadow register is now in sync with hardware
     if (address == ADDR_Q73_OUTPUT) {
       q73_shadow_dirty = false;
@@ -356,7 +356,7 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
   if (relay_bit > 7)
     return;
 
-  // PHASE 5.7: Gemini Fix - Use retry helper instead of simple timeout
+  // PHASE 5.7: Fix - Use retry helper instead of simple timeout
   // CRITICAL BUG FIX: Previous code returned early on mutex timeout,
   // leaving shadow register out of sync with hardware
   if (!plcAcquireShadowMutex()) {
@@ -437,7 +437,7 @@ void elboDiagnostics() {
   logPrintf("Output Register: 0x%02X\n", output_reg);
   logPrintf("Input Register:  0x%02X\n", i73_input_shadow);
 
-  // PHASE 5.7: Gemini Fix - Display shadow register health
+  // PHASE 5.7: Fix - Display shadow register health
   logPrintf("Shadow Register Dirty: %s\n",
                 q73_shadow_dirty ? "YES (OUT OF SYNC!)" : "No");
   logPrintf("Mutex Timeout Count: %lu\n",
@@ -455,7 +455,7 @@ void elboDiagnostics() {
   }
 }
 
-// PHASE 5.7: Gemini Fix - Shadow Register Health Monitoring
+// PHASE 5.7: Fix - Shadow Register Health Monitoring
 uint32_t elboGetMutexTimeoutCount() { return q73_mutex_timeout_count; }
 
 bool elboIsShadowRegisterDirty() { return q73_shadow_dirty; }

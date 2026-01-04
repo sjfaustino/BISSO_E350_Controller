@@ -1,4 +1,4 @@
-# Gemini CNC Controller - Test Suite
+# PosiPro CNC Controller - Test Suite
 
 ## Overview
 

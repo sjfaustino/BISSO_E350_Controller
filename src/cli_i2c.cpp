@@ -1,6 +1,6 @@
 /**
  * @file cli_i2c.cpp
- * @brief Comprehensive I2C diagnostics and management CLI commands (Gemini v3.5.25)
+ * @brief Comprehensive I2C diagnostics and management CLI commands (PosiPro)
  * @details Consolidated I2C command hierarchy with advanced features:
  *          - i2c scan [options] - Scan for devices with timing/baselines
  *          - i2c test [options] - Detailed device testing and stress testing

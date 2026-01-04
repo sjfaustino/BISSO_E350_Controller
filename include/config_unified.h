@@ -1,6 +1,6 @@
 /**
  * @file config_unified.h
- * @brief Unified Configuration Manager API (Gemini v3.5.22)
+ * @brief Unified Configuration Manager API (PosiPro)
  * @details Increased key limit to support WCS offsets.
  */
 

@@ -1,7 +1,7 @@
 /**
  * @file boot_validation.h
  * @brief Boot sequence validation and error recovery system
- * @project Gemini v1.0.0
+ * @project PosiPro
  * @author Sergio Faustino - sjfaustino@gmail.com
  * * This module provides comprehensive boot validation including:
  * - Subsystem initialization tracking

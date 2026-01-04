@@ -1,6 +1,6 @@
 /**
  * @file encoder_wj66.cpp
- * @brief Driver for WJ66 Absolute Encoders (Gemini v3.5.15)
+ * @brief Driver for WJ66 Absolute Encoders (PosiPro)
  * @details Merged: User's Baud/Parsing Logic + v3.5 Safety Flow Control.
  */
 
@@ -18,7 +18,7 @@
 #include "config_keys.h"
 
 // Safety Constants
-// BUFFER SIZE VERIFICATION (Gemini Audit):
+// BUFFER SIZE VERIFICATION (Code Audit):
 // Max frame: !<11 digits>,<11 digits>,<11 digits>,<11 digits>\r = 49 bytes
 // Example:   !-2147483648,-2147483648,-2147483648,-2147483648\r
 // Buffer:    64 bytes (15 byte safety margin)

@@ -32,7 +32,7 @@
 
 The BISSO E350 Motion Controller Firmware is a custom embedded solution designed to upgrade and replace obsolete control systems in industrial bridge saw equipment. It leverages modern ESP32 microcontrollers to manage motion control, safety, and human-machine interfaces.
 
-**Project Codename:** Gemini
+**Project Codename:** PosiPro
 
 ### 1.2 Core Function
 

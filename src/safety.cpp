@@ -1,7 +1,7 @@
 /**
  * @file safety.cpp
  * @brief Safety Monitor
- * @project Gemini v3.5.0
+ * @project PosiPro
  */
 
 #include "safety.h"
@@ -340,11 +340,11 @@ void safetyTriggerAlarm(const char *reason, safety_fault_t fault_type) {
   logPrintf("[SAFETY] Fault Count: %lu\n",
                 (unsigned long)safety_state.fault_count);
 
-  // CRITICAL: Deadlock-Safe Emergency Stop (Gemini Audit)
+  // CRITICAL: Deadlock-Safe Emergency Stop (Code Audit)
   // motionEmergencyStop() uses 10ms timeout to prevent deadlock
   // If Motion task holds mutex while blocked on I2C, E-stop still succeeds
   // via hardware PLC I/O layer (independent of motion_mutex)
-  // See: docs/GEMINI_FINAL_AUDIT.md for complete safety analysis
+  // See: docs/PosiPro_FINAL_AUDIT.md for complete safety analysis
   motionEmergencyStop();
 }
 

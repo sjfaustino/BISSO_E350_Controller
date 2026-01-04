@@ -1,6 +1,6 @@
 /**
  * @file gcode_parser.cpp
- * @brief G-Code Parser with WCS Logic (Gemini v3.5.25)
+ * @brief G-Code Parser with WCS Logic (PosiPro)
  */
 
 #include "gcode_parser.h"

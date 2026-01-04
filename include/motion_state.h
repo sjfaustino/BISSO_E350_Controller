@@ -1,7 +1,7 @@
 /**
  * @file motion_state.h
  * @brief Read-Only Accessors for Motion State
- * @project Gemini v3.5.0
+ * @project PosiPro
  */
 
 #ifndef MOTION_STATE_H

@@ -1,6 +1,6 @@
 /**
  * @file job_manager.cpp
- * @brief G-Code Job Streaming Engine (Gemini v3.5.24)
+ * @brief G-Code Job Streaming Engine (PosiPro)
  * @details Fixed compilation errors (missing includes, API mismatch).
  */
 
@@ -31,7 +31,7 @@ void JobManager::init() {
 void JobManager::update() {
     if (status.state != JOB_RUNNING || !file_open) return;
 
-    // PHASE 5.7: Gemini Clarification - Buffer Naming Convention
+    // PHASE 5.7: Clarification - Buffer Naming Convention
     // NOTE: motionBuffer.available() returns COUNT USED (not count free!)
     // This is opposite of Arduino convention where available() typically means "data ready to read"
     // Here: available() returns number of commands IN buffer (0 = empty, 32 = full)

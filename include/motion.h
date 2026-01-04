@@ -1,6 +1,6 @@
 /**
  * @file motion.h
- * @brief Core Motion Engine Definitions & API (Gemini v3.5.19)
+ * @brief Core Motion Engine Definitions & API (PosiPro)
  * @details Final Polish: Full Encapsulation of Axis Array.
  */
 

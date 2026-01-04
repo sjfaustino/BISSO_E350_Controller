@@ -1,7 +1,7 @@
 /**
  * @file network_manager.h
  * @brief Handles WiFi Provisioning, Ethernet, OTA, and Telnet
- * @project Gemini v1.2.0
+ * @project PosiPro
  */
 
 #ifndef NETWORK_MANAGER_H

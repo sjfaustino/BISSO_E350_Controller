@@ -1,6 +1,6 @@
 /**
  * @file tasks_monitor.cpp
- * @brief System Health Monitor Task (Gemini v3.5.0)
+ * @brief System Health Monitor Task (PosiPro)
  * @details Handles background maintenance: Memory checks, Config flushing, and Web Telemetry.
  * @author Sergio Faustino
  */

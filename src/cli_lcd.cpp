@@ -1,6 +1,6 @@
 /**
  * @file cli_lcd.cpp
- * @brief LCD control CLI commands (Gemini v4.1.0)
+ * @brief LCD control CLI commands (PosiPro)
  */
 
 #include "cli.h"

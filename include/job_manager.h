@@ -1,7 +1,7 @@
 /**
  * @file job_manager.h
  * @brief G-Code File Streaming Engine
- * @project Gemini v2.1.0
+ * @project PosiPro
  */
 
 #ifndef JOB_MANAGER_H

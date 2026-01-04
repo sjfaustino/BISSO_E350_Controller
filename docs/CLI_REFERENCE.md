@@ -1,6 +1,6 @@
 # BISSO E350 Controller - Command Line Interface Manual
 
-**Version:** 1.0.0 (Gemini)  
+**Version:** 1.0.0 (PosiPro)  
 **Last Updated:** 2025-12-31  
 **Connection:** Serial (115200 baud) or Telnet (Port 23)
 

@@ -2,7 +2,7 @@
  * @file openapi.cpp
  * @brief OpenAPI 3.0 Specification Generator Implementation (Phase 6)
  *
- * ARCHITECTURE NOTE (Gemini Audit):
+ * ARCHITECTURE NOTE (Code Audit):
  * This file generates OpenAPI spec at runtime (~10KB flash, 5-10ms per request).
  *
  * OPTIMIZATION OPPORTUNITY:
@@ -11,7 +11,7 @@
  * - Current approach: Acceptable for production (simple, auto-syncs)
  * - Future optimization: Available if flash space becomes constrained
  *
- * See: docs/GEMINI_FINAL_AUDIT.md for full analysis and optimization path
+ * See: docs/PosiPro_FINAL_AUDIT.md for full analysis and optimization path
  */
 
 #pragma GCC diagnostic push

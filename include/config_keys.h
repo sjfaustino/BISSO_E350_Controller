@@ -1,6 +1,6 @@
 /**
  * @file config_keys.h
- * @brief Central registry of NVS Configuration Keys (Gemini v3.5.22)
+ * @brief Central registry of NVS Configuration Keys (PosiPro)
  */
 
 #ifndef CONFIG_KEYS_H

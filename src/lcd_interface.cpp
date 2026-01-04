@@ -1,7 +1,7 @@
 /**
  * @file lcd_interface.cpp
  * @brief LCD (20x4) abstraction layer (I2C/Serial)
- * @project Gemini v1.0.0
+ * @project PosiPro
  * @author Sergio Faustino - sjfaustino@gmail.com
  */
 

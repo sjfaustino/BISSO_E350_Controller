@@ -1,7 +1,7 @@
 /**
  * @file web_server.h
  * @brief PsychicHttp Web Server manager with WebSockets, Auth, and File Management
- * @project Gemini v3.6.0
+ * @project PosiPro
  * @author Sergio Faustino - sjfaustino@gmail.com
  * @note Migrated from ESPAsyncWebServer to PsychicHttp for stability
  */

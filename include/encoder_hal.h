@@ -3,7 +3,7 @@
  * @brief Encoder Hardware Abstraction Layer (HAL)
  * @details Allows flexible switching between RS232 and RS485 encoder interfaces
  *          without changing the encoder driver logic
- * @project Gemini v4.0.0 - WJ66 Encoder Abstraction
+ * @project PosiPro - WJ66 Encoder Abstraction
  */
 
 #ifndef ENCODER_HAL_H
