@@ -583,7 +583,10 @@ void WebServerManager::init() {
         // Handle incoming messages (commands from web UI)
         if (frame->type == HTTPD_WS_TYPE_TEXT) {
             String msg = String((char*)frame->payload, frame->len);
-            logPrintf("[WS] Received: %s\n", msg.c_str());
+            // Filter out heartbeat pings to keep logs clean
+            if (msg.indexOf("ping") == -1) {
+                logPrintf("[WS] Received: %s\n", msg.c_str());
+            }
             // Could parse commands here if needed
         }
         return ESP_OK;
