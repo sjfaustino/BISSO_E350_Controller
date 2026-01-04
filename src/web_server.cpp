@@ -240,7 +240,7 @@ void WebServerManager::init() {
             return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
         }
 
-        if (!doc.containsKey("timestamp")) {
+        if (!doc["timestamp"].is<JsonVariant>()) {
             return response->send(400, "application/json", "{\"error\":\"Missing timestamp\"}");
         }
 
