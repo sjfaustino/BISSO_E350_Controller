@@ -280,6 +280,7 @@ void NetworkManager::init() {
   }
 
   // Try to connect to saved network without blocking
+  WiFi.setAutoReconnect(true); // Ensure it tries to reconnect if disconnected
   WiFi.begin(); // Uses credentials from previous autoConnect()
 
   // Don't wait for connection - boot continues

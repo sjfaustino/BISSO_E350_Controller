@@ -24,10 +24,8 @@ static const char* wifiGetStatusString(wl_status_t status) {
 
 void cmd_wifi_scan(int argc, char** argv) {
     logPrintln("[WIFI] Scanning...");
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
-    delay(100);
-    int n = WiFi.scanNetworks();
+    // Scan without disconnecting to avoid breaking existing sessions
+    int n = WiFi.scanNetworks(false, false, false, 300); // Fast scan
     if (n == 0) logPrintln("[WIFI] No networks found.");
     else {
         logPrintf("[WIFI] Found %d networks:\r\n", n);
