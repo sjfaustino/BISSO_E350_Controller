@@ -34,24 +34,24 @@
 //       - Deep call chains in complex state machines
 
 #define TASK_STACK_SAFETY                                                      \
-  4096 // Increased from 2048 - was overflowing (only 144 bytes free)
+  4096 // Restored to SAFE size (4096)
 #define TASK_STACK_MOTION                                                      \
-  4096 // Increased from 2048 - was near overflow (only 192 bytes free)
+  4096 // Restored to SAFE size (4096)
 #define TASK_STACK_ENCODER                                                     \
-  6144 // Increased from 5120 - stack monitoring shows tight margin
+  6144 // Restored to 6144 (Safe for complex encoder logic)
 #define TASK_STACK_PLC_COMM 2048
 #define TASK_STACK_I2C_MANAGER                                                 \
-  3072 // Increased from 2048 - handling bus recovery depth
+  3072 // Restored to 3072
 #define TASK_STACK_CLI                                                         \
-  3072 // Increased from 2048 - CLI parses complex commands with snprintf
-#define TASK_STACK_FAULT_LOG 3072
+  3072 // Kept
+#define TASK_STACK_FAULT_LOG 3072 // Restored
 #define TASK_STACK_MONITOR 2048
 #define TASK_STACK_TELEMETRY                                                   \
-  3072 // Increased from 2048 - collects comprehensive system state
+  3072 // Restored to 3072 (Fixes WDT)
 #define TASK_STACK_LCD_FORMAT                                                  \
-  3072 // Increased from 2048 - multiple snprintf calls for LCD strings
+  3072 // Restored to 3072
 #define TASK_STACK_LCD                                                         \
-  4096 // INCREASED from 2048 due to stack overflow in error handling
+  4096 // Restored to 4096 (Fixes low stack warning)
 #define TASK_STACK_BOOT 2048
 
 // WARNING: AsyncWebServer handlers create JsonDocument on stack!

@@ -24,77 +24,108 @@ void otaInit(void) {
 UpdateCheckResult otaCheckForUpdate(void) {
     UpdateCheckResult result = {false, "", "", ""};
     
+
     WiFiClientSecure client;
-    client.setInsecure(); // GitHub uses common CA, but for simplicity we skip cert validation here or could use root CA
-    
+    client.setInsecure(); // GitHub uses common CA
+    client.setHandshakeTimeout(30); // Allow more time for handshake
+
     HTTPClient http;
     logInfo("[OTA] Checking GitHub for updates: %s", GITHUB_API_URL);
     
-    if (http.begin(client, GITHUB_API_URL)) {
-        http.addHeader("User-Agent", "ESP32-OTA-Client");
-        int httpCode = http.GET();
+    int retry_count = 0;
+    bool success = false;
+    
+    while (retry_count < 3 && !success) {
+        if (retry_count > 0) {
+            logWarning("[OTA] Retry %d/3...", retry_count + 1);
+            delay(1000);
+        }
         
-        if (httpCode == HTTP_CODE_OK) {
-            String payload = http.getString();
-            JsonDocument doc;
-            DeserializationError error = deserializeJson(doc, payload);
+        if (http.begin(client, GITHUB_API_URL)) {
+            http.addHeader("User-Agent", "ESP32-OTA-Client");
+            http.setTimeout(10000); // 10s request timeout
+
+            int httpCode = http.GET();
             
-            if (!error) {
-                const char* tag_name = doc["tag_name"]; // e.g., "v1.0.1"
-                if (tag_name) {
-                    strncpy(result.latest_version, tag_name, sizeof(result.latest_version));
-                    
-                    // Parse GitHub version (format: "vX.Y.Z" or "X.Y.Z")
-                    int gh_major = 0, gh_minor = 0, gh_patch = 0;
-                    const char* ver_start = tag_name;
-                    if (ver_start[0] == 'v' || ver_start[0] == 'V') ver_start++;
-                    sscanf(ver_start, "%d.%d.%d", &gh_major, &gh_minor, &gh_patch);
-                    
-                    // Compare with current firmware version
-                    bool is_newer = false;
-                    if (gh_major > FIRMWARE_VERSION_MAJOR) {
-                        is_newer = true;
-                    } else if (gh_major == FIRMWARE_VERSION_MAJOR) {
-                        if (gh_minor > FIRMWARE_VERSION_MINOR) {
+            if (httpCode > 0) {
+                // Connection successful (even if 404/500, we reached the server)
+                success = true; 
+            }
+            
+            if (httpCode == HTTP_CODE_OK) {
+                String payload = http.getString();
+                JsonDocument doc;
+                DeserializationError error = deserializeJson(doc, payload);
+                
+                if (!error) {
+                    const char* tag_name = doc["tag_name"]; // e.g., "v1.0.1"
+                    if (tag_name) {
+                        strncpy(result.latest_version, tag_name, sizeof(result.latest_version));
+                        
+                        // Parse GitHub version (format: "vX.Y.Z" or "X.Y.Z")
+                        int gh_major = 0, gh_minor = 0, gh_patch = 0;
+                        const char* ver_start = tag_name;
+                        if (ver_start[0] == 'v' || ver_start[0] == 'V') ver_start++;
+                        sscanf(ver_start, "%d.%d.%d", &gh_major, &gh_minor, &gh_patch);
+                        
+                        // Compare with current firmware version
+                        bool is_newer = false;
+                        if (gh_major > FIRMWARE_VERSION_MAJOR) {
                             is_newer = true;
-                        } else if (gh_minor == FIRMWARE_VERSION_MINOR) {
-                            if (gh_patch > FIRMWARE_VERSION_PATCH) {
+                        } else if (gh_major == FIRMWARE_VERSION_MAJOR) {
+                            if (gh_minor > FIRMWARE_VERSION_MINOR) {
                                 is_newer = true;
-                            }
-                        }
-                    }
-                    
-                    logInfo("[OTA] Current: v%d.%d.%d, GitHub: v%d.%d.%d, Newer: %s",
-                            FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH,
-                            gh_major, gh_minor, gh_patch,
-                            is_newer ? "YES" : "NO");
-                    
-                    if (is_newer) {
-                        result.available = true;
-                        
-                        // Find the firmware.bin asset
-                        JsonArray assets = doc["assets"];
-                        for (JsonObject asset : assets) {
-                            const char* name = asset["name"];
-                            if (name && strstr(name, ".bin") != NULL) {
-                                strncpy(result.download_url, asset["browser_download_url"], sizeof(result.download_url));
-                                break;
+                            } else if (gh_minor == FIRMWARE_VERSION_MINOR) {
+                                if (gh_patch > FIRMWARE_VERSION_PATCH) {
+                                    is_newer = true;
+                                }
                             }
                         }
                         
-                        const char* body = doc["body"];
-                        if (body) {
-                            strncpy(result.release_notes, body, sizeof(result.release_notes));
+                        logInfo("[OTA] Current: v%d.%d.%d, GitHub: v%d.%d.%d, Newer: %s",
+                                FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH,
+                                gh_major, gh_minor, gh_patch,
+                                is_newer ? "YES" : "NO");
+                        
+                        if (is_newer) {
+                            result.available = true;
+                            
+                            // Find the firmware.bin asset
+                            JsonArray assets = doc["assets"];
+                            for (JsonObject asset : assets) {
+                                const char* name = asset["name"];
+                                if (name && strstr(name, ".bin") != NULL) {
+                                    strncpy(result.download_url, asset["browser_download_url"], sizeof(result.download_url));
+                                    break;
+                                }
+                            }
+                            
+                            const char* body = doc["body"];
+                            if (body) {
+                                strncpy(result.release_notes, body, sizeof(result.release_notes));
+                            }
                         }
                     }
+                } else {
+                     logError("[OTA] JSON parse failed: %s", error.c_str());
                 }
             } else {
-                 logError("[OTA] JSON parse failed: %s", error.c_str());
+                if (httpCode < 0) {
+                    logError("[OTA] HTTP GET failed: %s (%d)", http.errorToString(httpCode).c_str(), httpCode);
+                    // Explicitly log SSL error if available? (WiFiClientSecure logs it to Serial)
+                } else {
+                    logError("[OTA] HTTP Error: %d", httpCode);
+                }
             }
+            http.end();
+            if (success) break; // Don't retry if we got a response (even if JSON parse failed)
         } else {
-            logError("[OTA] HTTP GET failed, error: %s", http.errorToString(httpCode).c_str());
+            logError("[OTA] Connection failed");
         }
-        http.end();
+        
+        retry_count++;
+        // Force cleanup before retry
+        client.stop();
     }
     
     return result;
@@ -186,6 +217,8 @@ static void ota_check_task(void* pvParameters) {
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     
     logInfo("[OTA] Starting background update check...");
+    logInfo("[OTA] Free Heap: %u, Max Block: %u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+
     cached_result = otaCheckForUpdate();
     ota_check_complete = true;
     
@@ -201,7 +234,8 @@ static void ota_check_task(void* pvParameters) {
 void otaStartBackgroundCheck(void) {
     if (ota_check_complete) return; // Already checked
     
-    xTaskCreate(ota_check_task, "ota_check", 8192, NULL, 3, NULL);
+    // Reduced stack from 8192 to 5120 to save heap
+    xTaskCreate(ota_check_task, "ota_check", 5120, NULL, 3, NULL);
 }
 
 const UpdateCheckResult* otaGetCachedResult(void) {
