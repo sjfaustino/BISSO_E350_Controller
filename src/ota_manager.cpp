@@ -27,6 +27,7 @@ UpdateCheckResult otaCheckForUpdate(void) {
 
     WiFiClientSecure client;
     client.setInsecure(); // GitHub uses common CA
+    client.setInsecure(); // GitHub uses common CA
     client.setHandshakeTimeout(30); // Allow more time for handshake
 
     HTTPClient http;
