@@ -337,7 +337,8 @@ void NetworkManager::init() {
   logPrintln("[NET] Telnet Server Started on Port 23 (Authentication Required)");
   
   // 4. Start background OTA update check (non-blocking)
-  otaStartBackgroundCheck();
+  // DISABLED: Moved to main.cpp setup() for synchronous check at boot (better memory management)
+  // otaStartBackgroundCheck();
 }
 
 void NetworkManager::update() {

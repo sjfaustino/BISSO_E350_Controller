@@ -22,6 +22,7 @@
 #include "auth_manager.h"  // PHASE 5.10: SHA-256 password hashing
 #include "web_server.h"
 #include "network_manager.h"
+#include "ota_manager.h" // Needed for otaCheckForUpdate at boot
 #include "encoder_diagnostics.h"  // PHASE 5.3: Advanced encoder diagnostics
 #include "load_manager.h"  // PHASE 5.3: Graceful degradation under load
 #include "dashboard_metrics.h"  // PHASE 5.3: Web UI dashboard metrics
@@ -158,6 +159,39 @@ void setup() {
   }
 
   // taskManagerInit() already called earlier (before Motion init)
+  
+  // PHASE 5.4: Synchronous OTA Check at Boot (Fixes SSL Memory Issues)
+  // Wait for WiFi to connect (Reduced to 3s for faster boot)
+  logInfo("[BOOT] Waiting for WiFi...");
+  uint32_t wifi_wait_start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - wifi_wait_start < 3000) {
+      delay(100);
+      if ((millis() - wifi_wait_start) % 1000 == 0) Serial.print(".");
+  }
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+      logInfo("[BOOT] WiFi Connected. IP: %s", WiFi.localIP().toString().c_str());
+      logInfo("[BOOT] Running OTA Check (Free Heap: %u)...", ESP.getFreeHeap());
+      
+      // Allow network stack to settle
+      delay(500);
+      
+      // Perform synchronous check (uses main stack + heap)
+      // Since no other tasks are running, heap is maximizing contiguous blocks
+      UpdateCheckResult result = otaCheckForUpdate();
+      
+      if (result.available) {
+          logInfo("[OTA] Update Available: %s", result.latest_version);
+          // Note: Actual update (download) logic could be triggered here if desired
+          // For now, we just cache the result for the UI
+      } else {
+          logInfo("[OTA] Firmware is up to date");
+      }
+  } else {
+      logWarning("[BOOT] WiFi not connected - skipping OTA check");
+  }
+
   perfMonitorInit();  // PHASE 5.1: Initialize performance monitoring
   taskManagerStart();
   logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
