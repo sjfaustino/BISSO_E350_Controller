@@ -64,14 +64,51 @@ window.SystemModule = window.SystemModule || {
     },
 
     loadSystemInfo() {
-        // Load firmware version (replace with actual API call)
+        // Load firmware version from AppState
         const fwVersionEl = document.getElementById('fw-version');
         const fwBuildDateEl = document.getElementById('fw-build-date');
         const serialNumberEl = document.getElementById('serial-number');
 
-        if (fwVersionEl) fwVersionEl.textContent = '3.1.0';
-        if (fwBuildDateEl) fwBuildDateEl.textContent = '2024-12-14';
-        if (serialNumberEl) serialNumberEl.textContent = 'BS-E350-001-2024';
+        // Use real version if available in AppState, else fallback
+        const currentVer = AppState.get('system.firmware_version') || '1.0.0';
+
+        if (fwVersionEl) fwVersionEl.textContent = currentVer;
+        if (fwBuildDateEl) fwBuildDateEl.textContent = '2025-01-05'; // Static for now
+
+        // Hardware Info
+        if (document.getElementById('hw-mcu')) document.getElementById('hw-mcu').textContent = AppState.get('system.hw_mcu') || 'Unknown';
+        if (document.getElementById('hw-model')) document.getElementById('hw-model').textContent = AppState.get('system.hw_model') || 'BISSO E350';
+        if (document.getElementById('hw-revision')) document.getElementById('hw-revision').textContent = AppState.get('system.hw_revision') || 'v1.0';
+        if (serialNumberEl) serialNumberEl.textContent = AppState.get('system.hw_serial') || 'Scanning...';
+
+        // Load latest version info
+        const ota = AppState.get('ota');
+        const fwLatestEl = document.getElementById('fw-latest');
+        const checkBtn = document.getElementById('check-update-btn');
+
+        if (fwLatestEl && ota) {
+            if (ota.available) {
+                fwLatestEl.textContent = `${ota.latest_version} (Available)`;
+                fwLatestEl.style.color = 'var(--color-optimal)';
+
+                // Change button to "Install Update"
+                if (checkBtn) {
+                    checkBtn.textContent = 'Install Update';
+                    checkBtn.classList.remove('btn-primary');
+                    checkBtn.classList.add('btn-success');
+                    checkBtn.onclick = () => this.installUpdate();
+                }
+            } else {
+                fwLatestEl.textContent = `${currentVer} (Latest)`;
+                fwLatestEl.style.color = 'var(--text-secondary)';
+                if (checkBtn) {
+                    checkBtn.textContent = 'Check for Updates';
+                    checkBtn.classList.add('btn-primary');
+                    checkBtn.classList.remove('btn-success');
+                    checkBtn.onclick = () => this.checkForUpdates();
+                }
+            }
+        }
 
         // Load storage info
         this.updateStorageInfo();
@@ -81,6 +118,65 @@ window.SystemModule = window.SystemModule || {
 
         // Load device time
         this.updateDeviceTime();
+
+        // Update Configuration Card
+        const config = AppState.get('config') || {};
+        this.setConfigStatus('conf-auth', config.http_auth);
+        this.setConfigStatus('conf-https', config.https);
+        this.setConfigStatus('conf-ws', config.websocket);
+        this.setConfigStatus('conf-modbus', config.modbus);
+    },
+
+    setConfigStatus(id, enabled) {
+        const el = document.getElementById(id);
+        if (el) {
+            if (enabled === undefined) {
+                el.textContent = 'Loading...';
+                el.style.color = '';
+            } else if (enabled) {
+                el.textContent = '✓ Yes';
+                el.style.color = 'var(--color-optimal)';
+            } else {
+                el.textContent = '✗ No';
+                el.style.color = 'var(--color-warning)'; // or 'var(--text-secondary)'
+            }
+        }
+    },
+
+    // ... (storage and system status methods usually unchanged) ...
+
+    async checkForUpdates() {
+        AlertManager.add('Checking for updates...', 'info');
+        await AppState.checkForUpdates();
+        const ota = AppState.get('ota');
+
+        if (ota && ota.available) {
+            AlertManager.add(`Update available: ${ota.latest_version}`, 'success', 5000);
+            this.loadSystemInfo(); // Refresh UI to show update button
+        } else {
+            AlertManager.add('You are running the latest version', 'success', 3000);
+            this.loadSystemInfo();
+        }
+    },
+
+    async installUpdate() {
+        if (!confirm('Start firmware update? The device will reboot.')) return;
+
+        AlertManager.add('Starting update...', 'info');
+        try {
+            const response = await fetch('/api/ota/update', { method: 'POST' });
+            if (response.ok) {
+                AlertManager.add('Update started! Do not power off.', 'warning', 10000);
+                // Disable button
+                const checkBtn = document.getElementById('check-update-btn');
+                if (checkBtn) checkBtn.disabled = true;
+            } else {
+                const err = await response.json();
+                AlertManager.add(`Update failed: ${err.error}`, 'critical');
+            }
+        } catch (e) {
+            AlertManager.add('Update request failed', 'critical');
+        }
     },
 
     updateStorageInfo() {
@@ -145,9 +241,25 @@ window.SystemModule = window.SystemModule || {
         const lastResetEl = document.getElementById('last-reset');
         const lastBackupEl = document.getElementById('last-backup');
 
-        if (systemUptimeEl) systemUptimeEl.textContent = uptimeHours + ' h';
+        // Use backend uptime if available
+        const uptimeSec = AppState.get('system.uptime_seconds') || 0;
+
+        if (systemUptimeEl) {
+            const h = Math.floor(uptimeSec / 3600);
+            const m = Math.floor((uptimeSec % 3600) / 60);
+            systemUptimeEl.textContent = `${h}h ${m}m`;
+        }
+
+        if (lastResetEl) {
+            if (uptimeSec > 0) {
+                const resetTime = new Date(Date.now() - (uptimeSec * 1000));
+                lastResetEl.textContent = resetTime.toLocaleString();
+            } else {
+                lastResetEl.textContent = 'Unknown';
+            }
+        }
+
         if (resetCountEl) resetCountEl.textContent = this.resetCount;
-        if (lastResetEl) lastResetEl.textContent = '2024-12-01 09:15';
         if (lastBackupEl) lastBackupEl.textContent = new Date().toLocaleString();
     },
 
@@ -157,6 +269,7 @@ window.SystemModule = window.SystemModule || {
             this.updateStorageInfo();
             this.updateSystemStatus();
             this.updateDeviceTime();
+            this.loadSystemInfo();
         }, 10000);
     },
 
@@ -168,7 +281,11 @@ window.SystemModule = window.SystemModule || {
                 const timeEl = document.getElementById('device-time');
                 const sourceEl = document.getElementById('time-source');
 
-                if (timeEl) timeEl.textContent = data.formatted;
+                if (timeEl) {
+                    // Use browser locale format to match other date displays
+                    const d = new Date(data.timestamp * 1000);
+                    timeEl.textContent = d.toLocaleString();
+                }
                 if (sourceEl) {
                     // Check if time looks valid (after year 2020)
                     if (data.timestamp > 1577836800) {
@@ -212,99 +329,109 @@ window.SystemModule = window.SystemModule || {
         }
     },
 
-    checkForUpdates() {
-        AlertManager.add('Checking for updates...', 'info');
-
-        setTimeout(() => {
-            const hasUpdate = Math.random() > 0.8;
-            if (hasUpdate) {
-                AlertManager.add('Update available: v3.2.0', 'warning', 5000);
-                document.getElementById('fw-latest').textContent = '3.2.0 (Available)';
-            } else {
-                AlertManager.add('You are running the latest version', 'success', 3000);
-            }
-        }, 1500);
-    },
 
     viewSystemLogs() {
         AlertManager.add('System logs would open in logs page', 'info', 2000);
         // Could navigate to logs page or open modal with recent logs
     },
 
-    runHealthCheck() {
-        AlertManager.add('Running system health check...', 'info');
+    async runHealthCheck() {
+        AlertManager.add('Analyzing system telemetry...', 'info', 2000);
 
-        setTimeout(() => {
-            const report = `System Health Check Results:
-✓ Flash Memory: OK
-✓ RAM Memory: OK
-✓ SPIFFS: OK
-✓ WiFi: OK
-✓ WebSocket: OK
-✓ Modbus RTU: OK
-✓ Encoder 1: OK
-✓ Encoder 2: OK
-✓ Encoder 3: OK
-✓ Encoder 4: OK
+        // Allow UI to update
+        await new Promise(r => setTimeout(r, 1000));
 
-Overall Status: HEALTHY`;
+        const sys = AppState.get('system') || {};
+        const net = AppState.get('network') || {};
+        const vfd = AppState.get('vfd') || {};
+        const config = AppState.get('config') || {};
 
-            AlertManager.add('Health check complete: All systems operational', 'success', 4000);
-        }, 2000);
+        let issues = [];
+        let status = 'HEALTHY';
+
+        // 1. RAM Check
+        const freeHeap = sys.free_heap_bytes || 0;
+        const freeHeapKb = Math.round(freeHeap / 1024);
+        let ramStatus = 'OK';
+        if (freeHeapKb < 20) {
+            ramStatus = 'CRITICAL';
+            status = 'CRITICAL';
+            issues.push(`Low Memory (${freeHeapKb}KB free)`);
+        } else if (freeHeapKb < 50) {
+            ramStatus = 'WARNING';
+            if (status !== 'CRITICAL') status = 'WARNING';
+            issues.push(`Memory low (${freeHeapKb}KB free)`);
+        }
+
+        // 2. Connectivity
+        const wifiStatus = net.wifi_connected ? 'OK' : 'DISCONNECTED';
+        if (!net.wifi_connected) issues.push('WiFi Disconnected');
+
+        const sigStatus = (net.signal_percent > 30) ? 'OK' : 'WEAK';
+        if (net.wifi_connected && net.signal_percent <= 30) issues.push(`Weak WiFi Signal (${net.signal_percent}%)`);
+
+        // 3. Peripherals
+        let vfdStatus = 'N/A';
+        if (config.modbus) { // If Modbus/VFD enabled
+            vfdStatus = vfd.connected ? 'OK' : 'ERROR';
+            if (!vfd.connected) {
+                status = 'WARNING'; // VFD might be off
+                issues.push('VFD not connected');
+            }
+        }
+
+        // 4. Hardware
+        const hwStatus = sys.plc_hardware_present ? 'OK' : 'NOT DETECTED';
+
+        // Generate Report
+        const report = `System Health Report:
+✓ RAM: ${ramStatus} (${freeHeapKb}KB free)
+${net.wifi_connected ? '✓' : '✗'} WiFi: ${wifiStatus} (${net.signal_percent}%)
+${config.modbus ? (vfd.connected ? '✓' : '✗') + ' VFD: ' + vfdStatus : '• VFD: Disabled'}
+✓ Hardware: ${hwStatus}
+
+Overall Status: ${status}`;
+
+        if (issues.length > 0) {
+            AlertManager.add(`Health Check: ${status} - ${issues.join(', ')}`, status === 'CRITICAL' ? 'critical' : 'warning', 10000);
+        } else {
+            AlertManager.add('Health Check Passed: System Optimal', 'success', 5000);
+        }
+
+        console.log(report);
     },
 
-    rebootDevice() {
+    async rebootDevice() {
         const confirmed = confirm('Are you sure you want to reboot the device? Connected operations will be interrupted.');
         if (confirmed) {
-            AlertManager.add('Rebooting device...', 'warning', 3000);
-            // Send reboot command to device
-            setTimeout(() => {
-                AlertManager.add('Device restarting...', 'info', 2000);
-            }, 1000);
+            AlertManager.add('Sending reboot command...', 'warning', 5000);
+            try {
+                await fetch('/api/system/reboot', { method: 'POST' });
+                AlertManager.add('Device is restarting. Connection lost.', 'critical', 10000);
+            } catch (e) {
+                // Expected if device restarts before response
+                AlertManager.add('Device is restarting...', 'critical', 10000);
+            }
         }
     },
 
     backupConfiguration() {
         AlertManager.add('Creating backup...', 'info');
 
+        // Use backend endpoint to download file
+        // This avoids "insecure connection" warnings with Data URIs
         setTimeout(() => {
-            // Create a backup JSON file
-            const backup = {
-                timestamp: new Date().toISOString(),
-                firmware: '3.1.0',
-                configuration: {
-                    motion: {
-                        x_min: -100,
-                        x_max: 500,
-                        y_min: -100,
-                        y_max: 500
-                    },
-                    vfd: {
-                        min_freq: 1,
-                        max_freq: 105,
-                        accel_time: 600,
-                        decel_time: 400
-                    },
-                    encoder: {
-                        x_ppm: 100,
-                        y_ppm: 100,
-                        z_ppm: 100,
-                        a_ppm: 50
-                    }
-                }
-            };
+            const link = document.createElement('a');
+            link.href = '/api/config/backup';
+            // link.download is ignored if Content-Disposition header is present, but good practice
+            link.download = 'backup.json';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `backup-${Date.now()}.json`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-
-            AlertManager.add('Configuration backed up successfully', 'success', 3000);
+            AlertManager.add('Backup download started', 'success', 3000);
             document.getElementById('last-backup').textContent = new Date().toLocaleString();
-        }, 1000);
+        }, 500);
     },
 
     restoreConfiguration() {

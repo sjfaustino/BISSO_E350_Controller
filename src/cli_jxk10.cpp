@@ -72,12 +72,12 @@ static void cmd_jxk10_status() {
 }
 
 static void cmd_jxk10_enable() {
-    configSetInt(KEY_JXK10_EN, 1);
+    configSetInt(KEY_JXK10_ENABLED, 1);
     logInfo("[JXK10] Enabled in configuration (restart required)");
 }
 
 static void cmd_jxk10_disable() {
-    configSetInt(KEY_JXK10_EN, 0);
+    configSetInt(KEY_JXK10_ENABLED, 0);
     logInfo("[JXK10] Disabled in configuration (restart required)");
 }
 

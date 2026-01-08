@@ -11,6 +11,42 @@ window.HardwareModule = window.HardwareModule || {
         console.log('[Hardware] Initializing');
         this.loadPinConfiguration();
         this.setupEventListeners();
+        this.startTachometerPolling();
+    },
+
+    startTachometerPolling() {
+        // Poll tachometer every 1s
+        setInterval(() => this.updateTachometer(), 1000);
+        this.updateTachometer(); // Initial call
+    },
+
+    updateTachometer() {
+        const rpmEl = document.getElementById('tach_rpm');
+        if (!rpmEl) return; // Card not present
+
+        fetch('/api/hardware/tachometer')
+            .then(r => r.json())
+            .then(data => {
+                // Update RPM
+                document.getElementById('tach_rpm').textContent = data.rpm;
+                document.getElementById('tach_peak').textContent = data.peak_rpm;
+                document.getElementById('tach_pulses').textContent = data.pulse_count;
+                document.getElementById('tach_errors').textContent = data.error_count;
+
+                // Update Status Badge
+                const statusEl = document.getElementById('tach_status');
+                if (data.stalled) {
+                    statusEl.textContent = 'STALLED';
+                    statusEl.className = 'status-badge status-disconnected'; // Red
+                } else if (data.spinning) {
+                    statusEl.textContent = 'SPINNING';
+                    statusEl.className = 'status-badge status-connected'; // Green
+                } else {
+                    statusEl.textContent = 'IDLE';
+                    statusEl.className = 'status-badge status-unknown'; // Grey
+                }
+            })
+            .catch(e => console.warn('[Hardware] Tachometer fetch failed:', e));
     },
 
     loadPinConfiguration() {

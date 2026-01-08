@@ -18,14 +18,17 @@ int32_t rs485AutodetectBaud(void) {
     logInfo("[RS485_DET] Starting baud rate scan...");
     
     // Determine which devices to probe based on configuration
-    bool jxk_en = configGetInt(KEY_JXK10_EN, 1) != 0;
+    bool jxk_en = configGetInt(KEY_JXK10_ENABLED, 1) != 0;
     bool vfd_en = configGetInt(KEY_VFD_EN, 1) != 0;
+    bool yhtc05_en = configGetInt(KEY_YHTC05_ENABLED, 1) != 0;
     
-    uint8_t probe_addrs[2];
+    uint8_t probe_addrs[3];
     uint8_t probe_count = 0;
     
     if (jxk_en) probe_addrs[probe_count++] = (uint8_t)configGetInt(KEY_JXK10_ADDR, 1);
     if (vfd_en) probe_addrs[probe_count++] = (uint8_t)configGetInt(KEY_VFD_ADDR, 2);
+    // Hardcoded address 3 for now until KEY_YHTC05_ADDR is added
+    if (yhtc05_en) probe_addrs[probe_count++] = 3; 
 
     if (probe_count == 0) {
         logWarning("[RS485_DET] No RS485 devices are enabled in configuration. Aborting.");

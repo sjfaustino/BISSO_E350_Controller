@@ -12,6 +12,8 @@
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
+#include <WiFi.h>
+#include "hardware_config.h"
 
 
 // Configuration defaults (matching Altivar 31 + system constraints)
@@ -403,14 +405,112 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
   // Sized for motion + VFD + encoder config (~30 key-value pairs)
   JsonDocument doc;
 
+  // Metadata (placeholder, updated by web_server)
+  doc["timestamp"] = ""; 
+  doc["firmware"] = ""; 
+
+  // 1. Motion Config
   JsonObject motion = doc["motion"].to<JsonObject>();
-  motion["soft_limit_x_low"] = current_motion.soft_limit_low_mm[0];
-  motion["soft_limit_x_high"] = current_motion.soft_limit_high_mm[0];
+  JsonDocument motionDoc; apiConfigGet(CONFIG_CATEGORY_MOTION, motionDoc);
+  motion.set(motionDoc.as<JsonObject>());
+  // Add extras not in category getter
+  motion["home_enable"] = configGetInt(KEY_HOME_ENABLE, 0);
+  motion["home_fast"] = configGetInt(KEY_HOME_PROFILE_FAST, 100);
+  motion["home_slow"] = configGetInt(KEY_HOME_PROFILE_SLOW, 20);
 
+  // 2. VFD Config
   JsonObject vfd = doc["vfd"].to<JsonObject>();
-  vfd["min_speed_hz"] = current_vfd.min_speed_hz;
-  vfd["max_speed_hz"] = current_vfd.max_speed_hz;
+  JsonDocument vfdDoc; apiConfigGet(CONFIG_CATEGORY_VFD, vfdDoc);
+  vfd.set(vfdDoc.as<JsonObject>());
+  vfd["enabled"] = configGetInt(KEY_VFD_EN, 0);
+  vfd["address"] = configGetInt(KEY_VFD_ADDR, 2);
 
+  // 3. Encoder Config
+  JsonObject encoder = doc["encoder"].to<JsonObject>();
+  JsonDocument encDoc; apiConfigGet(CONFIG_CATEGORY_ENCODER, encDoc);
+  encoder.set(encDoc.as<JsonObject>());
+  encoder["feedback_en"] = configGetInt(KEY_ENC_FEEDBACK, 0);
+
+  // 4. Network
+  JsonObject net = doc["network"].to<JsonObject>();
+  // Use WiFi.SSID/psk because station creds are in NVS (WiFi lib), not config_unified
+  net["wifi_ssid"] = WiFi.SSID();
+  net["wifi_pass"] = WiFi.psk();
+  net["wifi_ap_en"] = configGetInt(KEY_WIFI_AP_EN, 0);
+  net["eth_en"] = configGetInt(KEY_ETH_ENABLED, 1);
+  net["eth_dhcp"] = configGetInt(KEY_ETH_DHCP, 1);
+  net["eth_ip"] = configGetString(KEY_ETH_IP, "");
+
+  // 5. System/Peripherals
+  JsonObject sys = doc["system"].to<JsonObject>();
+  sys["buzzer_en"] = configGetInt(KEY_BUZZER_EN, 1);
+  sys["status_light_en"] = configGetInt(KEY_STATUS_LIGHT_EN, 0);
+  sys["recovery_en"] = configGetInt(KEY_RECOV_EN, 1);
+  
+  // 6. Spindle (JXK10/Tach)
+  JsonObject spindle = doc["spindle"].to<JsonObject>();
+  spindle["jxk10_en"] = configGetInt(KEY_JXK10_ENABLED, 0);
+  spindle["jxk10_addr"] = configGetInt(KEY_JXK10_ADDR, 1);
+  spindle["yhtc05_en"] = configGetInt(KEY_YHTC05_ENABLED, 0);
+  spindle["pause_en"] = configGetInt(KEY_SPINDL_PAUSE_EN, 1);
+  // 7. Hardware Pins (Dynamic Mapping)
+  JsonObject hw = doc["hardware"].to<JsonObject>();
+  for (size_t i = 0; i < SIGNAL_COUNT; i++) {
+      hw[signalDefinitions[i].key] = getPin(signalDefinitions[i].key);
+  }
+
+  // 8. Motion Behavior & Safety
+  JsonObject behavior = doc["behavior"].to<JsonObject>();
+  behavior["jog_speed"] = configGetInt(KEY_DEFAULT_SPEED, 3000);
+  behavior["jog_accel"] = configGetInt(KEY_DEFAULT_ACCEL, 500);
+  behavior["x_approach"] = configGetInt(KEY_X_APPROACH, 50);
+  behavior["deadband"] = configGetFloat(KEY_MOTION_DEADBAND, 0.01f);
+  behavior["buf_en"] = configGetInt(KEY_MOTION_BUFFER_ENABLE, 0);
+  behavior["strict_limits"] = configGetInt(KEY_MOTION_STRICT_LIMITS, 0);
+  behavior["stop_timeout"] = configGetInt(KEY_STOP_TIMEOUT, 2000);
+  behavior["stall_timeout"] = configGetInt(KEY_STALL_TIMEOUT, 1000);
+  behavior["buttons_en"] = configGetInt(KEY_BUTTONS_ENABLED, 1);
+
+  // 9. Speed Calibration
+  JsonObject cal = doc["calibration"].to<JsonObject>();
+  cal["spd_x"] = configGetFloat(KEY_SPEED_CAL_X, 1.0f);
+  cal["spd_y"] = configGetFloat(KEY_SPEED_CAL_Y, 1.0f);
+  cal["spd_z"] = configGetFloat(KEY_SPEED_CAL_Z, 1.0f);
+  cal["spd_a"] = configGetFloat(KEY_SPEED_CAL_A, 1.0f);
+
+  // 10. Positions (Safe/User)
+  JsonObject pos = doc["positions"].to<JsonObject>();
+  pos["safe_x"] = configGetFloat(KEY_POS_SAFE_X, 0.0f);
+  pos["safe_y"] = configGetFloat(KEY_POS_SAFE_Y, 0.0f);
+  pos["safe_z"] = configGetFloat(KEY_POS_SAFE_Z, 0.0f);
+  pos["safe_a"] = configGetFloat(KEY_POS_SAFE_A, 0.0f);
+  pos["p1_x"] = configGetFloat(KEY_POS_1_X, 0.0f);
+  pos["p1_y"] = configGetFloat(KEY_POS_1_Y, 0.0f);
+  pos["p1_z"] = configGetFloat(KEY_POS_1_Z, 0.0f);
+  pos["p1_a"] = configGetFloat(KEY_POS_1_A, 0.0f);
+
+  // 11. Work Coordinate Systems (G54-G59)
+  JsonObject wcs = doc["wcs"].to<JsonObject>();
+  char wcsKey[16];
+  for (int s = 0; s < 6; s++) {
+      for (int a = 0; a < 4; a++) {
+          snprintf(wcsKey, sizeof(wcsKey), "g%d_%c", 54 + s, "xyza"[a]);
+          wcs[wcsKey] = configGetFloat(wcsKey, 0.0f);
+      }
+  }
+
+  // 12. Security (Credentials)
+  JsonObject sec = doc["security"].to<JsonObject>();
+  sec["web_user"] = configGetString(KEY_WEB_USERNAME, "admin");
+  sec["web_pass"] = configGetString(KEY_WEB_PASSWORD, "bisso");
+  sec["ota_pass"] = configGetString(KEY_OTA_PASSWORD, "bisso-ota");
+
+  // 13. Statistics/Counters
+  JsonObject stats = doc["stats"].to<JsonObject>();
+  stats["runtime_mins"] = configGetInt(KEY_RUNTIME_MINS, 0);
+  stats["cycles"] = configGetInt(KEY_CYCLE_COUNT, 0);
+  stats["maint_mins"] = configGetInt(KEY_LAST_MAINT_MINS, 0);
+  
   return serializeJson(doc, buffer, buffer_size);
 }
 

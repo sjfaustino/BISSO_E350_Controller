@@ -18,7 +18,7 @@
 
 static yhtc05_state_t yhtc05_state = {
     .enabled = false,
-    .slave_address = 1,
+    .slave_address = 3,  // Default to 3 based on user logs
     .baud_rate = 9600,
     .rpm = 0,
     .pulse_count = 0,
@@ -40,11 +40,15 @@ static uint8_t modbus_tx_buffer[16];
 static bool was_spinning = false;
 static uint32_t below_threshold_since_ms = 0;
 
+// Forward declarations
+bool yhtc05ModbusReadRPM(void);
+bool yhtc05ModbusOnResponse(const uint8_t* data, uint16_t len);
+
 // Device descriptor for RS485 registry
 static rs485_device_t yhtc05_device = {
     .name = "YH-TC05",
     .type = RS485_DEVICE_TYPE_RPM_SENSOR,
-    .slave_address = 1,
+    .slave_address = 3,
     .poll_interval_ms = 500,
     .priority = 100,
     .enabled = false,  // Disabled by default
@@ -111,11 +115,11 @@ bool yhtc05UnregisterFromBus(void) {
 // ============================================================================
 
 bool yhtc05ModbusReadRPM(void) {
-    // Build read request for RPM register (1 register)
+    // Build read request for RPM register (3 registers: RPM + CountL + CountH)
     uint16_t frame_len = modbusReadRegistersRequest(
         yhtc05_state.slave_address,
         YHTC05_REG_RPM,
-        1,  // Read 1 register (RPM only for speed)
+        3,  
         modbus_tx_buffer
     );
     
@@ -124,9 +128,10 @@ bool yhtc05ModbusReadRPM(void) {
 }
 
 bool yhtc05ModbusOnResponse(const uint8_t* data, uint16_t len) {
-    uint16_t values[1];
+    uint16_t values[3];
     
-    uint8_t err = modbusParseReadResponse(data, len, 1, values);
+    // Parse 3 registers
+    uint8_t err = modbusParseReadResponse(data, len, 3, values);
     if (err != MODBUS_ERR_NONE) {
         yhtc05_state.error_count++;
         yhtc05_state.consecutive_errors++;
@@ -137,6 +142,11 @@ bool yhtc05ModbusOnResponse(const uint8_t* data, uint16_t len) {
     
     // Update state
     yhtc05_state.rpm = values[0];
+    
+    // Combine High/Low words for Pulse Count 
+    // Assuming Reg 1 = Low, Reg 2 = High based on user log
+    yhtc05_state.pulse_count = ((uint32_t)values[2] << 16) | values[1];
+    
     yhtc05_state.last_read_time_ms = millis();
     yhtc05_state.read_count++;
     yhtc05_state.consecutive_errors = 0;
@@ -248,24 +258,18 @@ void yhtc05PrintDiagnostics(void) {
     Serial.printf("Enabled:         %s\n", yhtc05_device.enabled ? "YES" : "NO");
     
     Serial.println("\n[Measurements]");
-    Serial.printf("Current RPM:     %u\n", yhtc05_state.rpm);
+    Serial.printf("RPM:             %u\n", yhtc05_state.rpm);
     Serial.printf("Peak RPM:        %u\n", yhtc05_state.peak_rpm);
-    Serial.printf("Is Spinning:     %s\n", yhtc05_state.is_spinning ? "YES" : "NO");
-    Serial.printf("Is Stalled:      %s\n", yhtc05_state.is_stalled ? "YES" : "NO");
+    Serial.printf("Pulse Count:     %lu\n", (unsigned long)yhtc05_state.pulse_count);
+    Serial.printf("Spinning:        %s\n", yhtc05_state.is_spinning ? "YES" : "NO");
     
     Serial.println("\n[Stall Detection]");
+    Serial.printf("Diff:            %s\n", yhtc05_state.is_stalled ? "STALLED" : "OK");
     Serial.printf("Threshold:       %u RPM\n", yhtc05_state.stall_threshold_rpm);
-    Serial.printf("Time Window:     %lu ms\n", (unsigned long)yhtc05_state.stall_time_ms);
     
-    Serial.println("\n[Statistics]");
-    Serial.printf("Reads:           %lu\n", (unsigned long)yhtc05_state.read_count);
+    Serial.println("\n[Communication]");
+    Serial.printf("Read Count:      %lu\n", (unsigned long)yhtc05_state.read_count);
     Serial.printf("Errors:          %lu\n", (unsigned long)yhtc05_state.error_count);
-    Serial.printf("Consec Errors:   %lu\n", (unsigned long)yhtc05_state.consecutive_errors);
-    
-    if (yhtc05_state.last_read_time_ms > 0) {
-        Serial.printf("Last Read:       %lu ms ago\n",
-                      (unsigned long)(millis() - yhtc05_state.last_read_time_ms));
-    }
-    Serial.println();
+    Serial.println("========================================");
     serialLoggerUnlock();
 }

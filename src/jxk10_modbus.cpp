@@ -97,7 +97,7 @@ static bool jxk10OnResponse(const uint8_t* data, uint16_t len) {
 
 bool jxk10ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
     // Check if JXK-10 is enabled in configuration
-    if (configGetInt(KEY_JXK10_EN, 1) == 0) {
+    if (configGetInt(KEY_JXK10_ENABLED, 1) == 0) {
         logInfo("[JXK10] JXK-10 current monitor disabled in configuration");
         jxk10_state.enabled = false;
         jxk10_device.enabled = false;

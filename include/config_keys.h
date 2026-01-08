@@ -75,8 +75,11 @@
 #define KEY_VFD_ADDR "vfd_addr"         // Modbus slave address (1-247, default 2)
 
 // --- JXK-10 CURRENT MONITOR ---
-#define KEY_JXK10_EN "jxk10_en"         // Enable JXK-10 (1=on, 0=off, default 1)
-#define KEY_JXK10_ADDR "jxk10_addr"     // Modbus slave address (1-247, default 1)
+#define KEY_JXK10_ADDR "jxk10_addr"     // JXK-10 Modbus Address (default 2)
+#define KEY_JXK10_ENABLED "jxk10_en"    // JXK-10 Enable (1=on, 0=off)
+
+// --- YH-TC05 TACHOMETER ---
+#define KEY_YHTC05_ENABLED "yhtc05_en"  // Tachometer Enable (1=on, 0=off)
 
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"
@@ -190,6 +193,7 @@
 #define KEY_WEB_USERNAME "web_user" // Web server username
 #define KEY_WEB_PASSWORD "web_pass" // Web server password
 #define KEY_WEB_PORT "web_port"     // Web server port (default 80)
+#define KEY_WEB_AUTH_ENABLED "web_auth_en" // Web authentication enable (1=on, 0=off)
 #define KEY_WEB_PW_CHANGED                                                     \
   "web_pw_chg" // Flag: password changed from default (1=changed, 0=default)
 

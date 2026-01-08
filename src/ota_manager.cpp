@@ -129,7 +129,13 @@ UpdateCheckResult otaCheckForUpdate(void) {
         client.stop();
     }
     
+    // Cache the result for API access
+    memcpy(&cached_result, &result, sizeof(UpdateCheckResult));
     return result;
+}
+
+const UpdateCheckResult* otaGetCachedResult(void) {
+    return &cached_result;
 }
 
 static void ota_task(void* pvParameters) {
@@ -237,10 +243,6 @@ void otaStartBackgroundCheck(void) {
     
     // Reduced stack from 8192 to 5120 to save heap
     xTaskCreate(ota_check_task, "ota_check", 5120, NULL, 3, NULL);
-}
-
-const UpdateCheckResult* otaGetCachedResult(void) {
-    return &cached_result;
 }
 
 bool otaCheckComplete(void) {

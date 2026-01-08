@@ -762,6 +762,29 @@ html {
     animation: slideDown 0.4s ease-out;
 }
 
+/* =====================================================================
+   OTA UPDATE BANNER (Boot Notification)
+   ===================================================================== */
+#ota-update-banner {
+    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin: 15px 15px 0 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    animation: slideDown 0.5s ease-out;
+    display: block;
+}
+
+#ota-update-banner.hidden {
+    display: none;
+}
+
+[data-theme="dark"] #ota-update-banner {
+    background: linear-gradient(135deg, #4834d4, #686de0);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
 .ota-content {
     display: flex;
     align-items: center;

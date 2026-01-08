@@ -73,7 +73,9 @@ class AppState {
             y: { quality: 0, jitter_mms: 0, stalled: false, vfd_error_percent: 0 },
             z: { quality: 0, jitter_mms: 0, stalled: false, vfd_error_percent: 0 }
         },
-        encoders: [], network: { wifi_connected: false, signal_percent: 0 }, load_state: 0, performance: { tasks: [] }
+        encoders: [], network: { wifi_connected: false, signal_percent: 0 }, load_state: 0, performance: { tasks: [] },
+        ota: { available: false, latest_version: '', download_url: '', release_notes: '' },
+        config: { http_auth: true, https: false, websocket: true, modbus: false }
     };
     static listeners = [];
     static history = [];
@@ -101,6 +103,43 @@ class AppState {
         const target = keys.reduce((curr, prop) => curr[prop] = curr[prop] || {}, obj);
         target[lastKey] = value;
     }
+    static async checkForUpdates() {
+        try {
+            const response = await fetch('/api/ota/latest');
+            if (response.ok) {
+                const data = await response.json();
+                this.update({ ota: data });
+
+                if (data.available) {
+                    this.showUpdateBanner(data);
+                } else {
+                    const banner = document.getElementById('ota-update-banner');
+                    if (banner) banner.classList.add('hidden');
+                }
+            }
+        } catch (error) {
+            console.error('[OTA] Failed to check for updates:', error);
+        }
+    }
+
+    static showUpdateBanner(data) {
+        const banner = document.getElementById('ota-update-banner');
+        if (banner) {
+            banner.innerHTML = `
+                <div class="ota-content">
+                    <span class="ota-icon">🚀</span>
+                    <span class="ota-text">
+                        <strong>Update Available:</strong> PosiPro ${data.latest_version || 'v?.?.?'} is ready to install.
+                    </span>
+                    <div class="ota-actions">
+                        <button class="btn btn-sm btn-light" onclick="Router.go('system')">View Details</button>
+                    </div>
+                </div>
+            `;
+            banner.classList.remove('hidden');
+        }
+    }
+
     static recordHistory() {
         this.history.push({ timestamp: Date.now(), data: JSON.parse(JSON.stringify(this.data)) });
         if (this.history.length > this.maxHistory) this.history.shift();
@@ -228,6 +267,8 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { ThemeManager.init(); Router.init(); });
 } else {
     ThemeManager.init(); Router.init();
+    setTimeout(() => AppState.checkForUpdates(), 2000);
+
 }
 
 // PWA Service Worker

@@ -109,6 +109,18 @@ bool init_spindle_wrapper() {
     return spindleMonitorInit(addr, thr); 
 }
 
+// YH-TC05 Tachometer
+#include "yhtc05_modbus.h"
+bool init_yhtc05_wrapper() {
+    bool enabled = configGetInt(KEY_YHTC05_ENABLED, 1); // Default enabled
+    // Address 3 fixed for now as verified by user
+    yhtc05ModbusInit(3, 9600); 
+    if (enabled) {
+        yhtc05RegisterWithBus(1000, 100);
+    }
+    return true;
+}
+
 #define BOOT_INIT(name, func, code) \
   do { if (func()) { logInfo("[BOOT] Init %s [OK]", name); bootMarkInitialized(name); } \
        else { logError("[BOOT] Init %s [FAIL]", name); bootMarkFailed(name, "Init failed", code); } } while (0)
@@ -139,6 +151,7 @@ void setup() {
   BOOT_INIT("LCD", init_lcd_wrapper, (boot_status_code_t)19);
   BOOT_INIT("Inputs", init_inputs_wrapper, (boot_status_code_t)14);
   BOOT_INIT("Encoder", init_enc_wrapper, BOOT_ERROR_ENCODER);
+  BOOT_INIT("Tachometer", init_yhtc05_wrapper, (boot_status_code_t)22);
   BOOT_INIT("Safety", init_safety_wrapper, BOOT_ERROR_SAFETY);
   BOOT_INIT("Motion", init_motion_wrapper, BOOT_ERROR_MOTION);
   BOOT_INIT("CLI", init_cli_wrapper, BOOT_ERROR_CLI);

@@ -66,7 +66,8 @@ static const char *critical_keys[] = {
     KEY_WIFI_AP_EN,    // WiFi AP Mode
     KEY_WIFI_AP_SSID,
     KEY_WIFI_AP_PASS,
-    KEY_LCD_EN         // Display Enable
+    KEY_LCD_EN,        // Display Enable
+    KEY_YHTC05_ENABLED // Tachometer Enable
 };
 
 static bool isCriticalKey(const char *key) {

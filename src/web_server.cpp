@@ -21,6 +21,8 @@
 #include "rs485_autodetect.h"
 #include "config_keys.h"
 #include "ota_manager.h"
+#include "yhtc05_modbus.h"
+#include "firmware_version.h"
 
 // Telemetry History Buffer (last 60 samples, sampled every 5s = 5mins)
 #define HISTORY_BUFFER_SIZE 60
@@ -128,6 +130,50 @@ void WebServerManager::init() {
             return response->send(200, "application/json", "{\"success\":true}");
         }
         return response->send(500, "application/json", "{\"error\":\"Failed to set config\"}");
+        return response->send(500, "application/json", "{\"error\":\"Failed to set config\"}");
+    });
+
+    // POST /api/ota/update - Trigger firmware update
+    server.on("/api/ota/update", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        String body = request->body();
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        const char* url = nullptr;
+        
+        // If URL provided in body, use it. Otherwise use cached URL.
+        if (!error && doc["url"].is<const char*>()) {
+            url = doc["url"];
+        } else {
+            const UpdateCheckResult* result = otaGetCachedResult();
+            if (result->available && strlen(result->download_url) > 0) {
+                url = result->download_url;
+            }
+        }
+        
+        if (!url) {
+             return response->send(400, "application/json", "{\"error\":\"No update URL available\"}");
+        }
+        
+        if (otaPerformUpdate(url)) {
+            return response->send(200, "application/json", "{\"success\":true, \"message\":\"Update started\"}");
+        } else {
+            return response->send(500, "application/json", "{\"error\":\"Failed to start update (already active?)\"}");
+        }
+    });
+
+    // GET /api/ota/latest - Get cached update check result
+    server.on("/api/ota/latest", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        const UpdateCheckResult* result = otaGetCachedResult();
+        JsonDocument doc;
+        doc["available"] = result->available;
+        doc["latest_version"] = result->latest_version;
+        doc["download_url"] = result->download_url;
+        doc["release_notes"] = result->release_notes;
+        
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
     });
     
     // GET /api/network/status
@@ -398,6 +444,23 @@ void WebServerManager::init() {
 
     // --- Hardware API Routes ---
 
+    // GET /api/hardware/tachometer
+    server.on("/api/hardware/tachometer", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+         const yhtc05_state_t* state = yhtc05GetState();
+         JsonDocument doc;
+         doc["enabled"] = state->enabled;
+         doc["rpm"] = state->rpm;
+         doc["pulse_count"] = state->pulse_count;
+         doc["peak_rpm"] = state->peak_rpm;
+         doc["spinning"] = state->is_spinning;
+         doc["stalled"] = state->is_stalled;
+         doc["error_count"] = state->error_count;
+         
+         String json;
+         serializeJson(doc, json);
+         return response->send(200, "application/json", json.c_str());
+    });
+
     // GET /api/hardware/pins
     server.on("/api/hardware/pins", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         JsonDocument doc;
@@ -635,6 +698,49 @@ void WebServerManager::init() {
         return response->send(200, "application/json", resp);
     });
 
+    // GET /api/config/backup - Download full configuration
+    server.on("/api/config/backup", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        size_t bufSize = 8192;
+        char* json = (char*)malloc(bufSize);
+        if (!json) return response->send(500, "application/json", "{\"error\":\"OOM\"}");
+
+        size_t len = apiConfigExportJSON(json, bufSize);
+        (void)len; // Silence unused variable warning
+        
+        // Update timestamp/firmware in JSON
+        JsonDocument doc;
+        deserializeJson(doc, json);
+        
+        // Use current time if available
+        time_t now;
+        time(&now);
+        char timeStr[32];
+        strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
+        doc["timestamp"] = timeStr;
+        
+        char verStr[32];
+        snprintf(verStr, sizeof(verStr), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
+        doc["firmware"] = verStr;
+        
+        String output;
+        serializeJson(doc, output);
+        free(json);
+
+        char filename[64];
+        snprintf(filename, sizeof(filename), "attachment; filename=\"backup-%lu.json\"", (unsigned long)now);
+        
+        response->addHeader("Content-Disposition", filename);
+        return response->send(200, "application/json", output.c_str());
+    });
+
+    // POST /api/system/reboot
+    server.on("/api/system/reboot", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        esp_err_t err = response->send(200, "application/json", "{\"success\":true,\"message\":\"Rebooting...\"}");
+        delay(100); // Give time for response to flush
+        ESP.restart();
+        return err;
+    });
+
     logPrintln("[WEB] Hardware API routes registered");
     
     // --- WebSocket Handler for real-time telemetry ---
@@ -816,6 +922,23 @@ void WebServerManager::broadcastState() {
     doc["system"]["temperature"] = telemetry.temperature;
     doc["system"]["plc_hardware_present"] = telemetry.plc_hardware_present;
     
+    char ver_str[32];
+    snprintf(ver_str, sizeof(ver_str), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
+    doc["system"]["firmware_version"] = ver_str;
+
+    // Hardware Info
+    doc["system"]["hw_model"] = "BISSO E350";
+    doc["system"]["hw_mcu"] = ESP.getChipModel();
+    
+    char rev_str[16];
+    snprintf(rev_str, sizeof(rev_str), "Rev %d", ESP.getChipRevision());
+    doc["system"]["hw_revision"] = rev_str;
+
+    char serial_str[32];
+    uint64_t mac = ESP.getEfuseMac();
+    snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
+    doc["system"]["hw_serial"] = serial_str;
+
     doc["motion"]["position"]["x"] = current_status.x_pos;
     doc["motion"]["position"]["y"] = current_status.y_pos;
     doc["motion"]["position"]["z"] = current_status.z_pos;
@@ -845,6 +968,14 @@ void WebServerManager::broadcastState() {
     doc["network"]["wifi_connected"] = telemetry.wifi_connected;
     doc["network"]["signal_percent"] = telemetry.wifi_signal_strength;
     doc["network"]["latency"] = 0; // Placeholder for future ping/roundtrip tracking
+
+    // Configuration Status
+    doc["config"]["http_auth"] = (configGetInt(KEY_WEB_AUTH_ENABLED, 1) == 1);
+    doc["config"]["https"] = false; // Not configured
+    doc["config"]["websocket"] = true; // Always enabled
+    doc["config"]["modbus"] = (configGetInt(KEY_VFD_EN, 0) == 1) || 
+                              (configGetInt(KEY_JXK10_ENABLED, 0) == 1) || 
+                              (configGetInt(KEY_YHTC05_ENABLED, 0) == 1);
     
     portEXIT_CRITICAL(&statusSpinlock);
     

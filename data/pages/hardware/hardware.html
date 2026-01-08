@@ -82,6 +82,47 @@
             </div>
         </div>
 
+        <!-- YH-TC05 Tachometer Card -->
+        <div class="card device-card">
+            <div class="card-header device-header tachometer">
+                <h3>🔄 YH-TC05 Tachometer</h3>
+                <span class="device-protocol">Modbus RTU (Addr 3)</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row" style="margin-bottom: 15px;">
+                    <label>Current Speed:</label>
+                    <div class="value-display">
+                        <span id="tach_rpm" style="font-size: 1.2em; font-weight: bold;">--</span>
+                        <span class="unit">RPM</span>
+                    </div>
+                </div>
+                <div class="pin-row" style="margin-bottom: 15px;">
+                    <label>Peak Speed:</label>
+                    <div class="value-display">
+                        <span id="tach_peak" style="font-weight: bold;">--</span>
+                        <span class="unit">RPM</span>
+                    </div>
+                </div>
+                <div class="pin-row" style="margin-bottom: 15px;">
+                    <label>Total Pulses:</label>
+                    <div class="value-display">
+                        <span id="tach_pulses" style="font-family: monospace;">--</span>
+                    </div>
+                </div>
+                <div class="pin-row">
+                    <label>Status:</label>
+                    <div id="tach_status" class="status-badge status-unknown">Unknown</div>
+                </div>
+                <div class="pin-row" style="margin-top: 10px;">
+                    <label>Enabled:</label>
+                    <input type="checkbox" id="tach_enabled" data-config="yhtc05_en" checked>
+                </div>
+                <div class="device-note" style="margin-top: 10px; font-size: 0.85em; color: var(--text-secondary);">
+                    Errors: <span id="tach_errors">0</span>
+                </div>
+            </div>
+        </div>
+
         <!-- Ethernet LAN8270A Card -->
         <div class="card device-card">
             <div class="card-header device-header ethernet">

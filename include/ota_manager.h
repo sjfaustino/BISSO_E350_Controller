@@ -25,6 +25,12 @@ void otaInit(void);
 UpdateCheckResult otaCheckForUpdate(void);
 
 /**
+ * @brief Get the cached result of the boot-time update check
+ * @return Pointer to the cached UpdateCheckResult
+ */
+const UpdateCheckResult* otaGetCachedResult(void);
+
+/**
  * @brief Starts the background firmware update process
  * @param download_url The URL of the binary file on GitHub
  * @return True if update started successfully

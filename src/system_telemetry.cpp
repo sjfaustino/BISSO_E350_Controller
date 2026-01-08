@@ -4,6 +4,7 @@
  */
 
 #include "system_telemetry.h"
+#include "firmware_version.h"
 #include "serial_logger.h"
 #include "altivar31_modbus.h"  // VFD run status
 #include "motion.h"
@@ -257,7 +258,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
     size_t offset = 0;
 
     offset += snprintf(buffer + offset, buffer_size - offset,
-        "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"plc_hardware_present\":%s},"
+        "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"plc_hardware_present\":%s,\"firmware_version\":\"v%d.%d.%d\"},"
         "\"memory\":{\"free_bytes\":%lu,\"stack_used\":%lu},"
         "\"motion\":{\"enabled\":%s,\"moving\":%s,\"x_mm\":%.2f,\"y_mm\":%.2f,\"z_mm\":%.2f,\"a_mm\":%.2f},"
         "\"spindle\":{\"enabled\":%s,\"running\":%s,\"current_amps\":%.2f,\"peak_amps\":%.2f,\"errors\":%lu,"
@@ -271,6 +272,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         (unsigned long)t.uptime_seconds,
         t.cpu_usage_percent,
         t.plc_hardware_present ? "true" : "false",
+        FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH,
         (unsigned long)t.free_heap_bytes,
         (unsigned long)t.stack_used_bytes,
         t.motion_enabled ? "true" : "false",

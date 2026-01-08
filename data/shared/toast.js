@@ -21,6 +21,15 @@ const Toast = {
         document.body.appendChild(this.container);
 
         console.log('[Toast] Notification system initialized');
+
+        // Listen for AlertManager events
+        window.addEventListener('alert-added', (e) => {
+            const alert = e.detail;
+            // Map 'critical' to 'error' for Toast styling
+            const type = alert.type === 'critical' ? 'error' : alert.type;
+            const duration = alert.duration !== null ? alert.duration : 3000;
+            this.show(alert.message, type, duration);
+        });
     },
 
     /**
