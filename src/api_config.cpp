@@ -437,6 +437,8 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
   net["wifi_ssid"] = WiFi.SSID();
   net["wifi_pass"] = WiFi.psk();
   net["wifi_ap_en"] = configGetInt(KEY_WIFI_AP_EN, 0);
+  net["wifi_ap_ssid"] = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
+  net["wifi_ap_pass"] = configGetString(KEY_WIFI_AP_PASS, "password");
   net["eth_en"] = configGetInt(KEY_ETH_ENABLED, 1);
   net["eth_dhcp"] = configGetInt(KEY_ETH_DHCP, 1);
   net["eth_ip"] = configGetString(KEY_ETH_IP, "");
