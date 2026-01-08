@@ -8,7 +8,7 @@
 #include "task_manager.h" // THREAD SAFETY FIX: For I2C board mutex
 #include <Wire.h>
 
-static uint8_t input_cache = 0xFF;
+static uint8_t input_cache = 0x00; // Default 0 (Inactive)
 static bool device_present = false; // Track if device was detected at init
 static bool buttons_enabled =
     true; // Config flag to enable/disable button polling
@@ -20,9 +20,9 @@ static bool buttons_enabled =
 // To filter electrical noise, an input must remain stable for 
 // DEBOUNCE_STABILITY_REQUIRED consecutive polls (5ms each = 15ms total)
 #define DEBOUNCE_STABILITY_REQUIRED 3
-static uint8_t debounced_input_cache = 0xFF;
+static uint8_t debounced_input_cache = 0x00; // Default 0
 static uint8_t input_stability_count[8] = {0};
-static uint8_t last_raw_input = 0xFF;
+static uint8_t last_raw_input = 0x00; // Default 0
 
 static uint8_t mask_estop = 0;
 static uint8_t mask_pause = 0;

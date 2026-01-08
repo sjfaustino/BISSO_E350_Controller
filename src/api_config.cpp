@@ -265,6 +265,36 @@ bool apiConfigSet(config_category_t category, const char *key,
     }
     break;
 
+  case CONFIG_CATEGORY_NETWORK:
+    // Direct NVS saves for network to ensure they persist immediately
+    // Note: network_manager reloads these on reboot or on specific commands
+    if (strcmp(key, "wifi_ssid") == 0) {
+        // Station SSID is special - managed by WiFi lib, but we can save to NVS buffer if needed
+        // For now, we assume ConfigSetString will be called by caller or we use configSetString here
+        // BUT apiConfigSet typically updates RAM state. 
+        // NetworkManager reads NVS directly. So we should write to NVS.
+        // However, apiConfigSet is usually followed by apiConfigSave for some categories.
+        // Let's write to NVS directly here since Network doesn't have a "current_network" struct in RAM in this file.
+        // Station creds are usually handled by WiFi.begin() persistence, but backing up in NVS keys is good practice if we unify.
+        // Actually, let's just use configSetString for these.
+        // But wait, apiConfigSet returns void/bool. Caller might call apiConfigSave later.
+        // Since we don't have RAM struct, let's write to NVS cache (which is what configSetString does).
+        // WARNING: apiConfigSave() (lines 83-101) only saves Motion/Encoder!
+        // So relying on apiConfigSave() to save Network is WRONG if we only update NVS cache here and don't flush.
+        // configSetString updates the cache. configUnifiedSave() flushes it.
+        // We should probably call configSetString here.
+        configSetString(KEY_WIFI_SSID, value.as<const char*>());
+    } else if (strcmp(key, "wifi_pass") == 0) {
+        configSetString(KEY_WIFI_PASS, value.as<const char*>());
+    } else if (strcmp(key, "wifi_ap_en") == 0) {
+        configSetInt(KEY_WIFI_AP_EN, value.as<int>());
+    } else if (strcmp(key, "wifi_ap_ssid") == 0) {
+        configSetString(KEY_WIFI_AP_SSID, value.as<const char*>());
+    } else if (strcmp(key, "wifi_ap_pass") == 0) {
+        configSetString(KEY_WIFI_AP_PASS, value.as<const char*>());
+    }
+    break;
+
   default:
     return false;
   }
@@ -307,6 +337,17 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
     cal.add(current_encoder.calibrated[0]);
     cal.add(current_encoder.calibrated[1]);
     cal.add(current_encoder.calibrated[2]);
+    break;
+  }
+
+  case CONFIG_CATEGORY_NETWORK: {
+    // Station
+    obj["wifi_ssid"] = WiFi.SSID(); 
+    obj["wifi_pass"] = WiFi.psk();
+    // AP - Default to ENABLED (1) if missing to match system default
+    obj["wifi_ap_en"] = configGetInt(KEY_WIFI_AP_EN, 1);
+    obj["wifi_ap_ssid"] = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
+    obj["wifi_ap_pass"] = configGetString(KEY_WIFI_AP_PASS, "password");
     break;
   }
 

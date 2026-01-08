@@ -13,6 +13,7 @@
 #include "hardware_config.h"
 #include "plc_iface.h"
 #include "board_inputs.h"
+#include <ETH.h>
 #include "gcode_parser.h"
 #include "system_telemetry.h"
 #include "fault_logging.h"
@@ -179,14 +180,16 @@ void WebServerManager::init() {
     // GET /api/network/status
     server.on("/api/network/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
         JsonDocument doc;
-        bool connected = WiFi.isConnected();
-        doc["wifi_connected"] = connected;
-        doc["wifi_ssid"] = connected ? WiFi.SSID() : "--";
-        doc["wifi_ip"] = connected ? WiFi.localIP().toString() : "0.0.0.0";
-        doc["wifi_rssi"] = connected ? WiFi.RSSI() : -100;
+        
+        // WiFi Status
+        bool wifi_connected = WiFi.isConnected();
+        doc["wifi_connected"] = wifi_connected;
+        doc["wifi_ssid"] = wifi_connected ? WiFi.SSID() : "--";
+        doc["wifi_ip"] = wifi_connected ? WiFi.localIP().toString() : "0.0.0.0";
+        doc["wifi_rssi"] = wifi_connected ? WiFi.RSSI() : -100;
         doc["wifi_mac"] = WiFi.macAddress();
-        doc["wifi_gateway"] = connected ? WiFi.gatewayIP().toString() : "0.0.0.0";
-        doc["wifi_dns"] = connected ? WiFi.dnsIP().toString() : "0.0.0.0";
+        doc["wifi_gateway"] = wifi_connected ? WiFi.gatewayIP().toString() : "0.0.0.0";
+        doc["wifi_dns"] = wifi_connected ? WiFi.dnsIP().toString() : "0.0.0.0";
         
         // Calculate signal quality percentage (maps -100..-50 to 0..100)
         int rssi = WiFi.RSSI();
@@ -195,9 +198,19 @@ void WebServerManager::init() {
         else if (rssi >= -50) quality = 100;
         else quality = 2 * (rssi + 100);
         doc["signal_quality"] = quality;
+
+        // Ethernet Status
+        // Note: ETH object is standard in Arduino ETH.h
+        doc["eth_connected"] = ETH.linkUp();
+        doc["eth_ip"] = ETH.linkUp() ? ETH.localIP().toString() : "0.0.0.0";
+        doc["eth_mac"] = ETH.macAddress();
+        doc["eth_speed"] = ETH.linkSpeed();
+        doc["eth_duplex"] = ETH.fullDuplex();
+        doc["eth_gateway"] = ETH.linkUp() ? ETH.gatewayIP().toString() : "0.0.0.0";
         
         // System uptime in ms
         doc["uptime_ms"] = millis();
+        // doc["timestamp"] = millis(); // Removed as legacy since uptime_ms is preferred
         
         String json;
         serializeJson(doc, json);
@@ -756,11 +769,26 @@ void WebServerManager::init() {
         // Handle incoming messages (commands from web UI)
         if (frame->type == HTTPD_WS_TYPE_TEXT) {
             String msg = String((char*)frame->payload, frame->len);
+            
+            // Parse JSON for commands
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, msg);
+            
+            if (!error) {
+                const char* type = doc["type"] | "";
+                
+                // Handle Ping/Pong for latency tracking
+                if (strcmp(type, "ping") == 0) {
+                    // Send immediate Pong
+                    request->reply("{\"type\":\"pong\"}");
+                    return ESP_OK;
+                }
+            }
+
             // Filter out heartbeat pings to keep logs clean
             if (msg.indexOf("ping") == -1) {
                 logPrintf("[WS] Received: %s\n", msg.c_str());
             }
-            // Could parse commands here if needed
         }
         return ESP_OK;
     });

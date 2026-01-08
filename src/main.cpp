@@ -174,17 +174,10 @@ void setup() {
   // taskManagerInit() already called earlier (before Motion init)
   
   // PHASE 5.4: Synchronous OTA Check at Boot (Fixes SSL Memory Issues)
-<<<<<<< HEAD
   // Wait for WiFi to connect (up to 10 seconds)
   logInfo("[BOOT] Waiting for WiFi...");
   uint32_t wifi_wait_start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - wifi_wait_start < 10000) {
-=======
-  // Wait for WiFi to connect (Reduced to 3s for faster boot)
-  logInfo("[BOOT] Waiting for WiFi...");
-  uint32_t wifi_wait_start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - wifi_wait_start < 3000) {
->>>>>>> 7133459 (v1.0.0-hotfix: Fix OTA SSL (Fixed+Optimized 20s))
       delay(100);
       if ((millis() - wifi_wait_start) % 1000 == 0) Serial.print(".");
   }

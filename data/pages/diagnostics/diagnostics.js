@@ -609,7 +609,7 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
                 inputGrid.innerHTML += `
                     <div class="io-diag-pin">
                         <div class="pin-led off" id="io-in-${i}"></div>
-                        <span>IN${i}</span>
+                        <span>X${i}</span>
                     </div>`;
             }
         }
@@ -619,7 +619,7 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
                 outputGrid.innerHTML += `
                     <div class="io-diag-pin">
                         <div class="pin-led off" id="io-out-${i}"></div>
-                        <span>OUT${i}</span>
+                        <span>Y${i}</span>
                     </div>`;
             }
         }

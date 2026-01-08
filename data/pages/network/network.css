@@ -1,0 +1,74 @@
+/* Network Page Specific Styles */
+#network-diagnostics-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 600px;
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
+}
+
+#diagnostics-output {
+    background: #0f172a;
+    /* Slate 900 */
+    color: #ffffff;
+    /* Pure White */
+    font-weight: bold;
+    /* Thicker text */
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 15px;
+    /* Larger text */
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    /* Preserves newlines and wraps text */
+    margin-bottom: var(--space-md);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-md);
+}

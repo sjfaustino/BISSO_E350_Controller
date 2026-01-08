@@ -25,7 +25,8 @@ typedef enum {
     CONFIG_CATEGORY_VFD = 1,            // VFD parameters (speed, ramps)
     CONFIG_CATEGORY_ENCODER = 2,        // Encoder calibration (PPM)
     CONFIG_CATEGORY_SAFETY = 3,         // Safety thresholds
-    CONFIG_CATEGORY_THERMAL = 4         // Thermal protection
+    CONFIG_CATEGORY_THERMAL = 4,        // Thermal protection
+    CONFIG_CATEGORY_NETWORK = 5         // WiFi/Ethernet settings
 } config_category_t;
 
 /**

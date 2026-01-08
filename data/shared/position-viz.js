@@ -51,6 +51,8 @@ class PositionVisualizer {
             text: getComputedStyle(document.documentElement).getPropertyValue('--text-primary') || '#000000'
         };
 
+        this.padding = 60; // Increased padding for axis labels
+
         // Handle resize
         this.resizeObserver = new ResizeObserver(() => this.handleResize());
         this.resizeObserver.observe(this.canvas);
@@ -89,16 +91,14 @@ class PositionVisualizer {
     toCanvasX(x) {
         const range = this.config.x_max - this.config.x_min;
         const normalized = (x - this.config.x_min) / range;
-        const padding = 40;
-        return padding + normalized * (this.width - 2 * padding);
+        return this.padding + normalized * (this.width - 2 * this.padding);
     }
 
     toCanvasY(y) {
         const range = this.config.y_max - this.config.y_min;
         const normalized = (y - this.config.y_min) / range;
-        const padding = 40;
         // Invert Y axis (canvas Y increases downward)
-        return this.height - padding - normalized * (this.height - 2 * padding);
+        return this.height - this.padding - normalized * (this.height - 2 * this.padding);
     }
 
     draw() {
@@ -145,8 +145,8 @@ class PositionVisualizer {
         while (x <= this.config.x_max) {
             const canvasX = this.toCanvasX(x);
             this.ctx.beginPath();
-            this.ctx.moveTo(canvasX, 40);
-            this.ctx.lineTo(canvasX, this.height - 40);
+            this.ctx.moveTo(canvasX, this.padding);
+            this.ctx.lineTo(canvasX, this.height - this.padding);
             this.ctx.stroke();
             x += gridStep;
         }
@@ -156,8 +156,8 @@ class PositionVisualizer {
         while (y <= this.config.y_max) {
             const canvasY = this.toCanvasY(y);
             this.ctx.beginPath();
-            this.ctx.moveTo(40, canvasY);
-            this.ctx.lineTo(this.width - 40, canvasY);
+            this.ctx.moveTo(this.padding, canvasY);
+            this.ctx.lineTo(this.width - this.padding, canvasY);
             this.ctx.stroke();
             y += gridStep;
         }
@@ -226,7 +226,7 @@ class PositionVisualizer {
         let y = Math.ceil(this.config.y_min / step_y) * step_y;
         while (y <= this.config.y_max) {
             const canvasY = this.toCanvasY(y);
-            this.ctx.fillText(y + 'mm', 25, canvasY + 4);
+            this.ctx.fillText(y + 'mm', this.padding - 8, canvasY + 4);
             y += step_y;
         }
 
@@ -267,15 +267,19 @@ class PositionVisualizer {
         const box_width = 150;
         const box_height = 90;
 
+        // Move to top-right corner to avoid Y-axis overlap
+        const x_pos = this.width - box_width - padding;
+        const y_pos_start = padding;
+
         // Semi-transparent background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.fillRect(padding, padding, box_width, box_height);
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Detached from theme for better contrast
+        this.ctx.fillRect(x_pos, y_pos_start, box_width, box_height);
 
         // Border
         this.ctx.strokeStyle = this.colors.text;
         this.ctx.lineWidth = 1;
         this.ctx.globalAlpha = 0.5;
-        this.ctx.strokeRect(padding, padding, box_width, box_height);
+        this.ctx.strokeRect(x_pos, y_pos_start, box_width, box_height);
         this.ctx.globalAlpha = 1;
 
         // Text
@@ -283,14 +287,18 @@ class PositionVisualizer {
         this.ctx.font = 'bold 12px Arial';
         this.ctx.textAlign = 'left';
 
-        let y_pos = padding + 12;
-        this.ctx.fillText(`X: ${this.position.x.toFixed(1)} mm`, padding + 5, y_pos);
+        let y_pos = y_pos_start + 20;
+
+        // Use white text for better contrast on dark overlay
+        this.ctx.fillStyle = '#ffffff';
+
+        this.ctx.fillText(`X: ${this.position.x.toFixed(1)} mm`, x_pos + 10, y_pos);
         y_pos += lineHeight;
-        this.ctx.fillText(`Y: ${this.position.y.toFixed(1)} mm`, padding + 5, y_pos);
+        this.ctx.fillText(`Y: ${this.position.y.toFixed(1)} mm`, x_pos + 10, y_pos);
         y_pos += lineHeight;
-        this.ctx.fillText(`Z: ${this.position.z.toFixed(1)} mm`, padding + 5, y_pos);
+        this.ctx.fillText(`Z: ${this.position.z.toFixed(1)} mm`, x_pos + 10, y_pos);
         y_pos += lineHeight;
-        this.ctx.fillText(`A: ${this.position.a.toFixed(1)}°`, padding + 5, y_pos);
+        this.ctx.fillText(`A: ${this.position.a.toFixed(1)}°`, x_pos + 10, y_pos);
     }
 
     // Reset trail

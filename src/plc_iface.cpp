@@ -28,7 +28,7 @@
 #include <freertos/FreeRTOS.h>
 
 // Shadow Registers
-static uint8_t i73_input_shadow = 0xFF;
+static uint8_t i73_input_shadow = 0x00; // Default 0 (Inactive) to prevent phantom inputs on vanilla ESP32
 static uint8_t q73_shadow_register = 0xFF; // All OFF (active-low: 1=OFF, 0=ON)
 
 // CRITICAL FIX: Mutex to protect shadow register access

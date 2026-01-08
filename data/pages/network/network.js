@@ -2,7 +2,8 @@
  * Network & Connectivity Dashboard Module
  * Note: Use window.NetworkModule to avoid "already declared" errors when navigating
  */
-window.NetworkModule = window.NetworkModule || {
+// Force update of module definition to ensure new methods are available
+window.NetworkModule = {
     latencyHistory: [],
     maxHistoryLength: 100,
     reconnectCount: 0,
@@ -55,6 +56,31 @@ window.NetworkModule = window.NetworkModule || {
         const reconnectBtn = document.getElementById('reconnect-btn');
         if (reconnectBtn) {
             reconnectBtn.addEventListener('click', () => this.reconnectDevice());
+        }
+
+        // Toggle Password Visibility
+        const toggleStation = document.getElementById('toggle-station-pass');
+        if (toggleStation) {
+            console.log('[Network] Added station toggle listener');
+            toggleStation.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent focus loss or other side effects
+                console.log('[Network] Station toggle clicked');
+                this.togglePass('station-pass');
+            });
+        } else {
+            console.warn('[Network] Station toggle button not found');
+        }
+
+        const toggleAp = document.getElementById('toggle-ap-pass');
+        if (toggleAp) {
+            console.log('[Network] Added AP toggle listener');
+            toggleAp.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('[Network] AP toggle clicked');
+                this.togglePass('ap-pass');
+            });
+        } else {
+            console.warn('[Network] AP toggle button not found');
         }
 
         // Diagnostics button
@@ -112,6 +138,7 @@ window.NetworkModule = window.NetworkModule || {
                 const qualityText = quality > 75 ? 'Excellent' : quality > 50 ? 'Good' : quality > 25 ? 'Fair' : 'Poor';
                 const signalQualityEl = document.getElementById('signal-quality');
                 if (signalQualityEl) signalQualityEl.textContent = qualityText;
+                Utils.setText('signal-quality', qualityText);
 
                 const bar = document.getElementById('signal-bar');
                 if (bar) {
@@ -121,11 +148,24 @@ window.NetworkModule = window.NetworkModule || {
                     else bar.style.background = 'var(--color-critical)';
                 }
 
-                // Update IP and MAC
-                const ipEl = document.getElementById('ip-address');
-                const macEl = document.getElementById('mac-address');
-                if (ipEl) ipEl.textContent = data.wifi_ip || '--';
-                if (macEl) macEl.textContent = data.wifi_mac || '--';
+                // Update WiFi IP and MAC
+                Utils.setText('ip-address', data.wifi_ip || '--');
+                Utils.setText('gateway-address', data.wifi_gateway || '--');
+                Utils.setText('mac-address', data.wifi_mac || '--');
+
+                // Ethernet Status
+                const ethConnected = data.eth_connected;
+                const ethStatusEl = document.getElementById('eth-status');
+                if (ethStatusEl) {
+                    ethStatusEl.textContent = ethConnected ? 'Connected' : 'Disconnected';
+                    ethStatusEl.style.color = ethConnected ? 'var(--color-optimal)' : 'var(--color-critical)';
+                }
+
+                Utils.setText('eth-speed', ethConnected ? data.eth_speed + ' Mbps' : '--');
+                Utils.setText('eth-duplex', ethConnected ? (data.eth_duplex ? 'Full' : 'Half') : '--');
+                Utils.setText('eth-ip', data.eth_ip || '--');
+                Utils.setText('eth-gateway', data.eth_gateway || '--');
+                Utils.setText('eth-mac', data.eth_mac || '--');
 
                 // Update uptime from device response
                 if (data.uptime_ms) {
@@ -140,11 +180,8 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     updateLatency() {
-        // Use real latency calculated in SharedWebSocket (round-trip)
-        // Note: websocket.js doesn't currently store latency, but we can infer it or use a default
-        // For now, we'll use the AppState performance if available, or just keep the visual
-        const state = AppState.data;
-        const latency = state.network?.latency || 0;
+        // Use client-side measured latency from SharedWebSocket
+        const latency = SharedWebSocket.latency || 0;
 
         if (latency > 0) {
             this.latencyHistory.push(latency);
@@ -157,18 +194,20 @@ window.NetworkModule = window.NetworkModule || {
 
             const min = Math.min(...this.latencyHistory);
             const max = Math.max(...this.latencyHistory);
+            const avg = Math.round(this.latencyHistory.reduce((a, b) => a + b, 0) / this.latencyHistory.length);
 
             const latencyMinEl = document.getElementById('latency-min');
             const latencyMaxEl = document.getElementById('latency-max');
+            const latencyAvgEl = document.getElementById('latency-avg');
 
             if (latencyMinEl) latencyMinEl.textContent = min + ' ms';
             if (latencyMaxEl) latencyMaxEl.textContent = max + ' ms';
+            // Assuming there might be an avg element, or just good to calculate
         }
     },
 
     updateModbusStatus() {
         const state = AppState.data;
-        // Use real connectivity flag from telemetry
         const connected = state.vfd?.connected === true;
         const modbusStatus = connected ? 'Connected' : 'Disconnected';
 
@@ -178,13 +217,11 @@ window.NetworkModule = window.NetworkModule || {
             modbusStatusEl.style.color = connected ? 'var(--color-optimal)' : 'var(--color-critical)';
         }
 
-        // Dynamic (N/A) label logic
         const naLabel = document.getElementById('vfd-na');
         if (naLabel) {
             naLabel.style.display = connected ? 'none' : 'inline';
         }
 
-        // Modbus latency isn't currently in telemetry, so we use a null placeholder or 0
         const vfdLatencyEl = document.getElementById('vfd-latency');
         if (vfdLatencyEl) vfdLatencyEl.textContent = '-- ms';
 
@@ -193,7 +230,6 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     updateUptimeInfo() {
-        // Local connection duration
         const now = Date.now();
         const uptimeMs = now - this.connectionStartTime;
         const uptimeMins = Math.floor(uptimeMs / (1000 * 60));
@@ -204,7 +240,6 @@ window.NetworkModule = window.NetworkModule || {
         if (connectionDurationEl) connectionDurationEl.textContent = uptimeMins + ' m';
         if (reconnectCountEl) reconnectCountEl.textContent = this.reconnectCount;
 
-        // WebSocket Packet statistics (REAL)
         const packetsSent = SharedWebSocket.packetsSent || 0;
         const packetsReceived = SharedWebSocket.packetsReceived || 0;
         const dataBytes = SharedWebSocket.dataReceivedBytes || 0;
@@ -219,7 +254,6 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     startLatencyMonitoring() {
-        // Monitor latency every 2 seconds
         setInterval(() => {
             this.updateLatency();
             this.updateModbusStatus();
@@ -228,9 +262,7 @@ window.NetworkModule = window.NetworkModule || {
 
     sendPing() {
         AlertManager.add('Pinging device via WebSocket...', 'info');
-        const start = Date.now();
-        // Send a simple ping command if supported, or just wait for next telemetry
-        SharedWebSocket.send({ type: 'ping' });
+        SharedWebSocket.ping();
     },
 
     reconnectDevice() {
@@ -257,7 +289,6 @@ window.NetworkModule = window.NetworkModule || {
         const output = document.getElementById('diagnostics-output');
         output.textContent = 'Running diagnostics...\n\n';
 
-        // Fetch real data for diagnostics
         fetch('/api/network/status')
             .then(r => r.json())
             .then(data => {
@@ -273,14 +304,21 @@ window.NetworkModule = window.NetworkModule || {
                     `WiFi Status: ${data.wifi_connected ? 'Connected' : 'Disconnected'}`,
                     `SSID: ${data.wifi_ssid || 'N/A'}`,
                     `WiFi Signal: ${data.wifi_rssi} dBm (${qualityText})`,
-                    `IP Address: ${data.wifi_ip || 'N/A'}`,
-                    `MAC Address: ${data.wifi_mac || 'N/A'}`,
+                    `WiFi IP: ${data.wifi_ip || 'N/A'}`,
+                    `WiFi MAC: ${data.wifi_mac || 'N/A'}`,
                     `Gateway: ${data.wifi_gateway || 'N/A'}`,
                     `DNS: ${data.wifi_dns || 'N/A'}`,
                     `Signal Quality: ${data.signal_quality}%`,
+                    '',
+                    `Ethernet Status: ${data.eth_connected ? 'Connected' : 'Disconnected'}`,
+                    `Ethernet IP: ${data.eth_ip || 'N/A'}`,
+                    `Ethernet MAC: ${data.eth_mac || 'N/A'}`,
+                    `Link Speed: ${data.eth_connected ? data.eth_speed + ' Mbps' : 'N/A'}`,
+                    `Duplex: ${data.eth_connected ? (data.eth_duplex ? 'Full' : 'Half') : 'N/A'}`,
+                    '',
                     `Uptime: ${hours}h ${mins}m`,
                     '',
-                    data.wifi_connected ? '✓ Network operational' : '✗ Network disconnected'
+                    (data.wifi_connected || data.eth_connected) ? '✓ Network operational' : '✗ Network disconnected'
                 ];
 
                 let index = 0;
@@ -307,28 +345,14 @@ window.NetworkModule = window.NetworkModule || {
     },
 
     exportDiagnostics() {
+        const output = document.getElementById('diagnostics-output');
+        const content = output ? output.innerText : 'No diagnostics data found.';
+
         const report = `Network Diagnostics Report
 Generated: ${new Date().toLocaleString()}
 
-WiFi Status: Connected
-SSID: BISSO-Lab-5GHz
-Signal: -45 dBm
-Quality: Excellent
-
-IP Address: 192.168.1.100
-MAC: AA:BB:CC:DD:EE:FF
-Gateway: 192.168.1.1
-
-WebSocket Latency: 25ms (avg)
-Modbus RTU: Connected
-VFD Latency: 18ms
-
-Uptime: 2h 34m
-Reconnects: 0
-Packet Loss: 0.2%
+${content}
 `;
-
-        // Create downloadable file
         const blob = new Blob([report], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -342,13 +366,21 @@ Packet Loss: 0.2%
 
     loadWiFiConfig() {
         console.log('[Network] Loading WiFi configuration');
-        fetch('/api/config/get?category=2')
+        fetch('/api/config/get?category=5')
             .then(r => r.json())
             .then(data => {
-                if (data.success && data.config) {
-                    const cfg = data.config;
+                // Backend returns flat object or {error:...}, not wrapped in success/config
+                if (data.error) {
+                    console.error('[Network] Config load error:', data);
+                    this.setStatus('station', 'Error: ' + data.error, 'error');
+                    this.setStatus('ap', 'Error: ' + data.error, 'error');
+                    AlertManager.add('Failed to load WiFi config: ' + data.error, 'error');
+                } else {
+                    const cfg = data; // Flat response
                     Utils.setValue('station-ssid', cfg.wifi_ssid || '');
+                    Utils.setValue('station-pass', cfg.wifi_pass || ''); // Fixed: Populate password
                     Utils.setValue('ap-ssid', cfg.wifi_ap_ssid || '');
+                    Utils.setValue('ap-pass', cfg.wifi_ap_pass || '');   // Fixed: Populate password
 
                     const apEn = document.getElementById('ap-enabled');
                     if (apEn) {
@@ -357,14 +389,16 @@ Packet Loss: 0.2%
                         if (fields) fields.style.display = apEn.checked ? 'block' : 'none';
                     }
 
-                    this.setStatus('station', 'Loaded', 'success');
-                    this.setStatus('ap', 'Loaded', 'success');
+                    // Status update removed per user request
+                    this.setStatus('station', '', '');
+                    this.setStatus('ap', '', '');
                 }
             })
             .catch(err => {
                 console.error('[Network] Failed to load WiFi config:', err);
-                this.setStatus('station', 'Load failed', 'error');
-                this.setStatus('ap', 'Load failed', 'error');
+                this.setStatus('station', 'Load failed: ' + err.message, 'error');
+                this.setStatus('ap', 'Load failed: ' + err.message, 'error');
+                AlertManager.add('Network error loading config', 'error');
             });
     },
 
@@ -426,7 +460,7 @@ Packet Loss: 0.2%
         return fetch('/api/config/set', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ category: 2, key, value })
+            body: JSON.stringify({ category: 5, key, value })
         })
             .then(r => r.json())
             .then(data => {
@@ -436,9 +470,9 @@ Packet Loss: 0.2%
     },
 
     togglePass(id) {
-        const el = document.getElementById(id);
-        if (el) {
-            el.type = el.type === 'password' ? 'text' : 'password';
+        const input = document.getElementById(id);
+        if (input) {
+            input.type = input.type === 'password' ? 'text' : 'password';
         }
     },
 

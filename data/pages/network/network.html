@@ -5,7 +5,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>Network Status</h2>
+                <h2>WiFi Status</h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 15px;">
@@ -26,11 +26,54 @@
                     <div class="card-subtext">Quality: <span id="signal-quality">Excellent</span></div>
                 </div>
 
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 8px;">
+                    <div>
+                        <div class="card-label">IP Address</div>
+                        <div class="card-value" id="ip-address" style="font-size: 14px;">-- </div>
+                    </div>
+                    <div>
+                        <div class="card-label">Gateway</div>
+                        <div class="card-value" id="gateway-address" style="font-size: 14px;">--</div>
+                    </div>
+                </div>
                 <div>
-                    <div class="card-label">IP Address</div>
-                    <div class="card-value" id="ip-address" style="font-size: 14px;">-- </div>
-                    <div class="card-label" style="margin-top: 8px;">MAC Address</div>
+                    <div class="card-label">MAC Address</div>
                     <div class="card-value" id="mac-address" style="font-size: 12px;">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ethernet Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Ethernet Status</h2>
+            </div>
+            <div class="card-content">
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Ethernet Connection</div>
+                    <div class="card-value" id="eth-status" style="color: var(--text-secondary);">Disconnected</div>
+                    <div class="card-subtext">PHY: LAN8720</div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Link Speed</div>
+                    <div class="card-value" id="eth-speed">-- Mbps</div>
+                    <div class="card-subtext">Duplex: <span id="eth-duplex">--</span></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 8px;">
+                    <div>
+                        <div class="card-label">IP Address</div>
+                        <div class="card-value" id="eth-ip" style="font-size: 14px;">--</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Gateway</div>
+                        <div class="card-value" id="eth-gateway" style="font-size: 14px;">--</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="card-label">MAC Address</div>
+                    <div class="card-value" id="eth-mac" style="font-size: 12px;">--</div>
                 </div>
             </div>
         </div>
@@ -86,9 +129,7 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="card-grid">
         <div class="card">
             <div class="card-header">
                 <h2>Uptime & Connectivity</h2>
@@ -151,12 +192,8 @@
                     style="width: 100%; margin-bottom: 10px;">Reconnect</button>
                 <button class="btn btn-secondary" id="network-test-btn" style="width: 100%; margin-bottom: 10px;">Run
                     Diagnostics</button>
-                <button class="btn btn-ghost" id="network-info-btn" style="width: 100%;">More Info</button>
             </div>
         </div>
-    </div>
-
-    <div class="card-grid">
         <div class="card">
             <div class="card-header">
                 <h2>WiFi Station Settings</h2>
@@ -175,8 +212,7 @@
                     <label for="station-pass">Password:</label>
                     <div style="position: relative;">
                         <input type="password" id="station-pass" class="form-control" placeholder="••••••••">
-                        <button type="button" class="btn-toggle-pass"
-                            onclick="NetworkModule.togglePass('station-pass')">👁️</button>
+                        <button type="button" class="btn-toggle-pass" id="toggle-station-pass">👁️</button>
                     </div>
                 </div>
                 <div class="setting-group">
@@ -210,8 +246,7 @@
                         <label for="ap-pass">AP Password:</label>
                         <div style="position: relative;">
                             <input type="password" id="ap-pass" class="form-control" placeholder="••••••••">
-                            <button type="button" class="btn-toggle-pass"
-                                onclick="NetworkModule.togglePass('ap-pass')">👁️</button>
+                            <button type="button" class="btn-toggle-pass" id="toggle-ap-pass">👁️</button>
                         </div>
                         <div class="card-subtext">Min. 8 characters</div>
                     </div>
@@ -233,8 +268,7 @@
                     style="background: none; border: none; cursor: pointer; font-size: 20px;">✕</button>
             </div>
             <div class="card-content">
-                <div id="diagnostics-output"
-                    style="background: var(--bg-secondary); padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
+                <div id="diagnostics-output">
                     Running diagnostics...
                 </div>
                 <button class="btn btn-primary" id="export-diagnostics" style="width: 100%;">Export Report</button>
@@ -285,6 +319,7 @@
         align-items: center;
         justify-content: center;
         padding: 5px;
+        z-index: 10;
     }
 
     .card-status {

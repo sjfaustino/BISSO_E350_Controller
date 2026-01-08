@@ -8,9 +8,12 @@
     --bg-secondary: #f8fafc;
     --bg-tertiary: #f1f5f9;
     --text-primary: #0f172a;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
-    --border-color: #e2e8f0;
+    --text-secondary: #334155;
+    /* Darkened from #64748b for better visibility */
+    --text-muted: #64748b;
+    /* Darkened from #94a3b8 */
+    --border-color: #cbd5e1;
+    /* Darkened from #e2e8f0 */
     --header-bg: rgba(255, 255, 255, 0.98);
     --card-bg: rgba(255, 255, 255, 0.95);
     --page-bg: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);

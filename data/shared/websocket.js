@@ -69,7 +69,9 @@ class SharedWebSocket {
 
                     // Handle pong response
                     if (data.type === 'pong') {
-                        this.latency = Date.now() - this.lastPingTime;
+                        if (this.lastPingTime > 0) {
+                            this.latency = Date.now() - this.lastPingTime;
+                        }
                         return;
                     }
 
@@ -197,10 +199,16 @@ class SharedWebSocket {
         this.stopLatencyTracking();
         this.pingInterval = setInterval(() => {
             if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
-                this.lastPingTime = Date.now();
-                this.ws.send(JSON.stringify({ type: 'ping' }));
+                this.ping();
             }
         }, 5000); // Check latency every 5 seconds
+    }
+
+    static ping() {
+        if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
+            this.lastPingTime = Date.now();
+            this.ws.send(JSON.stringify({ type: 'ping' }));
+        }
     }
 
     static stopLatencyTracking() {
