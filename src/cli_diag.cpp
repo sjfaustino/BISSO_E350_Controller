@@ -62,6 +62,11 @@ void debugAllHandler();
 void debugConfigHandler();
 void cmd_diag_scheduler_main(int argc, char** argv);
 
+// CLI wrapper functions (match cli_handler_t signature)
+static void wrap_debugAllHandler(int argc, char** argv) { (void)argc; (void)argv; debugAllHandler(); }
+static void wrap_debugEncodersHandler(int argc, char** argv) { (void)argc; (void)argv; debugEncodersHandler(); }
+static void wrap_debugConfigHandler(int argc, char** argv) { (void)argc; (void)argv; debugConfigHandler(); }
+
 // ============================================================================
 // QUICK STATUS DASHBOARD
 // ============================================================================
@@ -356,15 +361,15 @@ void cmd_selftest(int argc, char** argv) {
 // DEBUG MAIN DISPATCHER
 // ============================================================================
 void cmd_debug_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("\n[DEBUG] Usage: debug [all | encoders | config]");
-        return;
-    }
-
-    if (strcmp(argv[1], "all") == 0) debugAllHandler();
-    else if (strcmp(argv[1], "encoders") == 0) debugEncodersHandler();
-    else if (strcmp(argv[1], "config") == 0) debugConfigHandler();
-    else logWarning("[CLI] Unknown target '%s'", argv[1]);
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"all",      wrap_debugAllHandler,      "Dump all debug info"},
+        {"encoders", wrap_debugEncodersHandler, "Encoder statistics"},
+        {"config",   wrap_debugConfigHandler,   "Configuration dump"}
+    };
+    
+    cliDispatchSubcommand("[DEBUG]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================
@@ -645,14 +650,15 @@ void cmd_encoder_config_main(int argc, char** argv) {
 }
 
 void cmd_encoder_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[ENCODER] Usage: encoder [diag | baud | config]");
-        return;
-    }
-    if (strcmp(argv[1], "diag") == 0) cmd_encoder_diag(argc, argv);
-    else if (strcmp(argv[1], "baud") == 0) cmd_encoder_baud_detect(argc, argv);
-    else if (strcmp(argv[1], "config") == 0) cmd_encoder_config_main(argc, argv);
-    else logWarning("[ENCODER] Unknown sub-command: %s", argv[1]);
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"diag",   cmd_encoder_diag,        "Run encoder diagnostics"},
+        {"baud",   cmd_encoder_baud_detect, "Auto-detect baud rate"},
+        {"config", cmd_encoder_config_main, "Configure encoder interface"}
+    };
+    
+    cliDispatchSubcommand("[ENCODER]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================
