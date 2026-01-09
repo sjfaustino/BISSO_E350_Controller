@@ -117,21 +117,16 @@ void cmd_wifi_ap(int argc, char **argv) {
 }
 
 void cmd_wifi_main(int argc, char **argv) {
-  if (argc < 2) {
-    logPrintln("\n[WIFI] === Network Management ===");
-    logPrintln("Usage: wifi [scan | connect | status | ap]");
-    return;
-  }
-  if (strcasecmp(argv[1], "scan") == 0)
-    cmd_wifi_scan(argc, argv);
-  else if (strcasecmp(argv[1], "connect") == 0)
-    cmd_wifi_connect(argc, argv);
-  else if (strcasecmp(argv[1], "status") == 0)
-    cmd_wifi_status(argc, argv);
-  else if (strcasecmp(argv[1], "ap") == 0)
-    cmd_wifi_ap(argc, argv);
-  else
-    logWarning("[WIFI] Unknown parameter '%s'.", argv[1]);
+  // Table-driven subcommand dispatch (P1: DRY improvement)
+  static const cli_subcommand_t subcmds[] = {
+      {"scan",    cmd_wifi_scan,    "Scan for networks"},
+      {"connect", cmd_wifi_connect, "Connect to network"},
+      {"status",  cmd_wifi_status,  "Show connection status"},
+      {"ap",      cmd_wifi_ap,      "Configure Access Point"}
+  };
+
+  cliDispatchSubcommand("[WIFI]", argc, argv, subcmds, 
+                        sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // =============================================================================
@@ -182,72 +177,71 @@ void cmd_eth_status(int argc, char** argv) {
     }
 }
 
-void cmd_eth_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("\n[ETH] === Ethernet Management ===");
-        logPrintln("Usage:");
-        logPrintln("  eth status                  - Show Ethernet status");
-        logPrintln("  eth on                      - Enable Ethernet");
-        logPrintln("  eth off                     - Disable Ethernet");
-        logPrintln("  eth dhcp                    - Use DHCP (default)");
-        logPrintln("  eth static <ip> <gw> [mask] - Set static IP");
-        logPrintln("  eth dns <dns_ip>            - Set DNS server");
-        logPrintln("\nExamples:");
-        logPrintln("  eth static 192.168.1.100 192.168.1.1");
-        logPrintln("  eth static 192.168.1.100 192.168.1.1 255.255.255.0");
+static void cmd_eth_on(int argc, char** argv) {
+    (void)argc; (void)argv;
+    configSetInt(KEY_ETH_ENABLED, 1);
+    configUnifiedSave();
+    logInfo("[ETH] [OK] Ethernet enabled. Reboot required.");
+}
+
+static void cmd_eth_off(int argc, char** argv) {
+    (void)argc; (void)argv;
+    configSetInt(KEY_ETH_ENABLED, 0);
+    configUnifiedSave();
+    logInfo("[ETH] [OK] Ethernet disabled. Reboot required.");
+}
+
+static void cmd_eth_dhcp(int argc, char** argv) {
+    (void)argc; (void)argv;
+    configSetInt(KEY_ETH_DHCP, 1);
+    configUnifiedSave();
+    logInfo("[ETH] [OK] DHCP mode enabled. Reboot required.");
+}
+
+static void cmd_eth_static(int argc, char** argv) {
+    if (argc < 4) {
+        logError("[ETH] Usage: eth static <ip> <gateway> [mask]");
         return;
     }
+    configSetString(KEY_ETH_IP, argv[2]);
+    configSetString(KEY_ETH_GW, argv[3]);
+    if (argc >= 5) {
+        configSetString(KEY_ETH_MASK, argv[4]);
+    } else {
+        configSetString(KEY_ETH_MASK, "255.255.255.0");
+    }
+    configSetInt(KEY_ETH_DHCP, 0);
+    configUnifiedSave();
+    logInfo("[ETH] [OK] Static IP configured:");
+    logPrintf("  IP:      %s\n", argv[2]);
+    logPrintf("  Gateway: %s\n", argv[3]);
+    logPrintf("  Mask:    %s\n", argc >= 5 ? argv[4] : "255.255.255.0");
+    logWarning("[ETH] Reboot required for changes to take effect.");
+}
+
+static void cmd_eth_dns(int argc, char** argv) {
+    if (argc < 3) {
+        logError("[ETH] Usage: eth dns <dns_ip>");
+        return;
+    }
+    configSetString(KEY_ETH_DNS, argv[2]);
+    configUnifiedSave();
+    logInfo("[ETH] [OK] DNS set to %s. Reboot required.", argv[2]);
+}
+
+void cmd_eth_main(int argc, char** argv) {
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"status", cmd_eth_status, "Show Ethernet status"},
+        {"on",     cmd_eth_on,     "Enable Ethernet"},
+        {"off",    cmd_eth_off,    "Disable Ethernet"},
+        {"dhcp",   cmd_eth_dhcp,   "Use DHCP"},
+        {"static", cmd_eth_static, "Set static IP"},
+        {"dns",    cmd_eth_dns,    "Set DNS server"}
+    };
     
-    if (strcasecmp(argv[1], "status") == 0) {
-        cmd_eth_status(argc, argv);
-    }
-    else if (strcasecmp(argv[1], "on") == 0) {
-        configSetInt(KEY_ETH_ENABLED, 1);
-        configUnifiedSave();
-        logInfo("[ETH] [OK] Ethernet enabled. Reboot required.");
-    }
-    else if (strcasecmp(argv[1], "off") == 0) {
-        configSetInt(KEY_ETH_ENABLED, 0);
-        configUnifiedSave();
-        logInfo("[ETH] [OK] Ethernet disabled. Reboot required.");
-    }
-    else if (strcasecmp(argv[1], "dhcp") == 0) {
-        configSetInt(KEY_ETH_DHCP, 1);
-        configUnifiedSave();
-        logInfo("[ETH] [OK] DHCP mode enabled. Reboot required.");
-    }
-    else if (strcasecmp(argv[1], "static") == 0) {
-        if (argc < 4) {
-            logError("[ETH] Usage: eth static <ip> <gateway> [mask]");
-            return;
-        }
-        configSetString(KEY_ETH_IP, argv[2]);
-        configSetString(KEY_ETH_GW, argv[3]);
-        if (argc >= 5) {
-            configSetString(KEY_ETH_MASK, argv[4]);
-        } else {
-            configSetString(KEY_ETH_MASK, "255.255.255.0");
-        }
-        configSetInt(KEY_ETH_DHCP, 0);
-        configUnifiedSave();
-        logInfo("[ETH] [OK] Static IP configured:");
-        logPrintf("  IP:      %s\n", argv[2]);
-        logPrintf("  Gateway: %s\n", argv[3]);
-        logPrintf("  Mask:    %s\n", argc >= 5 ? argv[4] : "255.255.255.0");
-        logWarning("[ETH] Reboot required for changes to take effect.");
-    }
-    else if (strcasecmp(argv[1], "dns") == 0) {
-        if (argc < 3) {
-            logError("[ETH] Usage: eth dns <dns_ip>");
-            return;
-        }
-        configSetString(KEY_ETH_DNS, argv[2]);
-        configUnifiedSave();
-        logInfo("[ETH] [OK] DNS set to %s. Reboot required.", argv[2]);
-    }
-    else {
-        logWarning("[ETH] Unknown command '%s'. Use 'eth' for help.", argv[1]);
-    }
+    cliDispatchSubcommand("[ETH]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // Track Ethernet connect/disconnect for uptime

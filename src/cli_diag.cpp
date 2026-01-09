@@ -1277,12 +1277,13 @@ void cmd_rs485_diag(int argc, char** argv) {
 }
 
 void cmd_rs485_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[RS485] Usage: rs485 diag");
-        return;
-    }
-    if (strcmp(argv[1], "diag") == 0) cmd_rs485_diag(argc, argv);
-    else logWarning("[RS485] Unknown sub-command: %s", argv[1]);
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"diag", cmd_rs485_diag, "Show RS-485 bus diagnostics"}
+    };
+    
+    cliDispatchSubcommand("[RS485]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================

@@ -61,18 +61,21 @@ void cmd_estop_off(int argc, char** argv) {
 }
 
 void cmd_estop_main(int argc, char** argv) {
-  if (argc < 2 || strcasecmp(argv[1], "status") == 0) {
-    cmd_estop_status(argc, argv);
-    return;
-  }
-  
-  if (strcasecmp(argv[1], "on") == 0) {
-    cmd_estop_on(argc, argv);
-  } else if (strcasecmp(argv[1], "off") == 0) {
-    cmd_estop_off(argc, argv);
-  } else {
-    logPrintln("Usage: estop [status|on|off]");
-  }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"status", cmd_estop_status, "Show E-Stop status"},
+        {"on",     cmd_estop_on,     "Trigger E-Stop"},
+        {"off",    cmd_estop_off,    "Clear E-Stop"}
+    };
+    
+    // Default to status if no subcommand provided
+    if (argc < 2) {
+        cmd_estop_status(argc, argv);
+        return;
+    }
+    
+    cliDispatchSubcommand("[ESTOP]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================
@@ -122,27 +125,26 @@ void cmd_feed_override(int argc, char** argv) {
 // PERFORMANCE DIAGNOSTICS
 // ============================================================================
 
+
+static void wrap_spinlock_stats(int argc, char** argv) { (void)argc; (void)argv; motionPrintSpinlockStats(); }
+static void wrap_spinlock_reset(int argc, char** argv) { (void)argc; (void)argv; motionResetSpinlockStats(); }
+
 void cmd_spinlock_main(int argc, char** argv) {
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"stats", wrap_spinlock_stats, "Show critical section timing report"},
+        {"reset", wrap_spinlock_reset, "Reset timing statistics"}
+    };
+    
     if (argc < 2) {
         logPrintln("[SPINLOCK] === Spinlock Timing Diagnostics ===");
         logPrintln("Usage: spinlock [stats | reset]");
-        logPrintln("  stats:  Show critical section timing report");
-        logPrintln("  reset:  Reset timing statistics");
-        logPrintln("");
-        logPrintln("Purpose: Audit spinlock critical section durations");
-        logPrintln("         to identify sections >10us that should use mutexes");
-        logPrintln("");
-        logPrintln("See: COMPREHENSIVE_AUDIT_REPORT.md Finding 1.3");
-        return;
+        logPrintln("Purpose: Audit spinlock durations (>10us -> mutex)");
+        // Usage printed by helper below anyway if we pass argc < 2, but let's keep the header
     }
 
-    if (strcmp(argv[1], "stats") == 0) {
-        motionPrintSpinlockStats();
-    } else if (strcmp(argv[1], "reset") == 0) {
-        motionResetSpinlockStats();
-    } else {
-        logWarning("[SPINLOCK] Unknown sub-command: %s", argv[1]);
-    }
+    cliDispatchSubcommand("[SPINLOCK]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================
