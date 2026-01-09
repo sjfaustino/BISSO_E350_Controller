@@ -66,6 +66,12 @@ void cmd_diag_scheduler_main(int argc, char** argv);
 static void wrap_debugAllHandler(int argc, char** argv) { (void)argc; (void)argv; debugAllHandler(); }
 static void wrap_debugEncodersHandler(int argc, char** argv) { (void)argc; (void)argv; debugEncodersHandler(); }
 static void wrap_debugConfigHandler(int argc, char** argv) { (void)argc; (void)argv; debugConfigHandler(); }
+static void wrap_spindle_diag(int argc, char** argv) { 
+    (void)argc; (void)argv; 
+    spindleMonitorPrintDiagnostics();
+    jxk10PrintDiagnostics();
+    rs485PrintDiagnostics();
+}
 
 // ============================================================================
 // QUICK STATUS DASHBOARD
@@ -792,22 +798,15 @@ void cmd_spindle_config_main(int argc, char** argv) {
 }
 
 void cmd_spindle_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[SPINDLE] Usage: spindle [diag | config | alarm]");
-        return;
-    }
-
-    if (strcmp(argv[1], "diag") == 0) {
-        spindleMonitorPrintDiagnostics();
-        jxk10PrintDiagnostics();
-        rs485PrintDiagnostics();
-    } else if (strcmp(argv[1], "config") == 0) {
-        cmd_spindle_config_main(argc, argv);
-    } else if (strcmp(argv[1], "alarm") == 0) {
-        cmd_spindle_alarm(argc, argv);
-    } else {
-        logWarning("[SPINDLE] Unknown sub-command: %s", argv[1]);
-    }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"diag",   wrap_spindle_diag,       "Print spindle diagnostics"},
+        {"config", cmd_spindle_config_main, "Configure spindle settings"},
+        {"alarm",  cmd_spindle_alarm,       "Alarm management"}
+    };
+    
+    cliDispatchSubcommand("[SPINDLE]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // Note: I2C commands have been moved to cli_i2c.cpp for better organization
