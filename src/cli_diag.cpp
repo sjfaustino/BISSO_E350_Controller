@@ -1238,37 +1238,15 @@ void cmd_axis_reset(int argc, char** argv) {
 }
 
 void cmd_axis_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[AXIS] === Per-Axis Motion Quality Monitoring (PHASE 5.6) ===");
-        logPrintln("Usage: axis [status | detail | reset] [args]");
-        logPrintln("");
-        logPrintln("  status          Show all axes quality summary");
-        logPrintln("  detail X|Y|Z    Show detailed diagnostics for specific axis");
-        logPrintln("  reset X|Y|Z|all Reset quality metrics for axis/all axes");
-        logPrintln("");
-        logPrintln("Metrics Reported:");
-        logPrintln("  Quality Score   0-100 (100 = perfect motion)");
-        logPrintln("  Jitter          Peak-to-peak velocity variation (mm/s)");
-        logPrintln("  Stalled         Motor commanded but not moving");
-        logPrintln("  VFD Error       Encoder vs VFD frequency mismatch (%)");
-        logPrintln("");
-        logPrintln("Quality Thresholds:");
-        logPrintln("  >= 80  Excellent motion");
-        logPrintln("  60-80  Good motion");
-        logPrintln("  40-60  Fair motion (degradation detected)");
-        logPrintln("  < 40   Poor motion (maintenance needed)");
-        return;
-    }
-
-    if (strcmp(argv[1], "status") == 0) {
-        cmd_axis_status(argc, argv);
-    } else if (strcmp(argv[1], "detail") == 0) {
-        cmd_axis_detail(argc, argv);
-    } else if (strcmp(argv[1], "reset") == 0) {
-        cmd_axis_reset(argc, argv);
-    } else {
-        logWarning("[AXIS] Unknown sub-command: %s", argv[1]);
-    }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"status", cmd_axis_status, "Show all axes quality summary"},
+        {"detail", cmd_axis_detail, "Show detailed diagnostics (usage: axis detail X|Y|Z)"},
+        {"reset",  cmd_axis_reset,  "Reset quality metrics (usage: axis reset X|Y|Z|all)"}
+    };
+    
+    cliDispatchSubcommand("[AXIS]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 void cmd_telemetry_summary(int argc, char** argv) {
@@ -1280,24 +1258,14 @@ void cmd_telemetry_detail(int argc, char** argv) {
 }
 
 void cmd_telemetry_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[TELEMETRY] === Comprehensive System Telemetry ===");
-        logPrintln("Usage: telemetry [summary | detail]");
-        logPrintln("  summary: Show brief telemetry snapshot");
-        logPrintln("  detail:  Show complete telemetry data");
-        logPrintln("");
-        logPrintln("Web API: GET /api/telemetry (comprehensive)");
-        logPrintln("         GET /api/telemetry/compact (lightweight)");
-        return;
-    }
-
-    if (strcmp(argv[1], "summary") == 0) {
-        cmd_telemetry_summary(argc, argv);
-    } else if (strcmp(argv[1], "detail") == 0) {
-        cmd_telemetry_detail(argc, argv);
-    } else {
-        logWarning("[TELEMETRY] Unknown sub-command: %s", argv[1]);
-    }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"summary", cmd_telemetry_summary, "Show brief telemetry snapshot"},
+        {"detail",  cmd_telemetry_detail,  "Show complete telemetry data"}
+    };
+    
+    cliDispatchSubcommand("[TELEMETRY]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================
