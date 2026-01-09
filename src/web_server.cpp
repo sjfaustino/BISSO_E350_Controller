@@ -86,6 +86,18 @@ void WebServerManager::init() {
         logPrintln("[WEB] LittleFS formatted and mounted");
     }
     
+    // Register all API routes (extracted for maintainability)
+    setupRoutes();
+    
+    // Initialize status cache
+    memset(&current_status, 0, sizeof(current_status));
+    strncpy(current_status.status, "IDLE", sizeof(current_status.status));
+}
+
+// ============================================================================
+// ROUTE REGISTRATION (P0 Refactor: Extracted from init())
+// ============================================================================
+void WebServerManager::setupRoutes() {
     // --- API Routes (must be registered before static file serving) ---
     
     // GET /api/config/get?category=N
@@ -820,10 +832,6 @@ void WebServerManager::init() {
     // Serve static files from root (MUST be after API routes)
     // PHASE 6: Enable browser caching to reduce load on LittleFS
     server.serveStatic("/", LittleFS, "/", "public, max-age=60");
-    
-    // Initialize status cache
-    memset(&current_status, 0, sizeof(current_status));
-    strncpy(current_status.status, "IDLE", sizeof(current_status.status));
 }
 
 void WebServerManager::begin() {
