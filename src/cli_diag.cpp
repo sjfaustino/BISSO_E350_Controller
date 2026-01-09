@@ -633,23 +633,15 @@ void cmd_encoder_config_baud(int argc, char** argv) {
 }
 
 void cmd_encoder_config_main(int argc, char** argv) {
-    if (argc < 3) {
-        logPrintln("\n[ENCODER CONFIG] Usage: encoder config [show | interface | baud]");
-        logPrintln("  show:       Display current configuration");
-        logPrintln("  interface:  Set encoder interface (RS232_HT or RS485_RXD2)");
-        logPrintln("  baud:       Set baud rate");
-        return;
-    }
-
-    if (strcmp(argv[2], "show") == 0) {
-        cmd_encoder_config_show(argc, argv);
-    } else if (strcmp(argv[2], "interface") == 0) {
-        cmd_encoder_config_interface(argc, argv);
-    } else if (strcmp(argv[2], "baud") == 0) {
-        cmd_encoder_config_baud(argc, argv);
-    } else {
-        logWarning("[ENCODER CONFIG] Unknown sub-command: %s", argv[2]);
-    }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"show",      cmd_encoder_config_show,      "Display current configuration"},
+        {"interface", cmd_encoder_config_interface, "Set encoder interface (RS232_HT or RS485_RXD2)"},
+        {"baud",      cmd_encoder_config_baud,      "Set baud rate"}
+    };
+    
+    cliDispatchSubcommand("[ENCODER CONFIG]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 2);
 }
 
 void cmd_encoder_main(int argc, char** argv) {
@@ -780,29 +772,17 @@ void cmd_spindle_config_interval(int argc, char** argv) {
 }
 
 void cmd_spindle_config_main(int argc, char** argv) {
-    if (argc < 3) {
-        logPrintln("\n[SPINDLE CONFIG] Usage: spindle config [show | enable | address | threshold | interval]");
-        logPrintln("  show:       Display current configuration");
-        logPrintln("  enable:     Enable/disable monitoring (on/off)");
-        logPrintln("  address:    Set JXK-10 Modbus address (1-247)");
-        logPrintln("  threshold:  Set overcurrent threshold (0-50 A)");
-        logPrintln("  interval:   Set poll interval (100-60000 ms)");
-        return;
-    }
-
-    if (strcmp(argv[2], "show") == 0) {
-        cmd_spindle_config_show(argc, argv);
-    } else if (strcmp(argv[2], "enable") == 0) {
-        cmd_spindle_config_enable(argc, argv);
-    } else if (strcmp(argv[2], "address") == 0) {
-        cmd_spindle_config_address(argc, argv);
-    } else if (strcmp(argv[2], "threshold") == 0) {
-        cmd_spindle_config_threshold(argc, argv);
-    } else if (strcmp(argv[2], "interval") == 0) {
-        cmd_spindle_config_interval(argc, argv);
-    } else {
-        logWarning("[SPINDLE CONFIG] Unknown sub-command: %s", argv[2]);
-    }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"show",      cmd_spindle_config_show,      "Display current configuration"},
+        {"enable",    cmd_spindle_config_enable,    "Enable/disable monitoring (on/off)"},
+        {"address",   cmd_spindle_config_address,   "Set JXK-10 Modbus address (1-247)"},
+        {"threshold", cmd_spindle_config_threshold, "Set overcurrent threshold (0-50 A)"},
+        {"interval",  cmd_spindle_config_interval,  "Set poll interval (100-60000 ms)"}
+    };
+    
+    cliDispatchSubcommand("[SPINDLE CONFIG]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 2);
 }
 
 void cmd_spindle_main(int argc, char** argv) {
