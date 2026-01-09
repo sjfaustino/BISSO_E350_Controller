@@ -1114,20 +1114,14 @@ void cmd_api_ratelimit_reset(int argc, char** argv) {
 }
 
 void cmd_api_ratelimit_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[API] Usage: api [diag | reset]");
-        logPrintln("  diag:   Show rate limiter diagnostics");
-        logPrintln("  reset:  Reset all rate limit counters");
-        return;
-    }
-
-    if (strcmp(argv[1], "diag") == 0) {
-        cmd_api_ratelimit_diag(argc, argv);
-    } else if (strcmp(argv[1], "reset") == 0) {
-        cmd_api_ratelimit_reset(argc, argv);
-    } else {
-        logWarning("[API] Unknown sub-command: %s", argv[1]);
-    }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"diag",  cmd_api_ratelimit_diag,  "Show rate limiter diagnostics"},
+        {"reset", cmd_api_ratelimit_reset, "Reset all rate limit counters"}
+    };
+    
+    cliDispatchSubcommand("[API]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================
@@ -1148,24 +1142,15 @@ void cmd_metrics_reset(int argc, char** argv) {
 }
 
 void cmd_metrics_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[METRICS] === Task Performance Monitoring ===");
-        logPrintln("Usage: metrics [summary | detail | reset]");
-        logPrintln("  summary: Show quick performance summary");
-        logPrintln("  detail:  Show detailed task diagnostics");
-        logPrintln("  reset:   Clear all collected metrics");
-        return;
-    }
-
-    if (strcmp(argv[1], "summary") == 0) {
-        cmd_metrics_summary(argc, argv);
-    } else if (strcmp(argv[1], "detail") == 0) {
-        cmd_metrics_detail(argc, argv);
-    } else if (strcmp(argv[1], "reset") == 0) {
-        cmd_metrics_reset(argc, argv);
-    } else {
-        logWarning("[METRICS] Unknown sub-command: %s", argv[1]);
-    }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"summary", cmd_metrics_summary, "Show quick performance summary"},
+        {"detail",  cmd_metrics_detail,  "Show detailed task diagnostics"},
+        {"reset",   cmd_metrics_reset,   "Clear all collected metrics"}
+    };
+    
+    cliDispatchSubcommand("[METRICS]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================
@@ -1182,23 +1167,14 @@ void cmd_ota_cancel(int argc, char** argv) {
 }
 
 void cmd_ota_main(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[OTA] === Firmware Update Management ===");
-        logPrintln("Usage: ota [status | cancel]");
-        logPrintln("  status: Show OTA update status");
-        logPrintln("  cancel: Cancel current OTA operation");
-        logPrintln("");
-        logPrintln("NOTE: Binary upload via /api/update endpoint");
-        return;
-    }
-
-    if (strcmp(argv[1], "status") == 0) {
-        cmd_ota_status(argc, argv);
-    } else if (strcmp(argv[1], "cancel") == 0) {
-        cmd_ota_cancel(argc, argv);
-    } else {
-        logWarning("[OTA] Unknown sub-command: %s", argv[1]);
-    }
+    // Table-driven subcommand dispatch (P1: DRY improvement)
+    static const cli_subcommand_t subcmds[] = {
+        {"status", cmd_ota_status, "Show OTA update status"},
+        {"cancel", cmd_ota_cancel, "Cancel current OTA operation"}
+    };
+    
+    cliDispatchSubcommand("[OTA]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 // ============================================================================
