@@ -408,7 +408,11 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         const ctx = canvas.getContext('2d');
         const width = canvas.width;
         const height = canvas.height;
-        const padding = 5;
+
+        // Margins for labels
+        const margin = { top: 10, right: 10, bottom: 20, left: 35 };
+        const graphWidth = width - margin.left - margin.right;
+        const graphHeight = height - margin.top - margin.bottom;
 
         // Clear canvas
         ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-tertiary') || '#1e293b';
@@ -416,15 +420,46 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 
         if (data.length < 2) return;
 
-        // Draw line
+        const range = maxVal - minVal || 1;
+
+        // Draw Grid & Y-Axis Labels
+        ctx.strokeStyle = '#334155'; // Dark slate for grid
+        ctx.lineWidth = 1;
+        ctx.fillStyle = '#94a3b8'; // Light slate for text
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        // Draw 5 horizontal grid lines
+        for (let i = 0; i <= 4; i++) {
+            const yRatio = i / 4;
+            const y = margin.top + graphHeight - (yRatio * graphHeight);
+            const value = minVal + (yRatio * range);
+
+            // Grid line
+            ctx.beginPath();
+            ctx.moveTo(margin.left, y);
+            ctx.lineTo(width - margin.right, y);
+            ctx.stroke();
+
+            // Label
+            ctx.fillText(value.toFixed(0), margin.left - 5, y);
+        }
+
+        // X-Axis Labels (Time)
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('-60s', margin.left, height - margin.bottom + 5);
+        ctx.fillText('Now', width - margin.right, height - margin.bottom + 5);
+
+        // Draw Line Path
         ctx.beginPath();
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
 
-        const range = maxVal - minVal || 1;
         for (let i = 0; i < data.length; i++) {
-            const x = padding + (i / (data.length - 1)) * (width - 2 * padding);
-            const y = height - padding - ((data[i] - minVal) / range) * (height - 2 * padding);
+            const x = margin.left + (i / (data.length - 1)) * graphWidth;
+            const y = margin.top + graphHeight - ((data[i] - minVal) / range) * graphHeight;
 
             if (i === 0) {
                 ctx.moveTo(x, y);
@@ -434,11 +469,12 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         }
         ctx.stroke();
 
-        // Draw gradient fill
-        ctx.lineTo(width - padding, height - padding);
-        ctx.lineTo(padding, height - padding);
+        // Draw Gradient Fill
+        ctx.lineTo(margin.left + graphWidth, margin.top + graphHeight);
+        ctx.lineTo(margin.left, margin.top + graphHeight);
         ctx.closePath();
-        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+
+        const gradient = ctx.createLinearGradient(0, margin.top, 0, height - margin.bottom);
         gradient.addColorStop(0, color + '40');
         gradient.addColorStop(1, color + '00');
         ctx.fillStyle = gradient;

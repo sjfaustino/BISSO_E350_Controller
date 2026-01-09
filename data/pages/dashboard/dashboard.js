@@ -607,30 +607,64 @@ window.DashboardModule = window.DashboardModule || {
         canvas.width = rect.width;
         canvas.height = rect.height;
 
-        const padding = 40;
-        const width = canvas.width - padding * 2;
-        const height = canvas.height - padding * 2;
+        // Margins for labels
+        const margin = { top: 10, right: 10, bottom: 20, left: 35 };
+        const width = canvas.width - margin.left - margin.right;
+        const height = canvas.height - margin.top - margin.bottom;
 
         // Clear
         ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim() || '#fff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Draw Grid & Y-Axis Labels
+        ctx.strokeStyle = '#e5e7eb'; // Light gray for grid
+        ctx.lineWidth = 1;
+        ctx.fillStyle = '#6b7280'; // Gray for text
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        // Draw 5 horizontal grid lines
+        for (let i = 0; i <= 4; i++) {
+            const yRatio = i / 4;
+            const y = margin.top + height - (yRatio * height);
+
+            // Grid line
+            ctx.beginPath();
+            ctx.moveTo(margin.left, y);
+            ctx.lineTo(canvas.width - margin.right, y);
+            ctx.stroke();
+
+            // Label (0-100%)
+            const value = yRatio * 100;
+            ctx.fillText(value.toFixed(0), margin.left - 5, y);
+        }
+
+        // X-Axis Labels (Time)
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const timeLabel = this.currentTimeRange / 1000 >= 60 ? (this.currentTimeRange / 60000) + 'm' : (this.currentTimeRange / 1000) + 's';
+        ctx.fillText('-' + timeLabel, margin.left, canvas.height - margin.bottom + 5);
+        ctx.fillText('Now', canvas.width - margin.right, canvas.height - margin.bottom + 5);
+
         // Get visible data
-        const sampleSize = Math.min(this.history.cpu.length, this.currentTimeRange * 60);
+        const sampleSize = Math.min(this.history.cpu.length, this.currentTimeRange * 60); // Approx sample rate
         const visibleCpu = this.history.cpu.slice(-sampleSize);
         const visibleMem = this.history.memory.slice(-sampleSize);
         const visibleSpindle = this.history.spindle.slice(-sampleSize);
 
         // Draw lines
         const drawLine = (data, color, scale, fallbackColor = '#888') => {
+            if (!data || data.length < 2) return;
+
             ctx.strokeStyle = color || fallbackColor;
             ctx.lineWidth = 2;
             ctx.beginPath();
 
             for (let i = 0; i < data.length; i++) {
                 const value = Math.max(0, Math.min(100, (data[i] / scale) * 100));
-                const x = padding + (i / Math.max(1, data.length - 1)) * width;
-                const y = canvas.height - padding - (value / 100) * height;
+                const x = margin.left + (i / Math.max(1, data.length - 1)) * width;
+                const y = margin.top + height - (value / 100) * height;
 
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
@@ -650,13 +684,13 @@ window.DashboardModule = window.DashboardModule || {
         drawLine(visibleMem, memColor, 320);
         drawLine(visibleSpindle, spindleColor, 30);
 
-        // Draw axes
+        // Draw Border axes
         ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1; // Thinner border
         ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, canvas.height - padding);
-        ctx.lineTo(canvas.width - padding, canvas.height - padding);
+        ctx.moveTo(margin.left, margin.top);
+        ctx.lineTo(margin.left, canvas.height - margin.bottom);
+        ctx.lineTo(canvas.width - margin.right, canvas.height - margin.bottom);
         ctx.stroke();
     },
 

@@ -5,6 +5,7 @@
  */
 
 #include "web_server.h"
+#include "gcode_parser.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -240,6 +241,27 @@ void WebServerManager::init() {
         
         String json;
         serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+
+    // POST /api/gcode - Execute G-code command
+    server.on("/api/gcode", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        String body = request->body();
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        if (error) return response->send(400, "application/json", "{\"success\":false, \"error\":\"Invalid JSON\"}");
+        
+        const char* cmd = doc["command"];
+        if (!cmd || strlen(cmd) == 0) return response->send(400, "application/json", "{\"success\":false, \"error\":\"No command\"}");
+        
+        bool result = gcodeParser.processCommand(cmd);
+        
+        JsonDocument resp;
+        resp["success"] = result;
+        resp["command"] = cmd;
+        String json;
+        serializeJson(resp, json);
         return response->send(200, "application/json", json.c_str());
     });
 
