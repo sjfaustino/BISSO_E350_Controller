@@ -423,3 +423,37 @@ void cmd_echo(int argc, char** argv) {
     logPrintln("Usage: echo [on|off]");
   }
 }
+
+// ============================================================================
+// TABLE-DRIVEN SUBCOMMAND DISPATCH (P1: DRY Improvement)
+// ============================================================================
+bool cliDispatchSubcommand(const char* prefix, int argc, char** argv,
+                           const cli_subcommand_t* table, size_t table_size,
+                           int arg_index) {
+    // Check if argument exists
+    if (argc <= arg_index) {
+        logPrintf("%s Usage: %s [", prefix, argv[0]);
+        for (size_t i = 0; i < table_size; i++) {
+            logPrintf("%s%s", table[i].name, (i < table_size - 1) ? " | " : "");
+        }
+        logPrintln("]");
+        
+        // Print available subcommands with help
+        for (size_t i = 0; i < table_size; i++) {
+            logPrintf("  %-12s %s\n", table[i].name, table[i].help);
+        }
+        return false;
+    }
+    
+    // Find matching subcommand
+    for (size_t i = 0; i < table_size; i++) {
+        if (strcasecmp(argv[arg_index], table[i].name) == 0) {
+            table[i].handler(argc, argv);
+            return true;
+        }
+    }
+    
+    // Not found
+    logWarning("%s Unknown subcommand: %s", prefix, argv[arg_index]);
+    return false;
+}

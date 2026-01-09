@@ -39,6 +39,27 @@ void cliPrintTableRow(const char* c1, const char* c2, const char* c3,
                       const char* c4 = nullptr, int w4 = 0,
                       const char* c5 = nullptr, int w5 = 0);
 
+// --- Subcommand Dispatch Helper (DRY pattern for nested commands) ---
+typedef struct {
+    const char* name;
+    cli_handler_t handler;
+    const char* help;
+} cli_subcommand_t;
+
+/**
+ * @brief Table-driven subcommand dispatcher
+ * @param prefix Prefix for error messages (e.g., "[SPINDLE]")
+ * @param argc Argument count from parent command
+ * @param argv Argument values from parent command
+ * @param table Array of subcommand definitions
+ * @param table_size Number of entries in table
+ * @param arg_index Which argv index contains the subcommand (typically 1 or 2)
+ * @return true if subcommand was found and executed
+ */
+bool cliDispatchSubcommand(const char* prefix, int argc, char** argv,
+                           const cli_subcommand_t* table, size_t table_size,
+                           int arg_index = 1);
+
 // ============================================================================
 // MODULE REGISTRATION FUNCTIONS
 // ============================================================================

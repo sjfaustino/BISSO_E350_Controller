@@ -465,10 +465,16 @@ void cmd_task_main(int argc, char** argv) {
 // FAULT HANDLERS
 // ============================================================================
 static const char* formatTimestamp(uint32_t timestamp_ms) {
-    static char time_buffer[32];
+    // Thread-safe rotating buffer pool (4 slots)
+    static char time_buffers[4][32];
+    static uint8_t buffer_index = 0;
+    
+    char* time_buffer = time_buffers[buffer_index];
+    buffer_index = (buffer_index + 1) % 4;
+    
     time_t t = timestamp_ms / 1000;
     struct tm *tm = localtime(&t);
-    strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", tm);
+    strftime(time_buffer, 32, "%Y-%m-%d %H:%M:%S", tm);
     return time_buffer;
 }
 

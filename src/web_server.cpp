@@ -132,7 +132,6 @@ void WebServerManager::init() {
             return response->send(200, "application/json", "{\"success\":true}");
         }
         return response->send(500, "application/json", "{\"error\":\"Failed to set config\"}");
-        return response->send(500, "application/json", "{\"error\":\"Failed to set config\"}");
     });
 
     // POST /api/ota/update - Trigger firmware update
