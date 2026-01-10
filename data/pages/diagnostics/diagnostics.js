@@ -9,6 +9,7 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
     spindleData: [],
     spindlePaused: false,
     spindleMaxPoints: 120,  // 60 seconds at 500ms intervals
+    tachometerInterval: null,
 
     // Helper to set N/A values with red styling
     setNA(element, suffix = '') {
@@ -47,6 +48,9 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         // Start I/O Diagnostics updates
         this.loadIODiagnostics();
         this.ioDiagInterval = setInterval(() => this.loadIODiagnostics(), 2000);
+
+        // Start Tachometer updates
+        this.startTachometerPolling();
     },
 
     setupEventListeners() {
@@ -633,6 +637,11 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
             clearInterval(this.ioDiagInterval);
             this.ioDiagInterval = null;
         }
+
+        if (this.tachometerInterval) {
+            clearInterval(this.tachometerInterval);
+            this.tachometerInterval = null;
+        }
     },
 
     loadIODiagnostics() {
@@ -691,6 +700,64 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
                 }
             })
             .catch(err => console.warn('[Diagnostics] Failed to load I/O diagnostics:', err));
+    },
+
+    startTachometerPolling() {
+        // Poll tachometer every 1s
+        if (this.tachometerInterval) clearInterval(this.tachometerInterval);
+        this.tachometerInterval = setInterval(() => this.updateTachometer(), 1000);
+        this.updateTachometer(); // Initial call
+    },
+
+    updateTachometer() {
+        const rpmEl = document.getElementById('tach_rpm');
+        if (!rpmEl) return;
+
+        // Check if config exists first (or handle N/A gracefully if API returns enabled=false)
+        fetch('/api/hardware/tachometer')
+            .then(r => r.json())
+            .then(data => {
+                const enabled = data.enabled !== false; // Default true if not sent
+
+                // Update Header N/A
+                this.updateHeaderNA('diag-header-tach', 'YH-TC05 Tachometer', enabled);
+
+                if (!enabled) {
+                    this.setNA(document.getElementById('tach_rpm'), ' <span style="font-size: 0.5em; vertical-align: middle;">RPM</span>');
+                    this.setNA(document.getElementById('tach_peak'), ' <span style="font-size: 0.5em; vertical-align: middle;">RPM</span>');
+                    this.setNA(document.getElementById('tach_pulses'));
+                    document.getElementById('tach_errors').textContent = 'N/A';
+
+                    const statusEl = document.getElementById('tach_status');
+                    statusEl.textContent = 'DISABLED';
+                    statusEl.className = 'status-badge status-unknown';
+                    return;
+                }
+
+                // Update Values
+                document.getElementById('tach_rpm').textContent = data.rpm;
+                document.getElementById('tach_peak').textContent = data.peak_rpm;
+                document.getElementById('tach_pulses').textContent = data.pulse_count;
+                document.getElementById('tach_errors').textContent = data.error_count;
+
+                // Update Status Badge
+                const statusEl = document.getElementById('tach_status');
+                if (data.stalled) {
+                    statusEl.textContent = 'STALLED';
+                    statusEl.className = 'status-badge status-disconnected'; // Red
+                } else if (data.spinning) {
+                    statusEl.textContent = 'SPINNING';
+                    statusEl.className = 'status-badge status-connected'; // Green
+                } else {
+                    statusEl.textContent = 'IDLE';
+                    statusEl.className = 'status-badge status-unknown'; // Grey
+                }
+            })
+            .catch(e => {
+                console.warn('[Diagnostics] Tachometer fetch failed:', e);
+                // On error, show N/A
+                this.updateHeaderNA('diag-header-tach', 'YH-TC05 Tachometer', false);
+            });
     }
 };
 

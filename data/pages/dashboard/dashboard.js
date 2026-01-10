@@ -319,58 +319,76 @@ window.DashboardModule = window.DashboardModule || {
 
     onStateChanged() {
         const state = AppState.data;
-
-        // Store last telemetry for VFD/spindle data
         this.lastTelemetry = state;
 
-        // System metrics
-        if (state.system) {
-            const cpu = state.system.cpu_percent || 0;
-            const mem = state.system.free_heap_bytes || 0;
-            const health = state.system.health || 'UNKNOWN';
-            const status = state.system.status || 'IDLE';
+        this.updateSystemStatus(state);
+        this.updateMotionStatus(state);
+        this.updateVFDStatus(state);
+        this.updateNetworkStatus(state);
 
-            // System Health Card
-            const healthValueEl = document.getElementById('health-value');
-            if (healthValueEl) {
-                healthValueEl.textContent = health;
-                // Apply classes for colors (optimal, normal, warning, critical)
-                healthValueEl.className = 'card-value ' + health.toLowerCase();
-            }
-            const healthDetailEl = document.getElementById('health-detail');
-            if (healthDetailEl) healthDetailEl.textContent = 'Status: ' + status;
+        // Axis metrics
+        if (state.axis) {
+            this.updateAxisCard('x', state.axis.x);
+            this.updateAxisCard('y', state.axis.y);
+            this.updateAxisCard('z', state.axis.z);
 
-            const healthBar = document.getElementById('health-bar');
-            if (healthBar) {
-                healthBar.className = 'progress-fill ' + health.toLowerCase();
-            }
-
-            // CPU Usage Card
-            const cpuValueEl = document.getElementById('cpu-value');
-            if (cpuValueEl) cpuValueEl.textContent = cpu.toFixed(1) + '%';
-
-            const cpuBar = document.getElementById('cpu-bar');
-            if (cpuBar) {
-                cpuBar.style.width = cpu + '%';
-                cpuBar.className = 'progress-fill';
-                if (cpu > 85) cpuBar.classList.add('warning');
-                if (cpu > 95) cpuBar.classList.add('critical');
-            }
-
-            // Memory Card
-            const memValueEl = document.getElementById('mem-value');
-            if (memValueEl) memValueEl.textContent = (mem / 1024).toFixed(0) + ' KB';
-
-            const memBar = document.getElementById('mem-bar');
-            if (memBar) {
-                // Assuming 320KB internal heap for scaling (typical ESP32)
-                const totalHeap = 320000;
-                const percent = Math.min(100, (mem / totalHeap) * 100);
-                memBar.style.width = percent + '%';
-            }
+            // Update DRO (Digital Readout) display
+            this.updateDRO(state.axis);
         }
 
-        const plcPresent = state.system?.plc_hardware_present !== false; // Default true if field missing for backward compatibility
+        this.updateHistoryData(state);
+        this.drawChart();
+    },
+
+    updateSystemStatus(state) {
+        if (!state.system) return;
+
+        const cpu = state.system.cpu_percent || 0;
+        const mem = state.system.free_heap_bytes || 0;
+        const health = state.system.health || 'UNKNOWN';
+        const status = state.system.status || 'IDLE';
+
+        // System Health Card
+        const healthValueEl = document.getElementById('health-value');
+        if (healthValueEl) {
+            healthValueEl.textContent = health;
+            healthValueEl.className = 'card-value ' + health.toLowerCase();
+        }
+        const healthDetailEl = document.getElementById('health-detail');
+        if (healthDetailEl) healthDetailEl.textContent = 'Status: ' + status;
+
+        const healthBar = document.getElementById('health-bar');
+        if (healthBar) {
+            healthBar.className = 'progress-fill ' + health.toLowerCase();
+        }
+
+        // CPU Usage Card
+        const cpuValueEl = document.getElementById('cpu-value');
+        if (cpuValueEl) cpuValueEl.textContent = cpu.toFixed(1) + '%';
+
+        const cpuBar = document.getElementById('cpu-bar');
+        if (cpuBar) {
+            cpuBar.style.width = cpu + '%';
+            cpuBar.className = 'progress-fill';
+            if (cpu > 85) cpuBar.classList.add('warning');
+            if (cpu > 95) cpuBar.classList.add('critical');
+        }
+
+        // Memory Card
+        const memValueEl = document.getElementById('mem-value');
+        if (memValueEl) memValueEl.textContent = (mem / 1024).toFixed(0) + ' KB';
+
+        const memBar = document.getElementById('mem-bar');
+        if (memBar) {
+            // Assuming 320KB internal heap for scaling (typical ESP32)
+            const totalHeap = 320000;
+            const percent = Math.min(100, (mem / totalHeap) * 100);
+            memBar.style.width = percent + '%';
+        }
+    },
+
+    updateMotionStatus(state) {
+        const plcPresent = state.system?.plc_hardware_present !== false; // Default true
 
         // Update Motion Header
         this.updateHeaderNA('header-motion', 'Motion Status', plcPresent);
@@ -403,71 +421,66 @@ window.DashboardModule = window.DashboardModule || {
                 }
             }
         }
-        // VFD status (Spindle)
-        if (state.vfd) {
-            // Update VFD Headers
-            this.updateHeaderNA('header-vfd', 'Axis Drive', state.vfd.connected);
-            this.updateHeaderNA('header-spindle-trend', 'Spindle Current Trend', state.vfd.connected);
+    },
 
-            const vfdStatusEl = document.getElementById('vfd-status');
-            const vfdRpmEl = document.getElementById('spindle-rpm');
-            const vfdSpeedEl = document.getElementById('spindle-speed');
-            const vfdCurrentEl = document.getElementById('spindle-current');
+    updateVFDStatus(state) {
+        if (!state.vfd) return;
 
-            if (state.vfd.connected) {
-                const motorStatus = (state.vfd.rpm > 0) ? 'RUNNING' : 'IDLE';
-                if (vfdStatusEl) vfdStatusEl.textContent = motorStatus;
+        // Update VFD Headers
+        this.updateHeaderNA('header-vfd', 'Axis Drive', state.vfd.connected);
+        this.updateHeaderNA('header-spindle-trend', 'Spindle Current Trend', state.vfd.connected);
 
-                if (vfdRpmEl) vfdRpmEl.textContent = (state.vfd.rpm || 0).toFixed(0);
-                if (vfdSpeedEl) vfdSpeedEl.textContent = (state.vfd.speed_m_s || 0).toFixed(1) + ' m/s';
-                if (vfdCurrentEl) vfdCurrentEl.textContent = (state.vfd.current_amps || 0).toFixed(2) + ' A';
+        const vfdStatusEl = document.getElementById('vfd-status');
+        const vfdRpmEl = document.getElementById('spindle-rpm');
+        const vfdSpeedEl = document.getElementById('spindle-speed');
+        const vfdCurrentEl = document.getElementById('spindle-current');
 
-                const bar = document.getElementById('spindle-bar');
-                if (bar) {
-                    const pct = Math.min(100, ((state.vfd.current_amps || 0) / 30.0) * 100);
-                    bar.style.width = pct + '%';
-                }
-            } else {
-                if (vfdStatusEl) vfdStatusEl.textContent = 'DISCONNECTED';
-                this.setNA(vfdRpmEl);
-                this.setNA(vfdSpeedEl, ' m/s');
-                this.setNA(vfdCurrentEl, ' A');
+        if (state.vfd.connected) {
+            const motorStatus = (state.vfd.rpm > 0) ? 'RUNNING' : 'IDLE';
+            if (vfdStatusEl) vfdStatusEl.textContent = motorStatus;
 
-                const bar = document.getElementById('spindle-bar');
-                if (bar) bar.style.width = '0%';
+            if (vfdRpmEl) vfdRpmEl.textContent = (state.vfd.rpm || 0).toFixed(0);
+            if (vfdSpeedEl) vfdSpeedEl.textContent = (state.vfd.speed_m_s || 0).toFixed(1) + ' m/s';
+            if (vfdCurrentEl) vfdCurrentEl.textContent = (state.vfd.current_amps || 0).toFixed(2) + ' A';
+
+            const bar = document.getElementById('spindle-bar');
+            if (bar) {
+                const pct = Math.min(100, ((state.vfd.current_amps || 0) / 30.0) * 100);
+                bar.style.width = pct + '%';
             }
+        } else {
+            if (vfdStatusEl) vfdStatusEl.textContent = 'DISCONNECTED';
+            this.setNA(vfdRpmEl);
+            this.setNA(vfdSpeedEl, ' m/s');
+            this.setNA(vfdCurrentEl, ' A');
 
-            // Axis Drive Card (Middle section)
-            const vfdFreqEl = document.getElementById('vfd-freq');
-            if (state.vfd.connected) {
-                if (vfdFreqEl) vfdFreqEl.textContent = (state.vfd.frequency_hz || 0).toFixed(1) + ' Hz';
-            } else {
-                this.setNA(vfdFreqEl, ' Hz');
-            }
+            const bar = document.getElementById('spindle-bar');
+            if (bar) bar.style.width = '0%';
         }
 
-        // Network status
-        if (state.network) {
-            const wifiSignalEl = document.getElementById('wifi-signal');
-            if (wifiSignalEl) wifiSignalEl.textContent = state.network.signal_percent + '%';
-
-            const wifiBarEl = document.getElementById('wifi-bar');
-            if (wifiBarEl) wifiBarEl.style.width = state.network.signal_percent + '%';
-
-            const wifiStatusEl = document.getElementById('wifi-status');
-            if (wifiStatusEl) wifiStatusEl.textContent = state.network.wifi_connected ? '✓ Connected' : '✗ Disconnected';
+        // Axis Drive Card (Middle section)
+        const vfdFreqEl = document.getElementById('vfd-freq');
+        if (state.vfd.connected) {
+            if (vfdFreqEl) vfdFreqEl.textContent = (state.vfd.frequency_hz || 0).toFixed(1) + ' Hz';
+        } else {
+            this.setNA(vfdFreqEl, ' Hz');
         }
+    },
 
-        // Axis metrics
-        if (state.axis) {
-            this.updateAxisCard('x', state.axis.x);
-            this.updateAxisCard('y', state.axis.y);
-            this.updateAxisCard('z', state.axis.z);
+    updateNetworkStatus(state) {
+        if (!state.network) return;
 
-            // Update DRO (Digital Readout) display
-            this.updateDRO(state.axis);
-        }
+        const wifiSignalEl = document.getElementById('wifi-signal');
+        if (wifiSignalEl) wifiSignalEl.textContent = state.network.signal_percent + '%';
 
+        const wifiBarEl = document.getElementById('wifi-bar');
+        if (wifiBarEl) wifiBarEl.style.width = state.network.signal_percent + '%';
+
+        const wifiStatusEl = document.getElementById('wifi-status');
+        if (wifiStatusEl) wifiStatusEl.textContent = state.network.wifi_connected ? '✓ Connected' : '✗ Disconnected';
+    },
+
+    updateHistoryData(state) {
         // Update history for chart
         this.history.cpu.push(state.system?.cpu_percent || 0);
         this.history.memory.push((state.system?.free_heap_bytes || 0) / 1024);
@@ -514,8 +527,6 @@ window.DashboardModule = window.DashboardModule || {
             this.history.wifi.shift();
             this.history.timestamps.shift();
         }
-
-        this.drawChart();
     },
 
     updateAxisCard(axis, metrics) {

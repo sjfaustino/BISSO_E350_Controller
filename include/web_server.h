@@ -14,6 +14,7 @@
 #include <SPIFFS.h>
 #include "config_unified.h"
 #include "system_constants.h" 
+#include "system_telemetry.h"
 
 class WebServerManager {
 public:
@@ -113,6 +114,9 @@ private:
     // File Manager Handlers
     esp_err_t handleFileList(PsychicRequest *request);
     esp_err_t handleFileDelete(PsychicRequest *request);
+
+    // JSON Builder Helper (Code Audit Refactor)
+    void buildTelemetryJson(JsonDocument& doc, const system_telemetry_t& telemetry);
 };
 
 extern WebServerManager webServer;

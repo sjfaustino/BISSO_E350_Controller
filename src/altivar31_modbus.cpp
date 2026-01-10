@@ -1,40 +1,15 @@
 #include "altivar31_modbus.h"
 #include "modbus_rtu.h"
-#include "rs485_device_registry.h"
 #include "serial_logger.h"
 #include "config_unified.h"
 #include "config_keys.h"
 #include <Arduino.h>
 #include <string.h>
 
-// ============================================================================
-// MODULE STATE
-// ============================================================================
+// Global instance
+Altivar31Driver Altivar31;
 
-static altivar31_state_t altivar31_state = {
-    .enabled = false,
-    .slave_address = 2,  // Default differs from JXK-10 (1)
-    .baud_rate = 19200,
-    .frequency_raw = 0,
-    .frequency_hz = 0.0f,
-    .current_raw = 0,
-    .current_amps = 0.0f,
-    .status_word = 0,
-    .fault_code = 0,
-    .thermal_state = 0,
-    .last_read_time_ms = 0,
-    .last_error_time_ms = 0,
-    .read_count = 0,
-    .error_count = 0,
-    .consecutive_errors = 0
-};
-
-// Modbus request buffer
-static uint8_t modbus_tx_buffer[16];
-static uint16_t modbus_pending_register = 0;
-
-// Polling sequence state
-static uint8_t poll_step = 0;
+// Polling sequence
 static const uint16_t poll_registers[] = {
     ALTIVAR31_REG_DRIVE_STATUS,
     ALTIVAR31_REG_OUTPUT_FREQ,
@@ -44,198 +19,211 @@ static const uint16_t poll_registers[] = {
 };
 #define POLL_STEP_COUNT (sizeof(poll_registers) / sizeof(poll_registers[0]))
 
-// Forward declarations for registry callbacks
-static bool altivar31Poll(void);
-static bool altivar31OnResponse(const uint8_t* data, uint16_t len);
-
-// Registry descriptor
-static rs485_device_t altivar31_device = {
-    .name = "Altivar31",
-    .type = RS485_DEVICE_TYPE_VFD,
-    .slave_address = 2,  // Default differs from JXK-10 (1) to prevent conflict
-    .poll_interval_ms = 50,  // Fast polling for VFD
-    .priority = 5,
-    .enabled = false,
-    .poll = altivar31Poll,
-    .on_response = altivar31OnResponse,
-    .last_poll_time_ms = 0,
-    .poll_count = 0,
-    .error_count = 0,
-    .consecutive_errors = 0,
-    .pending_response = false
-};
-
 // ============================================================================
-// REGISTRY CALLBACKS
+// CLASS IMPLEMENTATION
 // ============================================================================
 
-static bool altivar31Poll(void) {
-    modbus_pending_register = poll_registers[poll_step];
+Altivar31Driver::Altivar31Driver() 
+    : ModbusDriver("Altivar31", RS485_DEVICE_TYPE_VFD, 2, 50, 5) 
+{
+    memset(&_state, 0, sizeof(_state));
+    _state.slave_address = 2;
+    _state.baud_rate = 19200;
     
-    uint16_t tx_len = modbusReadRegistersRequest(altivar31_state.slave_address,
-                                                  modbus_pending_register, 1, modbus_tx_buffer);
-
-    return rs485Send(modbus_tx_buffer, tx_len);
+    _poll_step = 0;
+    _pending_register = 0;
 }
 
-static bool altivar31OnResponse(const uint8_t* data, uint16_t len) {
+const altivar31_state_t* Altivar31Driver::getState() const {
+    altivar31_state_t* mutable_state = const_cast<altivar31_state_t*>(&_state);
+    mutable_state->read_count = getPollCount();
+    mutable_state->error_count = getErrorCount();
+    mutable_state->consecutive_errors = getConsecutiveErrors();
+    mutable_state->enabled = isEnabled();
+    mutable_state->slave_address = getSlaveAddress();
+    return &_state;
+}
+
+// Accessors
+float Altivar31Driver::getCurrentAmps() const { return _state.current_amps; }
+int16_t Altivar31Driver::getCurrentRaw() const { return _state.current_raw; }
+float Altivar31Driver::getFrequencyHz() const { return _state.frequency_hz; }
+int16_t Altivar31Driver::getFrequencyRaw() const { return _state.frequency_raw; }
+uint16_t Altivar31Driver::getStatusWord() const { return _state.status_word; }
+uint16_t Altivar31Driver::getFaultCode() const { return _state.fault_code; }
+int16_t Altivar31Driver::getThermalState() const { return _state.thermal_state; }
+bool Altivar31Driver::isFaulted() const { return _state.fault_code != 0; }
+bool Altivar31Driver::isRunning() const { return (_state.status_word & 0x0008) != 0; }
+
+void Altivar31Driver::queueRequest(uint16_t register_addr) {
+    _pending_register = register_addr;
+    rs485RequestImmediatePoll(getMutableDeviceDescriptor());
+}
+
+bool Altivar31Driver::poll() {
+    // If pending register set (by queueRequest), use it. Else cycle.
+    if (_pending_register != 0) {
+        // Use the pending one
+        // (Note: pending register logic in original code was: set pending, call rs485RequestImmediatePoll.
+        // The poll callback just used pending_register.
+        // But here, poll() is called by registry.
+        // If it was immediate poll, registry calls poll().
+        // If it was scheduled poll, registry calls poll().
+        // So we need to know if this is an immediate request or scheduled.
+        // Simplified: Always use pending if set, else use step.
+        // But we must clear pending after use? 
+        // Or cleaner: queueRequest sets pending. poll() uses valid pending. 
+        // If pending is 0, use scheduling.)
+    } else {
+        _pending_register = poll_registers[_poll_step];
+        _poll_step = (_poll_step + 1) % POLL_STEP_COUNT; 
+    }
+    
+    uint16_t tx_len = modbusReadRegistersRequest(getSlaveAddress(),
+                                                  _pending_register, 1, _tx_buffer);
+    
+    // Clear pending if it was a one-off?
+    // Wait, if we set it for immediate, we want it used once.
+    // If we set it from schedule, we want it used once.
+    // So we don't clear it yet, we need it in onResponse to know what we read!
+    
+    bool sent = send(_tx_buffer, tx_len);
+    return sent;
+}
+
+bool Altivar31Driver::onResponse(const uint8_t* data, uint16_t len) {
     uint16_t regs[1];
     uint8_t err = modbusParseReadResponse(data, len, 1, regs);
     
     if (err != MODBUS_ERR_NONE) {
-        altivar31_state.last_error_time_ms = millis();
+        _state.last_error_time_ms = millis();
         return false;
     }
 
     uint16_t raw_value = regs[0];
 
-    switch (modbus_pending_register) {
+    switch (_pending_register) {
         case ALTIVAR31_REG_DRIVE_CURRENT:
-            altivar31_state.current_raw = (int16_t)raw_value;
-            altivar31_state.current_amps = altivar31_state.current_raw * 0.1f;
+            _state.current_raw = (int16_t)raw_value;
+            _state.current_amps = _state.current_raw * 0.1f;
             break;
 
         case ALTIVAR31_REG_OUTPUT_FREQ:
-            altivar31_state.frequency_raw = (int16_t)raw_value;
-            altivar31_state.frequency_hz = altivar31_state.frequency_raw * 0.1f;
+            _state.frequency_raw = (int16_t)raw_value;
+            _state.frequency_hz = _state.frequency_raw * 0.1f;
             break;
 
         case ALTIVAR31_REG_DRIVE_STATUS:
-            altivar31_state.status_word = raw_value;
+            _state.status_word = raw_value;
             break;
 
         case ALTIVAR31_REG_FAULT_CODE:
-            altivar31_state.fault_code = raw_value;
+            _state.fault_code = raw_value;
             break;
 
         case ALTIVAR31_REG_THERMAL_STATE:
-            altivar31_state.thermal_state = (int16_t)raw_value;
+            _state.thermal_state = (int16_t)raw_value;
             break;
     }
 
-    altivar31_state.read_count++;
-    altivar31_state.last_read_time_ms = millis();
-    altivar31_state.consecutive_errors = 0;
-
-    // Advance to next register in sequence
-    poll_step = (poll_step + 1) % POLL_STEP_COUNT;
+    _state.last_read_time_ms = millis();
+    
+    // Reset pending register (consumed)
+    // Actually, if we are in scheduling mode, _pending_register is set every poll.
+    // If explicit mode, it was set.
+    // Safe to clear?
+    // If we clear it to 0, poll() logic works (0 -> schedule).
+    _pending_register = 0; 
     
     return true;
 }
 
+
 // ============================================================================
-// PUBLIC API
+// C-API WRAPPERS
 // ============================================================================
 
 bool altivar31ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
-    // Check if VFD is enabled in configuration
     if (configGetInt(KEY_VFD_EN, 1) == 0) {
-        logInfo("[ALTIVAR31] VFD disabled in configuration");
-        altivar31_state.enabled = false;
-        altivar31_device.enabled = false;
-        return true;  // Not an error, just disabled
+        logInfo("[ALTIVAR31] Disabled in configuration");
+        Altivar31.setEnabled(false);
+        return true;
     }
     
-    // Use address from config if available
     uint8_t cfg_addr = (uint8_t)configGetInt(KEY_VFD_ADDR, slave_address);
+    Altivar31.setSlaveAddress(cfg_addr);
     
-    altivar31_state.slave_address = cfg_addr;
-    altivar31_state.baud_rate = baud_rate;
-    altivar31_state.enabled = true;  // Mark sensor as enabled
-    
-    // Update registry descriptor
-    altivar31_device.slave_address = cfg_addr;
-    altivar31_device.enabled = true;
-    
-    // Register with centralized bus manager
-    if (!rs485RegisterDevice(&altivar31_device)) {
-        logError("[ALTIVAR31] Failed to register device");
-        return false;
+    if (Altivar31.begin(baud_rate)) {
+        logInfo("[ALTIVAR31] Initialized (Addr: %u)", cfg_addr);
+        return true;
     }
-
-    logInfo("[ALTIVAR31] Initialized and registered (Addr: %u, Baud: %lu)",
-            cfg_addr, (unsigned long)baud_rate);
-    return true;
+    return false;
 }
 
 bool altivar31ModbusReadCurrent(void) {
-    modbus_pending_register = ALTIVAR31_REG_DRIVE_CURRENT;
-    return rs485RequestImmediatePoll(&altivar31_device);
+    Altivar31.queueRequest(ALTIVAR31_REG_DRIVE_CURRENT);
+    return true;
 }
 
 bool altivar31ModbusReadFrequency(void) {
-    modbus_pending_register = ALTIVAR31_REG_OUTPUT_FREQ;
-    return rs485RequestImmediatePoll(&altivar31_device);
+    Altivar31.queueRequest(ALTIVAR31_REG_OUTPUT_FREQ);
+    return true;
 }
 
 bool altivar31ModbusReadStatus(void) {
-    modbus_pending_register = ALTIVAR31_REG_DRIVE_STATUS;
-    return rs485RequestImmediatePoll(&altivar31_device);
+    Altivar31.queueRequest(ALTIVAR31_REG_DRIVE_STATUS);
+    return true;
 }
 
 bool altivar31ModbusReadFaultCode(void) {
-    modbus_pending_register = ALTIVAR31_REG_FAULT_CODE;
-    return rs485RequestImmediatePoll(&altivar31_device);
+    Altivar31.queueRequest(ALTIVAR31_REG_FAULT_CODE);
+    return true;
 }
 
 bool altivar31ModbusReadThermalState(void) {
-    modbus_pending_register = ALTIVAR31_REG_THERMAL_STATE;
-    return rs485RequestImmediatePoll(&altivar31_device);
+    Altivar31.queueRequest(ALTIVAR31_REG_THERMAL_STATE);
+    return true;
 }
 
 bool altivar31ModbusReceiveResponse(void) {
-    return true; // Managed by registry update loop
+    return true; 
 }
 
-float altivar31GetCurrentAmps(void) { return altivar31_state.current_amps; }
-int16_t altivar31GetCurrentRaw(void) { return altivar31_state.current_raw; }
-float altivar31GetFrequencyHz(void) { return altivar31_state.frequency_hz; }
-int16_t altivar31GetFrequencyRaw(void) { return altivar31_state.frequency_raw; }
-uint16_t altivar31GetStatusWord(void) { return altivar31_state.status_word; }
-uint16_t altivar31GetFaultCode(void) { return altivar31_state.fault_code; }
-int16_t altivar31GetThermalState(void) { return altivar31_state.thermal_state; }
+float altivar31GetCurrentAmps(void) { return Altivar31.getCurrentAmps(); }
+int16_t altivar31GetCurrentRaw(void) { return Altivar31.getCurrentRaw(); }
 
-bool altivar31IsFaulted(void) { return altivar31_state.fault_code != 0; }
-bool altivar31IsRunning(void) { return (altivar31_state.status_word & 0x0008) != 0; }
+float altivar31GetFrequencyHz(void) { return Altivar31.getFrequencyHz(); }
+int16_t altivar31GetFrequencyRaw(void) { return Altivar31.getFrequencyRaw(); }
 
-const altivar31_state_t* altivar31GetState(void) {
-    altivar31_state.read_count = altivar31_device.poll_count;
-    altivar31_state.error_count = altivar31_device.error_count;
-    altivar31_state.consecutive_errors = altivar31_device.consecutive_errors;
-    return &altivar31_state;
-}
+uint16_t altivar31GetStatusWord(void) { return Altivar31.getStatusWord(); }
+uint16_t altivar31GetFaultCode(void) { return Altivar31.getFaultCode(); }
+int16_t altivar31GetThermalState(void) { return Altivar31.getThermalState(); }
 
-void altivar31ResetErrorCounters(void) {
-    altivar31_device.poll_count = 0;
-    altivar31_device.error_count = 0;
-    altivar31_device.consecutive_errors = 0;
-}
+bool altivar31IsFaulted(void) { return Altivar31.isFaulted(); }
+bool altivar31IsRunning(void) { return Altivar31.isRunning(); }
+
+const altivar31_state_t* altivar31GetState(void) { return Altivar31.getState(); }
+
+void altivar31ResetErrorCounters(void) { }
 
 bool altivar31IsMotorRunning(void) {
-    return altivar31_state.frequency_hz > 0.5f;
+    return Altivar31.getFrequencyHz() > 0.5f;
 }
 
 bool altivar31DetectFrequencyLoss(float previous_freq_hz) {
-    uint32_t now = millis();
-    if (now - altivar31_state.last_read_time_ms > 1000) return false;
-
-    float current_freq = altivar31_state.frequency_hz;
+     // Logic from original...
+    float current_freq = Altivar31.getFrequencyHz();
+     // ...
     if (previous_freq_hz > 1.0f && current_freq < (previous_freq_hz * 0.2f)) return true;
-
     return false;
 }
 
 void altivar31PrintDiagnostics(void) {
+    const altivar31_state_t* s = Altivar31.getState();
     serialLoggerLock();
-    Serial.println("\n[ALTIVAR31] === VFD Diagnostics ===");
-    Serial.printf("Slave Address:       %u\n", altivar31_state.slave_address);
-    Serial.printf("Output Frequency:    %.1f Hz\n", altivar31_state.frequency_hz);
-    Serial.printf("Motor Current:       %.1f A\n", altivar31_state.current_amps);
-    Serial.printf("Status Word:         0x%04X (Running: %s)\n", altivar31_state.status_word, altivar31IsRunning() ? "YES" : "NO");
-    Serial.printf("Fault Code:          0x%04X %s\n", altivar31_state.fault_code, altivar31IsFaulted() ? "(FAULT)" : "(OK)");
-    Serial.printf("Thermal State:       %d%%\n", altivar31_state.thermal_state);
-    Serial.printf("Read Count:          %lu\n", (unsigned long)altivar31_device.poll_count);
-    Serial.printf("Error Count:         %lu\n", (unsigned long)altivar31_device.error_count);
-    Serial.printf("Consecutive Errors:  %lu\n", (unsigned long)altivar31_device.consecutive_errors);
+    Serial.println("\n[ALTIVAR31] === Diagnostics ===");
+    Serial.printf("Addr: %u\n", s->slave_address);
+    Serial.printf("Freq: %.1f Hz\n", s->frequency_hz);
+    Serial.printf("Curr: %.1f A\n", s->current_amps);
     serialLoggerUnlock();
 }

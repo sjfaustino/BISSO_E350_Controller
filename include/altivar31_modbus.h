@@ -20,27 +20,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// ============================================================================
-// MODBUS REGISTER ADDRESSES (Decimal)
-// ============================================================================
-// Verified against Altivar 31/312 Programming Manual BBV51701
-
-#define ALTIVAR31_REG_OUTPUT_FREQ       3202    // rFr: Output frequency (0.1 Hz units)
-#define ALTIVAR31_REG_DRIVE_CURRENT     3204    // LCr: Motor current (0.1 A units)
-#define ALTIVAR31_REG_DRIVE_STATUS      3201    // ETA: Status word (bit flags)
-#define ALTIVAR31_REG_FAULT_CODE        8606    // ERRD: Fault code
-#define ALTIVAR31_REG_THERMAL_STATE     3209    // tHd: Drive heatsink thermal state (1% units)
-
-// Drive status values
-#define ALTIVAR31_STATUS_IDLE           0
-#define ALTIVAR31_STATUS_RUNNING        1
-#define ALTIVAR31_STATUS_FAULT          2
-#define ALTIVAR31_STATUS_OVERHEAT       3
-
 // ============================================================================
 // VFD STATE STRUCTURE
 // ============================================================================
@@ -69,6 +48,69 @@ typedef struct {
     uint32_t consecutive_errors;        // Consecutive communication failures
 
 } altivar31_state_t;
+
+#ifdef __cplusplus
+#include "modbus_driver.h"
+
+class Altivar31Driver : public ModbusDriver {
+public:
+    Altivar31Driver();
+    
+    // Accessors
+    float getCurrentAmps() const;
+    int16_t getCurrentRaw() const;
+    float getFrequencyHz() const;
+    int16_t getFrequencyRaw() const;
+    uint16_t getStatusWord() const;
+    uint16_t getFaultCode() const;
+    int16_t getThermalState() const;
+    
+    bool isFaulted() const;
+    bool isRunning() const;
+    
+    const altivar31_state_t* getState() const;
+
+    // Commands (Queueing for next poll)
+    void queueRequest(uint16_t register_addr);
+    
+protected:
+    bool poll() override;
+    bool onResponse(const uint8_t* data, uint16_t len) override;
+
+private:
+    altivar31_state_t _state;
+    uint8_t _tx_buffer[16];
+    
+    // Polling state
+    uint16_t _pending_register;
+    uint8_t _poll_step;
+};
+
+extern Altivar31Driver Altivar31;
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// ============================================================================
+// MODBUS REGISTER ADDRESSES (Decimal)
+// ============================================================================
+// Verified against Altivar 31/312 Programming Manual BBV51701
+
+#define ALTIVAR31_REG_OUTPUT_FREQ       3202    // rFr: Output frequency (0.1 Hz units)
+#define ALTIVAR31_REG_DRIVE_CURRENT     3204    // LCr: Motor current (0.1 A units)
+#define ALTIVAR31_REG_DRIVE_STATUS      3201    // ETA: Status word (bit flags)
+#define ALTIVAR31_REG_FAULT_CODE        8606    // ERRD: Fault code
+#define ALTIVAR31_REG_THERMAL_STATE     3209    // tHd: Drive heatsink thermal state (1% units)
+
+// Drive status values
+#define ALTIVAR31_STATUS_IDLE           0
+#define ALTIVAR31_STATUS_RUNNING        1
+#define ALTIVAR31_STATUS_FAULT          2
+#define ALTIVAR31_STATUS_OVERHEAT       3
+
+
 
 // ============================================================================
 // INITIALIZATION

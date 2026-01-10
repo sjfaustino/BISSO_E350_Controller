@@ -11,43 +11,10 @@ window.HardwareModule = window.HardwareModule || {
         console.log('[Hardware] Initializing');
         this.loadPinConfiguration();
         this.setupEventListeners();
-        this.startTachometerPolling();
+        this.setupEventListeners();
     },
 
-    startTachometerPolling() {
-        // Poll tachometer every 1s
-        setInterval(() => this.updateTachometer(), 1000);
-        this.updateTachometer(); // Initial call
-    },
 
-    updateTachometer() {
-        const rpmEl = document.getElementById('tach_rpm');
-        if (!rpmEl) return; // Card not present
-
-        fetch('/api/hardware/tachometer')
-            .then(r => r.json())
-            .then(data => {
-                // Update RPM
-                document.getElementById('tach_rpm').textContent = data.rpm;
-                document.getElementById('tach_peak').textContent = data.peak_rpm;
-                document.getElementById('tach_pulses').textContent = data.pulse_count;
-                document.getElementById('tach_errors').textContent = data.error_count;
-
-                // Update Status Badge
-                const statusEl = document.getElementById('tach_status');
-                if (data.stalled) {
-                    statusEl.textContent = 'STALLED';
-                    statusEl.className = 'status-badge status-disconnected'; // Red
-                } else if (data.spinning) {
-                    statusEl.textContent = 'SPINNING';
-                    statusEl.className = 'status-badge status-connected'; // Green
-                } else {
-                    statusEl.textContent = 'IDLE';
-                    statusEl.className = 'status-badge status-unknown'; // Grey
-                }
-            })
-            .catch(e => console.warn('[Hardware] Tachometer fetch failed:', e));
-    },
 
     loadPinConfiguration() {
         // Fetch current pin configuration from API
@@ -233,6 +200,9 @@ window.HardwareModule = window.HardwareModule || {
         addUsage(13, 'JXK-10 Current Monitor (RS485 B)');
         // }
 
+        addUsage(16, 'YH-TC05 Tachometer (RS485 A)');
+        addUsage(13, 'YH-TC05 Tachometer (RS485 B)');
+
         // 3. Render Table
         let html = `
             <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
@@ -338,6 +308,16 @@ window.HardwareModule = window.HardwareModule || {
                 const jxk10Addr = document.getElementById('jxk10_addr');
                 if (jxk10Addr && config.jxk10_addr) {
                     jxk10Addr.value = config.jxk10_addr;
+                }
+
+                // YH-TC05 enabled and address
+                const tachEn = document.getElementById('tach_enabled');
+                if (tachEn) {
+                    tachEn.checked = config.yhtc05_en !== 0 && config.yhtc05_en !== "0";
+                }
+                const tachAddr = document.getElementById('tach_addr');
+                if (tachAddr && config.yhtc05_addr) {
+                    tachAddr.value = config.yhtc05_addr;
                 }
 
                 // WJ66 Baud Rate

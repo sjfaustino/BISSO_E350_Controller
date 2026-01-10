@@ -12,27 +12,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// ============================================================================
-// MODBUS REGISTER ADDRESSES (Typical YH-TC05 protocol)
-// ============================================================================
-
-#define YHTC05_REG_RPM              0x0000  // Current RPM (UINT16)
-#define YHTC05_REG_COUNT_LOW        0x0001  // Pulse count low word (UINT16)
-#define YHTC05_REG_COUNT_HIGH       0x0002  // Pulse count high word (UINT16)
-#define YHTC05_REG_STATUS           0x0003  // Status flags
-#define YHTC05_REG_PULSES_PER_REV   0x0010  // Pulses per revolution (config)
-#define YHTC05_REG_SLAVE_ADDR       0x0011  // Modbus slave address (config)
-#define YHTC05_REG_BAUD_RATE        0x0012  // Baud rate code (config)
-
-// Status flags
-#define YHTC05_STATUS_VALID         (1 << 0)  // Reading is valid
-#define YHTC05_STATUS_MOTION        (1 << 1)  // Motion detected
-#define YHTC05_STATUS_ALARM         (1 << 2)  // Speed alarm (over/under)
-
 // ============================================================================
 // DEVICE STATE
 // ============================================================================
@@ -66,6 +45,63 @@ typedef struct {
     // Peak tracking
     uint16_t peak_rpm;              // Maximum RPM recorded
 } yhtc05_state_t;
+
+#ifdef __cplusplus
+#include "modbus_driver.h"
+
+class YhTc05Driver : public ModbusDriver {
+public:
+    YhTc05Driver();
+    
+    uint16_t getRPM() const;
+    uint32_t getPulseCount() const;
+    bool isSpinning() const;
+    bool isStalled() const;
+    uint16_t getPeakRPM() const;
+    
+    // Configuration
+    void setStallThreshold(uint16_t rpm, uint32_t time_ms);
+    void resetStallDetection();
+    void resetPeakRPM();
+    
+    const yhtc05_state_t* getState() const;
+
+protected:
+    bool poll() override;
+    bool onResponse(const uint8_t* data, uint16_t len) override;
+
+private:
+    yhtc05_state_t _state;
+    uint8_t _tx_buffer[16];
+    bool _was_spinning;
+    uint32_t _below_threshold_since_ms;
+};
+
+extern YhTc05Driver YhTc05;
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// ============================================================================
+// MODBUS REGISTER ADDRESSES (Typical YH-TC05 protocol)
+// ============================================================================
+
+#define YHTC05_REG_RPM              0x0000  // Current RPM (UINT16)
+#define YHTC05_REG_COUNT_LOW        0x0001  // Pulse count low word (UINT16)
+#define YHTC05_REG_COUNT_HIGH       0x0002  // Pulse count high word (UINT16)
+#define YHTC05_REG_STATUS           0x0003  // Status flags
+#define YHTC05_REG_PULSES_PER_REV   0x0010  // Pulses per revolution (config)
+#define YHTC05_REG_SLAVE_ADDR       0x0011  // Modbus slave address (config)
+#define YHTC05_REG_BAUD_RATE        0x0012  // Baud rate code (config)
+
+// Status flags
+#define YHTC05_STATUS_VALID         (1 << 0)  // Reading is valid
+#define YHTC05_STATUS_MOTION        (1 << 1)  // Motion detected
+#define YHTC05_STATUS_ALARM         (1 << 2)  // Speed alarm (over/under)
+
+
 
 // ============================================================================
 // INITIALIZATION
@@ -101,7 +137,7 @@ bool yhtc05UnregisterFromBus(void);
  * @brief Initiate RPM read (called by RS485 scheduler)
  * @return true if request sent
  */
-bool yhtc05ModbusReadRPM(void);
+bool yhtc05ModbusReadRPM(void* ctx);
 
 /**
  * @brief Process response from Modbus read
@@ -109,7 +145,7 @@ bool yhtc05ModbusReadRPM(void);
  * @param len Response length
  * @return true if valid response
  */
-bool yhtc05ModbusOnResponse(const uint8_t* data, uint16_t len);
+bool yhtc05ModbusOnResponse(void* ctx, const uint8_t* data, uint16_t len);
 
 // ============================================================================
 // DATA ACCESSORS

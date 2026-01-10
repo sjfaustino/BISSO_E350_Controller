@@ -39,8 +39,8 @@ struct {
 } wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false};
 
 // RS-485 Registry Device Descriptor
-static bool wj66Poll(void);
-static bool wj66OnResponse(const uint8_t* data, uint16_t len);
+static bool wj66Poll(void* ctx);
+static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len);
 
 static rs485_device_t wj66_device = {
     .name = "WJ66",
@@ -195,7 +195,7 @@ uint32_t wj66Autodetect() {
     return found_rate;
 }
 
-static bool wj66Poll(void) {
+static bool wj66Poll(void* ctx) { (void)ctx;
     if (wj66_maintenance_mode) return false;
     
     // Check if we are on RS485 (Interface 1)
@@ -207,7 +207,7 @@ static bool wj66Poll(void) {
     return encoderHalSendString("#00\r");
 }
 
-static bool wj66OnResponse(const uint8_t* data, uint16_t len) {
+static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void)ctx;
     if (len == 0 || data[0] != '!') {
         return false;
     }

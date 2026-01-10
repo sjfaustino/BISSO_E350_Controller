@@ -12,6 +12,7 @@
 #include "serial_logger.h"
 #include "config_unified.h"
 #include "config_keys.h"
+#include "system_tuning.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -24,16 +25,16 @@
 //   - Stall threshold: 25A (102% of rated)
 static spindle_monitor_state_t monitor_state = {
     .enabled = false,
-    .poll_interval_ms = 1000,
+    .poll_interval_ms = SPINDLE_MONITOR_POLL_DEFAULT_MS,
     .last_poll_time_ms = 0,
-    .overcurrent_threshold_amps = 30.0f,  // 122% of 24.5A rated
+    .overcurrent_threshold_amps = SPINDLE_OVERCURRENT_DEFAULT_AMPS,  // 122% of 24.5A rated
     .current_amps = 0.0f,
     .current_peak_amps = 0.0f,
     .current_average_amps = 0.0f,
     .current_previous_amps = 0.0f,
-    .tool_breakage_drop_amps = 5.0f,
-    .stall_threshold_amps = 25.0f,
-    .stall_timeout_ms = 2000,
+    .tool_breakage_drop_amps = SPINDLE_DROP_DEFAULT_AMPS,
+    .stall_threshold_amps = SPINDLE_STALL_DEFAULT_AMPS,
+    .stall_timeout_ms = SPINDLE_STALL_TIMEOUT_DEFAULT_MS,
     .auto_pause_enabled = true,
     .auto_pause_threshold_amps = 25.0f,
     .auto_paused = false,
@@ -74,7 +75,7 @@ bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
   monitor_state.jxk10_slave_address = jxk10_address;
   monitor_state.jxk10_baud_rate = rs485_baud;
   monitor_state.overcurrent_threshold_amps = threshold_amps;
-  monitor_state.poll_interval_ms = 1000;
+  monitor_state.poll_interval_ms = SPINDLE_MONITOR_POLL_DEFAULT_MS;
   monitor_state.last_poll_time_ms = millis();
   
   // Load auto-pause config
@@ -130,7 +131,7 @@ bool spindleMonitorUpdate(void) {
   }
 
   uint32_t now = millis();
-  if (now - last_check_time_ms < 100) {
+  if (now - last_check_time_ms < SPINDLE_MONITOR_RATE_LIMIT_MS) {
       return false; // Rate limit logic check
   }
   last_check_time_ms = now;

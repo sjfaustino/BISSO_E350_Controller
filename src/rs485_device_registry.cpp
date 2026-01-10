@@ -201,7 +201,7 @@ bool rs485Update(void) {
     }
     
     // Initiate poll
-    if (next->poll && next->poll()) {
+    if (next->poll && next->poll(next->user_data)) {
         next->last_poll_time_ms = now;
         next->pending_response = true;
         registry.bus_busy = true;
@@ -228,7 +228,7 @@ bool rs485ProcessResponse(const uint8_t* data, uint16_t len) {
     
     bool success = false;
     if (current->on_response) {
-        success = current->on_response(data, len);
+        success = current->on_response(current->user_data, data, len);
     }
     
     if (success) {

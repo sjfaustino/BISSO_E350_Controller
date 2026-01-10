@@ -12,6 +12,49 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// JXK-10 device state
+typedef struct {
+    bool enabled;                       // Device enabled/connected flag
+    uint8_t slave_address;              // Modbus slave ID (1-254, default 1)
+    uint32_t baud_rate;                 // Baud rate in bps
+    int16_t current_raw;                // Raw Modbus register value
+    float current_amps;                 // Calculated current in amperes
+    uint32_t last_read_time_ms;         // Timestamp of last successful read
+    uint32_t last_error_time_ms;        // Timestamp of last error
+    uint32_t read_count;                // Statistics: successful reads
+    uint32_t error_count;               // Statistics: read errors
+    uint32_t consecutive_errors;        // Count of consecutive communication failures
+} jxk10_state_t;
+
+#ifdef __cplusplus
+#include "modbus_driver.h"
+
+class Jxk10Driver : public ModbusDriver {
+public:
+    Jxk10Driver();
+    
+    // API specific to JXK10
+    float getCurrentAmps() const;
+    int16_t getCurrentRaw() const;
+    
+    // Configuration
+    bool setInternalSlaveAddress(uint8_t new_address);
+    
+    // Legacy State Access
+    const jxk10_state_t* getState() const;
+
+protected:
+    bool poll() override;
+    bool onResponse(const uint8_t* data, uint16_t len) override;
+
+private:
+    jxk10_state_t _state;
+    uint8_t _tx_buffer[16];
+};
+
+extern Jxk10Driver Jxk10;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,19 +81,7 @@ extern "C" {
 #define JXK10_RANGE_0_50A        0
 #define JXK10_RANGE_0_100A       1
 
-// JXK-10 device state
-typedef struct {
-    bool enabled;                       // Device enabled/connected flag
-    uint8_t slave_address;              // Modbus slave ID (1-254, default 1)
-    uint32_t baud_rate;                 // Baud rate in bps
-    int16_t current_raw;                // Raw Modbus register value
-    float current_amps;                 // Calculated current in amperes
-    uint32_t last_read_time_ms;         // Timestamp of last successful read
-    uint32_t last_error_time_ms;        // Timestamp of last error
-    uint32_t read_count;                // Statistics: successful reads
-    uint32_t error_count;               // Statistics: read errors
-    uint32_t consecutive_errors;        // Count of consecutive communication failures
-} jxk10_state_t;
+
 
 /**
  * @brief Initialize JXK-10 Modbus driver

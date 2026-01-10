@@ -42,17 +42,19 @@ typedef enum {
 
 /**
  * @brief Device poll callback - initiates a Modbus transaction
+ * @param ctx User data context (optional)
  * @return true if request sent successfully
  */
-typedef bool (*rs485_poll_fn)(void);
+typedef bool (*rs485_poll_fn)(void* ctx);
 
 /**
  * @brief Device response callback - parses received data
+ * @param ctx User data context (optional)
  * @param data Received data buffer
  * @param len Data length
  * @return true if response parsed successfully
  */
-typedef bool (*rs485_response_fn)(const uint8_t* data, uint16_t len);
+typedef bool (*rs485_response_fn)(void* ctx, const uint8_t* data, uint16_t len);
 
 // ============================================================================
 // DEVICE DESCRIPTOR
@@ -69,6 +71,7 @@ typedef struct {
     // Callbacks
     rs485_poll_fn poll;             // Initiate transaction
     rs485_response_fn on_response;  // Process response
+    void* user_data;                // User context (passed to callbacks)
     
     // Runtime statistics (managed by registry)
     uint32_t last_poll_time_ms;     // Timestamp of last poll

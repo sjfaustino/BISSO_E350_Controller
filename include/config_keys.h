@@ -80,6 +80,7 @@
 
 // --- YH-TC05 TACHOMETER ---
 #define KEY_YHTC05_ENABLED "yhtc05_en"  // Tachometer Enable (1=on, 0=off)
+#define KEY_YHTC05_ADDR    "yhtc05_addr" // Tachometer Modbus Address (default 3)
 
 // --- MOTION LIMITS ---
 #define KEY_X_LIMIT_MIN "x_limit_min"

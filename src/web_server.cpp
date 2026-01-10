@@ -963,14 +963,9 @@ void WebServerManager::setAxisVFDError(uint8_t axis, float error_percent) {
     }
 }
 
-// --- Broadcast state to all connected WebSocket clients ---
-void WebServerManager::broadcastState() {
-    // Build JSON telemetry payload
-    JsonDocument doc;
-    
-    system_telemetry_t telemetry = telemetryGetSnapshot();
-    
-    portENTER_CRITICAL(&statusSpinlock);
+// --- JSON Builder Helper ---
+void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_telemetry_t& telemetry) {
+    // System Status
     doc["system"]["status"] = current_status.status;
     doc["system"]["health"] = telemetryGetHealthStatusString(telemetry.health_status);
     doc["system"]["uptime_seconds"] = current_status.uptime_sec;
@@ -996,12 +991,14 @@ void WebServerManager::broadcastState() {
     snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
     doc["system"]["hw_serial"] = serial_str;
 
+    // Motion
     doc["motion"]["position"]["x"] = current_status.x_pos;
     doc["motion"]["position"]["y"] = current_status.y_pos;
     doc["motion"]["position"]["z"] = current_status.z_pos;
     doc["motion"]["position"]["a"] = current_status.a_pos;
     doc["motion"]["dro_connected"] = current_status.dro_connected;
     
+    // VFD / Spindle
     doc["vfd"]["current_amps"] = current_status.vfd_current_amps;
     doc["vfd"]["frequency_hz"] = current_status.vfd_frequency_hz;
     doc["vfd"]["thermal_percent"] = current_status.vfd_thermal_percent;
@@ -1018,28 +1015,38 @@ void WebServerManager::broadcastState() {
         doc["axis"][axis_names[i]]["quality"] = current_status.axis_metrics[i].quality_score;
         doc["axis"][axis_names[i]]["jitter_mms"] = current_status.axis_metrics[i].jitter_mms;
         doc["axis"][axis_names[i]]["vfd_error_percent"] = current_status.axis_metrics[i].vfd_error_percent;
-        doc["axis"][axis_names[i]]["stalled"] = (current_status.axis_metrics[i].quality_score < 10); // Simple stall heuristic for UI
+        doc["axis"][axis_names[i]]["stalled"] = (current_status.axis_metrics[i].quality_score < 10);
     }
     
     // Network Status
     doc["network"]["wifi_connected"] = telemetry.wifi_connected;
     doc["network"]["signal_percent"] = telemetry.wifi_signal_strength;
-    doc["network"]["latency"] = 0; // Placeholder for future ping/roundtrip tracking
+    doc["network"]["latency"] = 0; 
 
     // Configuration Status
     doc["config"]["http_auth"] = (configGetInt(KEY_WEB_AUTH_ENABLED, 1) == 1);
-    doc["config"]["https"] = false; // Not configured
-    doc["config"]["websocket"] = true; // Always enabled
+    doc["config"]["https"] = false; 
+    doc["config"]["websocket"] = true; 
     doc["config"]["modbus"] = (configGetInt(KEY_VFD_EN, 0) == 1) || 
                               (configGetInt(KEY_JXK10_ENABLED, 0) == 1) || 
                               (configGetInt(KEY_YHTC05_ENABLED, 0) == 1);
+}
+
+// --- Broadcast state to all connected WebSocket clients ---
+void WebServerManager::broadcastState() {
+    // Get fresh telemetry snapshot
+    system_telemetry_t telemetry = telemetryGetSnapshot();
     
+    // Build JSON payload (Protected access to current_status)
+    JsonDocument doc;
+    portENTER_CRITICAL(&statusSpinlock);
+    buildTelemetryJson(doc, telemetry);
     portEXIT_CRITICAL(&statusSpinlock);
     
+    // Emit formatted JSON directly from doc to internal buffer of sendAll?
+    // sendAll takes const char*. We need to serialize to string.
     String json;
     serializeJson(doc, json);
-    
-    // Send to all connected WebSocket clients
     wsHandler.sendAll(json.c_str());
 
     // Update history tracking

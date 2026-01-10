@@ -475,18 +475,12 @@ void cmd_task_main(int argc, char** argv) {
 // ============================================================================
 // FAULT HANDLERS
 // ============================================================================
-static const char* formatTimestamp(uint32_t timestamp_ms) {
-    // Thread-safe rotating buffer pool (4 slots)
-    static char time_buffers[4][32];
-    static uint8_t buffer_index = 0;
-    
-    char* time_buffer = time_buffers[buffer_index];
-    buffer_index = (buffer_index + 1) % 4;
-    
+static String formatTimestamp(uint32_t timestamp_ms) {
     time_t t = timestamp_ms / 1000;
     struct tm *tm = localtime(&t);
-    strftime(time_buffer, 32, "%Y-%m-%d %H:%M:%S", tm);
-    return time_buffer;
+    char buf[32];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm);
+    return String(buf);
 }
 
 void cmd_faults_stats(int argc, char** argv) {
@@ -494,7 +488,7 @@ void cmd_faults_stats(int argc, char** argv) {
     logPrintln("\n[FAULT] === Statistics ===");
     logPrintf("Total: %lu\n", (unsigned long)stats.total_faults);
     if (stats.total_faults > 0) {
-        logPrintf("Last: %s\n", formatTimestamp(stats.last_fault_time_ms));
+        logPrintf("Last: %s\n", formatTimestamp(stats.last_fault_time_ms).c_str());
     }
 }
 

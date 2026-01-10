@@ -148,6 +148,17 @@
 #define VFD_POLL_INTERVAL_MS 1000               // Poll spindle current every second
 
 // ============================================================================
+// SPINDLE MONITOR PARAMETERS (JXK-10)
+// ============================================================================
+
+#define SPINDLE_MONITOR_POLL_DEFAULT_MS 1000    // Default poll interval
+#define SPINDLE_MONITOR_RATE_LIMIT_MS 100       // Minimum time between updates
+#define SPINDLE_OVERCURRENT_DEFAULT_AMPS 30.0f  // Default overcurrent threshold
+#define SPINDLE_STALL_DEFAULT_AMPS 25.0f        // Default stall threshold
+#define SPINDLE_DROP_DEFAULT_AMPS 5.0f          // Default breakage drop threshold
+#define SPINDLE_STALL_TIMEOUT_DEFAULT_MS 2000   // Default stall timeout
+
+// ============================================================================
 // TELEMETRY PARAMETERS
 // ============================================================================
 

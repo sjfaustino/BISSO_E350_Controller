@@ -113,8 +113,8 @@ bool init_spindle_wrapper() {
 #include "yhtc05_modbus.h"
 bool init_yhtc05_wrapper() {
     bool enabled = configGetInt(KEY_YHTC05_ENABLED, 1); // Default enabled
-    // Address 3 fixed for now as verified by user
-    yhtc05ModbusInit(3, 9600); 
+    int addr = configGetInt(KEY_YHTC05_ADDR, 3);
+    yhtc05ModbusInit((uint8_t)addr, 9600); 
     if (enabled) {
         yhtc05RegisterWithBus(1000, 100);
     }

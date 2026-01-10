@@ -82,43 +82,36 @@
             </div>
         </div>
 
-        <!-- YH-TC05 Tachometer Card -->
+        <!-- YH-TC05 Configuration Card -->
         <div class="card device-card">
             <div class="card-header device-header tachometer">
                 <h3>🔄 YH-TC05 Tachometer</h3>
-                <span class="device-protocol">Modbus RTU (Addr 3)</span>
+                <span class="device-protocol">RS485 Modbus</span>
             </div>
             <div class="card-content">
-                <div class="pin-row" style="margin-bottom: 15px;">
-                    <label>Current Speed:</label>
-                    <div class="value-display">
-                        <span id="tach_rpm" style="font-size: 1.2em; font-weight: bold;">--</span>
-                        <span class="unit">RPM</span>
-                    </div>
-                </div>
-                <div class="pin-row" style="margin-bottom: 15px;">
-                    <label>Peak Speed:</label>
-                    <div class="value-display">
-                        <span id="tach_peak" style="font-weight: bold;">--</span>
-                        <span class="unit">RPM</span>
-                    </div>
-                </div>
-                <div class="pin-row" style="margin-bottom: 15px;">
-                    <label>Total Pulses:</label>
-                    <div class="value-display">
-                        <span id="tach_pulses" style="font-family: monospace;">--</span>
-                    </div>
+                <div class="pin-row">
+                    <label>RS485 A:</label>
+                    <select class="pin-select" id="tach_rs485_a" data-signal="tach_rs485_a" disabled>
+                        <option value="16">RS485_A (GPIO16)</option>
+                    </select>
                 </div>
                 <div class="pin-row">
-                    <label>Status:</label>
-                    <div id="tach_status" class="status-badge status-unknown">Unknown</div>
+                    <label>RS485 B:</label>
+                    <select class="pin-select" id="tach_rs485_b" data-signal="tach_rs485_b" disabled>
+                        <option value="13">RS485_B (GPIO13)</option>
+                    </select>
+                </div>
+                <div class="pin-row">
+                    <label>Modbus Address:</label>
+                    <input type="number" class="pin-input" id="tach_addr" value="3" min="1" max="247"
+                        data-config="yhtc05_addr">
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
                     <label>Enabled:</label>
                     <input type="checkbox" id="tach_enabled" data-config="yhtc05_en" checked>
                 </div>
-                <div class="device-note" style="margin-top: 10px; font-size: 0.85em; color: var(--text-secondary);">
-                    Errors: <span id="tach_errors">0</span>
+                <div class="device-note">
+                    Digital Tachometer for Spindle RPM measurement via Modbus RTU
                 </div>
             </div>
         </div>
@@ -521,6 +514,10 @@
 
     .hardware-page .device-header.buzzer {
         background: linear-gradient(135deg, #f97316, #ea580c);
+    }
+
+    .hardware-page .device-header.tachometer {
+        background: linear-gradient(135deg, #0d9488, #0f766e);
     }
 
     /* Pin Rows */

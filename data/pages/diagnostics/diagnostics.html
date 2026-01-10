@@ -206,6 +206,42 @@
                 </div>
             </div>
         </div>
+
+        <!-- YH-TC05 Tachometer Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2 id="diag-header-tach">YH-TC05 Tachometer</h2>
+            </div>
+            <div class="card-content">
+                <div class="metric-card">
+                    <div class="metric-label">Current Speed</div>
+                    <div class="metric-value">
+                        <span id="tach_rpm">--</span> <span style="font-size: 0.5em; vertical-align: middle;">RPM</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Peak Speed</div>
+                    <div class="metric-value">
+                        <span id="tach_peak">--</span> <span
+                            style="font-size: 0.5em; vertical-align: middle;">RPM</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Status</div>
+                    <div class="metric-value">
+                        <span id="tach_status" class="status-badge status-unknown"
+                            style="font-size: 0.5em; padding: 2px 8px; vertical-align: middle;">Unknown</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Errors</div>
+                    <div class="metric-value" id="tach_errors" style="color: var(--text-secondary);">0</div>
+                </div>
+            </div>
+            <div style="padding: 0 15px 15px 15px; font-size: 11px; color: var(--text-secondary); text-align: right;">
+                Total Pulses: <span id="tach_pulses" style="font-family: monospace;">--</span>
+            </div>
+        </div>
     </div>
 
     <!-- Real-time Saw Blade Current Graph -->
