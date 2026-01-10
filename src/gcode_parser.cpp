@@ -153,6 +153,10 @@ bool GCodeParser::validateGCodeSyntax(const char* line, char* error_msg, size_t 
         bool valid_m = (cmd_num == 0 || cmd_num == 1 || cmd_num == 114 || cmd_num == 115 ||
                        cmd_num == 117 || cmd_num == 154 || cmd_num == 226 || cmd_num == 255 ||
                        cmd_num == 999);
+        if (cmd_num == 117) {
+            return true; // M117 is free-form text, skip parameter validation
+        }
+
         if (!valid_m) {
             snprintf(error_msg, error_msg_len, "Unsupported M-code M%ld", cmd_num);
             return false;
@@ -218,9 +222,18 @@ bool GCodeParser::processCommand(const char* line) {
     // G Codes
     if (parseCode(line, 'G', val)) {
         int cmd = (int)val;
+        // Optimization: Handle M117 free-form text separately to preserve case/formatting
+        if (cmd == 117) {
+            handleM117(line);
+            return true;
+        }
+
+        // Set current command string for UI tracking
+        motionSetCurrentCommand(line);
+
         switch (cmd) {
             case 0:
-            case 1:  handleG0_G1(line); break;
+            case 1:  return handleG0_G1(line);
             case 4:  handleG4(line); break;  // G4 Dwell
             case 10: handleG10(line); break; // G10 L20 P1...
             case 28: handleG28(line); break; // PHASE 5.1: G28 Home
@@ -294,7 +307,7 @@ void GCodeParser::handleG5x(int system_idx) {
     logInfo("[GCODE] Switched to G%d", 54 + system_idx);
 }
 
-void GCodeParser::handleG0_G1(const char* line) {
+bool GCodeParser::handleG0_G1(const char* line) {
     float fVal = 0.0f;
     if (parseCode(line, 'F', fVal) && fVal > 0) currentFeedRate = fVal;
 
@@ -306,7 +319,7 @@ void GCodeParser::handleG0_G1(const char* line) {
         if(parseCode(line, axes_char[i], req[i])) has[i] = true;
     }
 
-    if (!has[0] && !has[1] && !has[2] && !has[3]) return;
+    if (!has[0] && !has[1] && !has[2] && !has[3]) return true; // No axes specified
 
     float curM[4] = {
         motionGetPositionMM(0), motionGetPositionMM(1),
@@ -332,10 +345,12 @@ void GCodeParser::handleG0_G1(const char* line) {
         }
     }
 
+    // Check if any axis actually needs to move
     bool move = false;
-    for(int i=0; i<4; i++) if(fabs(targetM[i] - curM[i]) > 0.01) move=true;
+    for(int i=0; i<4; i++) if(fabs(targetM[i] - curM[i]) > 0.01) move = true;
 
-    if(move) pushMove(targetM[0], targetM[1], targetM[2], targetM[3]);
+    if(move) return pushMove(targetM[0], targetM[1], targetM[2], targetM[3]);
+    return true; // No move needed is considered success (idempotent)
 }
 
 void GCodeParser::handleG4(const char* line) {
@@ -369,11 +384,21 @@ void GCodeParser::handleG4(const char* line) {
     }
 }
 
-void GCodeParser::pushMove(float x, float y, float z, float a) {
+bool GCodeParser::pushMove(float x, float y, float z, float a) {
     if (configGetInt(KEY_MOTION_BUFFER_ENABLE, 0)) {
-        if (!motionBuffer.isFull()) motionBuffer.push(x, y, z, a, currentFeedRate);
+        if (!motionBuffer.isFull()) {
+            motionBuffer.push(x, y, z, a, currentFeedRate);
+            return true;
+        } else {
+            logError("[GCODE] Motion buffer full");
+            return false;
+        }
     } else {
-        motionMoveAbsolute(x, y, z, a, currentFeedRate);
+        if (!motionMoveAbsolute(x, y, z, a, currentFeedRate)) {
+            logError("[GCODE] Move failed (Busy, Limit, or Multi-Axis not supported)");
+            return false; 
+        }
+        return true;
     }
 }
 

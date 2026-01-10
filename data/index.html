@@ -6,14 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BISSO E350 - Debug Mode</title>
 
-    <!-- CSS - Individual Files -->
-    <link rel="stylesheet" href="css/variables.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/cards.css">
-    <link rel="stylesheet" href="css/charts.css">
-    <link rel="stylesheet" href="css/responsive.css">
-    <link rel="stylesheet" href="css/mobile-menu.css">
-    <link rel="stylesheet" href="shared/enhancements.css">
+    <!-- CSS - Bundled -->
+    <link rel="stylesheet" href="css/bundle.css">
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
@@ -49,14 +43,7 @@
         </main>
     </div>
 
-    <!-- JS - Shared modules (load before core.js) -->
-    <script src="shared/graphs.js"></script>
-    <script src="shared/position-viz.js"></script>
-    <script src="shared/websocket.js"></script>
-    <script src="shared/toast.js"></script>
-    <script src="shared/alerts.js"></script>
-
-    <!-- JS - Core contains Utils, AppState, ThemeManager, Router -->
+    <!-- JS - Core (contains Shared modules + Utils, AppState, ThemeManager, Router) -->
     <script src="core.js"></script>
 </body>
 

@@ -1330,7 +1330,7 @@ void cmd_nvs_main(int argc, char** argv) {
         if (argc < 3 || strcmp(argv[2], "legacy") == 0) {
             configEraseNamespace("gemini_cfg");
         } else if (strcmp(argv[2], "faults") == 0) {
-            configEraseNamespace("bisso_faults");
+            faultClearHistory();
         } else {
             logPrintln("Usage: nvs cleanup [legacy|faults]");
         }

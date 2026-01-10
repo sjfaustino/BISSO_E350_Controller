@@ -42,7 +42,11 @@ static struct {
   int32_t active_start_position;
   bool global_enabled;
   int strict_limits;
-} m_state = {255, 0, true, 1};
+  // Execution Tracking
+  char current_command[64];
+  float progress_percent;
+  float remaining_seconds;
+} m_state = {255, 0, true, 1, "", 0.0f, 0.0f};
 
 // PHASE 5.10: Non-static to allow external access from motion_state_machine.cpp
 portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -209,6 +213,34 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
   prev_position = current_pos;
   prev_update_ms = current_time_ms;
   position = current_pos;
+
+  // Calculate Progress & ETA (if this is the active axis)
+  portENTER_CRITICAL(&motionSpinlock);
+  bool is_active = (this->id == m_state.active_axis);
+  int32_t start_pos = m_state.active_start_position;
+  portEXIT_CRITICAL(&motionSpinlock);
+
+  if (is_active) {
+      float total_dist = abs(global_target_pos - start_pos);
+      if (total_dist > 0.0f) {
+          float current_dist = abs(current_pos - start_pos);
+          float prog = (current_dist / total_dist) * 100.0f;
+          if (prog > 100.0f) prog = 100.0f;
+          
+          portENTER_CRITICAL(&motionSpinlock);
+          m_state.progress_percent = prog;
+          
+          // ETA Calculation
+          if (abs(current_velocity_mm_s) > 0.1f) {
+              float ppm = encoderCalibrationGetPPM(id);
+              if (ppm > 0) {
+                  float rem_dist_mm = (total_dist - current_dist) / ppm;
+                  m_state.remaining_seconds = rem_dist_mm / abs(current_velocity_mm_s);
+              }
+          }
+          portEXIT_CRITICAL(&motionSpinlock);
+      }
+  }
 
   // PHASE 5.10: Use formal state machine instead of switch/case
   // State machine handles thread-safe state transitions internally
@@ -518,7 +550,39 @@ void motionSetActiveStartPosition(int32_t position) {
 void motionClearActiveAxis() {
   portENTER_CRITICAL(&motionSpinlock);
   m_state.active_axis = 255;
+  m_state.progress_percent = 0.0f;
+  m_state.remaining_seconds = 0.0f;
+  m_state.current_command[0] = '\0';
   portEXIT_CRITICAL(&motionSpinlock);
+}
+
+// Execution Status Accessors
+float motionGetExecutionProgress() {
+    portENTER_CRITICAL(&motionSpinlock);
+    float p = m_state.progress_percent;
+    portEXIT_CRITICAL(&motionSpinlock);
+    return p;
+}
+
+const char* motionGetCurrentCommand() {
+    // Note: returning pointer to static buffer may be risky if modified rapidly,
+    // but command strings are set once per move.
+    return m_state.current_command;
+}
+
+float motionGetEstimatedTimeRemaining() {
+    portENTER_CRITICAL(&motionSpinlock);
+    float t = m_state.remaining_seconds;
+    portEXIT_CRITICAL(&motionSpinlock);
+    return t;
+}
+
+void motionSetCurrentCommand(const char* cmd) {
+    if(!cmd) return;
+    portENTER_CRITICAL(&motionSpinlock);
+    strncpy(m_state.current_command, cmd, sizeof(m_state.current_command) - 1);
+    m_state.current_command[sizeof(m_state.current_command) - 1] = '\0';
+    portEXIT_CRITICAL(&motionSpinlock);
 }
 
 const char *motionStateToString(motion_state_t state) {

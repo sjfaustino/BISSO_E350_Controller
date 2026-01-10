@@ -49,7 +49,7 @@ private:
     bool parseCode(const char* line, char code, float& value);
     bool hasCode(const char* line, char code);
     
-    void handleG0_G1(const char* line);
+    bool handleG0_G1(const char* line);
     void handleG4(const char* line);   // G4 Dwell command
     void handleG10(const char* line);
     void handleG5x(int system_idx);
@@ -80,7 +80,7 @@ private:
 
     void loadWCS();
     void saveWCS(uint8_t system);
-    void pushMove(float x, float y, float z, float a);
+    bool pushMove(float x, float y, float z, float a);
 };
 
 extern GCodeParser gcodeParser;

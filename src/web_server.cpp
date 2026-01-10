@@ -9,6 +9,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
+#include "motion_state.h" // Added for execution tracking
 #include "api_config.h"
 #include "serial_logger.h"
 #include "hardware_config.h"
@@ -22,6 +23,7 @@
 #include "encoder_wj66.h"
 #include "rs485_autodetect.h"
 #include "config_keys.h"
+// #include "gcode_queue.h" // DISABLED - debugging memory issue
 #include "ota_manager.h"
 #include "yhtc05_modbus.h"
 #include "firmware_version.h"
@@ -37,6 +39,9 @@ static history_sample_t telemetry_history[HISTORY_BUFFER_SIZE];
 static int history_head = 0;
 static int history_count = 0;
 static uint32_t last_history_sample_ms = 0;
+
+// Forward Declaration
+bool webAuthenticate(PsychicRequest *request);
 
 static void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
     uint32_t now = millis();
@@ -266,11 +271,57 @@ void WebServerManager::setupRoutes() {
         const char* cmd = doc["command"];
         if (!cmd || strlen(cmd) == 0) return response->send(400, "application/json", "{\"success\":false, \"error\":\"No command\"}");
         
+        // Queue tracking temporarily disabled - TODO: debug queue crash
+        // uint16_t job_id = gcodeQueueAdd(cmd);
+        // gcodeQueueMarkRunning();
+        
         bool result = gcodeParser.processCommand(cmd);
+        
+        // Queue tracking temporarily disabled
+        // if (result) {
+        //     gcodeQueueMarkCompleted();
+        // } else {
+        //     gcodeQueueMarkFailed("Command rejected");
+        // }
         
         JsonDocument resp;
         resp["success"] = result;
         resp["command"] = cmd;
+        // resp["job_id"] = job_id;
+        
+        // Calculate ETA using calibration data for G0/G1 commands
+        if (result && (strncasecmp(cmd, "G0", 2) == 0 || strncasecmp(cmd, "G1", 2) == 0)) {
+            float x = 0, y = 0, z = 0, f = gcodeParser.getCurrentFeedRate();
+            
+            // Parse axis values from command
+            const char* xp = strchr(cmd, 'X'); if (!xp) xp = strchr(cmd, 'x');
+            const char* yp = strchr(cmd, 'Y'); if (!yp) yp = strchr(cmd, 'y');
+            const char* zp = strchr(cmd, 'Z'); if (!zp) zp = strchr(cmd, 'z');
+            const char* fp = strchr(cmd, 'F'); if (!fp) fp = strchr(cmd, 'f');
+            
+            if (xp) x = fabs(atof(xp + 1));
+            if (yp) y = fabs(atof(yp + 1));
+            if (zp) z = fabs(atof(zp + 1));
+            if (fp) f = atof(fp + 1);
+            
+            // Use calibration speeds (med speed as default representative)
+            float max_axis_speed = machineCal.X.speed_med_mm_min;
+            if (y > x && y > z) max_axis_speed = machineCal.Y.speed_med_mm_min;
+            if (z > x && z > y) max_axis_speed = machineCal.Z.speed_med_mm_min;
+            
+            // Use minimum of feedrate and calibrated speed
+            float effective_speed = (f > 0 && f < max_axis_speed) ? f : max_axis_speed;
+            if (effective_speed <= 0) effective_speed = 300.0f; // Fallback
+            
+            // Calculate distance and ETA
+            float distance = sqrtf(x*x + y*y + z*z);
+            float eta_seconds = (distance / effective_speed) * 60.0f;
+            
+            resp["eta_seconds"] = eta_seconds;
+            resp["distance_mm"] = distance;
+            resp["speed_mm_min"] = effective_speed;
+        }
+        
         String json;
         serializeJson(resp, json);
         return response->send(200, "application/json", json.c_str());
@@ -293,6 +344,34 @@ void WebServerManager::setupRoutes() {
         serializeJson(doc, json);
         return response->send(200, "application/json", json.c_str());
     });
+    
+    /* QUEUE FEATURE DISABLED - debugging memory issue
+    // GET /api/gcode/queue - Get queue state and job history
+    server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        // ... disabled
+        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+    });
+    
+    // POST /api/gcode/queue/retry - Retry failed job from start position
+    server.on("/api/gcode/queue/retry", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+    });
+    
+    // POST /api/gcode/queue/skip - Skip failed job and continue
+    server.on("/api/gcode/queue/skip", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+    });
+    
+    // POST /api/gcode/queue/resume - Resume from current position (operator fixed issue)
+    server.on("/api/gcode/queue/resume", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+    });
+    
+    // DELETE /api/gcode/queue - Clear queue history
+    server.on("/api/gcode/queue", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) {
+        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+    });
+    END QUEUE FEATURE DISABLED */
     
     // POST /api/encoder/calibrate
     server.on("/api/encoder/calibrate", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
@@ -445,6 +524,13 @@ void WebServerManager::setupRoutes() {
         String json;
         serializeJson(doc, json);
         return response->send(200, "application/json", json.c_str());
+    });
+
+    // DELETE /api/faults - Clear Fault Logs
+    server.on("/api/faults", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (!webAuthenticate(request)) return response->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+        faultClearHistory(); 
+        return response->send(200, "application/json", "{\"success\":true, \"message\":\"Fault logs cleared\"}");
     });
 
     // POST /api/faults/clear
@@ -988,6 +1074,9 @@ void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_teleme
     snprintf(rev_str, sizeof(rev_str), "Rev %d", ESP.getChipRevision());
     doc["system"]["hw_revision"] = rev_str;
 
+    // Phase 5.10: Explicit motion active flag for UI
+    doc["motion_active"] = motionIsMoving();
+
     char serial_str[32];
     uint64_t mac = ESP.getEfuseMac();
     snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
@@ -1024,6 +1113,11 @@ void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_teleme
     doc["network"]["wifi_connected"] = telemetry.wifi_connected;
     doc["network"]["signal_percent"] = telemetry.wifi_signal_strength;
     doc["network"]["latency"] = 0; 
+    
+    // Execution Status - DISABLED to save memory
+    // doc["exec"]["cmd"] = motionGetCurrentCommand();
+    // doc["exec"]["progress"] = motionGetExecutionProgress();
+    // doc["exec"]["eta"] = motionGetEstimatedTimeRemaining();
 
     // Configuration Status
     doc["config"]["http_auth"] = (configGetInt(KEY_WEB_AUTH_ENABLED, 1) == 1);
@@ -1063,5 +1157,20 @@ bool WebServerManager::isPasswordChangeRequired() { return false; }
 // --- Legacy Support ---
 void WebServerManager::handleClient() {}
 
-// --- WebSocket Handler Accessor ---
+// --- Authentication Helper ---
+bool webAuthenticate(PsychicRequest *request) {
+    // Check if auth is enabled (default: true)
+    if (configGetInt(KEY_WEB_AUTH_ENABLED, 1) == 0) {
+        return true;
+    }
+
+    // Get credentials from config
+    String username = configGetString(KEY_WEB_USERNAME, "admin");
+    String password = configGetString(KEY_WEB_PASSWORD, "bisso");
+    
+    // Use PsychicHttp's built-in digest authentication
+    // Note: authenticate() checks if the request has valid credentials
+    // If not, it sends the 401 challenge specific to Digest Auth
+    return request->authenticate(username.c_str(), password.c_str());
+}
 // getWebSocketHandler is defined inline in web_server.h

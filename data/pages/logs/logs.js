@@ -234,12 +234,24 @@ window.LogsModule = window.LogsModule || {
         URL.revokeObjectURL(url);
     },
 
-    clearLogs() {
-        if (confirm('Clear all logs? This cannot be undone.')) {
-            this.logs = [];
-            this.saveLogsToStorage();
-            this.applyFilters();
-            AlertManager.add('All logs cleared', 'info', 2000);
+    async clearLogs() {
+        if (confirm('Clear all logs (Local and Device History)? This cannot be undone.')) {
+            try {
+                // Clear backend NVS logs
+                const response = await fetch('/api/faults', { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to clear device logs');
+
+                // Clear local state
+                this.logs = [];
+                this.backendLogs = [];
+                this.saveLogsToStorage();
+                this.applyFilters();
+
+                AlertManager.add('All logs cleared', 'info', 2000);
+            } catch (e) {
+                console.error('[Logs] Error clearing logs:', e);
+                AlertManager.add('Failed to clear device logs', 'error', 3000);
+            }
         }
     },
 

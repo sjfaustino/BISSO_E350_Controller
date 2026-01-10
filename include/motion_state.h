@@ -16,13 +16,20 @@ int32_t motionGetTarget(uint8_t axis); // Added (Fixes encoder integration error
 float motionGetPositionMM(uint8_t axis); 
 motion_state_t motionGetState(uint8_t axis);
 
+
 // Status Checks
 bool motionIsMoving();
 bool motionIsStalled(uint8_t axis);
 bool motionIsEmergencyStopped();
 uint8_t motionGetActiveAxis();
 
+// Execution Status (New)
+float motionGetExecutionProgress();
+const char* motionGetCurrentCommand();
+float motionGetEstimatedTimeRemaining();
+
 // Helpers
 const char* motionStateToString(motion_state_t state);
+void motionSetCurrentCommand(const char* cmd);
 
 #endif // MOTION_STATE_H

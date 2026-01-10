@@ -3,9 +3,9 @@
 -->
 <div class="gcode-page">
     <!-- G-code Editor Card -->
-    <div class="card">
+    <div class="card" style="margin-bottom: var(--space-xl);">
         <div class="card-header">
-            <h2>G-code Command Input</h2>
+            <h2>G-CODE COMMAND INPUT</h2>
             <div style="display: flex; gap: 10px;">
                 <button class="btn btn-sm btn-ghost" id="clear-editor" title="Clear editor">Clear</button>
                 <button class="btn btn-sm btn-ghost" id="load-examples" title="Load example G-code">Examples</button>
@@ -76,10 +76,59 @@
         </div>
     </div>
 
-    <!-- Execution Log Card -->
+    <!-- Current Execution Card (Hidden by default) -->
+    <div class="card" id="execution-card" style="display: none; margin-bottom: var(--space-xl);">
+        <div class="card-header">
+            <h2>CURRENT EXECUTION</h2>
+            <div id="execution-eta" style="font-family: monospace; font-size: 0.9em; color: var(--text-muted);"></div>
+        </div>
+        <div class="card-content">
+            <div style="font-family: monospace; font-size: 1.1em; margin-bottom: 10px; color: var(--text-primary);"
+                id="execution-cmd"></div>
+            <div class="progress-bar-container"
+                style="height: 28px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; position: relative; border: 1px solid var(--border-color);">
+                <div id="execution-progress"
+                    style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--color-optimal)); transition: width 0.5s ease-out; min-width: 30px;">
+                </div>
+                <span id="execution-percent"
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-family: monospace; font-weight: bold; color: var(--text-primary);">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Queue Status Card (Server-Side History) -->
+    <div class="card" id="queue-status-card">
+        <div class="card-header">
+            <h2>JOB QUEUE STATUS</h2>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span id="queue-summary" style="font-size: 0.85em; color: var(--text-muted);">0 jobs</span>
+                <button class="btn btn-sm btn-ghost" id="refresh-queue" title="Refresh">🔄</button>
+                <button class="btn btn-sm btn-danger" id="clear-queue" title="Clear History">🗑️</button>
+            </div>
+        </div>
+        <div class="card-content">
+            <!-- Recovery Actions (shown when paused on error) -->
+            <div id="recovery-actions"
+                style="display: none; background: var(--color-critical-bg); padding: 12px; border-radius: 4px; margin-bottom: 12px;">
+                <div style="color: var(--color-critical); font-weight: bold; margin-bottom: 8px;">⚠️ Queue Paused - Job
+                    Failed</div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-sm btn-warning" id="retry-job" title="Move to start position and retry">🔁
+                        Retry from Start</button>
+                    <button class="btn btn-sm btn-primary" id="resume-job" title="Continue from current position">▶️
+                        Resume</button>
+                    <button class="btn btn-sm btn-ghost" id="skip-job" title="Skip to next command">⏭️ Skip</button>
+                </div>
+            </div>
+            <!-- Job List -->
+            <div id="job-list" class="job-list" style="max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- Execution Log Card (Client-Side) -->
     <div class="card">
         <div class="card-header">
-            <h2>Execution Log</h2>
+            <h2>QUEUE LOG</h2>
             <button class="btn btn-sm btn-ghost" id="clear-log">Clear Log</button>
         </div>
         <div class="card-content">
@@ -108,6 +157,7 @@
         user-select: none;
         border-right: 1px solid var(--border-color);
         min-width: 40px;
+        white-space: pre;
     }
 
     .gcode-editor {
