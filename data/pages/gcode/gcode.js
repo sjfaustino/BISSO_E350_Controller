@@ -83,10 +83,7 @@
             });
 
             // Clear log
-            document.getElementById('clear-log')?.addEventListener('click', () => {
-                const log = document.getElementById('execution-log');
-                if (log) log.innerHTML = '';
-            });
+
 
             // Load examples
             document.getElementById('load-examples')?.addEventListener('click', () => {
@@ -177,7 +174,6 @@
             this.updateExecutionButtons();
             const btn = document.getElementById('pause-execution');
             if (btn) btn.querySelector('span').textContent = '⏸️ Pause';
-            this.addLogEntry('Execution stopped', 'warning');
         }
 
         static updateExecutionButtons() {
@@ -194,8 +190,8 @@
                 return;
             }
 
-            // Show execution card immediately for motion commands (G0, G1)
-            const isMotionCommand = /^G[01]\s/i.test(command);
+            // Show execution card immediately for motion commands (G0, G1, G28)
+            const isMotionCommand = /^G(0|1|28)/i.test(command);
             if (isMotionCommand) {
                 this.showExecutionCard(command);
             }
@@ -214,7 +210,6 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    this.addLogEntry(`✓ ${command}`, 'success');
                     if (!batch) AlertManager.add('Command executed successfully', 'success', 2000);
 
                     // Update ETA with server-calculated value (uses calibration data)
@@ -229,7 +224,6 @@
                         setTimeout(() => this.hideExecutionCardIfStale(), gracePeriod);
                     }
                 } else {
-                    this.addLogEntry(`✗ ${command} (failed)`, 'error');
                     if (!batch) AlertManager.add('Command failed', 'critical', 3000);
                     // Hide card immediately on failure
                     if (isMotionCommand) {
@@ -238,7 +232,6 @@
                 }
             } catch (error) {
                 console.error('[GCODE] Execute error:', error);
-                this.addLogEntry(`✗ ${command} (error: ${error.message})`, 'error');
                 if (!batch) AlertManager.add('Communication error', 'critical', 3000);
                 if (isMotionCommand) {
                     this.hideExecutionCard();
@@ -321,27 +314,7 @@
             }
         }
 
-        static addLogEntry(message, type = 'info') {
-            const log = document.getElementById('execution-log');
-            if (!log) return;
 
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-
-            const timestamp = new Date().toLocaleTimeString();
-            entry.innerHTML = `
-            <span class="log-timestamp">[${timestamp}]</span>
-            <span>${message}</span>
-        `;
-
-            log.appendChild(entry);
-            log.scrollTop = log.scrollHeight;
-
-            // Limit log entries to 100
-            while (log.children.length > 100) {
-                log.removeChild(log.firstChild);
-            }
-        }
 
         static updateParserState(telemetry = null) {
             // Update from telemetry if available
@@ -352,6 +325,25 @@
                     const state = telemetry.motion_active ? 'Moving' : 'Idle';
                     motionState.textContent = state;
                     motionState.style.color = telemetry.motion_active ? 'var(--color-warning)' : 'var(--color-optimal)';
+                }
+
+                // Update Parser Status from telemetry
+                if (telemetry.parser) {
+                    const coordMode = document.getElementById('coord-mode');
+                    if (coordMode) coordMode.textContent = telemetry.parser.absolute_mode ? 'Absolute (G90)' : 'Relative (G91)';
+
+                    const feedrate = document.getElementById('feed-rate');
+                    if (feedrate) {
+                        const actual = telemetry.parser.actual_feedrate;
+                        const requested = telemetry.parser.feedrate || 0;
+                        if (actual && Math.abs(actual - requested) > 1) {
+                            feedrate.textContent = `${Math.round(actual)} mm/min (calibrated)`;
+                            feedrate.style.color = 'var(--color-warning)';
+                        } else {
+                            feedrate.textContent = `${Math.round(requested)} mm/min`;
+                            feedrate.style.color = '';
+                        }
+                    }
                 }
 
                 // Update Execution Card
@@ -406,17 +398,17 @@
                 }
             }
 
-            // Fetch parser state from backend API
-            if (window.location.protocol !== 'file:') {
+            // Fallback: Fetch parser state from backend API only if telemetry hasn't provided it yet
+            // or if we're not using WebSockets (rare)
+            if (!telemetry && window.location.protocol !== 'file:') {
                 fetch('/api/gcode/state')
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
-                            // Update modal coordinate mode display if element exists
                             const coordMode = document.getElementById('coord-mode');
                             if (coordMode) coordMode.textContent = data.absolute_mode ? 'Absolute (G90)' : 'Relative (G91)';
 
-                            const feedrate = document.getElementById('current-feedrate');
+                            const feedrate = document.getElementById('feed-rate');
                             if (feedrate) feedrate.textContent = (data.feedrate || 0) + ' mm/min';
                         }
                     })

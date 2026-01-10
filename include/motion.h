@@ -133,6 +133,7 @@ const char *motionStateToString(motion_state_t state);
 
 // --- HELPERS ---
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed);
+float motionGetCalibratedFeedRate(uint8_t axis, float speed_mm_s);
 void motionSetPLCSpeedProfile(speed_profile_t profile);
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
 

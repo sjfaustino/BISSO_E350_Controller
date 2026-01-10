@@ -125,16 +125,7 @@
         </div>
     </div>
 
-    <!-- Execution Log Card (Client-Side) -->
-    <div class="card">
-        <div class="card-header">
-            <h2>QUEUE LOG</h2>
-            <button class="btn btn-sm btn-ghost" id="clear-log">Clear Log</button>
-        </div>
-        <div class="card-content">
-            <div id="execution-log" class="execution-log"></div>
-        </div>
-    </div>
+
 </div>
 
 <style>
@@ -178,43 +169,7 @@
         background: var(--bg-primary);
     }
 
-    .execution-log {
-        font-family: 'Courier New', monospace;
-        font-size: 13px;
-        max-height: 300px;
-        overflow-y: auto;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-md);
-        padding: 10px;
-    }
 
-    .log-entry {
-        padding: 4px 0;
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    .log-entry:last-child {
-        border-bottom: none;
-    }
-
-    .log-entry.success {
-        color: var(--color-optimal);
-    }
-
-    .log-entry.error {
-        color: var(--color-critical);
-    }
-
-    .log-entry.info {
-        color: var(--text-muted);
-    }
-
-    .log-timestamp {
-        color: var(--text-muted);
-        font-size: 11px;
-        margin-right: 8px;
-    }
 
     .btn:disabled {
         opacity: 0.5;

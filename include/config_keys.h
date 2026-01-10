@@ -69,6 +69,7 @@
 // --- SPINDLE AUTO-PAUSE ---
 #define KEY_SPINDL_PAUSE_EN "sp_pause"  // Auto-pause on overload (1=on, 0=off, default 1)
 #define KEY_SPINDL_PAUSE_THR "sp_pthr"  // Pause threshold amps (default 25, less than shutdown)
+#define KEY_SPINDL_TOOLBREAK_THR "sp_tbthr" // Tool breakage threshold (default 5.0)
 
 // --- VFD (ALTIVAR31) CONFIGURATION ---
 #define KEY_VFD_EN "vfd_en"             // Enable VFD communication (1=on, 0=off, default 1)

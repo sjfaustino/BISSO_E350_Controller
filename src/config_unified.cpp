@@ -339,6 +339,10 @@ void configSetDefaults() {
     prefs.putInt(KEY_ALARM_PIN, 2);
   if (!prefs.isKey(KEY_STALL_TIMEOUT))
     prefs.putInt(KEY_STALL_TIMEOUT, 2000);
+  if (!prefs.isKey(KEY_SPINDL_TOOLBREAK_THR))
+    prefs.putFloat(KEY_SPINDL_TOOLBREAK_THR, 5.0f);
+  if (!prefs.isKey(KEY_SPINDL_PAUSE_THR))
+    prefs.putInt(KEY_SPINDL_PAUSE_THR, 25);
 
   // WEB SERVER CREDENTIALS
   if (!prefs.isKey(KEY_WEB_USERNAME))

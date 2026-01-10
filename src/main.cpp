@@ -47,11 +47,17 @@ extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskNa
   ESP.restart();
 }
 
+#include "api_config.h"
+
 // Wrappers
 bool init_fault_logging_wrapper() { faultLoggingInit(); return true; }
 bool init_watchdog_wrapper() { watchdogInit(); return true; }
 bool init_timeout_wrapper() { timeoutManagerInit(); return true; }
-bool init_config_wrapper() { configUnifiedInit(); return true; }
+bool init_config_wrapper() { 
+    configUnifiedInit(); 
+    apiConfigInit(); 
+    return true; 
+}
 bool init_schema_wrapper() { configSchemaVersioningInit(); configSchemaInit(); return !configIsMigrationNeeded(); }
 bool init_auth_wrapper() { authInit(); return true; }  // PHASE 5.10: SHA-256 authentication
 

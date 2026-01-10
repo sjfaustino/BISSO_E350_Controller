@@ -85,8 +85,8 @@ nav {
     height: 100vh;
     overflow-y: auto;
     z-index: var(--z-fixed);
-    padding-top: 80px;
-    /* Space for header */
+    padding-top: 0;
+    /* Branding at the very top */
 }
 
 nav ul {
@@ -137,11 +137,21 @@ nav li {
 
 /* Sidebar logo */
 .sidebar .logo {
-    padding: var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
     font-size: var(--font-size-xl);
     font-weight: 700;
     color: var(--color-normal);
     border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+}
+
+.version-tag {
+    font-size: 0.6em;
+    font-weight: 400;
+    opacity: 0.8;
 }
 
 /* Main content area - offset for fixed sidebar */

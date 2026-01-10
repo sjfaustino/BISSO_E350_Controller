@@ -24,6 +24,7 @@
 #include "spindle_current_monitor.h" // PHASE 5.0: Spindle current monitoring
 #include "system_constants.h"
 #include "task_manager.h"
+#include "hardware_config.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <math.h>
@@ -756,12 +757,42 @@ void motionSetPLCSpeedProfile(speed_profile_t profile) {
   plcSetSpeed((uint8_t)profile);
 }
 
-speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed) {
-  if (speed < 10.0f)
-    return SPEED_PROFILE_1;
-  if (speed < 30.0f)
-    return SPEED_PROFILE_2;
-  return SPEED_PROFILE_3;
+speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed_mm_s) {
+    if (axis >= MOTION_AXES) return SPEED_PROFILE_1;
+
+    // Convert speed_mm_s to mm_min for comparison with calibration
+    float speed_mm_min = speed_mm_s * 60.0f;
+
+    AxisCalibration* cal = nullptr;
+    if (axis == 0) cal = &machineCal.X;
+    else if (axis == 1) cal = &machineCal.Y;
+    else if (axis == 2) cal = &machineCal.Z;
+    else cal = &machineCal.A;
+
+    // Find the profile whose calibrated speed is closest to the requested speed
+    float d1 = fabsf(speed_mm_min - cal->speed_slow_mm_min);
+    float d2 = fabsf(speed_mm_min - cal->speed_med_mm_min);
+    float d3 = fabsf(speed_mm_min - cal->speed_fast_mm_min);
+
+    if (d1 <= d2 && d1 <= d3) return SPEED_PROFILE_1;
+    if (d2 <= d1 && d2 <= d3) return SPEED_PROFILE_2;
+    return SPEED_PROFILE_3;
+}
+
+float motionGetCalibratedFeedRate(uint8_t axis, float speed_mm_s) {
+    speed_profile_t prof = motionMapSpeedToProfile(axis, speed_mm_s);
+    
+    if (axis >= MOTION_AXES) return 0.0f;
+    
+    AxisCalibration* cal = nullptr;
+    if (axis == 0) cal = &machineCal.X;
+    else if (axis == 1) cal = &machineCal.Y;
+    else if (axis == 2) cal = &machineCal.Z;
+    else cal = &machineCal.A;
+
+    if (prof == SPEED_PROFILE_1) return cal->speed_slow_mm_min;
+    if (prof == SPEED_PROFILE_2) return cal->speed_med_mm_min;
+    return cal->speed_fast_mm_min;
 }
 
 bool motionStartInternalMove(float x, float y, float z, float a,

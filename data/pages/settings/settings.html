@@ -10,8 +10,8 @@
             </div>
             <div class="card-content">
                 <div class="setting-group">
-                    <label for="theme-select">Theme:</label>
-                    <div class="theme-selector">
+                    <label id="theme-label">Theme:</label>
+                    <div class="theme-selector" role="radiogroup" aria-labelledby="theme-label">
                         <button class="theme-option" data-theme="light" title="Light Theme">
                             <div class="theme-preview light"></div>
                             <span>Light</span>
@@ -32,7 +32,7 @@
                 </div>
 
                 <div class="setting-group">
-                    <label>Font Size: <span id="font-size-display">100</span>%</label>
+                    <label for="font-size-slider">Font Size: <span id="font-size-display">100</span>%</label>
                     <div class="slider-container">
                         <input type="range" id="font-size-slider" min="80" max="120" value="100" class="slider">
                         <div class="slider-labels">
@@ -43,10 +43,8 @@
                 </div>
 
                 <div class="setting-group">
-                    <label>
-                        <input type="checkbox" id="auto-refresh-toggle" checked>
-                        <span>Auto-refresh data (every 1 second)</span>
-                    </label>
+                    <input type="checkbox" id="auto-refresh-toggle" checked>
+                    <label for="auto-refresh-toggle">Auto-refresh data (every 1 second)</label>
                 </div>
             </div>
         </div>
@@ -82,17 +80,13 @@
                 </div>
 
                 <div class="setting-group">
-                    <label>
-                        <input type="checkbox" id="alert-sound-toggle" checked>
-                        <span>Sound alerts enabled</span>
-                    </label>
+                    <input type="checkbox" id="alert-sound-toggle" checked>
+                    <label for="alert-sound-toggle">Sound alerts enabled</label>
                 </div>
 
                 <div class="setting-group">
-                    <label>
-                        <input type="checkbox" id="alert-desktop-toggle" checked>
-                        <span>Desktop notifications enabled</span>
-                    </label>
+                    <input type="checkbox" id="alert-desktop-toggle" checked>
+                    <label for="alert-desktop-toggle">Desktop notifications enabled</label>
                 </div>
 
                 <button class="btn btn-secondary" id="test-alert-btn">Test Alert Sound</button>
@@ -127,7 +121,7 @@
 
                 <div class="storage-info">
                     <div class="storage-stat">
-                        <label>Local Storage Used:</label>
+                        <span class="info-label">Local Storage Used:</span>
                         <span id="storage-used">0</span> KB / <span id="storage-limit">5120</span> KB
                     </div>
                     <div class="storage-bar">
@@ -370,63 +364,7 @@
             </div>
         </div>
 
-        <!-- System Settings Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>System Information</h2>
-            </div>
-            <div class="card-content">
-                <div class="info-table">
-                    <div class="info-row">
-                        <span class="info-label">Firmware Version:</span>
-                        <span class="info-value" id="fw-version">--</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Hardware Version:</span>
-                        <span class="info-value" id="hw-version">--</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">System Uptime:</span>
-                        <span class="info-value" id="sys-uptime">--</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Free Memory:</span>
-                        <span class="info-value" id="free-memory">--</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">WiFi Signal Strength:</span>
-                        <span class="info-value" id="signal-strength">--</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Last Connection:</span>
-                        <span class="info-value" id="last-connection">--</span>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- About Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>About</h2>
-            </div>
-            <div class="card-content">
-                <div class="about-text">
-                    <p><strong>BISSO E350 Controller</strong></p>
-                    <p>Multi-file Web Interface v2.0</p>
-                    <p
-                        style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-md);">
-                        This control interface provides real-time monitoring and control of the BISSO E350 motion
-                        system.
-                        It features a modular architecture, responsive design, and accessibility compliance.
-                    </p>
-                    <p
-                        style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-md);">
-                        © 2025 BISSO Technologies. All rights reserved.
-                    </p>
-                </div>
-            </div>
-        </div>
 
         <!-- Configuration Import/Export Card -->
         <div class="card">
@@ -454,13 +392,13 @@
                     <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Configuration
                         Presets</h3>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <label for="preset-select" class="sr-only">Configuration Preset</label>
                         <select id="preset-select" class="form-control">
                             <option value="">-- Select a preset --</option>
-                            <option value="aluminum">Aluminum Cutting</option>
-                            <option value="steel">Steel Cutting</option>
-                            <option value="plastic">Plastic Cutting</option>
-                            <option value="wood">Wood Cutting</option>
-                            <option value="engraving">Engraving</option>
+                            <option value="limestone">Limestone</option>
+                            <option value="marble">Marble</option>
+                            <option value="soft_granite">Soft Granite</option>
+                            <option value="hard_granite">Hard Granite</option>
                         </select>
                         <button class="btn btn-primary" id="load-preset-btn">Load Preset</button>
                     </div>

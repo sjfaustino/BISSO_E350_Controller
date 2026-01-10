@@ -26,6 +26,7 @@ window.SettingsModule = window.SettingsModule || {
     async loadModules() {
         const base = '/pages/settings/';
         try {
+            await this.loadScript(base + 'material-presets.js');
             await this.loadScript(base + 'settings-motion.js');
             await this.loadScript(base + 'settings-spindle.js');
         } catch (e) { console.warn('[Settings] Module load failed:', e); }
@@ -110,6 +111,9 @@ window.SettingsModule = window.SettingsModule || {
         this.bindSpindleDisplay('spindle-toolbreak-threshold', 'toolbreak-value', v => parseFloat(v).toFixed(1));
         this.bindSpindleDisplay('spindle-stall-threshold', 'stall-threshold-value');
         this.bindSpindleDisplay('spindle-stall-timeout', 'stall-timeout-value');
+
+        // Configuration Management
+        document.getElementById('load-preset-btn')?.addEventListener('click', () => this.loadPreset());
     },
 
     // Helper: bind slider to settings property
@@ -306,7 +310,44 @@ window.SettingsModule = window.SettingsModule || {
         if (el) { el.textContent = '✗ ' + msg; el.className = 'card-status error'; }
     },
 
-    cleanup() { console.log('[Settings] Cleaning up'); }
+    cleanup() { console.log('[Settings] Cleaning up'); },
+
+    loadPreset() {
+        const presetId = document.getElementById('preset-select').value;
+        if (!presetId || !window.MaterialPresets[presetId]) {
+            AlertManager.add('Please select a valid preset', 'warning');
+            return;
+        }
+
+        const preset = window.MaterialPresets[presetId];
+        console.log('[Settings] Applying preset:', preset.name);
+
+        // Apply Spindle Settings
+        if (preset.spindle) {
+            const tb = document.getElementById('spindle-toolbreak-threshold');
+            const st = document.getElementById('spindle-stall-threshold');
+            const to = document.getElementById('spindle-stall-timeout');
+
+            if (tb) { tb.value = preset.spindle.toolbreak_threshold; document.getElementById('toolbreak-value').textContent = preset.spindle.toolbreak_threshold.toFixed(1); }
+            if (st) { st.value = preset.spindle.stall_threshold; document.getElementById('stall-threshold-value').textContent = preset.spindle.stall_threshold; }
+            if (to) { to.value = preset.spindle.stall_timeout_ms; document.getElementById('stall-timeout-value').textContent = preset.spindle.stall_timeout_ms; }
+        }
+
+        // Apply VFD Settings
+        if (preset.vfd) {
+            const min = document.getElementById('vfd-min-speed');
+            const max = document.getElementById('vfd-max-speed');
+            const acc = document.getElementById('vfd-acc-time');
+            const dec = document.getElementById('vfd-dec-time');
+
+            if (min) { min.value = preset.vfd.min_speed_hz; document.getElementById('vfd-min-display').textContent = preset.vfd.min_speed_hz; }
+            if (max) { max.value = preset.vfd.max_speed_hz; document.getElementById('vfd-max-display').textContent = preset.vfd.max_speed_hz; }
+            if (acc) { acc.value = preset.vfd.acc_time_ms; document.getElementById('vfd-acc-display').textContent = preset.vfd.acc_time_ms; }
+            if (dec) { dec.value = preset.vfd.dec_time_ms; document.getElementById('vfd-dec-display').textContent = preset.vfd.dec_time_ms; }
+        }
+
+        AlertManager.add(`Preset "${preset.name}" loaded into form. Click Save to persist.`, 'info', 3000);
+    }
 };
 
 window.currentPageModule = SettingsModule;

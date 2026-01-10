@@ -10,14 +10,16 @@ Object.assign(window.SettingsModule, {
         return fetch('/api/config/get?category=0')
             .then(r => r.json())
             .then(data => {
+                console.log('[Settings] Motion data received:', data);
                 if (data.success && data.config) {
                     const cfg = data.config;
-                    document.getElementById('x-limit-low').value = cfg.soft_limit_low_mm[0];
-                    document.getElementById('x-limit-high').value = cfg.soft_limit_high_mm[0];
-                    document.getElementById('y-limit-low').value = cfg.soft_limit_low_mm[1];
-                    document.getElementById('y-limit-high').value = cfg.soft_limit_high_mm[1];
-                    document.getElementById('z-limit-low').value = cfg.soft_limit_low_mm[2];
-                    document.getElementById('z-limit-high').value = cfg.soft_limit_high_mm[2];
+                    console.log('[Settings] Applying motion config:', cfg);
+                    document.getElementById('x-limit-low').value = cfg.soft_limit_x_low ?? 0;
+                    document.getElementById('x-limit-high').value = cfg.soft_limit_x_high ?? 500;
+                    document.getElementById('y-limit-low').value = cfg.soft_limit_y_low ?? 0;
+                    document.getElementById('y-limit-high').value = cfg.soft_limit_y_high ?? 500;
+                    document.getElementById('z-limit-low').value = cfg.soft_limit_z_low ?? 0;
+                    document.getElementById('z-limit-high').value = cfg.soft_limit_z_high ?? 500;
                     this.setStatusLoaded('motion');
                 }
             })
@@ -41,12 +43,12 @@ Object.assign(window.SettingsModule, {
         }
 
         Promise.all([
-            this.setConfig(0, 'soft_limit_low_mm[0]', x_low),
-            this.setConfig(0, 'soft_limit_high_mm[0]', x_high),
-            this.setConfig(0, 'soft_limit_low_mm[1]', y_low),
-            this.setConfig(0, 'soft_limit_high_mm[1]', y_high),
-            this.setConfig(0, 'soft_limit_low_mm[2]', z_low),
-            this.setConfig(0, 'soft_limit_high_mm[2]', z_high)
+            this.setConfig(0, 'soft_limit_x_low', x_low),
+            this.setConfig(0, 'soft_limit_x_high', x_high),
+            this.setConfig(0, 'soft_limit_y_low', y_low),
+            this.setConfig(0, 'soft_limit_y_high', y_high),
+            this.setConfig(0, 'soft_limit_z_low', z_low),
+            this.setConfig(0, 'soft_limit_z_high', z_high)
         ])
             .then(() => {
                 AlertManager.add('Motion settings saved', 'success', 2000);
@@ -61,12 +63,12 @@ Object.assign(window.SettingsModule, {
     resetMotionSettings() {
         if (!confirm('Reset motion settings to defaults?')) return;
         Promise.all([
-            this.setConfig(0, 'soft_limit_low_mm[0]', 0),
-            this.setConfig(0, 'soft_limit_high_mm[0]', 500),
-            this.setConfig(0, 'soft_limit_low_mm[1]', 0),
-            this.setConfig(0, 'soft_limit_high_mm[1]', 500),
-            this.setConfig(0, 'soft_limit_low_mm[2]', 0),
-            this.setConfig(0, 'soft_limit_high_mm[2]', 500)
+            this.setConfig(0, 'soft_limit_x_low', 0),
+            this.setConfig(0, 'soft_limit_x_high', 500),
+            this.setConfig(0, 'soft_limit_y_low', 0),
+            this.setConfig(0, 'soft_limit_y_high', 500),
+            this.setConfig(0, 'soft_limit_z_low', 0),
+            this.setConfig(0, 'soft_limit_z_high', 500)
         ])
             .then(() => this.loadMotionConfig())
             .then(() => AlertManager.add('Motion settings reset', 'success', 2000))
@@ -78,8 +80,10 @@ Object.assign(window.SettingsModule, {
         return fetch('/api/config/get?category=1')
             .then(r => r.json())
             .then(data => {
+                console.log('[Settings] VFD data received:', data);
                 if (data.success && data.config) {
                     const cfg = data.config;
+                    console.log('[Settings] Applying VFD config:', cfg);
                     document.getElementById('vfd-min-speed').value = cfg.min_speed_hz;
                     document.getElementById('vfd-min-display').textContent = cfg.min_speed_hz;
                     document.getElementById('vfd-max-speed').value = cfg.max_speed_hz;
@@ -177,9 +181,9 @@ Object.assign(window.SettingsModule, {
     resetEncoderSettings() {
         if (!confirm('Reset all encoders to 100 PPM?')) return;
         Promise.all([
-            this.setConfig(2, 'ppm[0]', 100),
-            this.setConfig(2, 'ppm[1]', 100),
-            this.setConfig(2, 'ppm[2]', 100)
+            this.setConfig(2, 'ppm_x', 100),
+            this.setConfig(2, 'ppm_y', 100),
+            this.setConfig(2, 'ppm_z', 100)
         ])
             .then(() => this.loadEncoderConfig())
             .then(() => AlertManager.add('Encoders reset', 'success', 2000))

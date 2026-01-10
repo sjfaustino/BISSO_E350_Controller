@@ -237,8 +237,8 @@ window.LogsModule = window.LogsModule || {
     async clearLogs() {
         if (confirm('Clear all logs (Local and Device History)? This cannot be undone.')) {
             try {
-                // Clear backend NVS logs
-                const response = await fetch('/api/faults', { method: 'DELETE' });
+                // Clear backend NVS logs - Use consistent /api/faults/clear POST endpoint
+                const response = await fetch('/api/faults/clear', { method: 'POST' });
                 if (!response.ok) throw new Error('Failed to clear device logs');
 
                 // Clear local state

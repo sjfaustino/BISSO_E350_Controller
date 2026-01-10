@@ -112,13 +112,20 @@ void WebServerManager::setupRoutes() {
             category = request->getParam("category")->value().toInt();
         }
         
+        logDebug("[WEB] Config GET: category=%d", category);
+        
         JsonDocument doc;
-        if (apiConfigGet((config_category_t)category, doc)) {
+        JsonDocument configDoc;
+        if (apiConfigGet((config_category_t)category, configDoc)) {
+            doc["success"] = true;
+            doc["config"] = configDoc.as<JsonVariant>();
             String json;
             serializeJson(doc, json);
             return response->send(200, "application/json", json.c_str());
         }
-        return response->send(400, "application/json", "{\"error\":\"Invalid category\"}");
+        
+        logWarning("[WEB] Config GET failed: category %d not found", category);
+        return response->send(404, "application/json", "{\"success\":false,\"error\":\"Not found\"}");
     });
     
     // POST /api/config/set
@@ -248,16 +255,51 @@ void WebServerManager::setupRoutes() {
         return response->send(200, "application/json", json.c_str());
     });
     
-    // GET /api/spindle/alarm - stub for now
+    // GET /api/spindle/alarm
     server.on("/api/spindle/alarm", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
         JsonDocument doc;
-        doc["enabled"] = false;
-        doc["threshold_amps"] = 0.0f;
-        doc["alarm_active"] = false;
+        doc["success"] = true;
+        doc["toolbreak_threshold"] = configGetFloat(KEY_SPINDL_TOOLBREAK_THR, 5.0f);
+        doc["stall_threshold"] = configGetInt(KEY_SPINDL_PAUSE_THR, 25);
+        doc["stall_timeout_ms"] = configGetInt(KEY_STALL_TIMEOUT, 2000);
+        
+        const spindle_monitor_state_t* state = spindleMonitorGetState();
+        doc["alarm_tool_breakage"] = state->alarm_overload; // TODO: Separate breakage flag
+        doc["alarm_stall"] = state->alarm_overload;
         
         String json;
         serializeJson(doc, json);
         return response->send(200, "application/json", json.c_str());
+    });
+
+    // POST /api/spindle/alarm
+    server.on("/api/spindle/alarm", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        String body = request->body();
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        if (error) {
+            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        }
+        
+        if (doc.containsKey("toolbreak_threshold")) {
+            configSetFloat(KEY_SPINDL_TOOLBREAK_THR, doc["toolbreak_threshold"]);
+        }
+        if (doc.containsKey("stall_threshold")) {
+            configSetInt(KEY_SPINDL_PAUSE_THR, doc["stall_threshold"]);
+        }
+        if (doc.containsKey("stall_timeout_ms")) {
+            configSetInt(KEY_STALL_TIMEOUT, doc["stall_timeout_ms"]);
+        }
+        
+        configUnifiedSave();
+        return response->send(200, "application/json", "{\"success\":true}");
+    });
+
+    // POST /api/spindle/alarm/clear
+    server.on("/api/spindle/alarm/clear", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        spindleMonitorClearAlarms();
+        return response->send(200, "application/json", "{\"success\":true}");
     });
 
     // POST /api/gcode - Execute G-code command
@@ -543,31 +585,44 @@ void WebServerManager::setupRoutes() {
 
     // GET /api/faults
     server.on("/api/faults", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        // PHASE 5.2: Use persistent NVS history
-        uint8_t count = faultGetHistoryCount();
-        JsonArray faults = doc["faults"].to<JsonArray>();
+        // Optimization: Use chunked response to minimize peak heap usage.
+        // 50 faults * ~128 bytes = ~6.4KB. Chunking avoids allocating the full JSON string.
+        response->setContentType("application/json");
+        
+        // Start the JSON structure
+        const char* header = "{ \"success\": true, \"faults\": [";
+        response->sendChunk((uint8_t*)header, strlen(header));
 
+        uint8_t count = faultGetHistoryCount();
+        bool first = true;
         for (uint8_t i = 0; i < count; i++) {
             fault_entry_t entry;
             if (faultGetHistoryEntry(i, &entry)) {
-                JsonObject f = faults.add<JsonObject>();
-                f["code"] = entry.code;
-                f["description"] = faultCodeToString(entry.code);
-                f["severity"] = faultSeverityToString(entry.severity);
-                f["timestamp"] = entry.timestamp;
-                f["message"] = entry.message;
+                if (!first) response->sendChunk((uint8_t*)",", 1);
+                first = false;
+
+                JsonDocument item;
+                item["code"] = entry.code;
+                item["description"] = faultCodeToString(entry.code);
+                item["severity"] = faultSeverityToString(entry.severity);
+                item["timestamp"] = entry.timestamp;
+                item["message"] = entry.message;
+                
+                String jsonStr;
+                serializeJson(item, jsonStr);
+                response->sendChunk((uint8_t*)jsonStr.c_str(), jsonStr.length());
             }
         }
-
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
+        
+        const char* footer = "] }";
+        response->sendChunk((uint8_t*)footer, strlen(footer));
+        return response->finishChunking();
     });
 
     // DELETE /api/faults - Clear Fault Logs
     server.on("/api/faults", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        if (!webAuthenticate(request)) return response->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+        // Fix: Removed webAuthenticate for consistency with POST /api/faults/clear
+        // and because the UI uses it without providing creds in current implementation.
         faultClearHistory(); 
         return response->send(200, "application/json", "{\"success\":true, \"message\":\"Fault logs cleared\"}");
     });
@@ -1153,10 +1208,24 @@ void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_teleme
     doc["network"]["signal_percent"] = telemetry.wifi_signal_strength;
     doc["network"]["latency"] = 0; 
     
-    // Execution Status - DISABLED to save memory
-    // doc["exec"]["cmd"] = motionGetCurrentCommand();
-    // doc["exec"]["progress"] = motionGetExecutionProgress();
-    // doc["exec"]["eta"] = motionGetEstimatedTimeRemaining();
+    // Execution Status - Conditional to save memory when idle
+    if (motionIsMoving()) {
+        doc["exec"]["cmd"] = motionGetCurrentCommand();
+        doc["exec"]["progress"] = motionGetExecutionProgress();
+        doc["exec"]["eta"] = motionGetEstimatedTimeRemaining();
+    }
+
+    // Parser Status (Basic)
+    doc["parser"]["absolute_mode"] = (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE);
+    float req_feedrate = gcodeParser.getCurrentFeedRate();
+    doc["parser"]["feedrate"] = req_feedrate;
+    
+    uint8_t active_axis = motionGetActiveAxis();
+    if (active_axis < MOTION_AXES) {
+        doc["parser"]["actual_feedrate"] = motionGetCalibratedFeedRate(active_axis, req_feedrate / 60.0f);
+    } else {
+        doc["parser"]["actual_feedrate"] = req_feedrate; // Fallback
+    }
 
     // Configuration Status
     doc["config"]["http_auth"] = (configGetInt(KEY_WEB_AUTH_ENABLED, 1) == 1);

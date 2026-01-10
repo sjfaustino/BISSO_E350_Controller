@@ -238,12 +238,19 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
         }
 
         fetch('/api/faults')
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+                return r.json();
+            })
             .then(data => {
                 this.updateFaultDisplay(data.faults || []);
             })
             .catch(err => {
                 console.warn('[Diagnostics] Failed to load fault log:', err);
+                const listEl = document.getElementById('fault-list');
+                if (listEl) {
+                    listEl.innerHTML = `<div class="log-entry log-error"><span>Error loading fault log: ${err.message}</span></div>`;
+                }
             });
     },
 
