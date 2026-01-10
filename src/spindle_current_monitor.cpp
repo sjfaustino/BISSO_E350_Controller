@@ -155,6 +155,7 @@ bool spindleMonitorUpdate(void) {
       monitor_state.auto_paused = true;
       monitor_state.auto_pause_count++;
       
+      faultLogWarning(FAULT_SPINDLE_OVERCURRENT, "Spindle Auto-Pause Triggered");
       logWarning("[SPINDLE] AUTO-PAUSE: Current %.1f A exceeds %.1f A threshold",
                  current, monitor_state.auto_pause_threshold_amps);
       logInfo("[SPINDLE] Motion paused. Reduce load and use 'resume' to continue.");

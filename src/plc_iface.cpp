@@ -164,6 +164,7 @@ void elboInit() {
           board_detected = true;
           break;
       }
+      faultLogWarning(FAULT_PLC_COMM_LOSS, "Q73 Board detection retry");
       logWarning("[PLC] Q73 Board detection attempt %d/3 failed, retrying...", i + 1);
       delay(50); // Give hardware time to settle
   }

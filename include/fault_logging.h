@@ -96,4 +96,8 @@ uint32_t faultGetRingBufferDropCount();
 uint8_t faultGetRingBufferEntryCount();
 const fault_entry_t* faultGetRingBufferEntry(uint8_t index);
 
+// PHASE 5.2: Persistent NVS History Access
+uint8_t faultGetHistoryCount();
+bool faultGetHistoryEntry(uint8_t logical_index, fault_entry_t* out_entry);
+
 #endif

@@ -845,6 +845,143 @@ void configLogNvsStats() {
   }
 }
 
+void configDumpNvsContents() {
+  logInfo("[NVS] Starting NVS Dump...");
+  
+  // Iterator for all namespaces and keys
+  nvs_iterator_t it = nvs_entry_find("nvs", NULL, NVS_TYPE_ANY);
+  
+  if (it == NULL) {
+    logInfo("[NVS] No entries found or iterator failed.");
+    return;
+  }
+
+  logInfo("\n[NVS] === NVS CONTENT DUMP ===");
+  logPrintf("%-12s | %-20s | %-4s | %s\n", "Namespace", "Key", "Type", "Value");
+  logPrintf("-------------|----------------------|------|--------------------------------\n");
+
+  while (it != NULL) {
+    nvs_entry_info_t info;
+    nvs_entry_info(it, &info);
+    
+    // Open handle to read value
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(info.namespace_name, NVS_READONLY, &handle);
+    
+    char value_str[128] = "ERR";
+    
+    if (err == ESP_OK) {
+        switch(info.type) {
+            case NVS_TYPE_U8: {
+                uint8_t v; nvs_get_u8(handle, info.key, &v);
+                snprintf(value_str, sizeof(value_str), "%u", v);
+                break;
+            }
+            case NVS_TYPE_I8: {
+                int8_t v; nvs_get_i8(handle, info.key, &v);
+                snprintf(value_str, sizeof(value_str), "%d", v);
+                break;
+            }
+            case NVS_TYPE_U16: {
+                uint16_t v; nvs_get_u16(handle, info.key, &v);
+                snprintf(value_str, sizeof(value_str), "%u", v);
+                break;
+            }
+            case NVS_TYPE_I16: {
+                int16_t v; nvs_get_i16(handle, info.key, &v);
+                snprintf(value_str, sizeof(value_str), "%d", v);
+                break;
+            }
+            case NVS_TYPE_U32: {
+                uint32_t v; nvs_get_u32(handle, info.key, &v);
+                snprintf(value_str, sizeof(value_str), "%u", v);
+                break;
+            }
+            case NVS_TYPE_I32: {
+                int32_t v; nvs_get_i32(handle, info.key, &v);
+                snprintf(value_str, sizeof(value_str), "%d", v);
+                break;
+            }
+            case NVS_TYPE_U64: {
+                uint64_t v; nvs_get_u64(handle, info.key, &v);
+                snprintf(value_str, sizeof(value_str), "%llu", v);
+                break;
+            }
+            case NVS_TYPE_I64: {
+                int64_t v; nvs_get_i64(handle, info.key, &v);
+                snprintf(value_str, sizeof(value_str), "%lld", v);
+                break;
+            }
+            case NVS_TYPE_STR: {
+                size_t len = 0;
+                nvs_get_str(handle, info.key, NULL, &len);
+                if (len < sizeof(value_str)) {
+                    nvs_get_str(handle, info.key, value_str, &len);
+                } else {
+                    snprintf(value_str, sizeof(value_str), "[STR too long: %u]", len);
+                }
+                break;
+            }
+            case NVS_TYPE_BLOB: {
+                size_t len = 0;
+                nvs_get_blob(handle, info.key, NULL, &len);
+                snprintf(value_str, sizeof(value_str), "[BLOB: %u bytes]", len);
+                break;
+            }
+            default:
+                snprintf(value_str, sizeof(value_str), "?");
+        }
+        nvs_close(handle);
+    } else {
+        snprintf(value_str, sizeof(value_str), "OPEN ERR");
+    }
+
+    // Short type string
+    const char* type_str = "UNK";
+    switch(info.type) {
+      case NVS_TYPE_U8:  type_str = "U8"; break;
+      case NVS_TYPE_I8:  type_str = "I8"; break;
+      case NVS_TYPE_U16: type_str = "U16"; break;
+      case NVS_TYPE_I16: type_str = "I16"; break;
+      case NVS_TYPE_U32: type_str = "U32"; break;
+      case NVS_TYPE_I32: type_str = "I32"; break;
+      case NVS_TYPE_U64: type_str = "U64"; break;
+      case NVS_TYPE_I64: type_str = "I64"; break;
+      case NVS_TYPE_STR: type_str = "STR"; break;
+      case NVS_TYPE_BLOB: type_str = "BLOB"; break;
+      case NVS_TYPE_ANY: type_str = "ANY"; break;
+    }
+
+    logPrintf("%-12s | %-20s | %-4s | %s\n", info.namespace_name, info.key, type_str, value_str);
+    
+    it = nvs_entry_next(it);
+  }
+  
+  logInfo("[NVS] === END DUMP ===\n");
+}
+
+void configEraseNamespace(const char* ns) {
+  if (ns == NULL || strlen(ns) == 0) return;
+
+  logInfo("[NVS] Erasing namespace '%s'...", ns);
+  
+  nvs_handle_t handle;
+  esp_err_t err = nvs_open(ns, NVS_READWRITE, &handle);
+  
+  if (err == ESP_OK) {
+    err = nvs_erase_all(handle);
+    if (err == ESP_OK) {
+      nvs_commit(handle);
+      logInfo("[NVS] [OK] Namespace '%s' erased.", ns);
+    } else {
+      logError("[NVS] Failed to erase: %d", err);
+    }
+    nvs_close(handle);
+  } else {
+    logError("[NVS] Failed to open namespace '%s': %d", ns, err);
+  }
+}
+
 bool configEraseNvs() {
   logWarning("[NVS] Erasing all NVS data...");
   prefs.end();

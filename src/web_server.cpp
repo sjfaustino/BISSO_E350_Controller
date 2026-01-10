@@ -426,17 +426,19 @@ void WebServerManager::setupRoutes() {
     // GET /api/faults
     server.on("/api/faults", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         JsonDocument doc;
-        uint8_t count = faultGetRingBufferEntryCount();
+        // PHASE 5.2: Use persistent NVS history
+        uint8_t count = faultGetHistoryCount();
         JsonArray faults = doc["faults"].to<JsonArray>();
 
         for (uint8_t i = 0; i < count; i++) {
-            const fault_entry_t* entry = faultGetRingBufferEntry(i);
-            if (entry) {
+            fault_entry_t entry;
+            if (faultGetHistoryEntry(i, &entry)) {
                 JsonObject f = faults.add<JsonObject>();
-                f["code"] = entry->code;
-                f["description"] = faultCodeToString(entry->code);
-                f["severity"] = faultSeverityToString(entry->severity);
-                f["timestamp"] = entry->timestamp;
+                f["code"] = entry.code;
+                f["description"] = faultCodeToString(entry.code);
+                f["severity"] = faultSeverityToString(entry.severity);
+                f["timestamp"] = entry.timestamp;
+                f["message"] = entry.message;
             }
         }
 

@@ -79,6 +79,8 @@ float configGetFloatValidated(const char* key, float default_val, float min_val,
 
 // NVS Space Management
 void configLogNvsStats();
+void configDumpNvsContents();
+void configEraseNamespace(const char* ns);
 bool configEraseNvs();
 
 #endif

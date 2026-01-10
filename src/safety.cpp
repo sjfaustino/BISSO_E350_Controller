@@ -215,6 +215,7 @@ void safetyUpdate() {
           if ((uint32_t)(now - last_thermal_warn) >
               SAFETY_THERMAL_WARN_INTERVAL_MS) {
             last_thermal_warn = now;
+            faultLogWarning(FAULT_TEMPERATURE_HIGH, "VFD Thermal Warning (Pre-alarm)");
             logWarning("[SAFETY] [WARN] VFD Thermal Warning: %d%% (>%ld°C)",
                        thermal_state, (long)temp_warn);
           }

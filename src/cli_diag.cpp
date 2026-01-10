@@ -1314,6 +1314,36 @@ void cmd_cutting_main(int argc, char** argv) {
 }
 
 // ============================================================================
+// NVS INSPECTOR COMMANDS
+// ============================================================================
+void cmd_nvs_main(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("Usage: nvs [stats | dump | cleanup]");
+        return;
+    }
+    
+    if (strcmp(argv[1], "stats") == 0) {
+        configLogNvsStats();
+    } else if (strcmp(argv[1], "dump") == 0) {
+        configDumpNvsContents();
+    } else if (strcmp(argv[1], "cleanup") == 0) {
+        if (argc < 3 || strcmp(argv[2], "legacy") == 0) {
+            configEraseNamespace("gemini_cfg");
+        } else if (strcmp(argv[2], "faults") == 0) {
+            configEraseNamespace("bisso_faults");
+        } else {
+            logPrintln("Usage: nvs cleanup [legacy|faults]");
+        }
+    } else if (strcmp(argv[1], "clear") == 0) {
+        logPrintln("Use 'config factory_reset' or 'nvs erase' (if implemented) to clear.");
+        // We have configEraseNvs but it reboots, maybe warn user first? 
+        // For now just pointing to stats/dump as requested.
+    } else {
+        logPrintln("Unknown subcommand");
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
@@ -1345,6 +1375,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("rs485", "RS-485 device registry diag", cmd_rs485_main);
     cliRegisterCommand("status", "Quick system status dashboard", cmd_status_dashboard);
     cliRegisterCommand("runtime", "Machine runtime & cycle counter", cmd_runtime);
+    cliRegisterCommand("nvs", "NVS storage inspector", cmd_nvs_main);
 
     cliRegisterCommand("dio", "Digital I/O status display", cmd_dio_main);
     cliRegisterCommand("spindle", "Spindle monitor & alarms", cmd_spindle_main);

@@ -6,6 +6,7 @@
 window.LogsModule = window.LogsModule || {
     // In-memory log buffer (max 10000 entries)
     logs: [],
+    backendLogs: [],
     maxLogs: 10000,
     filteredLogs: [],
 
@@ -19,6 +20,7 @@ window.LogsModule = window.LogsModule || {
     init() {
         console.log('[Logs] Initializing');
         this.loadLogsFromStorage();
+        this.fetchBackendLogs();
         this.setupEventListeners();
         this.updateDisplay();
         window.addEventListener('state-changed', () => this.onStateChanged());
@@ -118,12 +120,22 @@ window.LogsModule = window.LogsModule || {
     },
 
     applyFilters() {
-        this.filteredLogs = this.logs.filter(log => {
+        // Combine local and backend logs
+        const allLogs = [...this.logs, ...this.backendLogs];
+
+        // Sort by timestamp descending (newest first)
+        allLogs.sort((a, b) => {
+            if (a.timestamp < b.timestamp) return 1;
+            if (a.timestamp > b.timestamp) return -1;
+            return 0;
+        });
+
+        this.filteredLogs = allLogs.filter(log => {
             if (this.filters.level && log.level !== this.filters.level) return false;
             if (this.filters.source && log.source !== this.filters.source) return false;
             if (this.filters.search &&
                 !(log.message.toLowerCase().includes(this.filters.search) ||
-                  log.source.toLowerCase().includes(this.filters.search))) {
+                    log.source.toLowerCase().includes(this.filters.search))) {
                 return false;
             }
             return true;
@@ -168,11 +180,15 @@ window.LogsModule = window.LogsModule || {
     },
 
     updateStatistics() {
+        // use combined list if available (filteredLogs usually contains everything unless filtered)
+        // Better: reconstruct full list for stats to show "Total" regardless of filter
+        const allLogs = [...this.logs, ...this.backendLogs];
+
         const stats = {
-            total: this.logs.length,
-            critical: this.logs.filter(l => l.level === 'CRITICAL').length,
-            error: this.logs.filter(l => l.level === 'ERROR').length,
-            warn: this.logs.filter(l => l.level === 'WARN').length
+            total: allLogs.length,
+            critical: allLogs.filter(l => l.level === 'CRITICAL').length,
+            error: allLogs.filter(l => l.level === 'ERROR').length,
+            warn: allLogs.filter(l => l.level === 'WARN' || l.level === 'WARNING').length // Handle both conventions
         };
 
         const statTotalEl = document.getElementById('stat-total');
@@ -249,6 +265,42 @@ window.LogsModule = window.LogsModule || {
         }, 1000);
     },
 
+    async fetchBackendLogs() {
+        try {
+            // Get uptime to calculate absolute times
+            const statusResp = await fetch('/api/network/status');
+            const statusData = await statusResp.json();
+            const uptime = statusData.uptime_ms || 0;
+            const now = Date.now();
+
+            // Get faults
+            const faultResp = await fetch('/api/faults');
+            const faultData = await faultResp.json();
+
+            if (faultData.faults && Array.isArray(faultData.faults)) {
+                this.backendLogs = faultData.faults.map(f => {
+                    // Calculate approx absolute time: Now - (Uptime - FaultTime)
+                    // If fault time > uptime (due to reboot?), clamp
+                    const timeAgo = uptime - f.timestamp;
+                    const logDate = new Date(now - timeAgo);
+                    const timestamp = logDate.toISOString().replace('T', ' ').split('.')[0];
+
+                    return {
+                        timestamp: timestamp,
+                        level: f.severity, // WARN, ERROR, CRITICAL
+                        source: 'firmware',
+                        message: `[${f.code}] ${f.description || f.message || ''}`
+                    };
+                });
+
+                console.log(`[Logs] Fetched ${this.backendLogs.length} backend faults`);
+                this.applyFilters();
+            }
+        } catch (e) {
+            console.error('[Logs] Failed to fetch backend logs:', e);
+        }
+    },
+
     loadLogsFromStorage() {
         try {
             const stored = localStorage.getItem('systemLogs');
@@ -261,7 +313,7 @@ window.LogsModule = window.LogsModule || {
 
         // Always add system init log
         if (this.logs.length === 0) {
-            this.addLog('INFO', 'system', 'System initialized');
+            this.addLog('INFO', 'system', 'Log Viewer Initialized');
         }
     },
 

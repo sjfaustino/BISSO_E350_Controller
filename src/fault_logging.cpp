@@ -459,4 +459,24 @@ const fault_entry_t *faultGetRingBufferEntry(uint8_t index) {
   return &fault_ring_buffer.entries[actual_idx];
 }
 
+// PHASE 5.2: Persistent NVS History Access
+uint8_t faultGetHistoryCount() {
+    return log_header.count;
+}
+
+bool faultGetHistoryEntry(uint8_t logical_index, fault_entry_t* out_entry) {
+    if (logical_index >= log_header.count || !out_entry) {
+        return false;
+    }
+    
+    // Calculate actual NVS slot (Circular Buffer: Oldest First)
+    // logical_index 0 = Oldest
+    uint8_t slot = (log_header.head + logical_index) % MAX_FAULT_ENTRIES_NVS;
+    
+    char key[32];
+    snprintf(key, sizeof(key), "%s%d", KEY_FAULT_PREFIX, slot);
+    
+    return (fault_prefs.getBytes(key, out_entry, sizeof(fault_entry_t)) == sizeof(fault_entry_t));
+}
+
 #pragma GCC diagnostic pop
