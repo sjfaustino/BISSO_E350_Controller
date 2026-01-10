@@ -15,7 +15,7 @@
             this.setupEditor();
             this.setupEventListeners();
             this.updateParserState();
-            // this.initQueueUI(); // DISABLED - queue feature removed
+            this.initQueueUI(); // Initialize job queue UI
         }
 
         static setupEditor() {

@@ -23,7 +23,7 @@
 #include "encoder_wj66.h"
 #include "rs485_autodetect.h"
 #include "config_keys.h"
-// #include "gcode_queue.h" // DISABLED - debugging memory issue
+#include "gcode_queue.h"
 #include "ota_manager.h"
 #include "yhtc05_modbus.h"
 #include "firmware_version.h"
@@ -271,23 +271,23 @@ void WebServerManager::setupRoutes() {
         const char* cmd = doc["command"];
         if (!cmd || strlen(cmd) == 0) return response->send(400, "application/json", "{\"success\":false, \"error\":\"No command\"}");
         
-        // Queue tracking temporarily disabled - TODO: debug queue crash
-        // uint16_t job_id = gcodeQueueAdd(cmd);
-        // gcodeQueueMarkRunning();
+        // Add to queue for tracking
+        uint16_t job_id = gcodeQueueAdd(cmd);
+        gcodeQueueMarkRunning();
         
         bool result = gcodeParser.processCommand(cmd);
         
-        // Queue tracking temporarily disabled
-        // if (result) {
-        //     gcodeQueueMarkCompleted();
-        // } else {
-        //     gcodeQueueMarkFailed("Command rejected");
-        // }
+        // Update queue status
+        if (result) {
+            gcodeQueueMarkCompleted();
+        } else {
+            gcodeQueueMarkFailed("Command rejected");
+        }
         
         JsonDocument resp;
         resp["success"] = result;
         resp["command"] = cmd;
-        // resp["job_id"] = job_id;
+        resp["job_id"] = job_id;
         
         // Calculate ETA using calibration data for G0/G1 commands
         if (result && (strncasecmp(cmd, "G0", 2) == 0 || strncasecmp(cmd, "G1", 2) == 0)) {
@@ -345,33 +345,72 @@ void WebServerManager::setupRoutes() {
         return response->send(200, "application/json", json.c_str());
     });
     
-    /* QUEUE FEATURE DISABLED - debugging memory issue
     // GET /api/gcode/queue - Get queue state and job history
     server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        // ... disabled
-        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+        JsonDocument doc;
+        doc["success"] = true;
+        
+        // Get queue state summary
+        gcode_queue_state_t state = gcodeQueueGetState();
+        doc["queue"]["total"] = state.total_jobs;
+        doc["queue"]["pending"] = state.pending_count;
+        doc["queue"]["completed"] = state.completed_count;
+        doc["queue"]["failed"] = state.failed_count;
+        doc["queue"]["current_job_id"] = state.current_job_id;
+        doc["queue"]["paused"] = state.paused;
+        
+        // Get job history (last 10 jobs - limited to save stack)
+        gcode_job_t jobs[10];
+        uint16_t count = gcodeQueueGetAll(jobs, 10);
+        
+        JsonArray jobsArray = doc["jobs"].to<JsonArray>();
+        for (uint16_t i = 0; i < count; i++) {
+            JsonObject job = jobsArray.add<JsonObject>();
+            job["id"] = jobs[i].id;
+            job["command"] = jobs[i].command;
+            job["status"] = (int)jobs[i].status;
+            job["queued_time"] = jobs[i].queued_time_ms;
+            job["start_time"] = jobs[i].start_time_ms;
+            job["end_time"] = jobs[i].end_time_ms;
+            if (jobs[i].status == JOB_FAILED) {
+                job["error"] = jobs[i].error;
+            }
+        }
+        
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
     });
     
     // POST /api/gcode/queue/retry - Retry failed job from start position
     server.on("/api/gcode/queue/retry", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+        if (gcodeQueueRetry()) {
+            return response->send(200, "application/json", "{\"success\":true,\"action\":\"retry\"}");
+        }
+        return response->send(400, "application/json", "{\"success\":false,\"error\":\"No failed job to retry\"}");
     });
     
     // POST /api/gcode/queue/skip - Skip failed job and continue
     server.on("/api/gcode/queue/skip", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+        if (gcodeQueueSkip()) {
+            return response->send(200, "application/json", "{\"success\":true,\"action\":\"skip\"}");
+        }
+        return response->send(400, "application/json", "{\"success\":false,\"error\":\"No failed job to skip\"}");
     });
     
     // POST /api/gcode/queue/resume - Resume from current position (operator fixed issue)
     server.on("/api/gcode/queue/resume", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+        if (gcodeQueueResume()) {
+            return response->send(200, "application/json", "{\"success\":true,\"action\":\"resume\"}");
+        }
+        return response->send(400, "application/json", "{\"success\":false,\"error\":\"No failed job to resume\"}");
     });
     
     // DELETE /api/gcode/queue - Clear queue history
     server.on("/api/gcode/queue", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) {
-        return response->send(503, "application/json", "{\"error\":\"Queue feature disabled\"}");
+        gcodeQueueClear();
+        return response->send(200, "application/json", "{\"success\":true}");
     });
-    END QUEUE FEATURE DISABLED */
     
     // POST /api/encoder/calibrate
     server.on("/api/encoder/calibrate", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
