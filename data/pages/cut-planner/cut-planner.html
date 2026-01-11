@@ -1,0 +1,336 @@
+<!-- Cut Planner Page -->
+<div class="page-header">
+    <h1>Cut Planner</h1>
+    <p>Create cutting jobs without writing G-code. Select a job type, enter parameters, preview, and run.</p>
+</div>
+
+<div class="card-grid">
+    <!-- SVG Library for shared fragments -->
+    <svg style="width: 0; height: 0; position: absolute;">
+        <defs>
+            <!-- Base block gradients -->
+            <linearGradient id="baseTop" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#b0d0e8" />
+                <stop offset="100%" stop-color="#8cb0d0" />
+            </linearGradient>
+            <linearGradient id="baseFront" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#8cb0d0" />
+                <stop offset="100%" stop-color="#6a98b8" />
+            </linearGradient>
+            <!-- Wood workpiece gradients -->
+            <linearGradient id="woodTop" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#f5c684" />
+                <stop offset="100%" stop-color="#e0a860" />
+            </linearGradient>
+            <linearGradient id="woodFront" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#e0a860" />
+                <stop offset="100%" stop-color="#c68e48" />
+            </linearGradient>
+            <!-- Blade metallic gradient -->
+            <radialGradient id="bladeGrad" cx="35%" cy="35%" r="75%">
+                <stop offset="0%" stop-color="#e0e0e0" />
+                <stop offset="45%" stop-color="#b0b0b0" />
+                <stop offset="100%" stop-color="#606060" />
+            </radialGradient>
+            <!-- Arrow marker -->
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8 Z" fill="#10b981" />
+            </marker>
+        </defs>
+    </svg>
+
+    <!-- Single Linear Cut -->
+    <div class="card" id="card-single-cut">
+        <div class="card-header">
+            <h2>Single Linear Cut</h2>
+        </div>
+        <div class="card-content">
+            <div class="card-diagram">
+                <svg viewBox="0 0 140 100" class="operation-svg">
+                    <!-- Base block -->
+                    <polygon points="10,55 28,40 112,40 94,55" fill="url(#baseTop)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="10,55 94,55 94,88 10,88" fill="url(#baseFront)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="94,55 112,40 112,73 94,88" fill="#7aa0c2" stroke="#5a8299" stroke-width="0.8" />
+                    <!-- Wood -->
+                    <polygon points="22,45 38,32 98,32 82,45" fill="url(#woodTop)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="22,45 82,45 82,54 22,54" fill="url(#woodFront)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="82,45 98,32 98,41 82,54" fill="#d09850" stroke="#a87030" stroke-width="0.7" />
+                    <!-- Kerf -->
+                    <rect x="48" y="45" width="6" height="9" fill="#2a2a2a" />
+                    <polygon points="48,45 51,41 54,41 51,45" fill="#333" />
+                    <rect x="48" y="54" width="6" height="12" fill="#3a3a3a" />
+                    <!-- Blade (High Detail) -->
+                    <circle cx="51" cy="24" r="22" fill="url(#bladeGrad)" stroke="#444" stroke-width="1.2" />
+                    <circle cx="51" cy="24" r="17" fill="none" stroke="#777" stroke-width="0.8" />
+                    <circle cx="51" cy="24" r="5" fill="#555" stroke="#333" stroke-width="0.6" />
+                    <circle cx="51" cy="24" r="2.5" fill="#222" />
+                    <circle cx="51" cy="24" r="21" fill="none" stroke="#555" stroke-width="1.5"
+                        stroke-dasharray="2.5 3.5" />
+                    <!-- Arrow -->
+                    <line x1="72" y1="60" x2="108" y2="60" stroke="#10b981" stroke-width="2.5"
+                        marker-end="url(#arrow)" />
+                </svg>
+            </div>
+            <p class="card-description">One straight cut along the Y-axis at a fixed depth.</p>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="single-start-y">Start Y (mm)</label>
+                    <input type="number" id="single-start-y" value="0" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="single-end-y">End Y (mm)</label>
+                    <input type="number" id="single-end-y" value="100" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="single-depth">Cut Depth (mm)</label>
+                    <input type="number" id="single-depth" value="10" min="0" step="1">
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('single')">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('single')">Run Job</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Linear Cut with Passes -->
+    <div class="card" id="card-linear-passes">
+        <div class="card-header">
+            <h2>Linear Cut with Passes</h2>
+        </div>
+        <div class="card-content">
+            <div class="card-diagram">
+                <svg viewBox="0 0 140 100" class="operation-svg">
+                    <!-- Base block -->
+                    <polygon points="10,55 28,40 112,40 94,55" fill="url(#baseTop)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="10,55 94,55 94,88 10,88" fill="url(#baseFront)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="94,55 112,40 112,73 94,88" fill="#7aa0c2" stroke="#5a8299" stroke-width="0.8" />
+                    <!-- Wood -->
+                    <polygon points="22,45 38,32 98,32 82,45" fill="url(#woodTop)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="22,45 82,45 82,54 22,54" fill="url(#woodFront)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="82,45 98,32 98,41 82,54" fill="#d09850" stroke="#a87030" stroke-width="0.7" />
+                    <!-- Deeper Kerf with pass lines -->
+                    <rect x="48" y="45" width="6" height="9" fill="#2a2a2a" />
+                    <polygon points="48,45 51,41 54,41 51,45" fill="#333" />
+                    <rect x="48" y="54" width="6" height="20" fill="#1a1a1a" />
+                    <line x1="48" y1="60" x2="54" y2="60" stroke="#444" stroke-width="0.5" />
+                    <line x1="48" y1="67" x2="54" y2="67" stroke="#444" stroke-width="0.5" />
+                    <!-- Blade (High Detail) -->
+                    <circle cx="51" cy="24" r="22" fill="url(#bladeGrad)" stroke="#444" stroke-width="1.2" />
+                    <circle cx="51" cy="24" r="17" fill="none" stroke="#777" stroke-width="0.8" />
+                    <circle cx="51" cy="24" r="5" fill="#555" stroke="#333" stroke-width="0.6" />
+                    <circle cx="51" cy="24" r="2.5" fill="#222" />
+                    <circle cx="51" cy="24" r="21" fill="none" stroke="#555" stroke-width="1.5"
+                        stroke-dasharray="2.5 3.5" />
+                    <!-- Bidirectional Arrows -->
+                    <line x1="72" y1="58" x2="108" y2="58" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)" />
+                    <line x1="108" y1="64" x2="72" y2="64" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)" />
+                </svg>
+            </div>
+            <p class="card-description">Bidirectional Y-axis cuts with incremental depth per pass.</p>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="passes-start-y">Start Y (mm)</label>
+                    <input type="number" id="passes-start-y" value="0" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="passes-end-y">End Y (mm)</label>
+                    <input type="number" id="passes-end-y" value="100" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="passes-total-depth">Total Depth (mm)</label>
+                    <input type="number" id="passes-total-depth" value="50" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="passes-forward">Forward Pass Depth (mm)</label>
+                    <input type="number" id="passes-forward" value="5" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="passes-backward">Backward Pass Depth (mm)</label>
+                    <input type="number" id="passes-backward" value="5" min="0" step="1">
+                    <small>Set to 0 to cut only on forward passes</small>
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('linear-passes')">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('linear-passes')">Run Job</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parallel Cuts -->
+    <div class="card" id="card-parallel">
+        <div class="card-header">
+            <h2>Parallel Cuts</h2>
+        </div>
+        <div class="card-content">
+            <div class="card-diagram">
+                <svg viewBox="0 0 140 100" class="operation-svg">
+                    <!-- Base block -->
+                    <polygon points="10,55 28,40 112,40 94,55" fill="url(#baseTop)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="10,55 94,55 94,88 10,88" fill="url(#baseFront)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="94,55 112,40 112,73 94,88" fill="#7aa0c2" stroke="#5a8299" stroke-width="0.8" />
+                    <!-- Wood -->
+                    <polygon points="22,45 38,32 98,32 82,45" fill="url(#woodTop)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="22,45 82,45 82,54 22,54" fill="url(#woodFront)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="82,45 98,32 98,41 82,54" fill="#d09850" stroke="#a87030" stroke-width="0.7" />
+                    <!-- Multiple grooves -->
+                    <rect x="35" y="45" width="4" height="9" fill="#2a2a2a" />
+                    <rect x="52" y="45" width="4" height="9" fill="#2a2a2a" />
+                    <rect x="69" y="45" width="4" height="9" fill="#2a2a2a" />
+                    <rect x="69" y="54" width="4" height="8" fill="#3a3a3a" />
+                    <!-- X Step Indicator -->
+                    <line x1="37" y1="48" x2="54" y2="48" stroke="#ff4757" stroke-width="1.2" />
+                    <line x1="37" y1="45" x2="37" y2="51" stroke="#ff4757" stroke-width="1.2" />
+                    <line x1="54" y1="45" x2="54" y2="51" stroke="#ff4757" stroke-width="1.2" />
+                    <!-- Blade (High Detail) -->
+                    <circle cx="71" cy="24" r="22" fill="url(#bladeGrad)" stroke="#444" stroke-width="1.2" />
+                    <circle cx="71" cy="24" r="17" fill="none" stroke="#777" stroke-width="0.8" />
+                    <circle cx="71" cy="24" r="5" fill="#555" stroke="#333" stroke-width="0.6" />
+                    <circle cx="71" cy="24" r="2.5" fill="#222" />
+                    <circle cx="71" cy="24" r="21" fill="none" stroke="#555" stroke-width="1.5"
+                        stroke-dasharray="2.5 3.5" />
+                    <!-- Arrow -->
+                    <line x1="85" y1="60" x2="115" y2="60" stroke="#10b981" stroke-width="2.5"
+                        marker-end="url(#arrow)" />
+                </svg>
+            </div>
+            <p class="card-description">Multiple fixed-depth cuts spaced apart along the X-axis.</p>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="parallel-start-y">Start Y (mm)</label>
+                    <input type="number" id="parallel-start-y" value="0" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="parallel-end-y">End Y (mm)</label>
+                    <input type="number" id="parallel-end-y" value="100" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="parallel-depth">Cut Depth (mm)</label>
+                    <input type="number" id="parallel-depth" value="10" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="parallel-num-cuts">Number of Cuts</label>
+                    <input type="number" id="parallel-num-cuts" value="5" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="parallel-x-step">X Step (mm)</label>
+                    <input type="number" id="parallel-x-step" value="35" min="1" step="1">
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('parallel')">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('parallel')">Run Job</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parallel Cuts with Passes -->
+    <div class="card" id="card-parallel-passes">
+        <div class="card-header">
+            <h2>Parallel Cuts with Passes</h2>
+        </div>
+        <div class="card-content">
+            <div class="card-diagram">
+                <svg viewBox="0 0 140 100" class="operation-svg">
+                    <!-- Base block -->
+                    <polygon points="10,55 28,40 112,40 94,55" fill="url(#baseTop)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="10,55 94,55 94,88 10,88" fill="url(#baseFront)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="94,55 112,40 112,73 94,88" fill="#7aa0c2" stroke="#5a8299" stroke-width="0.8" />
+                    <!-- Wood -->
+                    <polygon points="22,45 38,32 98,32 82,45" fill="url(#woodTop)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="22,45 82,45 82,54 22,54" fill="url(#woodFront)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="82,45 98,32 98,41 82,54" fill="#d09850" stroke="#a87030" stroke-width="0.7" />
+                    <!-- Two deep parallel grooves -->
+                    <rect x="42" y="45" width="5" height="9" fill="#2a2a2a" />
+                    <rect x="42" y="54" width="5" height="15" fill="#1a1a1a" />
+                    <line x1="42" y1="60" x2="47" y2="60" stroke="#444" stroke-width="0.5" />
+                    <rect x="62" y="45" width="5" height="9" fill="#2a2a2a" />
+                    <rect x="62" y="54" width="5" height="15" fill="#1a1a1a" />
+                    <line x1="62" y1="60" x2="67" y2="60" stroke="#444" stroke-width="0.5" />
+                    <!-- Blade (High Detail) -->
+                    <circle cx="65" cy="24" r="22" fill="url(#bladeGrad)" stroke="#444" stroke-width="1.2" />
+                    <circle cx="65" cy="24" r="17" fill="none" stroke="#777" stroke-width="0.8" />
+                    <circle cx="65" cy="24" r="5" fill="#555" stroke="#333" stroke-width="0.6" />
+                    <circle cx="65" cy="24" r="2.5" fill="#222" />
+                    <circle cx="65" cy="24" r="21" fill="none" stroke="#555" stroke-width="1.5"
+                        stroke-dasharray="2.5 3.5" />
+                    <!-- Bidirectional Arrows -->
+                    <line x1="85" y1="75" x2="115" y2="75" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)" />
+                    <line x1="115" y1="82" x2="85" y2="82" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)" />
+                </svg>
+            </div>
+            <p class="card-description">Multiple cuts with bidirectional depth passes, spaced along X.</p>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="pp-start-y">Start Y (mm)</label>
+                    <input type="number" id="pp-start-y" value="0" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="pp-end-y">End Y (mm)</label>
+                    <input type="number" id="pp-end-y" value="100" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="pp-total-depth">Total Depth (mm)</label>
+                    <input type="number" id="pp-total-depth" value="50" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="pp-forward">Forward Pass Depth (mm)</label>
+                    <input type="number" id="pp-forward" value="5" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="pp-backward">Backward Pass Depth (mm)</label>
+                    <input type="number" id="pp-backward" value="5" min="0" step="1">
+                    <small>Set to 0 to cut only on forward passes</small>
+                </div>
+                <div class="form-group">
+                    <label for="pp-num-cuts">Number of Cuts</label>
+                    <input type="number" id="pp-num-cuts" value="3" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="pp-x-step">X Step (mm)</label>
+                    <input type="number" id="pp-x-step" value="35" min="1" step="1">
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('parallel-passes')">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('parallel-passes')">Run Job</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- G-Code Preview Modal -->
+    <div id="gcode-preview-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>G-Code Preview</h2>
+                <button class="modal-close" onclick="CutPlanner.closePreview()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="gcode-preview-content"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="CutPlanner.closePreview()">Cancel</button>
+                <button class="btn btn-success" id="gcode-preview-run">Run Job</button>
+            </div>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="pages/cut-planner/cut-planner.css">
+    <script src="pages/cut-planner/cut-planner.js"></script>

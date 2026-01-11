@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 // Current schema version
-#define CONFIG_SCHEMA_VERSION 2
+#define CONFIG_SCHEMA_VERSION 3
 #define CONFIG_SCHEMA_MIN_SUPPORTED 0
 
 // Migration direction

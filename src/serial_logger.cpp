@@ -13,6 +13,9 @@ static char log_buffer[LOGGER_BUFFER_SIZE];
 static SemaphoreHandle_t serial_mutex = NULL;
 static bool mutex_initialized = false;
 
+// Forward declaration for boot log writing
+static void bootLogWrite(const char* message);
+
 /**
  * @brief Initialize the serial mutex (called lazily)
  */
@@ -56,6 +59,9 @@ static void vlogPrint(log_level_t level, const char* prefix, const char* format,
   
   // Output to Serial (UART) only
   Serial.println(log_buffer);
+  
+  // Also write to boot log file if active
+  bootLogWrite(log_buffer);
   
   releaseSerialMutex();
 }
@@ -151,4 +157,144 @@ bool serialLoggerLock() {
 
 void serialLoggerUnlock() {
   releaseSerialMutex();
+}
+
+// ============================================================================
+// BOOT LOG CAPTURE (LittleFS)
+// ============================================================================
+
+#include <LittleFS.h>
+#include "config_keys.h"
+#include "config_unified.h"
+
+#define BOOT_LOG_PATH "/bootlog.txt"
+
+static File boot_log_file;
+static bool boot_logging_active = false;
+static size_t boot_log_max_size = 32768;
+static size_t boot_log_current_size = 0;
+
+bool bootLogInit(size_t max_size_bytes) {
+    // Check if boot logging is enabled in config (default: enabled)
+    if (configGetInt(KEY_BOOTLOG_EN, 1) == 0) {
+        Serial.println("[BOOTLOG] Disabled by configuration");
+        return false;
+    }
+    
+    // Mount LittleFS if not already mounted
+    if (!LittleFS.begin(false)) {
+        Serial.println("[BOOTLOG] LittleFS mount failed");
+        return false;
+    }
+    
+    boot_log_max_size = max_size_bytes;
+    
+    // Remove old log file (overwrite on each boot)
+    if (LittleFS.exists(BOOT_LOG_PATH)) {
+        LittleFS.remove(BOOT_LOG_PATH);
+    }
+    
+    // Open new log file for writing
+    boot_log_file = LittleFS.open(BOOT_LOG_PATH, "w");
+    if (!boot_log_file) {
+        Serial.println("[BOOTLOG] Failed to create log file");
+        return false;
+    }
+    
+    boot_logging_active = true;
+    boot_log_current_size = 0;
+    
+    // Write header
+    const char* header = "=== BOOT LOG START ===\n";
+    boot_log_file.print(header);
+    boot_log_current_size += strlen(header);
+    boot_log_file.flush();
+    
+    Serial.println("[BOOTLOG] Boot log capture started");
+    return true;
+}
+
+void bootLogStop() {
+    if (!boot_logging_active) return;
+    
+    boot_logging_active = false;
+    
+    if (boot_log_file) {
+        const char* footer = "\n=== BOOT LOG END ===\n";
+        boot_log_file.print(footer);
+        boot_log_file.flush();
+        boot_log_file.close();
+    }
+    
+    Serial.printf("[BOOTLOG] Boot log capture stopped (%u bytes)\n", boot_log_current_size);
+}
+
+bool bootLogIsActive() {
+    return boot_logging_active;
+}
+
+size_t bootLogGetSize() {
+    if (!LittleFS.begin(false)) return 0;
+    
+    if (!LittleFS.exists(BOOT_LOG_PATH)) return 0;
+    
+    File f = LittleFS.open(BOOT_LOG_PATH, "r");
+    if (!f) return 0;
+    
+    size_t size = f.size();
+    f.close();
+    return size;
+}
+
+size_t bootLogRead(char* buffer, size_t max_len) {
+    if (!buffer || max_len == 0) return 0;
+    
+    if (!LittleFS.begin(false)) return 0;
+    
+    if (!LittleFS.exists(BOOT_LOG_PATH)) {
+        strncpy(buffer, "(No boot log available)", max_len - 1);
+        buffer[max_len - 1] = '\0';
+        return strlen(buffer);
+    }
+    
+    File f = LittleFS.open(BOOT_LOG_PATH, "r");
+    if (!f) {
+        strncpy(buffer, "(Failed to open boot log)", max_len - 1);
+        buffer[max_len - 1] = '\0';
+        return strlen(buffer);
+    }
+    
+    size_t bytes_read = f.readBytes(buffer, max_len - 1);
+    buffer[bytes_read] = '\0';
+    f.close();
+    
+    return bytes_read;
+}
+
+/**
+ * @brief Internal helper to write to boot log file (called from vlogPrint)
+ */
+static void bootLogWrite(const char* message) {
+    if (!boot_logging_active || !boot_log_file) return;
+    
+    size_t msg_len = strlen(message);
+    
+    // Check size limit (leave room for footer)
+    if (boot_log_current_size + msg_len + 50 > boot_log_max_size) {
+        // Stop logging to prevent overflow
+        boot_log_file.print("\n[BOOTLOG] Size limit reached, stopping capture\n");
+        boot_log_file.flush();
+        boot_logging_active = false;
+        boot_log_file.close();
+        return;
+    }
+    
+    boot_log_file.print(message);
+    boot_log_file.print("\n");
+    boot_log_current_size += msg_len + 1;
+    
+    // Flush periodically (every 1KB)
+    if (boot_log_current_size % 1024 < msg_len) {
+        boot_log_file.flush();
+    }
 }

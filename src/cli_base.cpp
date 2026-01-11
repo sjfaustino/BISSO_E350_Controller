@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
+#include "config_keys.h"
+#include "config_unified.h"
 
 // CLI State
 static char cli_buffer[CLI_BUFFER_SIZE];
@@ -131,9 +133,13 @@ void cliInit() {
   cli_pos = 0;
   command_count = 0;
   
+  // Load echo setting from NVS (default: off)
+  cli_echo_enabled = (configGetInt(KEY_CLI_ECHO, 0) == 1);
+  
   cliRegisterCommand("help", "Show help", cmd_help);
   cliRegisterCommand("info", "System info", cmd_system_info);
-  cliRegisterCommand("reset", "System reset", cmd_system_reset);
+  cliRegisterCommand("reboot", "Restart system", cmd_system_reset);
+  cliRegisterCommand("reset", "System reset (reboot alias)", cmd_system_reset);
   cliRegisterCommand("$", "Grbl Settings", cmd_grbl_settings);
   cliRegisterCommand("$H", "Homing", cmd_grbl_home);
   cliRegisterCommand("$G", "Parser State", cmd_grbl_state);
@@ -278,7 +284,25 @@ void cliUpdate() {
 void cliProcessCommand(const char* cmd) {
   if (strlen(cmd) == 0) { logPrintln("ok"); return; }
   
-  // G-Code
+  // Internal CLI (Check registered commands first)
+  char cmd_copy[CLI_BUFFER_SIZE];
+  strncpy(cmd_copy, cmd, CLI_BUFFER_SIZE - 1); cmd_copy[CLI_BUFFER_SIZE - 1] = '\0';
+  char* argv[CLI_MAX_ARGS];
+  int argc = 0;
+  char* token = strtok(cmd_copy, " ");
+  while (token && argc < CLI_MAX_ARGS) { argv[argc++] = token; token = strtok(NULL, " "); }
+  
+  if (argc > 0) {
+    for (int i = 0; i < command_count; i++) {
+      if (strcasecmp(commands[i].command, argv[0]) == 0) {
+        commands[i].handler(argc, argv);
+        logPrintln("ok"); 
+        return;
+      }
+    }
+  }
+
+  // G-Code (Fallback if not a registered CLI command)
   char first_char = toupper(cmd[0]);
   if (first_char == 'G' || first_char == 'M' || first_char == 'T') {
       if (gcodeParser.processCommand(cmd)) logPrintln("ok"); 
@@ -327,23 +351,6 @@ void cliProcessCommand(const char* cmd) {
       return;
   }
 
-  // Internal CLI
-  char cmd_copy[CLI_BUFFER_SIZE];
-  strncpy(cmd_copy, cmd, CLI_BUFFER_SIZE - 1); cmd_copy[CLI_BUFFER_SIZE - 1] = '\0';
-  char* argv[CLI_MAX_ARGS];
-  int argc = 0;
-  char* token = strtok(cmd_copy, " ");
-  while (token && argc < CLI_MAX_ARGS) { argv[argc++] = token; token = strtok(NULL, " "); }
-  
-  if (argc == 0) { logPrintln("ok"); return; }
-  
-  for (int i = 0; i < command_count; i++) {
-    if (strcasecmp(commands[i].command, argv[0]) == 0) {
-      commands[i].handler(argc, argv);
-      logPrintln("ok"); 
-      return;
-    }
-  }
   logPrintln("error:1");
 }
 
@@ -410,17 +417,32 @@ void cmd_help(int argc, char** argv) { cliPrintHelp(); }
 void cmd_echo(int argc, char** argv) {
   if (argc < 2) {
     logInfo("Echo is currently %s", cli_echo_enabled ? "ON" : "OFF");
+    logInfo("Usage: echo [on|off] [save]");
     return;
   }
   
-  if (strcasecmp(argv[1], "on") == 0) {
-    cli_echo_enabled = true;
-    logInfo("Echo ENABLED");
-  } else if (strcasecmp(argv[1], "off") == 0) {
-    cli_echo_enabled = false;
-    logInfo("Echo DISABLED");
+  bool save_to_nvs = false;
+  bool new_state = cli_echo_enabled;
+  
+  // Parse arguments
+  for (int i = 1; i < argc; i++) {
+    if (strcasecmp(argv[i], "on") == 0) {
+      new_state = true;
+    } else if (strcasecmp(argv[i], "off") == 0) {
+      new_state = false;
+    } else if (strcasecmp(argv[i], "save") == 0) {
+      save_to_nvs = true;
+    }
+  }
+  
+  cli_echo_enabled = new_state;
+  
+  if (save_to_nvs) {
+    configSetInt(KEY_CLI_ECHO, cli_echo_enabled ? 1 : 0);
+    configUnifiedSave();
+    logInfo("Echo %s (saved to NVS)", cli_echo_enabled ? "ENABLED" : "DISABLED");
   } else {
-    logPrintln("Usage: echo [on|off]");
+    logInfo("Echo %s", cli_echo_enabled ? "ENABLED" : "DISABLED");
   }
 }
 

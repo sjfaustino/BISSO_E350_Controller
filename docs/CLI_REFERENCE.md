@@ -1,7 +1,7 @@
 # BISSO E350 Controller - Command Line Interface Manual
 
-**Version:** 1.0.0 (PosiPro)  
-**Last Updated:** 2025-12-31  
+**Version:** 1.1.0 (PosiPro)  
+**Last Updated:** 2026-01-11  
 **Connection:** Serial (115200 baud) or Telnet (Port 23)
 
 ---
@@ -13,10 +13,37 @@
 3. [Network Commands](#network-commands)
 4. [Job Management Commands](#job-management-commands)
 5. [Diagnostics Commands](#diagnostics-commands)
-6. [Configuration Commands](#configuration-commands)
-7. [Calibration Commands](#calibration-commands)
-8. [I2C Bus Commands](#i2c-bus-commands)
-9. [System Commands](#system-commands)
+    - [status (Dashboard)](#status---quick-system-status-dashboard)
+    - [motionstatus (Low-Level)](#motionstatus---motion-status-low-level)
+    - [spinlock](#spinlock---critical-section-timing)
+    - [debug](#debug---system-info-dump)
+    - [rs485](#rs485---bus-diagnostics)
+    - [wdt / watchdog](#wdt---watchdog-management)
+    - [task / task_list](#task---process-monitoring)
+    - [memory](#memory---heap-analysis)
+    - [encoder_deviation](#encoder_deviation---motion-accuracy)
+    - [fault_recovery](#fault_recovery---recovery-stats)
+    - [timeouts](#timeouts---show-timeout-diagnostics)
+    - [selftest](#selftest---hardware-hardware-diagnostic)
+    - [dio](#dio---digital-io-status)
+    - [runtime](#runtime---machine-runtime-counter)
+    - [metrics](#metrics---task-performance-monitoring)
+6. [System Commands](#system-commands)
+    - [auth](#auth---authentication-diagnostics)
+    - [lcd](#lcd---display-control)
+    - [jxk10](#jxk10---current-sensor-direct)
+    - [spindle](#spindle---monitoring--config)
+    - [web](#web---web-server-configuration)
+    - [api](#api---api-rate-limiter-diagnostics)
+    - [reboot](#reboot---restart-system)
+    - [info](#info---system-information)
+    - [echo](#echo---toggle-command-echo)
+7. [Configuration Commands](#configuration-commands)
+    - [config](#config---configuration-management)
+    - [nvs](#nvs---nvs-storage-inspector)
+    - [encoder_baud_set](#encoder_baud_set---set-encoder-baud-rate)
+8. [Calibration Commands](#calibration-commands)
+9. [I2C Bus Commands](#i2c-bus-commands)
 10. [G-Code / Grbl Commands](#g-code--grbl-commands)
 11. [Error Reference](#error-reference)
 
@@ -69,6 +96,136 @@ status
     A:    0.00 deg
   Feed Override: 100%
   Moving: NO
+
+---
+
+### `status` - Quick System Status Dashboard
+
+**Description:** Displays a high-level summary of system health, positions, network status, and active faults.
+
+**Syntax:**
+```
+status
+```
+
+**Example Output:**
+```
++============================================================+
+|           BISSO E350 QUICK STATUS DASHBOARD               |
+|  Uptime: 00:15:23                                        |
++============================================================+
+| POSITION (mm)                                             |
+|   X:      0.000    Y:      0.000                        |
+|   Z:      0.000    A:      0.000                        |
++------------------------------------------------------------+
+| ENCODER FEEDBACK                                          |
+|   Status: [ON]                                            |
++------------------------------------------------------------+
+| SPINDLE CURRENT                                           |
+|   Current:   5.2 A  |  Peak:   8.4 A                    |
+|   Alarm: OK                                               |
++------------------------------------------------------------+
+| NETWORK                                                   |
+|   WiFi: Connected (-45 dBm)                               |
+|   IP: 192.168.1.50                                        |
++------------------------------------------------------------+
+| ACTIVE FAULTS                                             |
+|   [NONE] System healthy                                   |
++============================================================+
+```
+
+---
+
+### `spinlock` - Critical Section Timing
+
+**Description:** Diagnostics for interrupt latency and thread safety locks. Identifies code sections that block interrupts for too long (>10µs).
+
+**Syntax:**
+```
+spinlock stats     # Show cumulative timing report
+spinlock reset     # Reset all counters
+```
+
+**Example:**
+```
+[SPINLOCK] === Spinlock Timing Diagnostics ===
+  Total Locks:  154238
+  Hold Time Max: 18.5 us (WARNING: >10us)
+  Hold Time Avg: 1.2 us
+  Location: motion_planner.cpp:L145
+```
+
+---
+
+### `debug` - System Info Dump
+
+**Description:** Comprehensive dump of internal state for factory debugging.
+
+**Syntax:**
+```
+debug all          # Complete system dump
+debug encoders     # Detailed WJ66 encoder status
+debug config       # In-memory config table dump
+```
+
+---
+
+### `rs485` - Bus Diagnostics
+
+**Description:** Monitor health of the global Modbus/RS-485 bus.
+
+**Syntax:**
+```
+rs485 diag
+```
+
+**Example:**
+```
+[RS485] === Bus Diagnostics ===
+  Bus State:   HEALTHY
+  Error Rate:  0.2%
+  Active Slaves: 3 (Altivar, JXK10, YHTC05)
+  Timeouts:    0
+```
+
+---
+
+### `wdt` - Watchdog Management
+
+**Description:** Monitor task health and scheduler responsiveness.
+
+**Syntax:**
+```
+wdt status         # Show global watchdog status
+wdt tasks          # List all registered tasks
+wdt stats          # Timing jitter statistics
+wdt report         # Detailed health report
+wdt test           # TRIGGER FAULT (Forces 10s stall to test reboot)
+```
+
+---
+
+### `task` - Process Monitoring
+
+**Description:** FreeRTOS task monitoring and CPU usage.
+
+**Syntax:**
+```
+task list          # Table of all running tasks
+task stats         # Stack usage and run-time %
+task cpu           # Overall CPU load
+```
+
+**Example Output:**
+```
+[TASK] Task List:
+  ID   Task Name  Pri   Stack(min)   CPU(%)
+  1    Main       10    452          2.5%
+  2    Motion     15    890          1.2%
+  3    WebServer   5    1520         0.8%
+  4    Modbus      8    310          0.4%
+[TASK] CPU: 5%
+```
 ```
 
 **Possible Errors:**
@@ -270,6 +427,104 @@ spinlock reset          # Reset statistics
   Telemetry:  Max: 8us, Avg: 3us, Count: 45000
   Motion:     Max: 12us, Avg: 5us, Count: 120000
   Config:     Max: 15us, Avg: 7us, Count: 1200
+```
+
+---
+
+### `motionstatus` - Motion Status (Low-Level)
+
+**Description:** Display real-time low-level motion data directly from the motion controller. This is more verbose than the `status` command and useful for debugging motion cycles.
+
+**Syntax:**
+```
+motionstatus
+```
+
+**Output Fields:**
+- `AxisState`: CURRENT axis state (IDLE, BUSY, ALARM)
+- `Flags`: Bitmask of active motion flags
+- `QueueSize`: Number of moves in the motion buffer
+- `Velocity`: Current instantaneous velocity (mm/min)
+
+---
+
+### `estop` - Emergency Stop Management
+
+**Description:** Manually trigger, clear, or view the Emergency Stop status.
+
+**Syntax:**
+```
+estop status          # Show current E-Stop state
+estop on              # Manually trigger software E-Stop
+estop off             # Clear software E-Stop alarm
+```
+
+---
+
+### `limit` - Set Soft Limits
+
+**Description:** Configure software travel limits for each axis.
+
+**Syntax:**
+```
+limit <axis> <min> <max>
+```
+
+**Parameters:**
+- `axis`: X, Y, Z, or A
+- `min`: Minimum coordinate (mm)
+- `max`: Maximum coordinate (mm)
+
+**Example:**
+```
+limit X 0 1000
+```
+
+---
+
+### `feed` - Set Feed Override
+
+**Description:** Dynamically adjust the feed rate during motion.
+
+**Syntax:**
+```
+feed <multiplier>
+```
+
+**Parameters:**
+- `multiplier`: Float between `0.1` and `2.0` (10% to 200%)
+
+---
+
+### `job_start` - Execute G-Code Job
+
+**Description:** Start a pre-loaded G-code job.
+
+**Syntax:**
+```
+job_start <filename>
+```
+
+---
+
+### `job_abort` - Abort Current Job
+
+**Description:** Stop the currently executing job immediately.
+
+**Syntax:**
+```
+job_abort
+```
+
+---
+
+### `job_status` - Get Job Progress
+
+**Description:** Show percentage completion and estimated time remaining for the current job.
+
+**Syntax:**
+```
+job_status
 ```
 
 ---
@@ -508,6 +763,70 @@ faults export           # Export to JSON
 
 ---
 
+### `log` - Boot Log Management
+
+**Description:** View, manage, and configure boot log capture.
+
+**Syntax:**
+```
+log                     # Show help
+log boot                # Display captured boot log from last startup
+log enable              # Show current enable status
+log enable on           # Enable boot log capture
+log enable off          # Disable boot log capture
+log delete              # Delete the boot log file
+```
+
+#### `log boot`
+**Example Output:**
+```
+[LOG] === Boot Log ===
+Boot log size: 4523 bytes
+
+=== BOOT LOG START ===
+[SYSTEM] BISSO E350 Controller v3.5.x booting
+[BOOTLOG] Boot log capture started
+[MOTION] Initializing motion system...
+[ENCODER] WJ66 encoder self-test passing...
+[VFD] Altivar 31 connection established
+[NETWORK] WiFi connected to "BISSO_5GHz" IP: 192.168.1.100
+[WEB] Web server listening on port 80
+[SYSTEM] Boot complete, ready for operation
+
+=== BOOT LOG END ===
+[LOG] === End Boot Log ===
+```
+
+**Notes:**
+- Boot log captures all serial output during device startup
+- Useful for debugging boot issues when serial monitor not available
+- Maximum log size: 32KB (configurable)
+- Log is overwritten on each boot
+- Stored at `/bootlog.txt` on LittleFS filesystem
+
+#### `log enable`
+**Example Output (status):**
+```
+[LOG] Boot log capture: ENABLED
+[LOG] Usage: log enable [on | off]
+```
+
+**Example (enable):**
+```
+log enable on
+```
+```
+[LOG] Boot log capture ENABLED (takes effect on next boot)
+```
+
+#### `log delete`
+**Example Output:**
+```
+[LOG] Boot log deleted
+```
+
+---
+
 ### `encoder` - Encoder Management
 
 **Description:** Encoder diagnostics and configuration.
@@ -676,20 +995,7 @@ rs485 scan              # Scan for devices
 
 ---
 
-### `jxk10` - JXK-10 Current Sensor
-
-**Description:** Control and monitor the JXK-10 Hall effect current sensor on RS-485 bus.
-
-**Syntax:**
-```
-jxk10                   # Show help
-jxk10 read              # Read current value
-jxk10 info              # Show device info (address, baud, stats)
-jxk10 addr <new>        # Change slave address (0-254, power cycle required)
-jxk10 status            # Show full diagnostics
-jxk10 enable            # Enable sensor in config
-jxk10 disable           # Disable sensor in config
-```
+---
 
 **Example Output (read):**
 ```
@@ -752,7 +1058,684 @@ task_list               # Detailed task list with stack
 
 ---
 
+### `memory` - Heap Analysis
+
+**Description:** Detailed memory monitoring and heap fragmentation analysis.
+
+**Syntax:**
+```
+memory                  # Show help and available subcommands
+memory stats            # Detailed memory diagnostics
+memory reset            # Reset minimum free heap counter
+memory detailed         # Deep analysis with fragmentation
+```
+
+**Example Output (memory stats):**
+```
+=== MEMORY DIAGNOSTICS ===
+Total Heap:   320760
+Current Free: 185432 (42% used)
+Min Free:     142100
+Max Used:     178660
+Largest Blk:  110592
+Samples:      12450
+Status: [GOOD]
+```
+
+**Example (memory detailed):**
+```
+[MEMORY] === Detailed Memory Analysis ===
+
+Heap Summary:
+  Total:      320760 bytes
+  Used:       135328 bytes (42.2%)
+  Free:       185432 bytes (57.8%)
+  Minimum:    142100 bytes (lowest ever)
+  Largest Block: 110592 bytes (max contiguous)
+
+Fragmentation: 40.4%
+```
+
+---
+
+### `encoder_deviation` - Motion Accuracy
+
+**Description:** Displays a statistical analysis of the deviation between commanded position and encoder feedback.
+
+**Syntax:**
+```
+encoder_deviation
+```
+
+---
+
+### `fault_recovery` - Recovery Stats
+
+**Description:** Shows statistics on automatic fault recoveries and power-loss resumes.
+
+**Syntax:**
+```
+fault_recovery
+```
+
+---
+
+## System Commands
+
+### `auth` - Authentication Diagnostics
+
+**Description:** Manage and diagnose the SHA-256 authentication system. Useful for troubleshooting login issues, testing password verification, and clearing rate limits after lockouts.
+
+**Syntax:**
+```
+auth                    # Show usage help
+auth diag               # Display authentication diagnostics
+auth test <password>    # Test if a password matches the stored hash
+auth reload             # Reload credentials from NVS
+auth clear_limits       # Clear all IP rate limits (useful after lockout)
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `diag` | Show username, hash format (SHA-256 or plain text), password change status, rate limit entries |
+| `test <password>` | Verify if a password matches the stored credential without logging in |
+| `reload` | Reload credentials from NVS storage (use after manual NVS edits) |
+| `clear_limits` | Clear all brute-force rate limit entries (unlocks all locked IPs) |
+
+**Example - Diagnostics:**
+```
+auth diag
+```
+```
+[AUTH] === Authentication Diagnostics ===
+Username:          admin
+Credentials Loaded: YES
+Password Change:   Not required
+Hash Format:       SHA-256 (secure)
+Hash Length:       97 chars
+Hash Preview:      $sha256$a1b2c3d4e5f6...
+Rate Limit IPs:    0/16
+```
+
+**Example - Test Password:**
+```
+auth test MyPassword123!
+```
+```
+[AUTH] Password test: MATCH
+```
+
+**Troubleshooting:**
+- **"Password test: NO MATCH"**: Clear browser cache, try incognito mode, or use `auth reload` to refresh
+- **"Rate limit exceeded"**: Use `auth clear_limits` to unlock locked out IPs
+- **"Hash Format: PLAIN TEXT"**: Upgrade to SHA-256 by re-setting the password with `web_setpass`
+
+---
+
+### `lcd` - Display Control
+
+**Description:** Control the 20x4 LCD display module. Manage power state, backlight, sleep mode, and view current status.
+
+**Syntax:**
+```
+lcd                     # Show usage help
+lcd on                  # Enable LCD and save setting to NVS
+lcd off                 # Disable LCD and save setting to NVS
+lcd backlight on        # Turn backlight on
+lcd backlight off       # Turn backlight off
+lcd sleep               # Force display to sleep mode
+lcd wakeup              # Wake display from sleep
+lcd timeout <seconds>   # Set auto-sleep timeout (0=never sleep)
+lcd status              # Show current LCD status
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `on` | Enable LCD module and save to NVS (persistent) |
+| `off` | Disable LCD module and save to NVS (persistent) |
+| `backlight [on\|off]` | Control backlight without affecting NVS |
+| `sleep` | Force display into power-saving sleep mode |
+| `wakeup` | Wake display from sleep mode |
+| `timeout <sec>` | Set auto-sleep timeout in seconds (0 disables auto-sleep) |
+| `status` | Display current LCD configuration and state |
+
+**Example - Status:**
+```
+lcd status
+```
+```
+[LCD] === Status ===
+Enabled:   YES
+Mode:      4
+Sleeping:  NO
+Timeout:   300 sec
+```
+
+**Example - Set Timeout:**
+```
+lcd timeout 120
+```
+```
+[LCD] Sleep timeout set to 120 seconds
+```
+
+**Troubleshooting:**
+- **LCD not responding**: Check I2C connection with `i2c scan`, verify address 0x27
+- **Display garbled**: Try `lcd off` then `lcd on` to reinitialize
+- **Backlight flickers**: Power supply may be inadequate, check 5V rail
+
+---
+
+### `jxk10` - Current Sensor Direct Access
+
+**Description:** Direct interface to the JXK-10 spindle current sensor via Modbus RTU. Read real-time current, check device info, configure address, and enable/disable the sensor.
+
+**Syntax:**
+```
+jxk10                   # Show usage help
+jxk10 read              # Read current value in Amps
+jxk10 info              # Show device info (address, baud, stats)
+jxk10 addr <1-247>      # Change Modbus slave address
+jxk10 status            # Show full diagnostics
+jxk10 enable            # Enable JXK-10 in config
+jxk10 disable           # Disable JXK-10 in config
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `read` | Read and display current value in Amps |
+| `info` | Show Modbus address, baud rate, communication statistics |
+| `addr <address>` | Change the sensor's Modbus address (1-247) |
+| `status` | Full diagnostic report including connection state and error counts |
+| `enable` | Enable JXK-10 monitoring in NVS config |
+| `disable` | Disable JXK-10 monitoring in NVS config |
+
+**Example - Read Current:**
+```
+jxk10 read
+```
+```
+[JXK10] Current: 8.5 A
+```
+
+**Example - Status:**
+```
+jxk10 status
+```
+```
+[JXK10] === JXK-10 Current Sensor Status ===
+  Enabled:      YES
+  Address:      2
+  Baud Rate:    9600
+  Current:      8.5 A
+  Reads OK:     1245
+  Reads ERR:    3
+  Last Error:   None
+```
+
+**Troubleshooting:**
+- **"Reads ERR" increasing**: Check RS-485 wiring, termination resistor, baud rate mismatch
+- **Current reads 0.0 A**: Verify sensor is powered and CT clamp is installed correctly
+- **Communication timeout**: Use `rs485 diag` to diagnose bus issues
+
+---
+
+### `spindle` - Spindle Monitoring & Configuration
+
+**Description:** Comprehensive spindle current monitoring, alarm configuration, and diagnostics. Monitors for tool breakage (sudden current drop) and stall conditions (overcurrent).
+
+**Syntax:**
+```
+spindle                         # Show subcommand help
+spindle diag                    # Print spindle diagnostics
+spindle config show             # Display current configuration
+spindle config enable [on|off]  # Enable/disable monitoring
+spindle config address <1-247>  # Set JXK-10 Modbus address
+spindle config threshold <amps> # Set overcurrent threshold (0-50 A)
+spindle config interval <ms>    # Set poll interval (100-60000 ms)
+spindle alarm status            # Show alarm states
+spindle alarm clear             # Clear all alarms
+spindle alarm toolbreak <amps>  # Set tool breakage threshold (1-20 A)
+spindle alarm stall <amps> <ms> # Set stall parameters
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `diag` | Full spindle diagnostics with current values, alarms, and history |
+| `config show` | Display all spindle configuration settings |
+| `config enable [on\|off]` | Enable or disable spindle current monitoring |
+| `config address <addr>` | Set JXK-10 sensor Modbus address |
+| `config threshold <amps>` | Set overcurrent shutdown threshold |
+| `config interval <ms>` | Set polling interval in milliseconds |
+| `alarm status` | Show tool breakage and stall alarm states |
+| `alarm clear` | Clear all active alarms |
+| `alarm toolbreak <amps>` | Set tool breakage detection threshold (sudden drop) |
+| `alarm stall <amps> <ms>` | Set stall threshold and timeout duration |
+
+**Example - Diagnostics:**
+```
+spindle diag
+```
+```
+[SPINDLE] === Diagnostics ===
+  Monitoring:     ENABLED
+  Current:        12.5 A
+  RMS Average:    11.8 A
+  Peak:           15.2 A
+  Tool Breakage:  OK (threshold: 5.0 A drop)
+  Stall:          OK (threshold: 25.0 A for 2000 ms)
+```
+
+**Example - Configure Alarm:**
+```
+spindle alarm stall 30 3000
+```
+```
+[SPINDLE] Stall threshold set to 30.0 A for 3000 ms
+```
+
+**Troubleshooting:**
+- **False tool breakage alarms**: Increase threshold with `spindle alarm toolbreak <higher_value>`
+- **Stall not detected**: Lower threshold or increase timeout
+- **Current reads 0**: Check `jxk10 status` for sensor connectivity
+
+---
+
+### `web` - Web Server Configuration
+
+**Description:** Configure web server settings including username and password for HTTP Basic Authentication.
+
+**Syntax:**
+```
+web                                 # Show usage help
+web config show                     # Display current web config
+web config username <name>          # Set web UI username (3-32 chars)
+web config password <pass>          # Set web UI password (4-64 chars)
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `config show` | Display current web server username (password not shown) |
+| `config username <name>` | Change the login username |
+| `config password <pass>` | Change the login password |
+
+**Example - Show Config:**
+```
+web config show
+```
+```
+[WEB CONFIG] === Current Configuration ===
+  Username: admin
+  Password: ******** (hidden)
+  Auth Enabled: YES
+```
+
+> **Note:** For stronger password management with SHA-256 hashing, use `web_setpass <password>` instead.
+
+**Troubleshooting:**
+- **Can't log in after password change**: Clear browser saved passwords, use incognito mode
+- **Auth not working**: Verify `web_auth_en` is set to 1 in `config list`
+
+---
+
+### `api` - API Rate Limiter Diagnostics
+
+**Description:** View and manage the API rate limiter used to prevent denial-of-service attacks on the web server.
+
+**Syntax:**
+```
+api                     # Show subcommand help
+api diag                # Show rate limiter diagnostics
+api reset               # Reset all rate limit counters
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `diag` | Display current rate limit status, blocked IPs, request counts |
+| `reset` | Clear all rate limit counters and unlock blocked endpoints |
+
+**Example - Diagnostics:**
+```
+api diag
+```
+```
+[API] === Rate Limiter Status ===
+  Requests (1min): 45
+  Blocked:         0
+  Endpoints:       12 tracked
+  Max per minute:  60
+```
+
+**Troubleshooting:**
+- **API requests being blocked**: Use `api reset` to clear limits
+- **Slow API responses**: Check `memory stats` for heap pressure
+
+---
+
+### `reboot` - Restart System
+
+**Description:** Safely restart the ESP32 controller. All pending operations are halted, motion is stopped, and the system performs a clean reboot.
+
+**Syntax:**
+```
+reboot                  # Restart the controller
+reset                   # Alias for reboot
+```
+
+**Example:**
+```
+reboot
+```
+```
+[SYSTEM] Rebooting...
+```
+
+> **Warning:** Motion will be stopped immediately. Ensure spindle is off and axes are in a safe position before rebooting.
+
+---
+
+### `info` - System Information
+
+**Description:** Display comprehensive system information including firmware version, hardware details, uptime, and memory status.
+
+**Syntax:**
+```
+info                    # Show system information
+```
+
+**Example:**
+```
+info
+```
+```
+=== BISSO E350 Controller ===
+  Firmware:    v1.1.0 (PosiPro)
+  Build Date:  Jan 11 2026
+  Hardware:    KC868-A16 ESP32-WROOM
+  Uptime:      2h 34m 12s
+  Free Heap:   185,432 bytes
+  WiFi:        Connected (192.168.1.100)
+  Ethernet:    Connected (192.168.1.101)
+```
+
+---
+
+### `timeouts` - Show Timeout Diagnostics
+
+**Description:** Display diagnostics for all active system timeouts including stall detection, communication timeouts, and safety timers.
+
+**Syntax:**
+```
+timeouts                # Show timeout diagnostics
+```
+
+**Example:**
+```
+timeouts
+```
+```
+[TIMEOUT] === Active Timeouts ===
+  Motion Stall:     2000 ms (not active)
+  Modbus Response:  100 ms
+  Watchdog:         5000 ms
+  LCD Sleep:        300 sec
+```
+
+---
+
+### `selftest` - Hardware Self-Test
+
+**Description:** Run comprehensive hardware diagnostic tests. Tests can be run individually by category or as a full suite.
+
+**Syntax:**
+```
+selftest                # Run full test suite
+selftest help           # Show available tests
+selftest quick          # Quick health check (fast tests only)
+selftest list           # List all available tests
+selftest <category>     # Run specific category
+```
+
+**Categories:**
+
+| Category | Description |
+|----------|-------------|
+| `memory` | Heap allocation, fragmentation, and minimum free tests |
+| `i2c` | I2C bus scan and device communication tests |
+| `storage` | LittleFS and NVS read/write tests |
+| `motion` | Motion system initialization and encoder tests |
+| `spindle` | Spindle monitor communication tests |
+| `safety` | E-stop, limit switch, and alarm system tests |
+| `network` | WiFi, Ethernet, and DNS connectivity tests |
+| `watchdog` | Watchdog timer feed and recovery tests |
+
+**Example - Full Suite:**
+```
+selftest
+```
+```
+[SELFTEST] === Self-Test Suite ===
+
+[MEMORY]    ✓ Heap allocation OK (185KB free)
+[MEMORY]    ✓ Fragmentation OK (32.5%)
+[I2C]       ✓ PCF8574 @0x21 OK
+[I2C]       ✓ PCF8574 @0x22 OK
+[I2C]       ✓ LCD @0x27 OK
+[STORAGE]   ✓ LittleFS mounted (1.2MB free)
+[STORAGE]   ✓ NVS read/write OK
+[MOTION]    ✓ Encoder X OK
+[MOTION]    ✓ Encoder Y OK
+[MOTION]    ✗ Encoder Z - No response
+[SPINDLE]   ✓ JXK-10 communication OK
+[SAFETY]    ✓ E-Stop circuit OK
+[NETWORK]   ✓ WiFi connected
+[WATCHDOG]  ✓ Fed successfully
+
+Summary: 12 passed, 1 failed
+```
+
+**Example - Quick Check:**
+```
+selftest quick
+```
+```
+[SELFTEST] === Quick Health Check ===
+[OK] Quick checks passed
+```
+
+**Troubleshooting:**
+- **Test fails repeatedly**: Check hardware connections, power supply stability
+- **"Encoder Z - No response"**: Verify encoder wiring and baud rate
+
+---
+
+### `dio` - Digital I/O Status
+
+**Description:** Display the state of all digital inputs and outputs on the PCF8574 I/O expanders. Shows raw bit values and active channel names.
+
+**Syntax:**
+```
+dio                     # Display all digital I/O status
+```
+
+**Example:**
+```
+dio
+```
+```
+[DIO] === Digital I/O Status ===
+
++---------+----------------+------------------------+
+| Addr    | Name           | State (MSB..LSB)       |
++---------+----------------+------------------------+
+| 0x21    | INPUTS-SAFE    | 11110111 (0xF7)        |
+|         |                | E-Stop
+| 0x22    | INPUTS-AUX     | 11111111 (0xFF)        |
+|         |                | (none active)
+| 0x24    | OUTPUTS-MAIN   | 11111110 (0xFE)        |
+|         |                | Spindle
+| 0x25    | OUTPUTS-AUX    | 11111111 (0xFF)        |
+|         |                | (none active)
++---------+----------------+------------------------+
+Legend: Inputs=HIGH when active, Outputs=LOW when relay ON
+```
+
+**I/O Bank Mapping:**
+
+| Address | Bank Name | Bit Labels (0-7) |
+|---------|-----------|------------------|
+| 0x21 | INPUTS-SAFE | Limit-X, Limit-Y, Limit-Z, E-Stop, Pause, Resume, Probe, Door |
+| 0x22 | INPUTS-AUX | Home-X, Home-Y, Home-Z, Home-A, ToolSns, Coolant, In-15, In-16 |
+| 0x24 | OUTPUTS-MAIN | Spindle, SpinDir, Coolant, Mist, Clamp, Vacuum, Light, Out-8 |
+| 0x25 | OUTPUTS-AUX | AirBlast, Lube, Alarm, Ready, Running, Error, Out-15, Out-16 |
+
+**Troubleshooting:**
+- **"[NOT CONNECTED]"**: I2C expander not responding, check wiring and power
+- **Inputs stuck HIGH/LOW**: Verify sensor wiring, check for short circuits
+
+---
+
+### `runtime` - Machine Runtime Counter
+
+**Description:** Track cumulative machine runtime, job cycle count, and maintenance schedule. Data persists across reboots via NVS.
+
+**Syntax:**
+```
+runtime                 # Show runtime statistics
+runtime reset           # Reset cycle counter to 0
+runtime maint           # Record maintenance performed (resets hours counter)
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| *(none)* | Display runtime, cycle count, and time since last maintenance |
+| `reset` | Reset the job cycle counter to 0 |
+| `maint` | Record that maintenance was performed (resets "since last maintenance" timer) |
+
+**Example:**
+```
+runtime
+```
+```
+[RUNTIME] === Machine Usage Statistics ===
+
++-------------------------+--------------------+
+| Metric                  | Value              |
++-------------------------+--------------------+
+| Total Runtime           | 156 hrs 42 min     |
+| Job Cycles Completed    | 1,234              |
+| Since Last Maintenance  | 45 hrs             |
++-------------------------+--------------------+
+```
+
+**Example - Record Maintenance:**
+```
+runtime maint
+```
+```
+[RUNTIME] Maintenance recorded
+```
+
+> **Note:** A warning is displayed when runtime exceeds 100 hours since last maintenance.
+
+---
+
+### `metrics` - Task Performance Monitoring
+
+**Description:** Monitor FreeRTOS task performance including execution times, CPU usage, and stack high-water marks.
+
+**Syntax:**
+```
+metrics                 # Show subcommand help
+metrics summary         # Quick performance summary
+metrics detail          # Detailed task diagnostics
+metrics reset           # Clear all collected metrics
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `summary` | Overview of system performance (CPU, memory, worst-case timings) |
+| `detail` | Per-task breakdown with stack usage, execution times, overruns |
+| `reset` | Clear all performance counters to start fresh measurement |
+
+**Example - Summary:**
+```
+metrics summary
+```
+```
+[METRICS] === Performance Summary ===
+  CPU Usage:      42%
+  Heap Usage:     58%
+  Worst Task:     Telemetry (1.2 ms max)
+  Overruns:       0
+```
+
+**Example - Detailed:**
+```
+metrics detail
+```
+```
+[METRICS] === Task Performance ===
+
++---------------+--------+----------+----------+--------+
+| Task          | CPU %  | Avg (µs) | Max (µs) | Stack  |
++---------------+--------+----------+----------+--------+
+| Motion        | 15.2%  | 450      | 1,200    | 78%    |
+| Telemetry     | 8.5%   | 800      | 1,850    | 65%    |
+| CLI           | 2.1%   | 150      | 12,000   | 45%    |
+| Network       | 5.4%   | 300      | 2,500    | 52%    |
++---------------+--------+----------+----------+--------+
+```
+
+**Troubleshooting:**
+- **High CPU usage**: Check for runaway tasks, reduce telemetry rate
+- **Stack usage > 90%**: Task at risk of overflow, increase stack size in `task_manager.h`
+- **High "Max" times**: Identify blocking operations, consider async alternatives
+
+---
+
 ## Configuration Commands
+
+### `echo` - Toggle Command Echo
+
+**Description:** Enable or disable local echo for the CLI. When enabled, typed characters are echoed back to the terminal. Use the `save` option to persist the setting across reboots.
+
+**Syntax:**
+```
+echo                    # Show current echo state
+echo on                 # Enable echo (session only)
+echo off                # Disable echo (session only)
+echo on save            # Enable echo and save to NVS (persistent)
+echo off save           # Disable echo and save to NVS (persistent)
+```
+
+**Example:**
+```
+echo on save
+```
+```
+[INFO]  Echo ENABLED (saved to NVS)
+```
+
+> **Note:** The echo setting can also be configured via the Web UI: **Settings** → **CLI Options** → **Enable local echo**.
+
+---
 
 ### `config` - Configuration Management
 
@@ -789,29 +1772,68 @@ config save
 [CONFIG] [OK] Configuration saved
 ```
 
-**Common Configuration Keys:**
+**Configuration Keys Reference:**
 
 | Key | Type | Description | Default |
 |-----|------|-------------|---------|
-| wifi_ssid | string | WiFi network name | - |
-| wifi_pass | string | WiFi password | - |
-| wifi_ap_en | int | Enable AP mode (0/1) | 1 |
-| wifi_ap_ssid | string | AP SSID | BISSO-E350-Setup |
-| wifi_ap_pass | string | AP password | password |
-| eth_en | int | Enable Ethernet (0/1) | 1 |
-| eth_dhcp | int | Use DHCP (0/1) | 1 |
-| eth_ip | string | Static IP | - |
-| spindl_en | int | Enable spindle monitor | 1 |
-| spindl_thr | int | Overcurrent threshold (A) | 30 |
-| enc_fb_en | int | Enable encoder feedback | 1 |
-| x_limit_min | int | X soft limit min (mm) | 0 |
-| x_limit_max | int | X soft limit max (mm) | 1000 |
-| def_spd | int | Default speed | 500 |
-| def_acc | int | Default acceleration | 100 |
+| **Network** | | | |
+| `wifi_ssid` | string | WiFi SSID | - |
+| `wifi_pass` | string | WiFi Password | - |
+| `wifi_ap_en` | int | Enable AP Mode (1=on, 0=off) | 1 |
+| `eth_en` | int | Enable Ethernet | 1 |
+| `eth_dhcp` | int | Use DHCP (1=on, 0=fixed) | 1 |
+| **Motion** | | | |
+| `ppm_x/y/z/a`| float| Steps/Pulses per MM/Deg | 100.0 |
+| `def_spd` | float| Default feedrate (mm/min) | 500 |
+| `def_acc` | float| Default acceleration | 100 |
+| `home_enable`| int | Enable Homing ($H) support | 1 |
+| **Safety** | | | |
+| `recov_en` | int | Power Loss Recovery enable | 1 |
+| `buzzer_en` | int | Enable audible alarm | 1 |
+| `st_light_en`| int | Enable Status Light (Red/Grn/Yel) | 1 |
+| `sp_pause` | int | Auto-pause on spindle overload | 1 |
+| `stall_ms` | int | Stall timeout (ms) | 2000 |
+| **Hardware** | | | |
+| `vfd_en` | int | Enable Modbus VFD Comm | 1 |
+| `vfd_addr` | int | VFD Modbus ID | 2 |
+| `jxk10_en` | int | Enable JXK-10 Current Monitoring | 1 |
+| `lcd_en` | int | Enable LCD Display | 1 |
+| `bootlog_en` | int | Enable boot log capture | 1 |
+| `encoder_baud` | int | Encoder baud rate (1200-115200) | 9600 |
+| `enc_iface` | int | Encoder Interface (0=RS232, 1=RS485) | 0 |
+| `cli_echo` | int | Enable CLI echo by default (1=on, 0=off) | 0 |
+| **Admin** | | | |
+| `web_pass` | string | Web UI Password | password |
+| `web_auth_en`| int | Require Web/Telnet login | 1 |
 
-**Possible Errors:**
+---
+
+### `nvs` - NVS Storage Inspector
+
+**Description:** Inspect and manage Non-Volatile Storage (NVS) for configuration persistence.
+
+**Syntax:**
 ```
-[CONFIG] Key not found: invalid_key
+nvs stats                    # Show NVS usage statistics
+nvs dump                     # Dump all NVS key-value pairs
+nvs cleanup legacy           # Erase legacy configuration namespace
+nvs cleanup faults           # Clear fault history from NVS
+```
+
+---
+
+### `encoder_baud` - Config Recommendation (Reactive)
+
+**Description:** The legacy `encoder_baud_set` command has been deprecated. Please use the unified configuration system. Setting this value immediately re-initializes the encoder hardware.
+
+**Syntax:**
+```
+config set encoder_baud <baud_rate>
+```
+
+**Example:**
+```
+config set encoder_baud 115200
 ```
 
 ---
@@ -980,19 +2002,35 @@ echo off                # Disable command echo
 
 ## G-Code / Grbl Commands
 
-The CLI supports limited Grbl-compatible commands:
+The CLI supports Grbl 1.1h compatible commands for motion and configuration.
 
-| Command | Description |
-|---------|-------------|
-| `$` | Show Grbl settings |
-| `$H` | Home all axes |
-| `?` | Query current state |
-| `$Jog=X10F500` | Jog X axis 10mm at 500mm/min |
-| `G0 X100 Y50` | Rapid move |
-| `G1 X200 Y100 F300` | Linear move at 300mm/min |
-| `G28` | Return to home position |
-| `G30` | Return to secondary home |
-| `G54`-`G59` | Select work coordinate system |
+### Real-Time Overrides
+These commands are processed immediately, even during active motion.
+
+| Command | Action | Description |
+|---------|--------|-------------|
+| `?` | Status | Get real-time status line (Positions, State, Buffers) |
+| `!` | Hold | Feed hold - decelerate to a stop and pause |
+| `~` | Resume | Cycle start - resume from pause or finish home |
+| `Ctrl-X` | Reset | Soft reset - aborts motion and clears alarm state |
+
+### Settings & State
+| Command | Description | Example |
+|---------|-------------|---------|
+| `$` | Settings | List current Grbl settings (PPM, Speed, Accel) |
+| `$H` | Home | Execute homing cycle on enabled axes |
+| `$G` | State | Show current G-code parser state (Modal groups) |
+| `$J=...`| Jog | Execute a jog move (e.g., `$J=G91X10F500`) |
+
+### Standard G-Code
+| Command | Description | Example |
+|---------|-------------|---------|
+| `G0` | Rapid | `G0 X100 Y50` |
+| `G1` | Linear | `G1 X200 Y100 F300` |
+| `G28`/`G30`| Home | Return to stored home positions |
+| `G54`-`G59`| Work | Select Work Coordinate System |
+| `G90`/`G91`| Mode | Absolute vs Relative positioning |
+| `G20`/`G21`| Units | Inches vs Millimeters |
 
 ---
 
@@ -1035,12 +2073,12 @@ The CLI supports limited Grbl-compatible commands:
 │                    BISSO E350 CLI Quick Reference               │
 ├─────────────────────────────────────────────────────────────────┤
 │ MOTION          │ NETWORK            │ DIAGNOSTICS              │
-│ status          │ wifi status        │ faults                   │
-│ stop            │ wifi scan          │ selftest                 │
-│ pause / resume  │ wifi connect       │ dio                      │
-│ estop on/off    │ eth status         │ telemetry                │
-│ feed <0.1-2.0>  │ eth static/dhcp    │ runtime                  │
-│ limit X 0 1000  │                    │ metrics                  │
+│ motionstatus     │ wifi status        │ faults                   │
+│ stop             │ wifi scan          │ selftest                 │
+│ pause / resume   │ wifi connect       │ dio                      │
+│ estop on/off     │ eth status         │ telemetry                │
+│ limit X 0 1000   │ ping <host>        │ memory / runtime         │
+│ job_start <file> │                    │ metrics / log boot       │
 ├─────────────────┴────────────────────┴──────────────────────────┤
 │ CONFIGURATION                                                    │
 │ config list        - Show all settings                          │
@@ -1052,6 +2090,7 @@ The CLI supports limited Grbl-compatible commands:
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+
 ---
 
-*Document generated for BISSO E350 CNC Controller Firmware v1.0.0 (PosiPro)*
+*Document generated for BISSO E350 CNC Controller Firmware v1.1.0 (PosiPro)*

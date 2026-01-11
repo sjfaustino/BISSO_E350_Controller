@@ -9,13 +9,12 @@
 
 static Preferences schema_prefs;
 
-// Update schema version to 2 for G-Code/Buffering features
-// #define CONFIG_SCHEMA_VERSION 2 
 
 static const schema_record_t schema_history[] = {
   {0, "Initial schema (v0.1)", "Base motion control", 0},
   {1, "Enhanced schema (v4.2)", "Speed calibration, NVS persistence", 1700000000},
-  {2, "PosiPro v1.0.0", "Motion Buffering, Enhanced Security & Compressed Telemetry", 1735000000}
+  {2, "PosiPro v1.0.0", "Motion Buffering, Enhanced Security & Compressed Telemetry", 1735000000},
+  {3, "PosiPro v1.1.0", "Encoder Config Unification", 1736600000}
 };
 
 static const config_key_metadata_t key_metadata[] = {
@@ -56,6 +55,10 @@ static const config_key_metadata_t key_metadata[] = {
   {KEY_WIFI_AP_EN, 2, 0, "int32", "WiFi AP Enable (0/1)", true, true},
   {KEY_WIFI_AP_SSID, 2, 0, "string", "WiFi AP SSID", true, true},
   {KEY_WIFI_AP_PASS, 2, 0, "string", "WiFi AP Password", true, true},
+
+  // NEW in v3.0
+  {KEY_ENC_BAUD, 3, 0, "int32", "Encoder Baud Rate", true, true},
+  {KEY_ENC_INTERFACE, 3, 0, "int32", "Encoder Interface (0=RS232, 1=RS485)", true, true},
 
   {NULL, 0, 0, NULL, NULL, false, false}
 };

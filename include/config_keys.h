@@ -102,7 +102,7 @@
 #define KEY_ENC_FEEDBACK "enc_fb_en"  // Encoder feedback enable (1=on, 0=off)
 #define KEY_ENC_INTERFACE                                                      \
   "enc_iface" // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)
-#define KEY_ENC_BAUD "enc_baud" // WJ66 baud rate
+#define KEY_ENC_BAUD "encoder_baud" // WJ66 baud rate
 #define KEY_RS485_BAUD "rs485_baud" // Global RS-485 bus baud rate
 
 // --- SPINDLE CURRENT SENSOR ---
@@ -211,9 +211,16 @@
   "ota_pass" // OTA update password (default: "bisso-ota")
 #define KEY_OTA_PW_CHANGED                                                     \
   "ota_pw_chg" // Flag: OTA password changed from default (1=changed, 0=default)
+#define KEY_OTA_CHECK_EN "ota_chk_en" // Enable GitHub OTA check (1=on, 0=off, default 0)
 
 
 // --- LCD DISPLAY (PHASE 4.0) ---
 #define KEY_LCD_EN "lcd_en"             // Enable LCD display (1=on, 0=off, default 1)
+
+// --- BOOT LOG (DIAGNOSTICS) ---
+#define KEY_BOOTLOG_EN "bootlog_en"     // Enable boot log capture (1=on, 0=off, default 1)
+
+// --- CLI OPTIONS ---
+#define KEY_CLI_ECHO "cli_echo"         // Enable CLI echo by default (1=on, 0=off, default 0)
 
 #endif

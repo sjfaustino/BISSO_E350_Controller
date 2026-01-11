@@ -135,6 +135,10 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   serialLoggerInit(LOG_LEVEL);
+  
+  // Initialize boot log capture to LittleFS (32KB max)
+  bootLogInit(32768);
+  
   boot_time_ms = millis();
 
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
@@ -179,40 +183,36 @@ void setup() {
 
   // taskManagerInit() already called earlier (before Motion init)
   
-  // PHASE 5.4: Synchronous OTA Check at Boot (Fixes SSL Memory Issues)
-  // Wait for WiFi to connect (up to 10 seconds)
-  logInfo("[BOOT] Waiting for WiFi...");
-  uint32_t wifi_wait_start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - wifi_wait_start < 10000) {
-      delay(100);
-      if ((millis() - wifi_wait_start) % 1000 == 0) Serial.print(".");
-  }
-  Serial.println();
-
+  // PHASE 6.1: REMOVED synchronous OTA check at boot
+  // The OTA check was allocating ~16KB SSL buffer that fragmented the heap.
+  // Now deferred to background task via otaStartBackgroundCheck() after tasks start.
+  // This allows task stacks to be allocated contiguously first.
   if (WiFi.status() == WL_CONNECTED) {
       logInfo("[BOOT] WiFi Connected. IP: %s", WiFi.localIP().toString().c_str());
-      logInfo("[BOOT] Running OTA Check (Free Heap: %u)...", ESP.getFreeHeap());
-      
-      // Allow network stack to settle
-      delay(500);
-      
-      // Perform synchronous check (uses main stack + heap)
-      // Since no other tasks are running, heap is maximizing contiguous blocks
-      UpdateCheckResult result = otaCheckForUpdate();
-      
-      if (result.available) {
-          logInfo("[OTA] Update Available: %s", result.latest_version);
-          // Note: Actual update (download) logic could be triggered here if desired
-          // For now, we just cache the result for the UI
-      } else {
-          logInfo("[OTA] Firmware is up to date");
-      }
+      logInfo("[BOOT] OTA check deferred to background task (fragmentation fix)");
   } else {
-      logWarning("[BOOT] WiFi not connected - skipping OTA check");
+      logWarning("[BOOT] WiFi not connected - OTA check will run when connected");
   }
 
   perfMonitorInit();  // PHASE 5.1: Initialize performance monitoring
+  
+  // Stop boot log capture before tasks start (prevents CLI output from being logged)
+  bootLogStop();
+  
   taskManagerStart();
+  
+  // PHASE 6.2: OTA check is now OPTIONAL and disabled by default
+  // The SSL buffer allocation (~16KB) causes heap fragmentation
+  // Enable via config: config set ota_chk_en 1
+  int ota_check_enabled = configGetInt(KEY_OTA_CHECK_EN, 0);
+  if (ota_check_enabled && WiFi.status() == WL_CONNECTED) {
+      logInfo("[BOOT] OTA GitHub check enabled - starting background check");
+      delay(1000);  // Let tasks initialize their stacks first
+      otaStartBackgroundCheck();
+  } else if (!ota_check_enabled) {
+      logInfo("[BOOT] OTA GitHub check disabled (saves 16KB SSL memory)");
+  }
+  
   logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
 }
 

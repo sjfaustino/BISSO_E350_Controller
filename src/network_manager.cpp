@@ -181,7 +181,7 @@ String NetworkManager::getEthernetIP() const {
 }
 
 void NetworkManager::initEthernet() {
-  int eth_enabled = configGetInt(KEY_ETH_ENABLED, 1);  // Default: enabled
+  int eth_enabled = configGetInt(KEY_ETH_ENABLED, 0);  // Default: disabled to save memory
   
   if (!eth_enabled) {
     logInfo("[ETH] Ethernet disabled in config");

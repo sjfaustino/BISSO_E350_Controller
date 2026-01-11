@@ -1,0 +1,228 @@
+<!--
+  system.html - Firmware info, system stats, memory usage, and device information
+-->
+<div class="system-page">
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>Firmware & Software</h2>
+            </div>
+            <div class="card-content">
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Firmware Version</div>
+                    <div class="card-value" id="fw-version" style="font-size: 18px;">Loading...</div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Build Date</div>
+                    <div class="card-value" id="fw-build-date" style="font-size: 14px;">2024-12-14</div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Latest Version</div>
+                    <div class="card-value" id="fw-latest" style="font-size: 14px;">3.1.0 (Current)</div>
+                </div>
+
+                <button class="btn btn-primary" id="check-update-btn" style="width: 100%; margin-top: 10px;">Check for
+                    Updates</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Hardware Information</h2>
+            </div>
+            <div class="card-content">
+                <div style="margin-bottom: 12px;">
+                    <div class="card-label">Microcontroller</div>
+                    <div class="card-value" id="hw-mcu" style="font-size: 14px;">Loading...</div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <div class="card-label">Model</div>
+                    <div class="card-value" id="hw-model" style="font-size: 14px;">Loading...</div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <div class="card-label">Serial Number</div>
+                    <div class="card-value" id="serial-number" style="font-size: 12px;">Loading...</div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <div class="card-label">Revision</div>
+                    <div class="card-value" id="hw-revision" style="font-size: 14px;">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Storage & Memory</h2>
+            </div>
+            <div class="card-content">
+                <div style="margin-bottom: 20px;">
+                    <div class="card-label">Flash Memory</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="flash-bar" style="width: 65%;"></div>
+                    </div>
+                    <div class="card-subtext"><span id="flash-used">2.1</span> / 4 MB used</div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <div class="card-label">RAM Memory</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="ram-bar" style="width: 58%;"></div>
+                    </div>
+                    <div class="card-subtext"><span id="ram-used">210</span> / 360 KB used</div>
+                </div>
+
+                <div>
+                    <div class="card-label">SPIFFS Filesystem</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="spiffs-bar" style="width: 42%;"></div>
+                    </div>
+                    <div class="card-subtext"><span id="spiffs-used">1.68</span> / 4 MB used</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>System Status</h2>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <div class="card-label">Uptime</div>
+                        <div class="card-value" id="system-uptime" style="font-size: 16px;">-- h</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Resets</div>
+                        <div class="card-value" id="reset-count" style="font-size: 16px;">2</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Last Reset</div>
+                        <div class="card-value" id="last-reset" style="font-size: 12px;">2024-12-01 09:15</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Reset Reason</div>
+                        <div class="card-value" style="font-size: 12px;">Software Restart</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Configuration</h2>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <div class="card-label">HTTP Auth Enabled</div>
+                        <div class="card-value" id="conf-auth" style="font-size: 14px;">Loading...</div>
+                    </div>
+                    <div>
+                        <div class="card-label">HTTPS Enabled</div>
+                        <div class="card-value" id="conf-https" style="font-size: 14px;">Loading...</div>
+                    </div>
+                    <div>
+                        <div class="card-label">WebSocket Enabled</div>
+                        <div class="card-value" id="conf-ws" style="font-size: 14px;">Loading...</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Modbus RTU Enabled</div>
+                        <div class="card-value" id="conf-modbus" style="font-size: 14px;">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Diagnostic Tools</h2>
+            </div>
+            <div class="card-content">
+                <button class="btn btn-primary" id="view-logs-btn" style="width: 100%; margin-bottom: 10px;">View System
+                    Logs</button>
+                <button class="btn btn-secondary" id="system-health-btn"
+                    style="width: 100%; margin-bottom: 10px;">System Health Check</button>
+                <button class="btn btn-ghost" id="reset-btn" style="width: 100%;">Reboot Device</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>Date & Time</h2>
+            </div>
+            <div class="card-content">
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Current Time (Device)</div>
+                    <div class="card-value" id="device-time" style="font-size: 16px;">--:--:--</div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Time Source</div>
+                    <div class="card-value" id="time-source" style="font-size: 12px;">Unknown</div>
+                </div>
+
+                <button class="btn btn-primary" id="sync-time-btn" style="width: 100%; margin-bottom: 10px;">Sync from
+                    Browser</button>
+                <div class="card-subtext" style="text-align: center;">Sets device time to your computer's clock</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Backups & Restore</h2>
+            </div>
+            <div class="card-content">
+                <div style="margin-bottom: 15px;">
+                    <div class="card-label">Last Backup</div>
+                    <div class="card-value" id="last-backup" style="font-size: 12px;">2024-12-14 08:30</div>
+                </div>
+
+                <button class="btn btn-primary" id="backup-config-btn" style="width: 100%; margin-bottom: 10px;">Backup
+                    Configuration</button>
+                <button class="btn btn-secondary" id="restore-config-btn" style="width: 100%;">Restore
+                    Configuration</button>
+
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <div class="card-label">Factory Reset</div>
+                    <button class="btn btn-danger" id="factory-reset-btn" style="width: 100%; margin-top: 10px;">Reset
+                        to Factory Defaults</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .system-page {
+        /* Page-specific styles */
+    }
+
+    .progress-bar {
+        height: 20px;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 5px 0;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--color-optimal), var(--color-normal));
+        transition: width 0.3s ease;
+    }
+
+    @media (max-width: 767px) {
+        .card-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

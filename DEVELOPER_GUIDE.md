@@ -1,7 +1,7 @@
 # BISSO E350 Controller - Developer Guide
 
-**Version:** 1.1  
-**Last Updated:** January 4, 2026  
+**Version:** 1.2  
+**Last Updated:** January 11, 2026  
 **Firmware Version:** See `include/firmware_version.h`  
 
 > **For operators:** See [OPERATOR_QUICKSTART.md](OPERATOR_QUICKSTART.md) for operation instructions.
@@ -307,6 +307,43 @@ logError("[MODULE] Error: operation failed");
 logDebug("[MODULE] Debug info (only in debug builds)");
 ```
 
+### 5.5 Boot Log Capture
+
+The system includes a boot log capture feature that saves all serial output during startup to a file on LittleFS. This is useful for debugging boot issues when a serial monitor is not connected.
+
+**Initialization** (in `main.cpp`):
+```cpp
+// Initialize boot log after serial logger, before other components
+serialLoggerInit(LOG_LEVEL);
+bootLogInit(32768);  // 32KB max size
+
+// ... other initialization ...
+
+// Stop boot logging before starting tasks (prevents CLI output from being logged)
+bootLogStop();
+taskManagerStart();
+```
+
+**API Functions** (in `serial_logger.h`):
+```cpp
+bool bootLogInit(size_t max_size_bytes);  // Start capturing boot log
+void bootLogStop();                        // Stop capturing and close file
+bool bootLogIsActive();                    // Check if currently logging
+size_t bootLogGetSize();                   // Get current log file size
+size_t bootLogRead(char* buffer, size_t max_len); // Read log contents
+```
+
+**Configuration**:
+- Enable/disable via `KEY_BOOTLOG_EN` config key (default: enabled)
+- Log file stored at `/bootlog.txt` on LittleFS
+- Maximum size configurable (default 32KB)
+- File is overwritten on each boot
+
+**Access Methods**:
+- CLI: `log boot` command
+- Web API: `GET /api/logs/boot`
+- Web UI: Diagnostics page Boot Log card
+
 ---
 
 ## 6. Motion Control System
@@ -444,14 +481,39 @@ The web server uses PsychicHttp (replaced ESPAsyncWebServer):
 
 | Endpoint | Method | Description |
 |:---|:---|:---|
-| `/api/status` | GET | System status |
-| `/api/jog` | POST | Jog axes `{x, y, z, a, speed}` |
-| `/api/faults` | GET | Fault history |
-| `/api/config/get` | GET | Get configuration |
-| `/api/config/set` | POST | Set configuration |
-| `/api/endpoints` | GET | List all endpoints |
-| `/api/openapi.json` | GET | OpenAPI specification |
-| `/api/docs` | GET | Swagger UI |
+| **System & Status** | | |
+| `/api/status` | GET | Comprehensive system health & positions |
+| `/api/time` | GET/POST | Read or sync RTC time (ISO8601) |
+| `/api/system/reboot` | POST | Safe system restart |
+| **Motion & G-Code** | | |
+| `/api/jog` | POST | Immediate axis move `{x, y, z, a, speed}`|
+| `/api/gcode` | POST | Execute raw G-code line |
+| `/api/gcode/state` | GET | Parser state (modal groups, offsets) |
+| `/api/gcode/queue` | GET | List queued motion commands |
+| `/api/gcode/queue` | DELETE | Abort and clear motion queue |
+| `/api/gcode/queue/resume` | POST | Resume from feed-hold/pause |
+| **Diagnostics & Logs** | | |
+| `/api/faults` | GET/DELETE | Fault history log |
+| `/api/faults/clear` | POST | Clear active fault state |
+| `/api/logs/boot` | GET/DELETE | Startup serial capture access |
+| `/api/io/status` | GET | Raw PCF8574 input/output bitmask |
+| **Hardware & Modbus** | | |
+| `/api/spindle/alarm` | GET/POST | Spindle overcurrent threshold/status |
+| `/api/spindle/alarm/clear` | POST | Reset spindle protection alarm |
+| `/api/hardware/pins` | GET/POST | Live pin database (Read/Batch Write) |
+| `/api/hardware/pins/reset` | POST | Reset all pin mappings to factory defaults |
+| `/api/hardware/io` | GET | Detailed PLC interface diagnostics |
+| `/api/hardware/wj66/detect` | POST | Force auto-detection of DRO baud rate |
+| `/api/config/detect-rs485` | POST | Scan RS-485 bus for Modbus slaves |
+| **Configuration** | | |
+| `/api/config/get` | GET | Retrieve all NVS keys |
+| `/api/config/set` | POST | Update specific keys |
+| `/api/config/batch` | POST | Update multiple keys in one transaction |
+| `/api/config/backup` | GET | Export full NVS table as JSON |
+| **Updates (OTA)** | | |
+| `/api/ota/check` | GET | Query GitHub for new releases |
+| `/api/ota/update` | POST | Trigger firmware download and flash |
+| `/api/ota/status` | GET | Percent progress of current update |
 
 ### 8.3 Adding New Endpoints
 
@@ -470,23 +532,41 @@ server.on("/api/myendpoint", HTTP_GET,
 });
 ```
 
-### 8.4 WebSocket for Real-Time Updates
+### 8.4 WebSocket Protocol
 
-```cpp
-// Broadcast state to all WebSocket clients
-void WebServerManager::broadcastState() {
-    if (wsHandler.count() == 0) return;
-    
-    JsonDocument doc;
-    doc["x"] = motionGetPositionMM(0);
-    doc["y"] = motionGetPositionMM(1);
-    doc["z"] = motionGetPositionMM(2);
-    
-    char buffer[512];
-    serializeJson(doc, buffer, sizeof(buffer));
-    wsHandler.sendAll(buffer);
+The system maintains a high-frequency WebSocket connection (default `/ws`) for real-time telemetry.
+
+**Protocol:** JSON over WebSocket  
+**Frequency:** 10Hz (100ms) during motion, 1Hz idle.
+
+#### Outbound Messages (Device → UI)
+
+| Message Type | Description | Frequency |
+|:---|:---|:---|
+| `telemetry` | Axis positions, VFD RPM, Spindle Current | 100ms |
+| `state_change` | Motion state transitions (IDLE → MOVING) | Instant |
+| `fault` | New fault notification | Instant |
+| `ota_progress` | Update download percentage | 500ms |
+
+**Example Telemetry Packet:**
+```json
+{
+  "t": "tel",
+  "x": 125.42, "y": 0.00, "z": 80.15, "a": 0.00,
+  "rpm": 1450, "amp": 5.2,
+  "st": "MOVING",
+  "q": 2
 }
 ```
+
+#### Inbound Messages (UI → Device)
+
+| Command | Action | Description |
+|:---|:---|:---|
+| `stop` | Stop | Immediate deceleration stop |
+| `pause` | Pause | Feed hold |
+| `resume` | Resume | Release feed hold |
+| `ping` | Heartbeat | Keep-alive (optional) |
 
 ---
 

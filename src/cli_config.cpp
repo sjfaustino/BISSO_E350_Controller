@@ -214,6 +214,18 @@ void cmd_config_set(int argc, char **argv) {
   } else {
     logError("[CONFIG] Unsupported type for key '%s'", key);
   }
+
+  // --- REACTIVE HARDWARE HOOKS ---
+  // Some keys require immediate hardware action beyond NVS update
+  if (strcmp(key, KEY_ENC_BAUD) == 0) {
+      extern bool wj66SetBaud(uint32_t baud);
+      uint32_t new_baud = (uint32_t)atol(value_str);
+      if (wj66SetBaud(new_baud)) {
+          logInfo("[CONFIG] Hardware re-initialized at %lu baud", (unsigned long)new_baud);
+      } else {
+          logError("[CONFIG] Failed to re-initialize hardware at %lu baud", (unsigned long)new_baud);
+      }
+  }
 }
 
 void cmd_config_show(int argc, char **argv) { configUnifiedDiagnostics(); }

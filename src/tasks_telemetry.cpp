@@ -45,6 +45,13 @@ void taskTelemetryFunction(void *parameter) {
   cuttingAnalyticsInit();
 
   while (1) {
+    // PHASE 6.1: Respect Load Manager suspension (Memory Stability Fix)
+    if (!loadManagerIsSubsystemActive(LOAD_SUBSYS_TELEMETRY)) {
+        watchdogFeed("Telemetry");
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Sleep longer when suspended to save CPU/Heap
+        continue;
+    }
+
     // 1. Update System Telemetry (PHASE 5.1)
     // Collect comprehensive system metrics for API and diagnostics
     telemetryUpdate();
@@ -186,6 +193,9 @@ void taskTelemetryFunction(void *parameter) {
     webServer.broadcastState();
 
     watchdogFeed("Telemetry");
-    vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_TELEMETRY));
+    
+    // PHASE 6.1: Dynamic refresh rate based on system load/fragmentation
+    uint32_t period = loadManagerGetAdjustedRefreshRate(TASK_PERIOD_TELEMETRY, LOAD_SUBSYS_TELEMETRY);
+    vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(period));
   }
 }

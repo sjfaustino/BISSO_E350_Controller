@@ -114,6 +114,12 @@ window.SettingsModule = window.SettingsModule || {
 
         // Configuration Management
         document.getElementById('load-preset-btn')?.addEventListener('click', () => this.loadPreset());
+
+        // CLI Options
+        document.getElementById('save-cli-options-btn')?.addEventListener('click', () => this.saveCliOptions());
+
+        // OTA Settings
+        document.getElementById('save-ota-settings-btn')?.addEventListener('click', () => this.saveOtaSettings());
     },
 
     // Helper: bind slider to settings property
@@ -286,7 +292,9 @@ window.SettingsModule = window.SettingsModule || {
             this.loadMotionConfig?.() || Promise.resolve(),
             this.loadVfdConfig?.() || Promise.resolve(),
             this.loadEncoderConfig?.() || Promise.resolve(),
-            this.loadSpindleAlarmConfig?.() || Promise.resolve()
+            this.loadSpindleAlarmConfig?.() || Promise.resolve(),
+            this.loadCliOptions(),
+            this.loadOtaSettings()
         ]).catch(e => console.error('[Settings] Config load failed:', e));
     },
 
@@ -347,6 +355,74 @@ window.SettingsModule = window.SettingsModule || {
         }
 
         AlertManager.add(`Preset "${preset.name}" loaded into form. Click Save to persist.`, 'info', 3000);
+    },
+
+    async loadCliOptions() {
+        try {
+            const res = await fetch('/api/config?key=cli_echo');
+            if (res.ok) {
+                const data = await res.json();
+                const toggle = document.getElementById('cli-echo-toggle');
+                if (toggle) toggle.checked = (data.cli_echo === 1);
+            }
+        } catch (e) {
+            console.warn('[Settings] CLI options load failed:', e);
+        }
+    },
+
+    async saveCliOptions() {
+        const toggle = document.getElementById('cli-echo-toggle');
+        if (!toggle) return;
+
+        try {
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'cli_echo', value: toggle.checked ? '1' : '0' })
+            });
+
+            if (res.ok) {
+                AlertManager.add('CLI settings saved', 'success', 2000);
+            } else {
+                this.showError('cli-options', 'Failed to save CLI settings');
+            }
+        } catch (e) {
+            this.showError('cli-options', 'Network error: ' + e.message);
+        }
+    },
+
+    async loadOtaSettings() {
+        try {
+            const res = await fetch('/api/config?key=ota_chk_en');
+            if (res.ok) {
+                const data = await res.json();
+                const toggle = document.getElementById('ota-check-toggle');
+                if (toggle) toggle.checked = (data.ota_chk_en === 1);
+            }
+        } catch (e) {
+            console.warn('[Settings] OTA settings load failed:', e);
+        }
+    },
+
+    async saveOtaSettings() {
+        const toggle = document.getElementById('ota-check-toggle');
+        if (!toggle) return;
+
+        try {
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'ota_chk_en', value: toggle.checked ? '1' : '0' })
+            });
+
+            if (res.ok) {
+                AlertManager.add('OTA settings saved. Reboot required for changes to take effect.', 'success', 3000);
+            } else {
+                this.showError('ota-settings', 'Failed to save OTA settings');
+            }
+        } catch (e) {
+            this.showError('ota-settings', 'Network error: ' + e.message);
+        }
     }
 };
 

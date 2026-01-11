@@ -442,6 +442,55 @@
             </div>
         </div>
 
+        <!-- CLI Options Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>CLI Options</h2>
+            </div>
+            <div class="card-content">
+                <p
+                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                    Settings for Serial and Telnet command-line interfaces.
+                </p>
+
+                <div class="setting-group">
+                    <input type="checkbox" id="cli-echo-toggle">
+                    <label for="cli-echo-toggle">Enable local echo (show typed characters)</label>
+                </div>
+
+                <div class="setting-group">
+                    <button class="btn btn-primary" id="save-cli-options-btn">Save CLI Settings</button>
+                </div>
+                <div id="cli-options-error" class="error-message" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- OTA Settings Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>OTA Updates</h2>
+            </div>
+            <div class="card-content">
+                <p
+                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                    Over-the-air firmware update settings. Disable GitHub check to save ~16KB memory.
+                </p>
+
+                <div class="setting-group">
+                    <input type="checkbox" id="ota-check-toggle">
+                    <label for="ota-check-toggle">Enable automatic GitHub update check</label>
+                    <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;">
+                        Checks GitHub for new firmware versions at boot. Requires internet connection.
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <button class="btn btn-primary" id="save-ota-settings-btn">Save OTA Settings</button>
+                </div>
+                <div id="ota-settings-error" class="error-message" style="display:none;"></div>
+            </div>
+        </div>
+
     </div>
 </div>
 

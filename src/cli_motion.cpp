@@ -152,7 +152,7 @@ void cmd_spinlock_main(int argc, char** argv) {
 // ============================================================================
 
 void cliRegisterMotionCommands() {
-  cliRegisterCommand("status", "Show motion status", cmd_motion_status);
+  cliRegisterCommand("motionstatus", "Show low-level motion status", cmd_motion_status);
   cliRegisterCommand("stop", "Stop all motion", cmd_motion_stop);
   cliRegisterCommand("pause", "Pause motion", cmd_motion_pause);
   cliRegisterCommand("resume", "Resume motion", cmd_motion_resume);

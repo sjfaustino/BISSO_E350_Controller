@@ -113,6 +113,14 @@ void loadManagerUpdate() {
     load_state.current_cpu_percent = cpu_usage;
     load_state.state_changed = false;
 
+    // Fragmentation check (PHASE 6.1)
+    uint32_t free_heap = ESP.getFreeHeap();
+    uint32_t max_alloc = ESP.getMaxAllocHeap();
+    float frag_percent = 0.0f;
+    if (free_heap > 0) {
+        frag_percent = (1.0f - ((float)max_alloc / (float)free_heap)) * 100.0f;
+    }
+
     // State machine: determine new state based on CPU usage
     load_state_t new_state = load_state.current_state;
 
@@ -128,6 +136,18 @@ void loadManagerUpdate() {
     } else {
         // Critical load
         new_state = LOAD_STATE_CRITICAL;
+    }
+
+    // PHASE 6.1: Force load state based on memory fragmentation
+    // If fragmentation is severe (>85%), force at least ELEVATED state to slow down tasks
+    if (frag_percent > 85.0f && new_state == LOAD_STATE_NORMAL) {
+        new_state = LOAD_STATE_ELEVATED;
+    }
+    
+    // If fragmentation is critical (>95%) or largest block is tiny (< 4KB), force HIGH state 
+    // to suspend non-critical services (like Web UI telemetry)
+    if ((frag_percent > 95.0f || max_alloc < 4096) && new_state < LOAD_STATE_HIGH) {
+        new_state = LOAD_STATE_HIGH;
     }
 
     // Transition if state changed

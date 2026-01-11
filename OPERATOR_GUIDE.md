@@ -20,6 +20,10 @@
 9. [Troubleshooting Guide](#troubleshooting-guide)
 10. [Maintenance Schedule](#maintenance-schedule)
 11. [Emergency Procedures](#emergency-procedures)
+12. [Feedback and Recovery Mechanisms](#feedback-and-recovery-mechanisms)
+    - [Status Light Meanings](#status-light-meanings)
+    - [Buzzer Notification Patterns](#buzzer-notification-patterns)
+    - [Power Loss Recovery Procedure](#power-loss-recovery-procedure)
 
 ---
 
@@ -1786,11 +1790,59 @@ Position doesn't match clicks?
 
 ---
 
-**Document Owner**: BISSO E350 Controller Development Team
-**Last Updated**: December 14, 2025
-**Next Review**: March 14, 2026
+## 12. Feedback and Recovery Mechanisms
+
+### Status Light Meanings (Tower Light)
+If your machine is equipped with a 3-color status tower, the following colors indicate the current system state:
+
+| Color | State | Meaning |
+|:---|:---|:---|
+| **Solid Green** | IDLE | System is healthy and ready for commands. |
+| **Blinking Green** | MOVING | An axis is currently in motion. |
+| **Solid Red** | E-STOP | Emergency Stop is active. System is locked. |
+| **Blinking Red** | FAULT | A system fault (e.g., VFD error, Stall) has occurred. |
+| **Solid Yellow**| PAUSED | Motion is temporarily paused (Feed Hold). |
+| **Blinking Blue** | CONNECTING| WiFi/Network is successfully establishing connection. |
+
+### Buzzer Notification Patterns
+The internal buzzer provides audible feedback for key events.
+
+| Pattern | Meaning | Action |
+|:---|:---|:---|
+| **1 Short Beep** | Command Recv | Confirms a button press or command. |
+| **2 Short Beeps** | Job Complete | A motion sequence has finished. |
+| **1 Long Beep** | Fault Triggered| A non-critical fault has been logged. |
+| **Continuous Beep**| CRITICAL FAULT| Emergency stop or critical hardware failure. |
 
 ---
 
-END OF QUICKSTART MANUAL
+### Power Loss Recovery Procedure
+
+The BISSO E350 includes a **Power Loss Recovery (PLR)** system that periodically saves the current axis positions to non-volatile memory. If power is lost during a job, follow these steps to resume safely:
+
+**Step 1: Emergency Stop**
+Immediately engage the physical E-Stop button before restoring power to prevent accidental motion.
+
+**Step 2: Power Restoration**
+Restore main 3-phase power. Wait for the controller to boot (approx. 30 seconds).
+
+**Step 3: Web Dashboard Alert**
+Upon login, you will see a banner: **"Power Loss Detected - Resume Job?"**.
+
+**Step 4: Verification**
+1. Check the "Pre-Power Loss Position" displayed in the alert.
+2. Visually verify that the cutting head is at this approximate location.
+3. Ensure no debris or tools were moved during the outage.
+
+**Step 5: Resume or Clear**
+- **Click RESUME:** The controller will re-sync the internal coordinates and allow you to continue the interrupted G-code or jog sequence.
+- **Click CLEAR:** Discards the recovery data. You must re-home the machine ($H) before starting a new job.
+
+---
+
+**Document Owner**: BISSO E350 Controller Development Team  
+**Last Updated**: January 11, 2026  
+**Next Review**: April 11, 2026
+
+*Document generated for BISSO E350 CNC Controller Firmware v1.1.0 (PosiPro)*
 

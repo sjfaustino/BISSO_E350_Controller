@@ -98,6 +98,16 @@ bool configMigrationExecute(uint8_t from_version, uint8_t to_version) {
   logInfo("[MIGRATION] [OK] Migration complete in %lu ms",
           (unsigned long)last_migration_stats.migration_time_ms);
 
+  // --- CUSTOM MIGRATIONS ---
+  
+  // 1. Rename enc_baud -> encoder_baud (User Request)
+  if (configGetInt("enc_baud", 0) != 0 && configGetInt(KEY_ENC_BAUD, 0) == 0) {
+      int32_t old_baud = configGetInt("enc_baud", 9600);
+      configSetInt(KEY_ENC_BAUD, old_baud);
+      logInfo("[MIGRATION] Ported legacy enc_baud (%ld) to %s", (long)old_baud, KEY_ENC_BAUD);
+      // We don't delete the old key here to be safe, but it's now ignored.
+  }
+
   return true;
 }
 

@@ -292,6 +292,8 @@ bool apiConfigSet(config_category_t category, const char *key,
         configSetString(KEY_WIFI_AP_SSID, value.as<const char*>());
     } else if (strcmp(key, "wifi_ap_pass") == 0) {
         configSetString(KEY_WIFI_AP_PASS, value.as<const char*>());
+    } else if (strcmp(key, "eth_en") == 0) {
+        configSetInt(KEY_ETH_ENABLED, value.as<int>());
     }
     break;
 
@@ -348,6 +350,7 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
     obj["wifi_ap_en"] = configGetInt(KEY_WIFI_AP_EN, 1);
     obj["wifi_ap_ssid"] = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
     obj["wifi_ap_pass"] = configGetString(KEY_WIFI_AP_PASS, "password");
+    obj["eth_en"] = configGetInt(KEY_ETH_ENABLED, 0);
     break;
   }
 

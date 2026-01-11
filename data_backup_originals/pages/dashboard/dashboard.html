@@ -1,0 +1,457 @@
+﻿<!--
+  dashboard.html - Main dashboard view with DRO, system status, and real-time graphs
+-->
+<div class="dashboard">
+    <!-- Live Position Display (DRO) -->
+    <div class="dro-container">
+        <div class="card dro-card">
+            <div class="card-header">
+                <h2 id="header-dro">🎯 Position (DRO)</h2>
+                <div class="dro-controls">
+                    <button class="btn btn-small btn-secondary" id="dro-zero-all" title="Zero all axes">Zero
+                        All</button>
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="dro-grid">
+                    <div class="dro-axis">
+                        <span class="dro-label">X</span>
+                        <span class="dro-value" id="dro-x">0.000</span>
+                        <span class="dro-unit">mm</span>
+                    </div>
+                    <div class="dro-axis">
+                        <span class="dro-label">Y</span>
+                        <span class="dro-value" id="dro-y">0.000</span>
+                        <span class="dro-unit">mm</span>
+                    </div>
+                    <div class="dro-axis">
+                        <span class="dro-label">Z</span>
+                        <span class="dro-value" id="dro-z">0.000</span>
+                        <span class="dro-unit">mm</span>
+                    </div>
+                    <div class="dro-axis">
+                        <span class="dro-label">A</span>
+                        <span class="dro-value" id="dro-a">0.000</span>
+                        <span class="dro-unit">°</span>
+                    </div>
+                </div>
+                <div class="dro-footer">
+                    <span class="dro-status" id="dro-status">Live</span>
+                    <div class="dro-coord-toggle">
+                        <button class="btn btn-small" id="dro-coord-mode" title="Toggle Machine/Work Coordinates">
+                            <span id="dro-mode-text">Machine</span>
+                        </button>
+                        <select id="dro-work-offset" class="dro-offset-select" title="Work Coordinate System">
+                            <option value="G54">G54</option>
+                            <option value="G55">G55</option>
+                            <option value="G56">G56</option>
+                            <option value="G57">G57</option>
+                            <option value="G58">G58</option>
+                            <option value="G59">G59</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status Cards -->
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>System Health</h2>
+                <button class="card-toggle" data-toggle="health">−</button>
+            </div>
+            <div class="card-content">
+                <div class="card-value" id="health-value">--</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="health-bar" style="width: 100%"></div>
+                </div>
+                <div class="card-subtext" id="health-detail">Initializing...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>CPU Usage</h2>
+                <button class="card-toggle" data-toggle="cpu">−</button>
+            </div>
+            <div class="card-content">
+                <div class="card-value" id="cpu-value">--%</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="cpu-bar"></div>
+                </div>
+                <div class="card-subtext">Avg: <span id="cpu-avg">--</span>% | Max: <span id="cpu-max">--</span>%</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Memory Free</h2>
+                <button class="card-toggle" data-toggle="memory">−</button>
+            </div>
+            <div class="card-content">
+                <div class="card-value" id="mem-value">-- KB</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="mem-bar" style="width: 100%"></div>
+                </div>
+                <div class="card-subtext">Min: <span id="mem-min">--</span> KB</div>
+            </div>
+        </div>
+
+        <!-- Spindle Monitor Card (Read-Only) -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Saw Blade Monitor</h2>
+                <button class="card-toggle" data-toggle="spindle">−</button>
+            </div>
+            <div class="card-content">
+                <div class="card-value" id="spindle-current">-- A</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="spindle-bar" style="width: 0%"></div>
+                </div>
+                <div class="card-subtext">
+                    RPM: <span id="spindle-rpm">--</span> |
+                    Speed: <span id="spindle-speed">-- m/s</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Trends Chart -->
+    <div class="chart-container">
+        <div class="card-header">
+            <h2>System Trends</h2>
+            <button class="card-toggle" data-toggle="trends">−</button>
+        </div>
+        <div class="card-content">
+            <div class="time-range-selector" role="group">
+                <button class="time-btn active" data-range="1">1m</button>
+                <button class="time-btn" data-range="5">5m</button>
+                <button class="time-btn" data-range="60">1h</button>
+                <button class="time-btn" data-range="1440">24h</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="trendsChart"></canvas>
+            </div>
+            <div class="chart-legend">
+                <div class="chart-legend-item">
+                    <div class="chart-legend-color" style="background: var(--chart-cpu)"></div>
+                    <span>CPU %</span>
+                </div>
+                <div class="chart-legend-item">
+                    <div class="chart-legend-color" style="background: var(--chart-mem)"></div>
+                    <span>Memory (KB/1000)</span>
+                </div>
+                <div class="chart-legend-item">
+                    <div class="chart-legend-color" style="background: var(--chart-spindle)"></div>
+                    <span>Spindle (A/10)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Axis Motion Quality Cards -->
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2 id="header-axis-x">X Axis Quality</h2>
+                <button class="card-toggle" data-toggle="axis-x">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <div class="card-value" id="axis-x-quality" style="font-size: 36px;">--</div>
+                        <div class="card-subtext">Quality</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="axis-x-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <div class="card-label">Jitter</div>
+                        <div id="axis-x-jitter">-- mm/s</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Stalled</div>
+                        <div id="axis-x-stalled">✓ OK</div>
+                    </div>
+                </div>
+                <div class="card-divider"></div>
+                <div>
+                    <div class="card-label">VFD Error</div>
+                    <div id="axis-x-error">--%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 id="header-axis-y">Y Axis Quality</h2>
+                <button class="card-toggle" data-toggle="axis-y">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <div class="card-value" id="axis-y-quality" style="font-size: 36px;">--</div>
+                        <div class="card-subtext">Quality</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="axis-y-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <div class="card-label">Jitter</div>
+                        <div id="axis-y-jitter">-- mm/s</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Stalled</div>
+                        <div id="axis-y-stalled">✓ OK</div>
+                    </div>
+                </div>
+                <div class="card-divider"></div>
+                <div>
+                    <div class="card-label">VFD Error</div>
+                    <div id="axis-y-error">--%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 id="header-axis-z">Z Axis Quality</h2>
+                <button class="card-toggle" data-toggle="axis-z">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <div class="card-value" id="axis-z-quality" style="font-size: 36px;">--</div>
+                        <div class="card-subtext">Quality</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="axis-z-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <div class="card-label">Jitter</div>
+                        <div id="axis-z-jitter">-- mm/s</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Stalled</div>
+                        <div id="axis-z-stalled">✓ OK</div>
+                    </div>
+                </div>
+                <div class="card-divider"></div>
+                <div>
+                    <div class="card-label">VFD Error</div>
+                    <div id="axis-z-error">--%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Motion Status -->
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2 id="header-motion">Motion Status</h2>
+                <button class="card-toggle" data-toggle="motion">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div class="card-label">Status</div>
+                        <div class="card-value" id="motion-status" style="font-size: 18px;">--</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Safety</div>
+                        <div class="card-value" id="safety-status" style="font-size: 18px;">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 id="header-vfd">Axis Drive</h2>
+                <button class="card-toggle" data-toggle="vfd">−</button>
+            </div>
+            <div class="card-content">
+                <div style="text-align: center; padding: 10px;">
+                    <div class="card-label">Output Frequency</div>
+                    <div class="card-value" id="vfd-freq" style="font-size: 24px;">--</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Network Status</h2>
+                <button class="card-toggle" data-toggle="network">−</button>
+            </div>
+            <div class="card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div class="card-label">WiFi Signal</div>
+                        <div class="card-value" id="wifi-signal" style="font-size: 18px;">--%</div>
+                    </div>
+                    <div>
+                        <div class="card-label">Connection</div>
+                        <div class="card-value" id="wifi-status" style="font-size: 14px;">--</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="wifi-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advanced Graphs & Analytics Section -->
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">📊 Advanced Graphs & Analytics</h2>
+            <div style="display: flex; gap: 10px;">
+                <select id="graph-time-range"
+                    style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                    <option value="300">Last 5 min</option>
+                    <option value="900">Last 15 min</option>
+                    <option value="1800">Last 30 min</option>
+                    <option value="3600">Last 1 hour</option>
+                </select>
+                <button class="btn btn-secondary" id="export-graphs-btn">Export Data</button>
+            </div>
+        </div>
+
+        <div class="card-grid" style="grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));">
+            <!-- CPU Usage Graph -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin: 0;">CPU Usage Trend</h3>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <canvas id="cpu-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                        Current: <span id="cpu-current" style="font-weight: 600;">--%</span> |
+                        Avg: <span id="cpu-stat-avg" style="font-weight: 600;">--%</span> |
+                        Max: <span id="cpu-stat-max" style="font-weight: 600;">--%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Memory Usage Graph -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin: 0;">Memory Usage Trend</h3>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <canvas id="memory-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                        Current: <span id="mem-current" style="font-weight: 600;">-- KB</span> |
+                        Avg: <span id="mem-stat-avg" style="font-weight: 600;">-- KB</span> |
+                        Max: <span id="mem-stat-max" style="font-weight: 600;">-- KB</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VFD Current Graph -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 id="header-spindle-trend" style="margin: 0;">Spindle Current Trend</h3>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <canvas id="spindle-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                        Current: <span id="spindle-stat-current" style="font-weight: 600;">-- A</span> |
+                        Avg: <span id="spindle-stat-avg" style="font-weight: 600;">-- A</span> |
+                        Max: <span id="spindle-stat-max" style="font-weight: 600;">-- A</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Temperature Graph -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin: 0;">CPU Temperature Trend</h3>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <canvas id="temperature-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                        Current: <span id="temp-current" style="font-weight: 600;">-- °C</span> |
+                        Avg: <span id="temp-stat-avg" style="font-weight: 600;">-- °C</span> |
+                        Max: <span id="temp-stat-max" style="font-weight: 600;">-- °C</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Latency Graph -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin: 0;">WebSocket Latency</h3>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <canvas id="latency-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                        Current: <span id="latency-current" style="font-weight: 600;">-- ms</span> |
+                        Avg: <span id="latency-stat-avg" style="font-weight: 600;">-- ms</span> |
+                        Max: <span id="latency-stat-max" style="font-weight: 600;">-- ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Motion Load Graph -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 id="header-motion-load" style="margin: 0;">Motion System Load</h3>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <canvas id="motion-load-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                        Encoder Quality: <span id="motion-quality" style="font-weight: 600;">--%</span> |
+                        Jitter: <span id="motion-jitter" style="font-weight: 600;">-- mm/s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WiFi Signal Graph -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin: 0;">WiFi Signal Quality</h3>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <canvas id="wifi-graph"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                        Current: <span id="wifi-current" style="font-weight: 600;">--%</span> |
+                        Avg: <span id="wifi-stat-avg" style="font-weight: 600;">--%</span> |
+                        Max: <span id="wifi-stat-max" style="font-weight: 600;">--%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -45,6 +45,7 @@
 #include "system_constants.h"
 #include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion quality diagnostics
 #include "cutting_analytics.h"      // Stone cutting analytics
+#include <LittleFS.h>               // Boot log file operations
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -61,6 +62,7 @@ void debugEncodersHandler();
 void debugAllHandler();
 void debugConfigHandler();
 void cmd_diag_scheduler_main(int argc, char** argv);
+void cmd_memory_detailed(int argc, char** argv); // Forward declaration
 
 // CLI wrapper functions (match cli_handler_t signature)
 static void wrap_debugAllHandler(int argc, char** argv) { (void)argc; (void)argv; debugAllHandler(); }
@@ -72,6 +74,8 @@ static void wrap_spindle_diag(int argc, char** argv) {
     jxk10PrintDiagnostics();
     rs485PrintDiagnostics();
 }
+static void wrap_memory_stats(int argc, char** argv) { (void)argc; (void)argv; memoryMonitorPrintStats(); }
+static void wrap_memory_reset(int argc, char** argv) { (void)argc; (void)argv; memoryMonitorResetMinimum(); }
 
 // ============================================================================
 // QUICK STATUS DASHBOARD
@@ -472,6 +476,17 @@ void cmd_task_main(int argc, char** argv) {
     else if (strcmp(argv[1], "cpu") == 0) logInfo("[TASK] CPU: %u%%", taskGetCpuUsage());
 }
 
+void cmd_memory_main(int argc, char** argv) {
+    static const cli_subcommand_t subcmds[] = {
+        {"stats",    wrap_memory_stats,   "Quick memory snapshot"},
+        {"reset",    wrap_memory_reset,   "Reset minimum free heap counter"},
+        {"detailed", cmd_memory_detailed, "Deep analysis with fragmentation"}
+    };
+    
+    cliDispatchSubcommand("[MEMORY]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
+}
+
 // ============================================================================
 // FAULT HANDLERS
 // ============================================================================
@@ -508,30 +523,6 @@ void cmd_faults_main(int argc, char** argv) {
 void cmd_timeout_diag(int argc, char** argv) { timeoutShowDiagnostics(); }
 void cmd_encoder_diag(int argc, char** argv) { encoderMotionDiagnostics(); }
 void cmd_encoder_baud_detect(int argc, char** argv) { encoderDetectBaudRate(); }
-
-// ============================================================================
-// ENCODER BAUD SET
-// ============================================================================
-extern bool encoderSetBaudRate(uint32_t baud_rate);
-
-void cmd_encoder_set_baud(int argc, char** argv) {
-  if (argc < 2) {
-    logPrintln("[CLI] Usage: encoder_baud_set <baud_rate>");
-    return;
-  }
-
-  int32_t new_baud_rate_i32 = 0;
-  if (!parseAndValidateInt(argv[1], &new_baud_rate_i32, 1200, 115200)) {
-    logError("[CLI] Invalid baud rate (1200-115200).");
-    return;
-  }
-
-  if (encoderSetBaudRate((uint32_t)new_baud_rate_i32)) {
-    logInfo("[CLI] [OK] Encoder baud set to %ld.", (long)new_baud_rate_i32);
-  } else {
-    logError("[CLI] Failed to set baud rate.");
-  }
-}
 
 // ============================================================================
 // ENCODER CONFIGURATION (WJ66 INTERFACE MANAGEMENT)
@@ -1344,9 +1335,102 @@ void cmd_nvs_main(int argc, char** argv) {
 }
 
 // ============================================================================
+// BOOT LOG VIEWER
+// ============================================================================
+void cmd_log_boot(int argc, char** argv) {
+    logPrintln("\n[LOG] === Boot Log ===");
+    
+    size_t log_size = bootLogGetSize();
+    logPrintf("Boot log size: %lu bytes\n\n", (unsigned long)log_size);
+    
+    if (log_size == 0) {
+        logPrintln("(No boot log available)");
+        return;
+    }
+    
+    // Read and print in chunks to avoid large stack allocation
+    const size_t chunk_size = 512;
+    char* chunk = (char*)malloc(chunk_size);
+    if (!chunk) {
+        logError("[LOG] Memory allocation failed");
+        return;
+    }
+    
+    size_t bytes_read = bootLogRead(chunk, chunk_size);
+    while (bytes_read > 0) {
+        Serial.print(chunk);
+        
+        // If we read less than buffer size, we're done
+        if (bytes_read < chunk_size - 1) break;
+        
+        // For full log, we'd need file offset tracking - for now just show first chunk
+        break;
+    }
+    
+    free(chunk);
+    logPrintln("\n[LOG] === End Boot Log ===");
+}
+
+void cmd_log_enable(int argc, char** argv) {
+    if (argc < 3) {
+        int enabled = configGetInt(KEY_BOOTLOG_EN, 1);
+        logPrintf("[LOG] Boot log capture: %s\n", enabled ? "ENABLED" : "DISABLED");
+        logPrintln("[LOG] Usage: log enable [on | off]");
+        return;
+    }
+    
+    bool enable = false;
+    if (strcmp(argv[2], "on") == 0 || strcmp(argv[2], "yes") == 0 || strcmp(argv[2], "1") == 0) {
+        enable = true;
+    } else if (strcmp(argv[2], "off") == 0 || strcmp(argv[2], "no") == 0 || strcmp(argv[2], "0") == 0) {
+        enable = false;
+    } else {
+        logError("[LOG] Invalid option (use: on, off)");
+        return;
+    }
+    
+    configSetInt(KEY_BOOTLOG_EN, enable ? 1 : 0);
+    configUnifiedSave();
+    logInfo("[LOG] Boot log capture %s (takes effect on next boot)", enable ? "ENABLED" : "DISABLED");
+}
+
+void cmd_log_delete(int argc, char** argv) {
+    if (LittleFS.exists("/bootlog.txt")) {
+        if (LittleFS.remove("/bootlog.txt")) {
+            logInfo("[LOG] Boot log deleted");
+        } else {
+            logError("[LOG] Failed to delete boot log");
+        }
+    } else {
+        logPrintln("[LOG] No boot log to delete");
+    }
+}
+
+void cmd_log_main(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("[LOG] Usage: log [boot | enable | delete]");
+        logPrintln("  boot:     Display captured boot log from last startup");
+        logPrintln("  enable:   Enable/disable boot log capture (on/off)");
+        logPrintln("  delete:   Delete the boot log file");
+        return;
+    }
+    
+    if (strcmp(argv[1], "boot") == 0) {
+        cmd_log_boot(argc, argv);
+    } else if (strcmp(argv[1], "enable") == 0) {
+        cmd_log_enable(argc, argv);
+    } else if (strcmp(argv[1], "delete") == 0) {
+        cmd_log_delete(argc, argv);
+    } else {
+        logWarning("[LOG] Unknown sub-command: %s", argv[1]);
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
+    cliRegisterCommand("memory", "Heap memory diagnostics", cmd_memory_main);
     cliRegisterCommand("faults", "Fault log management", cmd_faults_main);
     cliRegisterCommand("encoder", "Encoder management", cmd_encoder_main);
     cliRegisterCommand("spindle", "Spindle current monitoring", cmd_spindle_main);
@@ -1359,7 +1443,6 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
-    cliRegisterCommand("encoder_baud_set", "Set baud rate", cmd_encoder_set_baud);
     cliRegisterCommand("config", "Configuration management", cmd_config_main);
     cliRegisterCommand("wdt", "Watchdog management", cmd_diag_scheduler_main);
     cliRegisterCommand("task", "Task monitoring", cmd_diag_scheduler_main);
@@ -1368,7 +1451,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("encoder_deviation", "Encoder deviation diagnostics", cmd_encoder_deviation_diag);
     cliRegisterCommand("fault_recovery", "Fault recovery status", cmd_fault_recovery_diag);
     cliRegisterCommand("task_list", "Detailed task list with stack usage", cmd_task_list_detailed);
-    cliRegisterCommand("memory_detailed", "Detailed memory analysis with fragmentation", cmd_memory_detailed);
+
 
 
     // Session features
@@ -1380,4 +1463,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("dio", "Digital I/O status display", cmd_dio_main);
     cliRegisterCommand("spindle", "Spindle monitor & alarms", cmd_spindle_main);
     cliRegisterCommand("cutting", "Stone cutting analytics", cmd_cutting_main);
+    
+    // Boot log viewer
+    cliRegisterCommand("log", "Log management (boot log viewer)", cmd_log_main);
 }

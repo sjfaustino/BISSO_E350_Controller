@@ -1,0 +1,241 @@
+/**
+ * Cards CSS - Card components and grids
+ */
+
+.card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-md);
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+    border: 1px solid var(--border-color);
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+    gap: var(--space-md);
+}
+
+.card h2,
+.card h3 {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+    margin: 0;
+    flex-grow: 1;
+    text-align: center;
+}
+
+.card h3 {
+    font-size: var(--font-size-base);
+    /* Slightly smaller for h3 */
+}
+
+.card-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: var(--font-size-lg);
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition-fast);
+}
+
+.card-toggle:hover {
+    color: var(--text-primary);
+}
+
+.card-toggle:focus {
+    outline: 2px solid var(--text-primary);
+    outline-offset: 2px;
+}
+
+.card-content {
+    transition: max-height var(--transition-normal) ease, opacity var(--transition-normal) ease;
+    max-height: 1000px;
+    opacity: 1;
+    overflow: hidden;
+}
+
+.card-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.card-value {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+}
+
+.card-subtext {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.card-label {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--space-xs);
+}
+
+/* Grid layouts */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.axes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-lg);
+}
+
+.axis-item {
+    padding: var(--space-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    text-align: center;
+}
+
+.axis-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    margin-bottom: var(--space-sm);
+}
+
+.axis-value {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Progress bars */
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: var(--space-md);
+    border: 1px solid var(--border-color);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-normal), #8b5cf6);
+    transition: width var(--transition-normal) ease;
+    border-radius: 4px;
+}
+
+.progress-fill.warning {
+    background: linear-gradient(90deg, var(--color-warning), var(--color-critical));
+}
+
+.progress-fill.critical {
+    background: var(--color-critical);
+    animation: pulse-warning 1s infinite;
+}
+
+/* Metric card with border accent */
+.metric-card {
+    padding: var(--space-md);
+    border-left: 4px solid var(--color-normal);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-md);
+}
+
+.metric-card.warning {
+    border-left-color: var(--color-warning);
+}
+
+.metric-card.critical {
+    border-left-color: var(--color-critical);
+}
+
+.metric-card.success {
+    border-left-color: var(--color-optimal);
+}
+
+.metric-label {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xs);
+}
+
+.metric-value {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Flex layouts for card content */
+.card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+    gap: var(--space-md);
+}
+
+.card-row:last-child {
+    margin-bottom: 0;
+}
+
+.card-col {
+    flex: 1;
+}
+
+/* Divider */
+.card-divider {
+    margin: var(--space-md) 0;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-color);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .card-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .axes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .card {
+        padding: var(--space-md);
+    }
+
+    .card h2 {
+        font-size: var(--font-size-base);
+    }
+
+    .card-value {
+        font-size: var(--font-size-xl);
+    }
+}

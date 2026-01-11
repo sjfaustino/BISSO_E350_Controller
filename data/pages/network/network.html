@@ -78,6 +78,27 @@
             </div>
         </div>
 
+        <!-- Ethernet Settings Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Ethernet Settings</h2>
+            </div>
+            <div class="card-content">
+                <div class="setting-group">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="eth-enabled">
+                        <span>Enable Ethernet (LAN8720)</span>
+                    </label>
+                    <div class="card-subtext">Requires reboot to apply. Disabling saves memory.</div>
+                </div>
+                <div class="setting-group">
+                    <button class="btn btn-primary" id="save-eth-btn" style="width: 100%;">Save Ethernet
+                        Settings</button>
+                </div>
+            </div>
+        </div>
+
+
         <div class="card">
             <div class="card-header">
                 <h2>Connection Latency</h2>

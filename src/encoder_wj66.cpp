@@ -45,12 +45,13 @@ static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len);
 static rs485_device_t wj66_device = {
     .name = "WJ66",
     .type = RS485_DEVICE_TYPE_ENCODER,
-    .slave_address = 0,         // WJ66 uses broadcast or specific logic, but address 0 is often used for simple setups
-    .poll_interval_ms = 50,     // 20 Hz
-    .priority = 200,            // High priority
+    .slave_address = 0,
+    .poll_interval_ms = 50,
+    .priority = 200,
     .enabled = true,
     .poll = wj66Poll,
     .on_response = wj66OnResponse,
+    .user_data = nullptr,
     .last_poll_time_ms = 0,
     .poll_count = 0,
     .error_count = 0,

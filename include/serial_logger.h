@@ -113,4 +113,40 @@ bool serialLoggerLock();
  */
 void serialLoggerUnlock();
 
+// ============================================================================
+// BOOT LOG CAPTURE (LittleFS)
+// ============================================================================
+
+/**
+ * @brief Initialize boot log capture to LittleFS
+ * @param max_size_bytes Maximum log file size (default 32KB)
+ * @return true if initialized successfully
+ */
+bool bootLogInit(size_t max_size_bytes = 32768);
+
+/**
+ * @brief Stop boot log capture (call after boot completes)
+ */
+void bootLogStop();
+
+/**
+ * @brief Check if boot logging is currently active
+ * @return true if logging to file
+ */
+bool bootLogIsActive();
+
+/**
+ * @brief Get boot log file size
+ * @return Size in bytes, or 0 if file doesn't exist
+ */
+size_t bootLogGetSize();
+
+/**
+ * @brief Read boot log contents into buffer
+ * @param buffer Output buffer
+ * @param max_len Maximum bytes to read
+ * @return Actual bytes read
+ */
+size_t bootLogRead(char* buffer, size_t max_len);
+
 #endif

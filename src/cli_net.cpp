@@ -136,7 +136,7 @@ void cmd_wifi_main(int argc, char **argv) {
 void cmd_eth_status(int argc, char** argv) {
     logPrintln("\n[ETH] === Ethernet Status ===");
     
-    int enabled = configGetInt(KEY_ETH_ENABLED, 1);
+    int enabled = configGetInt(KEY_ETH_ENABLED, 0);
     int dhcp = configGetInt(KEY_ETH_DHCP, 1);
     
     logPrintf("  Enabled:     %s\n", enabled ? "YES" : "NO");

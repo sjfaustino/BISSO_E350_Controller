@@ -70,12 +70,12 @@ void WebServerManager::init() {
     logPrintln("[WEB] Init with REST API");
     otaInit();
     
-    // TUNE: Increase stack size and enable LRU purge for concurrency
-    server.config.stack_size = 8192;
-    server.config.max_open_sockets = 10; // Increase from default (4) to handle parallel browser requests
+    // TUNE: Keep sufficient stack for HTTP parsing, single socket to prevent fragmentation
+    server.config.stack_size = 8192;  // Reverted - 4KB was too small for file serving
+    server.config.max_open_sockets = 1; // Sequential requests only - prevents fragmentation
     server.config.lru_purge_enable = true;
-    server.config.send_wait_timeout = 2; // Increase send timeout (default is often small)
-    server.config.recv_wait_timeout = 2;
+    server.config.send_wait_timeout = 5; // Increased timeout for slower single-connection
+    server.config.recv_wait_timeout = 5;
 
     // Mount Filesystem (format on first failure for new/corrupted flash)
     if (!LittleFS.begin(false)) {
@@ -104,6 +104,55 @@ void WebServerManager::init() {
 // ============================================================================
 void WebServerManager::setupRoutes() {
     // --- API Routes (must be registered before static file serving) ---
+    
+    // GET /api/status - Compatibility endpoint for system status and positions
+    server.on("/api/status", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) {
+        system_telemetry_t telemetry = telemetryGetSnapshot();
+        JsonDocument doc;
+        
+        portENTER_CRITICAL(&statusSpinlock);
+        buildTelemetryJson(doc, telemetry);
+        portEXIT_CRITICAL(&statusSpinlock);
+        
+        String json;
+        serializeJson(doc, json);
+        return response->send(200, "application/json", json.c_str());
+    });
+    
+    // GET /api/logs/boot - Retrieve captured boot log
+    server.on("/api/logs/boot", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        size_t log_size = bootLogGetSize();
+        
+        if (log_size == 0) {
+            return response->send(200, "text/plain", "(No boot log available)");
+        }
+        
+        // Allocate buffer for log contents (max 32KB)
+        size_t buffer_size = (log_size < 32768) ? log_size + 1 : 32768;
+        char* buffer = (char*)malloc(buffer_size);
+        if (!buffer) {
+            return response->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+        }
+        
+        bootLogRead(buffer, buffer_size);
+        esp_err_t result = response->send(200, "text/plain", buffer);
+        
+        free(buffer);
+        return result;
+    });
+    
+    // DELETE /api/logs/boot - Delete boot log file
+    server.on("/api/logs/boot", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) {
+        if (LittleFS.exists("/bootlog.txt")) {
+            if (LittleFS.remove("/bootlog.txt")) {
+                logInfo("[WEB] Boot log deleted");
+                return response->send(200, "application/json", "{\"success\":true}");
+            } else {
+                return response->send(500, "application/json", "{\"success\":false,\"error\":\"Failed to delete file\"}");
+            }
+        }
+        return response->send(200, "application/json", "{\"success\":true,\"message\":\"No boot log to delete\"}");
+    });
     
     // GET /api/config/get?category=N
     server.on("/api/config/get", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
@@ -224,13 +273,25 @@ void WebServerManager::setupRoutes() {
         doc["signal_quality"] = quality;
 
         // Ethernet Status
-        // Note: ETH object is standard in Arduino ETH.h
-        doc["eth_connected"] = ETH.linkUp();
-        doc["eth_ip"] = ETH.linkUp() ? ETH.localIP().toString() : "0.0.0.0";
-        doc["eth_mac"] = ETH.macAddress();
-        doc["eth_speed"] = ETH.linkSpeed();
-        doc["eth_duplex"] = ETH.fullDuplex();
-        doc["eth_gateway"] = ETH.linkUp() ? ETH.gatewayIP().toString() : "0.0.0.0";
+        int eth_en = configGetInt(KEY_ETH_ENABLED, 0);
+        bool eth_up = false;
+        
+        if (eth_en) {
+            eth_up = ETH.linkUp();
+            doc["eth_connected"] = eth_up;
+            doc["eth_ip"] = eth_up ? ETH.localIP().toString() : "0.0.0.0";
+            doc["eth_mac"] = ETH.macAddress();
+            doc["eth_speed"] = ETH.linkSpeed();
+            doc["eth_duplex"] = ETH.fullDuplex();
+            doc["eth_gateway"] = eth_up ? ETH.gatewayIP().toString() : "0.0.0.0";
+        } else {
+            doc["eth_connected"] = false;
+            doc["eth_ip"] = "0.0.0.0";
+            doc["eth_mac"] = "00:00:00:00:00:00"; 
+            doc["eth_speed"] = 0;
+            doc["eth_duplex"] = false;
+            doc["eth_gateway"] = "0.0.0.0";
+        }
         
         // System uptime in ms
         doc["uptime_ms"] = millis();
@@ -282,13 +343,13 @@ void WebServerManager::setupRoutes() {
             return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
         }
         
-        if (doc.containsKey("toolbreak_threshold")) {
+        if (!doc["toolbreak_threshold"].isNull()) {
             configSetFloat(KEY_SPINDL_TOOLBREAK_THR, doc["toolbreak_threshold"]);
         }
-        if (doc.containsKey("stall_threshold")) {
+        if (!doc["stall_threshold"].isNull()) {
             configSetInt(KEY_SPINDL_PAUSE_THR, doc["stall_threshold"]);
         }
-        if (doc.containsKey("stall_timeout_ms")) {
+        if (!doc["stall_timeout_ms"].isNull()) {
             configSetInt(KEY_STALL_TIMEOUT, doc["stall_timeout_ms"]);
         }
         
@@ -972,12 +1033,18 @@ void WebServerManager::setupRoutes() {
     logPrintln("[WEB] Hardware API routes registered");
     
     // --- WebSocket Handler for real-time telemetry ---
+    // --- WebSocket Handler for real-time telemetry ---
     wsHandler.onOpen([this](PsychicWebSocketClient *client) {
-        logPrintf("[WS] Client connected: %s\n", client->remoteIP().toString().c_str());
+        // logPrintf("[WS] Client connected: %s\n", client->remoteIP().toString().c_str());
+        
+        // PHASE 6.3: Memory Optimization
+        // DO NOT send initial state here. It causes heap churn during page navigation.
+        // The client will pick up the next periodic broadcast (within 500ms).
+        // This elimiantes a ~2KB allocation per page load.
     });
     
     wsHandler.onClose([this](PsychicWebSocketClient *client) {
-        logPrintf("[WS] Client disconnected: %s\n", client->remoteIP().toString().c_str());
+        // logPrintf("[WS] Client disconnected: %s\n", client->remoteIP().toString().c_str());
     });
     
     wsHandler.onFrame([this](PsychicWebSocketRequest *request, httpd_ws_frame *frame) {
@@ -1019,10 +1086,10 @@ void WebServerManager::setupRoutes() {
 void WebServerManager::begin() {
     logPrintln("[WEB] Starting Server");
     
-    // PHASE 6: Performance tuning for concurrent browser requests
-    // Reduced to 2 for heap stability (preventing OOM when serving large files)
-    // Browser will queue additional requests; prevents ESP32 crash
-    server.config.max_open_sockets = 2;
+    // PHASE 6.2: Memory-safe configuration
+    // Single socket prevents concurrent allocations that fragment heap
+    // Browser queues requests; slightly slower but much more stable
+    server.config.max_open_sockets = 1;
     server.config.max_uri_handlers = 40;
     
     server.start(); 
@@ -1146,7 +1213,7 @@ void WebServerManager::setAxisVFDError(uint8_t axis, float error_percent) {
 }
 
 // --- JSON Builder Helper ---
-void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_telemetry_t& telemetry) {
+void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_telemetry_t& telemetry, bool full) {
     // System Status
     doc["system"]["status"] = current_status.status;
     doc["system"]["health"] = telemetryGetHealthStatusString(telemetry.health_status);
@@ -1154,27 +1221,30 @@ void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_teleme
     doc["system"]["cpu_percent"] = telemetry.cpu_usage_percent;
     doc["system"]["free_heap_bytes"] = telemetry.free_heap_bytes;
     doc["system"]["temperature"] = telemetry.temperature;
-    doc["system"]["plc_hardware_present"] = telemetry.plc_hardware_present;
     
-    char ver_str[32];
-    snprintf(ver_str, sizeof(ver_str), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
-    doc["system"]["firmware_version"] = ver_str;
+    if (full) {
+        doc["system"]["plc_hardware_present"] = telemetry.plc_hardware_present;
+        
+        char ver_str[32];
+        snprintf(ver_str, sizeof(ver_str), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
+        doc["system"]["firmware_version"] = ver_str;
 
-    // Hardware Info
-    doc["system"]["hw_model"] = "BISSO E350";
-    doc["system"]["hw_mcu"] = ESP.getChipModel();
-    
-    char rev_str[16];
-    snprintf(rev_str, sizeof(rev_str), "Rev %d", ESP.getChipRevision());
-    doc["system"]["hw_revision"] = rev_str;
+        // Hardware Info
+        doc["system"]["hw_model"] = "BISSO E350";
+        doc["system"]["hw_mcu"] = ESP.getChipModel();
+        
+        char rev_str[16];
+        snprintf(rev_str, sizeof(rev_str), "Rev %d", ESP.getChipRevision());
+        doc["system"]["hw_revision"] = rev_str;
+
+        char serial_str[32];
+        uint64_t mac = ESP.getEfuseMac();
+        snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
+        doc["system"]["hw_serial"] = serial_str;
+    }
 
     // Phase 5.10: Explicit motion active flag for UI
     doc["motion_active"] = motionIsMoving();
-
-    char serial_str[32];
-    uint64_t mac = ESP.getEfuseMac();
-    snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
-    doc["system"]["hw_serial"] = serial_str;
 
     // Motion
     doc["motion"]["position"]["x"] = current_status.x_pos;
@@ -1227,31 +1297,46 @@ void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_teleme
         doc["parser"]["actual_feedrate"] = req_feedrate; // Fallback
     }
 
-    // Configuration Status
-    doc["config"]["http_auth"] = (configGetInt(KEY_WEB_AUTH_ENABLED, 1) == 1);
-    doc["config"]["https"] = false; 
-    doc["config"]["websocket"] = true; 
-    doc["config"]["modbus"] = (configGetInt(KEY_VFD_EN, 0) == 1) || 
-                              (configGetInt(KEY_JXK10_ENABLED, 0) == 1) || 
-                              (configGetInt(KEY_YHTC05_ENABLED, 0) == 1);
+    // Configuration Status (Static-ish, only send if full)
+    if (full) {
+        doc["config"]["http_auth"] = (configGetInt(KEY_WEB_AUTH_ENABLED, 1) == 1);
+        doc["config"]["https"] = false; 
+        doc["config"]["websocket"] = true; 
+        doc["config"]["modbus"] = (configGetInt(KEY_VFD_EN, 0) == 1) || 
+                                (configGetInt(KEY_JXK10_ENABLED, 0) == 1) || 
+                                (configGetInt(KEY_YHTC05_ENABLED, 0) == 1);
+    }
 }
 
 // --- Broadcast state to all connected WebSocket clients ---
 void WebServerManager::broadcastState() {
+    // PHASE 6.2: Skip broadcast if heap is critically fragmented
+    // This gives the heap time to recover during file serving
+    size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    if (largest_block < 8192) {
+        // Heap is too fragmented - skip this broadcast cycle
+        return;
+    }
+    
     // Get fresh telemetry snapshot
     system_telemetry_t telemetry = telemetryGetSnapshot();
     
     // Build JSON payload (Protected access to current_status)
     JsonDocument doc;
     portENTER_CRITICAL(&statusSpinlock);
-    buildTelemetryJson(doc, telemetry);
+    buildTelemetryJson(doc, telemetry, false); // Dynamic update only
     portEXIT_CRITICAL(&statusSpinlock);
     
-    // Emit formatted JSON directly from doc to internal buffer of sendAll?
-    // sendAll takes const char*. We need to serialize to string.
-    String json;
-    serializeJson(doc, json);
-    wsHandler.sendAll(json.c_str());
+    // PHASE 6.2: Reduced buffer size to prevent stack overflow
+    // Telemetry dynamic JSON is typically under 1KB
+    char buffer[1024];
+    size_t len = serializeJson(doc, buffer, sizeof(buffer));
+    
+    if (len > 0 && len < sizeof(buffer)) {
+        wsHandler.sendAll(buffer);
+    } else if (len >= sizeof(buffer)) {
+        logError("[WS] Broadcast failed - JSON too large (%u bytes)", (uint32_t)len);
+    }
 
     // Update history tracking
     updateHistory(telemetry.cpu_usage_percent, telemetry.free_heap_bytes, current_status.vfd_current_amps);
