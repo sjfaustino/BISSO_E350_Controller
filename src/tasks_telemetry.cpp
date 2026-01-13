@@ -25,6 +25,7 @@
 #include "web_server.h"
 #include "task_manager.h"
 #include "system_telemetry.h"
+#include "task_performance_monitor.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <math.h> // For isnan() sensor validation
@@ -45,9 +46,11 @@ void taskTelemetryFunction(void *parameter) {
   cuttingAnalyticsInit();
 
   while (1) {
+    perfMonitorTaskStart(PERF_TASK_ID_TELEMETRY);
     // PHASE 6.1: Respect Load Manager suspension (Memory Stability Fix)
     if (!loadManagerIsSubsystemActive(LOAD_SUBSYS_TELEMETRY)) {
         watchdogFeed("Telemetry");
+        perfMonitorTaskEnd(PERF_TASK_ID_TELEMETRY);
         vTaskDelay(pdMS_TO_TICKS(1000)); // Sleep longer when suspended to save CPU/Heap
         continue;
     }
@@ -193,6 +196,7 @@ void taskTelemetryFunction(void *parameter) {
     webServer.broadcastState();
 
     watchdogFeed("Telemetry");
+    perfMonitorTaskEnd(PERF_TASK_ID_TELEMETRY);
     
     // PHASE 6.1: Dynamic refresh rate based on system load/fragmentation
     uint32_t period = loadManagerGetAdjustedRefreshRate(TASK_PERIOD_TELEMETRY, LOAD_SUBSYS_TELEMETRY);

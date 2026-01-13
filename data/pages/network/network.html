@@ -5,17 +5,17 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>WiFi Status</h2>
+                <h2 data-i18n="network.wifi_status">WiFi Status</h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 15px;">
-                    <div class="card-label">WiFi Connection</div>
+                    <div class="card-label" data-i18n="network.wifi_connection">WiFi Connection</div>
                     <div class="card-value" id="wifi-status" style="color: var(--color-optimal);">Connected</div>
                     <div class="card-subtext">SSID: <span id="wifi-ssid">--</span></div>
                 </div>
 
                 <div style="margin-bottom: 15px;">
-                    <div class="card-label">Signal Strength</div>
+                    <div class="card-label" data-i18n="network.signal_strength">Signal Strength</div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <div class="progress-bar" style="flex: 1; height: 25px;">
                             <div class="progress-fill" id="signal-bar"
@@ -28,16 +28,16 @@
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 8px;">
                     <div>
-                        <div class="card-label">IP Address</div>
+                        <div class="card-label" data-i18n="network.ip_address">IP Address</div>
                         <div class="card-value" id="ip-address" style="font-size: 14px;">-- </div>
                     </div>
                     <div>
-                        <div class="card-label">Gateway</div>
+                        <div class="card-label" data-i18n="network.gateway">Gateway</div>
                         <div class="card-value" id="gateway-address" style="font-size: 14px;">--</div>
                     </div>
                 </div>
                 <div>
-                    <div class="card-label">MAC Address</div>
+                    <div class="card-label" data-i18n="network.mac_address">MAC Address</div>
                     <div class="card-value" id="mac-address" style="font-size: 12px;">--</div>
                 </div>
             </div>
@@ -46,33 +46,33 @@
         <!-- Ethernet Status Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Ethernet Status</h2>
+                <h2 data-i18n="network.ethernet_status">Ethernet Status</h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 15px;">
-                    <div class="card-label">Ethernet Connection</div>
+                    <div class="card-label" data-i18n="network.ethernet_connection">Ethernet Connection</div>
                     <div class="card-value" id="eth-status" style="color: var(--text-secondary);">Disconnected</div>
                     <div class="card-subtext">PHY: LAN8720</div>
                 </div>
 
                 <div style="margin-bottom: 15px;">
-                    <div class="card-label">Link Speed</div>
+                    <div class="card-label" data-i18n="network.link_speed">Link Speed</div>
                     <div class="card-value" id="eth-speed">-- Mbps</div>
                     <div class="card-subtext">Duplex: <span id="eth-duplex">--</span></div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 8px;">
                     <div>
-                        <div class="card-label">IP Address</div>
+                        <div class="card-label" data-i18n="network.ip_address">IP Address</div>
                         <div class="card-value" id="eth-ip" style="font-size: 14px;">--</div>
                     </div>
                     <div>
-                        <div class="card-label">Gateway</div>
+                        <div class="card-label" data-i18n="network.gateway">Gateway</div>
                         <div class="card-value" id="eth-gateway" style="font-size: 14px;">--</div>
                     </div>
                 </div>
                 <div>
-                    <div class="card-label">MAC Address</div>
+                    <div class="card-label" data-i18n="network.mac_address">MAC Address</div>
                     <div class="card-value" id="eth-mac" style="font-size: 12px;">--</div>
                 </div>
             </div>
@@ -81,18 +81,19 @@
         <!-- Ethernet Settings Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Ethernet Settings</h2>
+                <h2 data-i18n="network.ethernet_settings">Ethernet Settings</h2>
             </div>
             <div class="card-content">
                 <div class="setting-group">
                     <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                         <input type="checkbox" id="eth-enabled">
-                        <span>Enable Ethernet (LAN8720)</span>
+                        <span data-i18n="network.enable_ethernet">Enable Ethernet (LAN8720)</span>
                     </label>
                     <div class="card-subtext">Requires reboot to apply. Disabling saves memory.</div>
                 </div>
                 <div class="setting-group">
-                    <button class="btn btn-primary" id="save-eth-btn" style="width: 100%;">Save Ethernet
+                    <button class="btn btn-primary" id="save-eth-btn" style="width: 100%;"
+                        data-i18n="network.save_eth_settings">Save Ethernet
                         Settings</button>
                 </div>
             </div>
@@ -101,51 +102,53 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Connection Latency</h2>
+                <h2 data-i18n="network.connection_latency">Connection Latency</h2>
             </div>
             <div class="card-content">
                 <div style="text-align: center;">
                     <div class="card-value" id="latency-ms" style="font-size: 36px; color: var(--color-optimal);">-- ms
                     </div>
-                    <div class="card-label">WebSocket Round-Trip</div>
+                    <div class="card-label" data-i18n="network.ws_roundtrip">WebSocket Round-Trip</div>
                 </div>
 
                 <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div>
-                        <div class="card-label">Min</div>
+                        <div class="card-label" data-i18n="dashboard.min_label">Min</div>
                         <div class="card-value" id="latency-min" style="font-size: 18px;">-- ms</div>
                     </div>
                     <div>
-                        <div class="card-label">Max</div>
+                        <div class="card-label" data-i18n="dashboard.max_label">Max</div>
                         <div class="card-value" id="latency-max" style="font-size: 18px;">-- ms</div>
                     </div>
                 </div>
 
                 <div style="margin-top: 15px;">
-                    <button class="btn btn-primary" id="ping-btn" style="width: 100%;">Ping Device</button>
+                    <button class="btn btn-primary" id="ping-btn" style="width: 100%;"
+                        data-i18n="network.ping_device">Ping Device</button>
                 </div>
             </div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <h2>Modbus/RTU Status <span class="na-label" id="vfd-na"
+                <h2 data-i18n="network.modbus_status">Modbus/RTU Status <span class="na-label" id="vfd-na"
                         style="display: none; color: var(--color-critical); margin-left: 10px;">(N/A)</span></h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 20px;">
-                    <div class="card-label">VFD Connection</div>
-                    <div class="card-value" id="modbus-status" style="color: var(--color-optimal);">Connected</div>
-                    <div class="card-subtext">Serial RTU, Baud: 19200</div>
+                    <div class="card-label" data-i18n="network.vfd_connection">VFD Connection</div>
+                    <div class="card-value" id="modbus-status" style="color: var(--color-optimal);"
+                        data-i18n="network.loading">Loading...</div>
+                    <div class="card-subtext" data-i18n="network.vfd_baud_info">Serial RTU, Baud: 19200</div>
                 </div>
 
                 <div style="margin-bottom: 15px;">
-                    <div class="card-label">VFD Response Time</div>
+                    <div class="card-label" data-i18n="network.vfd_response">VFD Response Time</div>
                     <div class="card-value" id="vfd-latency" style="font-size: 20px;">-- ms</div>
                 </div>
 
                 <div>
-                    <div class="card-label">Last Read</div>
+                    <div class="card-label" data-i18n="network.last_read">Last Read</div>
                     <div class="card-value" id="modbus-last-read" style="font-size: 12px;">-- </div>
                 </div>
             </div>
@@ -153,24 +156,24 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Uptime & Connectivity</h2>
+                <h2 data-i18n="network.uptime_connectivity">Uptime & Connectivity</h2>
             </div>
             <div class="card-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div>
-                        <div class="card-label">Device Uptime</div>
+                        <div class="card-label" data-i18n="network.uptime">Device Uptime</div>
                         <div class="card-value" id="device-uptime" style="font-size: 18px;">-- h</div>
                     </div>
                     <div>
-                        <div class="card-label">Connection Duration</div>
+                        <div class="card-label" data-i18n="network.conn_duration">Connection Duration</div>
                         <div class="card-value" id="connection-duration" style="font-size: 18px;">-- m</div>
                     </div>
                     <div>
-                        <div class="card-label">Reconnects</div>
+                        <div class="card-label" data-i18n="system.resets">Resets</div>
                         <div class="card-value" id="reconnect-count" style="font-size: 18px;">0</div>
                     </div>
                     <div>
-                        <div class="card-label">Data Received</div>
+                        <div class="card-label" data-i18n="network.data_received">Data Received</div>
                         <div class="card-value" id="data-received" style="font-size: 14px;">-- KB</div>
                     </div>
                 </div>
@@ -179,25 +182,25 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Packet Statistics</h2>
+                <h2 data-i18n="network.packet_statistics">Packet Statistics</h2>
             </div>
             <div class="card-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div>
-                        <div class="card-label">Packets Sent</div>
+                        <div class="card-label" data-i18n="network.packets_sent">Packets Sent</div>
                         <div class="card-value" id="packets-sent" style="font-size: 18px;">0</div>
                     </div>
                     <div>
-                        <div class="card-label">Packets Received</div>
+                        <div class="card-label" data-i18n="network.packets_received">Packets Received</div>
                         <div class="card-value" id="packets-received" style="font-size: 18px;">0</div>
                     </div>
                     <div>
-                        <div class="card-label">Errors</div>
+                        <div class="card-label" data-i18n="network.errors">Errors</div>
                         <div class="card-value" id="error-count" style="font-size: 18px; color: var(--color-warning);">0
                         </div>
                     </div>
                     <div>
-                        <div class="card-label">Loss Rate</div>
+                        <div class="card-label" data-i18n="network.loss_rate">Loss Rate</div>
                         <div class="card-value" id="loss-rate" style="font-size: 18px;">0%</div>
                     </div>
                 </div>
@@ -206,74 +209,77 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Network Actions</h2>
+                <h2 data-i18n="network.network_actions">Network Actions</h2>
             </div>
             <div class="card-content">
-                <button class="btn btn-primary" id="reconnect-btn"
-                    style="width: 100%; margin-bottom: 10px;">Reconnect</button>
-                <button class="btn btn-secondary" id="network-test-btn" style="width: 100%; margin-bottom: 10px;">Run
+                <button class="btn btn-primary" id="reconnect-btn" style="width: 100%; margin-bottom: 10px;"
+                    data-i18n="network.reconnect">Reconnect</button>
+                <button class="btn btn-secondary" id="network-test-btn" style="width: 100%; margin-bottom: 10px;"
+                    data-i18n="network.run_diagnostics">Run
                     Diagnostics</button>
             </div>
         </div>
         <div class="card">
             <div class="card-header">
-                <h2>WiFi Station Settings</h2>
+                <h2 data-i18n="network.wifi_station_settings">WiFi Station Settings</h2>
                 <span class="card-status" id="station-config-status"></span>
             </div>
             <div class="card-content">
-                <p
-                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);"
+                    data-i18n="network.station_desc">
                     Configure the network the controller connects to.
                 </p>
                 <div class="setting-group">
-                    <label for="station-ssid">SSID:</label>
+                    <label for="station-ssid" data-i18n="network.station_ssid">SSID:</label>
                     <input type="text" id="station-ssid" class="form-control" placeholder="Network Name">
                 </div>
                 <div class="setting-group">
-                    <label for="station-pass">Password:</label>
+                    <label for="station-pass" data-i18n="network.station_pass">Password:</label>
                     <div style="position: relative;">
                         <input type="password" id="station-pass" class="form-control" placeholder="••••••••">
                         <button type="button" class="btn-toggle-pass" id="toggle-station-pass">👁️</button>
                     </div>
                 </div>
                 <div class="setting-group">
-                    <button class="btn btn-primary" id="save-station-btn" style="width: 100%;">Save & Connect</button>
+                    <button class="btn btn-primary" id="save-station-btn" style="width: 100%;"
+                        data-i18n="network.save_connect">Save & Connect</button>
                 </div>
             </div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <h2>WiFi Access Point Settings</h2>
+                <h2 data-i18n="network.wifi_ap_settings">WiFi Access Point Settings</h2>
                 <span class="card-status" id="ap-config-status"></span>
             </div>
             <div class="card-content">
-                <p
-                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);"
+                    data-i18n="network.ap_desc">
                     Configure the broadcasted setup network.
                 </p>
                 <div class="setting-group">
                     <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                         <input type="checkbox" id="ap-enabled">
-                        <span>Enable Access Point</span>
+                        <span data-i18n="network.enable_ap">Enable Access Point</span>
                     </label>
                 </div>
                 <div id="ap-settings-fields">
                     <div class="setting-group">
-                        <label for="ap-ssid">AP SSID:</label>
+                        <label for="ap-ssid" data-i18n="network.ap_ssid_label">AP SSID:</label>
                         <input type="text" id="ap-ssid" class="form-control" placeholder="BISSO-E350-Setup">
                     </div>
                     <div class="setting-group">
-                        <label for="ap-pass">AP Password:</label>
+                        <label for="ap-pass" data-i18n="network.ap_pass_label">AP Password:</label>
                         <div style="position: relative;">
                             <input type="password" id="ap-pass" class="form-control" placeholder="••••••••">
                             <button type="button" class="btn-toggle-pass" id="toggle-ap-pass">👁️</button>
                         </div>
-                        <div class="card-subtext">Min. 8 characters</div>
+                        <div class="card-subtext" data-i18n="network.ap_pass_min">Min. 8 characters</div>
                     </div>
                 </div>
                 <div class="setting-group">
-                    <button class="btn btn-primary" id="save-ap-btn" style="width: 100%;">Save AP Settings</button>
+                    <button class="btn btn-primary" id="save-ap-btn" style="width: 100%;"
+                        data-i18n="network.save_ap_settings">Save AP Settings</button>
                 </div>
             </div>
         </div>
@@ -284,15 +290,16 @@
         style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
         <div class="card" style="max-width: 500px; width: 90%;">
             <div class="card-header">
-                <h2>Network Diagnostics</h2>
+                <h2 data-i18n="network.net_diag_title">Network Diagnostics</h2>
                 <button id="close-diagnostics"
                     style="background: none; border: none; cursor: pointer; font-size: 20px;">✕</button>
             </div>
             <div class="card-content">
-                <div id="diagnostics-output">
+                <div id="diagnostics-output" data-i18n="network.running_diag">
                     Running diagnostics...
                 </div>
-                <button class="btn btn-primary" id="export-diagnostics" style="width: 100%;">Export Report</button>
+                <button class="btn btn-primary" id="export-diagnostics" style="width: 100%;"
+                    data-i18n="network.export_report">Export Report</button>
             </div>
         </div>
     </div>

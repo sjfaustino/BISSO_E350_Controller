@@ -74,7 +74,7 @@ window.SettingsModule = window.SettingsModule || {
 
         // Buttons
         document.getElementById('test-alert-btn')?.addEventListener('click', () => {
-            AlertManager.add('This is a test alert!', 'warning', 3000);
+            AlertManager.add(window.i18n.t('settings.test_alert_msg'), 'warning', 3000);
             if (this.settings.soundAlerts) this.playAlertSound();
         });
         document.getElementById('clear-cache-btn')?.addEventListener('click', () => this.clearCache());
@@ -225,11 +225,11 @@ window.SettingsModule = window.SettingsModule || {
     },
 
     getRssiDescription(r) {
-        if (r >= -30) return 'Excellent';
-        if (r >= -67) return 'Good';
-        if (r >= -70) return 'Fair';
-        if (r >= -80) return 'Weak';
-        return 'Very Weak';
+        if (r >= -30) return window.i18n.t('settings.rssi_excellent');
+        if (r >= -67) return window.i18n.t('settings.rssi_good');
+        if (r >= -70) return window.i18n.t('settings.rssi_fair');
+        if (r >= -80) return window.i18n.t('settings.rssi_weak');
+        return window.i18n.t('settings.rssi_very_weak');
     },
 
     setTheme(theme) {
@@ -258,15 +258,15 @@ window.SettingsModule = window.SettingsModule || {
     },
 
     clearCache() {
-        if (!confirm('Clear cache and history?')) return;
+        if (!confirm(window.i18n.t('settings.confirm_clear_cache'))) return;
         const keep = ['themeSettings', 'userSettings'];
         for (const k in localStorage) if (localStorage.hasOwnProperty(k) && !keep.includes(k)) localStorage.removeItem(k);
         this.updateStorageInfo();
-        AlertManager.add('Cache cleared', 'success', 2000);
+        AlertManager.add(window.i18n.t('settings.cache_cleared'), 'success', 2000);
     },
 
     factoryReset() {
-        if (!confirm('Factory reset will clear ALL settings. Continue?') || !confirm('Are you sure?')) return;
+        if (!confirm(window.i18n.t('settings.confirm_reset')) || !confirm(window.i18n.t('settings.confirm_sure'))) return;
         localStorage.clear();
         this.settings = { ...this.defaults };
         this.saveSettings();
@@ -283,7 +283,7 @@ window.SettingsModule = window.SettingsModule || {
 
     saveSettings() {
         try { localStorage.setItem('userSettings', JSON.stringify(this.settings)); }
-        catch (e) { AlertManager.add('Failed to save settings', 'warning'); }
+        catch (e) { AlertManager.add(window.i18n.t('settings.save_failed'), 'warning'); }
     },
 
     loadConfiguration() {
@@ -310,7 +310,7 @@ window.SettingsModule = window.SettingsModule || {
 
     setStatusLoaded(section) {
         const el = document.getElementById(`${section}-status`);
-        if (el) { el.textContent = '✓ Loaded'; el.className = 'card-status loaded'; }
+        if (el) { el.textContent = ''; el.className = 'card-status'; }
     },
 
     setStatusError(section, msg) {
@@ -323,7 +323,7 @@ window.SettingsModule = window.SettingsModule || {
     loadPreset() {
         const presetId = document.getElementById('preset-select').value;
         if (!presetId || !window.MaterialPresets[presetId]) {
-            AlertManager.add('Please select a valid preset', 'warning');
+            AlertManager.add(window.i18n.t('settings.select_valid_preset'), 'warning');
             return;
         }
 
@@ -354,16 +354,16 @@ window.SettingsModule = window.SettingsModule || {
             if (dec) { dec.value = preset.vfd.dec_time_ms; document.getElementById('vfd-dec-display').textContent = preset.vfd.dec_time_ms; }
         }
 
-        AlertManager.add(`Preset "${preset.name}" loaded into form. Click Save to persist.`, 'info', 3000);
+        AlertManager.add(`"${preset.name}": ` + window.i18n.t('settings.preset_loaded'), 'info', 3000);
     },
 
     async loadCliOptions() {
         try {
-            const res = await fetch('/api/config?key=cli_echo');
+            const res = await fetch('/api/config/get?category=6');
             if (res.ok) {
                 const data = await res.json();
                 const toggle = document.getElementById('cli-echo-toggle');
-                if (toggle) toggle.checked = (data.cli_echo === 1);
+                if (toggle && data.config) toggle.checked = (data.config.cli_echo === 1);
             }
         } catch (e) {
             console.warn('[Settings] CLI options load failed:', e);
@@ -375,29 +375,30 @@ window.SettingsModule = window.SettingsModule || {
         if (!toggle) return;
 
         try {
-            const res = await fetch('/api/config', {
+            const res = await fetch('/api/config/set', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: 'cli_echo', value: toggle.checked ? '1' : '0' })
+                body: JSON.stringify({ category: 6, key: 'cli_echo', value: toggle.checked ? 1 : 0 })
             });
 
-            if (res.ok) {
-                AlertManager.add('CLI settings saved', 'success', 2000);
+            const data = await res.json();
+            if (res.ok && !data.error) {
+                AlertManager.add(window.i18n.t('settings.cli_saved'), 'success', 2000);
             } else {
-                this.showError('cli-options', 'Failed to save CLI settings');
+                this.showError('cli-options', window.i18n.t('settings.save_error') + ' ' + (data.error || 'Unknown error'));
             }
         } catch (e) {
-            this.showError('cli-options', 'Network error: ' + e.message);
+            this.showError('cli-options', window.i18n.t('settings.network_error') + ' ' + e.message);
         }
     },
 
     async loadOtaSettings() {
         try {
-            const res = await fetch('/api/config?key=ota_chk_en');
+            const res = await fetch('/api/config/get?category=6');
             if (res.ok) {
                 const data = await res.json();
                 const toggle = document.getElementById('ota-check-toggle');
-                if (toggle) toggle.checked = (data.ota_chk_en === 1);
+                if (toggle && data.config) toggle.checked = (data.config.ota_chk_en === 1);
             }
         } catch (e) {
             console.warn('[Settings] OTA settings load failed:', e);
@@ -409,19 +410,20 @@ window.SettingsModule = window.SettingsModule || {
         if (!toggle) return;
 
         try {
-            const res = await fetch('/api/config', {
+            const res = await fetch('/api/config/set', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: 'ota_chk_en', value: toggle.checked ? '1' : '0' })
+                body: JSON.stringify({ category: 6, key: 'ota_chk_en', value: toggle.checked ? 1 : 0 })
             });
 
-            if (res.ok) {
-                AlertManager.add('OTA settings saved. Reboot required for changes to take effect.', 'success', 3000);
+            const data = await res.json();
+            if (res.ok && !data.error) {
+                AlertManager.add(window.i18n.t('settings.ota_saved'), 'success', 2000);
             } else {
-                this.showError('ota-settings', 'Failed to save OTA settings');
+                this.showError('ota-settings', window.i18n.t('settings.save_error') + ' ' + (data.error || 'Unknown error'));
             }
         } catch (e) {
-            this.showError('ota-settings', 'Network error: ' + e.message);
+            this.showError('ota-settings', window.i18n.t('settings.network_error') + ' ' + e.message);
         }
     }
 };

@@ -346,7 +346,7 @@ if (typeof window.CutPlanner === 'undefined') {
         run(jobType) {
             const gcode = this.generate(jobType);
 
-            if (confirm('Run this cutting job now?')) {
+            if (confirm(window.i18n?.t('cut_planner.confirm_run') || 'Run this cutting job now?')) {
                 this.executeGcode(gcode);
             }
         },
@@ -362,7 +362,7 @@ if (typeof window.CutPlanner === 'undefined') {
                     .map(l => l.split(';')[0].trim())  // Remove inline comments
                     .filter(l => l);  // Filter empty lines
 
-                AlertManager.add('Starting cut job...', 'info', 2000);
+                AlertManager.add(window.i18n?.t('cut_planner.starting_job') || 'Starting cut job...', 'info', 2000);
 
                 for (const line of lines) {
                     // Wait for idle before sending next move command
@@ -389,10 +389,10 @@ if (typeof window.CutPlanner === 'undefined') {
                 // Wait for final move to finish
                 await this.waitForIdle();
 
-                AlertManager.add('Cut job completed!', 'success', 3000);
+                AlertManager.add(window.i18n?.t('cut_planner.job_completed') || 'Cut job completed!', 'success', 3000);
             } catch (error) {
                 console.error('[CutPlanner] Execution error:', error);
-                AlertManager.add(`Job failed: ${error.message}`, 'error', 5000);
+                AlertManager.add(`${window.i18n?.t('cut_planner.job_failed') || 'Job failed'}: ${error.message}`, 'error', 5000);
             }
         },
 

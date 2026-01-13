@@ -152,6 +152,7 @@ size_t perfMonitorExportJSON(char* buffer, size_t buffer_size);
 #define PERF_TASK_ID_FAULT_LOG  6
 #define PERF_TASK_ID_MONITOR    7
 #define PERF_TASK_ID_LCD        8
+#define PERF_TASK_ID_TELEMETRY  9
 
 /**
  * Convenience macros for task performance tracking

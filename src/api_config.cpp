@@ -15,6 +15,9 @@
 #include <WiFi.h>
 #include "hardware_config.h"
 
+static bool validateBool(JsonVariant value, char* error_msg, size_t len);
+
+
 
 // Configuration defaults (matching Altivar 31 + system constraints)
 static const motion_config_t default_motion = {
@@ -197,19 +200,31 @@ bool apiConfigValidate(config_category_t category, const char *key,
     }
     break;
 
-  case CONFIG_CATEGORY_ENCODER:
     if (strstr(key, "ppm")) {
       return validateEncoderPpm(key, value, error_msg, error_msg_len);
     }
     break;
 
-  default:
-    snprintf(error_msg, error_msg_len, "Unknown configuration category");
+  case CONFIG_CATEGORY_SYSTEM:
+    if (strcmp(key, "cli_echo") == 0 || strcmp(key, "ota_chk_en") == 0) {
+        return validateBool(value, error_msg, error_msg_len);
+    }
+    break;
+
     return false;
   }
 
   return true;
 }
+
+static bool validateBool(JsonVariant value, char* error_msg, size_t len) {
+    if (!value.is<int>() && !value.is<bool>()) {
+        snprintf(error_msg, len, "Value must be 0 or 1");
+        return false;
+    }
+    return true;
+}
+
 
 /**
  * @brief Set configuration value
@@ -295,6 +310,15 @@ bool apiConfigSet(config_category_t category, const char *key,
     } else if (strcmp(key, "eth_en") == 0) {
         configSetInt(KEY_ETH_ENABLED, value.as<int>());
     }
+
+    break;
+
+  case CONFIG_CATEGORY_SYSTEM:
+    if (strcmp(key, "cli_echo") == 0) {
+        configSetInt(KEY_CLI_ECHO, value.as<int>());
+    } else if (strcmp(key, "ota_chk_en") == 0) {
+        configSetInt(KEY_OTA_CHECK_EN, value.as<int>());
+    }
     break;
 
   default:
@@ -352,6 +376,12 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
     obj["wifi_ap_pass"] = configGetString(KEY_WIFI_AP_PASS, "password");
     obj["eth_en"] = configGetInt(KEY_ETH_ENABLED, 0);
     break;
+  }
+
+  case CONFIG_CATEGORY_SYSTEM: {
+      obj["cli_echo"] = configGetInt(KEY_CLI_ECHO, 1); // Default is Enabled (echo ON) for usability
+      obj["ota_chk_en"] = configGetInt(KEY_OTA_CHECK_EN, 0);
+      break;
   }
 
   default:

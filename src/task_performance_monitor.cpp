@@ -24,7 +24,8 @@ static bool task_tracking_enabled[MAX_TRACKED_TASKS] = {
     false,  // PERF_TASK_ID_CLI (low priority)
     true,   // PERF_TASK_ID_FAULT_LOG (important)
     false,  // PERF_TASK_ID_MONITOR (system task)
-    false   // PERF_TASK_ID_LCD (UI task)
+    false,  // PERF_TASK_ID_LCD (UI task)
+    true    // PERF_TASK_ID_TELEMETRY (important)
 };
 
 // Per-task performance metrics
@@ -51,7 +52,8 @@ static const char* task_names[] = {
     "CLI",
     "Fault_Log",
     "Monitor",
-    "LCD"
+    "LCD",
+    "Telemetry"
 };
 
 // Helper: Get or create metrics entry for task (PHASE 5.2: Lazy-load with selective tracking)
@@ -73,7 +75,7 @@ static task_performance_t* getOrCreateMetrics(uint32_t task_id) {
         task_performance_t* metrics = &task_metrics[active_tasks];
         memset(metrics, 0, sizeof(*metrics));
         metrics->task_id = task_id;
-        metrics->task_name = (task_id < 9) ? task_names[task_id] : "Unknown";
+        metrics->task_name = (task_id <= 9) ? task_names[task_id] : "Unknown";
         metrics->min_runtime_us = 0xFFFFFFFF;
         active_tasks++;
         return metrics;

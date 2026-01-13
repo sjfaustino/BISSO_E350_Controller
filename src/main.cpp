@@ -136,8 +136,7 @@ void setup() {
   delay(1000);
   serialLoggerInit(LOG_LEVEL);
   
-  // Initialize boot log capture to LittleFS (32KB max)
-  bootLogInit(32768);
+  // bootLogInit(32768);
   
   boot_time_ms = millis();
 
@@ -175,6 +174,7 @@ void setup() {
   // PHASE 5.0: Spindle Current Monitor
   BOOT_INIT("Spindle Mon", init_spindle_wrapper, (boot_status_code_t)23);
 
+
   logInfo("[BOOT] Validating system health...");
   if (!bootValidateAllSystems()) {
     bootHandleCriticalError("Boot validation failed.");
@@ -197,7 +197,7 @@ void setup() {
   perfMonitorInit();  // PHASE 5.1: Initialize performance monitoring
   
   // Stop boot log capture before tasks start (prevents CLI output from being logged)
-  bootLogStop();
+  // bootLogStop();
   
   taskManagerStart();
   

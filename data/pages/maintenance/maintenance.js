@@ -66,7 +66,7 @@ window.MaintenanceModule = window.MaintenanceModule || {
                     wearBarEl.style.width = wearPercent + '%';
                     wearBarEl.style.background = this.getWearColor(wearPercent);
                 }
-                if (wearDaysEl) wearDaysEl.textContent = `Est. ${Math.max(0, Math.floor(daysRemaining))} days`;
+                if (wearDaysEl) wearDaysEl.textContent = `${window.i18n.t('maintenance.est_prefix')} ${Math.max(0, Math.floor(daysRemaining))} ${window.i18n.t('maintenance.days_unit')}`;
             }
         });
 
@@ -138,13 +138,13 @@ window.MaintenanceModule = window.MaintenanceModule || {
         const nextContactorServiceEl = document.getElementById('next-contactor-service');
         const nextEncoderServiceEl = document.getElementById('next-encoder-service');
 
-        if (nextMotorServiceEl) nextMotorServiceEl.textContent = `Est. ${motorDate.toISOString().split('T')[0]}`;
-        if (nextVfdServiceEl) nextVfdServiceEl.textContent = `Est. ${vfdDate.toISOString().split('T')[0]}`;
-        if (nextContactorServiceEl) nextContactorServiceEl.textContent = `Est. ${contactorDate.toISOString().split('T')[0]}`;
-        if (nextEncoderServiceEl) nextEncoderServiceEl.textContent = `Est. ${encoderDate.toISOString().split('T')[0]}`;
+        if (nextMotorServiceEl) nextMotorServiceEl.textContent = `${window.i18n.t('maintenance.est_prefix')} ${motorDate.toISOString().split('T')[0]}`;
+        if (nextVfdServiceEl) nextVfdServiceEl.textContent = `${window.i18n.t('maintenance.est_prefix')} ${vfdDate.toISOString().split('T')[0]}`;
+        if (nextContactorServiceEl) nextContactorServiceEl.textContent = `${window.i18n.t('maintenance.est_prefix')} ${contactorDate.toISOString().split('T')[0]}`;
+        if (nextEncoderServiceEl) nextEncoderServiceEl.textContent = `${window.i18n.t('maintenance.est_prefix')} ${encoderDate.toISOString().split('T')[0]}`;
 
         // Update last service date
-        const lastService = localStorage.getItem('lastServiceDate') || 'Today';
+        const lastService = localStorage.getItem('lastServiceDate') || window.i18n.t('maintenance.today');
         const lastServiceEl = document.getElementById('last-service');
         if (lastServiceEl) lastServiceEl.textContent = lastService;
     },
@@ -185,7 +185,7 @@ window.MaintenanceModule = window.MaintenanceModule || {
             // Initialize with system startup
             history.push({
                 date: new Date().toISOString().split('T')[0],
-                type: 'System initialized',
+                type: window.i18n.t('maintenance.sys_init'),
                 qualityScore: 100
             });
             localStorage.setItem('serviceHistory', JSON.stringify(history));
@@ -195,7 +195,7 @@ window.MaintenanceModule = window.MaintenanceModule || {
             <div class="service-entry">
                 <div class="service-date">${entry.date}</div>
                 <div class="service-text">${entry.type}</div>
-                <div class="service-quality">Quality: ${entry.qualityScore}%</div>
+                <div class="service-quality">${window.i18n.t('maintenance.quality_label')} ${entry.qualityScore}%</div>
             </div>
         `).join('');
     },
@@ -208,7 +208,7 @@ window.MaintenanceModule = window.MaintenanceModule || {
 
         const event = {
             date: date,
-            type: 'Service performed',
+            type: window.i18n.t('maintenance.service_performed'),
             qualityScore: avgQuality
         };
 
@@ -218,7 +218,7 @@ window.MaintenanceModule = window.MaintenanceModule || {
         localStorage.setItem('lastServiceDate', date);
 
         this.loadServiceHistory();
-        AlertManager.add('Service event logged successfully', 'success', 2000);
+        AlertManager.add(window.i18n.t('maintenance.service_logged'), 'success', 2000);
     },
 
     calculateAverageQuality() {

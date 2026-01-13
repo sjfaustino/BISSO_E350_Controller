@@ -25,7 +25,7 @@ Object.assign(window.SettingsModule, {
             })
             .catch(err => {
                 console.error('[Settings] Motion config load failed:', err);
-                this.setStatusError('motion', 'Failed to load');
+                this.setStatusError('motion', window.i18n.t('settings.failed_load'));
             });
     },
 
@@ -38,7 +38,7 @@ Object.assign(window.SettingsModule, {
         const z_high = parseInt(document.getElementById('z-limit-high').value);
 
         if (x_low >= x_high || y_low >= y_high || z_low >= z_high) {
-            this.showError('motion', 'Lower limit must be less than upper limit');
+            this.showError('motion', window.i18n.t('settings.limit_order_error'));
             return;
         }
 
@@ -51,17 +51,17 @@ Object.assign(window.SettingsModule, {
             this.setConfig(0, 'soft_limit_z_high', z_high)
         ])
             .then(() => {
-                AlertManager.add('Motion settings saved', 'success', 2000);
+                AlertManager.add(window.i18n.t('settings.motion_saved'), 'success', 2000);
                 this.setStatusLoaded('motion');
             })
             .catch(err => {
-                this.showError('motion', 'Failed to save');
-                this.setStatusError('motion', 'Save failed');
+                this.showError('motion', window.i18n.t('settings.save_failed'));
+                this.setStatusError('motion', window.i18n.t('settings.save_failed'));
             });
     },
 
     resetMotionSettings() {
-        if (!confirm('Reset motion settings to defaults?')) return;
+        if (!confirm(window.i18n.t('settings.reset_motion_confirm'))) return;
         Promise.all([
             this.setConfig(0, 'soft_limit_x_low', 0),
             this.setConfig(0, 'soft_limit_x_high', 500),
@@ -71,8 +71,8 @@ Object.assign(window.SettingsModule, {
             this.setConfig(0, 'soft_limit_z_high', 500)
         ])
             .then(() => this.loadMotionConfig())
-            .then(() => AlertManager.add('Motion settings reset', 'success', 2000))
-            .catch(err => this.showError('motion', 'Reset failed'));
+            .then(() => AlertManager.add(window.i18n.t('settings.motion_reset'), 'success', 2000))
+            .catch(err => this.showError('motion', window.i18n.t('settings.reset_failed')));
     },
 
     // VFD configuration
@@ -97,7 +97,7 @@ Object.assign(window.SettingsModule, {
             })
             .catch(err => {
                 console.error('[Settings] VFD config load failed:', err);
-                this.setStatusError('vfd', 'Failed to load');
+                this.setStatusError('vfd', window.i18n.t('settings.failed_load'));
             });
     },
 
@@ -107,9 +107,9 @@ Object.assign(window.SettingsModule, {
         const acc_ms = parseInt(document.getElementById('vfd-acc-time').value);
         const dec_ms = parseInt(document.getElementById('vfd-dec-time').value);
 
-        if (min_hz >= max_hz) { this.showError('vfd', 'Min must be less than max'); return; }
-        if (min_hz < 1 || max_hz > 105) { this.showError('vfd', 'Speed: 1-105 Hz'); return; }
-        if (acc_ms < 200 || dec_ms < 200) { this.showError('vfd', 'Ramp >= 200ms'); return; }
+        if (min_hz >= max_hz) { this.showError('vfd', window.i18n.t('settings.vfd_min_max_error')); return; }
+        if (min_hz < 1 || max_hz > 105) { this.showError('vfd', window.i18n.t('settings.vfd_speed_range')); return; }
+        if (acc_ms < 200 || dec_ms < 200) { this.showError('vfd', window.i18n.t('settings.vfd_ramp_range')); return; }
 
         Promise.all([
             this.setConfig(1, 'min_speed_hz', min_hz),
@@ -118,14 +118,14 @@ Object.assign(window.SettingsModule, {
             this.setConfig(1, 'dec_time_ms', dec_ms)
         ])
             .then(() => {
-                AlertManager.add('VFD settings saved', 'success', 2000);
+                AlertManager.add(window.i18n.t('settings.vfd_saved'), 'success', 2000);
                 this.setStatusLoaded('vfd');
             })
-            .catch(err => this.showError('vfd', 'Save failed'));
+            .catch(err => this.showError('vfd', window.i18n.t('settings.save_failed')));
     },
 
     resetVfdSettings() {
-        if (!confirm('Reset VFD settings to defaults?')) return;
+        if (!confirm(window.i18n.t('settings.reset_vfd_confirm'))) return;
         Promise.all([
             this.setConfig(1, 'min_speed_hz', 1),
             this.setConfig(1, 'max_speed_hz', 105),
@@ -133,8 +133,8 @@ Object.assign(window.SettingsModule, {
             this.setConfig(1, 'dec_time_ms', 400)
         ])
             .then(() => this.loadVfdConfig())
-            .then(() => AlertManager.add('VFD settings reset', 'success', 2000))
-            .catch(err => this.showError('vfd', 'Reset failed'));
+            .then(() => AlertManager.add(window.i18n.t('settings.vfd_reset'), 'success', 2000))
+            .catch(err => this.showError('vfd', window.i18n.t('settings.reset_failed')));
     },
 
     // Encoder configuration
@@ -153,13 +153,13 @@ Object.assign(window.SettingsModule, {
                     this.setStatusLoaded('encoder');
                 }
             })
-            .catch(err => this.setStatusError('encoder', 'Failed to load'));
+            .catch(err => this.setStatusError('encoder', window.i18n.t('settings.failed_load')));
     },
 
     calibrateEncoder(axis) {
         const axisNames = ['X', 'Y', 'Z'];
         const ppm = parseInt(document.getElementById(`${'xyz'[axis]}-encoder-ppm`).value);
-        if (ppm < 50 || ppm > 200) { this.showError('encoder', 'PPM: 50-200'); return; }
+        if (ppm < 50 || ppm > 200) { this.showError('encoder', window.i18n.t('settings.ppm_range')); return; }
 
         fetch('/api/encoder/calibrate', {
             method: 'POST',
@@ -169,25 +169,25 @@ Object.assign(window.SettingsModule, {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    AlertManager.add(`${axisNames[axis]} calibrated to ${ppm} PPM`, 'success', 2000);
+                    AlertManager.add(`${axisNames[axis]} ${window.i18n.t('settings.calibrated_msg')} ${ppm} PPM`, 'success', 2000);
                     this.setStatusLoaded('encoder');
                 } else {
-                    this.showError('encoder', data.error || 'Calibration failed');
+                    this.showError('encoder', data.error || window.i18n.t('settings.calibration_failed'));
                 }
             })
-            .catch(err => this.showError('encoder', 'Calibration failed'));
+            .catch(err => this.showError('encoder', window.i18n.t('settings.calibration_failed')));
     },
 
     resetEncoderSettings() {
-        if (!confirm('Reset all encoders to 100 PPM?')) return;
+        if (!confirm(window.i18n.t('settings.reset_encoder_confirm'))) return;
         Promise.all([
             this.setConfig(2, 'ppm_x', 100),
             this.setConfig(2, 'ppm_y', 100),
             this.setConfig(2, 'ppm_z', 100)
         ])
             .then(() => this.loadEncoderConfig())
-            .then(() => AlertManager.add('Encoders reset', 'success', 2000))
-            .catch(err => this.showError('encoder', 'Reset failed'));
+            .then(() => AlertManager.add(window.i18n.t('settings.encoders_reset'), 'success', 2000))
+            .catch(err => this.showError('encoder', window.i18n.t('settings.reset_failed')));
     },
 
     setConfig(category, key, value) {

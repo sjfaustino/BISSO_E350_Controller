@@ -1,4 +1,5 @@
 #include "task_manager.h"
+#include "task_performance_monitor.h"
 #include "encoder_wj66.h"
 #include "encoder_motion_integration.h"
 #include "serial_logger.h"
@@ -28,12 +29,14 @@ void taskEncoderFunction(void* parameter) {
 
   uint32_t loop_count = 0;
   while (1) {
+    perfMonitorTaskStart(PERF_TASK_ID_ENCODER);
     // RUN THE CENTRAL RS-485 BUS HANDLER
     // This handles both WJ66 and Modbus devices (JXK-10, Altivar31, YH-TC05)
     rs485HandleBus();
     
     // Position/Status updates for motion engine
     encoderMotionUpdate();
+    perfMonitorTaskEnd(PERF_TASK_ID_ENCODER);
 
     // Periodic stack monitoring (every 100 cycles = 2 seconds)
     loop_count++;

@@ -5,51 +5,52 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>Firmware & Software</h2>
+                <h2 data-i18n="system.firmware_software">Firmware & Software</h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 15px;">
-                    <div class="card-label">Firmware Version</div>
+                    <div class="card-label" data-i18n="system.firmware_version">Firmware Version</div>
                     <div class="card-value" id="fw-version" style="font-size: 18px;">Loading...</div>
                 </div>
 
                 <div style="margin-bottom: 15px;">
-                    <div class="card-label">Build Date</div>
+                    <div class="card-label" data-i18n="system.build_date">Build Date</div>
                     <div class="card-value" id="fw-build-date" style="font-size: 14px;">2024-12-14</div>
                 </div>
 
                 <div style="margin-bottom: 15px;">
-                    <div class="card-label">Latest Version</div>
+                    <div class="card-label" data-i18n="system.latest_version">Latest Version</div>
                     <div class="card-value" id="fw-latest" style="font-size: 14px;">3.1.0 (Current)</div>
                 </div>
 
-                <button class="btn btn-primary" id="check-update-btn" style="width: 100%; margin-top: 10px;">Check for
+                <button class="btn btn-primary" id="check-update-btn" style="width: 100%; margin-top: 10px;"
+                    data-i18n="system.check_updates">Check for
                     Updates</button>
             </div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <h2>Hardware Information</h2>
+                <h2 data-i18n="system.hardware_info">Hardware Information</h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 12px;">
-                    <div class="card-label">Microcontroller</div>
+                    <div class="card-label" data-i18n="system.microcontroller">Microcontroller</div>
                     <div class="card-value" id="hw-mcu" style="font-size: 14px;">Loading...</div>
                 </div>
 
                 <div style="margin-bottom: 12px;">
-                    <div class="card-label">Model</div>
+                    <div class="card-label" data-i18n="system.model">Model</div>
                     <div class="card-value" id="hw-model" style="font-size: 14px;">Loading...</div>
                 </div>
 
                 <div style="margin-bottom: 12px;">
-                    <div class="card-label">Serial Number</div>
+                    <div class="card-label" data-i18n="system.serial_number">Serial Number</div>
                     <div class="card-value" id="serial-number" style="font-size: 12px;">Loading...</div>
                 </div>
 
                 <div style="margin-bottom: 12px;">
-                    <div class="card-label">Revision</div>
+                    <div class="card-label" data-i18n="system.revision">Revision</div>
                     <div class="card-value" id="hw-revision" style="font-size: 14px;">Loading...</div>
                 </div>
             </div>
@@ -57,11 +58,11 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Storage & Memory</h2>
+                <h2 data-i18n="system.storage_memory">Storage & Memory</h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 20px;">
-                    <div class="card-label">Flash Memory</div>
+                    <div class="card-label" data-i18n="system.flash_memory">Flash Memory</div>
                     <div class="progress-bar">
                         <div class="progress-fill" id="flash-bar" style="width: 65%;"></div>
                     </div>
@@ -69,7 +70,7 @@
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <div class="card-label">RAM Memory</div>
+                    <div class="card-label" data-i18n="system.ram_memory">RAM Memory</div>
                     <div class="progress-bar">
                         <div class="progress-fill" id="ram-bar" style="width: 58%;"></div>
                     </div>
@@ -77,7 +78,7 @@
                 </div>
 
                 <div>
-                    <div class="card-label">SPIFFS Filesystem</div>
+                    <div class="card-label" data-i18n="system.spiffs_fs">SPIFFS Filesystem</div>
                     <div class="progress-bar">
                         <div class="progress-fill" id="spiffs-bar" style="width: 42%;"></div>
                     </div>
@@ -90,7 +91,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>System Status</h2>
+                <h2 data-i18n="system.system_status">System Status</h2>
             </div>
             <div class="card-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
@@ -116,7 +117,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Configuration</h2>
+                <h2 data-i18n="system.configuration">Configuration</h2>
             </div>
             <div class="card-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
@@ -142,14 +143,16 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Diagnostic Tools</h2>
+                <h2 data-i18n="system.diagnostic_tools">Diagnostic Tools</h2>
             </div>
             <div class="card-content">
-                <button class="btn btn-primary" id="view-logs-btn" style="width: 100%; margin-bottom: 10px;">View System
+                <button class="btn btn-primary" id="view-logs-btn" style="width: 100%; margin-bottom: 10px;"
+                    data-i18n="system.view_logs">View System
                     Logs</button>
-                <button class="btn btn-secondary" id="system-health-btn"
-                    style="width: 100%; margin-bottom: 10px;">System Health Check</button>
-                <button class="btn btn-ghost" id="reset-btn" style="width: 100%;">Reboot Device</button>
+                <button class="btn btn-secondary" id="system-health-btn" style="width: 100%; margin-bottom: 10px;"
+                    data-i18n="system.health_check">System Health Check</button>
+                <button class="btn btn-ghost" id="reset-btn" style="width: 100%;"
+                    data-i18n="system.reboot_device">Reboot Device</button>
             </div>
         </div>
     </div>
@@ -157,7 +160,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>Date & Time</h2>
+                <h2 data-i18n="system.date_time">Date & Time</h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 15px;">
@@ -178,7 +181,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Backups & Restore</h2>
+                <h2 data-i18n="system.backups_restore">Backups & Restore</h2>
             </div>
             <div class="card-content">
                 <div style="margin-bottom: 15px;">

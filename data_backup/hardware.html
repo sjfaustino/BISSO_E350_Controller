@@ -4,8 +4,8 @@
 <div class="hardware-page">
     <!-- Page Header -->
     <div class="page-header">
-        <h2>🔌 Hardware Pin Configuration</h2>
-        <p class="page-description">
+        <h2 data-i18n="hardware.title">🔌 Hardware Pin Configuration</h2>
+        <p class="page-description" data-i18n="hardware.description">
             Configure pin connections for each device. Changes take effect immediately for testing.
             Click "Save Configuration" to persist to flash memory.
         </p>
@@ -17,12 +17,12 @@
         <!-- Serial Communications Card -->
         <div class="card device-card">
             <div class="card-header device-header serial-comm">
-                <h3>📟 Serial Communications</h3>
+                <h3 data-i18n="hardware.serial_comm">📟 Serial Communications</h3>
                 <span class="device-protocol">UART/RS485</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="wj66_baud">Encoder Baud (RS232):</label>
+                    <label for="wj66_baud" data-i18n="hardware.encoder_baud">Encoder Baud (RS232):</label>
                     <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
                         <select class="config-select" id="wj66_baud" data-config="encoder_baud" style="flex: 1;">
                             <option value="1200">1200</option>
@@ -34,13 +34,13 @@
                             <option value="57600">57600</option>
                             <option value="115200">115200</option>
                         </select>
-                        <button id="btn-detect-baud" class="btn btn-sm"
-                            title="Autodetect encoder baud rate">Detect</button>
+                        <button id="btn-detect-baud" class="btn btn-sm" title="Autodetect encoder baud rate"
+                            data-i18n="hardware.detect">Detect</button>
                     </div>
                 </div>
                 <div class="pin-row"
                     style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                    <label for="rs485_baud">RS485 Bus Baud:</label>
+                    <label for="rs485_baud" data-i18n="hardware.rs485_baud">RS485 Bus Baud:</label>
                     <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
                         <select class="config-select" id="rs485_baud" data-config="rs485_baud" style="flex: 1;">
                             <option value="4800">4800</option>
@@ -50,30 +50,31 @@
                             <option value="57600">57600</option>
                             <option value="115200">115200</option>
                         </select>
-                        <button id="btn-detect-rs485" class="btn btn-sm"
-                            title="Autodetect RS485 bus baud rate">Detect</button>
+                        <button id="btn-detect-rs485" class="btn btn-sm" title="Autodetect RS485 bus baud rate"
+                            data-i18n="hardware.detect">Detect</button>
                     </div>
                 </div>
-                <div class="device-note">Centralized timing for all serial devices</div>
+                <div class="device-note" data-i18n="hardware.serial_note">Centralized timing for all serial devices
+                </div>
             </div>
         </div>
 
         <!-- WJ66 Encoder Card -->
         <div class="card device-card">
             <div class="card-header device-header wj66">
-                <h3>📡 WJ66 Encoder</h3>
+                <h3 data-i18n="hardware.wj66_encoder">📡 WJ66 Encoder</h3>
                 <span class="device-protocol">RS232 TTL</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="wj66_rx">RX Pin:</label>
+                    <label for="wj66_rx" data-i18n="hardware.rx_pin">RX Pin:</label>
                     <select class="pin-select" id="wj66_rx" data-signal="wj66_rx">
                         <option value="14">HT1 (GPIO14)</option>
                         <option value="32">HT3 (GPIO32)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="wj66_tx">TX Pin:</label>
+                    <label for="wj66_tx" data-i18n="hardware.tx_pin">TX Pin:</label>
                     <select class="pin-select" id="wj66_tx" data-signal="wj66_tx">
                         <option value="33">HT2 (GPIO33)</option>
                         <option value="32">HT3 (GPIO32)</option>
@@ -85,32 +86,32 @@
         <!-- YH-TC05 Configuration Card -->
         <div class="card device-card">
             <div class="card-header device-header tachometer">
-                <h3>🔄 YH-TC05 Tachometer</h3>
+                <h3 data-i18n="hardware.tachometer">🔄 YH-TC05 Tachometer</h3>
                 <span class="device-protocol">RS485 Modbus</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="tach_rs485_a">RS485 A:</label>
+                    <label for="tach_rs485_a" data-i18n="hardware.rs485_a">RS485 A:</label>
                     <select class="pin-select" id="tach_rs485_a" data-signal="tach_rs485_a" disabled>
                         <option value="16">RS485_A (GPIO16)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="tach_rs485_b">RS485 B:</label>
+                    <label for="tach_rs485_b" data-i18n="hardware.rs485_b">RS485 B:</label>
                     <select class="pin-select" id="tach_rs485_b" data-signal="tach_rs485_b" disabled>
                         <option value="13">RS485_B (GPIO13)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="tach_addr">Modbus Address:</label>
+                    <label for="tach_addr" data-i18n="hardware.modbus_addr">Modbus Address:</label>
                     <input type="number" class="pin-input" id="tach_addr" value="3" min="1" max="247"
                         data-config="yhtc05_addr">
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
-                    <label for="tach_enabled">Enabled:</label>
+                    <label for="tach_enabled" data-i18n="hardware.enabled">Enabled:</label>
                     <input type="checkbox" id="tach_enabled" data-config="yhtc05_en" checked>
                 </div>
-                <div class="device-note">
+                <div class="device-note" data-i18n="hardware.tach_note">
                     Digital Tachometer for Spindle RPM measurement via Modbus RTU
                 </div>
             </div>
@@ -119,71 +120,71 @@
         <!-- Ethernet LAN8270A Card -->
         <div class="card device-card">
             <div class="card-header device-header ethernet">
-                <h3>🌐 Ethernet LAN8270A</h3>
+                <h3 data-i18n="hardware.ethernet_lan8270">🌐 Ethernet LAN8270A</h3>
                 <span class="device-protocol">RMII</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="eth_mdc">MDC Pin:</label>
+                    <label for="eth_mdc" data-i18n="hardware.mdc_pin">MDC Pin:</label>
                     <select class="pin-select" id="eth_mdc" disabled>
-                        <option>GPIO 23 (Fixed)</option>
+                        <option data-i18n="hardware.gpio23_fixed">GPIO 23 (Fixed)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="eth_mdio">MDIO Pin:</label>
+                    <label for="eth_mdio" data-i18n="hardware.mdio_pin">MDIO Pin:</label>
                     <select class="pin-select" id="eth_mdio" disabled>
-                        <option>GPIO 18 (Fixed)</option>
+                        <option data-i18n="hardware.gpio18_fixed">GPIO 18 (Fixed)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="eth_pwr">Power/Clk:</label>
+                    <label for="eth_pwr" data-i18n="hardware.pwr_clk">Power/Clk:</label>
                     <select class="pin-select" id="eth_pwr" disabled>
-                        <option>GPIO 17 (Fixed)</option>
+                        <option data-i18n="hardware.gpio17_fixed">GPIO 17 (Fixed)</option>
                     </select>
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
-                    <label for="eth_enabled">Enabled:</label>
+                    <label for="eth_enabled" data-i18n="hardware.enabled">Enabled:</label>
                     <input type="checkbox" id="eth_enabled" data-config="eth_en" checked>
                 </div>
-                <div class="device-note">Standard ESP32 RMII Interface (Fixed)</div>
+                <div class="device-note" data-i18n="hardware.eth_note">Standard ESP32 RMII Interface (Fixed)</div>
             </div>
         </div>
 
         <!-- LCD Display Card -->
         <div class="card device-card">
             <div class="card-header device-header lcd">
-                <h3>📺 LCD Display</h3>
+                <h3 data-i18n="hardware.lcd_display">📺 LCD Display</h3>
                 <span class="device-protocol">I2C</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="lcd_sda">SDA Pin:</label>
+                    <label for="lcd_sda" data-i18n="hardware.sda_pin">SDA Pin:</label>
                     <select class="pin-select" id="lcd_sda" data-signal="lcd_sda" disabled>
-                        <option value="4">GPIO4 (Fixed)</option>
+                        <option value="4" data-i18n="hardware.gpio4_fixed">GPIO4 (Fixed)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="lcd_scl">SCL Pin:</label>
+                    <label for="lcd_scl" data-i18n="hardware.scl_pin">SCL Pin:</label>
                     <select class="pin-select" id="lcd_scl" data-signal="lcd_scl" disabled>
-                        <option value="5">GPIO5 (Fixed)</option>
+                        <option value="5" data-i18n="hardware.gpio5_fixed">GPIO5 (Fixed)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="lcd_addr">I2C Address:</label>
+                    <label for="lcd_addr" data-i18n="hardware.i2c_addr">I2C Address:</label>
                     <input type="text" class="pin-input" id="lcd_addr" data-config="lcd_addr" value="0x27">
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
-                    <label for="lcd_enabled">Enabled:</label>
+                    <label for="lcd_enabled" data-i18n="hardware.enabled">Enabled:</label>
                     <input type="checkbox" id="lcd_enabled" data-config="lcd_en" checked>
                 </div>
-                <div class="device-note">20x4 character LCD via PCF8574</div>
+                <div class="device-note" data-i18n="hardware.lcd_note">20x4 character LCD via PCF8574</div>
             </div>
         </div>
 
         <!-- VFD Card -->
         <div class="card device-card">
             <div class="card-header device-header vfd">
-                <h3>⚡ VFD (Altivar31)</h3>
+                <h3 data-i18n="hardware.vfd_altivar">⚡ VFD (Altivar31)</h3>
                 <span class="device-protocol">RS485 Modbus</span>
             </div>
             <div class="card-content">
@@ -200,22 +201,23 @@
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="vfd_addr">Modbus Address:</label>
+                    <label for="vfd_addr" data-i18n="hardware.modbus_addr">Modbus Address:</label>
                     <input type="number" class="pin-input" id="vfd_addr" value="1" min="1" max="247"
                         data-config="vfd_addr">
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
-                    <label for="vfd_enabled">Enabled:</label>
+                    <label for="vfd_enabled" data-i18n="hardware.enabled">Enabled:</label>
                     <input type="checkbox" id="vfd_enabled" data-config="vfd_en" checked>
                 </div>
-                <div class="device-note">Variable frequency drive control (shared bus)</div>
+                <div class="device-note" data-i18n="hardware.vfd_note">Variable frequency drive control (shared bus)
+                </div>
             </div>
         </div>
 
         <!-- JXK-10 Card -->
         <div class="card device-card">
             <div class="card-header device-header jxk10">
-                <h3>🔋 JXK-10 Current Monitor</h3>
+                <h3 data-i18n="hardware.jxk10_current">🔋 JXK-10 Current Monitor</h3>
                 <span class="device-protocol">RS485 Modbus</span>
             </div>
             <div class="card-content">
@@ -232,44 +234,45 @@
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="jxk10_addr">Modbus Address:</label>
+                    <label for="jxk10_addr" data-i18n="hardware.modbus_addr">Modbus Address:</label>
                     <input type="number" class="pin-input" id="jxk10_addr" value="2" min="1" max="247"
                         data-config="jxk10_addr">
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
-                    <label for="jxk10_enabled">Enabled:</label>
+                    <label for="jxk10_enabled" data-i18n="hardware.enabled">Enabled:</label>
                     <input type="checkbox" id="jxk10_enabled" data-config="jxk10_en" checked>
                 </div>
-                <div class="device-note">Spindle current monitoring (shared bus with VFD)</div>
+                <div class="device-note" data-i18n="hardware.jxk10_note">Spindle current monitoring (shared bus with
+                    VFD)</div>
             </div>
         </div>
 
         <!-- PLC → ESP32 (Inputs) Card -->
         <div class="card device-card wide-card">
             <div class="card-header device-header plc-input">
-                <h3>← PLC → ESP32 (Inputs)</h3>
+                <h3 data-i18n="hardware.plc_inputs">← PLC → ESP32 (Inputs)</h3>
                 <span class="device-protocol">Digital Inputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-grid-4col">
                     <div class="pin-row">
-                        <label for="input_c">Consenso C:</label>
+                        <label for="input_c" data-i18n="hardware.consenso_c">Consenso C:</label>
                         <select class="pin-select" id="input_c" data-signal="input_c"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="input_t">Consenso T:</label>
+                        <label for="input_t" data-i18n="hardware.consenso_t">Consenso T:</label>
                         <select class="pin-select" id="input_t" data-signal="input_t"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="input_ct">Consenso C+T:</label>
+                        <label for="input_ct" data-i18n="hardware.consenso_ct">Consenso C+T:</label>
                         <select class="pin-select" id="input_ct" data-signal="input_ct"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="input_manual">Manual Mode:</label>
+                        <label for="input_manual" data-i18n="hardware.manual_mode">Manual Mode:</label>
                         <select class="pin-select" id="input_manual" data-signal="input_manual"></select>
                     </div>
                 </div>
-                <div class="device-note">Mode selection signals from ELBO PLC</div>
+                <div class="device-note" data-i18n="hardware.plc_input_note">Mode selection signals from ELBO PLC</div>
             </div>
         </div>
 
@@ -277,68 +280,70 @@
         <!-- Operator Buttons Card -->
         <div class="card device-card">
             <div class="card-header device-header switches">
-                <h3>🎚️ Operator Buttons</h3>
+                <h3 data-i18n="hardware.operator_buttons">🎚️ Operator Buttons</h3>
                 <span class="device-protocol">Digital Inputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="input_estop">E-Stop Button:</label>
+                    <label for="input_estop" data-i18n="hardware.estop_btn">E-Stop Button:</label>
                     <select class="pin-select" id="input_estop" data-signal="input_estop"></select>
                 </div>
                 <div class="pin-row">
-                    <label for="input_pause">Pause Button:</label>
+                    <label for="input_pause" data-i18n="hardware.pause_btn">Pause Button:</label>
                     <select class="pin-select" id="input_pause" data-signal="input_pause"></select>
                 </div>
                 <div class="pin-row">
-                    <label for="input_resume">Resume Button:</label>
+                    <label for="input_resume" data-i18n="hardware.resume_btn">Resume Button:</label>
                     <select class="pin-select" id="input_resume" data-signal="input_resume"></select>
                 </div>
-                <div class="device-note">Operator panel buttons via KC868-A16 inputs</div>
+                <div class="device-note" data-i18n="hardware.operator_note">Operator panel buttons via KC868-A16 inputs
+                </div>
             </div>
         </div>
 
         <!-- ESP32 → PLC (Outputs) Card -->
         <div class="card device-card wide-card">
             <div class="card-header device-header plc-output">
-                <h3>→ ESP32 → PLC (Outputs)</h3>
+                <h3 data-i18n="hardware.plc_outputs">→ ESP32 → PLC (Outputs)</h3>
                 <span class="device-protocol">Digital Outputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-grid-4col">
                     <div class="pin-row">
-                        <label for="output_axis_x">Axis X:</label>
+                        <label for="output_axis_x" data-i18n="hardware.axis_x">Axis X:</label>
                         <select class="pin-select" id="output_axis_x" data-signal="output_axis_x"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_axis_y">Axis Y:</label>
+                        <label for="output_axis_y" data-i18n="hardware.axis_y">Axis Y:</label>
                         <select class="pin-select" id="output_axis_y" data-signal="output_axis_y"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_axis_z">Axis Z:</label>
+                        <label for="output_axis_z" data-i18n="hardware.axis_z">Axis Z:</label>
                         <select class="pin-select" id="output_axis_z" data-signal="output_axis_z"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_dir_plus">Direction +:</label>
+                        <label for="output_dir_plus" data-i18n="hardware.dir_plus">Direction +:</label>
                         <select class="pin-select" id="output_dir_plus" data-signal="output_dir_plus"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_dir_minus">Direction −:</label>
+                        <label for="output_dir_minus" data-i18n="hardware.dir_minus">Direction −:</label>
                         <select class="pin-select" id="output_dir_minus" data-signal="output_dir_minus"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_speed_fast">Speed Fast:</label>
+                        <label for="output_speed_fast" data-i18n="hardware.speed_fast">Speed Fast:</label>
                         <select class="pin-select" id="output_speed_fast" data-signal="output_speed_fast"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_speed_med">Speed Med:</label>
+                        <label for="output_speed_med" data-i18n="hardware.speed_med">Speed Med:</label>
                         <select class="pin-select" id="output_speed_med" data-signal="output_speed_med"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_speed_slow">Speed Slow:</label>
+                        <label for="output_speed_slow" data-i18n="hardware.speed_slow">Speed Slow:</label>
                         <select class="pin-select" id="output_speed_slow" data-signal="output_speed_slow"></select>
                     </div>
                 </div>
-                <div class="device-note">Control signals to ELBO PLC via KC868-A16 digital outputs</div>
+                <div class="device-note" data-i18n="hardware.plc_output_note">Control signals to ELBO PLC via KC868-A16
+                    digital outputs</div>
             </div>
         </div>
 
@@ -347,46 +352,48 @@
         <!-- Tower Light Card -->
         <div class="card device-card">
             <div class="card-header device-header status-light">
-                <h3>🚦 Status Light</h3>
+                <h3 data-i18n="hardware.status_light">🚦 Status Light</h3>
                 <span class="device-protocol">Digital Outputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="output_status_green">🟢 Green (Idle):</label>
+                    <label for="output_status_green" data-i18n="hardware.green_idle">🟢 Green (Idle):</label>
                     <select class="pin-select" id="output_status_green" data-signal="output_status_green"></select>
                 </div>
                 <div class="pin-row">
-                    <label for="output_status_yellow">🟡 Yellow (Run):</label>
+                    <label for="output_status_yellow" data-i18n="hardware.yellow_run">🟡 Yellow (Run):</label>
                     <select class="pin-select" id="output_status_yellow" data-signal="output_status_yellow"></select>
                 </div>
                 <div class="pin-row">
-                    <label for="output_status_red">🔴 Red (Fault):</label>
+                    <label for="output_status_red" data-i18n="hardware.red_fault">🔴 Red (Fault):</label>
                     <select class="pin-select" id="output_status_red" data-signal="output_status_red"></select>
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
-                    <label for="status_light_enabled">Enabled:</label>
+                    <label for="status_light_enabled" data-i18n="hardware.enabled">Enabled:</label>
                     <input type="checkbox" id="status_light_enabled" data-config="status_light_en">
                 </div>
-                <div class="device-note">Visual status indicator via KC868-A16 outputs</div>
+                <div class="device-note" data-i18n="hardware.status_light_note">Visual status indicator via KC868-A16
+                    outputs</div>
             </div>
         </div>
 
         <!-- Buzzer Card -->
         <div class="card device-card">
             <div class="card-header device-header buzzer">
-                <h3>🔔 Audible Alarm</h3>
+                <h3 data-i18n="hardware.audible_alarm">🔔 Audible Alarm</h3>
                 <span class="device-protocol">Digital Outputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="output_buzzer">Buzzer Output:</label>
+                    <label for="output_buzzer" data-i18n="hardware.buzzer_output">Buzzer Output:</label>
                     <select class="pin-select" id="output_buzzer" data-signal="output_buzzer"></select>
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
-                    <label for="buzzer_enabled">Enabled:</label>
+                    <label for="buzzer_enabled" data-i18n="hardware.enabled">Enabled:</label>
                     <input type="checkbox" id="buzzer_enabled" data-config="buzzer_en" checked>
                 </div>
-                <div class="device-note">Audible alerts for job complete, warnings, faults</div>
+                <div class="device-note" data-i18n="hardware.buzzer_note">Audible alerts for job complete, warnings,
+                    faults</div>
             </div>
         </div>
     </div>
@@ -394,7 +401,7 @@
     <!-- Pin Summary Table -->
     <div class="card pin-summary-card">
         <div class="card-header">
-            <h3>📋 KC868-A16 Pin Summary</h3>
+            <h3 data-i18n="hardware.pin_summary">📋 KC868-A116 Pin Summary</h3>
         </div>
         <div class="card-content">
             <div id="pin-summary-table">
@@ -405,9 +412,11 @@
 
     <!-- Action Buttons -->
     <div class="action-bar">
-        <button class="btn btn-primary" id="save-config-btn">💾 Save Configuration</button>
-        <button class="btn btn-secondary" id="reload-config-btn">🔄 Reload</button>
-        <button class="btn btn-danger" id="reset-defaults-btn">⚠️ Reset to Defaults</button>
+        <button class="btn btn-primary" id="save-config-btn" data-i18n="hardware.save_config">💾 Save
+            Configuration</button>
+        <button class="btn btn-secondary" id="reload-config-btn" data-i18n="hardware.reload">🔄 Reload</button>
+        <button class="btn btn-danger" id="reset-defaults-btn" data-i18n="hardware.reset_defaults">⚠️ Reset to
+            Defaults</button>
     </div>
 
 

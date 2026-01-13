@@ -6,45 +6,47 @@
         <!-- Theme Settings Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Appearance</h2>
+                <h2 data-i18n="settings.appearance">Appearance</h2>
             </div>
             <div class="card-content">
                 <div class="setting-group">
-                    <label id="theme-label">Theme:</label>
+                    <label id="theme-label" data-i18n="settings.theme_label">Theme:</label>
                     <div class="theme-selector" role="radiogroup" aria-labelledby="theme-label">
                         <button class="theme-option" data-theme="light" title="Light Theme">
                             <div class="theme-preview light"></div>
-                            <span>Light</span>
+                            <span data-i18n="settings.light">Light</span>
                         </button>
                         <button class="theme-option" data-theme="dark" title="Dark Theme">
                             <div class="theme-preview dark"></div>
-                            <span>Dark</span>
+                            <span data-i18n="settings.dark">Dark</span>
                         </button>
                         <button class="theme-option" data-theme="high-contrast" title="High Contrast">
                             <div class="theme-preview high-contrast"></div>
-                            <span>High Contrast</span>
+                            <span data-i18n="settings.high_contrast">High Contrast</span>
                         </button>
                         <button class="theme-option" data-theme="colorblind" title="Colorblind Mode">
                             <div class="theme-preview colorblind"></div>
-                            <span>Colorblind</span>
+                            <span data-i18n="settings.colorblind">Colorblind</span>
                         </button>
                     </div>
                 </div>
 
                 <div class="setting-group">
-                    <label for="font-size-slider">Font Size: <span id="font-size-display">100</span>%</label>
+                    <label for="font-size-slider"><span data-i18n="settings.font_size">Font Size</span>: <span
+                            id="font-size-display">100</span>%</label>
                     <div class="slider-container">
                         <input type="range" id="font-size-slider" min="80" max="120" value="100" class="slider">
                         <div class="slider-labels">
-                            <span>Smaller</span>
-                            <span>Larger</span>
+                            <span data-i18n="settings.smaller">Smaller</span>
+                            <span data-i18n="settings.larger">Larger</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="setting-group">
                     <input type="checkbox" id="auto-refresh-toggle" checked>
-                    <label for="auto-refresh-toggle">Auto-refresh data (every 1 second)</label>
+                    <label for="auto-refresh-toggle" data-i18n="settings.auto_refresh">Auto-refresh data (every 1
+                        second)</label>
                 </div>
             </div>
         </div>
@@ -52,11 +54,12 @@
         <!-- Alert Settings Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Alert Thresholds</h2>
+                <h2 data-i18n="settings.alert_thresholds">Alert Thresholds</h2>
             </div>
             <div class="card-content">
                 <div class="setting-group">
-                    <label for="quality-threshold">Min. Quality Score Before Alert:</label>
+                    <label for="quality-threshold" data-i18n="settings.min_quality">Min. Quality Score Before
+                        Alert:</label>
                     <div class="input-with-value">
                         <input type="range" id="quality-threshold" min="0" max="100" value="50" class="slider">
                         <span class="input-value"><span id="quality-value">50</span>%</span>
@@ -64,7 +67,8 @@
                 </div>
 
                 <div class="setting-group">
-                    <label for="jitter-threshold">Max. Jitter Amplitude Before Alert:</label>
+                    <label for="jitter-threshold" data-i18n="settings.max_jitter">Max. Jitter Amplitude Before
+                        Alert:</label>
                     <div class="input-with-value">
                         <input type="range" id="jitter-threshold" min="0" max="5" step="0.1" value="1.0" class="slider">
                         <span class="input-value"><span id="jitter-value">1.0</span> mm/s</span>
@@ -72,7 +76,8 @@
                 </div>
 
                 <div class="setting-group">
-                    <label for="temp-threshold">Max. VFD Temperature Before Alert:</label>
+                    <label for="temp-threshold" data-i18n="settings.max_vfd_temp">Max. VFD Temperature Before
+                        Alert:</label>
                     <div class="input-with-value">
                         <input type="range" id="temp-threshold" min="30" max="100" value="80" class="slider">
                         <span class="input-value"><span id="temp-value">80</span>%</span>
@@ -81,36 +86,38 @@
 
                 <div class="setting-group">
                     <input type="checkbox" id="alert-sound-toggle" checked>
-                    <label for="alert-sound-toggle">Sound alerts enabled</label>
+                    <label for="alert-sound-toggle" data-i18n="settings.sound_alerts">Sound alerts enabled</label>
                 </div>
 
                 <div class="setting-group">
                     <input type="checkbox" id="alert-desktop-toggle" checked>
-                    <label for="alert-desktop-toggle">Desktop notifications enabled</label>
+                    <label for="alert-desktop-toggle" data-i18n="settings.desktop_alerts">Desktop notifications
+                        enabled</label>
                 </div>
 
-                <button class="btn btn-secondary" id="test-alert-btn">Test Alert Sound</button>
+                <button class="btn btn-secondary" id="test-alert-btn" data-i18n="settings.test_alert_btn">Test Alert
+                    Sound</button>
             </div>
         </div>
 
         <!-- Data Settings Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Data Management</h2>
+                <h2 data-i18n="settings.data_mgmt">Data Management</h2>
             </div>
             <div class="card-content">
                 <div class="setting-group">
-                    <label for="history-retention">History Retention:</label>
+                    <label for="history-retention" data-i18n="settings.history_retention">History Retention:</label>
                     <select id="history-retention" class="form-control">
-                        <option value="24">Last 24 hours</option>
-                        <option value="168">Last 7 days</option>
-                        <option value="720">Last 30 days</option>
-                        <option value="8760">Last 1 year</option>
+                        <option value="24" data-i18n="dashboard.last_24h">Last 24 hours</option>
+                        <option value="168" data-i18n="dashboard.last_7d">Last 7 days</option>
+                        <option value="720" data-i18n="dashboard.last_30d">Last 30 days</option>
+                        <option value="8760" data-i18n="dashboard.last_1y">Last 1 year</option>
                     </select>
                 </div>
 
                 <div class="setting-group">
-                    <label for="chart-resolution">Chart Resolution:</label>
+                    <label for="chart-resolution" data-i18n="settings.chart_resolution">Chart Resolution:</label>
                     <select id="chart-resolution" class="form-control">
                         <option value="1">Every 1 minute</option>
                         <option value="5">Every 5 minutes</option>
@@ -121,7 +128,7 @@
 
                 <div class="storage-info">
                     <div class="storage-stat">
-                        <span class="info-label">Local Storage Used:</span>
+                        <span class="info-label" data-i18n="settings.local_storage">Local Storage Used:</span>
                         <span id="storage-used">0</span> KB / <span id="storage-limit">5120</span> KB
                     </div>
                     <div class="storage-bar">
@@ -130,8 +137,10 @@
                 </div>
 
                 <div class="setting-group">
-                    <button class="btn btn-warning" id="clear-cache-btn">Clear Cache & History</button>
-                    <button class="btn btn-danger" id="factory-reset-btn">Factory Reset</button>
+                    <button class="btn btn-warning" id="clear-cache-btn" data-i18n="settings.clear_cache">Clear Cache &
+                        History</button>
+                    <button class="btn btn-danger" id="factory-reset-btn" data-i18n="settings.factory_reset">Factory
+                        Reset</button>
                 </div>
             </div>
         </div>
@@ -139,49 +148,51 @@
         <!-- Motion Control Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Motion Control</h2>
+                <h2 data-i18n="settings.motion_control">Motion Control</h2>
                 <span class="card-status" id="motion-status"></span>
             </div>
             <div class="card-content">
                 <div class="axis-group">
-                    <h3>X-Axis Soft Limits (mm)</h3>
+                    <h3 data-i18n="settings.x_limits">X-Axis Soft Limits (mm)</h3>
                     <div class="setting-group">
-                        <label for="x-limit-low">Lower Limit:</label>
+                        <label for="x-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
                         <input type="number" id="x-limit-low" min="0" max="1000" class="form-control">
                     </div>
                     <div class="setting-group">
-                        <label for="x-limit-high">Upper Limit:</label>
+                        <label for="x-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
                         <input type="number" id="x-limit-high" min="0" max="1000" class="form-control">
                     </div>
                 </div>
 
                 <div class="axis-group">
-                    <h3>Y-Axis Soft Limits (mm)</h3>
+                    <h3 data-i18n="settings.y_limits">Y-Axis Soft Limits (mm)</h3>
                     <div class="setting-group">
-                        <label for="y-limit-low">Lower Limit:</label>
+                        <label for="y-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
                         <input type="number" id="y-limit-low" min="0" max="1000" class="form-control">
                     </div>
                     <div class="setting-group">
-                        <label for="y-limit-high">Upper Limit:</label>
+                        <label for="y-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
                         <input type="number" id="y-limit-high" min="0" max="1000" class="form-control">
                     </div>
                 </div>
 
                 <div class="axis-group">
-                    <h3>Z-Axis Soft Limits (mm)</h3>
+                    <h3 data-i18n="settings.z_limits">Z-Axis Soft Limits (mm)</h3>
                     <div class="setting-group">
-                        <label for="z-limit-low">Lower Limit:</label>
+                        <label for="z-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
                         <input type="number" id="z-limit-low" min="0" max="1000" class="form-control">
                     </div>
                     <div class="setting-group">
-                        <label for="z-limit-high">Upper Limit:</label>
+                        <label for="z-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
                         <input type="number" id="z-limit-high" min="0" max="1000" class="form-control">
                     </div>
                 </div>
 
                 <div class="setting-group">
-                    <button class="btn btn-primary" id="save-motion-btn">Save Motion Settings</button>
-                    <button class="btn btn-secondary" id="reset-motion-btn">Reset to Defaults</button>
+                    <button class="btn btn-primary" id="save-motion-btn" data-i18n="settings.save_motion">Save Motion
+                        Settings</button>
+                    <button class="btn btn-secondary" id="reset-motion-btn" data-i18n="settings.reset_defaults">Reset to
+                        Defaults</button>
                 </div>
                 <div id="motion-error" class="error-message" style="display:none;"></div>
             </div>
@@ -190,12 +201,12 @@
         <!-- VFD Parameters Card -->
         <div class="card">
             <div class="card-header">
-                <h2>VFD Parameters</h2>
+                <h2 data-i18n="settings.vfd_params">VFD Parameters</h2>
                 <span class="card-status" id="vfd-status"></span>
             </div>
             <div class="card-content">
                 <div class="setting-group">
-                    <label for="vfd-min-speed">Minimum Speed (Hz):</label>
+                    <label for="vfd-min-speed" data-i18n="settings.min_speed">Minimum Speed (Hz):</label>
                     <div class="input-with-value">
                         <input type="number" id="vfd-min-speed" min="1" max="105" class="form-control">
                         <span class="input-value"><span id="vfd-min-display">1</span> Hz</span>
@@ -203,7 +214,7 @@
                 </div>
 
                 <div class="setting-group">
-                    <label for="vfd-max-speed">Maximum Speed (Hz):</label>
+                    <label for="vfd-max-speed" data-i18n="settings.max_speed">Maximum Speed (Hz):</label>
                     <div class="input-with-value">
                         <input type="number" id="vfd-max-speed" min="1" max="105" class="form-control">
                         <span class="input-value"><span id="vfd-max-display">105</span> Hz</span>
@@ -211,7 +222,7 @@
                 </div>
 
                 <div class="setting-group">
-                    <label for="vfd-acc-time">Acceleration Time (ms):</label>
+                    <label for="vfd-acc-time" data-i18n="settings.acc_time">Acceleration Time (ms):</label>
                     <div class="input-with-value">
                         <input type="number" id="vfd-acc-time" min="200" max="2000" step="50" class="form-control">
                         <span class="input-value"><span id="vfd-acc-display">600</span> ms</span>
@@ -219,7 +230,7 @@
                 </div>
 
                 <div class="setting-group">
-                    <label for="vfd-dec-time">Deceleration Time (ms):</label>
+                    <label for="vfd-dec-time" data-i18n="settings.dec_time">Deceleration Time (ms):</label>
                     <div class="input-with-value">
                         <input type="number" id="vfd-dec-time" min="200" max="2000" step="50" class="form-control">
                         <span class="input-value"><span id="vfd-dec-display">400</span> ms</span>
@@ -227,8 +238,10 @@
                 </div>
 
                 <div class="setting-group">
-                    <button class="btn btn-primary" id="save-vfd-btn">Save VFD Settings</button>
-                    <button class="btn btn-secondary" id="reset-vfd-btn">Reset to Defaults</button>
+                    <button class="btn btn-primary" id="save-vfd-btn" data-i18n="settings.save_vfd">Save VFD
+                        Settings</button>
+                    <button class="btn btn-secondary" id="reset-vfd-btn" data-i18n="settings.reset_defaults">Reset to
+                        Defaults</button>
                 </div>
                 <div id="vfd-error" class="error-message" style="display:none;"></div>
             </div>
@@ -237,12 +250,12 @@
         <!-- Spindle Alarm Configuration Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Spindle Alarm Configuration</h2>
+                <h2 data-i18n="settings.spindle_alarm">Spindle Alarm Configuration</h2>
                 <span class="card-status" id="spindle-alarm-status"></span>
             </div>
             <div class="card-content">
-                <p
-                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);"
+                    data-i18n="settings.spindle_desc">
                     Configure spindle load monitoring alarms for tool breakage and stall detection.
                 </p>
 
@@ -251,22 +264,24 @@
                     style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div>
-                            <span class="card-label">Tool Breakage:</span>
+                            <span class="card-label" data-i18n="settings.tool_breakage">Tool Breakage:</span>
                             <span class="card-value" id="alarm-toolbreak-status"
                                 style="color: var(--color-optimal);">OK</span>
                         </div>
                         <div>
-                            <span class="card-label">Stall Alarm:</span>
+                            <span class="card-label" data-i18n="settings.stall_alarm">Stall Alarm:</span>
                             <span class="card-value" id="alarm-stall-status"
                                 style="color: var(--color-optimal);">OK</span>
                         </div>
                     </div>
                     <button class="btn btn-secondary btn-small" id="clear-spindle-alarms-btn"
-                        style="margin-top: 10px; width: 100%;">Clear All Alarms</button>
+                        style="margin-top: 10px; width: 100%;" data-i18n="settings.clear_alarms">Clear All
+                        Alarms</button>
                 </div>
 
                 <div class="setting-group">
-                    <label for="spindle-toolbreak-threshold">Tool Breakage Threshold (sudden current drop):</label>
+                    <label for="spindle-toolbreak-threshold" data-i18n="settings.tool_break_thresh">Tool Breakage
+                        Threshold (sudden current drop):</label>
                     <div class="input-with-value">
                         <input type="range" id="spindle-toolbreak-threshold" min="1" max="20" step="0.5" value="5"
                             class="slider">
@@ -278,7 +293,8 @@
                 </div>
 
                 <div class="setting-group">
-                    <label for="spindle-stall-threshold">Stall Current Threshold:</label>
+                    <label for="spindle-stall-threshold" data-i18n="settings.stall_thresh">Stall Current
+                        Threshold:</label>
                     <div class="input-with-value">
                         <input type="range" id="spindle-stall-threshold" min="5" max="50" step="1" value="25"
                             class="slider">
@@ -290,7 +306,8 @@
                 </div>
 
                 <div class="setting-group">
-                    <label for="spindle-stall-timeout">Stall Detection Timeout:</label>
+                    <label for="spindle-stall-timeout" data-i18n="settings.stall_timeout">Stall Detection
+                        Timeout:</label>
                     <div class="input-with-value">
                         <input type="range" id="spindle-stall-timeout" min="500" max="10000" step="250" value="2000"
                             class="slider">
@@ -302,8 +319,10 @@
                 </div>
 
                 <div class="setting-group">
-                    <button class="btn btn-primary" id="save-spindle-alarm-btn">Save Alarm Settings</button>
-                    <button class="btn btn-secondary" id="reset-spindle-alarm-btn">Reset to Defaults</button>
+                    <button class="btn btn-primary" id="save-spindle-alarm-btn" data-i18n="settings.save_alarm">Save
+                        Alarm Settings</button>
+                    <button class="btn btn-secondary" id="reset-spindle-alarm-btn"
+                        data-i18n="settings.reset_defaults">Reset to Defaults</button>
                 </div>
                 <div id="spindle-alarm-error" class="error-message" style="display:none;"></div>
             </div>
@@ -312,53 +331,57 @@
         <!-- Encoder Calibration Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Encoder Calibration</h2>
+                <h2 data-i18n="settings.encoder_cal">Encoder Calibration</h2>
                 <span class="card-status" id="encoder-status"></span>
             </div>
             <div class="card-content">
-                <p
-                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);"
+                    data-i18n="settings.encoder_desc">
                     Pulses Per Millimeter (PPM) - typically 50-200 depending on encoder gearing
                 </p>
 
                 <div class="encoder-group">
-                    <h3>X-Axis Encoder</h3>
+                    <h3 data-i18n="settings.x_encoder">X-Axis Encoder</h3>
                     <div class="setting-group">
-                        <label for="x-encoder-ppm">PPM Value:</label>
+                        <label for="x-encoder-ppm" data-i18n="settings.ppm_value">PPM Value:</label>
                         <div class="input-with-value">
                             <input type="number" id="x-encoder-ppm" min="50" max="200" class="form-control">
                             <span class="input-value"><span id="x-ppm-display">100</span> PPM</span>
                         </div>
                     </div>
-                    <button class="btn btn-small btn-primary" id="calibrate-x-btn">Calibrate X</button>
+                    <button class="btn btn-small btn-primary" id="calibrate-x-btn"
+                        data-i18n="settings.calibrate_x">Calibrate X</button>
                 </div>
 
                 <div class="encoder-group">
-                    <h3>Y-Axis Encoder</h3>
+                    <h3 data-i18n="settings.y_encoder">Y-Axis Encoder</h3>
                     <div class="setting-group">
-                        <label for="y-encoder-ppm">PPM Value:</label>
+                        <label for="y-encoder-ppm" data-i18n="settings.ppm_value">PPM Value:</label>
                         <div class="input-with-value">
                             <input type="number" id="y-encoder-ppm" min="50" max="200" class="form-control">
                             <span class="input-value"><span id="y-ppm-display">100</span> PPM</span>
                         </div>
                     </div>
-                    <button class="btn btn-small btn-primary" id="calibrate-y-btn">Calibrate Y</button>
+                    <button class="btn btn-small btn-primary" id="calibrate-y-btn"
+                        data-i18n="settings.calibrate_y">Calibrate Y</button>
                 </div>
 
                 <div class="encoder-group">
-                    <h3>Z-Axis Encoder</h3>
+                    <h3 data-i18n="settings.z_encoder">Z-Axis Encoder</h3>
                     <div class="setting-group">
-                        <label for="z-encoder-ppm">PPM Value:</label>
+                        <label for="z-encoder-ppm" data-i18n="settings.ppm_value">PPM Value:</label>
                         <div class="input-with-value">
                             <input type="number" id="z-encoder-ppm" min="50" max="200" class="form-control">
                             <span class="input-value"><span id="z-ppm-display">100</span> PPM</span>
                         </div>
                     </div>
-                    <button class="btn btn-small btn-primary" id="calibrate-z-btn">Calibrate Z</button>
+                    <button class="btn btn-small btn-primary" id="calibrate-z-btn"
+                        data-i18n="settings.calibrate_z">Calibrate Z</button>
                 </div>
 
                 <div class="setting-group" style="margin-top: var(--space-lg);">
-                    <button class="btn btn-secondary" id="reset-encoder-btn">Reset All to Defaults</button>
+                    <button class="btn btn-secondary" id="reset-encoder-btn" data-i18n="settings.reset_encoder">Reset
+                        All to Defaults</button>
                 </div>
                 <div id="encoder-error" class="error-message" style="display:none;"></div>
             </div>
@@ -369,7 +392,7 @@
         <!-- Configuration Import/Export Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Configuration Management</h2>
+                <h2 data-i18n="settings.config_mgmt">Configuration Management</h2>
             </div>
             <div class="card-content">
                 <!-- Backup Status Banner -->
@@ -377,64 +400,76 @@
                     style="margin-bottom: 20px; padding: 12px; border-radius: 8px; background: var(--bg-secondary);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <span style="font-weight: 600;">Last Backup:</span>
+                            <span style="font-weight: 600;" data-i18n="settings.last_backup">Last Backup:</span>
                             <span id="last-backup-text" style="margin-left: 8px;">Never</span>
                         </div>
                         <span id="backup-status-icon" style="font-size: 1.2em;">⚠️</span>
                     </div>
                     <div id="backup-warning"
                         style="margin-top: 8px; font-size: var(--font-size-sm); color: var(--color-warning); display: none;">
-                        It's recommended to backup your configuration regularly.
+                        data-i18n="settings.backup_warning">It's recommended to backup your configuration regularly.
                     </div>
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Configuration
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;"
+                        data-i18n="settings.config_presets">Configuration
                         Presets</h3>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                        <label for="preset-select" class="sr-only">Configuration Preset</label>
+                        <label for="preset-select" class="sr-only" data-i18n="settings.config_presets">Configuration
+                            Preset</label>
                         <select id="preset-select" class="form-control">
-                            <option value="">-- Select a preset --</option>
+                            <option value="" data-i18n="settings.select_preset">-- Select a preset --</option>
                             <option value="limestone">Limestone</option>
                             <option value="marble">Marble</option>
                             <option value="soft_granite">Soft Granite</option>
                             <option value="hard_granite">Hard Granite</option>
                         </select>
-                        <button class="btn btn-primary" id="load-preset-btn">Load Preset</button>
+                        <button class="btn btn-primary" id="load-preset-btn" data-i18n="settings.load_preset">Load
+                            Preset</button>
                     </div>
                 </div>
 
                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Export
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;"
+                        data-i18n="settings.export_config">Export
                         Configuration</h3>
-                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
+                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;"
+                        data-i18n="settings.export_desc">
                         Download current configuration as JSON file for backup or sharing
                     </p>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <button class="btn btn-secondary" id="export-all-btn">Export All Settings</button>
-                        <button class="btn btn-ghost" id="export-motion-btn">Export Motion Only</button>
+                        <button class="btn btn-secondary" id="export-all-btn" data-i18n="settings.export_all">Export All
+                            Settings</button>
+                        <button class="btn btn-ghost" id="export-motion-btn" data-i18n="settings.export_motion">Export
+                            Motion Only</button>
                     </div>
                 </div>
 
                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Import
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;"
+                        data-i18n="settings.import_config">Import
                         Configuration</h3>
-                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
+                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;"
+                        data-i18n="settings.import_desc">
                         Upload a previously saved configuration file to restore settings
                     </p>
-                    <button class="btn btn-secondary" id="import-config-btn"
-                        style="width: 100%; margin-bottom: 10px;">Choose File & Import</button>
+                    <button class="btn btn-secondary" id="import-config-btn" style="width: 100%; margin-bottom: 10px;"
+                        data-i18n="settings.choose_file">Choose File & Import</button>
                     <div id="import-status"
                         style="font-size: var(--font-size-sm); display: none; padding: 10px; background: var(--bg-secondary); border-radius: 4px; margin-top: 10px;">
                     </div>
                 </div>
 
                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
-                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Comparison</h3>
-                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
+                    <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;"
+                        data-i18n="settings.comparison">Comparison</h3>
+                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;"
+                        data-i18n="settings.compare_desc">
                         Compare current settings with a backup file before importing
                     </p>
-                    <button class="btn btn-ghost" id="compare-config-btn">Compare with File</button>
+                    <button class="btn btn-ghost" id="compare-config-btn" data-i18n="settings.compare_btn">Compare with
+                        File</button>
                     <div id="comparison-result"
                         style="font-size: var(--font-size-sm); display: none; margin-top: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 4px; max-height: 200px; overflow-y: auto;">
                     </div>
@@ -445,21 +480,23 @@
         <!-- CLI Options Card -->
         <div class="card">
             <div class="card-header">
-                <h2>CLI Options</h2>
+                <h2 data-i18n="settings.cli_options">CLI Options</h2>
             </div>
             <div class="card-content">
-                <p
-                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);"
+                    data-i18n="settings.cli_desc">
                     Settings for Serial and Telnet command-line interfaces.
                 </p>
 
                 <div class="setting-group">
                     <input type="checkbox" id="cli-echo-toggle">
-                    <label for="cli-echo-toggle">Enable local echo (show typed characters)</label>
+                    <label for="cli-echo-toggle" data-i18n="settings.enable_echo">Enable local echo (show typed
+                        characters)</label>
                 </div>
 
                 <div class="setting-group">
-                    <button class="btn btn-primary" id="save-cli-options-btn">Save CLI Settings</button>
+                    <button class="btn btn-primary" id="save-cli-options-btn" data-i18n="settings.save_cli">Save CLI
+                        Settings</button>
                 </div>
                 <div id="cli-options-error" class="error-message" style="display:none;"></div>
             </div>
@@ -468,24 +505,27 @@
         <!-- OTA Settings Card -->
         <div class="card">
             <div class="card-header">
-                <h2>OTA Updates</h2>
+                <h2 data-i18n="settings.ota_updates">OTA Updates</h2>
             </div>
             <div class="card-content">
-                <p
-                    style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);">
+                <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md);"
+                    data-i18n="settings.ota_desc">
                     Over-the-air firmware update settings. Disable GitHub check to save ~16KB memory.
                 </p>
 
                 <div class="setting-group">
                     <input type="checkbox" id="ota-check-toggle">
-                    <label for="ota-check-toggle">Enable automatic GitHub update check</label>
-                    <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;">
+                    <label for="ota-check-toggle" data-i18n="settings.enable_ota">Enable automatic GitHub update
+                        check</label>
+                    <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 4px;"
+                        data-i18n="settings.ota_note">
                         Checks GitHub for new firmware versions at boot. Requires internet connection.
                     </div>
                 </div>
 
                 <div class="setting-group">
-                    <button class="btn btn-primary" id="save-ota-settings-btn">Save OTA Settings</button>
+                    <button class="btn btn-primary" id="save-ota-settings-btn" data-i18n="settings.save_ota">Save OTA
+                        Settings</button>
                 </div>
                 <div id="ota-settings-error" class="error-message" style="display:none;"></div>
             </div>

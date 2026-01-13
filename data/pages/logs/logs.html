@@ -6,11 +6,11 @@
         <!-- Log Filters Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Log Filters</h2>
+                <h2 data-i18n="logs.log_filters">Log Filters</h2>
             </div>
             <div class="card-content">
                 <div class="filter-group">
-                    <label for="log-level-filter">Level:</label>
+                    <label for="log-level-filter" data-i18n="logs.level">Level:</label>
                     <select id="log-level-filter" class="form-control">
                         <option value="">All Levels</option>
                         <option value="INFO">Info</option>
@@ -21,7 +21,7 @@
                 </div>
 
                 <div class="filter-group">
-                    <label for="log-source-filter">Source:</label>
+                    <label for="log-source-filter" data-i18n="logs.source">Source:</label>
                     <select id="log-source-filter" class="form-control">
                         <option value="">All Sources</option>
                         <option value="motion">Motion</option>
@@ -33,13 +33,15 @@
                 </div>
 
                 <div class="filter-group">
-                    <label for="log-search">Search:</label>
+                    <label for="log-search" data-i18n="logs.search">Search:</label>
                     <input type="text" id="log-search" class="form-control" placeholder="Search logs...">
                 </div>
 
                 <div class="filter-buttons">
-                    <button class="btn btn-primary" id="filter-apply-btn">Apply Filters</button>
-                    <button class="btn btn-secondary" id="filter-clear-btn">Clear All</button>
+                    <button class="btn btn-primary" id="filter-apply-btn" data-i18n="logs.apply_filters">Apply
+                        Filters</button>
+                    <button class="btn btn-secondary" id="filter-clear-btn" data-i18n="logs.clear_all">Clear
+                        All</button>
                 </div>
             </div>
         </div>
@@ -47,24 +49,24 @@
         <!-- Log Statistics Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Log Statistics</h2>
+                <h2 data-i18n="logs.log_statistics">Log Statistics</h2>
             </div>
             <div class="card-content">
                 <div class="stats-grid">
                     <div class="stat-item">
-                        <div class="stat-label">Total Events</div>
+                        <div class="stat-label" data-i18n="logs.total_events">Total Events</div>
                         <div class="stat-value" id="stat-total">0</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">Critical</div>
+                        <div class="stat-label" data-i18n="logs.critical">Critical</div>
                         <div class="stat-value critical" id="stat-critical">0</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">Errors</div>
+                        <div class="stat-label" data-i18n="logs.errors">Errors</div>
                         <div class="stat-value error" id="stat-error">0</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-label">Warnings</div>
+                        <div class="stat-label" data-i18n="logs.warnings">Warnings</div>
                         <div class="stat-value warning" id="stat-warning">0</div>
                     </div>
                 </div>
@@ -74,11 +76,14 @@
         <!-- Real-Time Log Tail Card -->
         <div class="card" style="grid-column: 1 / -1;">
             <div class="card-header">
-                <h2>Event Log</h2>
+                <h2 data-i18n="logs.event_log">Event Log</h2>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-secondary btn-sm" id="export-csv-btn">Export CSV</button>
-                    <button class="btn btn-secondary btn-sm" id="export-json-btn">Export JSON</button>
-                    <button class="btn btn-secondary btn-sm" id="clear-logs-btn">Clear Logs</button>
+                    <button class="btn btn-secondary btn-sm" id="export-csv-btn" data-i18n="logs.export_csv">Export
+                        CSV</button>
+                    <button class="btn btn-secondary btn-sm" id="export-json-btn" data-i18n="logs.export_json">Export
+                        JSON</button>
+                    <button class="btn btn-secondary btn-sm" id="clear-logs-btn" data-i18n="logs.clear_logs">Clear
+                        Logs</button>
                 </div>
             </div>
             <div class="card-content">

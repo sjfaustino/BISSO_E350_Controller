@@ -5,7 +5,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2 id="diag-header-axis-x">Axis X Diagnostics</h2>
+                <h2 id="diag-header-axis-x" data-i18n="diagnostics.axis_x">Axis X Diagnostics</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -29,7 +29,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2 id="diag-header-axis-y">Axis Y Diagnostics</h2>
+                <h2 id="diag-header-axis-y" data-i18n="diagnostics.axis_y">Axis Y Diagnostics</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -53,7 +53,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h2 id="diag-header-axis-z">Axis Z Diagnostics</h2>
+                <h2 id="diag-header-axis-z" data-i18n="diagnostics.axis_z">Axis Z Diagnostics</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -80,8 +80,9 @@
         <!-- Safety Status Card (simplified - operator panel controls elsewhere) -->
         <div class="card">
             <div class="card-header">
-                <h2>Safety Status</h2>
-                <button class="btn btn-small btn-secondary" id="refresh-io-btn">Refresh</button>
+                <h2 data-i18n="diagnostics.safety_status">Safety Status</h2>
+                <button class="btn btn-small btn-secondary" id="refresh-io-btn"
+                    data-i18n="diagnostics.refresh">Refresh</button>
             </div>
             <div class="card-content">
                 <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
@@ -106,7 +107,7 @@
         <!-- Enhanced Encoder Status Card -->
         <div class="card">
             <div class="card-header">
-                <h2 id="diag-header-encoder">Encoder Status</h2>
+                <h2 id="diag-header-encoder" data-i18n="diagnostics.encoder_status">Encoder Status</h2>
             </div>
             <div class="card-content">
                 <div class="encoder-row">
@@ -167,8 +168,9 @@
         <!-- Fault Log Viewer Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Fault Log</h2>
-                <button class="btn btn-small btn-secondary" id="clear-faults-btn">Clear</button>
+                <h2 data-i18n="diagnostics.fault_log">Fault Log</h2>
+                <button class="btn btn-small btn-secondary" id="clear-faults-btn"
+                    data-i18n="diagnostics.clear">Clear</button>
             </div>
             <div class="card-content">
                 <div class="fault-summary" style="margin-bottom: 15px;">
@@ -185,7 +187,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2 id="diag-header-vfd">VFD Diagnostics</h2>
+                <h2 id="diag-header-vfd" data-i18n="diagnostics.vfd_diagnostics">VFD Diagnostics</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -210,7 +212,7 @@
         <!-- YH-TC05 Tachometer Card -->
         <div class="card">
             <div class="card-header">
-                <h2 id="diag-header-tach">YH-TC05 Tachometer</h2>
+                <h2 id="diag-header-tach" data-i18n="diagnostics.tachometer">YH-TC05 Tachometer</h2>
             </div>
             <div class="card-content">
                 <div class="metric-card">
@@ -250,7 +252,8 @@
             <h2 id="diag-header-spindle-rt">🪚 Saw Blade Current (Real-time)</h2>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <span id="spindle-status-badge" class="badge badge-success">OK</span>
-                <button class="btn btn-small btn-secondary" id="spindle-graph-pause">Pause</button>
+                <button class="btn btn-small btn-secondary" id="spindle-graph-pause"
+                    data-i18n="diagnostics.pause">Pause</button>
             </div>
         </div>
         <div class="card-content">
@@ -287,8 +290,9 @@
     <!-- I/O Expander Diagnostics Card -->
     <div class="card" style="margin-top: 20px;">
         <div class="card-header">
-            <h3>🔌 I/O Expander Diagnostics</h3>
-            <button class="btn btn-small btn-secondary" id="refresh-io-diag-btn">Refresh</button>
+            <h3 data-i18n="diagnostics.io_expander">🔌 I/O Expander Diagnostics</h3>
+            <button class="btn btn-small btn-secondary" id="refresh-io-diag-btn"
+                data-i18n="diagnostics.refresh">Refresh</button>
         </div>
         <div class="card-content">
             <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
@@ -397,8 +401,9 @@
     <!-- Trend Charts Card -->
     <div class="card" style="margin-top: 20px;">
         <div class="card-header">
-            <h2>📈 Trend Charts (Last 60 Seconds)</h2>
-            <button class="btn btn-small btn-secondary" id="refresh-trends-btn">Refresh</button>
+            <h2 data-i18n="diagnostics.trend_charts">📈 Trend Charts (Last 60 Seconds)</h2>
+            <button class="btn btn-small btn-secondary" id="refresh-trends-btn"
+                data-i18n="diagnostics.refresh">Refresh</button>
         </div>
         <div class="card-content">
             <div class="trend-charts-grid">
@@ -435,10 +440,12 @@
     <!-- Boot Log Viewer Card -->
     <div class="card" style="margin-top: 20px;">
         <div class="card-header">
-            <h2>📋 Boot Log</h2>
+            <h2 data-i18n="diagnostics.boot_log">📋 Boot Log</h2>
             <div style="display: flex; gap: 8px;">
-                <button class="btn btn-small btn-secondary" id="refresh-bootlog-btn">Refresh</button>
-                <button class="btn btn-small btn-danger" id="delete-bootlog-btn">Delete</button>
+                <button class="btn btn-small btn-secondary" id="refresh-bootlog-btn"
+                    data-i18n="diagnostics.refresh">Refresh</button>
+                <button class="btn btn-small btn-danger" id="delete-bootlog-btn"
+                    data-i18n="diagnostics.delete">Delete</button>
             </div>
         </div>
         <div class="card-content">

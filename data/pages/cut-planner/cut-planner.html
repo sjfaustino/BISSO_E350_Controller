@@ -1,7 +1,8 @@
 <!-- Cut Planner Page -->
 <div class="page-header">
-    <h1>Cut Planner</h1>
-    <p>Create cutting jobs without writing G-code. Select a job type, enter parameters, preview, and run.</p>
+    <h1 data-i18n="cut_planner.title">Cut Planner</h1>
+    <p data-i18n="cut_planner.desc">Create cutting jobs without writing G-code. Select a job type, enter parameters,
+        preview, and run.</p>
 </div>
 
 <div class="card-grid">
@@ -42,7 +43,7 @@
     <!-- Single Linear Cut -->
     <div class="card" id="card-single-cut">
         <div class="card-header">
-            <h2>Single Linear Cut</h2>
+            <h2 data-i18n="cut_planner.single_cut">Single Linear Cut</h2>
         </div>
         <div class="card-content">
             <div class="card-diagram">
@@ -75,24 +76,27 @@
                         marker-end="url(#arrow)" />
                 </svg>
             </div>
-            <p class="card-description">One straight cut along the Y-axis at a fixed depth.</p>
+            <p class="card-description" data-i18n="cut_planner.single_desc">One straight cut along the Y-axis at a fixed
+                depth.</p>
             <div class="form-grid">
                 <div class="form-group">
-                    <label for="single-start-y">Start Y (mm)</label>
+                    <label for="single-start-y" data-i18n="cut_planner.start_y">Start Y (mm)</label>
                     <input type="number" id="single-start-y" value="0" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="single-end-y">End Y (mm)</label>
+                    <label for="single-end-y" data-i18n="cut_planner.end_y">End Y (mm)</label>
                     <input type="number" id="single-end-y" value="100" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="single-depth">Cut Depth (mm)</label>
+                    <label for="single-depth" data-i18n="cut_planner.cut_depth">Cut Depth (mm)</label>
                     <input type="number" id="single-depth" value="10" min="0" step="1">
                 </div>
             </div>
             <div class="card-actions">
-                <button class="btn btn-ghost" onclick="CutPlanner.preview('single')">Preview G-Code</button>
-                <button class="btn btn-success" onclick="CutPlanner.run('single')">Run Job</button>
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('single')"
+                    data-i18n="cut_planner.preview">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('single')" data-i18n="cut_planner.run_job">Run
+                    Job</button>
             </div>
         </div>
     </div>
@@ -100,7 +104,7 @@
     <!-- Linear Cut with Passes -->
     <div class="card" id="card-linear-passes">
         <div class="card-header">
-            <h2>Linear Cut with Passes</h2>
+            <h2 data-i18n="cut_planner.linear_passes">Linear Cut with Passes</h2>
         </div>
         <div class="card-content">
             <div class="card-diagram">
@@ -135,33 +139,36 @@
                     <line x1="108" y1="64" x2="72" y2="64" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)" />
                 </svg>
             </div>
-            <p class="card-description">Bidirectional Y-axis cuts with incremental depth per pass.</p>
+            <p class="card-description" data-i18n="cut_planner.linear_desc">Bidirectional Y-axis cuts with incremental
+                depth per pass.</p>
             <div class="form-grid">
                 <div class="form-group">
-                    <label for="passes-start-y">Start Y (mm)</label>
+                    <label for="passes-start-y" data-i18n="cut_planner.start_y">Start Y (mm)</label>
                     <input type="number" id="passes-start-y" value="0" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="passes-end-y">End Y (mm)</label>
+                    <label for="passes-end-y" data-i18n="cut_planner.end_y">End Y (mm)</label>
                     <input type="number" id="passes-end-y" value="100" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="passes-total-depth">Total Depth (mm)</label>
+                    <label for="passes-total-depth" data-i18n="cut_planner.total_depth">Total Depth (mm)</label>
                     <input type="number" id="passes-total-depth" value="50" min="1" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="passes-forward">Forward Pass Depth (mm)</label>
+                    <label for="passes-forward" data-i18n="cut_planner.forward_pass">Forward Pass Depth (mm)</label>
                     <input type="number" id="passes-forward" value="5" min="1" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="passes-backward">Backward Pass Depth (mm)</label>
+                    <label for="passes-backward" data-i18n="cut_planner.backward_pass">Backward Pass Depth (mm)</label>
                     <input type="number" id="passes-backward" value="5" min="0" step="1">
-                    <small>Set to 0 to cut only on forward passes</small>
+                    <small data-i18n="cut_planner.backward_note">Set to 0 to cut only on forward passes</small>
                 </div>
             </div>
             <div class="card-actions">
-                <button class="btn btn-ghost" onclick="CutPlanner.preview('linear-passes')">Preview G-Code</button>
-                <button class="btn btn-success" onclick="CutPlanner.run('linear-passes')">Run Job</button>
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('linear-passes')"
+                    data-i18n="cut_planner.preview">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('linear-passes')"
+                    data-i18n="cut_planner.run_job">Run Job</button>
             </div>
         </div>
     </div>
@@ -169,7 +176,7 @@
     <!-- Parallel Cuts -->
     <div class="card" id="card-parallel">
         <div class="card-header">
-            <h2>Parallel Cuts</h2>
+            <h2 data-i18n="cut_planner.parallel">Parallel Cuts</h2>
         </div>
         <div class="card-content">
             <div class="card-diagram">
@@ -207,32 +214,35 @@
                         marker-end="url(#arrow)" />
                 </svg>
             </div>
-            <p class="card-description">Multiple fixed-depth cuts spaced apart along the X-axis.</p>
+            <p class="card-description" data-i18n="cut_planner.parallel_desc">Multiple fixed-depth cuts spaced apart
+                along the X-axis.</p>
             <div class="form-grid">
                 <div class="form-group">
-                    <label for="parallel-start-y">Start Y (mm)</label>
+                    <label for="parallel-start-y" data-i18n="cut_planner.start_y">Start Y (mm)</label>
                     <input type="number" id="parallel-start-y" value="0" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="parallel-end-y">End Y (mm)</label>
+                    <label for="parallel-end-y" data-i18n="cut_planner.end_y">End Y (mm)</label>
                     <input type="number" id="parallel-end-y" value="100" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="parallel-depth">Cut Depth (mm)</label>
+                    <label for="parallel-depth" data-i18n="cut_planner.cut_depth">Cut Depth (mm)</label>
                     <input type="number" id="parallel-depth" value="10" min="1" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="parallel-num-cuts">Number of Cuts</label>
+                    <label for="parallel-num-cuts" data-i18n="cut_planner.num_cuts">Number of Cuts</label>
                     <input type="number" id="parallel-num-cuts" value="5" min="1" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="parallel-x-step">X Step (mm)</label>
+                    <label for="parallel-x-step" data-i18n="cut_planner.x_step">X Step (mm)</label>
                     <input type="number" id="parallel-x-step" value="35" min="1" step="1">
                 </div>
             </div>
             <div class="card-actions">
-                <button class="btn btn-ghost" onclick="CutPlanner.preview('parallel')">Preview G-Code</button>
-                <button class="btn btn-success" onclick="CutPlanner.run('parallel')">Run Job</button>
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('parallel')"
+                    data-i18n="cut_planner.preview">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('parallel')" data-i18n="cut_planner.run_job">Run
+                    Job</button>
             </div>
         </div>
     </div>
@@ -240,7 +250,7 @@
     <!-- Parallel Cuts with Passes -->
     <div class="card" id="card-parallel-passes">
         <div class="card-header">
-            <h2>Parallel Cuts with Passes</h2>
+            <h2 data-i18n="cut_planner.parallel_passes">Parallel Cuts with Passes</h2>
         </div>
         <div class="card-content">
             <div class="card-diagram">
@@ -276,41 +286,44 @@
                     <line x1="115" y1="82" x2="85" y2="82" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)" />
                 </svg>
             </div>
-            <p class="card-description">Multiple cuts with bidirectional depth passes, spaced along X.</p>
+            <p class="card-description" data-i18n="cut_planner.parallel_desc2">Multiple cuts with bidirectional depth
+                passes, spaced along X.</p>
             <div class="form-grid">
                 <div class="form-group">
-                    <label for="pp-start-y">Start Y (mm)</label>
+                    <label for="pp-start-y" data-i18n="cut_planner.start_y">Start Y (mm)</label>
                     <input type="number" id="pp-start-y" value="0" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="pp-end-y">End Y (mm)</label>
+                    <label for="pp-end-y" data-i18n="cut_planner.end_y">End Y (mm)</label>
                     <input type="number" id="pp-end-y" value="100" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="pp-total-depth">Total Depth (mm)</label>
+                    <label for="pp-total-depth" data-i18n="cut_planner.total_depth">Total Depth (mm)</label>
                     <input type="number" id="pp-total-depth" value="50" min="1" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="pp-forward">Forward Pass Depth (mm)</label>
+                    <label for="pp-forward" data-i18n="cut_planner.forward_pass">Forward Pass Depth (mm)</label>
                     <input type="number" id="pp-forward" value="5" min="1" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="pp-backward">Backward Pass Depth (mm)</label>
+                    <label for="pp-backward" data-i18n="cut_planner.backward_pass">Backward Pass Depth (mm)</label>
                     <input type="number" id="pp-backward" value="5" min="0" step="1">
-                    <small>Set to 0 to cut only on forward passes</small>
+                    <small data-i18n="cut_planner.backward_note">Set to 0 to cut only on forward passes</small>
                 </div>
                 <div class="form-group">
-                    <label for="pp-num-cuts">Number of Cuts</label>
+                    <label for="pp-num-cuts" data-i18n="cut_planner.num_cuts">Number of Cuts</label>
                     <input type="number" id="pp-num-cuts" value="3" min="1" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="pp-x-step">X Step (mm)</label>
+                    <label for="pp-x-step" data-i18n="cut_planner.x_step">X Step (mm)</label>
                     <input type="number" id="pp-x-step" value="35" min="1" step="1">
                 </div>
             </div>
             <div class="card-actions">
-                <button class="btn btn-ghost" onclick="CutPlanner.preview('parallel-passes')">Preview G-Code</button>
-                <button class="btn btn-success" onclick="CutPlanner.run('parallel-passes')">Run Job</button>
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('parallel-passes')"
+                    data-i18n="cut_planner.preview">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('parallel-passes')"
+                    data-i18n="cut_planner.run_job">Run Job</button>
             </div>
         </div>
     </div>
@@ -319,15 +332,16 @@
     <div id="gcode-preview-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>G-Code Preview</h2>
+                <h2 data-i18n="cut_planner.gcode_preview">G-Code Preview</h2>
                 <button class="modal-close" onclick="CutPlanner.closePreview()">&times;</button>
             </div>
             <div class="modal-body">
                 <pre id="gcode-preview-content"></pre>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-ghost" onclick="CutPlanner.closePreview()">Cancel</button>
-                <button class="btn btn-success" id="gcode-preview-run">Run Job</button>
+                <button class="btn btn-ghost" onclick="CutPlanner.closePreview()"
+                    data-i18n="cut_planner.cancel">Cancel</button>
+                <button class="btn btn-success" id="gcode-preview-run" data-i18n="cut_planner.run_job">Run Job</button>
             </div>
         </div>
     </div>

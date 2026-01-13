@@ -5,10 +5,12 @@
     <!-- G-code Editor Card -->
     <div class="card" style="margin-bottom: var(--space-xl);">
         <div class="card-header">
-            <h2>G-CODE COMMAND INPUT</h2>
+            <h2 data-i18n="gcode.command_input">G-CODE COMMAND INPUT</h2>
             <div style="display: flex; gap: 10px;">
-                <button class="btn btn-sm btn-ghost" id="clear-editor" title="Clear editor">Clear</button>
-                <button class="btn btn-sm btn-ghost" id="load-examples" title="Load example G-code">Examples</button>
+                <button class="btn btn-sm btn-ghost" id="clear-editor" title="Clear editor"
+                    data-i18n="gcode.clear">Clear</button>
+                <button class="btn btn-sm btn-ghost" id="load-examples" title="Load example G-code"
+                    data-i18n="gcode.examples">Examples</button>
             </div>
         </div>
         <div class="card-content">
@@ -20,16 +22,16 @@
             </div>
             <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
                 <button class="btn btn-primary" id="send-command">
-                    <span>▶️ Execute Command</span>
+                    <span data-i18n="gcode.execute_cmd">▶️ Execute Command</span>
                 </button>
                 <button class="btn btn-secondary" id="send-all">
-                    <span>▶️▶️ Execute All Lines</span>
+                    <span data-i18n="gcode.execute_all">▶️▶️ Execute All Lines</span>
                 </button>
                 <button class="btn btn-warning" id="pause-execution">
-                    <span>⏸️ Pause</span>
+                    <span data-i18n="gcode.pause">⏸️ Pause</span>
                 </button>
                 <button class="btn btn-danger" id="stop-execution">
-                    <span>⏹️ Stop</span>
+                    <span data-i18n="gcode.stop">⏹️ Stop</span>
                 </button>
             </div>
         </div>
@@ -39,20 +41,20 @@
         <!-- Parser State Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Parser State</h2>
+                <h2 data-i18n="gcode.parser_state">Parser State</h2>
             </div>
             <div class="card-content">
                 <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px 20px; align-items: center;">
-                    <span class="metric-label">Distance Mode:</span>
+                    <span class="metric-label" data-i18n="gcode.distance_mode">Distance Mode:</span>
                     <span class="metric-value" id="distance-mode">G90 (Absolute)</span>
 
-                    <span class="metric-label">Work Coordinate:</span>
+                    <span class="metric-label" data-i18n="gcode.work_coord">Work Coordinate:</span>
                     <span class="metric-value" id="work-coordinate">G54</span>
 
-                    <span class="metric-label">Feed Rate:</span>
+                    <span class="metric-label" data-i18n="gcode.feed_rate">Feed Rate:</span>
                     <span class="metric-value" id="feed-rate">-- mm/min</span>
 
-                    <span class="metric-label">Motion State:</span>
+                    <span class="metric-label" data-i18n="gcode.motion_state">Motion State:</span>
                     <span class="metric-value" id="motion-state">Idle</span>
                 </div>
             </div>
@@ -61,16 +63,22 @@
         <!-- Quick Commands Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Quick Commands</h2>
+                <h2 data-i18n="gcode.quick_commands">Quick Commands</h2>
             </div>
             <div class="card-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <button class="btn btn-ghost btn-sm" data-quick="G28">🏠 Home All</button>
-                    <button class="btn btn-ghost btn-sm" data-quick="M114">📍 Get Position</button>
-                    <button class="btn btn-ghost btn-sm" data-quick="M115">ℹ️ Firmware Info</button>
-                    <button class="btn btn-ghost btn-sm" data-quick="G90">📐 Absolute Mode</button>
-                    <button class="btn btn-ghost btn-sm" data-quick="G91">📐 Relative Mode</button>
-                    <button class="btn btn-ghost btn-sm" data-quick="G92 X0 Y0 Z0 A0">🎯 Zero Position</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="G28" data-i18n="gcode.home_all">🏠 Home
+                        All</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="M114" data-i18n="gcode.get_position">📍 Get
+                        Position</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="M115" data-i18n="gcode.firmware_info">ℹ️ Firmware
+                        Info</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="G90" data-i18n="gcode.absolute_mode">📐 Absolute
+                        Mode</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="G91" data-i18n="gcode.relative_mode">📐 Relative
+                        Mode</button>
+                    <button class="btn btn-ghost btn-sm" data-quick="G92 X0 Y0 Z0 A0" data-i18n="gcode.zero_position">🎯
+                        Zero Position</button>
                 </div>
             </div>
         </div>
@@ -79,7 +87,7 @@
     <!-- Current Execution Card (Hidden by default) -->
     <div class="card" id="execution-card" style="display: none; margin-bottom: var(--space-xl);">
         <div class="card-header">
-            <h2>CURRENT EXECUTION</h2>
+            <h2 data-i18n="gcode.current_execution">CURRENT EXECUTION</h2>
             <div id="execution-eta" style="font-family: monospace; font-size: 0.9em; color: var(--text-muted);"></div>
         </div>
         <div class="card-content">
@@ -99,7 +107,7 @@
     <!-- Job Queue Status Card (Server-Side History) -->
     <div class="card" id="queue-status-card">
         <div class="card-header">
-            <h2>JOB QUEUE STATUS</h2>
+            <h2 data-i18n="gcode.job_queue">JOB QUEUE STATUS</h2>
             <div style="display: flex; gap: 8px; align-items: center;">
                 <span id="queue-summary" style="font-size: 0.85em; color: var(--text-muted);">0 jobs</span>
                 <button class="btn btn-sm btn-ghost" id="refresh-queue" title="Refresh">🔄</button>

@@ -6,36 +6,39 @@
         <!-- Wear Prediction Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Wear Prediction</h2>
+                <h2 data-i18n="maintenance.wear_prediction">Wear Prediction</h2>
             </div>
             <div class="card-content">
                 <div class="axes-grid">
                     <div class="metric-card">
-                        <div class="metric-label">X Axis Wear</div>
+                        <div class="metric-label" data-i18n="maintenance.x_axis_wear">X Axis Wear</div>
                         <div class="metric-value" id="wear-x-percent">0%</div>
                         <div class="progress-bar">
                             <div class="progress-fill" id="wear-x-bar"
                                 style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
-                        <div class="metric-detail" id="wear-x-days">Est. 3650 days</div>
+                        <div class="metric-detail" id="wear-x-days"><span data-i18n="maintenance.est_prefix">Est.</span>
+                            3650 <span data-i18n="maintenance.days_unit">days</span></div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-label">Y Axis Wear</div>
+                        <div class="metric-label" data-i18n="maintenance.y_axis_wear">Y Axis Wear</div>
                         <div class="metric-value" id="wear-y-percent">0%</div>
                         <div class="progress-bar">
                             <div class="progress-fill" id="wear-y-bar"
                                 style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
-                        <div class="metric-detail" id="wear-y-days">Est. 3650 days</div>
+                        <div class="metric-detail" id="wear-y-days"><span data-i18n="maintenance.est_prefix">Est.</span>
+                            3650 <span data-i18n="maintenance.days_unit">days</span></div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-label">Z Axis Wear</div>
+                        <div class="metric-label" data-i18n="maintenance.z_axis_wear">Z Axis Wear</div>
                         <div class="metric-value" id="wear-z-percent">0%</div>
                         <div class="progress-bar">
                             <div class="progress-fill" id="wear-z-bar"
                                 style="width: 0%; background: var(--color-optimal);"></div>
                         </div>
-                        <div class="metric-detail" id="wear-z-days">Est. 3650 days</div>
+                        <div class="metric-detail" id="wear-z-days"><span data-i18n="maintenance.est_prefix">Est.</span>
+                            3650 <span data-i18n="maintenance.days_unit">days</span></div>
                     </div>
                 </div>
             </div>
@@ -44,14 +47,15 @@
         <!-- Component Lifetime Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Component Lifetime</h2>
+                <h2 data-i18n="maintenance.component_lifetime">Component Lifetime</h2>
             </div>
             <div class="card-content">
                 <div class="component-list">
                     <div class="component-item">
-                        <div class="component-name">3-Phase AC Motors (All Axes)</div>
+                        <div class="component-name" data-i18n="maintenance.motors_desc">3-Phase AC Motors (All Axes)
+                        </div>
                         <div class="component-hours">
-                            <span id="motor-hours">0</span> / 40000 hrs
+                            <span id="motor-hours">0</span> / 40000 <span data-i18n="maintenance.hrs_unit">hrs</span>
                         </div>
                         <div class="progress-bar">
                             <div class="progress-fill" id="motor-bar"
@@ -59,9 +63,9 @@
                         </div>
                     </div>
                     <div class="component-item">
-                        <div class="component-name">Altivar 31 VFD</div>
+                        <div class="component-name" data-i18n="maintenance.vfd_desc">Altivar 31 VFD</div>
                         <div class="component-hours">
-                            <span id="vfd-hours">0</span> / 120000 hrs
+                            <span id="vfd-hours">0</span> / 120000 <span data-i18n="maintenance.hrs_unit">hrs</span>
                         </div>
                         <div class="progress-bar">
                             <div class="progress-fill" id="vfd-bar"
@@ -69,9 +73,9 @@
                         </div>
                     </div>
                     <div class="component-item">
-                        <div class="component-name">PLC Contactor Switches</div>
+                        <div class="component-name" data-i18n="maintenance.contactors_desc">PLC Contactor Switches</div>
                         <div class="component-hours">
-                            <span id="contactor-ops">0</span> / 500000 ops
+                            <span id="contactor-ops">0</span> / 500000 <span data-i18n="maintenance.ops_unit">ops</span>
                         </div>
                         <div class="progress-bar">
                             <div class="progress-fill" id="contactor-bar"
@@ -85,57 +89,71 @@
         <!-- Service History Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Service History</h2>
+                <h2 data-i18n="maintenance.service_history">Service History</h2>
             </div>
             <div class="card-content">
                 <div class="service-history-list" id="service-history">
                     <div class="service-entry">
                         <div class="service-date">2025-12-14</div>
-                        <div class="service-text">System initialized</div>
-                        <div class="service-quality">Quality: 100%</div>
+                        <div class="service-text" data-i18n="maintenance.sys_init">System initialized</div>
+                        <div class="service-quality"><span data-i18n="maintenance.quality_label">Quality:</span> 100%
+                        </div>
                     </div>
                 </div>
-                <button class="btn btn-primary" id="log-service-btn">Log Service Event</button>
+                <button class="btn btn-primary" id="log-service-btn" data-i18n="maintenance.log_event_btn">Log Service
+                    Event</button>
             </div>
         </div>
 
         <!-- Maintenance Calendar Card -->
         <div class="card">
             <div class="card-header">
-                <h2>Maintenance Calendar</h2>
+                <h2 data-i18n="maintenance.maintenance_calendar">Maintenance Calendar</h2>
             </div>
             <div class="card-content">
                 <div class="maintenance-schedule">
                     <div class="schedule-item">
                         <div class="schedule-priority normal">ℹ</div>
                         <div class="schedule-info">
-                            <div class="schedule-task">AC Motor Bearing Lubrication</div>
-                            <div class="schedule-date" id="next-motor-service">Est. 2026-12-14</div>
-                            <div class="schedule-detail">Every 1000 operating hours or annually</div>
+                            <div class="schedule-task" data-i18n="maintenance.task_lubrication">AC Motor Bearing
+                                Lubrication</div>
+                            <div class="schedule-date" id="next-motor-service"><span
+                                    data-i18n="maintenance.est_prefix">Est.</span> 2026-12-14</div>
+                            <div class="schedule-detail" data-i18n="maintenance.interval_1000">Every 1000 operating
+                                hours or annually</div>
                         </div>
                     </div>
                     <div class="schedule-item">
                         <div class="schedule-priority normal">ℹ</div>
                         <div class="schedule-info">
-                            <div class="schedule-task">VFD Cooling Fan & Filter Maintenance</div>
-                            <div class="schedule-date" id="next-vfd-service">Est. 2027-12-14</div>
-                            <div class="schedule-detail">Every 2000 operating hours or annually</div>
+                            <div class="schedule-task" data-i18n="maintenance.task_fan">VFD Cooling Fan & Filter
+                                Maintenance</div>
+                            <div class="schedule-date" id="next-vfd-service"><span
+                                    data-i18n="maintenance.est_prefix">Est.</span> 2027-12-14</div>
+                            <div class="schedule-detail" data-i18n="maintenance.interval_2000">Every 2000 operating
+                                hours or annually</div>
                         </div>
                     </div>
                     <div class="schedule-item">
                         <div class="schedule-priority normal">ℹ</div>
                         <div class="schedule-info">
-                            <div class="schedule-task">PLC Contactor Contacts Inspection</div>
-                            <div class="schedule-date" id="next-contactor-service">Est. 2035-12-14</div>
-                            <div class="schedule-detail">Every 100,000 switching operations or 5 years</div>
+                            <div class="schedule-task" data-i18n="maintenance.task_inspection">PLC Contactor Contacts
+                                Inspection</div>
+                            <div class="schedule-date" id="next-contactor-service"><span
+                                    data-i18n="maintenance.est_prefix">Est.</span> 2035-12-14</div>
+                            <div class="schedule-detail" data-i18n="maintenance.interval_100k">Every 100,000 switching
+                                operations or 5 years</div>
                         </div>
                     </div>
                     <div class="schedule-item">
                         <div class="schedule-priority warning">⚠</div>
                         <div class="schedule-info">
-                            <div class="schedule-task">Encoder Calibration Verification</div>
-                            <div class="schedule-date" id="next-encoder-service">Est. 2026-06-14</div>
-                            <div class="schedule-detail">Every 6 months when quality score degrades</div>
+                            <div class="schedule-task" data-i18n="maintenance.task_encoder">Encoder Calibration
+                                Verification</div>
+                            <div class="schedule-date" id="next-encoder-service"><span
+                                    data-i18n="maintenance.est_prefix">Est.</span> 2026-06-14</div>
+                            <div class="schedule-detail" data-i18n="maintenance.interval_6m">Every 6 months when quality
+                                score degrades</div>
                         </div>
                     </div>
                 </div>
@@ -145,21 +163,21 @@
         <!-- System Uptime Card -->
         <div class="card">
             <div class="card-header">
-                <h2>System Uptime</h2>
+                <h2 data-i18n="maintenance.system_uptime">System Uptime</h2>
             </div>
             <div class="card-content">
                 <div class="uptime-display">
                     <div class="uptime-stat">
-                        <div class="uptime-label">Total Hours</div>
+                        <div class="uptime-label" data-i18n="maintenance.total_hours">Total Hours</div>
                         <div class="uptime-value" id="total-hours">0</div>
                     </div>
                     <div class="uptime-stat">
-                        <div class="uptime-label">Operating Days</div>
+                        <div class="uptime-label" data-i18n="maintenance.operating_days">Operating Days</div>
                         <div class="uptime-value" id="operating-days">0</div>
                     </div>
                     <div class="uptime-stat">
-                        <div class="uptime-label">Last Service</div>
-                        <div class="uptime-value" id="last-service">Today</div>
+                        <div class="uptime-label" data-i18n="maintenance.last_service">Last Service</div>
+                        <div class="uptime-value" id="last-service" data-i18n="maintenance.today">Today</div>
                     </div>
                 </div>
             </div>
@@ -168,34 +186,34 @@
         <!-- Calibration Wizards Card -->
         <div class="card">
             <div class="card-header">
-                <h2>🧙 Calibration Wizards</h2>
+                <h2 data-i18n="maintenance.calibration_wizards">🧙 Calibration Wizards</h2>
             </div>
             <div class="card-content">
-                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                <p style="color: var(--text-secondary); margin-bottom: 20px;" data-i18n="maintenance.calibration_desc">
                     Step-by-step wizards to help calibrate and optimize machine performance.
                 </p>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                     <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('encoder')">
                         <span style="font-size: 20px;">📏</span>
-                        <div style="margin-top: 8px;">Encoder Calibration</div>
+                        <div style="margin-top: 8px;" data-i18n="maintenance.wizard_encoder">Encoder Calibration</div>
                         <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">10-15 min
                         </div>
                     </button>
                     <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('motion')">
                         <span style="font-size: 20px;">🎯</span>
-                        <div style="margin-top: 8px;">Motion Accuracy</div>
+                        <div style="margin-top: 8px;" data-i18n="maintenance.wizard_motion">Motion Accuracy</div>
                         <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">15-20 min
                         </div>
                     </button>
                     <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('spindle')">
                         <span style="font-size: 20px;">🔄</span>
-                        <div style="margin-top: 8px;">Spindle Alignment</div>
+                        <div style="margin-top: 8px;" data-i18n="maintenance.wizard_spindle">Spindle Alignment</div>
                         <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">20-30 min
                         </div>
                     </button>
                     <button class="btn btn-primary wizard-btn" onclick="CalibrationWizard.launch('tuning')">
                         <span style="font-size: 20px;">⚙️</span>
-                        <div style="margin-top: 8px;">Auto-Tuning</div>
+                        <div style="margin-top: 8px;" data-i18n="maintenance.wizard_tuning">Auto-Tuning</div>
                         <div style="font-size: 12px; font-weight: normal; margin-top: 4px; opacity: 0.8;">10-15 min
                         </div>
                     </button>

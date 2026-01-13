@@ -175,8 +175,8 @@ static size_t boot_log_max_size = 32768;
 static size_t boot_log_current_size = 0;
 
 bool bootLogInit(size_t max_size_bytes) {
-    // Check if boot logging is enabled in config (default: enabled)
-    if (configGetInt(KEY_BOOTLOG_EN, 1) == 0) {
+    // Check if boot logging is enabled in config (default: disabled for debugging)
+    if (configGetInt(KEY_BOOTLOG_EN, 0) == 0) {
         Serial.println("[BOOTLOG] Disabled by configuration");
         return false;
     }

@@ -1,6 +1,7 @@
 #include "task_manager.h"
 #include "motion.h"
 #include "serial_logger.h"
+#include "task_performance_monitor.h"
 #include "watchdog_manager.h"
 #include "system_constants.h"
 #include "encoder_deviation.h"
@@ -18,8 +19,10 @@ void taskMotionFunction(void* parameter) {
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Motion");
 
   while (1) {
+    perfMonitorTaskStart(PERF_TASK_ID_MOTION);
     // Core motion operations
     motionUpdate();
+    perfMonitorTaskEnd(PERF_TASK_ID_MOTION);
 
     // PHASE 2 FIX: Encoder deviation detection
     // Monitor each axis for deviation (stalls, loss of sync, mechanical problems)

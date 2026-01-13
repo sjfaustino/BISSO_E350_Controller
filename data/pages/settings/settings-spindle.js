@@ -31,7 +31,7 @@ Object.assign(window.SettingsModule, {
                     this.setStatusLoaded('spindle-alarm');
                 }
             })
-            .catch(err => this.setStatusError('spindle-alarm', 'Failed to load'));
+            .catch(err => this.setStatusError('spindle-alarm', window.i18n.t('settings.failed_load')));
     },
 
     updateSpindleAlarmStatus(data) {
@@ -39,11 +39,11 @@ Object.assign(window.SettingsModule, {
         const stEl = document.getElementById('alarm-stall-status');
 
         if (tbEl) {
-            tbEl.textContent = data.alarm_tool_breakage ? 'ALARM' : 'OK';
+            tbEl.textContent = data.alarm_tool_breakage ? window.i18n.t('settings.alarm_status') : window.i18n.t('settings.ok_status');
             tbEl.style.color = data.alarm_tool_breakage ? 'var(--color-critical)' : 'var(--color-optimal)';
         }
         if (stEl) {
-            stEl.textContent = data.alarm_stall ? 'ALARM' : 'OK';
+            stEl.textContent = data.alarm_stall ? window.i18n.t('settings.alarm_status') : window.i18n.t('settings.ok_status');
             stEl.style.color = data.alarm_stall ? 'var(--color-critical)' : 'var(--color-optimal)';
         }
     },
@@ -65,17 +65,17 @@ Object.assign(window.SettingsModule, {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    AlertManager.add('Spindle alarm settings saved', 'success', 2000);
+                    AlertManager.add(window.i18n.t('settings.spindle_saved'), 'success', 2000);
                     this.setStatusLoaded('spindle-alarm');
                 } else {
-                    this.showError('spindle-alarm', data.error || 'Save failed');
+                    this.showError('spindle-alarm', data.error || window.i18n.t('settings.save_failed'));
                 }
             })
-            .catch(err => this.showError('spindle-alarm', 'Save failed'));
+            .catch(err => this.showError('spindle-alarm', window.i18n.t('settings.save_failed')));
     },
 
     resetSpindleAlarmSettings() {
-        if (!confirm('Reset spindle alarm settings?')) return;
+        if (!confirm(window.i18n.t('settings.reset_spindle_confirm'))) return;
         document.getElementById('spindle-toolbreak-threshold').value = 5;
         document.getElementById('toolbreak-value').textContent = '5.0';
         document.getElementById('spindle-stall-threshold').value = 25;
@@ -90,16 +90,16 @@ Object.assign(window.SettingsModule, {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    AlertManager.add('Spindle alarms cleared', 'success', 2000);
+                    AlertManager.add(window.i18n.t('settings.alarms_cleared'), 'success', 2000);
                     const tbEl = document.getElementById('alarm-toolbreak-status');
                     const stEl = document.getElementById('alarm-stall-status');
-                    if (tbEl) { tbEl.textContent = 'OK'; tbEl.style.color = 'var(--color-optimal)'; }
-                    if (stEl) { stEl.textContent = 'OK'; stEl.style.color = 'var(--color-optimal)'; }
+                    if (tbEl) { tbEl.textContent = window.i18n.t('settings.ok_status'); tbEl.style.color = 'var(--color-optimal)'; }
+                    if (stEl) { stEl.textContent = window.i18n.t('settings.ok_status'); stEl.style.color = 'var(--color-optimal)'; }
                 } else {
-                    AlertManager.add('Failed to clear: ' + (data.error || 'Error'), 'error');
+                    AlertManager.add(window.i18n.t('settings.clear_failed') + ' ' + (data.error || 'Error'), 'error');
                 }
             })
-            .catch(err => AlertManager.add('Failed to clear alarms', 'error'));
+            .catch(err => AlertManager.add(window.i18n.t('settings.clear_failed'), 'error'));
     }
 });
 

@@ -11,6 +11,7 @@
 #include "serial_logger.h"
 #include "system_constants.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
+#include "task_performance_monitor.h"
 #include "task_manager.h"
 #include "watchdog_manager.h"
 #include <freertos/FreeRTOS.h>
@@ -34,6 +35,7 @@ void taskSafetyFunction(void *parameter) {
   boardInputsInit();
 
   while (1) {
+    perfMonitorTaskStart(PERF_TASK_ID_SAFETY);
     uint32_t now = millis();
 
     // 1. Critical Safety Operations
@@ -110,6 +112,7 @@ void taskSafetyFunction(void *parameter) {
     }
 
     watchdogFeed("Safety");
+    perfMonitorTaskEnd(PERF_TASK_ID_SAFETY);
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_SAFETY));
   }
 }

@@ -1,19 +1,20 @@
 <!-- Homing Wizard - Step-by-step guided axis homing -->
 <div class="page-content">
     <div class="page-header">
-        <h2>🏠 Homing Wizard</h2>
-        <p>Step-by-step guided axis homing procedure</p>
+        <h2 data-i18n="homing.title">🏠 Homing Wizard</h2>
+        <p data-i18n="homing.desc">Step-by-step guided axis homing procedure</p>
     </div>
 
     <!-- Safety Warning -->
     <div class="card" style="border-left: 4px solid var(--color-warning); margin-bottom: 20px;">
         <div class="card-content">
-            <h3 style="color: var(--color-warning); margin-bottom: 10px;">⚠️ Safety Warning</h3>
+            <h3 style="color: var(--color-warning); margin-bottom: 10px;" data-i18n="homing.safety_warning">⚠️ Safety
+                Warning</h3>
             <ul style="margin: 0; padding-left: 20px; font-size: var(--font-size-sm);">
-                <li>Ensure the work area is clear before homing</li>
-                <li>Keep hands away from moving parts</li>
-                <li>E-Stop is available at any time</li>
-                <li>Machine will move to limits during homing</li>
+                <li data-i18n="homing.warning_clear">Ensure the work area is clear before homing</li>
+                <li data-i18n="homing.warning_hands">Keep hands away from moving parts</li>
+                <li data-i18n="homing.warning_estop">E-Stop is available at any time</li>
+                <li data-i18n="homing.warning_limits">Machine will move to limits during homing</li>
             </ul>
         </div>
     </div>
@@ -24,23 +25,23 @@
             <div id="wizard-progress" style="display: flex; justify-content: space-between; margin-bottom: 20px;">
                 <div class="wizard-step" data-step="1">
                     <div class="step-circle active">1</div>
-                    <span>Pre-check</span>
+                    <span data-i18n="homing.step_precheck">Pre-check</span>
                 </div>
                 <div class="wizard-step" data-step="2">
                     <div class="step-circle">2</div>
-                    <span>Z-Axis</span>
+                    <span data-i18n="homing.step_z">Z-Axis</span>
                 </div>
                 <div class="wizard-step" data-step="3">
                     <div class="step-circle">3</div>
-                    <span>X-Axis</span>
+                    <span data-i18n="homing.step_x">X-Axis</span>
                 </div>
                 <div class="wizard-step" data-step="4">
                     <div class="step-circle">4</div>
-                    <span>Y-Axis</span>
+                    <span data-i18n="homing.step_y">Y-Axis</span>
                 </div>
                 <div class="wizard-step" data-step="5">
                     <div class="step-circle">5</div>
-                    <span>Complete</span>
+                    <span data-i18n="homing.step_complete">Complete</span>
                 </div>
             </div>
         </div>
@@ -51,36 +52,37 @@
         <div class="card-content">
             <!-- Step 1: Pre-check -->
             <div id="step-1" class="wizard-content active">
-                <h3 style="margin-bottom: 15px;">Step 1: Pre-Homing Checklist</h3>
+                <h3 style="margin-bottom: 15px;" data-i18n="homing.step1_title">Step 1: Pre-Homing Checklist</h3>
                 <div style="margin-bottom: 20px;">
                     <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                         <input type="checkbox" id="check-clear" class="precheck">
-                        <span>Work area is clear of obstructions</span>
+                        <span data-i18n="homing.check_clear">Work area is clear of obstructions</span>
                     </label>
                     <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                         <input type="checkbox" id="check-spindle" class="precheck">
-                        <span>Spindle is OFF</span>
+                        <span data-i18n="homing.check_spindle">Spindle is OFF</span>
                     </label>
                     <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                         <input type="checkbox" id="check-estop" class="precheck">
-                        <span>E-Stop button is accessible</span>
+                        <span data-i18n="homing.check_estop">E-Stop button is accessible</span>
                     </label>
                     <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                         <input type="checkbox" id="check-vfd" class="precheck">
-                        <span>VFD is powered and ready</span>
+                        <span data-i18n="homing.check_vfd">VFD is powered and ready</span>
                     </label>
                 </div>
                 <div id="precheck-status"
                     style="padding: 10px; border-radius: 8px; background: var(--bg-secondary); margin-bottom: 15px;">
                     Complete all checks to proceed
                 </div>
-                <button class="btn btn-primary" id="btn-start-homing" disabled>Begin Homing Sequence →</button>
+                <button class="btn btn-primary" id="btn-start-homing" disabled data-i18n="homing.begin_homing">Begin
+                    Homing Sequence →</button>
             </div>
 
             <!-- Step 2: Z-Axis -->
             <div id="step-2" class="wizard-content" style="display: none;">
-                <h3 style="margin-bottom: 15px;">Step 2: Home Z-Axis (Height)</h3>
-                <p style="margin-bottom: 15px; color: var(--text-secondary);">
+                <h3 style="margin-bottom: 15px;" data-i18n="homing.step2_title">Step 2: Home Z-Axis (Height)</h3>
+                <p style="margin-bottom: 15px; color: var(--text-secondary);" data-i18n="homing.step2_desc">
                     Z-axis will move UP to find the upper limit. This prevents blade collision.
                 </p>
                 <div id="z-status" class="axis-status"
@@ -94,15 +96,15 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-primary" id="btn-home-z">🏠 Home Z-Axis</button>
-                    <button class="btn btn-ghost" id="btn-skip-z">Skip</button>
+                    <button class="btn btn-primary" id="btn-home-z" data-i18n="homing.home_z">🏠 Home Z-Axis</button>
+                    <button class="btn btn-ghost" id="btn-skip-z" data-i18n="homing.skip">Skip</button>
                 </div>
             </div>
 
             <!-- Step 3: X-Axis -->
             <div id="step-3" class="wizard-content" style="display: none;">
-                <h3 style="margin-bottom: 15px;">Step 3: Home X-Axis (Bridge)</h3>
-                <p style="margin-bottom: 15px; color: var(--text-secondary);">
+                <h3 style="margin-bottom: 15px;" data-i18n="homing.step3_title">Step 3: Home X-Axis (Bridge)</h3>
+                <p style="margin-bottom: 15px; color: var(--text-secondary);" data-i18n="homing.step3_desc">
                     X-axis will move to find the home position.
                 </p>
                 <div id="x-status" class="axis-status"
@@ -116,15 +118,15 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-primary" id="btn-home-x">🏠 Home X-Axis</button>
-                    <button class="btn btn-ghost" id="btn-skip-x">Skip</button>
+                    <button class="btn btn-primary" id="btn-home-x" data-i18n="homing.home_x">🏠 Home X-Axis</button>
+                    <button class="btn btn-ghost" id="btn-skip-x" data-i18n="homing.skip">Skip</button>
                 </div>
             </div>
 
             <!-- Step 4: Y-Axis -->
             <div id="step-4" class="wizard-content" style="display: none;">
-                <h3 style="margin-bottom: 15px;">Step 4: Home Y-Axis (Carriage)</h3>
-                <p style="margin-bottom: 15px; color: var(--text-secondary);">
+                <h3 style="margin-bottom: 15px;" data-i18n="homing.step4_title">Step 4: Home Y-Axis (Carriage)</h3>
+                <p style="margin-bottom: 15px; color: var(--text-secondary);" data-i18n="homing.step4_desc">
                     Y-axis will move to find the home position.
                 </p>
                 <div id="y-status" class="axis-status"
@@ -138,19 +140,20 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-primary" id="btn-home-y">🏠 Home Y-Axis</button>
-                    <button class="btn btn-ghost" id="btn-skip-y">Skip</button>
+                    <button class="btn btn-primary" id="btn-home-y" data-i18n="homing.home_y">🏠 Home Y-Axis</button>
+                    <button class="btn btn-ghost" id="btn-skip-y" data-i18n="homing.skip">Skip</button>
                 </div>
             </div>
 
             <!-- Step 5: Complete -->
             <div id="step-5" class="wizard-content" style="display: none;">
-                <h3 style="margin-bottom: 15px; color: var(--color-success);">✅ Homing Complete!</h3>
-                <p style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 15px; color: var(--color-success);" data-i18n="homing.complete_title">✅ Homing
+                    Complete!</h3>
+                <p style="margin-bottom: 20px;" data-i18n="homing.complete_desc">
                     All axes have been homed successfully. The machine is ready for operation.
                 </p>
                 <div style="padding: 15px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 20px;">
-                    <h4 style="margin-bottom: 10px;">Final Positions:</h4>
+                    <h4 style="margin-bottom: 10px;" data-i18n="homing.final_positions">Final Positions:</h4>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">
                         <div>
                             <div style="font-size: var(--font-size-sm); color: var(--text-secondary);">X-Axis</div>
@@ -167,8 +170,10 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-primary" id="btn-go-dashboard">Go to Dashboard</button>
-                    <button class="btn btn-ghost" id="btn-restart-wizard">Start Over</button>
+                    <button class="btn btn-primary" id="btn-go-dashboard" data-i18n="homing.go_dashboard">Go to
+                        Dashboard</button>
+                    <button class="btn btn-ghost" id="btn-restart-wizard" data-i18n="homing.start_over">Start
+                        Over</button>
                 </div>
             </div>
         </div>

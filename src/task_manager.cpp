@@ -461,7 +461,9 @@ uint8_t taskGetCpuUsage() {
     static uint32_t last_count = 0;
     static uint32_t last_time = 0;
     static uint8_t cpu = 0;
+    static bool first_run = true;
     
+    // PHASE 5.3: Heartbeat from loop() task via accumulated_loop_count
     uint32_t now = millis();
     if (now - last_time >= 1000) {
         uint32_t current = accumulated_loop_count;
@@ -469,11 +471,23 @@ uint8_t taskGetCpuUsage() {
         last_count = current;
         last_time = now;
         
-        // Max theoretical loops = 100 (due to delay(10) in loop)
-        // Cap delta at 100 to prevent overflow results
+        // Loop runs with delay(10), so theoretical max is ~100.
+        // If system is healthy, loop runs frequently.
+        // If delta is low, CPU is busy with RTOS tasks.
         if (delta > 100) delta = 100;
         
-        cpu = (uint8_t)(100 - delta);
+        uint8_t measured_cpu = (uint8_t)(100 - delta);
+        
+        // At boot, the loop might not have run yet. 
+        // If it's the first run and delta is 0, don't report 100%.
+        if (first_run && delta == 0) {
+            cpu = 0;
+            first_run = false;
+        } else {
+            // Simple smoothing: 50% previous, 50% current
+            cpu = (uint8_t)((cpu + measured_cpu) / 2);
+            first_run = false;
+        }
     }
     return cpu;
 }

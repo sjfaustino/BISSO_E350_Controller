@@ -1466,4 +1466,12 @@ void cliRegisterDiagCommands() {
     
     // Boot log viewer
     cliRegisterCommand("log", "Log management (boot log viewer)", cmd_log_main);
+
+    // Filesystem management (LittleFS)
+    extern void cmd_fs_ls(int argc, char** argv);
+    extern void cmd_fs_df(int argc, char** argv);
+    extern void cmd_fs_cat(int argc, char** argv);
+    cliRegisterCommand("ls", "List LittleFS files", cmd_fs_ls);
+    cliRegisterCommand("df", "Show LittleFS status", cmd_fs_df);
+    cliRegisterCommand("cat", "View LittleFS file content", cmd_fs_cat);
 }

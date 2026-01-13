@@ -5,8 +5,9 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>Real-Time Position Visualization</h2>
-                <button class="btn btn-sm" id="clear-trail" title="Clear position trail">Clear Trail</button>
+                <h2 data-i18n="motion.position_viz">Real-Time Position Visualization</h2>
+                <button class="btn btn-sm" id="clear-trail" title="Clear position trail"
+                    data-i18n="motion.clear_trail">Clear Trail</button>
             </div>
             <div class="card-content"
                 style="padding: 0; display: flex; justify-content: center; align-items: center; min-height: 350px;">
@@ -19,7 +20,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>XY Jog Controls</h2>
+                <h2 data-i18n="motion.xy_jog">XY Jog Controls</h2>
             </div>
             <div class="card-content">
                 <div
@@ -29,14 +30,16 @@
                     <button class="btn btn-primary" data-jog="X-"
                         style="grid-column: 1; grid-row: 2; min-height: 60px; font-size: 18px;">← X-</button>
                     <button class="btn btn-danger" data-jog="STOP"
-                        style="grid-column: 2; grid-row: 2; min-height: 60px; font-size: 18px; font-weight: bold;">STOP</button>
+                        style="grid-column: 2; grid-row: 2; min-height: 60px; font-size: 18px; font-weight: bold;"
+                        data-i18n="motion.stop">STOP</button>
                     <button class="btn btn-primary" data-jog="X+"
                         style="grid-column: 3; grid-row: 2; min-height: 60px; font-size: 18px;">X+ →</button>
                     <button class="btn btn-primary" data-jog="Y-"
                         style="grid-column: 2; grid-row: 3; min-height: 60px; font-size: 18px;">↓ Y-</button>
                 </div>
                 <div style="margin-bottom: 10px;">
-                    <label for="step-size" style="display: block; margin-bottom: 5px; font-size: 12px;">Step
+                    <label for="step-size" style="display: block; margin-bottom: 5px; font-size: 12px;"
+                        data-i18n="motion.step_size">Step
                         Size:</label>
                     <select id="step-size" style="width: 100%; padding: 8px;">
                         <option value="1">1mm</option>
@@ -50,19 +53,20 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Z Jog Controls</h2>
+                <h2 data-i18n="motion.z_jog">Z Jog Controls</h2>
             </div>
             <div class="card-content" style="padding: 10px;">
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     <button class="btn btn-primary" data-jog="Z+"
                         style="width: 100%; padding: 10px; font-size: 16px;">Z+ ↑</button>
-                    <button class="btn btn-danger" data-jog="STOP"
-                        style="width: 100%; padding: 10px; font-size: 16px;">STOP</button>
+                    <button class="btn btn-danger" data-jog="STOP" style="width: 100%; padding: 10px; font-size: 16px;"
+                        data-i18n="motion.stop">STOP</button>
                     <button class="btn btn-primary" data-jog="Z-"
                         style="width: 100%; padding: 10px; font-size: 16px;">Z- ↓</button>
                 </div>
                 <div style="margin-top: 10px;">
-                    <label for="z-step-size" style="display: block; margin-bottom: 5px; font-size: 11px;">Step:</label>
+                    <label for="z-step-size" style="display: block; margin-bottom: 5px; font-size: 11px;"
+                        data-i18n="motion.step">Step:</label>
                     <select id="z-step-size" style="width: 100%; padding: 6px; font-size: 12px;">
                         <option value="0.1">0.1mm</option>
                         <option value="1" selected>1mm</option>
@@ -75,19 +79,20 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Rotation (A Axis)</h2>
+                <h2 data-i18n="motion.rotation">Rotation (A Axis)</h2>
             </div>
             <div class="card-content" style="padding: 10px;">
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     <button class="btn btn-primary" data-jog="A+"
                         style="width: 100%; padding: 10px; font-size: 16px;">A+ ↻</button>
-                    <button class="btn btn-danger" data-jog="STOP"
-                        style="width: 100%; padding: 10px; font-size: 16px;">STOP</button>
+                    <button class="btn btn-danger" data-jog="STOP" style="width: 100%; padding: 10px; font-size: 16px;"
+                        data-i18n="motion.stop">STOP</button>
                     <button class="btn btn-primary" data-jog="A-"
                         style="width: 100%; padding: 10px; font-size: 16px;">A- ↺</button>
                 </div>
                 <div style="margin-top: 10px;">
-                    <label for="a-step-size" style="display: block; margin-bottom: 5px; font-size: 11px;">Step:</label>
+                    <label for="a-step-size" style="display: block; margin-bottom: 5px; font-size: 11px;"
+                        data-i18n="motion.step">Step:</label>
                     <select id="a-step-size" style="width: 100%; padding: 6px; font-size: 12px;">
                         <option value="1">1°</option>
                         <option value="5" selected>5°</option>
@@ -103,7 +108,7 @@
     <div class="card-grid">
         <div class="card">
             <div class="card-header">
-                <h2>Current Position</h2>
+                <h2 data-i18n="motion.current_position">Current Position</h2>
             </div>
             <div class="card-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -129,16 +134,20 @@
 
         <div class="card">
             <div class="card-header">
-                <h2>Quick Presets</h2>
+                <h2 data-i18n="motion.quick_presets">Quick Presets</h2>
             </div>
             <div class="card-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button class="btn btn-ghost" data-preset="home">🏠 Home</button>
-                    <button class="btn btn-ghost" data-preset="park">🅿️ Park</button>
-                    <button class="btn btn-ghost" data-preset="corner-tl">↖️ TL Corner</button>
-                    <button class="btn btn-ghost" data-preset="corner-tr">↗️ TR Corner</button>
-                    <button class="btn btn-ghost" data-preset="corner-bl">↙️ BL Corner</button>
-                    <button class="btn btn-ghost" data-preset="corner-br">↘️ BR Corner</button>
+                    <button class="btn btn-ghost" data-preset="home" data-i18n="motion.home">🏠 Home</button>
+                    <button class="btn btn-ghost" data-preset="park" data-i18n="motion.park">🅿️ Park</button>
+                    <button class="btn btn-ghost" data-preset="corner-tl" data-i18n="motion.corner_tl">↖️ TL
+                        Corner</button>
+                    <button class="btn btn-ghost" data-preset="corner-tr" data-i18n="motion.corner_tr">↗️ TR
+                        Corner</button>
+                    <button class="btn btn-ghost" data-preset="corner-bl" data-i18n="motion.corner_bl">↙️ BL
+                        Corner</button>
+                    <button class="btn btn-ghost" data-preset="corner-br" data-i18n="motion.corner_br">↘️ BR
+                        Corner</button>
                 </div>
             </div>
         </div>
