@@ -9,11 +9,23 @@
  */
 
 #include <unity.h>
+
+#ifdef ARDUINO
 #include <Arduino.h>
 #include "task_manager.h"
 #include "system_constants.h"
 #include "motion.h"  // Mock needed
 #include "rs485_device_registry.h"
+#endif
+
+//Stub for native tests
+#ifndef ARDUINO
+void run_hardware_optimization_tests(void) {
+    // Skip in native environment
+}
+#else
+// ... existing implementation ...
+
 
 // ============================================================================
 // MOCKS
@@ -130,3 +142,4 @@ void run_hardware_optimization_tests(void) {
     RUN_TEST(test_task_core_affinity_check);
     RUN_TEST(test_rs485_priority_sorting_under_load);
 }
+#endif
