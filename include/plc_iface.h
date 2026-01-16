@@ -73,6 +73,7 @@ bool elboI73GetInput(uint8_t bit, bool *success = nullptr);
 void plcSetAxisSelect(uint8_t axis);     // 0=X, 1=Y, 2=Z, 255=none
 void plcSetDirection(bool positive);     // true=+, false=-
 void plcSetSpeed(uint8_t speed_profile); // 0=fast, 1=medium, 2=slow
+void plcStopMovement();                  // Stop direction relays but keep axis select
 void plcClearAllOutputs();               // Clear all outputs (stop)
 void plcCommitOutputs();                 // Write shadow register to I2C
 

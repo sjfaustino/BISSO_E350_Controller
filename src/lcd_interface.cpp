@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "serial_logger.h"
+#include "system_tuning.h"
 
 // Global I2C LCD instance (will be initialized in lcdInterfaceInit)
 static LiquidCrystal_I2C *lcd_i2c = nullptr;
@@ -32,8 +33,9 @@ struct {
   char display[LCD_ROWS][LCD_COLS + 1];
   bool display_dirty[LCD_ROWS];
   bool i2c_found;
+  uint16_t consecutive_i2c_errors;
 } lcd_state = {LCD_MODE_SERIAL,          true, 0, 0, {"", "", "", ""},
-               {true, true, true, true}, false};
+               {true, true, true, true}, false, 0};
 
 void lcdInterfaceInit() {
   logPrintln("[LCD] Initializing...");
@@ -151,6 +153,7 @@ void lcdInterfaceUpdate() {
                 last_lcd_err = millis();
               }
               i2c_error = true;
+              lcd_state.consecutive_i2c_errors++;
               break;
             }
 
@@ -165,8 +168,12 @@ void lcdInterfaceUpdate() {
           }
         }
         taskUnlockMutex(taskGetLcdMutex());
+        
+        // Success! Clear error counter
+        lcd_state.consecutive_i2c_errors = 0;
       } else {
         // Mutex timeout - skip this update cycle (LCD is non-critical)
+        lcd_state.consecutive_i2c_errors++;
         static uint32_t last_log = 0;
         if (millis() - last_log > 5000) {
           logWarning("[LCD] LCD mutex timeout - skipping update");
@@ -305,12 +312,23 @@ void lcdInterfaceBacklight(bool on) {
   logInfo("[LCD] Backlight: %s", on ? "ON" : "OFF");
 }
 
+void lcdInterfaceResetErrors() {
+  lcd_state.consecutive_i2c_errors = 0;
+  if (lcd_state.i2c_found) {
+    lcd_state.mode = LCD_MODE_I2C;
+    logInfo("[LCD] Manually reset to I2C Mode");
+  } else {
+    logWarning("[LCD] Cannot reset to I2C - Hardware not found");
+  }
+}
+
 void lcdInterfaceDiagnostics() {
   logPrintln("\n[LCD] === Diagnostics ===");
-  logPrintf("Mode: %d\nI2C Found: %s\nBacklight: %s\nUpdates: %lu\n",
+  logPrintf("Mode: %d\nI2C Found: %s\nBacklight: %s\nUpdates: %lu\nI2C Errors: %u\n",
                 lcd_state.mode, lcd_state.i2c_found ? "YES" : "NO",
                 lcd_state.backlight_on ? "ON" : "OFF",
-                (unsigned long)lcd_state.update_count);
+                (unsigned long)lcd_state.update_count,
+                lcd_state.consecutive_i2c_errors);
 
   for (int i = 0; i < LCD_ROWS; i++) {
     logPrintf("  [%d] %s\n", i, lcd_state.display[i]);

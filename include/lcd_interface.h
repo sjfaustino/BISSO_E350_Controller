@@ -24,6 +24,7 @@ void lcdInterfaceSetMode(lcd_mode_t mode);
 lcd_mode_t lcdInterfaceGetMode();
 void lcdInterfaceClear();
 void lcdInterfaceBacklight(bool on);
+void lcdInterfaceResetErrors();
 void lcdInterfaceDiagnostics();
 
 // FIX: New function for 10Hz axial position updates

@@ -41,9 +41,7 @@
 #define WJ66_BAUD 9600                            
 #define WJ66_READ_INTERVAL_MS 50                  
 #define ENCODER_COMMAND_INTERVAL_MS 500           
-#ifndef ENCODER_TIMEOUT_MS
-#define ENCODER_TIMEOUT_MS 1000                   
-#endif
+// ENCODER_TIMEOUT_MS moved to system_tuning.h
 #define ENCODER_BUFFER_SIZE 64                    
 #define ENCODER_PPR 20                            
 
@@ -65,9 +63,7 @@
 // ============================================================================
 // SAFETY SYSTEM CONSTANTS
 // ============================================================================
-#ifndef SAFETY_STALL_CHECK_INTERVAL_MS
-#define SAFETY_STALL_CHECK_INTERVAL_MS 100        
-#endif
+// SAFETY_STALL_CHECK_INTERVAL_MS moved to system_tuning.h
 #define SAFETY_PLC_TIMEOUT_MS 500                 
 #define SAFETY_INTERLOCK_CHECK_MS 50              
 #define EMERGENCY_STOP_TIMEOUT_MS 100             

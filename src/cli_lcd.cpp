@@ -49,9 +49,10 @@ void cmd_lcd_timeout(int argc, char** argv) {
 void cmd_lcd_main(int argc, char** argv) {
     if (argc < 2) {
         logPrintln("\n[LCD] === LCD Control ===");
-        logPrintln("Usage: lcd [on|off|backlight|sleep|wakeup|timeout|status]");
+        logPrintln("Usage: lcd [on|off|backlight|sleep|wakeup|timeout|status|reset]");
         logPrintln("  on        - Enable LCD and save setting");
         logPrintln("  off       - Disable LCD and save setting");
+        logPrintln("  reset     - Reset I2C errors and try to re-enable I2C mode");
         logPrintln("  backlight - Control backlight (on/off)");
         logPrintln("  sleep     - Force display to sleep");
         logPrintln("  wakeup    - Force display to wake up");
@@ -72,12 +73,15 @@ void cmd_lcd_main(int argc, char** argv) {
         lcdSleepWakeup();
     } else if (strcasecmp(argv[1], "timeout") == 0) {
         cmd_lcd_timeout(argc, argv);
+    } else if (strcasecmp(argv[1], "reset") == 0) {
+        lcdInterfaceResetErrors();
     } else if (strcasecmp(argv[1], "status") == 0) {
         logPrintln("\n[LCD] === Status ===");
         logPrintf("Enabled:   %s\r\n", configGetInt(KEY_LCD_EN, 1) ? "YES" : "NO");
         logPrintf("Mode:      %d\r\n", (int)lcdInterfaceGetMode());
         logPrintf("Sleeping:  %s\r\n", lcdSleepIsAsleep() ? "YES" : "NO");
         logPrintf("Timeout:   %lu sec\r\n", (unsigned long)lcdSleepGetTimeout());
+        lcdInterfaceDiagnostics();
     } else {
         logWarning("[LCD] Unknown subcommand: %s", argv[1]);
     }

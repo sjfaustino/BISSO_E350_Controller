@@ -19,6 +19,7 @@
 #include "system_constants.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include "vfd_current_calibration.h" // PHASE 5.5: VFD current calibration
+#include "system_tuning.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>

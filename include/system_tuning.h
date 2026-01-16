@@ -75,6 +75,17 @@
 // Mutex timeout escalation
 #define I2C_MUTEX_TIMEOUT_THRESHOLD 10          // Escalate after 10 timeouts
 
+// LCD Degraded Mode
+#define LCD_MAX_CONSECUTIVE_ERRORS 10           // Permanently switch to Serial after 10 fails
+
+// ============================================================================
+// MOTION SAFETY PARAMETERS
+// ============================================================================
+
+// Z-axis Brake timing
+#define Z_AXIS_BRAKE_RELEASE_DELAY_MS 200       // Wait 200ms after release before motor start
+#define Z_AXIS_BRAKE_ENGAGE_DELAY_MS 100        // Wait 100ms after motor stop before engaging
+
 // ============================================================================
 // WATCHDOG PARAMETERS
 // ============================================================================

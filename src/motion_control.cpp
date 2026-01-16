@@ -26,6 +26,7 @@
 #include "system_constants.h"
 #include "task_manager.h"
 #include "hardware_config.h"
+#include "system_tuning.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <math.h>
@@ -698,10 +699,22 @@ bool motionHome(uint8_t axis) {
   taskUnlockMutex(taskGetMotionMutex());
 
   // I2C calls moved outside mutex - wrapped in transaction for performance
-  plcBeginTransaction();
-  motionSetPLCSpeedProfile((speed_profile_t)fast_prof);
-  motionSetPLCAxisDirection(axis, true, false);
-  plcEndTransaction();
+  if (axis == 2) {
+    // Special Z-axis brake release sequence for jog
+    plcBeginTransaction();
+    motionSetPLCSpeedProfile((speed_profile_t)fast_prof);
+    plcSetAxisSelect(2);
+    plcEndTransaction();
+    
+    vTaskDelay(pdMS_TO_TICKS(Z_AXIS_BRAKE_RELEASE_DELAY_MS));
+    
+    plcSetDirection(false); // Jog is always backward/negative in this legacy helper?
+  } else {
+    plcBeginTransaction();
+    motionSetPLCSpeedProfile((speed_profile_t)fast_prof);
+    motionSetPLCAxisDirection(axis, true, false);
+    plcEndTransaction();
+  }
 
   return true;
 }
@@ -784,10 +797,25 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   taskUnlockMutex(taskGetMotionMutex());
 
   // I2C calls moved outside mutex - wrapped in transaction for performance
-  plcBeginTransaction();
-  motionSetPLCSpeedProfile(prof);
-  motionSetPLCAxisDirection(target_axis, true, is_fwd);
-  plcEndTransaction();
+  if (target_axis == 2) {
+    // Special Z-axis brake release sequence:
+    // 1. Set speed and release brake (Select axis)
+    plcBeginTransaction();
+    motionSetPLCSpeedProfile(prof);
+    plcSetAxisSelect(2);
+    plcEndTransaction();
+    
+    // 2. Wait for mechanical brake release
+    vTaskDelay(pdMS_TO_TICKS(Z_AXIS_BRAKE_RELEASE_DELAY_MS));
+    
+    // 3. Start motor (Set direction)
+    plcSetDirection(is_fwd);
+  } else {
+    plcBeginTransaction();
+    motionSetPLCSpeedProfile(prof);
+    motionSetPLCAxisDirection(target_axis, true, is_fwd);
+    plcEndTransaction();
+  }
 
   taskSignalMotionUpdate();
   return true;
