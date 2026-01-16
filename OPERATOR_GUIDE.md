@@ -839,7 +839,7 @@ If the machine overshoots the target (common with high-mass slabs moving at high
 3. **Correction**: The machine automatically reverses direction using the **Slow Speed Profile** to "hunt" the target until it is within the allowed margin.
 
 > [!NOTE]
-> This feature ensures extreme precision even when moving heavy blocks, as any inertial overshoot is automatically corrected without operator intervention.
+> This feature only applies to the **X and Z axes**. For safety reasons, the **Y-axis (Bridge)** does not automatically reverse to avoid binding the blade into the stone at the end of a cut.
 
 ### Why Tune These Settings?
 
