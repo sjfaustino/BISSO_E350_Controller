@@ -44,9 +44,9 @@ static const config_key_metadata_t key_metadata[] = {
   
   // Advanced Tuning
   {KEY_STALL_TIMEOUT, 0, 0, "int32", "Stall Timeout", true, true},
-  {KEY_X_APPROACH, 1, 0, "int32", "X Final Approach", true, true},
-  {KEY_MOTION_DEADBAND, 1, 0, "int32", "Motion Deadband", true, true},
-  {KEY_MOTION_APPROACH_MODE, 1, 0, "int32", "Approach Mode", true, true},
+  {KEY_X_APPROACH, 1, 0, "int32", "X Final Approach (mm)", true, true},
+  {KEY_X_APPROACH_MED, 1, 0, "int32", "X Medium Approach (mm)", true, true},
+  {KEY_TARGET_MARGIN, 1, 0, "float", "Target Position Margin (mm)", true, true},
 
   // NEW in v2.0
   {KEY_MOTION_BUFFER_ENABLE, 2, 0, "int32", "Enable Motion Queue (0/1)", true, true},

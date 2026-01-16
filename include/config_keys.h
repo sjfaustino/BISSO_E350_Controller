@@ -174,9 +174,9 @@
 // --- MOTION BEHAVIOR ---
 #define KEY_DEFAULT_SPEED "def_spd"
 #define KEY_DEFAULT_ACCEL "def_acc"
-#define KEY_X_APPROACH "x_appr"
-#define KEY_MOTION_APPROACH_MODE "mot_app_mode"
-#define KEY_MOTION_DEADBAND "mot_deadband"
+#define KEY_X_APPROACH "x_appr"           // Final approach (SLOW) threshold in mm (default 5)
+#define KEY_X_APPROACH_MED "x_appr_med"   // Medium approach threshold in mm (default 20)
+#define KEY_TARGET_MARGIN "tgt_margin"    // Target position margin in mm (default 0.1)
 #define KEY_MOTION_BUFFER_ENABLE "mot_buf_en"
 #define KEY_MOTION_STRICT_LIMITS "mot_strict"
 #define KEY_STOP_TIMEOUT "stop_timeout"

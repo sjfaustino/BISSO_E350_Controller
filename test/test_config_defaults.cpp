@@ -25,8 +25,7 @@
 // Motion
 #define KEY_SOFT_LIMIT_X_MIN "slimit_x_min"
 #define KEY_SOFT_LIMIT_X_MAX "slimit_x_max"
-#define KEY_MOTION_DEADBAND "mot_deadband"
-#define KEY_APPROACH_MODE "mot_app_mode"
+#define KEY_TARGET_MARGIN "tgt_margin"
 
 // VFD
 #define KEY_VFD_SLAVE_ADDR "vfd_addr"
@@ -58,8 +57,7 @@ void test_wifi_keys_length(void) {
 void test_motion_keys_length(void) {
     TEST_ASSERT_LESS_THAN(NVS_KEY_MAX_LENGTH, strlen(KEY_SOFT_LIMIT_X_MIN));
     TEST_ASSERT_LESS_THAN(NVS_KEY_MAX_LENGTH, strlen(KEY_SOFT_LIMIT_X_MAX));
-    TEST_ASSERT_LESS_THAN(NVS_KEY_MAX_LENGTH, strlen(KEY_MOTION_DEADBAND));
-    TEST_ASSERT_LESS_THAN(NVS_KEY_MAX_LENGTH, strlen(KEY_APPROACH_MODE));
+    TEST_ASSERT_LESS_THAN(NVS_KEY_MAX_LENGTH, strlen(KEY_TARGET_MARGIN));
 }
 
 // @test VFD keys are within NVS limit
@@ -106,7 +104,7 @@ void test_key_naming_lowercase(void) {
 void test_key_naming_no_leading_underscore(void) {
     TEST_ASSERT_NOT_EQUAL('_', KEY_WIFI_SSID[0]);
     TEST_ASSERT_NOT_EQUAL('_', KEY_VFD_SLAVE_ADDR[0]);
-    TEST_ASSERT_NOT_EQUAL('_', KEY_MOTION_DEADBAND[0]);
+    TEST_ASSERT_NOT_EQUAL('_', KEY_TARGET_MARGIN[0]);
 }
 
 // ============================================================================
@@ -116,7 +114,7 @@ void test_key_naming_no_leading_underscore(void) {
 // Simulated defaults (would be loaded from config system)
 static const uint32_t DEFAULT_VFD_ADDR = 1;
 static const uint32_t DEFAULT_ENCODER_PPR = 100;
-static const float DEFAULT_DEADBAND_MM = 0.1f;
+static const float DEFAULT_TARGET_MARGIN_MM = 0.1f;
 static const uint32_t DEFAULT_BAUD_RATE = 9600;
 
 // @test VFD address default is valid Modbus range
@@ -131,11 +129,11 @@ void test_default_encoder_ppr_reasonable(void) {
     TEST_ASSERT_LESS_THAN(100000, DEFAULT_ENCODER_PPR);
 }
 
-// @test Deadband default is positive and small
-void test_default_deadband_small(void) {
+// @test Target margin default is positive and small
+void test_default_target_margin_small(void) {
     // Use float-aware assertions
-    TEST_ASSERT_TRUE(DEFAULT_DEADBAND_MM > 0.0f);
-    TEST_ASSERT_TRUE(DEFAULT_DEADBAND_MM < 10.0f);
+    TEST_ASSERT_TRUE(DEFAULT_TARGET_MARGIN_MM > 0.0f);
+    TEST_ASSERT_TRUE(DEFAULT_TARGET_MARGIN_MM < 10.0f);
 }
 
 // @test Baud rate default is standard value
@@ -189,7 +187,7 @@ void run_config_defaults_tests(void) {
     // Default values
     RUN_TEST(test_default_vfd_addr_valid);
     RUN_TEST(test_default_encoder_ppr_reasonable);
-    RUN_TEST(test_default_deadband_small);
+    RUN_TEST(test_default_target_margin_small);
     RUN_TEST(test_default_baud_rate_standard);
     
     // Critical constants

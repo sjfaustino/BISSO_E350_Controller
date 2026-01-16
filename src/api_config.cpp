@@ -539,8 +539,9 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
   JsonObject behavior = doc["behavior"].to<JsonObject>();
   behavior["jog_speed"] = configGetInt(KEY_DEFAULT_SPEED, 3000);
   behavior["jog_accel"] = configGetInt(KEY_DEFAULT_ACCEL, 500);
-  behavior["x_approach"] = configGetInt(KEY_X_APPROACH, 50);
-  behavior["deadband"] = configGetFloat(KEY_MOTION_DEADBAND, 0.01f);
+  behavior["x_approach"] = configGetInt(KEY_X_APPROACH, 5);            // Final approach (SLOW) - 5mm
+  behavior["x_approach_med"] = configGetInt(KEY_X_APPROACH_MED, 20);   // Medium approach - 20mm
+  behavior["target_margin"] = configGetFloat(KEY_TARGET_MARGIN, 0.1f); // Target position margin - 0.1mm
   behavior["buf_en"] = configGetInt(KEY_MOTION_BUFFER_ENABLE, 0);
   behavior["strict_limits"] = configGetInt(KEY_MOTION_STRICT_LIMITS, 0);
   behavior["stop_timeout"] = configGetInt(KEY_STOP_TIMEOUT, 2000);

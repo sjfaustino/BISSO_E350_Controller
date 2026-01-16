@@ -8,6 +8,8 @@
 #include "motion.h"
 #include "config_unified.h"
 #include "config_keys.h"
+#include "hardware_config.h" // For machineCal axis calibration
+#include "system_constants.h" // For MOTION_POSITION_SCALE_FACTOR
 #include "plc_iface.h"      // ELBO PLC I2C interface (replaces elbo_q73.h and elbo_i73.h)
 #include "encoder_wj66.h"
 #include "fault_logging.h"
@@ -229,14 +231,35 @@ void state_wait_consenso_handler(Axis* axis, int32_t pos, int32_t target, bool c
 }
 
 void state_executing_handler(Axis* axis, int32_t pos, int32_t target, bool consensus) {
-    // Check if target reached
+    // Get configurable target margin (in mm, convert to counts)
+    float margin_mm = configGetFloat(KEY_TARGET_MARGIN, 0.1f);
+    
+    // Get scale factor for this axis
+    float scale = MOTION_POSITION_SCALE_FACTOR;
+    switch (axis->id) {
+        case 0: scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 1: scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 2: scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 3: scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG; break;
+    }
+    int32_t margin_counts = (int32_t)(margin_mm * scale);
+    if (margin_counts < 1) margin_counts = 1; // Minimum 1 count margin
+    
+    // Check if target reached (within margin OR crossed target)
     bool target_reached = false;
-
-    int32_t start_pos = motionGetActiveStartPosition();
-    if (start_pos < target && pos >= target) {
+    int32_t dist_to_target = abs(pos - target);
+    
+    // Within margin = on target
+    if (dist_to_target <= margin_counts) {
         target_reached = true;
-    } else if (start_pos > target && pos <= target) {
-        target_reached = true;
+    } else {
+        // Also check for overshoot (crossed target)
+        int32_t start_pos = motionGetActiveStartPosition();
+        if (start_pos < target && pos >= target) {
+            target_reached = true;
+        } else if (start_pos > target && pos <= target) {
+            target_reached = true;
+        }
     }
 
     if (target_reached) {
@@ -247,10 +270,22 @@ void state_executing_handler(Axis* axis, int32_t pos, int32_t target, bool conse
 }
 
 void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consensus) {
-    int deadband = configGetInt(KEY_MOTION_DEADBAND, 10);
+    // Get configurable target margin (in mm, convert to counts)
+    float margin_mm = configGetFloat(KEY_TARGET_MARGIN, 0.1f);
+    
+    // Get scale factor for this axis
+    float scale = MOTION_POSITION_SCALE_FACTOR;
+    switch (axis->id) {
+        case 0: scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 1: scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 2: scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 3: scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG; break;
+    }
+    int32_t margin_counts = (int32_t)(margin_mm * scale);
+    if (margin_counts < 1) margin_counts = 1;
 
-    // Check if stopped within deadband
-    if (abs(pos - target) < deadband) {
+    // Check if stopped within margin (position on target)
+    if (abs(pos - target) <= margin_counts) {
         MotionStateMachine::transitionTo(axis, MOTION_IDLE);
         return;
     }
@@ -258,7 +293,8 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
     // Check for timeout
     uint32_t timeout = configGetInt(KEY_STOP_TIMEOUT, 5000);
     if ((uint32_t)(millis() - axis->state_entry_ms) > timeout) {
-        logWarning("[AXIS %d] Stop settlement timeout", axis->id);
+        logWarning("[AXIS %d] Stop settlement timeout (pos=%ld, target=%ld, margin=%ld)", 
+                   axis->id, (long)pos, (long)target, (long)margin_counts);
         MotionStateMachine::transitionTo(axis, MOTION_IDLE);
     }
 }

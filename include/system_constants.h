@@ -8,11 +8,6 @@
 #ifndef SYSTEM_CONSTANTS_H
 #define SYSTEM_CONSTANTS_H
 
-// ============================================================================
-// MOTION APPROACH MODES
-// ============================================================================
-#define APPROACH_MODE_FIXED   0  // Use fixed distance from config
-#define APPROACH_MODE_DYNAMIC 1  // Calculate distance based on speed/accel
 
 // ============================================================================
 // HARDWARE PIN CONFIGURATION

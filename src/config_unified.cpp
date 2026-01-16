@@ -54,7 +54,6 @@ static const char *critical_keys[] = {
     KEY_A_LIMIT_MAX,
     KEY_ALARM_PIN,
     KEY_STALL_TIMEOUT,
-    KEY_MOTION_APPROACH_MODE,
     KEY_MOTION_STRICT_LIMITS, // Safety Critical
     KEY_HOME_PROFILE_FAST,    // Homing
     KEY_HOME_PROFILE_SLOW,
@@ -247,12 +246,6 @@ static int32_t validateInt(const char *key, int32_t value) {
       return 2;
   }
 
-  // 4. Deadband (Positive)
-  if (strcmp(key, KEY_MOTION_DEADBAND) == 0) {
-    if (value < 0)
-      return 0;
-  }
-
   return value;
 }
 
@@ -321,16 +314,16 @@ void configSetDefaults() {
     prefs.putInt(KEY_HOME_PROFILE_SLOW, 0);
 
   // MOTION
-  if (!prefs.isKey(KEY_MOTION_DEADBAND))
-    prefs.putInt(KEY_MOTION_DEADBAND, 10);
   if (!prefs.isKey(KEY_MOTION_BUFFER_ENABLE))
     prefs.putInt(KEY_MOTION_BUFFER_ENABLE, 1);
-  if (!prefs.isKey(KEY_MOTION_APPROACH_MODE))
-    prefs.putInt(KEY_MOTION_APPROACH_MODE, 0);
 
   // AXIS
   if (!prefs.isKey(KEY_X_APPROACH))
-    prefs.putInt(KEY_X_APPROACH, 50);
+    prefs.putInt(KEY_X_APPROACH, 5);         // Final approach (SLOW) at 5mm
+  if (!prefs.isKey(KEY_X_APPROACH_MED))
+    prefs.putInt(KEY_X_APPROACH_MED, 20);    // Medium approach at 20mm
+  if (!prefs.isKey(KEY_TARGET_MARGIN))
+    prefs.putFloat(KEY_TARGET_MARGIN, 0.1f); // Target position margin 0.1mm
   if (!prefs.isKey(KEY_DEFAULT_ACCEL))
     prefs.putFloat(KEY_DEFAULT_ACCEL, 100.0f);
 
