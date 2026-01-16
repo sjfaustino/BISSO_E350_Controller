@@ -4,6 +4,7 @@
  */
 
 #include "system_telemetry.h"
+#include "lcd_interface.h" // Added for lcdInterfaceGetContent
 #include "firmware_version.h"
 #include "serial_logger.h"
 #include "altivar31_modbus.h"  // VFD run status
@@ -178,7 +179,7 @@ void telemetryUpdate() {
     }
 
     // Configuration
-    uint32_t cfg_ver = configGetInt("schema_version", 1);
+    // uint32_t cfg_ver = configGetInt("schema_version", 1); // Unused
     bool cfg_default = (configGetInt(KEY_WEB_PW_CHANGED, 0) == 0);
 
     // =========================================================================
