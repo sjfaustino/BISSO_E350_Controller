@@ -1,9 +1,9 @@
 # BISSO E350 Stone Bridge Saw Controller - Operator Quickstart Manual
 
-**Version:** 3.0
-**Document Date:** December 14, 2025
-**Controller Firmware:** Current
-**Web Interface:** Multi-File Architecture (v3.0)
+**Version:** 3.1
+**Document Date:** January 16, 2026
+**Controller Firmware:** Current (v3.1.0)
+**Web Interface:** Multi-File Architecture (v3.1)
 
 ---
 
@@ -24,6 +24,10 @@
     - [Status Light Meanings](#status-light-meanings)
     - [Buzzer Notification Patterns](#buzzer-notification-patterns)
     - [Power Loss Recovery Procedure](#power-loss-recovery-procedure)
+13. [Advanced Performance & Motion Tuning](#advanced-performance-motion-tuning)
+    - [I2C Bus Load Management](#i2c-bus-load-management)
+    - [Position Prediction & Smoothing](#position-prediction-smoothing)
+    - [Diagnostic Verification](#diagnostic-verification)
 
 ---
 
@@ -1843,7 +1847,91 @@ Position doesn't match clicks?
 
 ---
 
-## Contact Information for Support
+---
+
+## 13. Advanced Performance & Motion Tuning
+
+Version 3.1 introduces high-performance optimizations to the I2C communication bus and the motion control engine to ensure smoother, faster, and more accurate stone cutting.
+
+### I2C Bus Load Management
+
+The controller relies on the I2C bus to talk to the LCD and the PLC (relays/contactors). To prevent bus congestion (which could delay a critical motor stop command), the following optimizations are active:
+
+#### LCD Update Throttling
+The LCD now refreshes at **5Hz (every 200ms)** instead of 50Hz. 
+- **Benefit**: Frees up 90% of the I2C bandwidth for motion-critical relays.
+- **Visuals**: You may notice a slight "stepping" in the numbers on the physical LCD during fast moves, but the Web UI remains real-time.
+
+#### PLC Transaction Batching
+Commands to set speed and direction are now "batched" into a single transaction.
+- **Scenario**: When starting motion, the controller must set Axis, Speed, and Direction.
+- **Old Way**: 3 separate I2C writes (high risk of collision).
+- **New Way (Transactional)**: All 3 updates are prepared and sent in one atomic operation.
+
+---
+
+### Position Prediction & Smoothing
+
+Because the RS485 Encoders (WJ66) update relatively slowly (20-50ms) compared to the motion controller (10ms), there is usually a small "lag" in where the controller *thinks* it is.
+
+**Position Prediction** uses real-time velocity to extrapolate the axis position into the future, effectively removing this lag.
+
+#### The Prediction Gap
+```text
+      ENCODER UPDATE TIMELINE (20ms intervals)
+      |-------------------|-------------------|-------------------|
+      t=0ms               t=20ms              t=40ms
+      [POS: 100]          [POS: 110]          [POS: 120]
+      
+      CONTROLLER LOOP (10ms intervals)
+      t=0:   Read 100
+      t=10:  Predict 105  <-- Controller "sees" 5 units of movement without waiting
+      t=20:  Read 110
+      t=30:  Predict 115
+```
+
+#### Configuration Parameters
+- **Target Margin** (`tgt_margin`): Default **0.1mm**. 
+  - This is the maximum distance the predictor is allowed to "guess" ahead of the actual hardware. 
+  - If the axis calibration is 100 PPM, the predictor will never guess more than 10 counts ahead.
+
+#### Safety Guards
+1. **Time Limit**: The predictor will only look ahead for a maximum of **200ms**. If the encoder stops responding longer than that, prediction stalls to prevent runaway motion.
+2. **Magnitude Limit**: The prediction is strictly clamped to the `tgt_margin`. It will NEVER report a position further than what the safety system would consider a mechanical error.
+
+---
+
+### Diagnostic Verification
+
+Use these CLI commands to monitor the health of these new features:
+
+#### 1. Motion Prediction Scan
+Command: `predict [axis]`   (e.g., `predict X`)
+
+**Ideal Output Example**:
+```text
+=== PREDICTION DIAGNOSTICS ===
+Axis:            0
+Raw Position:    12540
+Actual Latched:  12540
+Predicted:       12572
+Prediction Gap:  32             <-- The "extra" distance the controller sees
+Velocity:        1.600 counts/ms
+Update Age:      20 ms          <-- Age of the last hardware update
+```
+
+#### 2. Troubleshooting Performance Issues
+
+| Symptom | Possible Cause | Solution |
+|:---|:---|:---|
+| **Oscillation at Target** | Target Margin too small | Increase `tgt_margin` to 0.15mm or 0.2mm. |
+| **Inaccurate Stop** | Wrong PPM | Re-run [Encoder Calibration](#encoder-calibration-procedure). |
+| **LCD "Frozen" or Laggy** | I2C Bus Error | Power cycle the controller. Check for electrical noise near I2C cables. |
+| **Prediction Gap = 0** | Axis not moving | Move the axis! Prediction only works when velocity > 0. |
+
+---
+
+## 14. Contact Information for Support
 
 **For Technical Issues**:
 - Serial Console Error Codes → Note exact error message and system state
@@ -1867,6 +1955,7 @@ Position doesn't match clicks?
 | 1.0 | 2025-06-01 | Initial release for Phase 5.0 |
 | 2.0 | 2025-09-15 | Updated for Phase 5.6 per-axis validation |
 | 3.0 | 2025-12-14 | Complete rewrite for multi-file web interface, detailed maintenance procedures |
+| 3.1 | 2026-01-16 | Added Position Prediction, I2C Optimization, and high-performance diagnostics |
 
 ---
 
