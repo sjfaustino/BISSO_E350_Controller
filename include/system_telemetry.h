@@ -95,6 +95,9 @@ typedef struct {
     uint32_t loop_cycle_count;
     uint32_t watchdog_resets;
     float temperature;
+
+    // LCD Mirror
+    char lcd_lines[4][21];
 } system_telemetry_t;
 
 /**

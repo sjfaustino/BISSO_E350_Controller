@@ -25,6 +25,7 @@
     - [fault_recovery](#fault_recovery---recovery-stats)
     - [timeouts (Show timeout diagnostics)](#timeouts---show-timeout-diagnostics)
     - [predict (Motion Position Prediction)](#predict---motion-position-prediction)
+    - [lcd reset (Manual Bus Recovery)](#lcd-reset)
     - [selftest](#selftest---hardware-hardware-diagnostic)
     - [dio](#dio---digital-io-status)
     - [runtime](#runtime---machine-runtime-counter)
@@ -342,22 +343,41 @@ lcd status              # Show LCD configuration status
   Timeout:   300 sec
 ```
 
-#### `lcd reset`
-**Description:** Force a re-discovery of the I2C LCD hardware and exit **DEGRADED Mode**. Use this after fixing wiring or noise issues.
-
-**Example Output:**
-```
-[LCD] Manually reset to I2C Mode
-[LCD] I2C Found: YES
-```
-
-**Possible Errors:**
-```
-[LCD] Cannot reset to I2C - Hardware not found
-```
 **Fix:** Verify I2C address is 0x27. Check that the LCD is powered. Verify that the I2C bus isn't locked by the PLC (try `i2c clear`).
 
----
+### `predict` - Motion Position Prediction
+
+**Description:** View and debug the real-time position prediction engine. This tool helps diagnose lag between the physical machine and the Web UI.
+
+**Syntax:**
+```
+predict <axis>       # Detailed view for specific axis
+predict stats        # Global performance stats
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|:---|:---|:---|:---|
+| axis | Char | Yes | X, Y, Z, or A |
+
+**Example Output (`predict X`):**
+```text
+[PREDICT] X-Axis Evaluation:
+  Raw Enc:     125000     (Last Hardware Count)
+  Latched:     125000     (Baseline for extrapolation)
+  Velocity:    15.2 mm/s  (Calculated over 50ms)
+  Delta:       240ms      (Time since last pulse)
+  Predicted:   125365     (Extrapolated value)
+  Gain:        +365 pulses (+3.65mm)
+  Clamp:       ENABLED    (Limited by tgt_margin)
+```
+
+**Troubleshooting:**
+- **"Prediction = 0"**: The axis is stationary or the encoder is not talking. Check `encoder status`.
+- **"Jumping values"**: Velocity jitter is high. Check for mechanical slippage in the encoder belt/coupler.
+- **"Out of range"**: The prediction reached the `tgt_margin` limit. This is normal during very high-speed traverses (e.g., G0 at 100Hz).
+
+------
 
 ### `limit` - Set Soft Limits
 

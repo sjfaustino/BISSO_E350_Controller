@@ -18,6 +18,7 @@
     },
     "dashboard": {
         "header_dro": "🎯 Posição (DRO)",
+        "lcd_mirror": "📺 Espelho LCD",
         "zero_all": "Zerar Tudo",
         "system_health": "Saúde do Sistema",
         "cpu_usage": "Uso de CPU",

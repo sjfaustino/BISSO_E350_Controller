@@ -217,9 +217,11 @@ void telemetryUpdate() {
     telemetry_cache.slowest_task_time_us = slowest_us;
     telemetry_cache.wifi_connected = wifi_conn;
     telemetry_cache.wifi_signal_strength = wifi_signal;
-    telemetry_cache.config_version = cfg_ver;
     telemetry_cache.config_is_default = cfg_default;
     telemetry_cache.plc_hardware_present = plcIsHardwarePresent();
+    
+    // LCD Mirror
+    lcdInterfaceGetContent(telemetry_cache.lcd_lines);
 
     portEXIT_CRITICAL(&telemetrySpinlock);
 
@@ -267,7 +269,8 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         "\"rpm_sensor\":{\"enabled\":%s,\"rpm\":%u,\"stall_detected\":%s},"
         "\"tasks\":{\"slowest_id\":%u,\"slowest_us\":%lu},"
         "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},"
-        "\"config\":{\"version\":%lu,\"is_default\":%s}}",
+        "\"config\":{\"version\":%lu,\"is_default\":%s},"
+        "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}}",
         telemetryGetHealthStatusString(t.health_status),
         (unsigned long)t.uptime_seconds,
         t.cpu_usage_percent,
@@ -297,7 +300,8 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         t.wifi_connected ? "true" : "false",
         t.wifi_signal_strength,
         (unsigned long)t.config_version,
-        t.config_is_default ? "true" : "false");
+        t.config_is_default ? "true" : "false",
+        t.lcd_lines[0], t.lcd_lines[1], t.lcd_lines[2], t.lcd_lines[3]);
     // PHASE 5.10: Check for buffer overflow
     if (offset >= buffer_size) return buffer_size - 1;
 

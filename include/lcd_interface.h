@@ -30,4 +30,7 @@ void lcdInterfaceDiagnostics();
 // FIX: New function for 10Hz axial position updates
 void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts, int32_t a_counts);
 
+// GETTER: Export current display content for Web UI mirroring
+void lcdInterfaceGetContent(char content[LCD_ROWS][LCD_COLS + 1]);
+
 #endif

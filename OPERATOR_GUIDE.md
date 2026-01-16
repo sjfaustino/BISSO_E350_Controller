@@ -26,6 +26,8 @@
     - [Power Loss Recovery Procedure](#power-loss-recovery-procedure)
 13. [Advanced Performance & Motion Tuning](#advanced-performance-motion-tuning)
     - [I2C Bus Load Management](#i2c-bus-load-management)
+    - [I2C Degraded Mode & Fallback](#i2c-degraded-mode-safety-hardening)
+    - [Web UI LCD Mirroring](#web-ui-lcd-mirroring)
     - [Position Prediction & Smoothing](#position-prediction-smoothing)
     - [Diagnostic Verification](#diagnostic-verification)
 
@@ -1881,19 +1883,53 @@ The controller monitors the success rate of every LCD update.
 - **Behavior**: The physical LCD will stop updating, but all diagnostic data will be redirected to the Serial/USB console so the operator can still monitor the machine during the fault.
 
 ```text
-    I2C BUS HEALTH MONITOR
-    [ OK ] Write 1
-    [ OK ] Write 2
-    [FAIL] Write 3  --> Increments internal "strike" counter
-    ...
-    [FAIL] Write 12 --> Counter hits 10! 
-    
-    ACTION: 
-    1. Log Error FAULT_I2C_ERROR
-    2. Switch to DEGRADED_MODE
-    3. Alert user via Serial Console
+    I2C BUS HEALTH MONITOR (WDT)
+    +------------------------------------------+
+    | [STRIKE 1]  - Noise Spike detected       |
+    | [STRIKE 2]  - Cable loose?               |
+    | [STRIKE 3]  - EMI from Spindle VFD       |
+    | ...                                      |
+    | [STRIKE 10] - BUS HALT TRIGGERED         |
+    +------------------------------------------+
+    | ACTION: DEMOTE LCD TO SERIAL CONSOLE     |
+    +------------------------------------------+
 ```
 
+#### How to verify Degraded Mode
+If the physical screen is frozen, check the **Web Dashboard** or the **Serial Console**. 
+- **Web UI Status Dot**: A yellow/orange dot in the LCD Mirror card indicates Degraded Mode.
+- **CLI Command**: Typing `lcd status` will return `Mode: SERIAL (DEGRADED)`.
+
+---
+
+### Web UI LCD Mirroring
+
+Version 3.1 introduces a high-fidelity **Digital Twin** of the physical 20x4 LCD. This allows the operator to see exactly what the machine is reporting without being standing in front of the local pendant.
+
+#### Visual Interface
+The Mirror card on the Dashboard uses a "Retro STN Blue" theme with monospaced characters to ensure 100% layout parity with the physical hardware.
+
+```text
+    WEB LCD MIRROR INTERFACE
+    +------------------------------------------+
+    | [ Dashboard ]                   (o) ONLINE|
+    |                                          |
+    |  +------------------------------------+  |
+    |  |  X: 125.50 mm      READY           |  |
+    |  |  Y: 75.25  mm      IDLE            |  |
+    |  |  Z: 50.00  mm                      |  |
+    |  |  VFD: 60Hz         AMPS: 5.2A      |  |
+    |  +------------------------------------+  |
+    |                                          |
+    +------------------------------------------+
+```
+
+#### Key Benefits
+1. **True Remote Monitoring**: Even if the I2C Bus is down (Degraded Mode), the Web Mirror continues to work because it reads from the controller's internal memory buffer, not the physical wire.
+2. **Layout Parity**: Every space and character is exactly where it appears on the physical screen. 
+3. **Health Indicator**: The small LED dot in the corner shows the real-time health of the physical display connection.
+
+---
 #### Manual Recovery Steps
 Once the physical issue (loose cable, EMI) is resolved, the operator can manually restore the LCD:
 1. Connect to the **CLI (Command Line Interface)**.
@@ -1927,9 +1963,21 @@ Because the RS485 Encoders (WJ66) update relatively slowly (20-50ms) compared to
   - This is the maximum distance the predictor is allowed to "guess" ahead of the actual hardware. 
   - If the axis calibration is 100 PPM, the predictor will never guess more than 10 counts ahead.
 
-#### Safety Guards
+#### Safety Guards & Logic
 1. **Time Limit**: The predictor will only look ahead for a maximum of **200ms**. If the encoder stops responding longer than that, prediction stalls to prevent runaway motion.
 2. **Magnitude Limit**: The prediction is strictly clamped to the `tgt_margin`. It will NEVER report a position further than what the safety system would consider a mechanical error.
+3. **Correction Logic**: Every time a raw encoder pulse arrives, the predictor "resets" its clock, ensuring errors don't accumulate.
+
+```text
+    PREDICTION LOGIC (WJ66 + Velocity)
+    [Raw Encoder] ---> [Velocity Calc] ---> [Prediction Engine]
+          |                |                      |
+          |                |           +----------V----------+
+          |                +---------->| NewPos = Raw + (V*t)|
+          |                            +----------+----------+
+          |                                       |
+          +---------------------------------------+-----> [Web DRO Mirror]
+```
 
 ---
 

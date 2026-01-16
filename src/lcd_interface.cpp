@@ -322,6 +322,13 @@ void lcdInterfaceResetErrors() {
   }
 }
 
+void lcdInterfaceGetContent(char content[LCD_ROWS][LCD_COLS + 1]) {
+  for (int i = 0; i < LCD_ROWS; i++) {
+    strncpy(content[i], lcd_state.display[i], LCD_COLS);
+    content[i][LCD_COLS] = '\0';
+  }
+}
+
 void lcdInterfaceDiagnostics() {
   logPrintln("\n[LCD] === Diagnostics ===");
   logPrintf("Mode: %d\nI2C Found: %s\nBacklight: %s\nUpdates: %lu\nI2C Errors: %u\n",
