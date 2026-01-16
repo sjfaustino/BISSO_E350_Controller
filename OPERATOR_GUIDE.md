@@ -798,6 +798,75 @@ Example: 10 Hz axis VFD ≈ 150 mm/s (about 9 m/min) depending on transmission
 - Increasing axis VFD frequency makes axes move faster
 - Decreasing axis VFD frequency makes axes move slower
 - The relationship is approximately linear
+
+---
+
+## Motion Tuning and Dynamic Approach
+
+The BISSO E350 features a sophisticated **Dynamic Approach** system designed to maximize throughput while maintaining millimeter-level positioning accuracy. This system automatically manages the deceleration of the X-axis as it nears its target.
+
+### The Approach Concept
+
+When the controller moves the X-axis, it uses a multi-stage approach strategy. Instead of traveling at full speed until the target and then braking (which causes overshoot), or traveling slowly the entire way (which wastes time), it "gears down" through three distinct speed zones.
+
+#### 🏁 Visual Aid: The Deceleration Curve
+
+```text
+START ───────────────────────────────────────────► TARGET
+            │              │              │          │
+   Fast ────►│─── Medium ──►│─── Slow ───►│◄─ Margin─►│
+            │              │              │   0.1mm  │
+         20mm           5mm             Target      ±0.1mm
+       from target    from target                 "On Target"
+```
+
+### Configurable Parameters
+
+These settings can be adjusted in the **Web UI (Settings > Motion Control)** or via the **CLI**.
+
+| Parameter | Key | Default | Recommended Range | Description |
+|-----------|-----|---------|-------------------|-------------|
+| **X Medium Approach** | `x_appr_med` | 20 mm | 10 - 100 mm | The distance from the target where the motor shifts from **FAST** to **MEDIUM** speed. |
+| **X Slow Approach** | `x_appr_slow` | 5 mm | 2 - 20 mm | The distance from the target where the motor shifts from **MEDIUM** to **SLOW** speed for precision stopping. |
+| **Target Position Margin** | `tgt_margin` | 0.1 mm | 0.01 - 0.5 mm | The "Slack" allowed. The machine is considered "On Target" when it is within this distance of the requested position. |
+
+### Why Tune These Settings?
+
+- **Heavier Stones**: If you are moving very heavy granite slabs, you may notice the axis "coasts" past the target. **Solution**: Increase `x_appr_slow` (e.g., to 10mm) to allow more time for braking at slow speeds.
+- **High Speed Production**: If the machine feels too slow on the final approach, you can decrease `x_appr_med` and `x_appr_slow`, but be careful of overshooting.
+- **Precision Requirements**: If your cuts must be extremely accurate, decrease the `tgt_margin` to 0.05mm. Note that this might cause the machine to "hunt" for the position if the mechanics have too much backlight.
+
+### Example Tuning Scenarios
+
+#### Scenario A: High-Mass Slabs (Heavy)
+> [!TIP]
+> Use more conservative approach values to prevent inertial overshoot.
+- `x_appr_med`: 30.0
+- `x_appr_slow`: 12.0
+- `tgt_margin`: 0.1
+
+#### Scenario B: Rapid Repetitive Cuts (Lightweight)
+> [!TIP]
+> Use aggressive approach values to shave seconds off each move.
+- `x_appr_med`: 15.0
+- `x_appr_slow`: 3.0
+- `tgt_margin`: 0.15
+
+### Troubleshooting and Errors
+
+#### Error: "Position Hunting" (Axis keeps moving back and forth)
+- **Cause**: The `tgt_margin` is set smaller than the mechanical resolution or backlash of your system.
+- **Solution**: Increase `tgt_margin` to 0.15mm or 0.2mm.
+
+#### Error: "Sudden Deceleration Jarring"
+- **Cause**: The gap between `x_appr_med` and `x_appr_slow` is too small, causing the VFD to ramp down too aggressively.
+- **Solution**: Ensure `x_appr_med` is at least 3x larger than `x_appr_slow`.
+
+#### Error: "Axis Overshoots Target"
+- **Cause**: Inertia is carrying the axis past the target because it's traveling too fast during the final millimeters.
+- **Solution**: Increase `x_appr_slow` (e.g., from 5mm to 10mm).
+
+---
 - Spindle speed is NOT affected by axis VFD changes
 
 #### Safe Speed Selection for Stone Cutting

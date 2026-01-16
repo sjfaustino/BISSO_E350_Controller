@@ -1787,6 +1787,9 @@ config save
 | `def_spd` | float| Default feedrate (mm/min) | 500 |
 | `def_acc` | float| Default acceleration | 100 |
 | `home_enable`| int | Enable Homing ($H) support | 1 |
+| `x_appr_slow`| int | X Slow Approach Threshold (mm) | 5 |
+| `x_appr_med` | int | X Medium Approach Threshold (mm) | 20 |
+| `tgt_margin` | float | Target position margin (mm) | 0.1 |
 | **Safety** | | | |
 | `recov_en` | int | Power Loss Recovery enable | 1 |
 | `buzzer_en` | int | Enable audible alarm | 1 |
