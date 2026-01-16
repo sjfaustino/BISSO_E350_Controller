@@ -14,6 +14,8 @@
 // Use Serial2 for RS485 Bus (pins 16/13 on KC868-A16)
 static HardwareSerial* bus_serial = &Serial2;
 
+#include "motion.h" // Added for motionIsMoving() check
+
 // ============================================================================
 // MODULE STATE
 // ============================================================================
@@ -143,6 +145,9 @@ static rs485_device_t* selectNextDevice(void) {
     rs485_device_t* best = NULL;
     uint32_t longest_wait = 0;
     
+    // Check global motion state once
+    bool moving = motionIsMoving();
+    
     for (uint8_t i = 0; i < registry.device_count; i++) {
         rs485_device_t* dev = registry.devices[i];
         
@@ -151,6 +156,15 @@ static rs485_device_t* selectNextDevice(void) {
         
         uint32_t elapsed = now - dev->last_poll_time_ms;
         if (elapsed < dev->poll_interval_ms) continue;
+        
+        // OPTIMIZATION: Prioritization during motion
+        if (moving && dev->priority < 5) {
+            // Allow low priority devices to be skipped, BUT ensure they don't starve completely
+            // If it's been waiting > 1000ms, force a poll anyway
+            if (elapsed < 1000) {
+                continue;
+            }
+        }
         
         // Weight by priority and wait time
         uint32_t score = elapsed * (dev->priority + 1);

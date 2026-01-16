@@ -21,6 +21,7 @@ extern void run_lcd_formatter_tests(void);
 extern void run_modbus_rtu_tests(void);
 extern void run_motion_planner_tests(void);
 extern void run_rs485_registry_tests(void);
+extern void run_hardware_optimization_tests(void);
 
 // Unity setup/teardown hooks
 void setUp(void) {
@@ -51,6 +52,7 @@ int main(int argc, char** argv) {
     run_modbus_rtu_tests();
     run_motion_planner_tests();
     run_rs485_registry_tests();
+    run_hardware_optimization_tests();
     
     return UNITY_END();
 }

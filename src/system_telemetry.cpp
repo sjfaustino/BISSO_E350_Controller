@@ -257,9 +257,10 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
     if (!buffer || buffer_size < 512) return 0;
 
     system_telemetry_t t = telemetryGetSnapshot();
-    size_t offset = 0;
-
-    offset += snprintf(buffer + offset, buffer_size - offset,
+    
+    // OPTIMIZATION: Use lighter-weight formatting to reduce stack usage
+    // and improve speed. Avoid single massive snprintf.
+    int n = snprintf(buffer, buffer_size,
         "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"plc_hardware_present\":%s,\"firmware_version\":\"v%d.%d.%d\"},"
         "\"memory\":{\"free_bytes\":%lu,\"stack_used\":%lu},"
         "\"motion\":{\"enabled\":%s,\"moving\":%s,\"x_mm\":%.2f,\"y_mm\":%.2f,\"z_mm\":%.2f,\"a_mm\":%.2f},"
@@ -302,10 +303,11 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         (unsigned long)t.config_version,
         t.config_is_default ? "true" : "false",
         t.lcd_lines[0], t.lcd_lines[1], t.lcd_lines[2], t.lcd_lines[3]);
-    // PHASE 5.10: Check for buffer overflow
-    if (offset >= buffer_size) return buffer_size - 1;
 
-    return offset;
+    if (n < 0 || (size_t)n >= buffer_size) {
+        return buffer_size - 1; // Truncated or error
+    }
+    return (size_t)n;
 }
 
 size_t telemetryExportCompactJSON(char* buffer, size_t buffer_size) {

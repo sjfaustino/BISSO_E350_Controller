@@ -123,7 +123,7 @@ void i2cSoftReset() {
   logInfo("[I2C] Soft reset...");
   Wire.end();
   delay(10);
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 400000);
   logInfo("[I2C] Reset done.");
 }
 
@@ -133,7 +133,7 @@ void i2cHardReset() {
   pinMode(PIN_I2C_SDA, INPUT);
   pinMode(PIN_I2C_SCL, INPUT);
   delay(100);
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 400000);
   logInfo("[I2C] Reset done.");
 }
 

@@ -334,7 +334,7 @@ void taskPlcCommCreate() {
 void taskI2cManagerCreate() {
   if (xTaskCreatePinnedToCore(
           taskI2cManagerFunction, "I2C_Manager", TASK_STACK_I2C_MANAGER, NULL,
-          TASK_PRIORITY_I2C_MANAGER, &task_i2c_manager, CORE_1) == pdPASS) {
+          TASK_PRIORITY_I2C_MANAGER, &task_i2c_manager, CORE_0) == pdPASS) {
     task_stats[4].handle = task_i2c_manager;
   } else {
     logError("[TASK] ERROR: Failed to create I2C_Manager task!");
@@ -365,7 +365,7 @@ void taskFaultLogCreate() {
 void taskMonitorCreate() {
   if (xTaskCreatePinnedToCore(taskMonitorFunction, "Monitor",
                               TASK_STACK_MONITOR, NULL, TASK_PRIORITY_MONITOR,
-                              &task_monitor, CORE_1) == pdPASS) {
+                              &task_monitor, CORE_0) == pdPASS) {
     task_stats[7].handle = task_monitor;
   } else {
     logWarning("[TASK] WARNING: Failed to create Monitor task - diagnostics "
@@ -398,7 +398,7 @@ void taskLcdFormatterCreate() { // PHASE 5.4: LCD formatting on Core 0
 }
 void taskLcdCreate() {
   if (xTaskCreatePinnedToCore(taskLcdFunction, "LCD", TASK_STACK_LCD, NULL,
-                              TASK_PRIORITY_LCD, &task_lcd, CORE_1) == pdPASS) {
+                              TASK_PRIORITY_LCD, &task_lcd, CORE_0) == pdPASS) {
     task_stats[10].handle = task_lcd;
   } else {
     logWarning("[TASK] WARNING: Failed to create LCD task - no display");
