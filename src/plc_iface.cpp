@@ -289,27 +289,6 @@ void plcSetSpeed(uint8_t speed_profile) {
 }
 
 /**
- * @brief Stop movement (directional relays) but keep axis and speed
- */
-void plcStopMovement() {
-  if (!plcAcquireShadowMutex()) {
-    logError("[PLC] plcStopMovement FAILED (shadow register dirty)");
-    return;
-  }
-
-  // Clear both direction bits (active-low: set bit = OFF)
-  q73_shadow_register |= ((1 << PLC_OUT_DIR_POSITIVE) |
-                          (1 << PLC_OUT_DIR_NEGATIVE));
-
-  uint8_t register_copy = q73_shadow_register;
-  xSemaphoreGive(plc_shadow_mutex);
-  
-  if (!plc_in_transaction) {
-    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Stop Movement");
-  }
-}
-
-/**
  * @brief Clear all outputs (safe stop)
  */
 void plcClearAllOutputs() {

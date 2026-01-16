@@ -265,15 +265,7 @@ void state_executing_handler(Axis* axis, int32_t pos, int32_t target, bool conse
 
     if (target_reached) {
         axis->position_at_stop = pos;
-        
-        // PHASE 5.3: Z-axis Brake Engagement Delay
-        if (axis->id == 2) {
-            // Stop motor (Direction bits) but keep axis selected (Brake released)
-            plcStopMovement();
-        } else {
-            motionSetPLCAxisDirection(255, false, false); // Stop everything for other axes
-        }
-        
+        motionSetPLCAxisDirection(255, false, false); // Stop all axes
         MotionStateMachine::transitionTo(axis, MOTION_STOPPING);
     }
 }
@@ -295,14 +287,6 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
 
     // Check if stopped within margin (position on target)
     if (abs(pos - target) <= margin_counts) {
-        // PHASE 5.3: Ensure Z-axis brake is engaged before finishing
-        if (axis->id == 2) {
-            uint32_t elapsed = millis() - axis->state_entry_ms;
-            if (elapsed < Z_AXIS_BRAKE_ENGAGE_DELAY_MS) {
-                return; // Wait for stop delay
-            }
-            plcClearAllOutputs(); // Finally engage brake
-        }
         MotionStateMachine::transitionTo(axis, MOTION_IDLE);
         return;
     }
