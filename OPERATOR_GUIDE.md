@@ -830,6 +830,17 @@ These settings can be adjusted in the **Web UI (Settings > Motion Control)** or 
 | **X Slow Approach** | `x_appr_slow` | 5 mm | 2 - 20 mm | The distance from the target where the motor shifts from **MEDIUM** to **SLOW** speed for precision stopping. |
 | **Target Position Margin** | `tgt_margin` | 0.1 mm | 0.01 - 0.5 mm | The "Slack" allowed. The machine is considered "On Target" when it is within this distance of the requested position. |
 
+### Automatic Position Hunting
+
+If the machine overshoots the target (common with high-mass slabs moving at high speed), the BISSO E350 now includes **Automatic Position Hunting**.
+
+1. **Detection**: After a motion completes, the system waits **600ms** for mechanical vibrations to settle.
+2. **Verification**: If the final position is outside the `tgt_margin`, the controller detects the error.
+3. **Correction**: The machine automatically reverses direction using the **Slow Speed Profile** to "hunt" the target until it is within the allowed margin.
+
+> [!NOTE]
+> This feature ensures extreme precision even when moving heavy blocks, as any inertial overshoot is automatically corrected without operator intervention.
+
 ### Why Tune These Settings?
 
 - **Heavier Stones**: If you are moving very heavy granite slabs, you may notice the axis "coasts" past the target. **Solution**: Increase `x_appr_slow` (e.g., to 10mm) to allow more time for braking at slow speeds.

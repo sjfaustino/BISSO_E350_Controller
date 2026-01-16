@@ -290,7 +290,27 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
         return;
     }
 
-    // Check for timeout
+    // PHASE 5.20: Position Hunting Logic
+    // If we've settled for at least 600ms (typical mechanical bounce time)
+    // and we are still outside margin, we check if we should "hunt" back.
+    // This allows the machine to correct for inertial overshoot.
+    uint32_t settle_time = (uint32_t)(millis() - axis->state_entry_ms);
+    if (settle_time > 600) {
+        logInfo("[AXIS %d] Position hunt: error=%ld counts. Reversing...", 
+                axis->id, (long)(target - pos));
+        
+        // Re-engage motion towards target using Slow profile (Speed Profile 1)
+        bool is_fwd = (target > pos);
+        motionSetPLCSpeedProfile(SPEED_PROFILE_1); // Forced slow speed for hunting
+        motionSetPLCAxisDirection(axis->id, true, is_fwd);
+        
+        // Transition back to EXECUTING
+        // Note: state_executing_entry will auto-update active_start_position
+        MotionStateMachine::transitionTo(axis, MOTION_EXECUTING);
+        return;
+    }
+
+    // Check for timeout (Safety fallback if hunting fails or gets stuck)
     uint32_t timeout = configGetInt(KEY_STOP_TIMEOUT, 5000);
     if ((uint32_t)(millis() - axis->state_entry_ms) > timeout) {
         logWarning("[AXIS %d] Stop settlement timeout (pos=%ld, target=%ld, margin=%ld)", 
