@@ -449,9 +449,6 @@ void motionUpdate() {
         
     // Logic/State machine now operates on PREDICTED position for better responsiveness
     // (Actual position tracking stays in updateState for statistics)
-    Axis* active_axis_ptr = &axes[m_state.active_axis];
-    int32_t target = active_axis_ptr->target_position;
-    int32_t current = active_axis_ptr->predicted_position;
     
     // Re-run state machine logic if needed OR let it use predicted
     // The state_executing_handler and state_stopping_handler will now see 'current' as predicted

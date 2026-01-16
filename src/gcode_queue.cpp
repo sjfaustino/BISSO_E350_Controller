@@ -88,7 +88,7 @@ gcode_job_t* gcodeQueueGetJob(uint16_t id) {
 }
 
 gcode_queue_state_t gcodeQueueGetState() {
-    gcode_queue_state_t state = {0};
+    gcode_queue_state_t state = {0, 0, 0, 0, 0, false};
     
     portENTER_CRITICAL(&queueSpinlock);
     state.total_jobs = job_count;
