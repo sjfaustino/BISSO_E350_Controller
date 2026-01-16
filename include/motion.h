@@ -68,10 +68,16 @@ public:
   uint8_t wait_pin_state;       // State to wait for (0 or 1)
   uint32_t wait_pin_timeout_ms; // Timeout (0 = no timeout)
 
-  // Velocity tracking (for encoder deviation detection)
+  // Velocity tracking (for encoder deviation detection and prediction)
   float current_velocity_mm_s; // Current velocity in mm/s
-  int32_t prev_position;       // Previous position (for velocity calculation)
+  int32_t prev_position;       // Previous position for velocity calc (may be same as last_actual)
   uint32_t prev_update_ms;     // Previous update timestamp
+  
+  // PHASE 1: Position Prediction (Extrapolation)
+  int32_t last_actual_position;   // Last unique value from encoder
+  uint32_t last_actual_update_ms; // Timestamp of last UNIQUE encoder reading
+  int32_t predicted_position;     // Extrapolated value for real-time control
+  float velocity_counts_ms;       // Velocity in counts/ms (for prediction)
 
 private:
   bool _error_logged;

@@ -20,6 +20,23 @@ void cmd_motion_status(int argc, char** argv) {
   motionDiagnostics();
 }
 
+void cmd_predict_status(int argc, char** argv) {
+  uint8_t axis = 0;
+  if (argc > 1) axis = axisCharToIndex(argv[1]);
+  if (axis == 255) axis = 0;
+
+  const Axis* a = motionGetAxis(axis);
+  logPrintln("\n=== PREDICTION DIAGNOSTICS ===");
+  logPrintf("Axis:            %d\n", axis);
+  logPrintf("Raw Position:    %ld\n", (long)a->position);
+  logPrintf("Actual Latched:  %ld\n", (long)a->last_actual_position);
+  logPrintf("Predicted:       %ld\n", (long)a->predicted_position);
+  logPrintf("Prediction Gap:  %ld\n", (long)(a->predicted_position - a->last_actual_position));
+  logPrintf("Velocity:        %.3f counts/ms\n", a->velocity_counts_ms);
+  logPrintf("Update Age:      %lu ms\n", (unsigned long)(millis() - a->last_actual_update_ms));
+  logPrintln("");
+}
+
 void cmd_estop_status(int argc, char** argv) {
   if (motionIsEmergencyStopped()) {
     logWarning("[MOTION] EMERGENCY STOP ACTIVE");
@@ -162,5 +179,6 @@ void cliRegisterMotionCommands() {
   cliRegisterCommand("limit", "Set soft limits", cmd_soft_limits);
   cliRegisterCommand("feed", "Set Feed Override (0.1 - 2.0)", cmd_feed_override);
 
+  cliRegisterCommand("predict", "Show position prediction diagnostics [axis]", cmd_predict_status);
   cliRegisterCommand("spinlock", "Spinlock timing diagnostics (stats|reset)", cmd_spinlock_main);
 }

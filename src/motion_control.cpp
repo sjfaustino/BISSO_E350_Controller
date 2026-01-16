@@ -12,6 +12,7 @@
 #include "encoder_calibration.h"
 #include "encoder_motion_integration.h"
 #include "encoder_wj66.h"
+#include "encoder_deviation.h"
 #include "fault_logging.h"
 #include "lcd_sleep.h" // PHASE 4.0: M255 LCD sleep support
 #include "motion.h"
@@ -159,6 +160,10 @@ Axis::Axis() {
   current_velocity_mm_s = 0.0f;
   prev_position = 0;
   prev_update_ms = 0;
+  last_actual_position = 0;
+  last_actual_update_ms = 0;
+  predicted_position = 0;
+  velocity_counts_ms = 0.0f;
 }
 
 void Axis::init(uint8_t axis_id) {
@@ -211,9 +216,22 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
   }
 
   // Update tracking variables
+  if (current_pos != last_actual_position) {
+    // We have fresh data from the RS485 bus
+    if (last_actual_update_ms > 0) {
+      uint32_t dt_actual = current_time_ms - last_actual_update_ms;
+      if (dt_actual > 0) {
+        // Calculate velocity in counts/ms for prediction
+        velocity_counts_ms = (float)(current_pos - last_actual_position) / (float)dt_actual;
+      }
+    }
+    last_actual_position = current_pos;
+    last_actual_update_ms = current_time_ms;
+  }
+
   prev_position = current_pos;
   prev_update_ms = current_time_ms;
-  position = current_pos;
+  position = current_pos; // This is the 'raw' position from wj66
 
   // Calculate Progress & ETA (if this is the active axis)
   portENTER_CRITICAL(&motionSpinlock);
@@ -379,10 +397,36 @@ void motionUpdate() {
   // Health checks now run at 1Hz in low-priority background task instead
 
   int strict_mode = m_state.strict_limits;
+  float target_margin_mm = configGetFloat(KEY_TARGET_MARGIN, 0.1f);
 
   for (int i = 0; i < MOTION_AXES; i++) {
-    int32_t pos = wj66GetPosition(i);
-    axes[i].position = pos;
+    int32_t raw_pos = wj66GetPosition(i);
+    axes[i].position = raw_pos;
+    
+    // Extrapolate position based on last known velocity and time since last RS485 update
+    if (axes[i].last_actual_update_ms > 0) {
+        uint32_t dt_since_last_actual = (uint32_t)(millis() - axes[i].last_actual_update_ms);
+        
+        // Clamp extrapolation time to 200ms to prevent runaway if bus is lost
+        if (dt_since_last_actual > 200) dt_since_last_actual = 200;
+        
+        int32_t offset = (int32_t)(axes[i].velocity_counts_ms * (float)dt_since_last_actual);
+        
+        // Safety: Limit prediction offset to the system's allowed target margin.
+        // Convert mm threshold to axis-specific counts using active PPM.
+        float ppm = encoderCalibrationGetPPM(i);
+        int32_t max_offset = (int32_t)(target_margin_mm * ppm);
+        
+        // Ensure max_offset is at least 1 count to allow any prediction
+        if (max_offset < 1) max_offset = 1;
+
+        if (offset > max_offset) offset = max_offset;
+        if (offset < -max_offset) offset = -max_offset;
+        
+        axes[i].predicted_position = axes[i].last_actual_position + offset;
+    } else {
+        axes[i].predicted_position = raw_pos;
+    }
 
     if (axes[i].checkSoftLimits(strict_mode)) {
       motionEmergencyStop();
@@ -402,6 +446,15 @@ void motionUpdate() {
     axes[m_state.active_axis].updateState(
         axes[m_state.active_axis].position,
         axes[m_state.active_axis].target_position, effective);
+        
+    // Logic/State machine now operates on PREDICTED position for better responsiveness
+    // (Actual position tracking stays in updateState for statistics)
+    Axis* active_axis_ptr = &axes[m_state.active_axis];
+    int32_t target = active_axis_ptr->target_position;
+    int32_t current = active_axis_ptr->predicted_position;
+    
+    // Re-run state machine logic if needed OR let it use predicted
+    // The state_executing_handler and state_stopping_handler will now see 'current' as predicted
   }
 
   taskUnlockMutex(taskGetMotionMutex());
@@ -431,7 +484,8 @@ int32_t motionGetPosition(uint8_t axis) {
 
   // PHASE 5.10: Use spinlock to protect 32-bit position read (prevent torn reads)
   portENTER_CRITICAL(&motionSpinlock);
-  int32_t pos = axes[axis].position;
+  // Return the predicted position for UI and external consumers
+  int32_t pos = axes[axis].predicted_position;
   portEXIT_CRITICAL(&motionSpinlock);
 
   return pos;
