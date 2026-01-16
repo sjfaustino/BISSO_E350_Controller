@@ -76,6 +76,10 @@ void plcSetSpeed(uint8_t speed_profile); // 0=fast, 1=medium, 2=slow
 void plcClearAllOutputs();               // Clear all outputs (stop)
 void plcCommitOutputs();                 // Write shadow register to I2C
 
+// Transaction API for batching I2C writes
+void plcBeginTransaction();              // Delay I2C writes until EndTransaction
+void plcEndTransaction();                // Commit changes and resume immediate writes
+
 // Legacy API (redirects to new API internally)
 void elboQ73SetRelay(uint8_t bit, bool state);
 void elboSetSpeedProfile(uint8_t profile_idx);

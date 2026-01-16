@@ -646,9 +646,11 @@ bool motionHome(uint8_t axis) {
 
   taskUnlockMutex(taskGetMotionMutex());
 
-  // I2C calls moved outside mutex
+  // I2C calls moved outside mutex - wrapped in transaction for performance
+  plcBeginTransaction();
   motionSetPLCSpeedProfile((speed_profile_t)fast_prof);
   motionSetPLCAxisDirection(axis, true, false);
+  plcEndTransaction();
 
   return true;
 }
@@ -730,9 +732,11 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
 
   taskUnlockMutex(taskGetMotionMutex());
 
-  // I2C calls moved outside mutex
+  // I2C calls moved outside mutex - wrapped in transaction for performance
+  plcBeginTransaction();
   motionSetPLCSpeedProfile(prof);
   motionSetPLCAxisDirection(target_axis, true, is_fwd);
+  plcEndTransaction();
 
   taskSignalMotionUpdate();
   return true;
@@ -1011,10 +1015,12 @@ bool motionResume() {
 
   taskUnlockMutex(taskGetMotionMutex());
 
-  // I2C call moved outside mutex
+  // I2C call moved outside mutex - wrapped in transaction for performance
   if (valid_resume) {
+    plcBeginTransaction();
     motionSetPLCSpeedProfile(prof);
     motionSetPLCAxisDirection(axis, true, is_fwd);
+    plcEndTransaction();
   }
 
   taskSignalMotionUpdate();

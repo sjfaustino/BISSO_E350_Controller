@@ -49,6 +49,7 @@ static uint32_t q73_mutex_timeout_count = 0;
 
 // Hardware presence flag - set at boot, checked by monitor tasks
 static bool g_plc_hardware_present = true;  // Optimistic default
+static bool plc_in_transaction = false;     // PHASE 1: I2C Performance (Batching)
 
 #define I2C_RETRIES 3
 #define SHADOW_MUTEX_TIMEOUT_MS 100
@@ -208,8 +209,10 @@ void plcSetAxisSelect(uint8_t axis) {
 
   uint8_t register_copy = q73_shadow_register;
   xSemaphoreGive(plc_shadow_mutex);
-
-  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Axis");
+  
+  if (!plc_in_transaction) {
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Axis");
+  }
 }
 
 /**
@@ -235,8 +238,10 @@ void plcSetDirection(bool positive) {
 
   uint8_t register_copy = q73_shadow_register;
   xSemaphoreGive(plc_shadow_mutex);
-
-  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Direction");
+  
+  if (!plc_in_transaction) {
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Direction");
+  }
 }
 
 /**
@@ -277,8 +282,10 @@ void plcSetSpeed(uint8_t speed_profile) {
 
   uint8_t register_copy = q73_shadow_register;
   xSemaphoreGive(plc_shadow_mutex);
-
-  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Speed");
+  
+  if (!plc_in_transaction) {
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Speed");
+  }
 }
 
 /**
@@ -294,8 +301,10 @@ void plcClearAllOutputs() {
 
   uint8_t register_copy = q73_shadow_register;
   xSemaphoreGive(plc_shadow_mutex);
-
-  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Clear All");
+  
+  if (!plc_in_transaction) {
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Clear All");
+  }
 }
 
 /**
@@ -309,8 +318,23 @@ void plcCommitOutputs() {
 
   uint8_t register_copy = q73_shadow_register;
   xSemaphoreGive(plc_shadow_mutex);
-
+  
   plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Commit");
+}
+
+/**
+ * @brief Start a batch of relay changes
+ */
+void plcBeginTransaction() {
+  plc_in_transaction = true;
+}
+
+/**
+ * @brief Finish batch and write to hardware
+ */
+void plcEndTransaction() {
+  plc_in_transaction = false;
+  plcCommitOutputs(); // Force write now
 }
 
 // ============================================================================
@@ -378,7 +402,9 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
 
   xSemaphoreGive(plc_shadow_mutex);
 
-  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Relay");
+  if (!plc_in_transaction) {
+    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Relay");
+  }
 }
 
 // ============================================================================

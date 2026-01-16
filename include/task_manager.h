@@ -81,10 +81,11 @@
 #define TASK_PERIOD_TELEMETRY                                                  \
   1000 // PHASE 5.4: Background collection same rate as monitor
 #define TASK_PERIOD_LCD_FORMAT                                                 \
-  20 // PHASE 5.4: Format strings same rate as display
+  200 // PHASE 5.4: Format strings same rate as display
 // PHASE 3.1: Increased from 100ms to 20ms (50Hz) to match encoder update
 // frequency Reduces position display staleness from ±100ms to ±20ms
-#define TASK_PERIOD_LCD 20
+// AUDIT: Reduced to 200ms (5Hz) to prevent I2C bus contention with Motion task
+#define TASK_PERIOD_LCD 200
 
 // ============================================================================
 // ADAPTIVE I2C TIMEOUT CONFIGURATION

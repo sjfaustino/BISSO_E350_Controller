@@ -301,8 +301,10 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
         
         // Re-engage motion towards target using Slow profile (Speed Profile 1)
         bool is_fwd = (target > pos);
+        plcBeginTransaction();
         motionSetPLCSpeedProfile(SPEED_PROFILE_1); // Forced slow speed for hunting
         motionSetPLCAxisDirection(axis->id, true, is_fwd);
+        plcEndTransaction();
         
         // Transition back to EXECUTING
         // Note: state_executing_entry will auto-update active_start_position
