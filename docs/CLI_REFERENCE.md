@@ -23,7 +23,8 @@
     - [memory](#memory---heap-analysis)
     - [encoder_deviation](#encoder_deviation---motion-accuracy)
     - [fault_recovery](#fault_recovery---recovery-stats)
-    - [timeouts](#timeouts---show-timeout-diagnostics)
+    - [timeouts (Show timeout diagnostics)](#timeouts---show-timeout-diagnostics)
+    - [predict (Motion Position Prediction)](#predict---motion-position-prediction)
     - [selftest](#selftest---hardware-hardware-diagnostic)
     - [dio](#dio---digital-io-status)
     - [runtime](#runtime---machine-runtime-counter)
@@ -340,6 +341,21 @@ lcd status              # Show LCD configuration status
   Sleeping:  NO
   Timeout:   300 sec
 ```
+
+#### `lcd reset`
+**Description:** Force a re-discovery of the I2C LCD hardware and exit **DEGRADED Mode**. Use this after fixing wiring or noise issues.
+
+**Example Output:**
+```
+[LCD] Manually reset to I2C Mode
+[LCD] I2C Found: YES
+```
+
+**Possible Errors:**
+```
+[LCD] Cannot reset to I2C - Hardware not found
+```
+**Fix:** Verify I2C address is 0x27. Check that the LCD is powered. Verify that the I2C bus isn't locked by the PLC (try `i2c clear`).
 
 ---
 
@@ -798,6 +814,51 @@ Boot log size: 4523 bytes
 ```
 
 **Notes:**
+The boot log is limited to 4KB. If the system crashes early, this is the first place to look.
+
+---
+
+### `predict` - Motion Position Prediction
+
+**Description:** View real-time extrapolation diagnostics for the motion smoothing system.
+
+**Syntax:**
+```
+predict <axis>
+```
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| axis | 0-3 | Axis index (0=X, 1=Y, 2=Z, 3=A) |
+
+**Example:**
+```
+predict 0
+```
+
+**Example Output:**
+```text
+=== PREDICTION DIAGNOSTICS ===
+Axis:            0
+Raw Position:    12540
+Actual Latched:  12540
+Predicted:       12572
+Prediction Gap:  32             <-- Extra "smooth" distance (counts)
+Velocity:        1.600 counts/ms
+Update Age:      20 ms          <-- Time since last hardware update
+```
+
+#### Understanding the Output
+- **Raw Position**: The last literal value received from the RS485 encoder.
+- **Predicted**: The position the motion controller is currently using for soft-limits and target detection.
+- **Prediction Gap**: If this is constantly **0** during motion, the prediction system is disabled or stalled.
+- **Update Age**: Should be **< 60ms**. If > 200ms, prediction is automatically disabled for safety.
+
+#### Troubleshooting
+- **Gap is negative**: Check axis direction calibration.
+- **Gap stays 0**: Verify that velocity is non-zero and that encoder feedback is enabled (`config encoder_feedback 1`).
+- **Jittery Gap**: High vibration or unstable encoder baud rate. Check WJ66 RS485 cables.
 - Boot log captures all serial output during device startup
 - Useful for debugging boot issues when serial monitor not available
 - Maximum log size: 32KB (configurable)

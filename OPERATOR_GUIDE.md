@@ -1870,6 +1870,38 @@ Commands to set speed and direction are now "batched" into a single transaction.
 
 ---
 
+### I2C Degraded Mode (Safety Hardening)
+
+If the I2C bus becomes unstable due to electrical noise from the VFD or a loose LCD cable, the system is designed to **demote** the LCD rather than letting it block critical motion tasks.
+
+#### The Fallback Mechanism
+The controller monitors the success rate of every LCD update. 
+- **Trigger**: If **10 consecutive** I2C writes fail, the system triggers an emergency fallback.
+- **Result**: The LCD mode switches from **I2C** to **SERIAL (DEGRADED)**.
+- **Behavior**: The physical LCD will stop updating, but all diagnostic data will be redirected to the Serial/USB console so the operator can still monitor the machine during the fault.
+
+```text
+    I2C BUS HEALTH MONITOR
+    [ OK ] Write 1
+    [ OK ] Write 2
+    [FAIL] Write 3  --> Increments internal "strike" counter
+    ...
+    [FAIL] Write 12 --> Counter hits 10! 
+    
+    ACTION: 
+    1. Log Error FAULT_I2C_ERROR
+    2. Switch to DEGRADED_MODE
+    3. Alert user via Serial Console
+```
+
+#### Manual Recovery Steps
+Once the physical issue (loose cable, EMI) is resolved, the operator can manually restore the LCD:
+1. Connect to the **CLI (Command Line Interface)**.
+2. Type `lcd reset`.
+3. The system will attempt to ping the I2C LCD hardware and restore standard operation.
+
+---
+
 ### Position Prediction & Smoothing
 
 Because the RS485 Encoders (WJ66) update relatively slowly (20-50ms) compared to the motion controller (10ms), there is usually a small "lag" in where the controller *thinks* it is.
@@ -1984,6 +2016,20 @@ The internal buzzer provides audible feedback for key events.
 | **Continuous Beep**| CRITICAL FAULT| Emergency stop or critical hardware failure. |
 
 ---
+
+### I2C Bus Fault Recovery
+If the system enters **DEGRADED Mode**, the LCD will stop updating. This is a safety feature to ensure the I2C bus stays open for the Axis Motors.
+
+**Recovery Procedure**:
+1. **Identify**: Check if the physical LCD is stuck or showing an old message while the Web UI is still working.
+2. **Verify**: Use the CLI command `lcd status`. If "Mode" is `1`, it is in Degraded Serial mode.
+3. **Inspect**: Check the physical I2C cables leading to the back of the LCD display.
+4. **Restore**: Issue the `lcd reset` command via Serial or Telnet.
+
+```text
+    OPERATOR RECOVERY FLOW
+    [Stuck LCD] --> [Check CLI: lcd status] --> [Fix Cable] --> [Command: lcd reset]
+```
 
 ### Power Loss Recovery Procedure
 
