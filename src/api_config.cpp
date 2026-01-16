@@ -21,7 +21,11 @@ static bool validateBool(JsonVariant value, char* error_msg, size_t len);
 
 // Configuration defaults (matching Altivar 31 + system constraints)
 static const motion_config_t default_motion = {
-    .soft_limit_low_mm = {0, 0, 0}, .soft_limit_high_mm = {500, 500, 500}};
+    .soft_limit_low_mm = {0, 0, 0},
+    .soft_limit_high_mm = {500, 500, 500},
+    .x_approach_slow_mm = 5,
+    .x_approach_med_mm = 20,
+    .target_margin_mm = 0.1f};
 
 static const vfd_config_t default_vfd = {
     .min_speed_hz = 1,   // LSP (Altivar 31 minimum)
@@ -59,6 +63,11 @@ bool apiConfigLoad(void) {
   current_motion.soft_limit_low_mm[2] = configGetInt(KEY_Z_LIMIT_MIN, 0);
   current_motion.soft_limit_high_mm[2] = configGetInt(KEY_Z_LIMIT_MAX, 500);
 
+  // Load Approach/Tuning params
+  current_motion.x_approach_slow_mm = configGetInt(KEY_X_APPROACH, 5);
+  current_motion.x_approach_med_mm = configGetInt(KEY_X_APPROACH_MED, 20);
+  current_motion.target_margin_mm = configGetFloat(KEY_TARGET_MARGIN, 0.1f);
+
   // Load VFD config (using idle RMS as proxy for min speed characteristics)
   // Note: VFD has fixed acceleration/deceleration timings via Modbus, not
   // configurable here
@@ -91,6 +100,11 @@ bool apiConfigSave(void) {
   configSetInt(KEY_Y_LIMIT_MAX, current_motion.soft_limit_high_mm[1]);
   configSetInt(KEY_Z_LIMIT_MIN, current_motion.soft_limit_low_mm[2]);
   configSetInt(KEY_Z_LIMIT_MAX, current_motion.soft_limit_high_mm[2]);
+
+  // Save Approach/Tuning params
+  configSetInt(KEY_X_APPROACH, current_motion.x_approach_slow_mm);
+  configSetInt(KEY_X_APPROACH_MED, current_motion.x_approach_med_mm);
+  configSetFloat(KEY_TARGET_MARGIN, current_motion.target_margin_mm);
 
   // VFD config - speeds and timings are fixed in Altivar31 and set via Modbus
   // No need to save these as they are hardware constants
@@ -191,6 +205,12 @@ bool apiConfigValidate(config_category_t category, const char *key,
   case CONFIG_CATEGORY_MOTION:
     if (strstr(key, "soft_limit")) {
       return validateSoftLimit(key, value, error_msg, error_msg_len);
+    } else if (strstr(key, "x_appr") || strstr(key, "tgt_margin")) {
+      if (!value.is<int>() && !value.is<float>()) {
+        snprintf(error_msg, error_msg_len, "Value must be numeric");
+        return false;
+      }
+      return true;
     }
     break;
 
@@ -255,6 +275,12 @@ bool apiConfigSet(config_category_t category, const char *key,
       current_motion.soft_limit_low_mm[2] = value.as<int32_t>();
     } else if (strcmp(key, "soft_limit_z_high") == 0) {
       current_motion.soft_limit_high_mm[2] = value.as<int32_t>();
+    } else if (strcmp(key, "x_appr_slow") == 0) {
+      current_motion.x_approach_slow_mm = value.as<int32_t>();
+    } else if (strcmp(key, "x_appr_med") == 0) {
+      current_motion.x_approach_med_mm = value.as<int32_t>();
+    } else if (strcmp(key, "tgt_margin") == 0) {
+      current_motion.target_margin_mm = value.as<float>();
     }
     break;
 
@@ -343,6 +369,9 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
     obj["soft_limit_y_high"] = current_motion.soft_limit_high_mm[1];
     obj["soft_limit_z_low"] = current_motion.soft_limit_low_mm[2];
     obj["soft_limit_z_high"] = current_motion.soft_limit_high_mm[2];
+    obj["x_appr_slow"] = current_motion.x_approach_slow_mm;
+    obj["x_appr_med"] = current_motion.x_approach_med_mm;
+    obj["tgt_margin"] = current_motion.target_margin_mm;
     break;
   }
 

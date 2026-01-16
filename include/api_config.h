@@ -37,6 +37,9 @@ typedef enum {
 typedef struct {
     int32_t soft_limit_low_mm[3];       // Lower limit for X, Y, Z (mm) - supports negative
     int32_t soft_limit_high_mm[3];      // Upper limit for X, Y, Z (mm)
+    int32_t x_approach_slow_mm;         // X Slow approach threshold (mm)
+    int32_t x_approach_med_mm;          // X Medium approach threshold (mm)
+    float target_margin_mm;             // Target position margin (mm)
 } motion_config_t;
 
 /**

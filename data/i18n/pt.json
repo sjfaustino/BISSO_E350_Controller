@@ -103,7 +103,10 @@
         "min_label": "Mín",
         "rpm_label": "RPM",
         "speed_label": "Velocidade",
-        "unknown": "Desconhecido"
+        "unknown": "Desconhecido",
+        "position_dro": "Posição (DRO)",
+        "axis_quality": "Qualidade do Eixo",
+        "axis_status": "Estado do Eixo"
     },
     "cut_planner": {
         "title": "Planificador de Cortes",
@@ -123,8 +126,9 @@
         "forward_pass": "Profundidade Passada Avanço (mm)",
         "backward_pass": "Profundidade Passada Retorno (mm)",
         "backward_note": "Defina 0 para cortar apenas em passadas de avanço",
-        "num_cuts": "Número de Cortes",
+        "num_pieces": "Número de Peças",
         "x_step": "Passo X (mm)",
+        "blade_thickness": "Espessura da Lâmina (mm)",
         "preview": "Pré-visualizar G-Code",
         "run_job": "Executar Trabalho",
         "gcode_preview": "Pré-visualização G-Code",
@@ -578,6 +582,10 @@
         "z_limits": "Limites Software Eixo Z (mm)",
         "lower_limit": "Limite Inferior",
         "upper_limit": "Limite Superior",
+        "motion_tuning": "Ajuste de Movimento e Posicionamento",
+        "x_approach_slow": "Aproximação Lenta X (mm)",
+        "x_approach_med": "Aproximação Média X (mm)",
+        "target_margin": "Margem de Posição Alvo (mm)",
         "save_motion": "Guardar Movimento",
         "reset_defaults": "Repor Padrões",
         "vfd_params": "Parâmetros VFD",

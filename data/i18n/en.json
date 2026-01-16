@@ -103,7 +103,10 @@
         "min_label": "Min",
         "rpm_label": "RPM",
         "speed_label": "Speed",
-        "unknown": "Unknown"
+        "unknown": "Unknown",
+        "position_dro": "Position (DRO)",
+        "axis_quality": "Axis Quality",
+        "axis_status": "Axis Status"
     },
     "cut_planner": {
         "title": "Cut Planner",
@@ -123,8 +126,9 @@
         "forward_pass": "Forward Pass Depth (mm)",
         "backward_pass": "Backward Pass Depth (mm)",
         "backward_note": "Set to 0 to cut only on forward passes",
-        "num_cuts": "Number of Cuts",
+        "num_pieces": "Number of Pieces",
         "x_step": "X Step (mm)",
+        "blade_thickness": "Blade Thickness (mm)",
         "preview": "Preview G-Code",
         "run_job": "Run Job",
         "gcode_preview": "G-Code Preview",
@@ -578,6 +582,10 @@
         "z_limits": "Z-Axis Soft Limits (mm)",
         "lower_limit": "Lower Limit",
         "upper_limit": "Upper Limit",
+        "motion_tuning": "Motion Tuning & Positioning",
+        "x_approach_slow": "X Slow Approach (mm)",
+        "x_approach_med": "X Medium Approach (mm)",
+        "target_margin": "Target Position Margin (mm)",
         "save_motion": "Save Motion Settings",
         "reset_defaults": "Reset to Defaults",
         "vfd_params": "VFD Parameters",

@@ -230,12 +230,17 @@
                     <input type="number" id="parallel-depth" value="10" min="1" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="parallel-num-cuts" data-i18n="cut_planner.num_cuts">Number of Cuts</label>
-                    <input type="number" id="parallel-num-cuts" value="5" min="1" step="1">
+                    <label for="parallel-num-pieces" data-i18n="cut_planner.num_pieces">Number of Pieces</label>
+                    <input type="number" id="parallel-num-pieces" value="5" min="1" step="1">
                 </div>
                 <div class="form-group">
                     <label for="parallel-x-step" data-i18n="cut_planner.x_step">X Step (mm)</label>
                     <input type="number" id="parallel-x-step" value="35" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="parallel-blade-thickness" data-i18n="cut_planner.blade_thickness">Blade Thickness
+                        (mm)</label>
+                    <input type="number" id="parallel-blade-thickness" value="4" min="0" step="0.1">
                 </div>
             </div>
             <div class="card-actions">
@@ -311,12 +316,16 @@
                     <small data-i18n="cut_planner.backward_note">Set to 0 to cut only on forward passes</small>
                 </div>
                 <div class="form-group">
-                    <label for="pp-num-cuts" data-i18n="cut_planner.num_cuts">Number of Cuts</label>
-                    <input type="number" id="pp-num-cuts" value="3" min="1" step="1">
+                    <label for="pp-num-pieces" data-i18n="cut_planner.num_pieces">Number of Pieces</label>
+                    <input type="number" id="pp-num-pieces" value="3" min="1" step="1">
                 </div>
                 <div class="form-group">
                     <label for="pp-x-step" data-i18n="cut_planner.x_step">X Step (mm)</label>
                     <input type="number" id="pp-x-step" value="35" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="pp-blade-thickness" data-i18n="cut_planner.blade_thickness">Blade Thickness (mm)</label>
+                    <input type="number" id="pp-blade-thickness" value="4" min="0" step="0.1">
                 </div>
             </div>
             <div class="card-actions">

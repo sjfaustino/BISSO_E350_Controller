@@ -34,6 +34,7 @@ public:
     uint32_t getPollCount() const;
     uint32_t getErrorCount() const;
     uint32_t getConsecutiveErrors() const;
+    void resetErrorCounters();
 
     // Registry Access (for advanced use)
     const rs485_device_t* getDeviceDescriptor() const;

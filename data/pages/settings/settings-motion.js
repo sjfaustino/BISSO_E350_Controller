@@ -20,6 +20,12 @@ Object.assign(window.SettingsModule, {
                     document.getElementById('y-limit-high').value = cfg.soft_limit_y_high ?? 500;
                     document.getElementById('z-limit-low').value = cfg.soft_limit_z_low ?? 0;
                     document.getElementById('z-limit-high').value = cfg.soft_limit_z_high ?? 500;
+
+                    // New motion tuning params
+                    document.getElementById('x-approach-slow').value = cfg.x_appr_slow ?? 5;
+                    document.getElementById('x-approach-med').value = cfg.x_appr_med ?? 20;
+                    document.getElementById('target-margin').value = cfg.tgt_margin ?? 0.1;
+
                     this.setStatusLoaded('motion');
                 }
             })
@@ -36,6 +42,9 @@ Object.assign(window.SettingsModule, {
         const y_high = parseInt(document.getElementById('y-limit-high').value);
         const z_low = parseInt(document.getElementById('z-limit-low').value);
         const z_high = parseInt(document.getElementById('z-limit-high').value);
+        const x_appr_slow = parseInt(document.getElementById('x-approach-slow').value);
+        const x_appr_med = parseInt(document.getElementById('x-approach-med').value);
+        const tgt_margin = parseFloat(document.getElementById('target-margin').value);
 
         if (x_low >= x_high || y_low >= y_high || z_low >= z_high) {
             this.showError('motion', window.i18n.t('settings.limit_order_error'));
@@ -48,7 +57,10 @@ Object.assign(window.SettingsModule, {
             this.setConfig(0, 'soft_limit_y_low', y_low),
             this.setConfig(0, 'soft_limit_y_high', y_high),
             this.setConfig(0, 'soft_limit_z_low', z_low),
-            this.setConfig(0, 'soft_limit_z_high', z_high)
+            this.setConfig(0, 'soft_limit_z_high', z_high),
+            this.setConfig(0, 'x_appr_slow', x_appr_slow),
+            this.setConfig(0, 'x_appr_med', x_appr_med),
+            this.setConfig(0, 'tgt_margin', tgt_margin)
         ])
             .then(() => {
                 AlertManager.add(window.i18n.t('settings.motion_saved'), 'success', 2000);
@@ -68,7 +80,10 @@ Object.assign(window.SettingsModule, {
             this.setConfig(0, 'soft_limit_y_low', 0),
             this.setConfig(0, 'soft_limit_y_high', 500),
             this.setConfig(0, 'soft_limit_z_low', 0),
-            this.setConfig(0, 'soft_limit_z_high', 500)
+            this.setConfig(0, 'soft_limit_z_high', 500),
+            this.setConfig(0, 'x_appr_slow', 5),
+            this.setConfig(0, 'x_appr_med', 20),
+            this.setConfig(0, 'tgt_margin', 0.1)
         ])
             .then(() => this.loadMotionConfig())
             .then(() => AlertManager.add(window.i18n.t('settings.motion_reset'), 'success', 2000))

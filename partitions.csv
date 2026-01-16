@@ -1,9 +1,9 @@
 # Name,   Type, SubType, Offset,  Size, Flags
-# PosiPro v1.0.0 OTA Partition Table
+# PosiPro v1.0.0 Single-App Partition Table (No OTA)
 # Total Flash: 4MB (0x400000)
-# Layout: NVS + OTAdata + PHY + App0 + App1 + LittleFS
+# Layout: NVS + PHY + Factory App + LittleFS
 nvs,      data, nvs,     0x9000,  0x5000,
-otadata,  data, ota,     0xE000,  0x2000,
-ota_0,    app,  ota_0,   0x10000, 0x180000,
-ota_1,    app,  ota_1,   0x190000,0x180000,
-spiffs,   data, spiffs,  0x310000,0x100000,
+phy_init, data, phy,     0xE000,  0x1000,
+factory,  app,  factory, 0x10000, 0x200000,
+spiffs,   data, spiffs,  0x210000,0x1F0000,
+

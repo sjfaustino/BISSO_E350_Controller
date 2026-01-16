@@ -100,6 +100,23 @@ void WebServerManager::init() {
 }
 
 // ============================================================================
+// JSON RESPONSE HELPER (P2 DRY Improvement)
+// ============================================================================
+
+/**
+ * @brief Send JSON response with proper content type
+ * @param response PsychicHttp response object
+ * @param doc ArduinoJson document to serialize
+ * @param status HTTP status code (default 200)
+ * @return esp_err_t result
+ */
+static esp_err_t sendJsonResponse(PsychicResponse* response, JsonDocument& doc, int status = 200) {
+    String json;
+    serializeJson(doc, json);
+    return response->send(status, "application/json", json.c_str());
+}
+
+// ============================================================================
 // ROUTE REGISTRATION (P0 Refactor: Extracted from init())
 // ============================================================================
 void WebServerManager::setupRoutes() {
@@ -114,9 +131,7 @@ void WebServerManager::setupRoutes() {
         buildTelemetryJson(doc, telemetry);
         portEXIT_CRITICAL(&statusSpinlock);
         
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
+        return sendJsonResponse(response, doc);
     });
     
     // GET /api/logs/boot - Retrieve captured boot log

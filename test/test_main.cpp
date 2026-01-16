@@ -10,7 +10,9 @@
 // External test registration functions
 extern void run_altivar31_vfd_tests(void);
 extern void run_auth_manager_tests(void);
+extern void run_axis_synchronization_tests(void);
 extern void run_config_defaults_tests(void);
+extern void run_cutting_analytics_tests(void);
 extern void run_dashboard_metrics_tests(void);
 extern void run_encoder_hal_tests(void);
 extern void run_fault_logging_tests(void);
@@ -38,7 +40,9 @@ int main(int argc, char** argv) {
     
     run_altivar31_vfd_tests();
     run_auth_manager_tests();
+    run_axis_synchronization_tests();
     run_config_defaults_tests();
+    run_cutting_analytics_tests();
     run_dashboard_metrics_tests();
     run_encoder_hal_tests();
     run_fault_logging_tests();
@@ -50,3 +54,4 @@ int main(int argc, char** argv) {
     
     return UNITY_END();
 }
+

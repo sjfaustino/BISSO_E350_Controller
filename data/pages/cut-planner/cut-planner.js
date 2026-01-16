@@ -10,7 +10,7 @@ if (typeof window.CutPlanner === 'undefined') {
         generatedGcode: '',
 
         init() {
-            console.log('[CutPlanner] Initializing...');
+            console.log('[CutPlanner] Initialization V1.2 (Blade Thickness Fix)');
             this.captureSafeZ();
         },
 
@@ -20,19 +20,14 @@ if (typeof window.CutPlanner === 'undefined') {
         captureSafeZ() {
             if (typeof AppState !== 'undefined' && AppState.data && AppState.data.motion) {
                 this.safeZ = AppState.data.motion.position?.z || 0;
-                console.log('[CutPlanner] Safe Z captured from AppState:', this.safeZ);
             } else {
-                // Fallback: fetch from API
                 fetch('/api/status')
                     .then(r => r.json())
                     .then(data => {
-                        // Handle both nested and flat response structures for safety
                         this.safeZ = (data.motion?.position?.z !== undefined) ?
                             data.motion.position.z : (data.z_pos || 0);
-                        console.log('[CutPlanner] Safe Z from API:', this.safeZ);
                     })
                     .catch(() => {
-                        console.warn('[CutPlanner] Could not capture Safe Z, using 0');
                         this.safeZ = 0;
                     });
             }
@@ -45,35 +40,41 @@ if (typeof window.CutPlanner === 'undefined') {
             switch (jobType) {
                 case 'single':
                     return {
-                        startY: parseFloat(document.getElementById('single-start-y').value),
-                        endY: parseFloat(document.getElementById('single-end-y').value),
-                        depth: parseFloat(document.getElementById('single-depth').value)
+                        startY: parseFloat(document.getElementById('single-start-y').value) || 0,
+                        endY: parseFloat(document.getElementById('single-end-y').value) || 0,
+                        depth: parseFloat(document.getElementById('single-depth').value) || 0
                     };
                 case 'linear-passes':
                     return {
-                        startY: parseFloat(document.getElementById('passes-start-y').value),
-                        endY: parseFloat(document.getElementById('passes-end-y').value),
-                        totalDepth: parseFloat(document.getElementById('passes-total-depth').value),
-                        forwardPass: parseFloat(document.getElementById('passes-forward').value),
-                        backwardPass: parseFloat(document.getElementById('passes-backward').value)
+                        startY: parseFloat(document.getElementById('passes-start-y').value) || 0,
+                        endY: parseFloat(document.getElementById('passes-end-y').value) || 0,
+                        totalDepth: parseFloat(document.getElementById('passes-total-depth').value) || 0,
+                        forwardPass: parseFloat(document.getElementById('passes-forward').value) || 0,
+                        backwardPass: parseFloat(document.getElementById('passes-backward').value) || 0
                     };
                 case 'parallel':
+                    const numPiecesP = parseInt(document.getElementById('parallel-num-pieces').value) || 1;
                     return {
-                        startY: parseFloat(document.getElementById('parallel-start-y').value),
-                        endY: parseFloat(document.getElementById('parallel-end-y').value),
-                        depth: parseFloat(document.getElementById('parallel-depth').value),
-                        numCuts: parseInt(document.getElementById('parallel-num-cuts').value),
-                        xStep: parseFloat(document.getElementById('parallel-x-step').value)
+                        startY: parseFloat(document.getElementById('parallel-start-y').value) || 0,
+                        endY: parseFloat(document.getElementById('parallel-end-y').value) || 0,
+                        depth: parseFloat(document.getElementById('parallel-depth').value) || 0,
+                        numCuts: numPiecesP + 1,
+                        numPieces: numPiecesP,
+                        xStep: parseFloat(document.getElementById('parallel-x-step').value) || 0,
+                        bladeThickness: parseFloat(document.getElementById('parallel-blade-thickness').value) || 0
                     };
                 case 'parallel-passes':
+                    const numPiecesPP = parseInt(document.getElementById('pp-num-pieces').value) || 1;
                     return {
-                        startY: parseFloat(document.getElementById('pp-start-y').value),
-                        endY: parseFloat(document.getElementById('pp-end-y').value),
-                        totalDepth: parseFloat(document.getElementById('pp-total-depth').value),
-                        forwardPass: parseFloat(document.getElementById('pp-forward').value),
-                        backwardPass: parseFloat(document.getElementById('pp-backward').value),
-                        numCuts: parseInt(document.getElementById('pp-num-cuts').value),
-                        xStep: parseFloat(document.getElementById('pp-x-step').value)
+                        startY: parseFloat(document.getElementById('pp-start-y').value) || 0,
+                        endY: parseFloat(document.getElementById('pp-end-y').value) || 0,
+                        totalDepth: parseFloat(document.getElementById('pp-total-depth').value) || 0,
+                        forwardPass: parseFloat(document.getElementById('pp-forward').value) || 0,
+                        backwardPass: parseFloat(document.getElementById('pp-backward').value) || 0,
+                        numCuts: numPiecesPP + 1,
+                        numPieces: numPiecesPP,
+                        xStep: parseFloat(document.getElementById('pp-x-step').value) || 0,
+                        bladeThickness: parseFloat(document.getElementById('pp-blade-thickness').value) || 0
                     };
                 default:
                     return {};
@@ -82,25 +83,23 @@ if (typeof window.CutPlanner === 'undefined') {
 
         /**
          * Generate G-code for Single Linear Cut
-         * Uses relative positioning - operator's starting position is the origin
          */
         generateSingle(p) {
-            const cutDistance = p.endY - p.startY;  // Total Y travel
-
+            const cutDistance = p.endY - p.startY;
             const lines = [
                 '; Single Linear Cut',
                 '; Generated by Cut Planner',
-                '; Starting position is job origin (0,0,0)',
+                '; Job Origin (0) is starting saw position',
                 '',
                 'G91              ; Relative positioning',
-                `G1 Z${-p.depth} F2      ; Plunge to depth (medium speed)`,
-                `G1 Y${cutDistance} F2   ; Cut forward (medium speed)`,
-                `G0 Z${p.depth} F3       ; Retract to surface (fast)`,
-                `G0 Y${-cutDistance} F3  ; Rapid return to start (fast)`,
+                `G0 Y${p.startY.toFixed(1)} F3       ; Move to Start Position`,
+                `G1 Z${(-p.depth).toFixed(1)} F2   ; Plunge to target depth`,
+                `G1 Y${cutDistance.toFixed(1)} F2    ; Perform the cut`,
+                `G0 Z${p.depth.toFixed(1)} F3    ; Retract`,
+                `G0 Y${(-p.endY).toFixed(1)} F3    ; Return to Job Origin`,
                 '',
                 '; Job complete'
             ];
-
             return lines.join('\n');
         },
 
@@ -112,62 +111,67 @@ if (typeof window.CutPlanner === 'undefined') {
             const lines = [
                 '; Linear Cut with Passes',
                 '; Generated by Cut Planner',
-                '; Starting position is job origin (0,0,0)',
+                '; Target Pieces: 1 (Linear Pass)',
                 '',
-                'G91              ; Relative positioning'
+                'G91              ; Relative positioning',
+                `G0 Y${p.startY.toFixed(1)} F3       ; Move to Start Position`
             ];
 
             let totalZ = 0;
-            let atStart = true;
+            let atStart = true; // true = at startY, false = at endY
 
             while (totalZ < p.totalDepth) {
-                // Forward pass
+                // Forward pass step
                 let forwardStep = Math.min(p.forwardPass, p.totalDepth - totalZ);
                 totalZ += forwardStep;
 
                 lines.push('');
-                lines.push(`; Pass at depth -${totalZ.toFixed(1)}`);
-                lines.push(`G1 Z${-forwardStep.toFixed(1)} F2   ; Plunge`);
+                lines.push(`; Pass at cumulative depth -${totalZ.toFixed(1)}`);
+                lines.push(`G1 Z${(-forwardStep).toFixed(1)} F2   ; Plunge`);
 
                 if (atStart) {
-                    lines.push(`G1 Y${cutDistance} F2        ; Cut forward`);
+                    lines.push(`G1 Y${cutDistance.toFixed(1)} F2        ; Cut forward to End Y`);
                     atStart = false;
                 } else {
-                    lines.push(`G1 Y${-cutDistance} F2       ; Cut backward`);
+                    lines.push(`G1 Y${(-cutDistance).toFixed(1)} F2       ; Cut backward to Start Y`);
                     atStart = true;
                 }
 
                 if (totalZ >= p.totalDepth) break;
 
-                // Backward pass (if enabled)
+                // Backward pass step (if enabled)
                 if (p.backwardPass > 0) {
                     let backwardStep = Math.min(p.backwardPass, p.totalDepth - totalZ);
                     totalZ += backwardStep;
 
-                    lines.push(`G1 Z${-backwardStep.toFixed(1)} F2  ; Deepen`);
+                    lines.push(`G1 Z${(-backwardStep).toFixed(1)} F2  ; Deepen`);
                     if (atStart) {
-                        lines.push(`G1 Y${cutDistance} F2        ; Cut forward`);
+                        lines.push(`G1 Y${cutDistance.toFixed(1)} F2        ; Cut forward to End Y`);
                         atStart = false;
                     } else {
-                        lines.push(`G1 Y${-cutDistance} F2       ; Cut backward`);
+                        lines.push(`G1 Y${(-cutDistance).toFixed(1)} F2       ; Cut backward to Start Y`);
                         atStart = true;
                     }
                 } else {
-                    // No backward pass - retract and return
+                    // One-way cutting: retract and return to startY
                     lines.push(`G0 Z${totalZ.toFixed(1)} F3         ; Retract to surface`);
                     if (!atStart) {
-                        lines.push(`G0 Y${-cutDistance} F3       ; Return to start`);
+                        lines.push(`G0 Y${(-cutDistance).toFixed(1)} F3       ; Return to Start Y`);
                         atStart = true;
                     }
-                    lines.push(`G0 Z${-totalZ.toFixed(1)} F3        ; Return to depth`);
+                    lines.push(`G0 Z${(-totalZ).toFixed(1)} F3        ; Return to depth`);
                 }
             }
 
-            // Return to safe home
+            // Final retract and return to Job Origin (0,0)
             lines.push('');
             lines.push(`G0 Z${totalZ.toFixed(1)} F3             ; Retract to surface`);
             if (!atStart) {
-                lines.push(`G0 Y${-cutDistance} F3           ; Return to start Y`);
+                // Currently at endY
+                lines.push(`G0 Y${(-p.endY).toFixed(1)} F3           ; Return to Job Origin (0)`);
+            } else {
+                // Currently at startY
+                lines.push(`G0 Y${(-p.startY).toFixed(1)} F3         ; Return to Job Origin (0)`);
             }
             lines.push('');
             lines.push('; Job complete');
@@ -180,10 +184,11 @@ if (typeof window.CutPlanner === 'undefined') {
          */
         generateParallel(p) {
             const cutDistance = p.endY - p.startY;
+            const totalXMove = p.xStep + p.bladeThickness;
             const lines = [
                 '; Parallel Cuts',
                 '; Generated by Cut Planner',
-                '; Starting position is job origin (0,0,0)',
+                `; Target Pieces: ${p.numPieces}`,
                 '',
                 'G91              ; Relative positioning'
             ];
@@ -191,26 +196,19 @@ if (typeof window.CutPlanner === 'undefined') {
             for (let i = 0; i < p.numCuts; i++) {
                 lines.push('');
                 lines.push(`; --- Cut ${i + 1} of ${p.numCuts} ---`);
-
-                lines.push(`G1 Z${-p.depth} F2      ; Plunge`);
-                lines.push(`G1 Y${cutDistance} F2   ; Cut forward`);
-                lines.push(`G0 Z${p.depth} F3       ; Retract`);
-                lines.push(`G0 Y${-cutDistance} F3  ; Return to start Y`);
+                lines.push(`G0 Y${p.startY.toFixed(1)} F3       ; Move to Start Y`);
+                lines.push(`G1 Z${(-p.depth).toFixed(1)} F2   ; Plunge`);
+                lines.push(`G1 Y${cutDistance.toFixed(1)} F2    ; Cut to End Y`);
+                lines.push(`G0 Z${p.depth.toFixed(1)} F3    ; Retract`);
+                lines.push(`G0 Y${(-p.endY).toFixed(1)} F3    ; Return to Origin Y`);
 
                 if (i < p.numCuts - 1) {
-                    lines.push(`G0 X${p.xStep} F3       ; Move to next X position`);
+                    lines.push(`G0 X${totalXMove.toFixed(1)} F3       ; Move to next piece (+ blade thickness)`);
                 }
-            }
-
-            // Return to start X (optional, but good practice if user wants to repeat)
-            if (p.numCuts > 1) {
-                lines.push('');
-                lines.push(`G0 X${-(p.xStep * (p.numCuts - 1))} F3  ; Return to start X`);
             }
 
             lines.push('');
             lines.push('; Job complete');
-
             return lines.join('\n');
         },
 
@@ -219,10 +217,11 @@ if (typeof window.CutPlanner === 'undefined') {
          */
         generateParallelPasses(p) {
             const cutDistance = p.endY - p.startY;
+            const totalXMove = p.xStep + p.bladeThickness;
             const lines = [
                 '; Parallel Cuts with Passes',
                 '; Generated by Cut Planner',
-                '; Starting position is job origin (0,0,0)',
+                `; Target Pieces: ${p.numPieces}`,
                 '',
                 'G91              ; Relative positioning'
             ];
@@ -230,69 +229,61 @@ if (typeof window.CutPlanner === 'undefined') {
             for (let cut = 0; cut < p.numCuts; cut++) {
                 lines.push('');
                 lines.push(`; === Parallel Cut ${cut + 1} of ${p.numCuts} ===`);
+                lines.push(`G0 Y${p.startY.toFixed(1)} F3       ; Move to Start Y`);
 
                 let totalZ = 0;
                 let atStart = true;
 
                 while (totalZ < p.totalDepth) {
-                    // Forward pass
                     let forwardStep = Math.min(p.forwardPass, p.totalDepth - totalZ);
                     totalZ += forwardStep;
-                    lines.push(`G1 Z${-forwardStep.toFixed(1)} F2   ; Plunge`);
+                    lines.push(`G1 Z${(-forwardStep).toFixed(1)} F2   ; Plunge`);
 
                     if (atStart) {
-                        lines.push(`G1 Y${cutDistance} F2        ; Cut forward`);
+                        lines.push(`G1 Y${cutDistance.toFixed(1)} F2        ; Cut forward`);
                         atStart = false;
                     } else {
-                        lines.push(`G1 Y${-cutDistance} F2       ; Cut backward`);
+                        lines.push(`G1 Y${(-cutDistance).toFixed(1)} F2       ; Cut backward`);
                         atStart = true;
                     }
 
                     if (totalZ >= p.totalDepth) break;
 
-                    // Backward pass
                     if (p.backwardPass > 0) {
                         let backwardStep = Math.min(p.backwardPass, p.totalDepth - totalZ);
                         totalZ += backwardStep;
-                        lines.push(`G1 Z${-backwardStep.toFixed(1)} F2  ; Deepen`);
+                        lines.push(`G1 Z${(-backwardStep).toFixed(1)} F2  ; Deepen`);
                         if (atStart) {
-                            lines.push(`G1 Y${cutDistance} F2        ; Cut forward`);
+                            lines.push(`G1 Y${cutDistance.toFixed(1)} F2        ; Cut forward`);
                             atStart = false;
                         } else {
-                            lines.push(`G1 Y${-cutDistance} F2       ; Cut backward`);
+                            lines.push(`G1 Y${(-cutDistance).toFixed(1)} F2       ; Cut backward`);
                             atStart = true;
                         }
                     } else {
-                        lines.push(`G0 Z${totalZ.toFixed(1)} F3`);
+                        lines.push(`G0 Z${totalZ.toFixed(1)} F3         ; Retract`);
                         if (!atStart) {
-                            lines.push(`G0 Y${-cutDistance} F3`);
+                            lines.push(`G0 Y${(-cutDistance).toFixed(1)} F3       ; Return to Start Y`);
                             atStart = true;
                         }
-                        lines.push(`G0 Z${-totalZ.toFixed(1)} F3`);
+                        lines.push(`G0 Z${(-totalZ).toFixed(1)} F3        ; Depth`);
                     }
                 }
 
-                // Finish current parallel cut
                 lines.push(`G0 Z${totalZ.toFixed(1)} F3             ; Retract`);
                 if (!atStart) {
-                    lines.push(`G0 Y${-cutDistance} F3           ; Return to start Y`);
+                    lines.push(`G0 Y${(-p.endY).toFixed(1)} F3           ; Return to Origin Y`);
+                } else {
+                    lines.push(`G0 Y${(-p.startY).toFixed(1)} F3         ; Return to Origin Y`);
                 }
 
-                // Move to next X
                 if (cut < p.numCuts - 1) {
-                    lines.push(`G0 X${p.xStep} F3               ; Move to next X`);
+                    lines.push(`G0 X${totalXMove.toFixed(1)} F3               ; Next piece (+ blade thickness)`);
                 }
-            }
-
-            // Return to start X
-            if (p.numCuts > 1) {
-                lines.push('');
-                lines.push(`G0 X${-(p.xStep * (p.numCuts - 1))} F3  ; Return to start X`);
             }
 
             lines.push('');
             lines.push('; Job complete');
-
             return lines.join('\n');
         },
 
@@ -301,18 +292,12 @@ if (typeof window.CutPlanner === 'undefined') {
          */
         generate(jobType) {
             const params = this.getParams(jobType);
-
             switch (jobType) {
-                case 'single':
-                    return this.generateSingle(params);
-                case 'linear-passes':
-                    return this.generateLinearPasses(params);
-                case 'parallel':
-                    return this.generateParallel(params);
-                case 'parallel-passes':
-                    return this.generateParallelPasses(params);
-                default:
-                    return '; Unknown job type';
+                case 'single': return this.generateSingle(params);
+                case 'linear-passes': return this.generateLinearPasses(params);
+                case 'parallel': return this.generateParallel(params);
+                case 'parallel-passes': return this.generateParallelPasses(params);
+                default: return '; Unknown job type';
             }
         },
 
@@ -322,111 +307,71 @@ if (typeof window.CutPlanner === 'undefined') {
         preview(jobType) {
             this.currentJobType = jobType;
             this.generatedGcode = this.generate(jobType);
-
             document.getElementById('gcode-preview-content').textContent = this.generatedGcode;
             document.getElementById('gcode-preview-modal').classList.remove('hidden');
-
-            // Set up run button in modal
             document.getElementById('gcode-preview-run').onclick = () => {
                 this.closePreview();
                 this.executeGcode(this.generatedGcode);
             };
         },
 
-        /**
-         * Close preview modal
-         */
         closePreview() {
             document.getElementById('gcode-preview-modal').classList.add('hidden');
         },
 
-        /**
-         * Run job directly (no preview)
-         */
         run(jobType) {
             const gcode = this.generate(jobType);
-
             if (confirm(window.i18n?.t('cut_planner.confirm_run') || 'Run this cutting job now?')) {
                 this.executeGcode(gcode);
             }
         },
 
-        /**
-         * Send G-code to execution API
-         */
         async executeGcode(gcode) {
             try {
-                // Send each line to the G-code API
-                // Strip inline comments and filter empty lines
                 const lines = gcode.split('\n')
-                    .map(l => l.split(';')[0].trim())  // Remove inline comments
-                    .filter(l => l);  // Filter empty lines
+                    .map(l => l.split(';')[0].trim())
+                    .filter(l => l);
 
-                AlertManager.add(window.i18n?.t('cut_planner.starting_job') || 'Starting cut job...', 'info', 2000);
+                AlertManager.add(window.i18n?.t('cut_planner.starting_job') || 'Starting...', 'info', 2000);
 
                 for (const line of lines) {
-                    // Wait for idle before sending next move command
                     if (line.startsWith('G0') || line.startsWith('G1')) {
                         await this.waitForIdle();
                     }
-
                     const response = await fetch('/api/gcode', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ command: line })
                     });
-
-                    if (!response.ok) {
-                        throw new Error(`Failed to execute: ${line}`);
-                    }
-
-                    const result = await response.json();
-                    if (!result.success) {
-                        throw new Error(result.error || `Execution of "${line}" failed`);
-                    }
+                    if (!response.ok) throw new Error(`API error`);
                 }
-
-                // Wait for final move to finish
                 await this.waitForIdle();
-
-                AlertManager.add(window.i18n?.t('cut_planner.job_completed') || 'Cut job completed!', 'success', 3000);
+                AlertManager.add(window.i18n?.t('cut_planner.job_completed') || 'Done!', 'success', 3000);
             } catch (error) {
-                console.error('[CutPlanner] Execution error:', error);
-                AlertManager.add(`${window.i18n?.t('cut_planner.job_failed') || 'Job failed'}: ${error.message}`, 'error', 5000);
+                AlertManager.add(`Error: ${error.message}`, 'error', 5000);
             }
         },
 
-        /**
-         * Helper to wait until the machine is idle
-         */
         async waitForIdle() {
             return new Promise((resolve) => {
                 const start = Date.now();
                 const check = () => {
                     const isMoving = typeof AppState !== 'undefined' && AppState.data?.motion?.moving;
-                    const status = typeof AppState !== 'undefined' ? AppState.data?.motion?.status : 'UNKNOWN';
-
-                    // If not moving or in error state, resolve
-                    if (!isMoving || status === 'ERROR' || status === 'ALARM') {
-                        // Small delay to ensure state propagates
+                    if (!isMoving || Date.now() - start > 30000) {
                         setTimeout(resolve, 100);
-                    } else if (Date.now() - start > 30000) { // 30s timeout safety
-                        console.warn('[CutPlanner] Waiting for idle timed out');
-                        resolve();
                     } else {
                         setTimeout(check, 100);
                     }
                 };
-                // Initial wait to let the last command start if needed
                 setTimeout(check, 50);
             });
         }
     };
-} // End of guard block
+}
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', () => CutPlanner.init());
-// Also init if loaded dynamically by router
+// Initialize
 if (document.readyState === 'complete') {
     CutPlanner.init();
+} else {
+    document.addEventListener('DOMContentLoaded', () => CutPlanner.init());
 }

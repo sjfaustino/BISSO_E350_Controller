@@ -66,6 +66,12 @@ uint32_t ModbusDriver::getConsecutiveErrors() const {
     return _device.consecutive_errors;
 }
 
+void ModbusDriver::resetErrorCounters() {
+    _device.poll_count = 0;
+    _device.error_count = 0;
+    _device.consecutive_errors = 0;
+}
+
 const rs485_device_t* ModbusDriver::getDeviceDescriptor() const {
     return &_device;
 }

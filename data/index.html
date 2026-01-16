@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Posipro - Cut Planner</title>
+
+    <!-- CSS - Bundled -->
+    <link rel="stylesheet" href="css/bundle.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="shortcut icon" href="favicon.ico">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Navigation Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">Posipro <span class="version-tag">v1.0.0</span>
+                <span class="lang-flags">
+                    <button class="lang-btn" onclick="I18nManager.setLang('pt')" title="Português"><svg viewBox="0 0 600 400"><rect width="240" height="400" fill="#006600"/><rect x="240" width="360" height="400" fill="#f00"/><circle cx="240" cy="200" r="80" fill="#ff0"/><circle cx="240" cy="200" r="50" fill="#fff" stroke="#000" stroke-width="2"/><rect x="225" y="175" width="30" height="50" fill="#f00"/><rect x="215" y="185" width="50" height="30" fill="#f00"/></svg></button>
+                    <button class="lang-btn" onclick="I18nManager.setLang('en')" title="English"><svg viewBox="0 0 741 390"><rect width="741" height="390" fill="#bf0a30"/><path d="M0 30h741M0 90h741M0 150h741M0 210h741M0 270h741M0 330h741" stroke="#fff" stroke-width="30"/><rect width="296.4" height="210" fill="#002868"/><g fill="#fff"><g id="s18"><g id="s9"><g id="s5"><g id="s"><path d="M0-11.75l2.76 8.5 8.99.01L4.49 2.01l2.77 8.52-7.26-5.27-7.26 5.27 2.77-8.52-7.26-5.25 8.99-.01z"/></g><use href="#s" x="59.28"/><use href="#s" x="118.56"/><use href="#s" x="177.84"/><use href="#s" x="237.12"/></g><use href="#s5" x="29.64" y="21"/></g><use href="#s9" y="42"/></g><use href="#s18" y="84"/><use href="#s9" y="168"/></g></svg></button>
+                </span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#cut-planner" class="nav-item">🗓️ <span data-i18n="nav.cut_planner">Planeador</span></a>
+                </li>
+                <li><a href="#dashboard" class="nav-item">📊 <span data-i18n="nav.dashboard">Painel</span></a></li>
+                <li><a href="#motion" class="nav-item">🎮 <span data-i18n="nav.motion">Movimento</span></a></li>
+                <li><a href="#gcode" class="nav-item">📝 <span data-i18n="nav.gcode">G-Code</span></a></li>
+                <li><a href="#homing" class="nav-item">🏠 <span data-i18n="nav.homing">Referenciação</span></a></li>
+                <li><a href="#diagnostics" class="nav-item">🔍 <span data-i18n="nav.diagnostics">Diagnóstico</span></a>
+                </li>
+                <li><a href="#network" class="nav-item">🌐 <span data-i18n="nav.network">Rede</span></a></li>
+                <li><a href="#system" class="nav-item">ℹ️ <span data-i18n="nav.system">Sistema</span></a></li>
+                <li><a href="#maintenance" class="nav-item">🔧 <span data-i18n="nav.maintenance">Manutenção</span></a>
+                </li>
+                <li><a href="#logs" class="nav-item">📋 <span data-i18n="nav.logs">Registos</span></a></li>
+                <li><a href="#hardware" class="nav-item">⚙️ <span data-i18n="nav.hardware">Hardware</span></a></li>
+                <li><a href="#settings" class="nav-item">🛠️ <span data-i18n="nav.settings">Definições</span></a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div id="ota-update-banner" class="hidden"></div>
+            <div id="page-container">
+                <div class="loading">Loading...</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- i18n Manager -->
+    <script src="shared/i18n.js"></script>
+    <!-- JS - Core (contains Shared modules + Utils, AppState, ThemeManager, Router) -->
+    <script src="core.js"></script>
+    <script>
+        // Initialize i18n on load
+        if (window.I18nManager && window.I18nManager.init) {
+            window.I18nManager.init();
+        }
+    </script>
+    <style>
+        .lang-flags {
+            margin-left: 8px;
+        }
+
+        .lang-btn { display: inline-flex; align-items: center; justify-content: center; 
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 2px 4px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .lang-btn:hover {
+            opacity: 1;
+        }
+            .lang-btn svg { width: 24px; height: auto; border-radius: 2px; shadow: 0 1px 2px rgba(0,0,0,0.2); }
+    </style>
+</body>
+
+</html>

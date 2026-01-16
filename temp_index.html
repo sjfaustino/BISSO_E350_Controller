@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="BISSO E350 CNC Control System Dashboard">
+    <meta name="theme-color" content="#3b82f6">
+    <title>BISSO E350 Dashboard</title>
+    <link rel="stylesheet" href="css/bundle.css">
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- Header -->
+    <header role="banner">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu">
+                <span></span><span></span><span></span>
+            </button>
+            <h1>⚙️ BISSO E350</h1>
+            <div class="status-indicator" aria-label="System connection status">
+                <div class="status-dot online" id="status-dot"></div>
+                <span id="status-text">Online</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav role="navigation" aria-label="Main navigation" id="main-nav">
+        <ul>
+            <li><a href="#dashboard" class="nav-item active" data-icon="📊"><span>Dashboard</span></a></li>
+            <li><a href="#gcode" class="nav-item" data-icon="📝"><span>G-Code</span></a></li>
+            <li><a href="#motion" class="nav-item" data-icon="🎮"><span>Motion</span></a></li>
+            <li><a href="#diagnostics" class="nav-item" data-icon="🔍"><span>Diagnostics</span></a></li>
+            <li><a href="#network" class="nav-item" data-icon="🌐"><span>Network</span></a></li>
+            <li><a href="#system" class="nav-item" data-icon="ℹ️"><span>System</span></a></li>
+            <li><a href="#maintenance" class="nav-item" data-icon="🔧"><span>Maintenance</span></a></li>
+            <li><a href="#logs" class="nav-item" data-icon="📋"><span>Logs</span></a></li>
+            <li><a href="#hardware" class="nav-item" data-icon="🔌"><span>Hardware</span></a></li>
+            <li><a href="#settings" class="nav-item" data-icon="⚙️"><span>Settings</span></a></li>
+        </ul>
+    </nav>
+
+    <!-- Alerts Container -->
+    <div class="alerts" role="region" aria-label="System alerts" id="alerts-container"></div>
+
+    <!-- Floating Connection Status Badge -->
+    <div class="connection-badge" id="connection-badge">
+        <div class="status-dot online" id="badge-status-dot"></div>
+        <span class="status-text" id="badge-status-text">Connected</span>
+        <span class="latency" id="badge-latency">-- ms</span>
+    </div>
+
+    <!-- Main Content -->
+    <main id="page-container" class="container" role="main">
+        <div style="text-align: center; padding: 2rem;">
+            <p>Loading...</p>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p>BISSO E350 Dashboard v3.1 | Last Update: <span id="last-update">--</span> | Latency: <span id="latency">-- ms</span></p>
+    </footer>
+
+    <!-- Single Bundle Script -->
+    <script src="core.js"></script>
+    
+    <script>
+        // Main App Initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("Initializing App...");
+            // Initialize Router directly since there is no main App class
+            if (window.Router) {
+                window.Router.init();
+            } else {
+                console.error("Router not found!");
+            }
+        });
+    </script>
+</body>
+</html>

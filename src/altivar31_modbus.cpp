@@ -204,7 +204,10 @@ bool altivar31IsRunning(void) { return Altivar31.isRunning(); }
 
 const altivar31_state_t* altivar31GetState(void) { return Altivar31.getState(); }
 
-void altivar31ResetErrorCounters(void) { }
+void altivar31ResetErrorCounters(void) {
+    // Reset base class error counters
+    Altivar31.resetErrorCounters();
+}
 
 bool altivar31IsMotorRunning(void) {
     return Altivar31.getFrequencyHz() > 0.5f;
