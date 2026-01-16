@@ -32,11 +32,8 @@ void tearDown(void) {
     // Called after each test
 }
 
-// Main entry point
-int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
-    
+// Common test runner
+void run_all_tests(void) {
     UNITY_BEGIN();
     
     run_altivar31_vfd_tests();
@@ -54,6 +51,26 @@ int main(int argc, char** argv) {
     run_rs485_registry_tests();
     run_hardware_optimization_tests();
     
-    return UNITY_END();
+    UNITY_END();
 }
+
+#ifdef ARDUINO
+#include <Arduino.h>
+void setup() {
+    // Wait for serial to settle
+    delay(2000);
+    run_all_tests();
+}
+void loop() {
+    // Nothing to do
+    delay(100);
+}
+#else
+int main(int argc, char** argv) {
+    (void)argc;
+    (void)argv;
+    run_all_tests();
+    return 0;
+}
+#endif
 
