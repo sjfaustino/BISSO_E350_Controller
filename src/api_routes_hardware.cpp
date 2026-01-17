@@ -242,7 +242,8 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         // Bus status
         uint32_t now = millis();
         uint32_t time_since_response = now - state->last_successful_response_ms;
-        bool healthy = (device_count == 0) || (time_since_response < RS485_WATCHDOG_TIMEOUT_MS);
+        // Healthy only if we have devices and they are responding
+        bool healthy = (device_count > 0) && (time_since_response < RS485_WATCHDOG_TIMEOUT_MS);
         
         doc["healthy"] = healthy;
         doc["watchdog_alert"] = state->watchdog_alert_active;

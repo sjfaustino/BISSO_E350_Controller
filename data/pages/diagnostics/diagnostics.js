@@ -76,15 +76,26 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
             const errorRateEl = document.getElementById("rs485-error-rate");
             const deviceListEl = document.getElementById("rs485-device-list");
 
+            const deviceCount = data.device_count || 0;
+
             if (indicator) {
                 indicator.classList.remove("on", "off", "alarm");
-                indicator.classList.add(data.healthy ? "on" : "alarm");
+                if (deviceCount === 0) {
+                    indicator.classList.add("off"); // Grey for no devices
+                } else {
+                    indicator.classList.add(data.healthy ? "on" : "alarm");
+                }
             }
             if (statusEl) {
-                statusEl.textContent = data.healthy ? "Healthy" : (data.watchdog_alert ? "TIMEOUT" : "Error");
-                statusEl.style.color = data.healthy ? "var(--color-optimal)" : "var(--color-critical)";
+                if (deviceCount === 0) {
+                    statusEl.textContent = "No Devices";
+                    statusEl.style.color = "var(--text-secondary)";
+                } else {
+                    statusEl.textContent = data.healthy ? "Healthy" : (data.watchdog_alert ? "TIMEOUT" : "Error");
+                    statusEl.style.color = data.healthy ? "var(--color-optimal)" : "var(--color-critical)";
+                }
             }
-            if (deviceCountEl) deviceCountEl.textContent = data.device_count || "0";
+            if (deviceCountEl) deviceCountEl.textContent = deviceCount;
             if (txCountEl) txCountEl.textContent = this.formatNumber(data.total_transactions || 0);
             if (errorRateEl) {
                 const rate = data.error_rate || 0;
