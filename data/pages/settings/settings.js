@@ -105,6 +105,7 @@ window.SettingsModule = window.SettingsModule || {
         this.bindSpindleDisplay('spindle-stall-timeout', 'stall-timeout-value');
 
         // Configuration Management
+        document.getElementById('export-all-btn')?.addEventListener('click', () => { window.location.href = '/api/config/backup'; });
         document.getElementById('load-preset-btn')?.addEventListener('click', () => this.loadPreset());
 
         // CLI Options (includes OTA toggle now)

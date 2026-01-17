@@ -168,7 +168,9 @@ void registerSystemRoutes(PsychicHttpServer& server) {
         free(json);
 
         char filename[64];
-        snprintf(filename, sizeof(filename), "attachment; filename=\"backup-%lu.json\"", (unsigned long)now);
+        char fileTime[32];
+        strftime(fileTime, sizeof(fileTime), "%Y%m%d-%H%M%S", gmtime(&now));
+        snprintf(filename, sizeof(filename), "attachment; filename=\"config-backup-%s.json\"", fileTime);
         
         response->addHeader("Content-Disposition", filename);
         return response->send(200, "application/json", output.c_str());
