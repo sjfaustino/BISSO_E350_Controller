@@ -183,32 +183,48 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"success\":true,\"message\":\"No boot log to delete\"}");
     });
     
-    // POST /api/hardware/i2c/test - Test I2C bus by scanning for LCD
+    // POST /api/hardware/i2c/test - Comprehensive I2C bus scan
     server.on("/api/hardware/i2c/test", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         JsonDocument doc;
         
-        // Common LCD I2C addresses
-        const uint8_t lcd_addresses[] = {0x27, 0x3F, 0x20};
-        bool found = false;
-        uint8_t found_addr = 0;
+        // Define all known I2C devices to scan
+        struct I2CDevice {
+            uint8_t addr;
+            const char* name;
+        };
         
-        for (size_t i = 0; i < sizeof(lcd_addresses) && !found; i++) {
-            Wire.beginTransmission(lcd_addresses[i]);
+        const I2CDevice devices[] = {
+            {0x21, "I73 Input"},      // Limit switches & sensors (PCF8574)
+            {0x22, "Board Inputs"},   // KC868-A16 onboard inputs
+            {0x24, "Q73 Output"},     // Relays & VFD control (PCF8574)
+            {0x27, "LCD Display"},    // LCD backpack (PCF8574)
+            {0x3F, "LCD Alt"}         // LCD backpack alternate address (PCF8574A)
+        };
+        
+        JsonArray found = doc["devices"].to<JsonArray>();
+        int count = 0;
+        
+        for (const auto& dev : devices) {
+            Wire.beginTransmission(dev.addr);
             uint8_t error = Wire.endTransmission();
             if (error == 0) {
-                found = true;
-                found_addr = lcd_addresses[i];
+                JsonObject d = found.add<JsonObject>();
+                char addr_str[6];
+                snprintf(addr_str, sizeof(addr_str), "0x%02X", dev.addr);
+                d["address"] = addr_str;
+                d["name"] = dev.name;
+                count++;
             }
         }
         
-        doc["success"] = found;
-        if (found) {
-            doc["address"] = String("0x") + String(found_addr, HEX);
-            doc["message"] = "LCD detected";
-            logInfo("[WEB] I2C test: LCD found at 0x%02X", found_addr);
+        doc["success"] = (count > 0);
+        doc["count"] = count;
+        
+        if (count > 0) {
+            logInfo("[WEB] I2C scan: %d devices found", count);
         } else {
-            doc["error"] = "No I2C device found";
-            logWarning("[WEB] I2C test: No device found at 0x27/0x3F/0x20");
+            doc["error"] = "No I2C devices found";
+            logWarning("[WEB] I2C scan: No devices found");
         }
         
         return sendJsonResponse(response, doc);
