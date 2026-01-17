@@ -375,6 +375,8 @@ window.SettingsModule = window.SettingsModule || {
     },
 
     async loadOtaSettings() {
+        // OTA settings are loaded together with CLI options from the same API category
+        // This function is kept for backward compatibility but loadCliOptions handles both
         try {
             const res = await fetch('/api/config/get?category=6');
             if (res.ok) {
@@ -384,28 +386,6 @@ window.SettingsModule = window.SettingsModule || {
             }
         } catch (e) {
             console.warn('[Settings] OTA settings load failed:', e);
-        }
-    },
-
-    async saveOtaSettings() {
-        const toggle = document.getElementById('ota-check-toggle');
-        if (!toggle) return;
-
-        try {
-            const res = await fetch('/api/config/set', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ category: 6, key: 'ota_chk_en', value: toggle.checked ? 1 : 0 })
-            });
-
-            const data = await res.json();
-            if (res.ok && !data.error) {
-                AlertManager.add(window.i18n.t('settings.ota_saved'), 'success', 2000);
-            } else {
-                this.showError('ota-settings', window.i18n.t('settings.save_error') + ' ' + (data.error || 'Unknown error'));
-            }
-        } catch (e) {
-            this.showError('ota-settings', window.i18n.t('settings.network_error') + ' ' + e.message);
         }
     }
 };

@@ -470,6 +470,8 @@
         "detect_title_encoder": "Auto-detetar baud rate do encoder",
         "detect_title_rs485": "Auto-detetar baud rate do bus RS485",
         "serial_note": "Temporização centralizada para todos os dispositivos série",
+        "i2c_speed": "Velocidade Bus I2C:",
+        "i2c_reboot_note": "Requer reinício para aplicar",
         "wj66_encoder": "Encoder WJ66",
         "protocol_rs232_ttl": "RS232 TTL",
         "rx_pin": "Pino RX:",
