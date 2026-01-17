@@ -7,6 +7,8 @@
         <div class="card">
             <div class="card-header">
                 <h2>Appearance</h2>
+                <button class="btn btn-small btn-ghost" id="undo-settings-btn"
+                    style="display:none; float: right;">Undo</button>
             </div>
             <div class="card-content">
                 <div class="setting-group">
@@ -199,6 +201,8 @@
                 <div class="setting-group">
                     <button class="btn btn-primary" id="save-motion-btn" data-i18n="settings.save_motion">Save Motion
                         Settings</button>
+                    <button class="btn btn-ghost" id="revert-motion-btn" data-i18n="settings.revert_changes">Revert
+                        Changes</button>
                     <button class="btn btn-secondary" id="reset-motion-btn" data-i18n="settings.reset_defaults">Reset to
                         Defaults</button>
                 </div>
@@ -276,6 +280,7 @@
 
                 <div class="setting-group">
                     <button class="btn btn-primary" id="save-spindle-alarm-btn">Save Alarm Settings</button>
+                    <button class="btn btn-ghost" id="revert-spindle-alarm-btn">Revert</button>
                     <button class="btn btn-secondary" id="reset-spindle-alarm-btn">Reset to Defaults</button>
                 </div>
                 <div id="spindle-alarm-error" class="error-message" style="display:none;"></div>
@@ -331,6 +336,7 @@
                 </div>
 
                 <div class="setting-group" style="margin-top: var(--space-lg);">
+                    <button class="btn btn-ghost" id="revert-encoder-btn">Revert All</button>
                     <button class="btn btn-secondary" id="reset-encoder-btn">Reset All to Defaults</button>
                 </div>
                 <div id="encoder-error" class="error-message" style="display:none;"></div>

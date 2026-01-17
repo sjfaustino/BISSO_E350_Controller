@@ -6,25 +6,64 @@
 
 // --- Utils ---
 const Utils = {
+    /**
+     * Sets the text content of an element.
+     * @param {string} id - Element ID
+     * @param {string} value - Text to set
+     * @returns {boolean} True if element found
+     */
     setText(id, value) {
         const el = document.getElementById(id);
         if (el) { el.textContent = value; return true; }
         return false;
     },
+
+    /**
+     * Sets the value of an input element.
+     * @param {string} id - Element ID
+     * @param {any} value - Value to set
+     * @returns {boolean} True if element found
+     */
     setValue(id, value) {
         const el = document.getElementById(id);
         if (el) { el.value = value; return true; }
         return false;
     },
+
+    /**
+     * Sets a style property on an element.
+     * @param {string} id - Element ID
+     * @param {string} property - Style property name
+     * @param {string} value - Style value
+     * @returns {boolean} True if element found
+     */
     setStyle(id, property, value) {
         const el = document.getElementById(id);
         if (el) { el.style[property] = value; return true; }
         return false;
     },
+
+    /**
+     * Gets an element by ID.
+     * @param {string} id - Element ID
+     * @returns {HTMLElement|null} The element
+     */
     getElement(id) { return document.getElementById(id); },
+
+    /**
+     * Updates multiple elements' text content.
+     * @param {object} updates - Map of ID to text value
+     */
     updateElements(updates) {
         for (const [id, value] of Object.entries(updates)) this.setText(id, value);
     },
+
+    /**
+     * Creates a debounced function.
+     * @param {function} func - Function to debounce
+     * @param {number} wait - Wait time in ms
+     * @returns {function} Debounced function
+     */
     debounce(func, wait) {
         let timeout;
         return function (...args) {
@@ -32,6 +71,13 @@ const Utils = {
             timeout = setTimeout(() => func(...args), wait);
         };
     },
+
+    /**
+     * Creates a throttled function.
+     * @param {function} func - Function to throttle
+     * @param {number} limit - Limit time in ms
+     * @returns {function} Throttled function
+     */
     throttle(func, limit) {
         let inThrottle;
         return function (...args) {
@@ -42,6 +88,13 @@ const Utils = {
             }
         };
     },
+
+    /**
+     * Formats bytes into human readable string.
+     * @param {number} bytes - Size in bytes
+     * @param {number} [decimals=2] - Number of decimals
+     * @returns {string} Formatted string (e.g., "1.5 MB")
+     */
     formatBytes(bytes, decimals = 2) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024, dm = decimals < 0 ? 0 : decimals;
@@ -49,6 +102,12 @@ const Utils = {
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
     },
+
+    /**
+     * Formats duration in milliseconds to generic string.
+     * @param {number} ms - Duration in ms
+     * @returns {string} Formatted duration (e.g., "1h 30m")
+     */
     formatDuration(ms) {
         const s = Math.floor(ms / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60), d = Math.floor(h / 24);
         if (d > 0) return `${d}d ${h % 24}h`;
@@ -56,13 +115,35 @@ const Utils = {
         if (m > 0) return `${m}m ${s % 60}s`;
         return `${s}s`;
     },
+
+    /**
+     * Clamps a number between min and max.
+     * @param {number} value - Input value
+     * @param {number} min - Minimum
+     * @param {number} max - Maximum
+     * @returns {number} Clamped value
+     */
     clamp(value, min, max) { return Math.min(Math.max(value, min), max); },
+
+    /**
+     * Escapes HTML characters in a string.
+     * @param {string} text - Text to escape
+     * @returns {string} Escaped HTML
+     */
     escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 };
 window.Utils = Utils;
 
 // --- AppState ---
+// --- AppState ---
+/**
+ * Global application state management.
+ * Handles state updates, history recording, and subscription notifications.
+ */
 class AppState {
+    /**
+     * @property {object} data - The complete application state tree.
+     */
     static data = {
         system: { status: 'INITIALIZING', health: 'unknown', cpu_percent: 0, free_heap_bytes: 0, firmware_version: '--', uptime_seconds: 0, plc_hardware_present: false, lcd_msg: '', lcd_msg_id: 0 },
         motion: { position: { x: 0, y: 0, z: 0, a: 0 }, moving: false, status: 'STOPPED' },
@@ -80,14 +161,45 @@ class AppState {
     static listeners = [];
     static history = [];
     static maxHistory = 1440;
+
+    /**
+     * Updates the application state with new data.
+     * Performs deep merge and notifies subscribers.
+     * @param {object} newData - Partial state object to merge
+     */
     static update(newData) {
         this.data = this.deepMerge(this.data, newData);
         if (Math.random() < 0.1) this.recordHistory();
         this.notifyListeners('state-changed');
     }
+
+    /**
+     * Gets a value from the state by path.
+     * @param {string} path - Dot-notation path (e.g. 'system.status')
+     * @returns {any} The value at the path
+     */
     static get(path) { return this.getNestedValue(this.data, path); }
+
+    /**
+     * Sets a value in the state by path and notifies listeners.
+     * @param {string} path - Dot-notation path
+     * @param {any} value - Value to set
+     */
     static set(path, value) { this.setNestedValue(this.data, path, value); this.notifyListeners('state-changed'); }
+
+    /**
+     * Subscribes to state changes.
+     * @param {function} callback - Function called on state change
+     * @returns {function} Unsubscribe function
+     */
     static subscribe(callback) { this.listeners.push(callback); return () => { this.listeners = this.listeners.filter(l => l !== callback); }; }
+
+    /**
+     * Deep merges source object into target object.
+     * @param {object} target - Target object
+     * @param {object} source - Source object
+     * @returns {object} Merged object
+     */
     static deepMerge(target, source) {
         const result = { ...target };
         for (const key in source) {
@@ -97,6 +209,13 @@ class AppState {
         }
         return result;
     }
+
+    /**
+     * Helper to retrieve nested value.
+     * @param {object} obj - Object to traverse
+     * @param {string} path - Dot-notation path
+     * @returns {any} Value
+     */
     static getNestedValue(obj, path) { return path.split('.').reduce((curr, prop) => curr?.[prop], obj); }
     static setNestedValue(obj, path, value) {
         const keys = path.split('.'), lastKey = keys.pop();
