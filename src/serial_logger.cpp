@@ -236,6 +236,7 @@ bool bootLogIsActive() {
 size_t bootLogGetSize() {
     if (!LittleFS.begin(false)) return 0;
     
+    // Check existence first to prevent VFS noise/errors in certain core versions
     if (!LittleFS.exists(BOOT_LOG_PATH)) return 0;
     
     File f = LittleFS.open(BOOT_LOG_PATH, "r");
@@ -248,9 +249,9 @@ size_t bootLogGetSize() {
 
 size_t bootLogRead(char* buffer, size_t max_len) {
     if (!buffer || max_len == 0) return 0;
-    
     if (!LittleFS.begin(false)) return 0;
     
+    // Check existence first to prevent VFS noise
     if (!LittleFS.exists(BOOT_LOG_PATH)) {
         strncpy(buffer, "(No boot log available)", max_len - 1);
         buffer[max_len - 1] = '\0';

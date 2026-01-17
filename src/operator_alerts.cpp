@@ -148,27 +148,27 @@ void statusLightTest(void) {
     
     // All off
     updateStatusLightOutputs(false, false, false);
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(500));
     
     // Green
     logPrintln("  GREEN");
     updateStatusLightOutputs(true, false, false);
-    delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     
     // Yellow
     logPrintln("  YELLOW");
     updateStatusLightOutputs(false, true, false);
-    delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     
     // Red
     logPrintln("  RED");
     updateStatusLightOutputs(false, false, true);
-    delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     
     // All on
     logPrintln("  ALL");
     updateStatusLightOutputs(true, true, true);
-    delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     
     // Return to current state
     statusLightSetState(current_state);

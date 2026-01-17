@@ -94,7 +94,14 @@ typedef struct {
     bool bus_busy;                              // Transaction in progress
     uint32_t total_transactions;                // Total transactions
     uint32_t total_errors;                      // Total errors
+    
+    // Watchdog state
+    uint32_t last_successful_response_ms;       // Last successful response timestamp
+    bool watchdog_alert_active;                 // True if alert has been raised
 } rs485_registry_state_t;
+
+// Watchdog timeout (ms) - alert if no response in this time
+#define RS485_WATCHDOG_TIMEOUT_MS 5000
 
 // ============================================================================
 // INITIALIZATION
@@ -258,6 +265,18 @@ void rs485ResetErrorCounters(void);
  * @brief Print diagnostics for all registered devices
  */
 void rs485PrintDiagnostics(void);
+
+/**
+ * @brief Check watchdog and return alert status
+ * @details Returns true if no successful response in RS485_WATCHDOG_TIMEOUT_MS
+ * @return true if bus is unresponsive (alert condition)
+ */
+bool rs485CheckWatchdog(void);
+
+/**
+ * @brief Clear watchdog alert (call after user acknowledges)
+ */
+void rs485ClearWatchdogAlert(void);
 
 #ifdef __cplusplus
 }

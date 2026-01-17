@@ -156,6 +156,7 @@ void telemetryUpdate() {
     }
 
     // Task Metrics
+    taskUpdateStackUsage();
     uint8_t slowest_id = 0;
     uint32_t slowest_us = 0;
     int task_count = 0;
@@ -304,6 +305,36 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         (unsigned long)t.config_version,
         t.config_is_default ? "true" : "false",
         t.lcd_lines[0], t.lcd_lines[1], t.lcd_lines[2], t.lcd_lines[3]);
+
+    // Append Task Stack Usage (Memory Tuning)
+    if (n > 0 && (size_t)n < buffer_size - 64) {
+        // Remove the last '}' to append detailed stats
+        buffer[n - 1] = ','; 
+        
+        // Use n as our write position
+        size_t offset = (size_t)n;
+        offset += snprintf(buffer + offset, buffer_size - offset, "\"stack\":{");
+        
+        // Update stats first (lightweight)
+        taskUpdateStackUsage();
+        task_stats_t* stats = taskGetStatsArray();
+        int count = taskGetStatsCount();
+        
+        for(int i=0; i<count; i++) {
+            if(stats[i].handle) {
+                // Report FREE bytes (High Water Mark) - standard metric for tuning
+                offset += snprintf(buffer + offset, buffer_size - offset, "\"%s\":%u,", stats[i].name, stats[i].stack_high_water);
+                if(offset >= buffer_size - 10) break; 
+            }
+        }
+        
+        // Remove trailing comma if exists
+        if (buffer[offset-1] == ',') offset--;
+        
+        // Close object and root
+        offset += snprintf(buffer + offset, buffer_size - offset, "}}");
+        return offset;
+    }
 
     if (n < 0 || (size_t)n >= buffer_size) {
         return buffer_size - 1; // Truncated or error

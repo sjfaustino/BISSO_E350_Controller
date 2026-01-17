@@ -166,75 +166,57 @@ void taskLcdFunction(void *parameter) {
       snprintf(fault_line, 21, "F#%02X %s", current_fault_code,
                faultCodeToString((fault_code_t)current_fault_code));
       lcdInterfacePrintLine(3, fault_line);
-    } else if (has_custom_msg) {
-      // PHASE 3.2: Display custom G-code M117 message (lines 2-3)
-      lcdInterfacePrintLine(2, "M117 Message:");
-      lcdInterfacePrintLine(3, custom_msg.text);
-    } else if (motionIsMoving()) {
-      // PHASE 3.2: Detailed motion display - show which axis and target
-      // distance in mm
-      uint8_t active_axis = motionGetActiveAxis();
-      int32_t target_counts = motionGetTarget(active_axis);
-      float current_mm = motionGetPositionMM(active_axis);
-
-      // Convert target counts to mm/degrees using calibration data
-      float target_mm = 0.0f;
-      const char *unit = "mm";
-
-      // PHASE 3.2 FIX: Use proper calibration data to convert counts to
-      // user-friendly units
-      const float def_lin = (float)MOTION_POSITION_SCALE_FACTOR;
-      const float def_ang = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
-
-      if (active_axis == 0) { // X axis
-        float sx = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm
-                                                    : def_lin;
-        target_mm = target_counts / sx;
-      } else if (active_axis == 1) { // Y axis
-        float sy = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm
-                                                    : def_lin;
-        target_mm = target_counts / sy;
-      } else if (active_axis == 2) { // Z axis
-        float sz = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm
-                                                    : def_lin;
-        target_mm = target_counts / sz;
-      } else if (active_axis == 3) { // A axis (rotary - in degrees)
-        float sa = (machineCal.A.pulses_per_degree > 0)
-                       ? machineCal.A.pulses_per_degree
-                       : def_ang;
-        target_mm = target_counts / sa;
-        unit = "°";                             // Degrees for A axis
-        current_mm = motionGetPosition(3) / sa; // Convert A position to degrees
+    } else {
+      // Line 2: Always show primary status
+      if (motionIsMoving()) {
+        lcdInterfacePrintLine(2, "EXEC: In Motion...");
+      } else {
+        lcdInterfacePrintLine(2, "Status: IDLE");
       }
 
-      // Line 2: Motion status (Z/A/amps now on line 1 via
-      // lcdInterfacePrintAxes)
-      lcdInterfacePrintLine(2, "EXEC: In Motion...");
+      // Line 3: Custom message (M117) takes priority, then detailed motion, then ready
+      if (has_custom_msg) {
+        // Show M117 message on the last line
+        lcdInterfacePrintLine(3, custom_msg.text);
+      } else if (motionIsMoving()) {
+        // Detailed motion display (X/Y/Z move info)
+        uint8_t active_axis = motionGetActiveAxis();
+        int32_t target_counts = motionGetTarget(active_axis);
+        float current_mm = motionGetPositionMM(active_axis);
+        float target_mm = 0.0f;
+        const char *unit = "mm";
 
-      // Line 3: Detailed motion - axis and movement with right-aligned distance
-      // Example: "EXEC: Mv X   +25.4mm" or "EXEC: Mv A    +45.0°"
-      // Format: "EXEC: Mv" + axis + right-aligned distance
-      char motion_line[21];
-      char axis_char = "XYZA"[active_axis % 4];
-      float delta_mm = (target_mm >= current_mm) ? (target_mm - current_mm)
-                                                 : (current_mm - target_mm);
-      char direction = (target_mm >= current_mm) ? '+' : '-';
+        const float def_lin = (float)MOTION_POSITION_SCALE_FACTOR;
+        const float def_ang = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
 
-      // Build distance string with sign, value, and unit
-      // Then right-align it within the remaining 10 characters
-      char distance_str[10];
-      snprintf(distance_str, sizeof(distance_str), "%c%4.1f%s", direction,
-               fabsf(delta_mm), unit);
+        if (active_axis == 0) { // X axis
+          float sx = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : def_lin;
+          target_mm = target_counts / sx;
+        } else if (active_axis == 1) { // Y axis
+          float sy = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : def_lin;
+          target_mm = target_counts / sy;
+        } else if (active_axis == 2) { // Z axis
+          float sz = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : def_lin;
+          target_mm = target_counts / sz;
+        } else if (active_axis == 3) { // A axis
+          float sa = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : def_ang;
+          target_mm = target_counts / sa;
+          unit = "°";
+          current_mm = motionGetPosition(3) / sa;
+        }
 
-      // Right-align distance string: "EXEC: Mv X" (10 chars) + distance (10
-      // chars, right-aligned)
-      snprintf(motion_line, 21, "EXEC: Mv %c%10s", axis_char, distance_str);
-      lcdInterfacePrintLine(3, motion_line);
-    } else {
-      // Idle state: Lines 2-3 show status (Z/A/amps on line 1 via
-      // lcdInterfacePrintAxes)
-      lcdInterfacePrintLine(2, "Status: IDLE");
-      lcdInterfacePrintLine(3, "System Ready");
+        char motion_line[21];
+        char axis_char = "XYZA"[active_axis % 4];
+        float delta_mm = fabsf(target_mm - current_mm);
+        char direction = (target_mm >= current_mm) ? '+' : '-';
+
+        char distance_str[10];
+        snprintf(distance_str, sizeof(distance_str), "%c%4.1f%s", direction, delta_mm, unit);
+        snprintf(motion_line, 21, "Mv %c%13s", axis_char, distance_str);
+        lcdInterfacePrintLine(3, motion_line);
+      } else {
+        lcdInterfacePrintLine(3, "System Ready");
+      }
     }
 
     lcdInterfaceUpdate();

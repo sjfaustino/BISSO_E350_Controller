@@ -367,6 +367,8 @@ void cmd_selftest(int argc, char** argv) {
     selftestFreeResults(&suite);
 }
 
+static void wrap_debugStack(int argc, char** argv) { (void)argc; (void)argv; taskShowAllTasks(); }
+
 // ============================================================================
 // DEBUG MAIN DISPATCHER
 // ============================================================================
@@ -375,7 +377,8 @@ void cmd_debug_main(int argc, char** argv) {
     static const cli_subcommand_t subcmds[] = {
         {"all",      wrap_debugAllHandler,      "Dump all debug info"},
         {"encoders", wrap_debugEncodersHandler, "Encoder statistics"},
-        {"config",   wrap_debugConfigHandler,   "Configuration dump"}
+        {"config",   wrap_debugConfigHandler,   "Configuration dump"},
+        {"stack",    wrap_debugStack,           "Task stack usage (HWM)"} // Memory Tuning
     };
     
     cliDispatchSubcommand("[DEBUG]", argc, argv, subcmds, 

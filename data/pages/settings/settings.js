@@ -87,14 +87,6 @@ window.SettingsModule = window.SettingsModule || {
             document.getElementById(id)?.addEventListener('change', () => this.hideError('motion'));
         });
 
-        // VFD config buttons
-        document.getElementById('save-vfd-btn')?.addEventListener('click', () => this.saveVfdSettings?.());
-        document.getElementById('reset-vfd-btn')?.addEventListener('click', () => this.resetVfdSettings?.());
-        this.bindDisplay('vfd-min-speed', 'vfd-min-display', 'vfd');
-        this.bindDisplay('vfd-max-speed', 'vfd-max-display', 'vfd');
-        this.bindDisplay('vfd-acc-time', 'vfd-acc-display', 'vfd');
-        this.bindDisplay('vfd-dec-time', 'vfd-dec-display', 'vfd');
-
         // Encoder config buttons
         document.getElementById('calibrate-x-btn')?.addEventListener('click', () => this.calibrateEncoder?.(0));
         document.getElementById('calibrate-y-btn')?.addEventListener('click', () => this.calibrateEncoder?.(1));
@@ -115,11 +107,8 @@ window.SettingsModule = window.SettingsModule || {
         // Configuration Management
         document.getElementById('load-preset-btn')?.addEventListener('click', () => this.loadPreset());
 
-        // CLI Options
+        // CLI Options (includes OTA toggle now)
         document.getElementById('save-cli-options-btn')?.addEventListener('click', () => this.saveCliOptions());
-
-        // OTA Settings
-        document.getElementById('save-ota-settings-btn')?.addEventListener('click', () => this.saveOtaSettings());
     },
 
     // Helper: bind slider to settings property
@@ -290,7 +279,6 @@ window.SettingsModule = window.SettingsModule || {
         console.log('[Settings] Loading configuration');
         Promise.all([
             this.loadMotionConfig?.() || Promise.resolve(),
-            this.loadVfdConfig?.() || Promise.resolve(),
             this.loadEncoderConfig?.() || Promise.resolve(),
             this.loadSpindleAlarmConfig?.() || Promise.resolve(),
             this.loadCliOptions(),
@@ -341,19 +329,6 @@ window.SettingsModule = window.SettingsModule || {
             if (to) { to.value = preset.spindle.stall_timeout_ms; document.getElementById('stall-timeout-value').textContent = preset.spindle.stall_timeout_ms; }
         }
 
-        // Apply VFD Settings
-        if (preset.vfd) {
-            const min = document.getElementById('vfd-min-speed');
-            const max = document.getElementById('vfd-max-speed');
-            const acc = document.getElementById('vfd-acc-time');
-            const dec = document.getElementById('vfd-dec-time');
-
-            if (min) { min.value = preset.vfd.min_speed_hz; document.getElementById('vfd-min-display').textContent = preset.vfd.min_speed_hz; }
-            if (max) { max.value = preset.vfd.max_speed_hz; document.getElementById('vfd-max-display').textContent = preset.vfd.max_speed_hz; }
-            if (acc) { acc.value = preset.vfd.acc_time_ms; document.getElementById('vfd-acc-display').textContent = preset.vfd.acc_time_ms; }
-            if (dec) { dec.value = preset.vfd.dec_time_ms; document.getElementById('vfd-dec-display').textContent = preset.vfd.dec_time_ms; }
-        }
-
         AlertManager.add(`"${preset.name}": ` + window.i18n.t('settings.preset_loaded'), 'info', 3000);
     },
 
@@ -371,22 +346,29 @@ window.SettingsModule = window.SettingsModule || {
     },
 
     async saveCliOptions() {
-        const toggle = document.getElementById('cli-echo-toggle');
-        if (!toggle) return;
+        const echoToggle = document.getElementById('cli-echo-toggle');
+        const otaToggle = document.getElementById('ota-check-toggle');
 
         try {
-            const res = await fetch('/api/config/set', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ category: 6, key: 'cli_echo', value: toggle.checked ? 1 : 0 })
-            });
-
-            const data = await res.json();
-            if (res.ok && !data.error) {
-                AlertManager.add(window.i18n.t('settings.cli_saved'), 'success', 2000);
-            } else {
-                this.showError('cli-options', window.i18n.t('settings.save_error') + ' ' + (data.error || 'Unknown error'));
+            // Save CLI echo
+            if (echoToggle) {
+                await fetch('/api/config/set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category: 6, key: 'cli_echo', value: echoToggle.checked ? 1 : 0 })
+                });
             }
+
+            // Save OTA check
+            if (otaToggle) {
+                await fetch('/api/config/set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category: 6, key: 'ota_chk_en', value: otaToggle.checked ? 1 : 0 })
+                });
+            }
+
+            AlertManager.add(window.i18n.t('settings.cli_saved'), 'success', 2000);
         } catch (e) {
             this.showError('cli-options', window.i18n.t('settings.network_error') + ' ' + e.message);
         }

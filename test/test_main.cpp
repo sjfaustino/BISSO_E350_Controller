@@ -22,6 +22,7 @@ extern void run_modbus_rtu_tests(void);
 extern void run_motion_planner_tests(void);
 extern void run_rs485_registry_tests(void);
 extern void run_hardware_optimization_tests(void);
+extern void run_api_routes_tests(void);
 
 // Unity setup/teardown hooks
 void setUp(void) {
@@ -50,6 +51,7 @@ void run_all_tests(void) {
     run_motion_planner_tests();
     run_rs485_registry_tests();
     run_hardware_optimization_tests();
+    run_api_routes_tests();
     
     UNITY_END();
 }

@@ -20,6 +20,8 @@
  */
 
 #include "plc_iface.h"
+#include "config_keys.h"
+#include "config_unified.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "system_constants.h"
@@ -149,8 +151,11 @@ void elboInit() {
   }
 
   // Initialize Wire I2C bus (only called once at startup)
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, 100000);
+  // Use configured speed, defaulting to 100KHz (Standard Mode)
+  uint32_t i2c_speed = configGetInt(KEY_I2C_SPEED, 100000);
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, i2c_speed);
   Wire.setTimeOut(100); // Reduce I2C timeout from 1000ms to 100ms
+  logInfo("[PLC] I2C initialized at %lu Hz", (unsigned long)i2c_speed);
   delay(10);            // Allow bus to settle
 
   // Reset Outputs (Safe State: All OFF)

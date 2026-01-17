@@ -28,7 +28,9 @@ static rs485_registry_state_t registry = {
     .baud_rate = RS485_DEFAULT_BAUD_RATE,
     .bus_busy = false,
     .total_transactions = 0,
-    .total_errors = 0
+    .total_errors = 0,
+    .last_successful_response_ms = 0,
+    .watchdog_alert_active = false
 };
 
 // ============================================================================
@@ -41,6 +43,8 @@ bool rs485RegistryInit(uint32_t baud_rate) {
     memset(&registry, 0, sizeof(registry));
     registry.baud_rate = baud_rate;
     registry.last_switch_time_ms = millis();
+    registry.last_successful_response_ms = millis();  // Assume healthy at start
+    registry.watchdog_alert_active = false;
     
     // Initialize RS485 UART
     bus_serial->begin(baud_rate, SERIAL_8N1, 16, 13);
@@ -248,6 +252,8 @@ bool rs485ProcessResponse(const uint8_t* data, uint16_t len) {
     if (success) {
         current->poll_count++;
         current->consecutive_errors = 0;
+        registry.last_successful_response_ms = millis();  // Reset watchdog
+        registry.watchdog_alert_active = false;           // Clear alert on success
     } else {
         current->error_count++;
         current->consecutive_errors++;
@@ -427,4 +433,45 @@ void rs485PrintDiagnostics(void) {
     }
     Serial.println();
     serialLoggerUnlock();
+}
+
+bool rs485CheckWatchdog(void) {
+    // Skip watchdog if no devices registered or no devices enabled
+    if (registry.device_count == 0) {
+        return false;
+    }
+    
+    // Check if any devices are actually enabled
+    bool any_enabled = false;
+    for (uint8_t i = 0; i < registry.device_count; i++) {
+        if (registry.devices[i] && registry.devices[i]->enabled) {
+            any_enabled = true;
+            break;
+        }
+    }
+    
+    if (!any_enabled) {
+        return false;  // No enabled devices, nothing to watch
+    }
+    
+    uint32_t now = millis();
+    uint32_t elapsed = now - registry.last_successful_response_ms;
+    
+    if (elapsed > RS485_WATCHDOG_TIMEOUT_MS) {
+        if (!registry.watchdog_alert_active) {
+            // First time detecting issue - raise alert
+            registry.watchdog_alert_active = true;
+            logWarning("[RS485] Watchdog: No response from any device for %lu ms!", 
+                       (unsigned long)elapsed);
+        }
+        return true;  // Alert condition active
+    }
+    
+    return false;  // All good
+}
+
+void rs485ClearWatchdogAlert(void) {
+    registry.watchdog_alert_active = false;
+    registry.last_successful_response_ms = millis();
+    logInfo("[RS485] Watchdog alert cleared");
 }

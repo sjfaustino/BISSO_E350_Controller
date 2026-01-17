@@ -450,7 +450,7 @@ void taskShowAllTasks() {
 
     logPrintf("%-21s %-9lu %-13lu %ld\n", task_stats[i].name,
                   (unsigned long)priority,
-                  (unsigned long)(stack_high_water * 4), (long)core_id);
+                  (unsigned long)stack_high_water, (long)core_id);
   }
   logPrintln("");
 }
@@ -493,6 +493,16 @@ uint8_t taskGetCpuUsage() {
 }
 
 uint32_t taskGetUptime() { return (millis() - boot_time_ms) / 1000; }
+
+// Update stack usage statistics for all tracked tasks
+void taskUpdateStackUsage() {
+    for (int i = 0; i < stats_count; i++) {
+        if (task_stats[i].handle) {
+            // Returns minimum free stack space in bytes on ESP32
+            task_stats[i].stack_high_water = uxTaskGetStackHighWaterMark(task_stats[i].handle);
+        }
+    }
+}
 
 // ============================================================================
 // PHASE 2.5: ADAPTIVE I2C TIMEOUT

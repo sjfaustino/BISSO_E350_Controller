@@ -55,79 +55,12 @@ static struct {
 portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
 // PERFORMANCE AUDIT: Spinlock critical section duration tracking
-// Enable to measure and log spinlock durations for migration analysis
-#define ENABLE_SPINLOCK_TIMING 1
+// Extracted to spinlock_timing.h for maintainability
+#include "spinlock_timing.h"
 
-#if ENABLE_SPINLOCK_TIMING
-typedef struct {
-  const char* location;   // Source code location identifier
-  uint32_t max_duration_us;  // Maximum duration observed (microseconds)
-  uint32_t total_count;      // Number of times executed
-  uint32_t over_10us_count;  // Count of executions >10μs (should use mutex)
-} spinlock_stats_t;
-
-#define MAX_SPINLOCK_LOCATIONS 32
-static spinlock_stats_t spinlock_stats[MAX_SPINLOCK_LOCATIONS];
-static uint8_t spinlock_stats_count = 0;
-static SemaphoreHandle_t spinlock_stats_mutex = NULL;
-
-// Get or create stats entry for a location
-static __attribute__((unused)) spinlock_stats_t* getSpinlockStats(const char* location) {
-  if (!spinlock_stats_mutex) {
-    spinlock_stats_mutex = xSemaphoreCreateMutex();
-  }
-
-  xSemaphoreTake(spinlock_stats_mutex, portMAX_DELAY);
-
-  // Find existing entry
-  for (uint8_t i = 0; i < spinlock_stats_count; i++) {
-    if (strcmp(spinlock_stats[i].location, location) == 0) {
-      xSemaphoreGive(spinlock_stats_mutex);
-      return &spinlock_stats[i];
-    }
-  }
-
-  // Create new entry
-  if (spinlock_stats_count < MAX_SPINLOCK_LOCATIONS) {
-    spinlock_stats_t* entry = &spinlock_stats[spinlock_stats_count];
-    entry->location = location;
-    entry->max_duration_us = 0;
-    entry->total_count = 0;
-    entry->over_10us_count = 0;
-    spinlock_stats_count++;
-    xSemaphoreGive(spinlock_stats_mutex);
-    return entry;
-  }
-
-  xSemaphoreGive(spinlock_stats_mutex);
-  return NULL;
-}
-
-// Macros for timed critical sections
-#define SPINLOCK_ENTER(location) \
-  uint32_t _spinlock_start_##location = micros(); \
-  portENTER_CRITICAL(&motionSpinlock);
-
-#define SPINLOCK_EXIT(location) \
-  portEXIT_CRITICAL(&motionSpinlock); \
-  uint32_t _spinlock_duration_##location = micros() - _spinlock_start_##location; \
-  spinlock_stats_t* _stats_##location = getSpinlockStats(#location); \
-  if (_stats_##location) { \
-    _stats_##location->total_count++; \
-    if (_spinlock_duration_##location > _stats_##location->max_duration_us) { \
-      _stats_##location->max_duration_us = _spinlock_duration_##location; \
-    } \
-    if (_spinlock_duration_##location > 10) { \
-      _stats_##location->over_10us_count++; \
-      logWarning("[MOTION] Long critical section '%s': %lu us (should use mutex)", \
-                 #location, (unsigned long)_spinlock_duration_##location); \
-    } \
-  }
-#else
-// Timing disabled - use standard spinlock macros
-#define SPINLOCK_ENTER(location) portENTER_CRITICAL(&motionSpinlock);
-#define SPINLOCK_EXIT(location) portEXIT_CRITICAL(&motionSpinlock);
-#endif
+// Convenience macros that bind to motionSpinlock
+#define MOTION_SPINLOCK_ENTER(location) SPINLOCK_ENTER(motionSpinlock, location)
+#define MOTION_SPINLOCK_EXIT(location) SPINLOCK_EXIT(motionSpinlock, location)
 
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y,
                                    ELBO_I73_AXIS_Z, ELBO_I73_AXIS_A};
@@ -410,6 +343,17 @@ void motionUpdate() {
         
         // Clamp extrapolation time to 200ms to prevent runaway if bus is lost
         if (dt_since_last_actual > 200) dt_since_last_actual = 200;
+        
+        // Extended encoder silence warning (diagnostic aid)
+        uint32_t actual_silence = (uint32_t)(millis() - axes[i].last_actual_update_ms);
+        if (actual_silence >= 2000) {
+            if (!axes[i].prediction_stale_logged) {
+                logWarning("[MOTION] Axis %d: Encoder silence >2s - prediction capped", i);
+                axes[i].prediction_stale_logged = true;
+            }
+        } else {
+            axes[i].prediction_stale_logged = false;  // Reset when data resumes
+        }
         
         int32_t offset = (int32_t)(axes[i].velocity_counts_ms * (float)dt_since_last_actual);
         

@@ -62,7 +62,6 @@ void taskTelemetryFunction(void *parameter) {
     // 2. Update Phase 5.3 Modules
     // Advanced encoder diagnostics, load management, and dashboard metrics
     encoderDiagnosticsUpdate();
-    loadManagerUpdate();
     dashboardMetricsUpdate();
     
     // 2.5. Update Stone Cutting Analytics

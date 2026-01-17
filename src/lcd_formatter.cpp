@@ -91,7 +91,7 @@ void lcdFormatterUpdate() {
         snprintf(temp_buffer.line2, 21, "ALARM: HALTED");
         snprintf(temp_buffer.line3, 21, "F#%02X", current_fault_code);
     } else if (has_custom_msg) {
-        snprintf(temp_buffer.line2, 21, "M117:");
+        snprintf(temp_buffer.line2, 21, "READY S:%c", speed_char);
         snprintf(temp_buffer.line3, 21, "%.19s", custom_msg.text);
     } else if (motionIsMoving()) {
         snprintf(temp_buffer.line2, 21, "MOVING S:%c", speed_char);

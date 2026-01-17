@@ -64,7 +64,7 @@ window.Utils = Utils;
 // --- AppState ---
 class AppState {
     static data = {
-        system: { status: 'INITIALIZING', health: 'unknown', cpu_percent: 0, free_heap_bytes: 0, firmware_version: '--', uptime_seconds: 0, plc_hardware_present: false },
+        system: { status: 'INITIALIZING', health: 'unknown', cpu_percent: 0, free_heap_bytes: 0, firmware_version: '--', uptime_seconds: 0, plc_hardware_present: false, lcd_msg: '', lcd_msg_id: 0 },
         motion: { position: { x: 0, y: 0, z: 0, a: 0 }, moving: false, status: 'STOPPED' },
         safety: { estop: false, alarm: false },
         vfd: { current_amps: 0, frequency_hz: 0, thermal_percent: 0, fault_code: 0, stall_threshold: 0, calibration_valid: false, connected: false },
@@ -148,7 +148,19 @@ class AppState {
     static notifyListeners(event) { window.dispatchEvent(new CustomEvent(event, { detail: this.data })); }
     static reset() { this.data = { ...this.constructor.data }; this.history = []; this.notifyListeners('state-reset'); }
 }
-window.addEventListener('telemetry', (event) => AppState.update(event.detail));
+window.addEventListener('telemetry', (event) => {
+    const data = event.detail;
+    // PHASE 3.2: Trigger toast notification for new LCD messages (M117)
+    if (data.system && data.system.lcd_msg_id && data.system.lcd_msg) {
+        const lastId = AppState.data.system?.lcd_msg_id || 0;
+        if (data.system.lcd_msg_id !== lastId) {
+            if (typeof AlertManager !== 'undefined') {
+                AlertManager.add(data.system.lcd_msg, 'info', 10000);
+            }
+        }
+    }
+    AppState.update(data);
+});
 
 // --- ThemeManager ---
 class ThemeManager {
@@ -681,32 +693,40 @@ class GraphVisualizer {
         });
     }
 
-    drawLegend(yMin, yMax) {
-        const legendX = 60;
-        const legendY = this.height - 30; // Moved up to tighten spacing (was -20)
-        const spacing = 120;
+    drawLegend() {
+        const startX = 20;
+        const rowHeight = 16;
+        let currentX = startX;
+        let currentY = this.height - 28;
+        const canvasWidth = this.width - 20;
+        const boxSize = 10;
+        const itemPadding = 15;
 
-        let index = 0;
+        this.ctx.font = '11px Arial';
+        this.ctx.textAlign = 'left';
+
         this.series.forEach((series, seriesName) => {
-            // Only show visible series in legend
             if (!series.visible) return;
 
-            const x = legendX + index * spacing;
-            const y = legendY;
+            const labelWidth = this.ctx.measureText(seriesName).width + boxSize + 10;
+
+            // Wrap to next row if it doesn't fit
+            if (currentX + labelWidth > canvasWidth && currentX > startX) {
+                currentX = startX;
+                currentY += rowHeight;
+            }
 
             // Draw color box
             this.ctx.fillStyle = series.color;
             this.ctx.globalAlpha = 0.8;
-            this.ctx.fillRect(x, y, 10, 10);
+            this.ctx.fillRect(currentX, currentY, boxSize, boxSize);
 
             // Draw label
             this.ctx.fillStyle = this.colors.text;
             this.ctx.globalAlpha = 1;
-            this.ctx.font = '11px Arial';
-            this.ctx.textAlign = 'left';
-            this.ctx.fillText(seriesName, x + 15, y + 9);
+            this.ctx.fillText(seriesName, currentX + boxSize + 5, currentY + boxSize - 1);
 
-            index++;
+            currentX += labelWidth + itemPadding;
         });
     }
 

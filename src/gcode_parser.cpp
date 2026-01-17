@@ -419,8 +419,8 @@ void GCodeParser::handleM117(const char* line) {
 
     if (*msg_start == '\0') return;  // No message text
 
-    // Display message for 3 seconds (3000ms)
-    lcdMessageSet(msg_start, 3000);
+    // Display message for 10 seconds (10000ms)
+    lcdMessageSet(msg_start, 10000);
     logInfo("[GCODE] M117: Display message: '%s'", msg_start);
 }
 

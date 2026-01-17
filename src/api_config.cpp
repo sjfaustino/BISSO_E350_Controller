@@ -291,18 +291,6 @@ bool apiConfigSet(config_category_t category, const char *key,
     }
     break;
 
-  case CONFIG_CATEGORY_VFD:
-    if (strcmp(key, "min_speed_hz") == 0) {
-      current_vfd.min_speed_hz = value.as<uint16_t>();
-    } else if (strcmp(key, "max_speed_hz") == 0) {
-      current_vfd.max_speed_hz = value.as<uint16_t>();
-    } else if (strcmp(key, "acc_time_ms") == 0) {
-      current_vfd.acc_time_ms = value.as<uint16_t>();
-    } else if (strcmp(key, "dec_time_ms") == 0) {
-      current_vfd.dec_time_ms = value.as<uint16_t>();
-    }
-    break;
-
   case CONFIG_CATEGORY_ENCODER:
     if (strstr(key, "ppm_x")) {
       current_encoder.ppm[0] = value.as<uint16_t>();
@@ -382,14 +370,6 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
     break;
   }
 
-  case CONFIG_CATEGORY_VFD: {
-    obj["min_speed_hz"] = current_vfd.min_speed_hz;
-    obj["max_speed_hz"] = current_vfd.max_speed_hz;
-    obj["acc_time_ms"] = current_vfd.acc_time_ms;
-    obj["dec_time_ms"] = current_vfd.dec_time_ms;
-    break;
-  }
-
   case CONFIG_CATEGORY_ENCODER: {
     JsonArray ppm = obj["ppm"].to<JsonArray>();
     ppm.add(current_encoder.ppm[0]);
@@ -404,8 +384,8 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
 
   case CONFIG_CATEGORY_NETWORK: {
     // Station
-    obj["wifi_ssid"] = WiFi.SSID(); 
-    obj["wifi_pass"] = WiFi.psk();
+    obj["wifi_ssid"] = configGetString(KEY_WIFI_SSID, ""); 
+    obj["wifi_pass"] = configGetString(KEY_WIFI_PASS, "");
     // AP - Default to ENABLED (1) if missing to match system default
     obj["wifi_ap_en"] = configGetInt(KEY_WIFI_AP_EN, 1);
     obj["wifi_ap_ssid"] = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
@@ -460,16 +440,6 @@ bool apiConfigGetSchema(config_category_t category, JsonDocument &json_doc) {
     obj["soft_limit_z_high"]["min"] = -10000;
     obj["soft_limit_z_high"]["max"] = 10000;
     obj["soft_limit_z_high"]["unit"] = "mm";
-    break;
-  }
-
-  case CONFIG_CATEGORY_VFD: {
-    obj["min_speed_hz"]["type"] = "integer";
-    obj["min_speed_hz"]["min"] = 1;
-    obj["min_speed_hz"]["max"] = 105;
-    obj["max_speed_hz"]["type"] = "integer";
-    obj["max_speed_hz"]["min"] = 1;
-    obj["max_speed_hz"]["max"] = 105;
     break;
   }
 
@@ -528,10 +498,8 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
   motion["home_fast"] = configGetInt(KEY_HOME_PROFILE_FAST, 100);
   motion["home_slow"] = configGetInt(KEY_HOME_PROFILE_SLOW, 20);
 
-  // 2. VFD Config
+  // 2. VFD Config (hardware settings only - speed/timing are fixed in Altivar31)
   JsonObject vfd = doc["vfd"].to<JsonObject>();
-  JsonDocument vfdDoc; apiConfigGet(CONFIG_CATEGORY_VFD, vfdDoc);
-  vfd.set(vfdDoc.as<JsonObject>());
   vfd["enabled"] = configGetInt(KEY_VFD_EN, 0);
   vfd["address"] = configGetInt(KEY_VFD_ADDR, 2);
 
@@ -543,9 +511,9 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
 
   // 4. Network
   JsonObject net = doc["network"].to<JsonObject>();
-  // Use WiFi.SSID/psk because station creds are in NVS (WiFi lib), not config_unified
-  net["wifi_ssid"] = WiFi.SSID();
-  net["wifi_pass"] = WiFi.psk();
+  // Use NVS-stored credentials, not currently connected ones
+  net["wifi_ssid"] = configGetString(KEY_WIFI_SSID, "");
+  net["wifi_pass"] = configGetString(KEY_WIFI_PASS, "");
   net["wifi_ap_en"] = configGetInt(KEY_WIFI_AP_EN, 0);
   net["wifi_ap_ssid"] = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
   net["wifi_ap_pass"] = configGetString(KEY_WIFI_AP_PASS, "password");
@@ -558,14 +526,26 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
   sys["buzzer_en"] = configGetInt(KEY_BUZZER_EN, 1);
   sys["status_light_en"] = configGetInt(KEY_STATUS_LIGHT_EN, 0);
   sys["recovery_en"] = configGetInt(KEY_RECOV_EN, 1);
+  sys["lcd_en"] = configGetInt(KEY_LCD_EN, 1);
+  sys["bootlog_en"] = configGetInt(KEY_BOOTLOG_EN, 1);
+  sys["cli_echo"] = configGetInt(KEY_CLI_ECHO, 1);  // Default ON for usability
+  sys["ota_chk_en"] = configGetInt(KEY_OTA_CHECK_EN, 0);
   
   // 6. Spindle (JXK10/Tach)
   JsonObject spindle = doc["spindle"].to<JsonObject>();
   spindle["jxk10_en"] = configGetInt(KEY_JXK10_ENABLED, 0);
   spindle["jxk10_addr"] = configGetInt(KEY_JXK10_ADDR, 1);
   spindle["yhtc05_en"] = configGetInt(KEY_YHTC05_ENABLED, 0);
+  spindle["yhtc05_addr"] = configGetInt(KEY_YHTC05_ADDR, 3);
   spindle["pause_en"] = configGetInt(KEY_SPINDL_PAUSE_EN, 1);
-  // 7. Hardware Pins (Dynamic Mapping)
+
+  // 7. Serial Communication
+  JsonObject serial = doc["serial"].to<JsonObject>();
+  serial["encoder_baud"] = configGetInt(KEY_ENC_BAUD, 9600);
+  serial["rs485_baud"] = configGetInt(KEY_RS485_BAUD, 9600);
+  serial["i2c_speed"] = configGetInt(KEY_I2C_SPEED, 100000);
+
+  // 8. Hardware Pins (Dynamic Mapping)
   JsonObject hw = doc["hardware"].to<JsonObject>();
   for (size_t i = 0; i < SIGNAL_COUNT; i++) {
       hw[signalDefinitions[i].key] = getPin(signalDefinitions[i].key);

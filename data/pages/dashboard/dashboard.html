@@ -114,10 +114,14 @@
                 <div class="progress-bar">
                     <div class="progress-fill" id="mem-bar" style="width: 100%"></div>
                 </div>
-                <div class="card-subtext"><span data-i18n="dashboard.min_label">Min</span>: <span id="mem-min">--</span>
-                    KB</div>
+                <div class="card-subtext">
+                    <span data-i18n="dashboard.min_label">Min</span>: <span id="mem-min">--</span> KB |
+                    <span data-i18n="dashboard.avg_label">Avg</span>: <span id="mem-avg">--</span> KB |
+                    <span data-i18n="dashboard.max_label">Max</span>: <span id="mem-max">--</span> KB
+                </div>
             </div>
         </div>
+
 
         <!-- Spindle Monitor Card (Read-Only) -->
         <div class="card">
@@ -386,6 +390,21 @@
                         Current: <span id="mem-current" style="font-weight: 600;">-- KB</span> |
                         Avg: <span id="mem-stat-avg" style="font-weight: 600;">-- KB</span> |
                         Max: <span id="mem-stat-max" style="font-weight: 600;">-- KB</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stack Monitor Trend -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin: 0;">Stack Monitor Trend</h3>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <canvas id="stackChart"
+                        style="width: 100%; height: 250px; display: block; border-radius: 4px;"></canvas>
+                    <div
+                        style="padding: 10px 15px; font-size: 12px; background: var(--bg-secondary); border-radius: 0 0 4px 4px;">
+                        Real-time free stack space per task (HWM)
                     </div>
                 </div>
             </div>

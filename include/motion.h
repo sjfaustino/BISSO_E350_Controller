@@ -78,6 +78,7 @@ public:
   uint32_t last_actual_update_ms; // Timestamp of last UNIQUE encoder reading
   int32_t predicted_position;     // Extrapolated value for real-time control
   float velocity_counts_ms;       // Velocity in counts/ms (for prediction)
+  bool prediction_stale_logged;   // True if stale prediction warning was logged
 
 private:
   bool _error_logged;

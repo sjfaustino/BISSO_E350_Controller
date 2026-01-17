@@ -134,7 +134,7 @@ void cliInit() {
   command_count = 0;
   
   // Load echo setting from NVS (default: off)
-  cli_echo_enabled = (configGetInt(KEY_CLI_ECHO, 0) == 1);
+  cli_echo_enabled = (configGetInt(KEY_CLI_ECHO, 1) == 1);  // Default ON for usability
   
   cliRegisterCommand("help", "Show help", cmd_help);
   cliRegisterCommand("info", "System info", cmd_system_info);

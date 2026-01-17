@@ -27,6 +27,12 @@
 #include "ota_manager.h"
 #include "yhtc05_modbus.h"
 #include "firmware_version.h"
+#include "boot_validation.h"
+#include "api_routes.h"
+#include <PsychicJson.h>
+#include "lcd_interface.h"  // Added for LCD mirroring
+#include "lcd_message.h"    // Added for M117 telemetry
+#include "task_manager.h"   // Added for Stack monitoring
 
 // Telemetry History Buffer (last 60 samples, sampled every 5s = 5mins)
 #define HISTORY_BUFFER_SIZE 60
@@ -35,15 +41,15 @@ struct history_sample_t {
     uint32_t heap;
     float spindle;
 };
-static history_sample_t telemetry_history[HISTORY_BUFFER_SIZE];
-static int history_head = 0;
-static int history_count = 0;
+history_sample_t telemetry_history[HISTORY_BUFFER_SIZE];
+int history_head = 0;
+int history_count = 0;
 static uint32_t last_history_sample_ms = 0;
 
 // Forward Declaration
 bool webAuthenticate(PsychicRequest *request);
 
-static void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
+void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
     uint32_t now = millis();
     if (now - last_history_sample_ms < 5000) return; // Sample every 5s
     last_history_sample_ms = now;
@@ -110,942 +116,40 @@ void WebServerManager::init() {
  * @param status HTTP status code (default 200)
  * @return esp_err_t result
  */
-static esp_err_t sendJsonResponse(PsychicResponse* response, JsonDocument& doc, int status = 200) {
-    String json;
-    serializeJson(doc, json);
-    return response->send(status, "application/json", json.c_str());
+esp_err_t sendJsonResponse(PsychicResponse* response, JsonDocument& doc, int status) {
+    response->setCode(status);
+    response->setContentType("application/json");
+
+    // Start chunking and send headers
+    response->sendHeaders();
+
+    // Use a small stack buffer for the chunk printer to avoid heap churn
+    // Typical JSON responses are < 2KB, so 1KB chunks are efficient.
+    uint8_t buffer[1024];
+    ChunkPrinter printer(response, buffer, sizeof(buffer));
+
+    // Serialize directly to the chunk printer (streaming)
+    serializeJson(doc, printer);
+
+    // Finalize the response
+    printer.flush();
+    return response->finishChunking();
 }
 
 // ============================================================================
 // ROUTE REGISTRATION (P0 Refactor: Extracted from init())
 // ============================================================================
 void WebServerManager::setupRoutes() {
-    // --- API Routes (must be registered before static file serving) ---
+    // --- API Routes (delegated to modular files) ---
+    registerTelemetryRoutes(server);
+    registerGcodeRoutes(server);
+    registerMotionRoutes(server);
+    registerNetworkRoutes(server);
+    registerHardwareRoutes(server);
+    registerSystemRoutes(server);
     
-    // GET /api/status - Compatibility endpoint for system status and positions
-    server.on("/api/status", HTTP_GET, [this](PsychicRequest *request, PsychicResponse *response) {
-        system_telemetry_t telemetry = telemetryGetSnapshot();
-        JsonDocument doc;
-        
-        portENTER_CRITICAL(&statusSpinlock);
-        buildTelemetryJson(doc, telemetry);
-        portEXIT_CRITICAL(&statusSpinlock);
-        
-        return sendJsonResponse(response, doc);
-    });
+    logPrintln("[WEB] All API routes registered");
     
-    // GET /api/logs/boot - Retrieve captured boot log
-    server.on("/api/logs/boot", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        size_t log_size = bootLogGetSize();
-        
-        if (log_size == 0) {
-            return response->send(200, "text/plain", "(No boot log available)");
-        }
-        
-        // Allocate buffer for log contents (max 32KB)
-        size_t buffer_size = (log_size < 32768) ? log_size + 1 : 32768;
-        char* buffer = (char*)malloc(buffer_size);
-        if (!buffer) {
-            return response->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
-        }
-        
-        bootLogRead(buffer, buffer_size);
-        esp_err_t result = response->send(200, "text/plain", buffer);
-        
-        free(buffer);
-        return result;
-    });
-    
-    // DELETE /api/logs/boot - Delete boot log file
-    server.on("/api/logs/boot", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) {
-        if (LittleFS.exists("/bootlog.txt")) {
-            if (LittleFS.remove("/bootlog.txt")) {
-                logInfo("[WEB] Boot log deleted");
-                return response->send(200, "application/json", "{\"success\":true}");
-            } else {
-                return response->send(500, "application/json", "{\"success\":false,\"error\":\"Failed to delete file\"}");
-            }
-        }
-        return response->send(200, "application/json", "{\"success\":true,\"message\":\"No boot log to delete\"}");
-    });
-    
-    // GET /api/config/get?category=N
-    server.on("/api/config/get", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        int category = 0;
-        if (request->hasParam("category")) {
-            category = request->getParam("category")->value().toInt();
-        }
-        
-        logDebug("[WEB] Config GET: category=%d", category);
-        
-        JsonDocument doc;
-        JsonDocument configDoc;
-        if (apiConfigGet((config_category_t)category, configDoc)) {
-            doc["success"] = true;
-            doc["config"] = configDoc.as<JsonVariant>();
-            String json;
-            serializeJson(doc, json);
-            return response->send(200, "application/json", json.c_str());
-        }
-        
-        logWarning("[WEB] Config GET failed: category %d not found", category);
-        return response->send(404, "application/json", "{\"success\":false,\"error\":\"Not found\"}");
-    });
-    
-    // POST /api/config/set
-    server.on("/api/config/set", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        String body = request->body();
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, body);
-        
-        if (error) {
-            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-        }
-        
-        int category = doc["category"] | 0;
-        const char* key = doc["key"] | "";
-        JsonVariant value = doc["value"];
-        
-        char error_msg[128] = {0};
-        if (!apiConfigValidate((config_category_t)category, key, value, error_msg, sizeof(error_msg))) {
-            JsonDocument resp;
-            resp["error"] = error_msg;
-            String json;
-            serializeJson(resp, json);
-            return response->send(400, "application/json", json.c_str());
-        }
-        
-        if (apiConfigSet((config_category_t)category, key, value)) {
-            apiConfigSave();
-            return response->send(200, "application/json", "{\"success\":true}");
-        }
-        return response->send(500, "application/json", "{\"error\":\"Failed to set config\"}");
-    });
-
-    // POST /api/ota/update - Trigger firmware update
-    server.on("/api/ota/update", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        String body = request->body();
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, body);
-        
-        const char* url = nullptr;
-        
-        // If URL provided in body, use it. Otherwise use cached URL.
-        if (!error && doc["url"].is<const char*>()) {
-            url = doc["url"];
-        } else {
-            const UpdateCheckResult* result = otaGetCachedResult();
-            if (result->available && strlen(result->download_url) > 0) {
-                url = result->download_url;
-            }
-        }
-        
-        if (!url) {
-             return response->send(400, "application/json", "{\"error\":\"No update URL available\"}");
-        }
-        
-        if (otaPerformUpdate(url)) {
-            return response->send(200, "application/json", "{\"success\":true, \"message\":\"Update started\"}");
-        } else {
-            return response->send(500, "application/json", "{\"error\":\"Failed to start update (already active?)\"}");
-        }
-    });
-
-    // GET /api/ota/latest - Get cached update check result
-    server.on("/api/ota/latest", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        const UpdateCheckResult* result = otaGetCachedResult();
-        JsonDocument doc;
-        doc["available"] = result->available;
-        doc["latest_version"] = result->latest_version;
-        doc["download_url"] = result->download_url;
-        doc["release_notes"] = result->release_notes;
-        
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-    
-    // GET /api/network/status
-    server.on("/api/network/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        
-        // WiFi Status
-        bool wifi_connected = WiFi.isConnected();
-        doc["wifi_connected"] = wifi_connected;
-        doc["wifi_ssid"] = wifi_connected ? WiFi.SSID() : "--";
-        doc["wifi_ip"] = wifi_connected ? WiFi.localIP().toString() : "0.0.0.0";
-        doc["wifi_rssi"] = wifi_connected ? WiFi.RSSI() : -100;
-        doc["wifi_mac"] = WiFi.macAddress();
-        doc["wifi_gateway"] = wifi_connected ? WiFi.gatewayIP().toString() : "0.0.0.0";
-        doc["wifi_dns"] = wifi_connected ? WiFi.dnsIP().toString() : "0.0.0.0";
-        
-        // Calculate signal quality percentage (maps -100..-50 to 0..100)
-        int rssi = WiFi.RSSI();
-        int quality = 0;
-        if (rssi <= -100) quality = 0;
-        else if (rssi >= -50) quality = 100;
-        else quality = 2 * (rssi + 100);
-        doc["signal_quality"] = quality;
-
-        // Ethernet Status
-        int eth_en = configGetInt(KEY_ETH_ENABLED, 0);
-        bool eth_up = false;
-        
-        if (eth_en) {
-            eth_up = ETH.linkUp();
-            doc["eth_connected"] = eth_up;
-            doc["eth_ip"] = eth_up ? ETH.localIP().toString() : "0.0.0.0";
-            doc["eth_mac"] = ETH.macAddress();
-            doc["eth_speed"] = ETH.linkSpeed();
-            doc["eth_duplex"] = ETH.fullDuplex();
-            doc["eth_gateway"] = eth_up ? ETH.gatewayIP().toString() : "0.0.0.0";
-        } else {
-            doc["eth_connected"] = false;
-            doc["eth_ip"] = "0.0.0.0";
-            doc["eth_mac"] = "00:00:00:00:00:00"; 
-            doc["eth_speed"] = 0;
-            doc["eth_duplex"] = false;
-            doc["eth_gateway"] = "0.0.0.0";
-        }
-        
-        // System uptime in ms
-        doc["uptime_ms"] = millis();
-        // doc["timestamp"] = millis(); // Removed as legacy since uptime_ms is preferred
-        
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // POST /api/network/reconnect
-    server.on("/api/network/reconnect", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        WiFi.disconnect();
-        WiFi.begin(); // Re-trigger connection using current credentials
-        
-        JsonDocument doc;
-        doc["success"] = true;
-        doc["message"] = "Reconnection triggered";
-        
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-    
-    // GET /api/spindle/alarm
-    server.on("/api/spindle/alarm", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        doc["success"] = true;
-        doc["toolbreak_threshold"] = configGetFloat(KEY_SPINDL_TOOLBREAK_THR, 5.0f);
-        doc["stall_threshold"] = configGetInt(KEY_SPINDL_PAUSE_THR, 25);
-        doc["stall_timeout_ms"] = configGetInt(KEY_STALL_TIMEOUT, 2000);
-        
-        const spindle_monitor_state_t* state = spindleMonitorGetState();
-        doc["alarm_tool_breakage"] = state->alarm_overload; // TODO: Separate breakage flag
-        doc["alarm_stall"] = state->alarm_overload;
-        
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // POST /api/spindle/alarm
-    server.on("/api/spindle/alarm", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        String body = request->body();
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, body);
-        
-        if (error) {
-            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-        }
-        
-        if (!doc["toolbreak_threshold"].isNull()) {
-            configSetFloat(KEY_SPINDL_TOOLBREAK_THR, doc["toolbreak_threshold"]);
-        }
-        if (!doc["stall_threshold"].isNull()) {
-            configSetInt(KEY_SPINDL_PAUSE_THR, doc["stall_threshold"]);
-        }
-        if (!doc["stall_timeout_ms"].isNull()) {
-            configSetInt(KEY_STALL_TIMEOUT, doc["stall_timeout_ms"]);
-        }
-        
-        configUnifiedSave();
-        return response->send(200, "application/json", "{\"success\":true}");
-    });
-
-    // POST /api/spindle/alarm/clear
-    server.on("/api/spindle/alarm/clear", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        spindleMonitorClearAlarms();
-        return response->send(200, "application/json", "{\"success\":true}");
-    });
-
-    // POST /api/gcode - Execute G-code command
-    server.on("/api/gcode", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        String body = request->body();
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, body);
-        
-        if (error) return response->send(400, "application/json", "{\"success\":false, \"error\":\"Invalid JSON\"}");
-        
-        const char* cmd = doc["command"];
-        if (!cmd || strlen(cmd) == 0) return response->send(400, "application/json", "{\"success\":false, \"error\":\"No command\"}");
-        
-        // Add to queue for tracking
-        uint16_t job_id = gcodeQueueAdd(cmd);
-        gcodeQueueMarkRunning();
-        
-        bool result = gcodeParser.processCommand(cmd);
-        
-        // Update queue status
-        if (result) {
-            gcodeQueueMarkCompleted();
-        } else {
-            gcodeQueueMarkFailed("Command rejected");
-        }
-        
-        JsonDocument resp;
-        resp["success"] = result;
-        resp["command"] = cmd;
-        resp["job_id"] = job_id;
-        
-        // Calculate ETA using calibration data for G0/G1 commands
-        if (result && (strncasecmp(cmd, "G0", 2) == 0 || strncasecmp(cmd, "G1", 2) == 0)) {
-            float x = 0, y = 0, z = 0, f = gcodeParser.getCurrentFeedRate();
-            
-            // Parse axis values from command
-            const char* xp = strchr(cmd, 'X'); if (!xp) xp = strchr(cmd, 'x');
-            const char* yp = strchr(cmd, 'Y'); if (!yp) yp = strchr(cmd, 'y');
-            const char* zp = strchr(cmd, 'Z'); if (!zp) zp = strchr(cmd, 'z');
-            const char* fp = strchr(cmd, 'F'); if (!fp) fp = strchr(cmd, 'f');
-            
-            if (xp) x = fabs(atof(xp + 1));
-            if (yp) y = fabs(atof(yp + 1));
-            if (zp) z = fabs(atof(zp + 1));
-            if (fp) f = atof(fp + 1);
-            
-            // Use calibration speeds (med speed as default representative)
-            float max_axis_speed = machineCal.X.speed_med_mm_min;
-            if (y > x && y > z) max_axis_speed = machineCal.Y.speed_med_mm_min;
-            if (z > x && z > y) max_axis_speed = machineCal.Z.speed_med_mm_min;
-            
-            // Use minimum of feedrate and calibrated speed
-            float effective_speed = (f > 0 && f < max_axis_speed) ? f : max_axis_speed;
-            if (effective_speed <= 0) effective_speed = 300.0f; // Fallback
-            
-            // Calculate distance and ETA
-            float distance = sqrtf(x*x + y*y + z*z);
-            float eta_seconds = (distance / effective_speed) * 60.0f;
-            
-            resp["eta_seconds"] = eta_seconds;
-            resp["distance_mm"] = distance;
-            resp["speed_mm_min"] = effective_speed;
-        }
-        
-        String json;
-        serializeJson(resp, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // GET /api/gcode/state
-    server.on("/api/gcode/state", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        doc["success"] = true;
-        doc["absolute_mode"] = (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE);
-        // doc["wcs"] = (54 + gcodeParser.currentWCS); // currentWCS is private, but getParserState uses it
-        doc["feedrate"] = gcodeParser.getCurrentFeedRate();
-        
-        // Use getParserState to get the full grbl-style state string if needed
-        char buffer[64];
-        gcodeParser.getParserState(buffer, sizeof(buffer));
-        doc["state_str"] = buffer;
-
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-    
-    // GET /api/gcode/queue - Get queue state and job history
-    server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        doc["success"] = true;
-        
-        // Get queue state summary
-        gcode_queue_state_t state = gcodeQueueGetState();
-        doc["queue"]["total"] = state.total_jobs;
-        doc["queue"]["pending"] = state.pending_count;
-        doc["queue"]["completed"] = state.completed_count;
-        doc["queue"]["failed"] = state.failed_count;
-        doc["queue"]["current_job_id"] = state.current_job_id;
-        doc["queue"]["paused"] = state.paused;
-        
-        // Get job history (last 10 jobs - limited to save stack)
-        gcode_job_t jobs[10];
-        uint16_t count = gcodeQueueGetAll(jobs, 10);
-        
-        JsonArray jobsArray = doc["jobs"].to<JsonArray>();
-        for (uint16_t i = 0; i < count; i++) {
-            JsonObject job = jobsArray.add<JsonObject>();
-            job["id"] = jobs[i].id;
-            job["command"] = jobs[i].command;
-            job["status"] = (int)jobs[i].status;
-            job["queued_time"] = jobs[i].queued_time_ms;
-            job["start_time"] = jobs[i].start_time_ms;
-            job["end_time"] = jobs[i].end_time_ms;
-            if (jobs[i].status == JOB_FAILED) {
-                job["error"] = jobs[i].error;
-            }
-        }
-        
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-    
-    // POST /api/gcode/queue/retry - Retry failed job from start position
-    server.on("/api/gcode/queue/retry", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        if (gcodeQueueRetry()) {
-            return response->send(200, "application/json", "{\"success\":true,\"action\":\"retry\"}");
-        }
-        return response->send(400, "application/json", "{\"success\":false,\"error\":\"No failed job to retry\"}");
-    });
-    
-    // POST /api/gcode/queue/skip - Skip failed job and continue
-    server.on("/api/gcode/queue/skip", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        if (gcodeQueueSkip()) {
-            return response->send(200, "application/json", "{\"success\":true,\"action\":\"skip\"}");
-        }
-        return response->send(400, "application/json", "{\"success\":false,\"error\":\"No failed job to skip\"}");
-    });
-    
-    // POST /api/gcode/queue/resume - Resume from current position (operator fixed issue)
-    server.on("/api/gcode/queue/resume", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        if (gcodeQueueResume()) {
-            return response->send(200, "application/json", "{\"success\":true,\"action\":\"resume\"}");
-        }
-        return response->send(400, "application/json", "{\"success\":false,\"error\":\"No failed job to resume\"}");
-    });
-    
-    // DELETE /api/gcode/queue - Clear queue history
-    server.on("/api/gcode/queue", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) {
-        gcodeQueueClear();
-        return response->send(200, "application/json", "{\"success\":true}");
-    });
-    
-    // POST /api/encoder/calibrate
-    server.on("/api/encoder/calibrate", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        String body = request->body();
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, body);
-        
-        if (error) {
-            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-        }
-        
-        uint8_t axis = doc["axis"] | 0;
-        uint16_t ppm = doc["ppm"] | 0;
-        
-        if (apiConfigCalibrateEncoder(axis, ppm)) {
-            return response->send(200, "application/json", "{\"success\":true}");
-        }
-        return response->send(400, "application/json", "{\"error\":\"Calibration failed\"}");
-    });
-
-    // POST /api/hardware/wj66/baud
-    server.on("/api/hardware/wj66/baud", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        String body = request->body();
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, body);
-        
-        if (error) return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-        
-        uint32_t baud = doc["baud"] | 0;
-        if (wj66SetBaud(baud)) {
-            return response->send(200, "application/json", "{\"success\":true}");
-        }
-        return response->send(400, "application/json", "{\"error\":\"Invalid baud rate\"}");
-    });
-
-    // POST /api/hardware/wj66/detect
-    server.on("/api/hardware/wj66/detect", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
-        // Don't block the web server - spawn a background task
-        xTaskCreate([](void* param) {
-            logInfo("[WJ66] Autodetect task starting...");
-            wj66Autodetect();
-            logInfo("[WJ66] Autodetect task complete");
-            vTaskDelete(NULL);
-        }, "wj66_detect", 4096, NULL, 1, NULL);
-        
-        // Return immediately
-        return response->send(200, "application/json", "{\"success\":true,\"message\":\"Detection started\"}");
-    });
-
-    // --- Time API ---
-    server.on("/api/time", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-        time_t now;
-        struct tm timeinfo;
-        time(&now);
-        localtime_r(&now, &timeinfo);
-
-        char buf[64];
-        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
-
-        JsonDocument doc;
-        doc["timestamp"] = (uint32_t)now;
-        doc["formatted"] = buf;
-        doc["synced"] = (timeinfo.tm_year > (2020 - 1900));
-
-        String output;
-        serializeJson(doc, output);
-        return response->send(200, "application/json", output.c_str());
-    });
-
-    server.on("/api/time/sync", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, request->body());
-        
-        if (error) {
-            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-        }
-
-        if (!doc["timestamp"].is<JsonVariant>()) {
-            return response->send(400, "application/json", "{\"error\":\"Missing timestamp\"}");
-        }
-
-        uint32_t timestamp = doc["timestamp"];
-        struct timeval tv;
-        tv.tv_sec = timestamp;
-        tv.tv_usec = 0;
-        settimeofday(&tv, NULL);
-
-        time_t now = timestamp;
-        struct tm* timeinfo = localtime(&now);
-        char buf[64];
-        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", timeinfo);
-
-        String out = String("{\"status\":\"success\",\"time\":\"") + buf + "\"}";
-        return response->send(200, "application/json", out.c_str());
-    });
-
-    // --- Diagnostics & Monitoring API ---
-
-    // GET /api/io/status
-    server.on("/api/io/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        doc["success"] = true;
-        
-        uint8_t in_bits = elboI73GetRawState();
-        uint8_t board_in = boardInputsGetRawState();
-        uint8_t out_bits = elboQ73GetRawState();
-        
-        // Map fields expected by diagnostics.js
-        doc["estop"] = (board_in & 0x08) != 0; 
-        doc["door"] = (board_in & 0x10) != 0;
-        doc["probe"] = (board_in & 0x20) != 0;
-        doc["limit_x"] = (board_in & 0x01) != 0;
-        doc["limit_y"] = (board_in & 0x02) != 0;
-        doc["limit_z"] = (board_in & 0x04) != 0;
-        
-        doc["spindle_on"] = (out_bits & 0x01) == 0; // Active-low
-        doc["coolant_on"] = (out_bits & 0x02) == 0;
-        doc["vacuum_on"] = (out_bits & 0x04) == 0;
-        doc["alarm_on"] = (out_bits & 0x80) == 0;
-
-        // Raw values for power users
-        doc["raw_in"] = in_bits;
-        doc["raw_out"] = out_bits;
-        doc["raw_board"] = board_in;
-
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // GET /api/faults
-    server.on("/api/faults", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        // Optimization: Use chunked response to minimize peak heap usage.
-        // 50 faults * ~128 bytes = ~6.4KB. Chunking avoids allocating the full JSON string.
-        response->setContentType("application/json");
-        
-        // Start the JSON structure
-        const char* header = "{ \"success\": true, \"faults\": [";
-        response->sendChunk((uint8_t*)header, strlen(header));
-
-        uint8_t count = faultGetHistoryCount();
-        bool first = true;
-        for (uint8_t i = 0; i < count; i++) {
-            fault_entry_t entry;
-            if (faultGetHistoryEntry(i, &entry)) {
-                if (!first) response->sendChunk((uint8_t*)",", 1);
-                first = false;
-
-                JsonDocument item;
-                item["code"] = entry.code;
-                item["description"] = faultCodeToString(entry.code);
-                item["severity"] = faultSeverityToString(entry.severity);
-                item["timestamp"] = entry.timestamp;
-                item["message"] = entry.message;
-                
-                String jsonStr;
-                serializeJson(item, jsonStr);
-                response->sendChunk((uint8_t*)jsonStr.c_str(), jsonStr.length());
-            }
-        }
-        
-        const char* footer = "] }";
-        response->sendChunk((uint8_t*)footer, strlen(footer));
-        return response->finishChunking();
-    });
-
-    // DELETE /api/faults - Clear Fault Logs
-    server.on("/api/faults", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        // Fix: Removed webAuthenticate for consistency with POST /api/faults/clear
-        // and because the UI uses it without providing creds in current implementation.
-        faultClearHistory(); 
-        return response->send(200, "application/json", "{\"success\":true, \"message\":\"Fault logs cleared\"}");
-    });
-
-    // POST /api/faults/clear
-    server.on("/api/faults/clear", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        faultClearHistory();
-        return response->send(200, "application/json", "{\"success\":true}");
-    });
-
-    // GET /api/spindle
-    server.on("/api/spindle", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        const spindle_monitor_state_t* state = spindleMonitorGetState();
-        JsonDocument doc;
-        doc["current_amps"] = state->current_amps;
-        doc["peak_amps"] = state->current_peak_amps;
-        doc["threshold_amps"] = state->overcurrent_threshold_amps;
-        doc["auto_pause_threshold"] = state->auto_pause_threshold_amps;
-        doc["auto_pause_count"] = state->auto_pause_count;
-        doc["overcurrent"] = state->alarm_overload;
-
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // GET /api/history/telemetry
-    server.on("/api/history/telemetry", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        doc["success"] = true;
-        JsonArray cpu_arr = doc["cpu"].to<JsonArray>();
-        JsonArray heap_arr = doc["heap"].to<JsonArray>();
-        JsonArray spindle_arr = doc["spindle_amps"].to<JsonArray>();
-
-        // Reconstruct chronological order from circular buffer
-        for (int i = 0; i < history_count; i++) {
-            int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
-            cpu_arr.add(telemetry_history[idx].cpu);
-            heap_arr.add(telemetry_history[idx].heap);
-            spindle_arr.add(telemetry_history[idx].spindle);
-        }
-
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // --- Hardware API Routes ---
-
-    // GET /api/hardware/tachometer
-    server.on("/api/hardware/tachometer", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-         const yhtc05_state_t* state = yhtc05GetState();
-         JsonDocument doc;
-         doc["enabled"] = state->enabled;
-         doc["rpm"] = state->rpm;
-         doc["pulse_count"] = state->pulse_count;
-         doc["peak_rpm"] = state->peak_rpm;
-         doc["spinning"] = state->is_spinning;
-         doc["stalled"] = state->is_stalled;
-         doc["error_count"] = state->error_count;
-         
-         String json;
-         serializeJson(doc, json);
-         return response->send(200, "application/json", json.c_str());
-    });
-
-    // GET /api/hardware/pins
-    server.on("/api/hardware/pins", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        
-        // Populate pins array (GPIOs)
-        JsonArray pinsArray = doc["pins"].to<JsonArray>();
-        for (size_t i = 0; i < PIN_COUNT; i++) {
-            JsonObject p = pinsArray.add<JsonObject>();
-            p["gpio"] = pinDatabase[i].gpio;
-            p["silk"] = pinDatabase[i].silk;
-            p["type"] = pinDatabase[i].type;
-            p["note"] = pinDatabase[i].note;
-        }
-
-        // Populate signals array (Mappings)
-        JsonArray sigsArray = doc["signals"].to<JsonArray>();
-        for (size_t i = 0; i < SIGNAL_COUNT; i++) {
-            JsonObject s = sigsArray.add<JsonObject>();
-            s["key"] = signalDefinitions[i].key;
-            s["name"] = signalDefinitions[i].name;
-            s["type"] = signalDefinitions[i].type;
-            s["current_pin"] = getPin(signalDefinitions[i].key);
-            s["default_pin"] = signalDefinitions[i].default_gpio;
-        }
-
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // POST /api/hardware/pins
-    server.on("/api/hardware/pins", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, request->body());
-        if (error) {
-            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-        }
-
-        JsonObject assignments = doc.as<JsonObject>();
-        bool all_ok = true;
-        int count = 0;
-        for (JsonPair kv : assignments) {
-            // Pass skip_save=true to defer NVS flush
-            if (!setPin(kv.key().c_str(), kv.value().as<int8_t>(), true)) {
-                all_ok = false;
-            }
-            count++;
-        }
-
-        // Single flush for all pin changes
-        configUnifiedSave();
-        logInfo("[WEB] Batch pin save: %d pins", count);
-
-        if (all_ok) {
-            return response->send(200, "application/json", "{\"success\":true}");
-        }
-        return response->send(400, "application/json", "{\"error\":\"One or more assignments failed\"}");
-    });
-
-    // GET /api/hardware/io
-    server.on("/api/hardware/io", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        doc["success"] = true;
-        
-        uint8_t in_bits = elboI73GetRawState();
-        uint8_t out_bits = elboQ73GetRawState();
-        uint8_t board_in = boardInputsGetRawState();
-        
-        // I73/Board Inputs (16 total)
-        JsonArray inputs = doc["inputs"].to<JsonArray>();
-        for (int i = 0; i < 8; i++) {
-            JsonObject in = inputs.add<JsonObject>();
-            in["state"] = (in_bits & (1 << i)) != 0;
-            in["name"] = String("I73-") + i;
-        }
-        for (int i = 0; i < 8; i++) {
-            JsonObject in = inputs.add<JsonObject>();
-            in["state"] = (board_in & (1 << i)) != 0;
-            in["name"] = String("B-X") + (i+1);
-        }
-
-        // Q73 Outputs (8 total)
-        JsonArray outputs = doc["outputs"].to<JsonArray>();
-        for (int i = 0; i < 8; i++) {
-            JsonObject out = outputs.add<JsonObject>();
-            out["state"] = (out_bits & (1 << i)) == 0; // Active-low
-            out["name"] = String("Y") + (i+1);
-        }
-
-        doc["estop"] = (board_in & 0x08) != 0; // Typical E-stop mask
-
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // POST /api/hardware/pins/reset
-    server.on("/api/hardware/pins/reset", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        // Reset pin mappings to defaults by clearing NVS keys
-        for (size_t i = 0; i < SIGNAL_COUNT; i++) {
-            char nvs_key[40];
-            snprintf(nvs_key, sizeof(nvs_key), "pin_%s", signalDefinitions[i].key);
-            // We don't have a direct configDelete, so we set to -1
-            configSetInt(nvs_key, -1);
-        }
-        configUnifiedSave();
-        return response->send(200, "application/json", "{\"success\":true}");
-    });
-
-    // Detect RS485 Baud Rate
-    server.on("/api/config/detect-rs485", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        int32_t baud = rs485AutodetectBaud();
-        
-        char json[128];
-        if (baud > 0) {
-            snprintf(json, sizeof(json), "{\"success\":true, \"baud\": %lu}", (unsigned long)baud);
-            return response->send(200, "application/json", json);
-        } else if (baud == -1) {
-            return response->send(200, "application/json", "{\"success\":false, \"error\": \"No RS485 devices are enabled. Please enable VFD or Current Monitor first.\"}");
-        } else {
-            return response->send(200, "application/json", "{\"success\":false, \"error\": \"No RS485 devices found (check wiring/power)\"}");
-        }
-    });
-
-    // --- GitHub OTA Update API ---
-    
-    // Check for updates (returns cached result from background check)
-    server.on("/api/ota/check", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        const UpdateCheckResult* res = otaGetCachedResult();
-        
-        JsonDocument doc;
-        doc["check_complete"] = otaCheckComplete();
-        doc["available"] = res->available;
-        doc["latest_version"] = res->latest_version;
-        doc["url"] = res->download_url;
-        doc["notes"] = res->release_notes;
-        
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-    
-    // Perform update
-    server.on("/api/ota/update", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        deserializeJson(doc, request->body());
-        
-        if (doc["url"].is<const char*>()) {
-            const char* url = doc["url"];
-            if (otaPerformUpdate(url)) {
-                return response->send(200, "application/json", "{\"success\":true, \"message\":\"Update started in background\"}");
-            } else {
-                return response->send(400, "application/json", "{\"success\":false, \"error\":\"Update already in progress or failed to start\"}");
-            }
-        }
-        return response->send(400, "application/json", "{\"error\":\"Missing URL\"}");
-    });
-    
-    // Get update status
-    server.on("/api/ota/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        doc["updating"] = otaIsUpdating();
-        doc["progress"] = otaGetProgress();
-        
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    // --- Config API Aliases (for hardware.js compatibility) ---
-    // These maps /api/config (GET/POST) to the existing category-based logic
-    
-    server.on("/api/config", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        // Merge common categories for the hardware page
-        apiConfigGet(CONFIG_CATEGORY_MOTION, doc);
-        apiConfigGet(CONFIG_CATEGORY_VFD, doc);
-        apiConfigGet(CONFIG_CATEGORY_ENCODER, doc);
-        
-        String json;
-        serializeJson(doc, json);
-        return response->send(200, "application/json", json.c_str());
-    });
-
-    server.on("/api/config", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        deserializeJson(doc, request->body());
-        
-        if (doc["key"].is<const char*>() && doc["value"].is<const char*>()) {
-            const char* key = doc["key"];
-            const char* value = doc["value"];
-            
-            // Simple string-to-typed set
-            if (strchr(value, '.')) configSetFloat(key, atof(value));
-            else configSetInt(key, atoi(value));
-            
-            configUnifiedSave();
-            return response->send(200, "application/json", "{\"success\":true}");
-        }
-        return response->send(400, "application/json", "{\"error\":\"Missing key/value\"}");
-    });
-
-    // Batch config save - reduces NVS wear by setting all values then flushing once
-    server.on("/api/config/batch", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        DeserializationError err = deserializeJson(doc, request->body());
-        if (err) {
-            return response->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-        }
-        
-        int count = 0;
-        JsonObject obj = doc.as<JsonObject>();
-        for (JsonPair kv : obj) {
-            const char* key = kv.key().c_str();
-            JsonVariant val = kv.value();
-            
-            if (val.is<int>() || val.is<long>()) {
-                configSetInt(key, val.as<int32_t>());
-            } else if (val.is<float>() || val.is<double>()) {
-                configSetFloat(key, val.as<float>());
-            } else if (val.is<const char*>()) {
-                const char* strVal = val.as<const char*>();
-                if (strchr(strVal, '.')) configSetFloat(key, atof(strVal));
-                else configSetInt(key, atoi(strVal));
-            }
-            count++;
-        }
-        
-        // Single flush for all changes
-        configUnifiedSave();
-        logInfo("[WEB] Batch config saved %d keys", count);
-        
-        char resp[64];
-        snprintf(resp, sizeof(resp), "{\"success\":true,\"count\":%d}", count);
-        return response->send(200, "application/json", resp);
-    });
-
-    // GET /api/config/backup - Download full configuration
-    server.on("/api/config/backup", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        size_t bufSize = 8192;
-        char* json = (char*)malloc(bufSize);
-        if (!json) return response->send(500, "application/json", "{\"error\":\"OOM\"}");
-
-        size_t len = apiConfigExportJSON(json, bufSize);
-        (void)len; // Silence unused variable warning
-        
-        // Update timestamp/firmware in JSON
-        JsonDocument doc;
-        deserializeJson(doc, json);
-        
-        // Use current time if available
-        time_t now;
-        time(&now);
-        char timeStr[32];
-        strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
-        doc["timestamp"] = timeStr;
-        
-        char verStr[32];
-        snprintf(verStr, sizeof(verStr), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
-        doc["firmware"] = verStr;
-        
-        String output;
-        serializeJson(doc, output);
-        free(json);
-
-        char filename[64];
-        snprintf(filename, sizeof(filename), "attachment; filename=\"backup-%lu.json\"", (unsigned long)now);
-        
-        response->addHeader("Content-Disposition", filename);
-        return response->send(200, "application/json", output.c_str());
-    });
-
-    // POST /api/system/reboot
-    server.on("/api/system/reboot", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        esp_err_t err = response->send(200, "application/json", "{\"success\":true,\"message\":\"Rebooting...\"}");
-        delay(100); // Give time for response to flush
-        ESP.restart();
-        return err;
-    });
-
-    logPrintln("[WEB] Hardware API routes registered");
     
     // --- WebSocket Handler for real-time telemetry ---
     // --- WebSocket Handler for real-time telemetry ---
@@ -1095,6 +199,18 @@ void WebServerManager::setupRoutes() {
     
     // Serve static files from root (MUST be after API routes)
     // PHASE 6: Enable browser caching to reduce load on LittleFS
+    // --- Static File Routing ---
+    
+    // Noise suppressor: Intercept /bootlog.txt requests to prevent VFS "[E] open() failed" logs
+    server.on("/bootlog.txt", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (!LittleFS.exists("/bootlog.txt")) {
+            return response->send(404, "text/plain", "Boot log missing");
+        }
+        PsychicFileResponse streamResponse(response, LittleFS, "/bootlog.txt");
+        return streamResponse.send();
+    });
+
+    // Main static handler (serves from LittleFS /)
     server.serveStatic("/", LittleFS, "/", "public, max-age=60");
 }
 
@@ -1237,12 +353,24 @@ void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_teleme
     doc["system"]["free_heap_bytes"] = telemetry.free_heap_bytes;
     doc["system"]["temperature"] = telemetry.temperature;
     
+    // Always include version and build date for UI synchronization
+    char ver_str[32];
+    snprintf(ver_str, sizeof(ver_str), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
+    doc["system"]["firmware_version"] = ver_str;
+    doc["system"]["build_date"] = __DATE__;
+
+    // PHASE 3.2: Add LCD message to telemetry for global toasts
+    lcd_message_t custom_msg;
+    if (lcdMessageGet(&custom_msg)) {
+        doc["system"]["lcd_msg"] = (const char*)custom_msg.text;
+        doc["system"]["lcd_msg_id"] = custom_msg.timestamp_ms;
+    } else {
+        doc["system"]["lcd_msg"] = "";
+        doc["system"]["lcd_msg_id"] = 0;
+    }
+    
     if (full) {
         doc["system"]["plc_hardware_present"] = telemetry.plc_hardware_present;
-        
-        char ver_str[32];
-        snprintf(ver_str, sizeof(ver_str), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
-        doc["system"]["firmware_version"] = ver_str;
 
         // Hardware Info
         doc["system"]["hw_model"] = "BISSO E350";
@@ -1319,7 +447,26 @@ void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_teleme
         doc["config"]["websocket"] = true; 
         doc["config"]["modbus"] = (configGetInt(KEY_VFD_EN, 0) == 1) || 
                                 (configGetInt(KEY_JXK10_ENABLED, 0) == 1) || 
-                                (configGetInt(KEY_YHTC05_ENABLED, 0) == 1);
+                                 (configGetInt(KEY_YHTC05_ENABLED, 0) == 1);
+    }
+
+    // LCD Mirroring - Capture current display content
+    char lcd_lines[LCD_ROWS][LCD_COLS + 1];
+    lcdInterfaceGetContent(lcd_lines);
+    for (int i = 0; i < LCD_ROWS; i++) {
+        doc["lcd"]["lines"][i] = lcd_lines[i];
+    }
+
+    // Stack Monitor - Populate free stack space for all tracked tasks
+    task_stats_t* stats = taskGetStatsArray();
+    int stats_count = taskGetStatsCount();
+    if (stats != nullptr) {
+        for (int i = 0; i < stats_count; i++) {
+            if (stats[i].name != nullptr) {
+                // frontend dashboard.js: updateStackMonitor expects t.stack[taskName] = bytes
+                doc["stack"][stats[i].name] = stats[i].stack_high_water;
+            }
+        }
     }
 }
 
@@ -1343,8 +490,8 @@ void WebServerManager::broadcastState() {
     portEXIT_CRITICAL(&statusSpinlock);
     
     // PHASE 6.2: Reduced buffer size to prevent stack overflow
-    // Telemetry dynamic JSON is typically under 1KB
-    char buffer[1024];
+    // Telemetry dynamic JSON is TYPICALLY under 1KB, but with LCD+Stack it hits ~1.2KB
+    char buffer[2048];
     size_t len = serializeJson(doc, buffer, sizeof(buffer));
     
     if (len > 0 && len < sizeof(buffer)) {

@@ -56,7 +56,7 @@ calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profi
             motion_complete = true;
             break;
         }
-        delay(10); 
+        vTaskDelay(pdMS_TO_TICKS(10));  // Yield to scheduler during polling
     }
     
     motionSetPLCAxisDirection(255, false, false); 

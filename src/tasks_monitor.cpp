@@ -17,6 +17,7 @@
 #include "plc_iface.h"              // PERFORMANCE FIX: I2C health monitoring
 #include "motion.h"                 // PERFORMANCE FIX: For motionEmergencyStop()
 #include "i2c_bus_recovery.h"       // ROBUSTNESS FIX: I2C bus recovery before E-STOP
+#include "load_manager.h"           // PHASE 5.3: For loadManagerUpdate()
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -48,6 +49,11 @@ void taskMonitorFunction(void* parameter) {
     // 3. Task Stall Detection
     // PHASE 2.5: Check for task stalls and log warnings
     taskStallDetectionUpdate();
+
+    // 3.7. Load & Resource Management (PHASE 5.3/6.1)
+    // Update system load state and calculate task stack usage statistics
+    loadManagerUpdate();
+    taskUpdateStackUsage();
 
     // 3.5. I2C Health Check (moved from motion loop for performance)
     // PERFORMANCE FIX: Check PLC I2C communication health at 1Hz instead of 100Hz
@@ -140,27 +146,24 @@ void taskMonitorFunction(void* parameter) {
                        stats_array[i].name, (unsigned long)stats_array[i].last_run_time_ms);
         }
 
-        // SECURITY FIX: Enhanced stack overflow monitoring with critical fault logging
-        // Stack sizes are typically 2048 words (8192 bytes)
-        // Thresholds defined in system_tuning.h:
-        //   STACK_CRITICAL_THRESHOLD_WORDS = 128 (6.25% of 2048)
-        //   STACK_WARNING_THRESHOLD_WORDS = 256 (12.5% of 2048)
+        // SECURITY FIX: Stack monitoring is now handled globally by taskUpdateStackUsage()
+        // and reported via telemetry. The Monitor task still logs critical alerts.
         if (stats_array[i].handle != NULL) {
-            UBaseType_t high_water = uxTaskGetStackHighWaterMark(stats_array[i].handle);
+            uint16_t high_water = stats_array[i].stack_high_water;
 
-            if (high_water < STACK_CRITICAL_THRESHOLD_WORDS) {  // < 512 bytes remaining - CRITICAL
+            if (high_water < STACK_CRITICAL_THRESHOLD_WORDS * 4) {  // Convert words to bytes
                 faultLogEntry(FAULT_CRITICAL, FAULT_CRITICAL_SYSTEM_ERROR, i, high_water,
-                             "CRITICAL: Stack near overflow in task '%s' (%lu words free)",
-                             stats_array[i].name, (unsigned long)high_water);
-                logError("[MONITOR] [CRITICAL] Stack overflow imminent: %s (%lu words / %lu bytes free)",
-                         stats_array[i].name, (unsigned long)high_water, (unsigned long)(high_water * 4));
+                             "CRITICAL: Stack near overflow in task '%s' (%u bytes free)",
+                             stats_array[i].name, high_water);
+                logError("[MONITOR] [CRITICAL] Stack overflow imminent: %s (%u bytes free)",
+                         stats_array[i].name, high_water);
             }
-            else if (high_water < STACK_WARNING_THRESHOLD_WORDS) {  // < 1024 bytes remaining - WARNING
+            else if (high_water < STACK_WARNING_THRESHOLD_WORDS * 4) {
                 faultLogEntry(FAULT_WARNING, FAULT_CRITICAL_SYSTEM_ERROR, i, high_water,
-                             "WARNING: Low stack space in task '%s' (%lu words free)",
-                             stats_array[i].name, (unsigned long)high_water);
-                logWarning("[MONITOR] [WARN] Low stack: %s (%lu words / %lu bytes free)",
-                          stats_array[i].name, (unsigned long)high_water, (unsigned long)(high_water * 4));
+                             "WARNING: Low stack space in task '%s' (%u bytes free)",
+                             stats_array[i].name, high_water);
+                logWarning("[MONITOR] [WARN] Low stack: %s (%u bytes free)",
+                          stats_array[i].name, high_water);
             }
         }
     }

@@ -45,9 +45,9 @@
 #define TASK_STACK_CLI                                                         \
   4096
 #define TASK_STACK_FAULT_LOG 3072
-#define TASK_STACK_MONITOR 2048
+#define TASK_STACK_MONITOR 3072
 #define TASK_STACK_TELEMETRY                                                   \
-  4096 // REDUCED: 6KB->4KB (Using smaller buffers in web_server logic)
+  6144 // INCREASED: 4KB->6KB to prevent overflow with stack stats and JSON buffers
 #define TASK_STACK_LCD_FORMAT                                                  \
   3072
 #define TASK_STACK_LCD                                                         \
@@ -230,5 +230,8 @@ uint32_t taskGetUptime();
 // Returns timeout in milliseconds, scaled from base to max based on current CPU
 // usage
 uint32_t taskGetAdaptiveI2cTimeout();
+
+// Memory Tuning
+void taskUpdateStackUsage();
 
 #endif
