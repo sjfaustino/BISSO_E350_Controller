@@ -15,6 +15,7 @@
 #include "serial_logger.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
 
 void registerHardwareRoutes(PsychicHttpServer& server) {
     
@@ -180,6 +181,37 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
             }
         }
         return response->send(200, "application/json", "{\"success\":true,\"message\":\"No boot log to delete\"}");
+    });
+    
+    // POST /api/hardware/i2c/test - Test I2C bus by scanning for LCD
+    server.on("/api/hardware/i2c/test", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        
+        // Common LCD I2C addresses
+        const uint8_t lcd_addresses[] = {0x27, 0x3F, 0x20};
+        bool found = false;
+        uint8_t found_addr = 0;
+        
+        for (size_t i = 0; i < sizeof(lcd_addresses) && !found; i++) {
+            Wire.beginTransmission(lcd_addresses[i]);
+            uint8_t error = Wire.endTransmission();
+            if (error == 0) {
+                found = true;
+                found_addr = lcd_addresses[i];
+            }
+        }
+        
+        doc["success"] = found;
+        if (found) {
+            doc["address"] = String("0x") + String(found_addr, HEX);
+            doc["message"] = "LCD detected";
+            logInfo("[WEB] I2C test: LCD found at 0x%02X", found_addr);
+        } else {
+            doc["error"] = "No I2C device found";
+            logWarning("[WEB] I2C test: No device found at 0x27/0x3F/0x20");
+        }
+        
+        return sendJsonResponse(response, doc);
     });
     
     logDebug("[WEB] Hardware routes registered");
