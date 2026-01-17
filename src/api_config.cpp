@@ -220,6 +220,7 @@ bool apiConfigValidate(config_category_t category, const char *key,
     }
     break;
 
+  case CONFIG_CATEGORY_ENCODER:
     if (strstr(key, "ppm")) {
       return validateEncoderPpm(key, value, error_msg, error_msg_len);
     }
