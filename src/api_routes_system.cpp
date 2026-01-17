@@ -109,6 +109,18 @@ void registerSystemRoutes(PsychicHttpServer& server) {
             const char* key = kv.key().c_str();
             JsonVariant val = kv.value();
             
+            // Validate I2C speed (only 100000 or 400000 Hz allowed)
+            if (strcmp(key, KEY_I2C_SPEED) == 0) {
+                int32_t speed = val.as<int32_t>();
+                if (speed != 100000 && speed != 400000) {
+                    logWarning("[WEB] Invalid I2C speed %d, using 100000", speed);
+                    speed = 100000;  // Default to standard mode
+                }
+                configSetInt(key, speed);
+                count++;
+                continue;
+            }
+            
             if (val.is<int>() || val.is<long>()) {
                 configSetInt(key, val.as<int32_t>());
             } else if (val.is<float>() || val.is<double>()) {

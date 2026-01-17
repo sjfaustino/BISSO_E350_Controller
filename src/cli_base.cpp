@@ -409,6 +409,18 @@ void cmd_grbl_state(int argc, char** argv) {
 void cmd_system_info(int argc, char** argv) {
   char ver[32]; firmwareGetVersionString(ver, 32);
   logPrintf("[VER:1.1h.PosiPro:%s]\r\n", ver);
+  
+  // Show key hardware configuration
+  uint32_t i2c_speed = configGetInt(KEY_I2C_SPEED, 100000);
+  logPrintf("[I2C: %lu Hz (%s Mode)]\r\n", 
+            (unsigned long)i2c_speed, 
+            i2c_speed >= 400000 ? "Fast" : "Standard");
+  logPrintf("[RS485: %d baud | Encoder: %d baud]\r\n",
+            configGetInt(KEY_RS485_BAUD, 9600),
+            configGetInt(KEY_ENC_BAUD, 9600));
+  logPrintf("[Echo: %s | OTA Check: %s]\r\n",
+            configGetInt(KEY_CLI_ECHO, 1) ? "ON" : "OFF",
+            configGetInt(KEY_OTA_CHECK_EN, 0) ? "ON" : "OFF");
 }
 
 void cmd_system_reset(int argc, char** argv) { bootRebootSystem(); }

@@ -27,19 +27,11 @@ static const motion_config_t default_motion = {
     .x_approach_med_mm = 20,
     .target_margin_mm = 0.1f};
 
-static const vfd_config_t default_vfd = {
-    .min_speed_hz = 1,   // LSP (Altivar 31 minimum)
-    .max_speed_hz = 105, // HSP (Altivar 31 maximum)
-    .acc_time_ms = 600,  // 0.6 seconds
-    .dec_time_ms = 400   // 0.4 seconds
-};
-
 static const encoder_config_t default_encoder = {.ppm = {100, 100, 100},
                                                  .calibrated = {0, 0, 0}};
 
 // Current configuration in RAM
 static motion_config_t current_motion;
-static vfd_config_t current_vfd;
 static encoder_config_t current_encoder;
 
 /**
@@ -67,14 +59,6 @@ bool apiConfigLoad(void) {
   current_motion.x_approach_slow_mm = configGetInt(KEY_X_APPROACH, 5);
   current_motion.x_approach_med_mm = configGetInt(KEY_X_APPROACH_MED, 20);
   current_motion.target_margin_mm = configGetFloat(KEY_TARGET_MARGIN, 0.1f);
-
-  // Load VFD config (using idle RMS as proxy for min speed characteristics)
-  // Note: VFD has fixed acceleration/deceleration timings via Modbus, not
-  // configurable here
-  current_vfd.min_speed_hz = 1;   // Altivar31 minimum (LSP)
-  current_vfd.max_speed_hz = 105; // Altivar31 maximum (HSP)
-  current_vfd.acc_time_ms = 600;  // Fixed in VFD configuration
-  current_vfd.dec_time_ms = 400;  // Fixed in VFD configuration
 
   // Load encoder config
   current_encoder.ppm[0] = configGetInt(KEY_PPM_X, 100);
@@ -123,7 +107,6 @@ bool apiConfigSave(void) {
  */
 bool apiConfigReset(void) {
   current_motion = default_motion;
-  current_vfd = default_vfd;
   current_encoder = default_encoder;
 
   logWarning("[API_CONFIG] Configuration reset to defaults");
@@ -618,9 +601,6 @@ void apiConfigPrint(void) {
       current_motion.soft_limit_low_mm[1], current_motion.soft_limit_high_mm[1],
       current_motion.soft_limit_low_mm[2],
       current_motion.soft_limit_high_mm[2]);
-  logInfo("[API_CONFIG] VFD: %u-%u Hz, ACC=%ums, DEC=%ums",
-          current_vfd.min_speed_hz, current_vfd.max_speed_hz,
-          current_vfd.acc_time_ms, current_vfd.dec_time_ms);
   logInfo("[API_CONFIG] Encoder: X=%u Y=%u Z=%u PPM", current_encoder.ppm[0],
           current_encoder.ppm[1], current_encoder.ppm[2]);
   logInfo("[API_CONFIG] ================================================");
