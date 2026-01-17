@@ -232,6 +232,12 @@ bool apiConfigValidate(config_category_t category, const char *key,
     }
     break;
 
+  case CONFIG_CATEGORY_SAFETY:
+  case CONFIG_CATEGORY_THERMAL:
+  case CONFIG_CATEGORY_NETWORK:
+    // No specific validation yet
+    break;
+
     return false;
   }
 
