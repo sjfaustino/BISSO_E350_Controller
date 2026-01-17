@@ -137,6 +137,13 @@ bool apiConfigReset(void);
 size_t apiConfigExportJSON(char* buffer, size_t buffer_size);
 
 /**
+ * @brief Import configuration from JSON
+ * @param doc JSON document containing configuration
+ * @return true if import successful
+ */
+bool apiConfigImportJSON(const JsonVariant& doc);
+
+/**
  * @brief Print configuration to serial console
  */
 void apiConfigPrint(void);

@@ -605,3 +605,137 @@ void apiConfigPrint(void) {
           current_encoder.ppm[1], current_encoder.ppm[2]);
   logInfo("[API_CONFIG] ================================================");
 }
+
+/**
+ * @brief Import configuration from JSON
+ * @param doc JSON document containing configuration
+ * @return true if import successful
+ */
+bool apiConfigImportJSON(const JsonVariant& doc) {
+  if (doc.isNull()) return false;
+  
+  // 1. Motion Config
+  if (doc["motion"].is<JsonObject>()) {
+    JsonObject m = doc["motion"];
+    if (m["soft_limit_x_low"].is<int>()) configSetInt(KEY_X_LIMIT_MIN, m["soft_limit_x_low"]);
+    if (m["soft_limit_x_high"].is<int>()) configSetInt(KEY_X_LIMIT_MAX, m["soft_limit_x_high"]);
+    if (m["soft_limit_y_low"].is<int>()) configSetInt(KEY_Y_LIMIT_MIN, m["soft_limit_y_low"]);
+    if (m["soft_limit_y_high"].is<int>()) configSetInt(KEY_Y_LIMIT_MAX, m["soft_limit_y_high"]);
+    if (m["soft_limit_z_low"].is<int>()) configSetInt(KEY_Z_LIMIT_MIN, m["soft_limit_z_low"]);
+    if (m["soft_limit_z_high"].is<int>()) configSetInt(KEY_Z_LIMIT_MAX, m["soft_limit_z_high"]);
+    
+    // Extras
+    if (m["home_enable"].is<int>()) configSetInt(KEY_HOME_ENABLE, m["home_enable"]);
+    if (m["home_fast"].is<int>()) configSetInt(KEY_HOME_PROFILE_FAST, m["home_fast"]);
+    if (m["home_slow"].is<int>()) configSetInt(KEY_HOME_PROFILE_SLOW, m["home_slow"]);
+  }
+
+  // 2. VFD Config
+  if (doc["vfd"].is<JsonObject>()) {
+    JsonObject v = doc["vfd"];
+    if (v["enabled"].is<int>()) configSetInt(KEY_VFD_EN, v["enabled"]);
+    if (v["address"].is<int>()) configSetInt(KEY_VFD_ADDR, v["address"]);
+  }
+
+  // 3. Encoder Config
+  if (doc["encoder"].is<JsonObject>()) {
+    JsonObject e = doc["encoder"];
+    if (e["ppm_x"].is<int>()) configSetInt(KEY_PPM_X, e["ppm_x"]);
+    if (e["ppm_y"].is<int>()) configSetInt(KEY_PPM_Y, e["ppm_y"]);
+    if (e["ppm_z"].is<int>()) configSetInt(KEY_PPM_Z, e["ppm_z"]);
+    if (e["feedback_en"].is<int>()) configSetInt(KEY_ENC_FEEDBACK, e["feedback_en"]);
+  }
+
+  // 4. Network
+  if (doc["network"].is<JsonObject>()) {
+    JsonObject n = doc["network"];
+    if (n["wifi_ap_en"].is<int>()) configSetInt(KEY_WIFI_AP_EN, n["wifi_ap_en"]);
+    if (n["eth_en"].is<int>()) configSetInt(KEY_ETH_ENABLED, n["eth_en"]);
+    if (n["eth_dhcp"].is<int>()) configSetInt(KEY_ETH_DHCP, n["eth_dhcp"]);
+    // Credentials might be skipped for security or included
+    if (n["wifi_ssid"].is<const char*>()) configSetString(KEY_WIFI_SSID, n["wifi_ssid"]);
+    if (n["wifi_pass"].is<const char*>()) configSetString(KEY_WIFI_PASS, n["wifi_pass"]);
+    if (n["wifi_ap_ssid"].is<const char*>()) configSetString(KEY_WIFI_AP_SSID, n["wifi_ap_ssid"]);
+    if (n["wifi_ap_pass"].is<const char*>()) configSetString(KEY_WIFI_AP_PASS, n["wifi_ap_pass"]);
+  }
+
+  // 5. System
+  if (doc["system"].is<JsonObject>()) {
+    JsonObject s = doc["system"];
+    if (s["buzzer_en"].is<int>()) configSetInt(KEY_BUZZER_EN, s["buzzer_en"]);
+    if (s["status_light_en"].is<int>()) configSetInt(KEY_STATUS_LIGHT_EN, s["status_light_en"]);
+    if (s["recovery_en"].is<int>()) configSetInt(KEY_RECOV_EN, s["recovery_en"]);
+    if (s["lcd_en"].is<int>()) configSetInt(KEY_LCD_EN, s["lcd_en"]);
+    if (s["bootlog_en"].is<int>()) configSetInt(KEY_BOOTLOG_EN, s["bootlog_en"]);
+    if (s["cli_echo"].is<int>()) configSetInt(KEY_CLI_ECHO, s["cli_echo"]);
+    if (s["ota_chk_en"].is<int>()) configSetInt(KEY_OTA_CHECK_EN, s["ota_chk_en"]);
+  }
+
+  // 6. Spindle
+  if (doc["spindle"].is<JsonObject>()) {
+     JsonObject sp = doc["spindle"];
+     if (sp["jxk10_en"].is<int>()) configSetInt(KEY_JXK10_ENABLED, sp["jxk10_en"]);
+     if (sp["jxk10_addr"].is<int>()) configSetInt(KEY_JXK10_ADDR, sp["jxk10_addr"]);
+     if (sp["yhtc05_en"].is<int>()) configSetInt(KEY_YHTC05_ENABLED, sp["yhtc05_en"]);
+     if (sp["yhtc05_addr"].is<int>()) configSetInt(KEY_YHTC05_ADDR, sp["yhtc05_addr"]);
+     if (sp["pause_en"].is<int>()) configSetInt(KEY_SPINDL_PAUSE_EN, sp["pause_en"]);
+  }
+
+  // 7. Serial
+  if (doc["serial"].is<JsonObject>()) {
+     JsonObject sr = doc["serial"];
+     if (sr["encoder_baud"].is<int>()) configSetInt(KEY_ENC_BAUD, sr["encoder_baud"]);
+     if (sr["rs485_baud"].is<int>()) configSetInt(KEY_RS485_BAUD, sr["rs485_baud"]);
+     if (sr["i2c_speed"].is<int>()) configSetInt(KEY_I2C_SPEED, sr["i2c_speed"]);
+  }
+
+  // 8. Hardware Pins
+  if (doc["hardware"].is<JsonObject>()) {
+    JsonObject h = doc["hardware"];
+    for (size_t i = 0; i < SIGNAL_COUNT; i++) {
+        const char* key = signalDefinitions[i].key;
+        if (h[key].is<int>()) {
+            setPin(key, h[key]); 
+        }
+    }
+  }
+
+  // 9. Behavior
+  if (doc["behavior"].is<JsonObject>()) {
+    JsonObject b = doc["behavior"];
+    if (b["jog_speed"].is<int>()) configSetInt(KEY_DEFAULT_SPEED, b["jog_speed"]);
+    if (b["jog_accel"].is<int>()) configSetInt(KEY_DEFAULT_ACCEL, b["jog_accel"]);
+    if (b["x_approach"].is<int>()) configSetInt(KEY_X_APPROACH, b["x_approach"]);
+    if (b["x_approach_med"].is<int>()) configSetInt(KEY_X_APPROACH_MED, b["x_approach_med"]);
+    if (b["target_margin"].is<float>()) configSetFloat(KEY_TARGET_MARGIN, b["target_margin"]);
+    if (b["buf_en"].is<int>()) configSetInt(KEY_MOTION_BUFFER_ENABLE, b["buf_en"]);
+    if (b["strict_limits"].is<int>()) configSetInt(KEY_MOTION_STRICT_LIMITS, b["strict_limits"]);
+    if (b["stop_timeout"].is<int>()) configSetInt(KEY_STOP_TIMEOUT, b["stop_timeout"]);
+    if (b["stall_timeout"].is<int>()) configSetInt(KEY_STALL_TIMEOUT, b["stall_timeout"]);
+    if (b["buttons_en"].is<int>()) configSetInt(KEY_BUTTONS_ENABLED, b["buttons_en"]);
+  }
+
+  // 10. Calibration
+  if (doc["calibration"].is<JsonObject>()) {
+    JsonObject c = doc["calibration"];
+    if (c["spd_x"].is<float>()) configSetFloat(KEY_SPEED_CAL_X, c["spd_x"]);
+    if (c["spd_y"].is<float>()) configSetFloat(KEY_SPEED_CAL_Y, c["spd_y"]);
+    if (c["spd_z"].is<float>()) configSetFloat(KEY_SPEED_CAL_Z, c["spd_z"]);
+    if (c["spd_a"].is<float>()) configSetFloat(KEY_SPEED_CAL_A, c["spd_a"]);
+  }
+
+  // 11. Positions
+  if (doc["positions"].is<JsonObject>()) {
+     JsonObject p = doc["positions"];
+     if (p["safe_x"].is<float>()) configSetFloat(KEY_POS_SAFE_X, p["safe_x"]);
+     if (p["safe_y"].is<float>()) configSetFloat(KEY_POS_SAFE_Y, p["safe_y"]);
+     if (p["safe_z"].is<float>()) configSetFloat(KEY_POS_SAFE_Z, p["safe_z"]);
+     if (p["safe_a"].is<float>()) configSetFloat(KEY_POS_SAFE_A, p["safe_a"]);
+     if (p["p1_x"].is<float>()) configSetFloat(KEY_POS_1_X, p["p1_x"]);
+     if (p["p1_y"].is<float>()) configSetFloat(KEY_POS_1_Y, p["p1_y"]);
+     if (p["p1_z"].is<float>()) configSetFloat(KEY_POS_1_Z, p["p1_z"]);
+     if (p["p1_a"].is<float>()) configSetFloat(KEY_POS_1_A, p["p1_a"]);
+  }
+
+  return true;
+}

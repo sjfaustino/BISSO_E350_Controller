@@ -139,8 +139,10 @@ window.SettingsModule = window.SettingsModule || {
         // But for now, bind what I added.
 
 
+
         // Configuration Management
         document.getElementById('export-all-btn')?.addEventListener('click', () => { window.location.href = '/api/config/backup'; });
+        document.getElementById('import-config-btn')?.addEventListener('click', () => this.importConfiguration());
         document.getElementById('load-preset-btn')?.addEventListener('click', () => this.loadPreset());
 
         // CLI Options (includes OTA toggle now)
@@ -341,6 +343,54 @@ window.SettingsModule = window.SettingsModule || {
             this.loadCliOptions(),
             this.loadOtaSettings()
         ]).catch(e => console.error('[Settings] Config load failed:', e));
+    },
+
+    async importConfiguration() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (re) => {
+                try {
+                    const json = JSON.parse(re.target.result);
+                    // Minimal validation
+                    if (!json.motion || !json.system) throw new Error("Invalid configuration file format");
+
+                    if (!await window.UI.showConfirm("Overwrite current settings with imported configuration? Device will reboot.")) return;
+
+                    const btn = document.getElementById('import-config-btn');
+                    const restore = window.UI.showSpinner(btn, "Importing...");
+
+                    try {
+                        const res = await fetch('/api/config/restore', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(json)
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            window.AlertManager.add(data.message, 'success');
+                            setTimeout(() => location.reload(), 3000);
+                        } else {
+                            window.AlertManager.add(data.error || 'Import failed', 'error');
+                            restore();
+                        }
+                    } catch (netErr) {
+                        window.AlertManager.add("Network error during import", 'error');
+                        restore();
+                    }
+                } catch (err) {
+                    window.AlertManager.add(err.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
     },
 
     showError(section, msg) {

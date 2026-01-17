@@ -176,6 +176,22 @@ void registerSystemRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", output.c_str());
     });
 
+    // POST /api/config/restore
+    server.on("/api/config/restore", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+         JsonDocument doc;
+         DeserializationError error = deserializeJson(doc, request->body());
+         if (error) {
+             return response->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
+         }
+         
+         if (apiConfigImportJSON(doc)) {
+             configUnifiedSave(); // Persist changes
+             return response->send(200, "application/json", "{\"success\":true,\"message\":\"Configuration restored. Rebooting...\"}");
+         } else {
+             return response->send(400, "application/json", "{\"success\":false,\"error\":\"Import failed\"}");
+         }
+    });
+
     // POST /api/config/detect-rs485
     server.on("/api/config/detect-rs485", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         int32_t baud = rs485AutodetectBaud();
