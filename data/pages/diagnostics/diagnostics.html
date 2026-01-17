@@ -165,6 +165,38 @@
             </div>
         </div>
 
+        <!-- RS485 Bus Health Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2 data-i18n="diagnostics.rs485_health">RS485 Bus Health</h2>
+                <span class="io-indicator off" id="rs485-status-indicator" style="width: 12px; height: 12px;"></span>
+            </div>
+            <div class="card-content">
+                <div class="metric-card">
+                    <div class="metric-label">Bus Status</div>
+                    <div class="metric-value" id="rs485-bus-status">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Devices Online</div>
+                    <div class="metric-value" id="rs485-device-count">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Transactions</div>
+                    <div class="metric-value" id="rs485-tx-count">--</div>
+                </div>
+                <div class="metric-card warning">
+                    <div class="metric-label">Error Rate</div>
+                    <div class="metric-value" id="rs485-error-rate">--%</div>
+                </div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <div class="metric-label" style="margin-bottom: 8px;">Device Status</div>
+                    <div id="rs485-device-list" style="font-size: 12px; color: var(--text-secondary);">
+                        No devices registered
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Fault Log Viewer Card -->
         <div class="card">
             <div class="card-header">

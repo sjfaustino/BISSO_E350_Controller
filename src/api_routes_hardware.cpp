@@ -16,6 +16,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
+#include "rs485_device_registry.h"
 
 void registerHardwareRoutes(PsychicHttpServer& server) {
     
@@ -225,6 +226,53 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         } else {
             doc["error"] = "No I2C devices found";
             logWarning("[WEB] I2C scan: No devices found");
+        }
+        
+        return sendJsonResponse(response, doc);
+    });
+    
+    // GET /api/hardware/rs485/status - Get RS485 bus health
+    server.on("/api/hardware/rs485/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        
+        const rs485_registry_state_t* state = rs485GetState();
+        uint8_t device_count = 0;
+        rs485_device_t** devices = rs485GetDevices(&device_count);
+        
+        // Bus status
+        uint32_t now = millis();
+        uint32_t time_since_response = now - state->last_successful_response_ms;
+        bool healthy = (device_count == 0) || (time_since_response < RS485_WATCHDOG_TIMEOUT_MS);
+        
+        doc["healthy"] = healthy;
+        doc["watchdog_alert"] = state->watchdog_alert_active;
+        doc["device_count"] = device_count;
+        doc["total_transactions"] = state->total_transactions;
+        doc["total_errors"] = state->total_errors;
+        doc["baud_rate"] = state->baud_rate;
+        doc["bus_busy"] = state->bus_busy;
+        
+        // Calculate error rate
+        float error_rate = 0.0f;
+        if (state->total_transactions > 0) {
+            error_rate = (float)state->total_errors / (float)state->total_transactions * 100.0f;
+        }
+        doc["error_rate"] = error_rate;
+        
+        // Device list
+        JsonArray devArray = doc["devices"].to<JsonArray>();
+        for (uint8_t i = 0; i < device_count; i++) {
+            rs485_device_t* dev = devices[i];
+            if (!dev) continue;
+            
+            JsonObject d = devArray.add<JsonObject>();
+            d["name"] = dev->name;
+            d["address"] = dev->slave_address;
+            d["enabled"] = dev->enabled;
+            d["poll_count"] = dev->poll_count;
+            d["error_count"] = dev->error_count;
+            d["consecutive_errors"] = dev->consecutive_errors;
+            d["healthy"] = dev->consecutive_errors < 3;
         }
         
         return sendJsonResponse(response, doc);

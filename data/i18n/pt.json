@@ -229,6 +229,7 @@
         "axis_x": "Diagnóstico Eixo X",
         "axis_y": "Diagnóstico Eixo Y",
         "axis_z": "Diagnóstico Eixo Z",
+        "rs485_health": "Saúde Bus RS485",
         "quality_score": "Pontuação Qualidade",
         "active_duration": "Duração Ativa",
         "stall_count": "Contagem Paragens",

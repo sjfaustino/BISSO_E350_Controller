@@ -229,6 +229,7 @@
         "axis_x": "Axis X Diagnostics",
         "axis_y": "Axis Y Diagnostics",
         "axis_z": "Axis Z Diagnostics",
+        "rs485_health": "RS485 Bus Health",
         "quality_score": "Quality Score",
         "active_duration": "Active Duration",
         "stall_count": "Stall Count",
