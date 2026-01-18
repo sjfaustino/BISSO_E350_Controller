@@ -26,16 +26,17 @@ void registerNetworkRoutes(PsychicHttpServer& server) {
         else if (rssi >= -50) quality = 100;
         else quality = 2 * (rssi + 100);
 
-        // Ethernet Status
+        // Ethernet Status - ONLY access ETH if enabled in config
         int eth_en = configGetInt(KEY_ETH_ENABLED, 0);
-        bool eth_up = eth_en ? ETH.linkUp() : false;
         
         char buffer[512];
-        if (eth_en && eth_up) {
+        if (eth_en) {
+            // Only call ETH functions if ethernet is enabled
+            bool eth_up = ETH.linkUp();
             snprintf(buffer, sizeof(buffer),
                 "{\"wifi_connected\":%s,\"wifi_ssid\":\"%s\",\"wifi_ip\":\"%s\",\"wifi_rssi\":%d,"
                 "\"wifi_mac\":\"%s\",\"wifi_gateway\":\"%s\",\"wifi_dns\":\"%s\",\"signal_quality\":%d,"
-                "\"eth_connected\":true,\"eth_ip\":\"%s\",\"eth_mac\":\"%s\",\"eth_speed\":%d,"
+                "\"eth_connected\":%s,\"eth_ip\":\"%s\",\"eth_mac\":\"%s\",\"eth_speed\":%d,"
                 "\"eth_duplex\":%s,\"eth_gateway\":\"%s\",\"uptime_ms\":%lu}",
                 wifi_connected ? "true" : "false",
                 wifi_connected ? WiFi.SSID().c_str() : "--",
@@ -45,14 +46,16 @@ void registerNetworkRoutes(PsychicHttpServer& server) {
                 wifi_connected ? WiFi.gatewayIP().toString().c_str() : "0.0.0.0",
                 wifi_connected ? WiFi.dnsIP().toString().c_str() : "0.0.0.0",
                 quality,
-                ETH.localIP().toString().c_str(),
+                eth_up ? "true" : "false",
+                eth_up ? ETH.localIP().toString().c_str() : "0.0.0.0",
                 ETH.macAddress().c_str(),
-                (int)ETH.linkSpeed(),
-                ETH.fullDuplex() ? "true" : "false",
-                ETH.gatewayIP().toString().c_str(),
+                eth_up ? (int)ETH.linkSpeed() : 0,
+                eth_up ? (ETH.fullDuplex() ? "true" : "false") : "false",
+                eth_up ? ETH.gatewayIP().toString().c_str() : "0.0.0.0",
                 (unsigned long)millis()
             );
         } else {
+            // Ethernet disabled - don't call any ETH functions
             snprintf(buffer, sizeof(buffer),
                 "{\"wifi_connected\":%s,\"wifi_ssid\":\"%s\",\"wifi_ip\":\"%s\",\"wifi_rssi\":%d,"
                 "\"wifi_mac\":\"%s\",\"wifi_gateway\":\"%s\",\"wifi_dns\":\"%s\",\"signal_quality\":%d,"
