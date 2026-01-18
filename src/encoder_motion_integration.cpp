@@ -138,12 +138,12 @@ bool encoderMotionIsFeedbackActive() { return encoder_feedback_enabled; }
 
 void encoderMotionDiagnostics() {
   serialLoggerLock();
-  Serial.println("\n=== ENCODER INTEGRATION ===");
-  Serial.printf("Feedback: %s\n", encoder_feedback_enabled ? "[ON]" : "[OFF]");
-  Serial.printf("Threshold: %.1f mm\n", encoder_error_threshold / 1000.0f);
+  logPrintln("\n=== ENCODER INTEGRATION ===");
+  logPrintf("Feedback: %s\n", encoder_feedback_enabled ? "[ON]" : "[OFF]");
+  logPrintf("Threshold: %.1f mm\n", encoder_error_threshold / 1000.0f);
   
   for (int i = 0; i < 4; i++) {
-    Serial.printf("Axis %d: Err=%.1f mm | State=%s\n",
+    logPrintf("Axis %d: Err=%.1f mm | State=%s\n",
         i, position_errors[i].current_error / 1000.0f, 
         position_errors[i].error_active ? "[ERR]" : "[OK]");
   }

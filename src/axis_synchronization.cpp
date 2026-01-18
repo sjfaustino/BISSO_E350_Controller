@@ -495,40 +495,40 @@ const char* axisSynchronizationGetStatusString(uint8_t axis) {
 
 void axisSynchronizationPrintSummary(void) {
     serialLoggerLock();
-    Serial.println("\n[AXIS_SYNC] === Per-Axis Motion Quality Summary ===");
-    Serial.println("Active Axis: X                    Y                    Z");
+    logPrintln("\n[AXIS_SYNC] === Per-Axis Motion Quality Summary ===");
+    logPrintln("Active Axis: X                    Y                    Z");
 
-    Serial.print("Status:      ");
-    Serial.printf("%-20s %-20s %-20s\n",
+    logPrintf("%s", "Status:      ");
+    logPrintf("%-20s %-20s %-20s\n",
                   axisSynchronizationGetStatusString(0),
                   axisSynchronizationGetStatusString(1),
                   axisSynchronizationGetStatusString(2));
 
-    Serial.print("Quality:     ");
-    Serial.printf("%-20u %-20u %-20u\n",
+    logPrintf("%s", "Quality:     ");
+    logPrintf("%-20u %-20u %-20u\n",
                   all_axes.x_axis.quality_score,
                   all_axes.y_axis.quality_score,
                   all_axes.z_axis.quality_score);
 
-    Serial.print("Velocity:    ");
-    Serial.printf("%-20.2f %-20.2f %-20.2f mm/s\n",
+    logPrintf("%s", "Velocity:    ");
+    logPrintf("%-20.2f %-20.2f %-20.2f mm/s\n",
                   all_axes.x_axis.current_velocity_mms,
                   all_axes.y_axis.current_velocity_mms,
                   all_axes.z_axis.current_velocity_mms);
 
-    Serial.print("Jitter:      ");
-    Serial.printf("%-20.3f %-20.3f %-20.3f mm/s\n",
+    logPrintf("%s", "Jitter:      ");
+    logPrintf("%-20.3f %-20.3f %-20.3f mm/s\n",
                   all_axes.x_axis.velocity_jitter_mms,
                   all_axes.y_axis.velocity_jitter_mms,
                   all_axes.z_axis.velocity_jitter_mms);
 
-    Serial.print("Stalled:     ");
-    Serial.printf("%-20s %-20s %-20s\n",
+    logPrintf("%s", "Stalled:     ");
+    logPrintf("%-20s %-20s %-20s\n",
                   all_axes.x_axis.stalled ? "YES" : "NO",
                   all_axes.y_axis.stalled ? "YES" : "NO",
                   all_axes.z_axis.stalled ? "YES" : "NO");
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }
 
@@ -542,36 +542,36 @@ void axisSynchronizationPrintAxisDiagnostics(uint8_t axis) {
     const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
 
     serialLoggerLock();
-    Serial.printf("\n[AXIS_SYNC] === Axis %s Diagnostics ===\n", axis_name);
-    Serial.printf("Status:                  %s (%u/100)\n",
+    logPrintf("\n[AXIS_SYNC] === Axis %s Diagnostics ===\n", axis_name);
+    logPrintf("Status:                  %s (%u/100)\n",
                   axisSynchronizationGetStatusString(axis),
                   metrics->quality_score);
-    Serial.printf("Current Velocity:        %.2f mm/s\n", metrics->current_velocity_mms);
-    Serial.printf("Commanded Feedrate:      %.2f mm/s\n", metrics->commanded_feedrate_mms);
-    Serial.printf("Is Moving:               %s\n", metrics->is_moving ? "YES" : "NO");
-    Serial.printf("Stalled:                 %s (count: %lu)\n",
+    logPrintf("Current Velocity:        %.2f mm/s\n", metrics->current_velocity_mms);
+    logPrintf("Commanded Feedrate:      %.2f mm/s\n", metrics->commanded_feedrate_mms);
+    logPrintf("Is Moving:               %s\n", metrics->is_moving ? "YES" : "NO");
+    logPrintf("Stalled:                 %s (count: %lu)\n",
                   metrics->stalled ? "YES" : "NO", (unsigned long)metrics->stall_count);
 
-    Serial.println("\n[VFD/Encoder Correlation]");
-    Serial.printf("VFD Frequency:           %.1f Hz\n", metrics->vfd_frequency_hz);
-    Serial.printf("Error:                   %.1f%% (tolerance: %.1f%%)\n",
+    logPrintln("\n[VFD/Encoder Correlation]");
+    logPrintf("VFD Frequency:           %.1f Hz\n", metrics->vfd_frequency_hz);
+    logPrintf("Error:                   %.1f%% (tolerance: %.1f%%)\n",
                   metrics->vfd_encoder_error_percent,
                   sync_config.vfd_encoder_tolerance_percent);
 
-    Serial.println("\n[Jitter & Wear]");
-    Serial.printf("Current Jitter:          %.3f mm/s\n", metrics->velocity_jitter_mms);
-    Serial.printf("Max Jitter Recorded:     %.3f mm/s\n",
+    logPrintln("\n[Jitter & Wear]");
+    logPrintf("Current Jitter:          %.3f mm/s\n", metrics->velocity_jitter_mms);
+    logPrintf("Max Jitter Recorded:     %.3f mm/s\n",
                   metrics->max_jitter_recorded_mms);
-    Serial.printf("Jitter Elevated:         %s (threshold: %.2f mm/s)\n",
+    logPrintf("Jitter Elevated:         %s (threshold: %.2f mm/s)\n",
                   metrics->jitter_elevated ? "YES" : "NO",
                   sync_config.jitter_threshold_mms);
 
-    Serial.println("\n[Sampling History]");
-    Serial.printf("Good Samples:            %lu\n", (unsigned long)metrics->good_motion_samples);
-    Serial.printf("Bad Samples:             %lu\n", (unsigned long)metrics->bad_motion_samples);
-    Serial.printf("Active Duration:         %lu ms\n", (unsigned long)metrics->active_duration_ms);
+    logPrintln("\n[Sampling History]");
+    logPrintf("Good Samples:            %lu\n", (unsigned long)metrics->good_motion_samples);
+    logPrintf("Bad Samples:             %lu\n", (unsigned long)metrics->bad_motion_samples);
+    logPrintf("Active Duration:         %lu ms\n", (unsigned long)metrics->active_duration_ms);
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }
 

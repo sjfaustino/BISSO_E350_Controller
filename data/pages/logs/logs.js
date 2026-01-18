@@ -238,8 +238,7 @@ window.LogsModule = window.LogsModule || {
         if (confirm('Clear all logs (Local and Device History)? This cannot be undone.')) {
             try {
                 // Clear backend NVS logs - Use consistent /api/faults/clear POST endpoint
-                const response = await fetch('/api/faults/clear', { method: 'POST' });
-                if (!response.ok) throw new Error('Failed to clear device logs');
+                await window.API.post('faults/clear', {}, 'clear-logs-btn');
 
                 // Clear local state
                 this.logs = [];
@@ -250,7 +249,7 @@ window.LogsModule = window.LogsModule || {
                 AlertManager.add('All logs cleared', 'info', 2000);
             } catch (e) {
                 console.error('[Logs] Error clearing logs:', e);
-                AlertManager.add('Failed to clear device logs', 'error', 3000);
+                // API client already showed toast if it failed, but we might want custom message or just rely on API
             }
         }
     },
@@ -280,16 +279,16 @@ window.LogsModule = window.LogsModule || {
     async fetchBackendLogs() {
         try {
             // Get uptime to calculate absolute times
-            const statusResp = await fetch('/api/network/status');
-            const statusData = await statusResp.json();
-            const uptime = statusData.uptime_ms || 0;
+            // Using API.get. Silent because if logs fail we usually just ignore
+            const [statusData, faultData] = await Promise.all([
+                window.API.get('network/status', null, { silent: true }),
+                window.API.get('faults', null, { silent: true })
+            ]);
+
+            const uptime = statusData?.uptime_ms || 0;
             const now = Date.now();
 
-            // Get faults
-            const faultResp = await fetch('/api/faults');
-            const faultData = await faultResp.json();
-
-            if (faultData.faults && Array.isArray(faultData.faults)) {
+            if (faultData && faultData.faults && Array.isArray(faultData.faults)) {
                 this.backendLogs = faultData.faults.map(f => {
                     // Calculate approx absolute time: Now - (Uptime - FaultTime)
                     // If fault time > uptime (due to reboot?), clamp

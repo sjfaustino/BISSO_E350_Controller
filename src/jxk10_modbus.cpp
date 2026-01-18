@@ -182,14 +182,14 @@ void jxk10ResetErrorCounters(void) {
 void jxk10PrintDiagnostics(void) {
     const jxk10_state_t* s = Jxk10.getState();
     serialLoggerLock();
-    Serial.println("\n[JXK10] === Diagnostics ===");
-    Serial.printf("Slave Address:       %u\n", s->slave_address);
-    Serial.printf("Current:             %.2f A (raw: %d)\n", s->current_amps, s->current_raw);
-    Serial.printf("Read Count:          %lu\n", (unsigned long)s->read_count);
-    Serial.printf("Error Count:         %lu\n", (unsigned long)s->error_count);
-    Serial.printf("Consecutive Errors:  %lu\n", (unsigned long)s->consecutive_errors);
+    logPrintln("\n[JXK10] === Diagnostics ===");
+    logPrintf("Slave Address:       %u\n", s->slave_address);
+    logPrintf("Current:             %.2f A (raw: %d)\n", s->current_amps, s->current_raw);
+    logPrintf("Read Count:          %lu\n", (unsigned long)s->read_count);
+    logPrintf("Error Count:         %lu\n", (unsigned long)s->error_count);
+    logPrintf("Consecutive Errors:  %lu\n", (unsigned long)s->consecutive_errors);
     if (s->last_read_time_ms > 0) {
-        Serial.printf("Last Read:           %lu ms ago\n", (unsigned long)(millis() - s->last_read_time_ms));
+        logPrintf("Last Read:           %lu ms ago\n", (unsigned long)(millis() - s->last_read_time_ms));
     }
     serialLoggerUnlock();
 }

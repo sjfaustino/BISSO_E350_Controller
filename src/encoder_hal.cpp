@@ -98,9 +98,15 @@ static const encoder_interface_config_t* findInterfaceConfig(encoder_interface_t
  */
 static HardwareSerial* getSerialByUart(uint8_t uart_num) {
     switch (uart_num) {
+#if !defined(CONFIG_IDF_TARGET_ESP32S2)
+        // On S2, Serial is USBCDC type, not HardwareSerial - skip case 0
         case 0: return &Serial;
+#endif
         case 1: return &Serial1;
+#if !defined(CONFIG_IDF_TARGET_ESP32S2)
+        // ESP32-S2 only has UART0 and UART1, Serial2 not available
         case 2: return &Serial2;
+#endif
         default: return NULL;
     }
 }
@@ -288,26 +294,17 @@ uint32_t encoderHalGetLastError(void) {
 
 void encoderHalPrintStatus(void) {
     serialLoggerLock();
-    Serial.println("\n========== ENCODER HAL STATUS ==========");
-    Serial.print("Interface: ");
-    Serial.println(encoderHalGetInterfaceName(hal_state.config.interface));
-    Serial.print("Description: ");
-    Serial.println(encoderHalGetInterfaceDescription(hal_state.config.interface));
-    Serial.print("Baud Rate: ");
-    Serial.println(hal_state.config.baud_rate);
-    Serial.print("RX Pin: ");
-    Serial.println(hal_state.config.rx_pin);
-    Serial.print("TX Pin: ");
-    Serial.println(hal_state.config.tx_pin);
-    Serial.print("Status: ");
-    Serial.println(hal_state.initialized ? "READY" : "NOT INITIALIZED");
-    Serial.print("Bytes Sent: ");
-    Serial.println(hal_state.bytes_sent);
-    Serial.print("Bytes Received: ");
-    Serial.println(hal_state.bytes_received);
-    Serial.print("RX Available: ");
-    Serial.println(encoderHalAvailable());
-    Serial.println("=========================================\n");
+    logPrintln("\n========== ENCODER HAL STATUS ==========");
+    logPrintf("Interface: %s\n", encoderHalGetInterfaceName(hal_state.config.interface));
+    logPrintf("Description: %s\n", encoderHalGetInterfaceDescription(hal_state.config.interface));
+    logPrintf("Baud Rate: %lu\r\n", (unsigned long)hal_state.config.baud_rate);
+    logPrintf("RX Pin: %d\r\n", hal_state.config.rx_pin);
+    logPrintf("TX Pin: %d\r\n", hal_state.config.tx_pin);
+    logPrintf("Status: %s\r\n", hal_state.initialized ? "READY" : "NOT INITIALIZED");
+    logPrintf("Bytes Sent: %lu\r\n", (unsigned long)hal_state.bytes_sent);
+    logPrintf("Bytes Received: %lu\r\n", (unsigned long)hal_state.bytes_received);
+    logPrintf("RX Available: %d\r\n", encoderHalAvailable());
+    logPrintln("=========================================\n");
     serialLoggerUnlock();
 
     logInfo("[ENCODER-HAL] Status: %s @ %lu baud, %lu sent, %lu received",

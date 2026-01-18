@@ -346,24 +346,24 @@ void selftestPrintResults(const selftest_suite_t* suite) {
     if (!suite || !suite->results) return;
 
     serialLoggerLock();
-    Serial.println("\n[SELFTEST] === Firmware Self-Test Results ===");
-    Serial.println("Test Name                    | Status | Duration");
-    Serial.println("-----------------------------|--------|----------");
+    logPrintln("\n[SELFTEST] === Firmware Self-Test Results ===");
+    logPrintln("Test Name                    | Status | Duration");
+    logPrintln("-----------------------------|--------|----------");
 
     for (uint32_t i = 0; i < suite->total_tests; i++) {
         const selftest_result_t* result = &suite->results[i];
-        Serial.printf("%-28s | %-6s | %lu ms\n",
+        logPrintf("%-28s | %-6s | %lu ms\n",
                     result->test_name,
                     result->passed ? "PASS" : "FAIL",
                     (unsigned long)result->duration_ms);
 
         if (!result->passed && result->error_message) {
-            Serial.printf("  ERROR: %s\n", result->error_message);
+            logPrintf("  ERROR: %s\n", result->error_message);
         }
     }
 
-    Serial.println("-----------------------------|--------|----------");
-    Serial.printf("Results: %lu/%lu passed in %lu ms\n\n",
+    logPrintln("-----------------------------|--------|----------");
+    logPrintf("Results: %lu/%lu passed in %lu ms\n\n",
                 (unsigned long)suite->passed_tests,
                 (unsigned long)suite->total_tests,
                 (unsigned long)suite->total_duration_ms);
@@ -406,15 +406,15 @@ void selftestFreeResults(selftest_suite_t* suite) {
 
 void selftestListTests() {
     serialLoggerLock();
-    Serial.println("\n[SELFTEST] === Available Tests ===");
+    logPrintln("\n[SELFTEST] === Available Tests ===");
 
     for (int i = 0; i < test_definition_count; i++) {
-        Serial.printf("  %s %s\n",
+        logPrintf("  %s %s\n",
                     test_definitions[i].name,
                     test_definitions[i].quick ? "(quick)" : "");
     }
 
-    Serial.printf("\nTotal: %d tests\n\n", test_definition_count);
+    logPrintf("\nTotal: %d tests\n\n", test_definition_count);
     serialLoggerUnlock();
 }
 

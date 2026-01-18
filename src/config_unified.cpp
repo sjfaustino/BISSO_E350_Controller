@@ -731,16 +731,16 @@ int configGetKeyCount() { return config_count; }
 
 void configUnifiedDiagnostics() {
   serialLoggerLock();
-  Serial.println("\n=== CONFIG DIAGNOSTICS ===");
-  Serial.printf("Strict Limits: %s\n", configGetInt(KEY_MOTION_STRICT_LIMITS, 1)
+  logPrintln("\n=== CONFIG DIAGNOSTICS ===");
+  logPrintf("Strict Limits: %s\r\n", configGetInt(KEY_MOTION_STRICT_LIMITS, 1)
                                            ? "ON (Safe)"
                                            : "OFF (Recovery)");
-  Serial.printf("Home Fast Profile: %ld\n",
+  logPrintf("Home Fast Profile: %ld\r\n",
                 (long)configGetInt(KEY_HOME_PROFILE_FAST, 2));
-  Serial.printf("Buffer Enable: %s\n",
+  logPrintf("Buffer Enable: %s\r\n",
                 configGetInt(KEY_MOTION_BUFFER_ENABLE, 1) ? "YES" : "NO");
-  Serial.printf("Total Keys: %d\n", config_count);
-  Serial.println("==========================\n");
+  logPrintf("Total Keys: %d\r\n", config_count);
+  logPrintln("==========================\n");
   serialLoggerUnlock();
 }
 
@@ -803,20 +803,20 @@ void configUnifiedPrintAll() {
       continue;
 
     // Pad key for alignment
-    Serial.printf("%-30s | ", config_table[i].key);
+    logPrintf("%-30s | ", config_table[i].key);
 
     switch (config_table[i].type) {
     case CONFIG_INT32:
-      Serial.printf("%ld", (long)config_table[i].value.int_val);
+      logPrintf("%ld", (long)config_table[i].value.int_val);
       break;
     case CONFIG_FLOAT:
-      Serial.printf("%.3f", config_table[i].value.float_val);
+      logPrintf("%.3f", config_table[i].value.float_val);
       break;
     case CONFIG_STRING:
-      Serial.printf("\"%s\"", config_table[i].value.str_val);
+      logPrintf("\"%s\"", config_table[i].value.str_val);
       break;
     }
-    Serial.println();
+    logPrintln("");
   }
   serialLoggerUnlock();
 }

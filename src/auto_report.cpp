@@ -102,7 +102,7 @@ void autoReportUpdate() {
                  "[POS:X:%.1f Y:%.1f Z:%.1f A:%.1f]",
                  x_mm, y_mm, z_mm, a_deg);
 
-        Serial.println(response);
+        logPrintln(response);
         logInfo("[AUTO-REPORT] %s", response);
     }
 }

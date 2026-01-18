@@ -188,7 +188,7 @@ void WebServerManager::setupRoutes() {
 
             // Filter out heartbeat pings to keep logs clean
             if (msg.indexOf("ping") == -1) {
-                logPrintf("[WS] Received: %s\n", msg.c_str());
+                logPrintf("[WS] Received: %s\r\n", msg.c_str());
             }
         }
         return ESP_OK;

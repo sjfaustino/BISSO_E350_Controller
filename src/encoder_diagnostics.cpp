@@ -266,14 +266,14 @@ size_t encoderDiagnosticsExportJSON(char* buffer, size_t buffer_size) {
 
 void encoderDiagnosticsPrint() {
     serialLoggerLock();
-    Serial.println("\n[ENCODER_DIAG] === Encoder Diagnostics ===");
-    Serial.println("Axis | Health    | Position  | Variance | Drift/h  | Quality | Errors");
-    Serial.println("-----|-----------|-----------|----------|----------|---------|--------");
+    logPrintln("\n[ENCODER_DIAG] === Encoder Diagnostics ===");
+    logPrintln("Axis | Health    | Position  | Variance | Drift/h  | Quality | Errors");
+    logPrintln("-----|-----------|-----------|----------|----------|---------|--------");
 
     for (int i = 0; i < 4; i++) {
         const encoder_diagnostic_t* diag = &diagnostics[i];
 
-        Serial.printf("%d    | %-9s | %9.2f | %8.2f | %8.3f | %7u | %lu\n",
+        logPrintf("%d    | %-9s | %9.2f | %8.2f | %8.3f | %7u | %lu\r\n",
             diag->axis_id,
             encoderDiagnosticsGetHealthString(diag->health),
             diag->position_mm,
@@ -283,11 +283,11 @@ void encoderDiagnosticsPrint() {
             (unsigned long)diag->signal_errors);
 
         if (diag->needs_recalibration) {
-            Serial.printf("     [!] Recalibration recommended\n");
+            logPrintf("     [!] Recalibration recommended\r\n");
         }
     }
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }
 

@@ -34,24 +34,24 @@
 //       - Deep call chains in complex state machines
 
 #define TASK_STACK_SAFETY                                                      \
-  4096 // Keep 4K for safety critical
+  3072 // REDUCED: 4KB->3KB (Avg usage ~1.5KB)
 #define TASK_STACK_MOTION                                                      \
   4096 // Keep 4K for motion planner
 #define TASK_STACK_ENCODER                                                     \
-  6144 // Keep 6K for high-speed encoder
+  4096 // REDUCED: 6KB->4KB (Avg usage ~1.5KB)
 #define TASK_STACK_PLC_COMM 2048
 #define TASK_STACK_I2C_MANAGER                                                 \
   3072
 #define TASK_STACK_CLI                                                         \
-  4096
+  8192
 #define TASK_STACK_FAULT_LOG 3072
-#define TASK_STACK_MONITOR 3072
+#define TASK_STACK_MONITOR 6144
 #define TASK_STACK_TELEMETRY                                                   \
   6144 // INCREASED: 4KB->6KB to prevent overflow with stack stats and JSON buffers
 #define TASK_STACK_LCD_FORMAT                                                  \
   3072
 #define TASK_STACK_LCD                                                         \
-  3072 // REDUCED: 4KB->3KB (Sufficient for I2C)
+  4096 // INCREASED: 3KB->4KB (Fix low stack warning)
 #define TASK_STACK_BOOT 2048
 
 // WARNING: AsyncWebServer handlers create JsonDocument on stack!

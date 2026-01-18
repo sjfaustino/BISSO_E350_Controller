@@ -195,7 +195,7 @@ button_state_t boardInputsUpdate() {
 
 void boardInputsDiagnostics() {
   serialLoggerLock();
-  Serial.println("\n[INPUTS] === Physical Inputs (0x24) ===");
+  logPrintln("\n[INPUTS] === Physical Inputs (0x24) ===");
 
   // THREAD SAFETY FIX: Protect I2C bus access with mutex
   SemaphoreHandle_t i2c_mutex = taskGetI2cBoardMutex();
@@ -204,23 +204,23 @@ void boardInputsDiagnostics() {
     i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &input_cache, 1);
     xSemaphoreGive(i2c_mutex);
   } else {
-    Serial.println("[INPUTS] [ERR] Mutex timeout - I2C bus busy");
+    logPrintln("[INPUTS] [ERR] Mutex timeout - I2C bus busy");
     serialLoggerUnlock();
     return;
   }
 
-  Serial.printf("Raw Byte: 0x%02X | Debounced: 0x%02X\n", input_cache, debounced_input_cache);
+  logPrintf("Raw Byte: 0x%02X | Debounced: 0x%02X\n", input_cache, debounced_input_cache);
 
   // Decode using current maps for diagnostics
   bool estop = (debounced_input_cache & mask_estop);
   bool pause = !(debounced_input_cache & mask_pause);
   bool resume = !(debounced_input_cache & mask_resume);
 
-  Serial.printf("  E-STOP (Mask 0x%02X): %s\n", mask_estop,
+  logPrintf("  E-STOP (Mask 0x%02X): %s\n", mask_estop,
                 estop ? "TRIPPED (OPEN)" : "OK (CLOSED)");
-  Serial.printf("  PAUSE  (Mask 0x%02X): %s\n", mask_pause,
+  logPrintf("  PAUSE  (Mask 0x%02X): %s\n", mask_pause,
                 pause ? "PRESSED" : "RELEASED");
-  Serial.printf("  RESUME (Mask 0x%02X): %s\n", mask_resume,
+  logPrintf("  RESUME (Mask 0x%02X): %s\n", mask_resume,
                 resume ? "PRESSED" : "RELEASED");
   serialLoggerUnlock();
 }

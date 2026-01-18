@@ -1,1 +1,406 @@
-window.NetworkModule = { latencyHistory: [], maxHistoryLength: 100, reconnectCount: 0, connectionStartTime: Date.now(), stats: { packetsSent: 0, packetsReceived: 0, errors: 0, dataReceived: 0 }, init() { console.log("[Network] Initializing"), this.loadWiFiConfig(), this.updateNetworkStatus(), this.setupEventListeners(), this.startLatencyMonitoring(), window.addEventListener("state-changed", () => this.onStateChanged()) }, setupEventListeners() { const t = document.getElementById("ap-enabled"); t && t.addEventListener("change", t => { const e = document.getElementById("ap-settings-fields"); e && (e.style.display = t.target.checked ? "block" : "none") }); const btEth = document.getElementById("save-eth-btn"); btEth && btEth.addEventListener("click", () => this.saveEthConfig()); const e = document.getElementById("save-station-btn"); e && e.addEventListener("click", () => this.saveStationConfig()); const n = document.getElementById("save-ap-btn"); n && n.addEventListener("click", () => this.saveAPConfig()); const o = document.getElementById("ping-btn"); o && o.addEventListener("click", () => this.sendPing()); const s = document.getElementById("reconnect-btn"); s && s.addEventListener("click", () => this.reconnectDevice()); const a = document.getElementById("toggle-station-pass"); a ? (console.log("[Network] Added station toggle listener"), a.addEventListener("click", t => { t.preventDefault(), console.log("[Network] Station toggle clicked"), this.togglePass("station-pass") })) : console.warn("[Network] Station toggle button not found"); const i = document.getElementById("toggle-ap-pass"); i ? (console.log("[Network] Added AP toggle listener"), i.addEventListener("click", t => { t.preventDefault(), console.log("[Network] AP toggle clicked"), this.togglePass("ap-pass") })) : console.warn("[Network] AP toggle button not found"); const c = document.getElementById("network-test-btn"); c && c.addEventListener("click", () => this.runDiagnostics()); const d = document.getElementById("close-diagnostics"); d && d.addEventListener("click", () => this.closeDiagnostics()); const r = document.getElementById("export-diagnostics"); r && r.addEventListener("click", () => this.exportDiagnostics()) }, updateNetworkStatus() { this.updateWiFiStatus(), this.updateUptimeInfo(), setInterval(() => this.updateWiFiStatus(), 5e3), setInterval(() => this.updateUptimeInfo(), 1e3) }, updateWiFiStatus() { fetch("/api/network/status").then(t => t.json()).then(t => { const e = t.wifi_connected ? window.i18n.t('network.connected') : window.i18n.t('network.disconnected'), n = t.wifi_ssid || "--", o = t.wifi_rssi || -100, s = t.signal_quality || 0, a = document.getElementById("wifi-status"), i = document.getElementById("wifi-ssid"), c = document.getElementById("signal-dbm"); a && (a.textContent = e, a.style.color = t.wifi_connected ? "var(--color-optimal)" : "var(--color-critical)"), i && (i.textContent = n), c && (c.textContent = o + " dBm"); const d = document.getElementById("signal-bar"); d && (d.style.width = s + "%"); const r = s > 75 ? window.i18n.t('network.signal_excellent') : s > 50 ? window.i18n.t('network.signal_good') : s > 25 ? window.i18n.t('network.signal_fair') : window.i18n.t('network.signal_poor'), l = document.getElementById("signal-quality"); l && (l.textContent = r), Utils.setText("signal-quality", r); const g = document.getElementById("signal-bar"); g && (g.style.background = s > 75 ? "var(--color-optimal)" : s > 50 ? "var(--color-normal)" : s > 25 ? "var(--color-warning)" : "var(--color-critical)"), Utils.setText("ip-address", t.wifi_ip || "--"), Utils.setText("gateway-address", t.wifi_gateway || "--"), Utils.setText("mac-address", t.wifi_mac || "--"); const u = t.eth_connected, m = document.getElementById("eth-status"); if (m && (m.textContent = u ? window.i18n.t('network.connected') : window.i18n.t('network.disconnected'), m.style.color = u ? "var(--color-optimal)" : "var(--color-critical)"), Utils.setText("eth-speed", u ? t.eth_speed + " Mbps" : "--"), Utils.setText("eth-duplex", u ? t.eth_duplex ? window.i18n.t('network.full_duplex') : window.i18n.t('network.half_duplex') : "--"), Utils.setText("eth-ip", t.eth_ip || "--"), Utils.setText("eth-gateway", t.eth_gateway || "--"), Utils.setText("eth-mac", t.eth_mac || "--"), t.uptime_ms) { const e = Math.floor(t.uptime_ms / 1e3), n = Math.floor(e / 3600), o = Math.floor(e % 3600 / 60), s = document.getElementById("device-uptime"); s && (s.textContent = n + " h " + o + " m") } }).catch(t => console.error("[Network] Status fetch failed:", t)) }, updateLatency() { const t = SharedWebSocket.latency || 0; if (t > 0) { this.latencyHistory.push(t), this.latencyHistory.length > this.maxHistoryLength && this.latencyHistory.shift(); const e = document.getElementById("latency-ms"); e && (e.textContent = t + " ms"); const n = Math.min(...this.latencyHistory), o = Math.max(...this.latencyHistory), s = (Math.round(this.latencyHistory.reduce((t, e) => t + e, 0) / this.latencyHistory.length), document.getElementById("latency-min")), a = document.getElementById("latency-max"); document.getElementById("latency-avg"); s && (s.textContent = n + " ms"), a && (a.textContent = o + " ms") } }, updateModbusStatus() { const t = AppState.data, e = !0 === t.vfd?.connected, n = e ? window.i18n.t('network.connected') : window.i18n.t('network.disconnected'), o = document.getElementById("modbus-status"); o && (o.textContent = n, o.style.color = e ? "var(--color-optimal)" : "var(--color-critical)"); const s = document.getElementById("vfd-na"); s && (s.style.display = e ? "none" : "inline"); const a = document.getElementById("vfd-latency"); a && (a.textContent = "-- ms"); const i = document.getElementById("modbus-last-read"); i && (i.textContent = (new Date).toLocaleTimeString()) }, updateUptimeInfo() { const t = Date.now() - this.connectionStartTime, e = Math.floor(t / 6e4), n = document.getElementById("connection-duration"), o = document.getElementById("reconnect-count"); n && (n.textContent = e + " m"), o && (o.textContent = this.reconnectCount); const s = SharedWebSocket.packetsSent || 0, a = SharedWebSocket.packetsReceived || 0, i = SharedWebSocket.dataReceivedBytes || 0, c = document.getElementById("packets-sent"), d = document.getElementById("packets-received"), r = document.getElementById("data-received"); c && (c.textContent = s), d && (d.textContent = a), r && (r.textContent = (i / 1024).toFixed(1) + " KB") }, startLatencyMonitoring() { setInterval(() => { this.updateLatency(), this.updateModbusStatus() }, 2e3) }, sendPing() { AlertManager.add(window.i18n.t('network.pinging_msg'), "info"), SharedWebSocket.ping() }, reconnectDevice() { AlertManager.add(window.i18n.t('network.reconnecting_msg'), "info"), fetch("/api/network/reconnect", { method: "POST" }).then(t => t.json()).then(t => { t.success ? (AlertManager.add(window.i18n.t('network.reconnect_success'), "success", 2e3), this.reconnectCount++) : AlertManager.add(window.i18n.t('network.reconnect_failed'), "error") }).catch(t => AlertManager.add("Reconnect API failed", "error")) }, runDiagnostics() { const t = document.getElementById("network-diagnostics-modal"); t && (t.style.display = "flex"); const e = document.getElementById("diagnostics-output"); e.textContent = window.i18n.t('network.running_diag_msg') + "\n\n", fetch("/api/network/status").then(t => t.json()).then(t => { const n = Math.floor((t.uptime_ms || 0) / 1e3), o = Math.floor(n / 3600), s = Math.floor(n % 3600 / 60), a = t.signal_quality > 75 ? window.i18n.t('network.signal_excellent') : t.signal_quality > 50 ? window.i18n.t('network.signal_good') : t.signal_quality > 25 ? window.i18n.t('network.signal_fair') : window.i18n.t('network.signal_poor'), i = ["WiFi Status: " + (t.wifi_connected ? window.i18n.t('network.connected') : window.i18n.t('network.disconnected')), `SSID: ${t.wifi_ssid || "N/A"}`, `WiFi Signal: ${t.wifi_rssi} dBm (${a})`, `WiFi IP: ${t.wifi_ip || "N/A"}`, `WiFi MAC: ${t.wifi_mac || "N/A"}`, `Gateway: ${t.wifi_gateway || "N/A"}`, `DNS: ${t.wifi_dns || "N/A"}`, `Signal Quality: ${t.signal_quality}%`, "", "Ethernet Status: " + (t.eth_connected ? window.i18n.t('network.connected') : window.i18n.t('network.disconnected')), `Ethernet IP: ${t.eth_ip || "N/A"}`, `Ethernet MAC: ${t.eth_mac || "N/A"}`, "Link Speed: " + (t.eth_connected ? t.eth_speed + " Mbps" : "N/A"), "Duplex: " + (t.eth_connected ? t.eth_duplex ? window.i18n.t('network.full_duplex') : window.i18n.t('network.half_duplex') : "N/A"), "", `Uptime: ${o}h ${s}m`, "", t.wifi_connected || t.eth_connected ? "✓ Network operational" : "✗ Network disconnected"]; let c = 0; const d = setInterval(() => { c < i.length ? (e.textContent += i[c] + "\n", e.scrollTop = e.scrollHeight, c++) : clearInterval(d) }, 150) }).catch(t => { e.textContent += "Error fetching network status: " + t.message + "\n" }) }, closeDiagnostics() { const t = document.getElementById("network-diagnostics-modal"); t && (t.style.display = "none") }, exportDiagnostics() { const t = document.getElementById("diagnostics-output"), e = t ? t.innerText : "No diagnostics data found.", n = `Network Diagnostics Report\nGenerated: ${(new Date).toLocaleString()}\n\n${e}\n`, o = new Blob([n], { type: "text/plain" }), s = window.URL.createObjectURL(o), a = document.createElement("a"); a.href = s, a.download = `network-diagnostics-${Date.now()}.txt`, a.click(), window.URL.revokeObjectURL(s), AlertManager.add(window.i18n.t('network.exported_msg'), "success", 2e3) }, loadWiFiConfig() { console.log("[Network] Loading WiFi configuration"), fetch("/api/config/get?category=5").then(t => t.json()).then(t => { if (t.error) console.error("[Network] Config load error:", t), this.setStatus("station", "Error: " + t.error, "error"), this.setStatus("ap", "Error: " + t.error, "error"), AlertManager.add("Failed to load WiFi config: " + t.error, "error"); else { const e = t.config || {}; Utils.setValue("station-ssid", e.wifi_ssid || ""), Utils.setValue("station-pass", e.wifi_pass || ""), Utils.setValue("ap-ssid", e.wifi_ap_ssid || ""), Utils.setValue("ap-pass", e.wifi_ap_pass || ""); const ethEn = document.getElementById("eth-enabled"); if (ethEn) ethEn.checked = !!e.eth_en; const n = document.getElementById("ap-enabled"); if (n) { n.checked = !!e.wifi_ap_en; const t = document.getElementById("ap-settings-fields"); t && (t.style.display = n.checked ? "block" : "none") } this.setStatus("station", "", ""), this.setStatus("ap", "", "") } }).catch(t => { console.error("[Network] Failed to load WiFi config:", t), this.setStatus("station", "Load failed: " + t.message, "error"), this.setStatus("ap", "Load failed: " + t.message, "error"), AlertManager.add("Network error loading config", "error") }) }, async saveEthConfig() { const t = document.getElementById("eth-enabled").checked ? 1 : 0; try { await this.setConfig("eth_en", t), AlertManager.add("Ethernet settings saved. Reboot required.", "success") } catch (t) { AlertManager.add("Failed to save Ethernet settings", "error") } }, async saveStationConfig() { const t = document.getElementById("station-ssid").value, e = document.getElementById("station-pass").value; if (t) { this.setStatus("station", window.i18n.t('network.saving'), ""); try { await this.setConfig("wifi_ssid", t), e && await this.setConfig("wifi_pass", e), AlertManager.add("Station settings saved. Reconnecting...", "success"), this.setStatus("station", window.i18n.t('network.saved'), "success") } catch (t) { console.error("[Network] Save station failed:", t), AlertManager.add("Failed to save settings", "error"), this.setStatus("station", window.i18n.t('network.error'), "error") } } else AlertManager.add(window.i18n.t('network.ssid_required'), "error") }, async saveAPConfig() { const t = document.getElementById("ap-enabled").checked ? 1 : 0, e = document.getElementById("ap-ssid").value, n = document.getElementById("ap-pass").value; if (!t || e) if (t && n && n.length < 8) AlertManager.add(window.i18n.t('network.ap_pass_min_error'), "error"); else { this.setStatus("ap", window.i18n.t('network.saving'), ""); try { await this.setConfig("wifi_ap_en", t), t && (await this.setConfig("wifi_ap_ssid", e), n && await this.setConfig("wifi_ap_pass", n)), AlertManager.add("AP settings saved. Reboot required.", "success"), this.setStatus("ap", window.i18n.t('network.saved'), "success") } catch (t) { console.error("[Network] Save AP failed:", t), AlertManager.add("Failed to save AP settings", "error"), this.setStatus("ap", window.i18n.t('network.error'), "error") } } else AlertManager.add(window.i18n.t('network.ap_ssid_required'), "error") }, setConfig: (t, e) => fetch("/api/config/set", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category: 5, key: t, value: e }) }).then(t => t.json()).then(t => { if (!t.success) throw new Error(t.error || "Set failed"); return t }), togglePass(t) { const e = document.getElementById(t); if (e) { const isPass = e.type === "password"; e.type = isPass ? "text" : "password"; const btn = document.getElementById("toggle-" + t); if (btn) btn.textContent = isPass ? "🙈" : "👁️"; } }, setStatus(t, e, n) { const o = document.getElementById(`${t}-config-status`); o && (o.textContent = e, o.className = "card-status " + (n || "")) }, onStateChanged() { }, cleanup() { console.log("[Network] Cleaning up") } }, window.currentPageModule = NetworkModule;
+/**
+ * Network Module
+ * Handles WiFi and Ethernet configuration, status monitoring, and diagnostics.
+ */
+window.NetworkModule = {
+    latencyHistory: [],
+    maxHistoryLength: 100,
+    reconnectCount: 0,
+    connectionStartTime: Date.now(),
+    stats: { packetsSent: 0, packetsReceived: 0, errors: 0, dataReceived: 0 },
+
+    init() {
+        console.log("[Network] Initializing");
+        this.loadWiFiConfig();
+        this.updateNetworkStatus();
+        this.setupEventListeners();
+        this.startLatencyMonitoring();
+        window.addEventListener("state-changed", () => this.onStateChanged());
+    },
+
+    setupEventListeners() {
+        const apToggle = document.getElementById("ap-enabled");
+        if (apToggle) {
+            apToggle.addEventListener("change", (e) => {
+                const fields = document.getElementById("ap-settings-fields");
+                if (fields) fields.style.display = e.target.checked ? "block" : "none";
+            });
+        }
+
+        document.getElementById("save-eth-btn")?.addEventListener("click", () => this.saveEthConfig());
+        document.getElementById("save-station-btn")?.addEventListener("click", () => this.saveStationConfig());
+        document.getElementById("save-ap-btn")?.addEventListener("click", () => this.saveAPConfig());
+        document.getElementById("ping-btn")?.addEventListener("click", () => this.sendPing());
+        document.getElementById("reconnect-btn")?.addEventListener("click", () => this.reconnectDevice());
+
+        const toggleStation = document.getElementById("toggle-station-pass");
+        if (toggleStation) {
+            toggleStation.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.togglePass("station-pass");
+            });
+        }
+
+        const toggleAp = document.getElementById("toggle-ap-pass");
+        if (toggleAp) {
+            toggleAp.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.togglePass("ap-pass");
+            });
+        }
+
+        document.getElementById("network-test-btn")?.addEventListener("click", () => this.runDiagnostics());
+        document.getElementById("close-diagnostics")?.addEventListener("click", () => this.closeDiagnostics());
+        document.getElementById("export-diagnostics")?.addEventListener("click", () => this.exportDiagnostics());
+    },
+
+    updateNetworkStatus() {
+        this.updateWiFiStatus();
+        this.updateUptimeInfo();
+        // Clear existing intervals to avoid stacking if init called twice? Or just trust single init.
+        // Assuming single init.
+        setInterval(() => this.updateWiFiStatus(), 5000);
+        setInterval(() => this.updateUptimeInfo(), 1000);
+    },
+
+    updateWiFiStatus() {
+        window.API.get("network/status", null, { silent: true })
+            .then(data => {
+                const connectedText = window.i18n.t('network.connected');
+                const disconnectedText = window.i18n.t('network.disconnected');
+
+                // WiFi Status
+                const wifiStatusEl = document.getElementById("wifi-status");
+                if (wifiStatusEl) {
+                    wifiStatusEl.textContent = data.wifi_connected ? connectedText : disconnectedText;
+                    wifiStatusEl.style.color = data.wifi_connected ? "var(--color-optimal)" : "var(--color-critical)";
+                }
+                Utils.setText("wifi-ssid", data.wifi_ssid || "--");
+                Utils.setText("signal-dbm", (data.wifi_rssi || -100) + " dBm");
+
+                const qual = data.signal_quality || 0;
+                const signalBar = document.getElementById("signal-bar");
+                if (signalBar) {
+                    signalBar.style.width = qual + "%";
+                    signalBar.style.background = qual > 75 ? "var(--color-optimal)" : qual > 50 ? "var(--color-normal)" : qual > 25 ? "var(--color-warning)" : "var(--color-critical)";
+                }
+
+                let qualText = window.i18n.t('network.signal_poor');
+                if (qual > 75) qualText = window.i18n.t('network.signal_excellent');
+                else if (qual > 50) qualText = window.i18n.t('network.signal_good');
+                else if (qual > 25) qualText = window.i18n.t('network.signal_fair');
+                Utils.setText("signal-quality", qualText);
+
+                Utils.setText("ip-address", data.wifi_ip || "--");
+                Utils.setText("gateway-address", data.wifi_gateway || "--");
+                Utils.setText("mac-address", data.wifi_mac || "--");
+
+                // Ethernet Status
+                const ethConnected = data.eth_connected;
+                const ethStatusEl = document.getElementById("eth-status");
+                if (ethStatusEl) {
+                    ethStatusEl.textContent = ethConnected ? connectedText : disconnectedText;
+                    ethStatusEl.style.color = ethConnected ? "var(--color-optimal)" : "var(--color-critical)";
+                }
+                Utils.setText("eth-speed", ethConnected ? data.eth_speed + " Mbps" : "--");
+                Utils.setText("eth-duplex", ethConnected ? (data.eth_duplex ? window.i18n.t('network.full_duplex') : window.i18n.t('network.half_duplex')) : "--");
+                Utils.setText("eth-ip", data.eth_ip || "--");
+                Utils.setText("eth-gateway", data.eth_gateway || "--");
+                Utils.setText("eth-mac", data.eth_mac || "--");
+
+                // Uptime
+                if (data.uptime_ms) {
+                    const sec = Math.floor(data.uptime_ms / 1000);
+                    const h = Math.floor(sec / 3600);
+                    const m = Math.floor((sec % 3600) / 60);
+                    Utils.setText("device-uptime", `${h} h ${m} m`);
+                }
+            })
+            .catch(() => { /* Silent error */ });
+    },
+
+    updateLatency() {
+        const latency = SharedWebSocket.latency || 0;
+        if (latency > 0) {
+            this.latencyHistory.push(latency);
+            if (this.latencyHistory.length > this.maxHistoryLength) this.latencyHistory.shift();
+
+            Utils.setText("latency-ms", latency + " ms");
+
+            const min = Math.min(...this.latencyHistory);
+            const max = Math.max(...this.latencyHistory);
+
+            Utils.setText("latency-min", min + " ms");
+            Utils.setText("latency-max", max + " ms");
+        }
+    },
+
+    updateModbusStatus() {
+        const data = AppState.data;
+        const vfdConnected = data.vfd && data.vfd.connected;
+        const statusEl = document.getElementById("modbus-status");
+
+        if (statusEl) {
+            statusEl.textContent = vfdConnected ? window.i18n.t('network.connected') : window.i18n.t('network.disconnected');
+            statusEl.style.color = vfdConnected ? "var(--color-optimal)" : "var(--color-critical)";
+        }
+
+        const naEl = document.getElementById("vfd-na");
+        if (naEl) naEl.style.display = vfdConnected ? "none" : "inline";
+
+        Utils.setText("vfd-latency", "-- ms"); // Not implemented in backend yet
+        Utils.setText("modbus-last-read", new Date().toLocaleTimeString());
+    },
+
+    updateUptimeInfo() {
+        const diff = Date.now() - this.connectionStartTime;
+        const min = Math.floor(diff / 60000);
+
+        Utils.setText("connection-duration", min + " m");
+        Utils.setText("reconnect-count", this.reconnectCount);
+        Utils.setText("packets-sent", SharedWebSocket.packetsSent || 0);
+        Utils.setText("packets-received", SharedWebSocket.packetsReceived || 0);
+        Utils.setText("data-received", ((SharedWebSocket.dataReceivedBytes || 0) / 1024).toFixed(1) + " KB");
+    },
+
+    startLatencyMonitoring() {
+        setInterval(() => {
+            this.updateLatency();
+            this.updateModbusStatus();
+        }, 2000);
+    },
+
+    sendPing() {
+        AlertManager.add(window.i18n.t('network.pinging_msg'), "info");
+        SharedWebSocket.ping();
+    },
+
+    reconnectDevice() {
+        // Reconnect via API simply triggers backend to reset WiFi or similar? 
+        // Or is it literally just restarting the request?
+        // Original code: `fetch("/api/network/reconnect", { method: "POST" })`
+
+        window.API.post("network/reconnect", {}, "reconnect-btn")
+            .then(data => {
+                if (data.success) {
+                    AlertManager.add(window.i18n.t('network.reconnect_success'), "success", 2000);
+                    this.reconnectCount++;
+                } else {
+                    AlertManager.add(window.i18n.t('network.reconnect_failed'), "error");
+                }
+            })
+            .catch(() => AlertManager.add("Reconnect API failed", "error"));
+    },
+
+    runDiagnostics() {
+        const modal = document.getElementById("network-diagnostics-modal");
+        if (modal) modal.style.display = "flex";
+
+        const output = document.getElementById("diagnostics-output");
+        if (!output) return;
+
+        output.textContent = window.i18n.t('network.running_diag_msg') + "\n\n";
+
+        window.API.get("network/status")
+            .then(data => {
+                const sec = Math.floor((data.uptime_ms || 0) / 1000);
+                const h = Math.floor(sec / 3600);
+                const m = Math.floor((sec % 3600) / 60);
+                const qual = data.signal_quality;
+
+                let qualText = window.i18n.t('network.signal_poor');
+                if (qual > 75) qualText = window.i18n.t('network.signal_excellent');
+                else if (qual > 50) qualText = window.i18n.t('network.signal_good');
+                else if (qual > 25) qualText = window.i18n.t('network.signal_fair');
+
+                const reportLines = [
+                    "WiFi Status: " + (data.wifi_connected ? window.i18n.t('network.connected') : window.i18n.t('network.disconnected')),
+                    `SSID: ${data.wifi_ssid || "N/A"}`,
+                    `WiFi Signal: ${data.wifi_rssi} dBm (${qualText})`,
+                    `WiFi IP: ${data.wifi_ip || "N/A"}`,
+                    `WiFi MAC: ${data.wifi_mac || "N/A"}`,
+                    `Gateway: ${data.wifi_gateway || "N/A"}`,
+                    `DNS: ${data.wifi_dns || "N/A"}`,
+                    `Signal Quality: ${qual}%`,
+                    "",
+                    "Ethernet Status: " + (data.eth_connected ? window.i18n.t('network.connected') : window.i18n.t('network.disconnected')),
+                    `Ethernet IP: ${data.eth_ip || "N/A"}`,
+                    `Ethernet MAC: ${data.eth_mac || "N/A"}`,
+                    "Link Speed: " + (data.eth_connected ? data.eth_speed + " Mbps" : "N/A"),
+                    "Duplex: " + (data.eth_connected ? (data.eth_duplex ? window.i18n.t('network.full_duplex') : window.i18n.t('network.half_duplex')) : "N/A"),
+                    "",
+                    `Uptime: ${h}h ${m}m`,
+                    "",
+                    (data.wifi_connected || data.eth_connected) ? "✓ Network operational" : "✗ Network disconnected"
+                ];
+
+                let i = 0;
+                const typing = setInterval(() => {
+                    if (i < reportLines.length) {
+                        output.textContent += reportLines[i] + "\n";
+                        output.scrollTop = output.scrollHeight;
+                        i++;
+                    } else {
+                        clearInterval(typing);
+                    }
+                }, 150);
+            })
+            .catch(e => {
+                output.textContent += "Error fetching network status: " + e.message + "\n";
+            });
+    },
+
+    closeDiagnostics() {
+        const modal = document.getElementById("network-diagnostics-modal");
+        if (modal) modal.style.display = "none";
+    },
+
+    exportDiagnostics() {
+        const output = document.getElementById("diagnostics-output");
+        const text = output ? output.innerText : "No diagnostics data found.";
+        const content = `Network Diagnostics Report\nGenerated: ${(new Date()).toLocaleString()}\n\n${text}\n`;
+
+        const blob = new Blob([content], { type: "text/plain" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `network-diagnostics-${Date.now()}.txt`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        AlertManager.add(window.i18n.t('network.exported_msg'), "success", 2000);
+    },
+
+    loadWiFiConfig() {
+        console.log("[Network] Loading WiFi configuration");
+        window.API.get("config/get?category=5")
+            .then(data => {
+                if (data.error) {
+                    console.error("[Network] Config load error:", data);
+                    this.setStatus("station", "Error: " + data.error, "error");
+                    this.setStatus("ap", "Error: " + data.error, "error");
+                } else {
+                    const cfg = data.config || {};
+                    Utils.setValue("station-ssid", cfg.wifi_ssid || "");
+                    Utils.setValue("station-pass", cfg.wifi_pass || "");
+                    Utils.setValue("ap-ssid", cfg.wifi_ap_ssid || "");
+                    Utils.setValue("ap-pass", cfg.wifi_ap_pass || "");
+
+                    const ethEn = document.getElementById("eth-enabled");
+                    if (ethEn) ethEn.checked = !!cfg.eth_en;
+
+                    const apEn = document.getElementById("ap-enabled");
+                    if (apEn) {
+                        apEn.checked = !!cfg.wifi_ap_en;
+                        const fields = document.getElementById("ap-settings-fields");
+                        if (fields) fields.style.display = apEn.checked ? "block" : "none";
+                    }
+
+                    this.setStatus("station", "", "");
+                    this.setStatus("ap", "", "");
+                }
+            })
+            .catch(e => {
+                console.error("[Network] Failed to load WiFi config:", e);
+                this.setStatus("station", "Load failed", "error");
+                this.setStatus("ap", "Load failed", "error");
+            });
+    },
+
+    async saveEthConfig() {
+        const enabled = document.getElementById("eth-enabled").checked ? 1 : 0;
+        try {
+            await this.setConfig("eth_en", enabled);
+            AlertManager.add("Ethernet settings saved. Reboot required.", "success");
+        } catch (e) {
+            // API client already showed error
+        }
+    },
+
+    async saveStationConfig() {
+        const ssid = document.getElementById("station-ssid").value;
+        const pass = document.getElementById("station-pass").value;
+
+        if (ssid) {
+            this.setStatus("station", window.i18n.t('network.saving'), "");
+            try {
+                // Batch or sequential? Existing code did sequential await.
+                await this.setConfig("wifi_ssid", ssid);
+                if (pass) await this.setConfig("wifi_pass", pass);
+
+                AlertManager.add("Station settings saved. Reconnecting...", "success");
+                this.setStatus("station", window.i18n.t('network.saved'), "success");
+            } catch (e) {
+                console.error("[Network] Save station failed:", e);
+                this.setStatus("station", window.i18n.t('network.error'), "error");
+            }
+        } else {
+            AlertManager.add(window.i18n.t('network.ssid_required'), "error");
+        }
+    },
+
+    async saveAPConfig() {
+        const enabled = document.getElementById("ap-enabled").checked ? 1 : 0;
+        const ssid = document.getElementById("ap-ssid").value;
+        const pass = document.getElementById("ap-pass").value;
+
+        if (!enabled || ssid) {
+            if (enabled && pass && pass.length < 8) {
+                AlertManager.add(window.i18n.t('network.ap_pass_min_error'), "error");
+            } else {
+                this.setStatus("ap", window.i18n.t('network.saving'), "");
+                try {
+                    await this.setConfig("wifi_ap_en", enabled);
+                    if (enabled) {
+                        await this.setConfig("wifi_ap_ssid", ssid);
+                        if (pass) await this.setConfig("wifi_ap_pass", pass);
+                    }
+
+                    AlertManager.add("AP settings saved. Reboot required.", "success");
+                    this.setStatus("ap", window.i18n.t('network.saved'), "success");
+                } catch (e) {
+                    console.error("[Network] Save AP failed:", e);
+                    this.setStatus("ap", window.i18n.t('network.error'), "error");
+                }
+            }
+        } else {
+            AlertManager.add(window.i18n.t('network.ap_ssid_required'), "error");
+        }
+    },
+
+    setConfig(key, value) {
+        return window.API.post("config/set", { category: 5, key, value })
+            .then(data => {
+                if (!data.success) throw new Error(data.error || "Set failed");
+                return data;
+            });
+    },
+
+    togglePass(id) {
+        const el = document.getElementById(id);
+        if (el) {
+            const isPass = el.type === "password";
+            el.type = isPass ? "text" : "password";
+            const btn = document.getElementById("toggle-" + id);
+            if (btn) btn.textContent = isPass ? "🙈" : "👁️";
+        }
+    },
+
+    setStatus(id, text, type) {
+        const el = document.getElementById(`${id}-config-status`);
+        if (el) {
+            el.textContent = text;
+            el.className = "card-status " + (type || "");
+        }
+    },
+
+    onStateChanged() {
+        // Handle global state updates if needed (e.g. from websocket)
+    },
+
+    cleanup() {
+        console.log("[Network] Cleaning up");
+    }
+};
+
+window.currentPageModule = NetworkModule;

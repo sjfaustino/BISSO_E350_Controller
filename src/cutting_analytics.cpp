@@ -291,45 +291,45 @@ void cuttingResetStats(void) {
 
 void cuttingPrintDiagnostics(void) {
     serialLoggerLock();
-    Serial.println("\n[CUTTING] === Stone Cutting Analytics ===");
-    Serial.printf("Status:        %s\n", analytics.enabled ? "ENABLED" : "DISABLED");
-    Serial.printf("Updates:       %lu\n", (unsigned long)analytics.update_count);
+    logPrintln("\n[CUTTING] === Stone Cutting Analytics ===");
+    logPrintf("Status:        %s\n", analytics.enabled ? "ENABLED" : "DISABLED");
+    logPrintf("Updates:       %lu\n", (unsigned long)analytics.update_count);
     
-    Serial.println("\n[Real-Time]");
-    Serial.printf("Current:       %.2f A (avg: %.2f, peak: %.2f)\n",
+    logPrintln("\n[Real-Time]");
+    logPrintf("Current:       %.2f A (avg: %.2f, peak: %.2f)\n",
                   analytics.current_amps, analytics.avg_current_amps, analytics.peak_current_amps);
-    Serial.printf("Power:         %.0f W (avg: %.0f, peak: %.0f)\n",
+    logPrintf("Power:         %.0f W (avg: %.0f, peak: %.0f)\r\n",
                   analytics.power_watts, analytics.avg_power_watts, analytics.peak_power_watts);
-    Serial.printf("Feed Rate:     %.1f mm/s\n", analytics.feed_rate_mms);
-    Serial.printf("MRR:           %.2f mm³/s\n", analytics.mrr_mm3s);
-    Serial.printf("SCE:           %.1f J/mm³ (avg: %.1f)\n", 
+    logPrintf("Feed Rate:     %.1f mm/s\r\n", analytics.feed_rate_mms);
+    logPrintf("MRR:           %.2f mm³/s\r\n", analytics.mrr_mm3s);
+    logPrintf("SCE:           %.1f J/mm³ (avg: %.1f)\r\n", 
                   analytics.sce_jmm3, analytics.avg_sce_jmm3);
     
-    Serial.println("\n[Blade Health]");
-    Serial.printf("Baseline SCE:  %.1f J/mm³\n", analytics.baseline_sce);
-    Serial.printf("Deviation:     %.1f%%\n", analytics.sce_deviation_pct);
-    Serial.printf("Alert:         %s\n", analytics.blade_alert ? "BLADE WORN!" : "OK");
+    logPrintln("\n[Blade Health]");
+    logPrintf("Baseline SCE:  %.1f J/mm³\r\n", analytics.baseline_sce);
+    logPrintf("Deviation:     %.1f%%\r\n", analytics.sce_deviation_pct);
+    logPrintf("Alert:         %s\r\n", analytics.blade_alert ? "BLADE WORN!" : "OK");
     
-    Serial.println("\n[Configuration]");
-    Serial.printf("Voltage:       %.0f V\n", analytics.config.motor_voltage_v);
-    Serial.printf("Efficiency:    %.0f%%\n", analytics.config.motor_efficiency * 100.0f);
-    Serial.printf("Blade Width:   %.1f mm\n", analytics.config.blade_width_mm);
-    Serial.printf("Cut Depth:     %.1f mm\n", analytics.config.cut_depth_mm);
+    logPrintln("\n[Configuration]");
+    logPrintf("Voltage:       %.0f V\r\n", analytics.config.motor_voltage_v);
+    logPrintf("Efficiency:    %.0f%%\r\n", analytics.config.motor_efficiency * 100.0f);
+    logPrintf("Blade Width:   %.1f mm\r\n", analytics.config.blade_width_mm);
+    logPrintf("Cut Depth:     %.1f mm\r\n", analytics.config.cut_depth_mm);
     
     if (analytics.session_active || analytics.session.start_time_ms > 0) {
-        Serial.println("\n[Session]");
-        Serial.printf("Active:        %s\n", analytics.session_active ? "YES" : "NO");
+        logPrintln("\n[Session]");
+        logPrintf("Active:        %s\r\n", analytics.session_active ? "YES" : "NO");
         uint32_t end_ts = analytics.session_active ? millis() : analytics.session.end_time_ms;
         float duration_s = (end_ts - analytics.session.start_time_ms) / 1000.0f;
-        Serial.printf("Duration:      %.1f s\n", duration_s);
-        Serial.printf("Total Energy:  %.1f J (%.3f kWh)\n", 
+        logPrintf("Duration:      %.1f s\r\n", duration_s);
+        logPrintf("Total Energy:  %.1f J (%.3f kWh)\r\n", 
                       analytics.session.total_energy_joules,
                       analytics.session.total_energy_joules / 3600000.0f);
-        Serial.printf("Material Cut:  %.1f mm³\n", analytics.session.total_material_mm3);
-        Serial.printf("Session SCE:   %.1f J/mm³\n", analytics.session.avg_sce);
+        logPrintf("Material Cut:  %.1f mm³\r\n", analytics.session.total_material_mm3);
+        logPrintf("Session SCE:   %.1f J/mm³\r\n", analytics.session.avg_sce);
     }
     
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }
 

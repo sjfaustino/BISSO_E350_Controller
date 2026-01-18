@@ -166,6 +166,7 @@ void watchdogFeed(const char* task_name) {
       wdt_tasks[i].last_tick = millis();
       wdt_tasks[i].tick_count++;
       wdt_tasks[i].fed_this_cycle = true;
+      wdt_stats.total_ticks++;
       
       if (wdt_tasks[i].consecutive_misses > 0) {
         wdt_stats.automatic_recoveries++;
@@ -222,9 +223,9 @@ bool watchdogRecoveredFromTimeout() {
 // ============================================================================
 
 void watchdogShowStatus() {
-  logPrintln("\n=== WATCHDOG STATUS ===");
-  logPrintf("State: %s\n", wdt_enabled ? "[ENABLED]" : "[DISABLED]");
-  logPrintf("Timeout: %d sec\n", WATCHDOG_TIMEOUT_SEC);
+  logPrintln("\r\n=== WATCHDOG STATUS ===");
+  logPrintf("State: %s\r\n", wdt_enabled ? "[ENABLED]" : "[DISABLED]");
+  logPrintf("Timeout: %d sec\r\n", WATCHDOG_TIMEOUT_SEC);
   
   const char* status_str = "[UNKNOWN]";
   switch (watchdogGetStatus()) {
@@ -234,16 +235,16 @@ void watchdogShowStatus() {
     case WDT_STATUS_RECOVERY_ATTEMPTED: status_str = "[WARN] RECOVERING"; break;
     case WDT_STATUS_DISABLED: status_str = "[DISABLED]"; break;
   }
-  logPrintf("Status: %s\n", status_str);
+  logPrintf("Status: %s\r\n", status_str);
   
-  logPrintf("Last Reset: %s\n", resetReasonString(last_reset_reason));
-  logPrintf("Total Resets: %lu\n", (unsigned long)wdt_stats.reset_count);
-  logPrintf("Timeouts: %lu\n", (unsigned long)wdt_stats.timeouts_detected);
+  logPrintf("Last Reset: %s\r\n", resetReasonString(last_reset_reason));
+  logPrintf("Total Resets: %lu\r\n", (unsigned long)wdt_stats.reset_count);
+  logPrintf("Timeouts: %lu\r\n", (unsigned long)wdt_stats.timeouts_detected);
   logPrintln("");
 }
 
 void watchdogShowTasks() {
-  logPrintln("\n=== MONITORED TASKS ===");
+  logPrintln("\r\n=== MONITORED TASKS ===");
   logPrintln("Task                  Ticks     Missed   Age(ms)  Status");
   logPrintln("------------------------------------------------------");
   
@@ -255,7 +256,7 @@ void watchdogShowTasks() {
     if (age < (WATCHDOG_TIMEOUT_SEC * 1000 / 2)) status_str = "[OK]";
     else if (age < WATCHDOG_TIMEOUT_SEC * 1000) status_str = "[WARN]";
     
-    logPrintf("%-20s  %-8lu  %-8lu %-8lu %s\n", 
+    logPrintf("%-20s  %-8lu  %-8lu %-8lu %s\r\n", 
         wdt_tasks[i].task_name, 
         (unsigned long)wdt_tasks[i].tick_count, 
         (unsigned long)wdt_tasks[i].missed_ticks, 
@@ -266,13 +267,13 @@ void watchdogShowTasks() {
 }
 
 void watchdogShowStats() {
-  logPrintln("\n=== WATCHDOG STATISTICS ===");
-  logPrintf("Timeouts: %lu\n", (unsigned long)wdt_stats.timeouts_detected);
-  logPrintf("Recoveries: %lu\n", (unsigned long)wdt_stats.automatic_recoveries);
-  logPrintf("Task Resets: %lu\n", (unsigned long)wdt_stats.task_resets);
-  logPrintf("Sys Resets: %lu\n", (unsigned long)wdt_stats.system_resets);
-  logPrintf("Total Feeds: %lu\n", (unsigned long)wdt_stats.total_ticks);
-  logPrintf("Missed Ticks: %lu\n", (unsigned long)wdt_stats.missed_ticks);
+  logPrintln("\r\n=== WATCHDOG STATISTICS ===");
+  logPrintf("Timeouts: %lu\r\n", (unsigned long)wdt_stats.timeouts_detected);
+  logPrintf("Recoveries: %lu\r\n", (unsigned long)wdt_stats.automatic_recoveries);
+  logPrintf("Task Resets: %lu\r\n", (unsigned long)wdt_stats.task_resets);
+  logPrintf("Sys Resets: %lu\r\n", (unsigned long)wdt_stats.system_resets);
+  logPrintf("Total Feeds: %lu\r\n", (unsigned long)wdt_stats.total_ticks);
+  logPrintf("Missed Ticks: %lu\r\n", (unsigned long)wdt_stats.missed_ticks);
   logPrintln("");
 }
 

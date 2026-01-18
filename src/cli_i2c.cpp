@@ -444,8 +444,8 @@ void cmd_i2c_monitor(int argc, char** argv) {
         watchdogFeed("CLI");
         
         // Check for Ctrl+C (0x03)
-        if (Serial.available() > 0 && Serial.peek() == 0x03) {
-            Serial.read(); // Consume 0x03
+        if (CLI_SERIAL.available() > 0 && CLI_SERIAL.peek() == 0x03) {
+            CLI_SERIAL.read(); // Consume 0x03
             logInfo("\n[I2C] Monitor aborted by user");
             break;
         }

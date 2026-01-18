@@ -40,6 +40,12 @@ void logRateLimiterInit();
 // Returns true if fault should be logged, false if suppressed
 bool logRateLimiterCheck(uint16_t fault_id, int16_t sub_id);
 
+// Enable or disable the rate limiter (useful for stress tests)
+void logRateLimiterSetEnabled(bool enabled);
+
+// Check if rate limiter is currently enabled
+bool logRateLimiterIsEnabled();
+
 // Update rate limit for a specific fault type (default is 5s)
 // Use for high-frequency faults that need stricter limits
 void logRateLimiterSetInterval(uint16_t fault_id, uint32_t interval_ms);

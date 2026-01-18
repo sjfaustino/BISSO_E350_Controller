@@ -179,7 +179,7 @@ void encoderDeviationClearAll() {
 
 void encoderDeviationDiagnostics() {
     serialLoggerLock();
-    Serial.println("\n[ENCODER_DEV] === Deviation Detection Status ===");
+    logPrintln("\n[ENCODER_DEV] === Deviation Detection Status ===");
 
     bool has_any_deviation = false;
 
@@ -187,20 +187,20 @@ void encoderDeviationDiagnostics() {
         const encoder_deviation_t* dev = &deviation_data[axis];
         const char* axis_name[] = {"X", "Y", "Z", "A"};
 
-        Serial.printf("\nAxis %s:\n", axis_name[axis]);
-        Serial.printf("  Status: %s\n", encoderDeviationStatusToString(dev->status));
-        Serial.printf("  Expected: %ld, Actual: %ld\n", (long)dev->expected_position, (long)dev->actual_position);
-        Serial.printf("  Deviation: %ld counts (+/-%ld max)\n", (long)dev->deviation_counts, (long)dev->max_deviation);
-        Serial.printf("  Events: %lu deviations, %lu alarms\n", (unsigned long)dev->deviation_count, (unsigned long)dev->alarm_count);
+        logPrintf("\r\nAxis %s:\r\n", axis_name[axis]);
+        logPrintf("  Status: %s\r\n", encoderDeviationStatusToString(dev->status));
+        logPrintf("  Expected: %ld, Actual: %ld\r\n", (long)dev->expected_position, (long)dev->actual_position);
+        logPrintf("  Deviation: %ld counts (+/-%ld max)\r\n", (long)dev->deviation_counts, (long)dev->max_deviation);
+        logPrintf("  Events: %lu deviations, %lu alarms\r\n", (unsigned long)dev->deviation_count, (unsigned long)dev->alarm_count);
 
         if (dev->status != AXIS_OK) {
             has_any_deviation = true;
-            Serial.printf("  [ALERT] Axis has active deviation condition!\n");
+            logPrintf("  [ALERT] Axis has active deviation condition!\r\n");
         }
     }
 
     if (!has_any_deviation) {
-        Serial.println("\n[ENCODER_DEV] All axes tracking normally");
+        logPrintln("\n[ENCODER_DEV] All axes tracking normally");
     }
     serialLoggerUnlock();
 }

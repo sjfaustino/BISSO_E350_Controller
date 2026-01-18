@@ -256,29 +256,29 @@ void loadManagerPrintStatus() {
     load_status_t status = loadManagerGetStatus();
 
     serialLoggerLock();
-    Serial.println("\n[LOAD_MGR] === System Load Status ===");
-    Serial.printf("Current State: %s\n", loadManagerGetStateString(status.current_state));
-    Serial.printf("CPU Usage: %u%%\n", status.current_cpu_percent);
-    Serial.printf("Time in State: %lu ms\n", (unsigned long)status.time_in_state_ms);
+    logPrintln("\r\n[LOAD_MGR] === System Load Status ===");
+    logPrintf("Current State: %s\r\n", loadManagerGetStateString(status.current_state));
+    logPrintf("CPU Usage: %u%%\r\n", status.current_cpu_percent);
+    logPrintf("Time in State: %lu ms\r\n", (unsigned long)status.time_in_state_ms);
 
-    Serial.println("\nThresholds:");
-    Serial.printf("  Normal    < %u%% CPU\n", LOAD_THRESHOLD_NORMAL);
-    Serial.printf("  Elevated  %u-%u%% CPU (reduce refresh rates 50%%)\n",
+    logPrintln("\r\nThresholds:");
+    logPrintf("  Normal    < %u%% CPU\r\n", LOAD_THRESHOLD_NORMAL);
+    logPrintf("  Elevated  %u-%u%% CPU (reduce refresh rates 50%%)\r\n",
                  LOAD_THRESHOLD_NORMAL, LOAD_THRESHOLD_ELEVATED);
-    Serial.printf("  High      %u-%u%% CPU (suspend non-essential tasks)\n",
+    logPrintf("  High      %u-%u%% CPU (suspend non-essential tasks)\r\n",
                  LOAD_THRESHOLD_ELEVATED, LOAD_THRESHOLD_HIGH);
-    Serial.printf("  Critical  > %u%% CPU (emergency shutdown in 30s)\n", LOAD_THRESHOLD_HIGH);
+    logPrintf("  Critical  > %u%% CPU (emergency shutdown in 30s)\r\n", LOAD_THRESHOLD_HIGH);
 
-    Serial.println("\nActions by State:");
-    Serial.println("  NORMAL:    All subsystems active");
-    Serial.println("  ELEVATED:  Reduce LCD refresh, increase telemetry interval");
-    Serial.println("  HIGH:      Suspend LCD/Monitor/Telemetry");
-    Serial.println("  CRITICAL:  Safety-only, E-STOP after 30s");
+    logPrintln("\nActions by State:");
+    logPrintln("  NORMAL:    All subsystems active");
+    logPrintln("  ELEVATED:  Reduce LCD refresh, increase telemetry interval");
+    logPrintln("  HIGH:      Suspend LCD/Monitor/Telemetry");
+    logPrintln("  CRITICAL:  Safety-only, E-STOP after 30s");
 
     if (status.emergency_estop_initiated) {
-        Serial.println("\n[!] EMERGENCY E-STOP HAS BEEN TRIGGERED");
+        logPrintln("\n[!] EMERGENCY E-STOP HAS BEEN TRIGGERED");
     }
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }

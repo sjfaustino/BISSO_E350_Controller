@@ -25,6 +25,10 @@
 #include "task_manager.h"
 #include "system_tuning.h"
 #include <Arduino.h>
+#include "serial_logger.h"
+#include "load_manager.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 // ============================================================================
 // TEST HELPERS
@@ -56,7 +60,7 @@ void tearDown(void) {
  * Expected: No crashes, no deadlocks, graceful queue handling
  */
 void test_concurrent_motion_commands(void) {
-  Serial.println("\n[TEST] Starting concurrent motion command test...");
+  logPrintln("\n[TEST] Starting concurrent motion command test...");
 
   uint32_t start_time = millis();
   uint32_t commands_sent = 0;
@@ -82,9 +86,9 @@ void test_concurrent_motion_commands(void) {
 
   uint32_t duration_ms = millis() - start_time;
 
-  Serial.printf("[TEST] Completed in %lu ms\n", (unsigned long)duration_ms);
-  Serial.printf("[TEST] Commands sent: %lu\n", (unsigned long)commands_sent);
-  Serial.printf("[TEST] Commands rejected: %lu\n", (unsigned long)commands_rejected);
+  logPrintf("[TEST] Completed in %lu ms\n", (unsigned long)duration_ms);
+  logPrintf("[TEST] Commands sent: %lu\n", (unsigned long)commands_sent);
+  logPrintf("[TEST] Commands rejected: %lu\n", (unsigned long)commands_rejected);
 
   // Verify system still operational
   TEST_ASSERT_FALSE_MESSAGE(motionIsEmergencyStopped(),
@@ -107,7 +111,7 @@ void test_concurrent_motion_commands(void) {
  * Expected: Ring buffer prevents data loss, no crashes
  */
 void test_fault_queue_overflow(void) {
-  Serial.println("\n[TEST] Starting fault queue overflow test...");
+  logPrintln("\n[TEST] Starting fault queue overflow test...");
 
   // Clear existing faults
   faultClearHistory();
@@ -123,13 +127,13 @@ void test_fault_queue_overflow(void) {
 
   uint32_t duration_ms = millis() - start_time;
 
-  Serial.printf("[TEST] Generated 200 faults in %lu ms\n", (unsigned long)duration_ms);
-  Serial.printf("[TEST] Fault rate: %lu faults/sec\n",
+  logPrintf("[TEST] Generated 200 faults in %lu ms\n", (unsigned long)duration_ms);
+  logPrintf("[TEST] Fault rate: %lu faults/sec\n",
                 (unsigned long)(200000 / duration_ms));
 
   // Verify ring buffer captured faults
   uint8_t ring_count = faultGetRingBufferEntryCount();
-  Serial.printf("[TEST] Ring buffer entries: %u\n", ring_count);
+  logPrintf("[TEST] Ring buffer entries: %u\n", ring_count);
 
   TEST_ASSERT_GREATER_THAN_MESSAGE(0, ring_count,
                                   "Ring buffer should contain faults");
@@ -137,7 +141,7 @@ void test_fault_queue_overflow(void) {
   // Verify fault storm detection activated
   // (NVS writes should be throttled to 10s cooldown)
 
-  Serial.println("[TEST] Fault overflow handling validated");
+  logPrintln("[TEST] Fault overflow handling validated");
 }
 
 // ============================================================================
@@ -152,7 +156,7 @@ void test_fault_queue_overflow(void) {
  * Expected: Motion command returns false, no deadlock, system recovers
  */
 void test_mutex_timeout_recovery(void) {
-  Serial.println("\n[TEST] Starting mutex timeout recovery test...");
+  logPrintln("\n[TEST] Starting mutex timeout recovery test...");
 
   // Acquire motion mutex from test context
   SemaphoreHandle_t motion_mutex = taskGetMotionMutex();
@@ -161,12 +165,12 @@ void test_mutex_timeout_recovery(void) {
   BaseType_t taken = xSemaphoreTake(motion_mutex, portMAX_DELAY);
   TEST_ASSERT_EQUAL_MESSAGE(pdTRUE, taken, "Should acquire motion mutex");
 
-  Serial.println("[TEST] Mutex held - attempting motion command (should timeout)...");
+  logPrintln("[TEST] Mutex held - attempting motion command (should timeout)...");
 
   // Try motion command - should timeout gracefully
   bool success = motionMoveAbsolute(10.0f, 10.0f, 10.0f, 0, 100.0f);
 
-  Serial.printf("[TEST] Motion command result: %s\n", success ? "SUCCESS" : "TIMEOUT");
+  logPrintf("[TEST] Motion command result: %s\n", success ? "SUCCESS" : "TIMEOUT");
 
   // Release mutex
   xSemaphoreGive(motion_mutex);
@@ -179,7 +183,7 @@ void test_mutex_timeout_recovery(void) {
   TEST_ASSERT_FALSE_MESSAGE(motionIsEmergencyStopped(),
                             "System should not E-STOP on mutex timeout");
 
-  Serial.println("[TEST] Mutex timeout recovery validated");
+  logPrintln("[TEST] Mutex timeout recovery validated");
 }
 
 // ============================================================================
@@ -194,15 +198,15 @@ void test_mutex_timeout_recovery(void) {
  * Expected: No stack overflows, warnings if thresholds approached
  */
 void test_stack_exhaustion_detection(void) {
-  Serial.println("\n[TEST] Starting stack exhaustion detection test...");
+  logPrintln("\n[TEST] Starting stack exhaustion detection test...");
 
   // Get initial stack states
   int stats_count = taskGetStatsCount();
   task_stats_t* stats = taskGetStatsArray();
 
-  Serial.println("[TEST] Current stack watermarks:");
-  Serial.println("Task                  | Stack Free (words) | Status");
-  Serial.println("---------------------|-------------------|--------");
+  logPrintln("[TEST] Current stack watermarks:");
+  logPrintln("Task                  | Stack Free (words) | Status");
+  logPrintln("---------------------|-------------------|--------");
 
   bool all_stacks_safe = true;
 
@@ -218,7 +222,7 @@ void test_stack_exhaustion_detection(void) {
         status = "WARNING";
       }
 
-      Serial.printf("%-20s | %17lu | %s\n",
+      logPrintf("%-20s | %17lu | %s\n",
                     stats[i].name,
                     (unsigned long)high_water,
                     status);
@@ -228,7 +232,7 @@ void test_stack_exhaustion_detection(void) {
   TEST_ASSERT_TRUE_MESSAGE(all_stacks_safe,
                           "All task stacks should be above critical threshold");
 
-  Serial.println("[TEST] Stack exhaustion detection validated");
+  logPrintln("[TEST] Stack exhaustion detection validated");
 }
 
 // ============================================================================
@@ -243,16 +247,16 @@ void test_stack_exhaustion_detection(void) {
  * Expected: All critical tasks monitored, no timeouts detected
  */
 void test_watchdog_resilience(void) {
-  Serial.println("\n[TEST] Starting watchdog resilience test...");
+  logPrintln("\n[TEST] Starting watchdog resilience test...");
 
   watchdog_stats_t* stats = watchdogGetStats();
   TEST_ASSERT_NOT_NULL_MESSAGE(stats, "Watchdog stats should be available");
 
-  Serial.printf("[TEST] Watchdog status:\n");
-  Serial.printf("  Total ticks: %lu\n", (unsigned long)stats->total_ticks);
-  Serial.printf("  Missed ticks: %lu\n", (unsigned long)stats->missed_ticks);
-  Serial.printf("  Timeouts detected: %lu\n", (unsigned long)stats->timeouts_detected);
-  Serial.printf("  Uptime: %lu seconds\n", (unsigned long)stats->uptime_sec);
+  logPrintf("[TEST] Watchdog status:\n");
+  logPrintf("  Total ticks: %lu\n", (unsigned long)stats->total_ticks);
+  logPrintf("  Missed ticks: %lu\n", (unsigned long)stats->missed_ticks);
+  logPrintf("  Timeouts detected: %lu\n", (unsigned long)stats->timeouts_detected);
+  logPrintf("  Uptime: %lu seconds\n", (unsigned long)stats->uptime_sec);
 
   // Verify watchdog is active
   TEST_ASSERT_GREATER_THAN_MESSAGE(0, stats->total_ticks,
@@ -262,7 +266,7 @@ void test_watchdog_resilience(void) {
   TEST_ASSERT_EQUAL_MESSAGE(0, stats->timeouts_detected,
                             "No watchdog timeouts should occur in normal operation");
 
-  Serial.println("[TEST] Watchdog resilience validated");
+  logPrintln("[TEST] Watchdog resilience validated");
 }
 
 // ============================================================================
@@ -280,20 +284,78 @@ void test_watchdog_resilience(void) {
  * Actual I2C fault injection would require hardware manipulation.
  */
 void test_i2c_recovery_mechanism(void) {
-  Serial.println("\n[TEST] Starting I2C recovery mechanism test...");
+  logPrintln("\n[TEST] Starting I2C recovery mechanism test...");
 
   // Check I2C communication health
   bool shadow_dirty = elboIsShadowRegisterDirty();
   uint32_t timeout_count = elboGetMutexTimeoutCount();
 
-  Serial.printf("[TEST] I2C Health Status:\n");
-  Serial.printf("  Shadow register dirty: %s\n", shadow_dirty ? "YES" : "NO");
-  Serial.printf("  Mutex timeout count: %lu\n", (unsigned long)timeout_count);
+  logPrintf("[TEST] I2C Health Status:\n");
+  logPrintf("  Shadow register dirty: %s\n", shadow_dirty ? "YES" : "NO");
+  logPrintf("  Mutex timeout count: %lu\n", (unsigned long)timeout_count);
 
   TEST_ASSERT_FALSE_MESSAGE(shadow_dirty,
                             "Shadow register should be synchronized");
 
-  Serial.println("[TEST] I2C recovery mechanism validated");
+  logPrintln("[TEST] I2C recovery mechanism validated");
+}
+
+// ============================================================================
+// TEST 7: LOGGING & LOAD RESILIENCE
+// ============================================================================
+
+volatile bool g_stress_logging_active = false;
+volatile uint32_t g_stress_log_count = 0;
+
+static void logging_stress_task(void* pvParameters) {
+    int task_id = (int)pvParameters;
+    while (g_stress_logging_active) {
+        logPrintf("[STRESS:%d] Concurrent log message #%lu from Core %d\n", 
+                  task_id, (unsigned long)g_stress_log_count++, xPortGetCoreID());
+        vTaskDelay(pdMS_TO_TICKS(1)); // Maximum churn
+    }
+    vTaskDelete(NULL);
+}
+
+/**
+ * @test test_logging_load_resilience
+ * @brief Validates logging stability during Load Manager state transitions
+ *
+ * Scenario: 4 concurrent tasks flooding the logger while Load Manager cycles states
+ * Expected: No deadlocks, no watchdog timeouts, correct state transitions
+ */
+void test_logging_load_resilience(void) {
+    logPrintln("\n[TEST] Starting Logging & Load Resilience test...");
+    
+    g_stress_logging_active = true;
+    g_stress_log_count = 0;
+    
+    // Create 4 stress tasks (2 on each core)
+    xTaskCreatePinnedToCore(logging_stress_task, "LogSt0", 2048, (void*)0, 1, NULL, 0);
+    xTaskCreatePinnedToCore(logging_stress_task, "LogSt1", 2048, (void*)1, 1, NULL, 1);
+    xTaskCreatePinnedToCore(logging_stress_task, "LogSt2", 2048, (void*)2, 2, NULL, 0);
+    xTaskCreatePinnedToCore(logging_stress_task, "LogSt3", 2048, (void*)3, 2, NULL, 1);
+    
+    logPrintln("[TEST] Logging storm active - cycling Load Manager states...");
+    
+    load_state_t states[] = {LOAD_STATE_NORMAL, LOAD_STATE_ELEVATED, LOAD_STATE_HIGH, LOAD_STATE_CRITICAL, LOAD_STATE_NORMAL};
+    
+    for (int i = 0; i < 5; i++) {
+        logPrintf("[TEST] Forcing state: %s\n", loadManagerGetStateString(states[i]));
+        loadManagerForceState(states[i]);
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Maintain state for 1 second
+        
+        // Verify we haven't crashed or E-STOPped
+        TEST_ASSERT_FALSE_MESSAGE(motionIsEmergencyStopped(), "System should stay active during load transitions");
+    }
+    
+    g_stress_logging_active = false;
+    vTaskDelay(pdMS_TO_TICKS(100)); // Grace period for tasks to terminate
+    
+    logPrintf("[TEST] Total stress logs generated: %lu\n", (unsigned long)g_stress_log_count);
+    TEST_ASSERT_GREATER_THAN(100, g_stress_log_count);
+    
+    logPrintln("[TEST] Logging & Load Resilience validated");
 }
 
 // ============================================================================
@@ -309,6 +371,7 @@ void runStressTests(void) {
   RUN_TEST(test_stack_exhaustion_detection);
   RUN_TEST(test_watchdog_resilience);
   RUN_TEST(test_i2c_recovery_mechanism);
+  RUN_TEST(test_logging_load_resilience);
 
   UNITY_END();
 }
@@ -324,15 +387,16 @@ void runStressTests(void) {
  */
 void cmd_stress_test(int argc, char** argv) {
   if (argc < 2) {
-    Serial.println("\n[STRESS TEST] Usage: test stress [test|all]");
-    Serial.println("Available tests:");
-    Serial.println("  concurrent  - Concurrent motion command stress");
-    Serial.println("  faults      - Fault queue overflow");
-    Serial.println("  mutex       - Mutex timeout recovery");
-    Serial.println("  stack       - Stack exhaustion detection");
-    Serial.println("  watchdog    - Watchdog resilience");
-    Serial.println("  i2c         - I2C recovery mechanism");
-    Serial.println("  all         - Run complete test suite");
+    logPrintln("\n[STRESS TEST] Usage: test stress [test|all]");
+    logPrintln("Available tests:");
+    logPrintln("  concurrent  - Concurrent motion command stress");
+    logPrintln("  faults      - Fault queue overflow");
+    logPrintln("  mutex       - Mutex timeout recovery");
+    logPrintln("  stack       - Stack exhaustion detection");
+    logPrintln("  watchdog    - Watchdog resilience");
+    logPrintln("  i2c         - I2C recovery mechanism");
+    logPrintln("  load        - Logging & Load resilience");
+    logPrintln("  all         - Run complete test suite");
     return;
   }
 
@@ -362,7 +426,11 @@ void cmd_stress_test(int argc, char** argv) {
     UNITY_BEGIN();
     RUN_TEST(test_i2c_recovery_mechanism);
     UNITY_END();
+  } else if (strcmp(argv[1], "load") == 0) {
+    UNITY_BEGIN();
+    RUN_TEST(test_logging_load_resilience);
+    UNITY_END();
   } else {
-    Serial.printf("[STRESS TEST] Unknown test: %s\n", argv[1]);
+    logPrintf("[STRESS TEST] Unknown test: %s\n", argv[1]);
   }
 }

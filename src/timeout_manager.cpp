@@ -85,17 +85,17 @@ void timeoutResetAll() {
 
 void timeoutShowDiagnostics() {
   serialLoggerLock();
-  Serial.println("\n=== TIMEOUT DIAGNOSTICS ===");
-  Serial.printf("Active: %d / %d\n", active_timeout_count, MAX_TIMEOUT_HANDLES);
+  logPrintln("\n=== TIMEOUT DIAGNOSTICS ===");
+  logPrintf("Active: %d / %d\r\n", active_timeout_count, MAX_TIMEOUT_HANDLES);
   
   for (int i = 0; i < MAX_TIMEOUT_HANDLES; i++) {
     if (timeout_handles[i].active) {
-        Serial.printf("  [%d] %s: Elapsed=%lu ms | Remaining=%lu ms\n",
+        logPrintf("  [%d] %s: Elapsed=%lu ms | Remaining=%lu ms\r\n",
             i, timeout_names[timeout_handles[i].type],
             (unsigned long)timeoutElapsed(&timeout_handles[i]),
             (unsigned long)timeoutRemaining(&timeout_handles[i]));
     }
   }
-  Serial.println();
+  logPrintln("");
   serialLoggerUnlock();
 }

@@ -19,6 +19,7 @@
 static Preferences fault_prefs;
 static bool estop_active = false;
 static bool estop_recovery_requested = false;
+static bool fault_log_silent = false;
 
 #define FAULT_LOG_NAMESPACE "bisso_faults"
 #define FAULT_LOG_VERSION 2 // Increment to force migration/clear
@@ -195,8 +196,10 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis,
       return;
   }
 
-  logPrintf("[FAULT_RT] %s: %s\n", faultSeverityToString(severity),
-                msg_buffer);
+  if (!fault_log_silent) {
+    logPrintf("[FAULT_RT] %s: %s\n", faultSeverityToString(severity),
+                  msg_buffer);
+  }
 
   queue_message_t msg;
   msg.type = MSG_FAULT_LOGGED;
@@ -404,6 +407,9 @@ void faultClearHistory() {
   log_header.head = 0;
   log_header.total_lifetime_faults = 0;
   fault_prefs.putBytes(KEY_HEADER, &log_header, sizeof(log_header));
+  
+  // PHASE 5.25: Clear ring buffer fallback as well
+  memset(&fault_ring_buffer, 0, sizeof(fault_ring_buffer));
 
   logInfo("[FAULT] [OK] Cleared");
 }
@@ -477,6 +483,14 @@ bool faultGetHistoryEntry(uint8_t logical_index, fault_entry_t* out_entry) {
     snprintf(key, sizeof(key), "%s%d", KEY_FAULT_PREFIX, slot);
     
     return (fault_prefs.getBytes(key, out_entry, sizeof(fault_entry_t)) == sizeof(fault_entry_t));
+}
+
+void faultLogSetSilent(bool silent) {
+    fault_log_silent = silent;
+}
+
+bool faultLogIsSilent() {
+    return fault_log_silent;
 }
 
 #pragma GCC diagnostic pop

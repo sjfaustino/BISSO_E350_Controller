@@ -230,43 +230,43 @@ void spindleMonitorResetStats(void) {
 
 void spindleMonitorPrintDiagnostics(void) {
   serialLoggerLock();
-  Serial.println("\n[SPINDLE] === Current Monitor Diagnostics ===");
-  Serial.printf("Status:              %s\n",
+  logPrintln("\n[SPINDLE] === Current Monitor Diagnostics ===");
+  logPrintf("Status:              %s\n",
                 monitor_state.enabled ? "ENABLED" : "DISABLED");
-  Serial.printf("Current:             %.2f A\n", monitor_state.current_amps);
-  Serial.printf("Peak Current:        %.2f A\n",
+  logPrintf("Current:             %.2f A\n", monitor_state.current_amps);
+  logPrintf("Peak Current:        %.2f A\n",
                 monitor_state.current_peak_amps);
-  Serial.printf("Average Current:     %.2f A\n",
+  logPrintf("Average Current:     %.2f A\n",
                 monitor_state.current_average_amps);
-  Serial.printf("Overcurrent Threshold: %.1f A\n",
+  logPrintf("Overcurrent Threshold: %.1f A\n",
                 monitor_state.overcurrent_threshold_amps);
-  Serial.printf("Poll Interval:       %lu ms\n",
+  logPrintf("Poll Interval:       %lu ms\n",
                 (unsigned long)monitor_state.poll_interval_ms);
-  Serial.printf("Read Count:          %lu\n",
+  logPrintf("Read Count:          %lu\n",
                 (unsigned long)monitor_state.read_count);
-  Serial.printf("Error Count:         %lu\n",
+  logPrintf("Error Count:         %lu\n",
                 (unsigned long)monitor_state.error_count);
-  Serial.printf("Overload Events:     %lu\n",
+  logPrintf("Overload Events:     %lu\n",
                 (unsigned long)monitor_state.overload_count);
-  Serial.printf("Shutdown Events:     %lu\n",
+  logPrintf("Shutdown Events:     %lu\n",
                 (unsigned long)monitor_state.shutdown_count);
   if (monitor_state.shutdown_count > 0) {
-    Serial.printf(
+    logPrintf(
         "Last Shutdown:       %lu ms ago @ %.1f A\n",
         (unsigned long)(millis() - monitor_state.last_shutdown_time_ms),
         monitor_state.last_shutdown_current_amps);
   }
   
   // Alarm status
-  Serial.printf("Tool Breakage Alarm: %s (count: %lu)\n",
+  logPrintf("Tool Breakage Alarm: %s (count: %lu)\n",
                 monitor_state.alarm_tool_breakage ? "ACTIVE" : "OK",
                 (unsigned long)monitor_state.tool_breakage_count);
-  Serial.printf("Stall Alarm:         %s (count: %lu)\n",
+  logPrintf("Stall Alarm:         %s (count: %lu)\n",
                 monitor_state.alarm_stall ? "ACTIVE" : "OK",
                 (unsigned long)monitor_state.stall_count);
-  Serial.printf("Tool Breakage Threshold: %.1f A drop\n",
+  logPrintf("Tool Breakage Threshold: %.1f A drop\n",
                 monitor_state.tool_breakage_drop_amps);
-  Serial.printf("Stall Threshold:     %.1f A for %lu ms\n",
+  logPrintf("Stall Threshold:     %.1f A for %lu ms\n",
                 monitor_state.stall_threshold_amps,
                 (unsigned long)monitor_state.stall_timeout_ms);
   serialLoggerUnlock();

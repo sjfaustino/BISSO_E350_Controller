@@ -331,12 +331,12 @@ void cmd_config_import(int argc, char **argv) {
 
   // Read JSON data line by line until empty line
   while (buffer_pos < sizeof(json_buffer) - 1 && empty_line_count < 2) {
-    if (!Serial.available()) {
+    if (!CLI_SERIAL.available()) {
       delay(10);
       continue;
     }
 
-    char c = Serial.read();
+    char c = CLI_SERIAL.read();
     
     // Ctrl+C (0x03) aborts the import
     if (c == 0x03) {

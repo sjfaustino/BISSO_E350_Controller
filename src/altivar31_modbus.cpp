@@ -224,9 +224,9 @@ bool altivar31DetectFrequencyLoss(float previous_freq_hz) {
 void altivar31PrintDiagnostics(void) {
     const altivar31_state_t* s = Altivar31.getState();
     serialLoggerLock();
-    Serial.println("\n[ALTIVAR31] === Diagnostics ===");
-    Serial.printf("Addr: %u\n", s->slave_address);
-    Serial.printf("Freq: %.1f Hz\n", s->frequency_hz);
-    Serial.printf("Curr: %.1f A\n", s->current_amps);
+    logPrintln("\n[ALTIVAR31] === Diagnostics ===");
+    logPrintf("Addr: %u\n", s->slave_address);
+    logPrintf("Freq: %.1f Hz\n", s->frequency_hz);
+    logPrintf("Curr: %.1f A\n", s->current_amps);
     serialLoggerUnlock();
 }

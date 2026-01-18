@@ -467,18 +467,18 @@ void GCodeParser::handleM115() {
     firmwareGetVersionString(ver_buf, sizeof(ver_buf));
     
     serialLoggerLock();
-    Serial.printf("[VER:%s BISSO-E350]\n", ver_buf);
-    Serial.println("[OPT:B#,M,T#]");  // Options: Block #, Messages, Real-time status
+    logPrintf("[VER:%s BISSO-E350]\n", ver_buf);
+    logPrintln("[OPT:B#,M,T#]");  // Options: Block #, Messages, Real-time status
 
     // Report capabilities
-    Serial.println("[CAPABILITY:4-axis]");        // 4 axes: X, Y, Z, A
-    Serial.println("[CAPABILITY:adaptive-feed]");  // Feed override support
-    Serial.println("[CAPABILITY:G4-dwell]");       // G4 dwell support
-    Serial.println("[CAPABILITY:M114-position]");  // M114 position reporting
-    Serial.println("[CAPABILITY:M154-auto-report]"); // M154 auto-report support
-    Serial.println("[CAPABILITY:M117-lcd-msg]");  // M117 LCD message support
-    Serial.println("[CAPABILITY:WCS-6-system]");  // 6 work coordinate systems
-    Serial.println("[CAPABILITY:soft-limits]");   // Soft limits enabled
+    logPrintln("[CAPABILITY:4-axis]");        // 4 axes: X, Y, Z, A
+    logPrintln("[CAPABILITY:adaptive-feed]");  // Feed override support
+    logPrintln("[CAPABILITY:G4-dwell]");       // G4 dwell support
+    logPrintln("[CAPABILITY:M114-position]");  // M114 position reporting
+    logPrintln("[CAPABILITY:M154-auto-report]"); // M154 auto-report support
+    logPrintln("[CAPABILITY:M117-lcd-msg]");  // M117 LCD message support
+    logPrintln("[CAPABILITY:WCS-6-system]");  // 6 work coordinate systems
+    logPrintln("[CAPABILITY:soft-limits]");   // Soft limits enabled
     serialLoggerUnlock();
 
     logInfo("[GCODE] M115 Firmware Info Reported");

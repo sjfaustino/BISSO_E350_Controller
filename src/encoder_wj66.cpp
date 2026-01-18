@@ -95,7 +95,12 @@ void wj66Init() {
       if (config_iface == ENCODER_INTERFACE_RS232_HT) {
           Serial1.begin(config_baud, SERIAL_8N1, 14, 33);
       } else {
+#if !defined(CONFIG_IDF_TARGET_ESP32S2)
           Serial2.begin(config_baud, SERIAL_8N1, 16, 13);
+#else
+          // ESP32-S2 fallback: use Serial1 for second interface
+          Serial1.begin(config_baud, SERIAL_8N1, 16, 13);
+#endif
       }
   }
 
@@ -150,8 +155,13 @@ uint32_t wj66Autodetect() {
     
     const uint32_t rates[] = {9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200};
     uint32_t found_rate = 0;
+#if !defined(CONFIG_IDF_TARGET_ESP32S2)
     uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, 0);
     HardwareSerial* s = (config_iface == 1) ? &Serial2 : &Serial1;
+#else
+    // ESP32-S2: always use Serial1 (no Serial2)
+    HardwareSerial* s = &Serial1;
+#endif
 
     for (uint32_t rate : rates) {
         vTaskDelay(20 / portTICK_PERIOD_MS); // Feed WDT

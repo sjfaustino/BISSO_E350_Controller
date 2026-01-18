@@ -12,7 +12,12 @@
 #include <string.h>
 
 // Use Serial2 for RS485 Bus (pins 16/13 on KC868-A16)
+// ESP32-S2 only has Serial0 and Serial1
+#if defined(CONFIG_IDF_TARGET_ESP32S2)
+static HardwareSerial* bus_serial = &Serial1;
+#else
 static HardwareSerial* bus_serial = &Serial2;
+#endif
 
 #include "motion.h" // Added for motionIsMoving() check
 
@@ -410,19 +415,19 @@ void rs485ResetErrorCounters(void) {
 
 void rs485PrintDiagnostics(void) {
     serialLoggerLock();
-    Serial.println("\n[RS485] === Device Registry ===");
-    Serial.printf("Baud Rate: %lu bps\n", (unsigned long)registry.baud_rate);
-    Serial.printf("Devices: %d/%d\n", registry.device_count, RS485_MAX_DEVICES);
-    Serial.printf("Total TX: %lu | Errors: %lu\n\n",
+    logPrintln("\n[RS485] === Device Registry ===");
+    logPrintf("Baud Rate: %lu bps\n", (unsigned long)registry.baud_rate);
+    logPrintf("Devices: %d/%d\n", registry.device_count, RS485_MAX_DEVICES);
+    logPrintf("Total TX: %lu | Errors: %lu\n\n",
                   (unsigned long)registry.total_transactions,
                   (unsigned long)registry.total_errors);
     
-    Serial.println("Device          | Addr | Prio | Interval | Polls   | Errors  | Status");
-    Serial.println("----------------|------|------|----------|---------|---------|--------");
+    logPrintln("Device          | Addr | Prio | Interval | Polls   | Errors  | Status");
+    logPrintln("----------------|------|------|----------|---------|---------|--------");
     
     for (uint8_t i = 0; i < registry.device_count; i++) {
         rs485_device_t* dev = registry.devices[i];
-        Serial.printf("%-15s | %4d | %4d | %6dms | %7lu | %7lu | %s\n",
+        logPrintf("%-15s | %4d | %4d | %6dms | %7lu | %7lu | %s\n",
                       dev->name,
                       dev->slave_address,
                       dev->priority,
@@ -431,7 +436,7 @@ void rs485PrintDiagnostics(void) {
                       (unsigned long)dev->error_count,
                       dev->enabled ? "ON" : "OFF");
     }
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }
 

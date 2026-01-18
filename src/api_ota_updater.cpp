@@ -261,39 +261,39 @@ void otaUpdaterPrintDiagnostics() {
     ota_status_info_t status = otaUpdaterGetStatus();
 
     serialLoggerLock();
-    Serial.println("\n[OTA] === Firmware Update Status ===");
-    Serial.printf("Status: ");
+    logPrintln("\n[OTA] === Firmware Update Status ===");
+    logPrintf("Status: ");
 
     switch (status.status) {
         case OTA_STATUS_IDLE:
-            Serial.println("IDLE (Ready for update)");
+            logPrintln("IDLE (Ready for update)");
             break;
         case OTA_STATUS_IN_PROGRESS:
-            Serial.printf("IN_PROGRESS (%lu / %lu bytes)\n",
+            logPrintf("IN_PROGRESS (%lu / %lu bytes)\n",
                          (unsigned long)status.bytes_received,
                          (unsigned long)status.total_size);
             break;
         case OTA_STATUS_VALIDATING:
-            Serial.println("VALIDATING (Checking integrity)");
+            logPrintln("VALIDATING (Checking integrity)");
             break;
         case OTA_STATUS_SUCCESS:
-            Serial.println("SUCCESS (Waiting for reboot)");
+            logPrintln("SUCCESS (Waiting for reboot)");
             break;
         case OTA_STATUS_ERROR:
-            Serial.printf("ERROR: %s (code: %lu)\n",
+            logPrintf("ERROR: %s (code: %lu)\n",
                          status.last_error_msg ? status.last_error_msg : "Unknown",
                          (unsigned long)status.last_error);
             break;
         default:
-            Serial.printf("UNKNOWN STATUS: %d\n", status.status);
+            logPrintf("UNKNOWN STATUS: %d\n", status.status);
     }
 
     if (status.total_size > 0) {
         float percent = (float)status.bytes_received * 100.0f / status.total_size;
-        Serial.printf("Progress: %.1f%%\n", percent);
-        Serial.printf("CRC32: 0x%08lX\n", (unsigned long)status.crc32);
+        logPrintf("Progress: %.1f%%\n", percent);
+        logPrintf("CRC32: 0x%08lX\n", (unsigned long)status.crc32);
     }
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }

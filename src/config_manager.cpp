@@ -141,15 +141,15 @@ config_preset_info_t configGetPresetInfo(config_preset_t preset) {
 
 uint8_t configListPresets() {
   serialLoggerLock();
-  Serial.println("\n=== AVAILABLE PRESETS ===");
+  logPrintln("\n=== AVAILABLE PRESETS ===");
   uint8_t count = 0;
   for (int i = 0; i < 5; i++) {
     if (preset_info[i].valid) {
-      Serial.printf("[%d] %s - %s\n", i, preset_info[i].name, preset_info[i].description);
+      logPrintf("[%d] %s - %s\n", i, preset_info[i].name, preset_info[i].description);
       count++;
     }
   }
-  Serial.println();
+  logPrintln("");
   serialLoggerUnlock();
   return count;
 }
@@ -260,10 +260,10 @@ bool configSetLimits(const config_limits_t* limits) {
 
 void configPrintValidationReport() {
   serialLoggerLock();
-  Serial.println("\n=== CONFIG VALIDATION REPORT ===");
-  Serial.printf("Max Pos: %ld\nMin Pos: %ld\n", (long)current_limits.max_position, (long)current_limits.min_position);
-  Serial.printf("Max Vel: %lu\nMax Acc: %lu\n", (unsigned long)current_limits.max_velocity, (unsigned long)current_limits.max_acceleration);
-  Serial.printf("Status: %s\n", configValidate(false) ? "[VALID]" : "[INVALID]");
-  Serial.println();
+  logPrintln("\n=== CONFIG VALIDATION REPORT ===");
+  logPrintf("Max Pos: %ld\nMin Pos: %ld\n", (long)current_limits.max_position, (long)current_limits.min_position);
+  logPrintf("Max Vel: %lu\nMax Acc: %lu\n", (unsigned long)current_limits.max_velocity, (unsigned long)current_limits.max_acceleration);
+  logPrintf("Status: %s\n", configValidate(false) ? "[VALID]" : "[INVALID]");
+  logPrintln("");
   serialLoggerUnlock();
 }

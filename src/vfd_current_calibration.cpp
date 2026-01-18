@@ -317,38 +317,38 @@ const vfd_calibration_data_t* vfdCalibrationGetData(void) {
 
 void vfdCalibrationPrintSummary(void) {
     serialLoggerLock();
-    Serial.println("\n[VFDCAL] === Current Calibration Summary ===");
-    Serial.printf("Status:              %s\n", calib_data.is_calibrated ? "VALID" : "INVALID");
-    Serial.printf("Calibration Count:   %lu\n", (unsigned long)calib_data.calibration_count);
+    logPrintln("\n[VFDCAL] === Current Calibration Summary ===");
+    logPrintf("Status:              %s\r\n", calib_data.is_calibrated ? "VALID" : "INVALID");
+    logPrintf("Calibration Count:   %lu\r\n", (unsigned long)calib_data.calibration_count);
 
     if (calib_data.idle_rms_amps > 0.0f || calib_data.idle_peak_amps > 0.0f) {
-        Serial.printf("Idle Baseline:       %.2f A (RMS) / %.2f A (peak)\n",
+        logPrintf("Idle Baseline:       %.2f A (RMS) / %.2f A (peak)\r\n",
                       calib_data.idle_rms_amps, calib_data.idle_peak_amps);
     } else {
-        Serial.println("Idle Baseline:       Not measured");
+        logPrintln("Idle Baseline:       Not measured");
     }
 
     if (calib_data.standard_cut_rms_amps > 0.0f || calib_data.standard_cut_peak_amps > 0.0f) {
-        Serial.printf("Standard Cut:        %.2f A (RMS) / %.2f A (peak)\n",
+        logPrintf("Standard Cut:        %.2f A (RMS) / %.2f A (peak)\r\n",
                       calib_data.standard_cut_rms_amps, calib_data.standard_cut_peak_amps);
     } else {
-        Serial.println("Standard Cut:        Not measured");
+        logPrintln("Standard Cut:        Not measured");
     }
 
     if (calib_data.heavy_cut_rms_amps > 0.0f || calib_data.heavy_cut_peak_amps > 0.0f) {
-        Serial.printf("Heavy Load:          %.2f A (RMS) / %.2f A (peak)\n",
+        logPrintf("Heavy Load:          %.2f A (RMS) / %.2f A (peak)\r\n",
                       calib_data.heavy_cut_rms_amps, calib_data.heavy_cut_peak_amps);
     } else {
-        Serial.println("Heavy Load:          Not measured");
+        logPrintln("Heavy Load:          Not measured");
     }
 
-    Serial.printf("Stall Threshold:     %.2f A (Margin: %.0f%%)\n",
+    logPrintf("Stall Threshold:     %.2f A (Margin: %.0f%%)\r\n",
                   calib_data.stall_threshold_amps, calib_data.stall_margin_percent);
 
     if (calib_data.last_calibration_ms > 0) {
-        Serial.printf("Last Calibration:    %lu ms ago\n",
+        logPrintf("Last Calibration:    %lu ms ago\r\n",
                       (unsigned long)(millis() - calib_data.last_calibration_ms));
     }
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }

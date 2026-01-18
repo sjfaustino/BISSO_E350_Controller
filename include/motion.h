@@ -148,6 +148,11 @@ void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
 void motionPrintSpinlockStats();  // Print spinlock critical section timing report
 void motionResetSpinlockStats();  // Reset spinlock timing statistics
 
+// --- JITTER TRACKING ---
+uint32_t motionGetMaxJitterUS();   // Get maximum loop jitter recorded in microseconds
+void motionResetMaxJitter();     // Reset jitter tracking
+void motionTrackJitterUS(uint32_t jitter_us); // Internal use: track loop jitter in microseconds
+
 extern const uint8_t AXIS_TO_I73_BIT[];
 extern const uint8_t AXIS_TO_CONSENSO_BIT[];
 

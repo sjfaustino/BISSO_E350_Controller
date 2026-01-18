@@ -23,7 +23,7 @@ window.HardwareModule = window.HardwareModule || {
     },
 
     loadPinConfiguration() {
-        fetch("/api/hardware/pins").then(e => e.json()).then(e => {
+        window.API.get("hardware/pins").then(e => {
             console.log("[Hardware] Pin configuration loaded:", e);
             this.pinData = e.pins || [];
             this.signalData = e.signals || [];

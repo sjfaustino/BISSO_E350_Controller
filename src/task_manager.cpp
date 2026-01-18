@@ -411,7 +411,7 @@ void taskLcdCreate() {
 // ============================================================================
 
 void taskShowStats() {
-  logPrintln("\n=== TASK STATISTICS ===");
+  logPrintln("\r\n=== TASK STATISTICS ===");
   logPrintln("Task               Runs      Avg(ms)   Max(ms)   CPU%%");
   logPrintln("------------------------------------------------------");
 
@@ -429,7 +429,7 @@ void taskShowStats() {
             ? ((float)task_stats[i].total_time_ms / total_time) * 100.0
             : 0;
 
-    logPrintf("%-18s %-9lu %-9.2f %-9lu %-6.1f%%\n", task_stats[i].name,
+    logPrintf("%-18s %-9lu %-9.2f %-9lu %-6.1f%%\r\n", task_stats[i].name,
                   (unsigned long)task_stats[i].run_count, avg_time,
                   (unsigned long)task_stats[i].max_run_time_ms, cpu_percent);
   }
@@ -437,7 +437,7 @@ void taskShowStats() {
 }
 
 void taskShowAllTasks() {
-  logPrintln("\n=== TASK LIST ===");
+  logPrintln("\r\n=== TASK LIST ===");
   logPrintln("Task                  Priority  Stack(bytes)  Core");
   logPrintln("--------------------------------------------------");
   for (int i = 0; i < stats_count; i++) {
@@ -448,7 +448,7 @@ void taskShowAllTasks() {
         uxTaskGetStackHighWaterMark(task_stats[i].handle);
     BaseType_t core_id = xTaskGetAffinity(task_stats[i].handle);
 
-    logPrintf("%-21s %-9lu %-13lu %ld\n", task_stats[i].name,
+    logPrintf("%-21s %-9lu %-13lu %ld\r\n", task_stats[i].name,
                   (unsigned long)priority,
                   (unsigned long)stack_high_water, (long)core_id);
   }

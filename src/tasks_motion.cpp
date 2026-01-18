@@ -20,6 +20,19 @@ void taskMotionFunction(void* parameter) {
 
   while (1) {
     perfMonitorTaskStart(PERF_TASK_ID_MOTION);
+    
+    // High-Resolution Jitter Measurement (PHASE 5.5)
+    static uint64_t last_wake_us = 0;
+    uint64_t now_us = esp_timer_get_time();
+    if (last_wake_us != 0) {
+        uint64_t interval_us = now_us - last_wake_us;
+        uint64_t expected_us = TASK_PERIOD_MOTION * 1000;
+        if (interval_us > expected_us) {
+            motionTrackJitterUS((uint32_t)(interval_us - expected_us));
+        }
+    }
+    last_wake_us = now_us;
+
     // Core motion operations
     motionUpdate();
     perfMonitorTaskEnd(PERF_TASK_ID_MOTION);
@@ -59,15 +72,9 @@ void taskMotionFunction(void* parameter) {
     // Motion task now feeds PLC watchdog since Motion uses PLC I/O heavily
     watchdogFeed("PLC");
 
-    // Hybrid Wait: Periodic + Event Driven
-    TickType_t xNow = xTaskGetTickCount();
-    xLastWakeTime += xPeriod;
-    
-    if (xLastWakeTime > xNow) {
-        ulTaskNotifyTake(pdTRUE, xLastWakeTime - xNow);
-    } else {
-        xLastWakeTime = xNow; 
-        vTaskDelay(1);
-    }
+    watchdogFeed("PLC");
+
+    // Periodic Wait (PHASE 5.5: Fixed jitter logic)
+    vTaskDelayUntil(&xLastWakeTime, xPeriod);
   }
 }

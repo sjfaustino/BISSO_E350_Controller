@@ -15,6 +15,7 @@
 #define BOOT_VALIDATION_H
 
 #include <Arduino.h>
+#include "serial_logger.h"
 
 // ============================================================================
 // BOOT VALIDATION STATUS CODES
@@ -125,22 +126,16 @@ void bootShowRecoveryHistory();
 // Safe initialization wrapper with error checking
 #define BOOT_INIT_SUBSYSTEM(subsystem_name, init_function, error_code) \
   do { \
-    Serial.print("[BOOT] Initializing "); \
-    Serial.print(subsystem_name); \
-    Serial.print("... "); \
+    logPrintf("[BOOT] Initializing %s... ", subsystem_name); \
     bootRegisterSubsystem(subsystem_name); \
     uint32_t init_start = millis(); \
     bool init_result = init_function(); \
     uint32_t init_time = millis() - init_start; \
     if (init_result) { \
-      Serial.print("[OK] ("); \
-      Serial.print(init_time); \
-      Serial.println("ms)"); \
+      logPrintf("[OK] (%lums)\n", (unsigned long)init_time); \
       bootMarkInitialized(subsystem_name); \
     } else { \
-      Serial.print("[FAIL] ("); \
-      Serial.print(init_time); \
-      Serial.println("ms)"); \
+      logPrintf("[FAIL] (%lums)\n", (unsigned long)init_time); \
       bootMarkFailed(subsystem_name, "Initialization returned false", error_code); \
     } \
   } while(0)

@@ -100,4 +100,10 @@ const fault_entry_t* faultGetRingBufferEntry(uint8_t index);
 uint8_t faultGetHistoryCount();
 bool faultGetHistoryEntry(uint8_t logical_index, fault_entry_t* out_entry);
 
+// Set fault log silent mode (suppresses logPrintf)
+void faultLogSetSilent(bool silent);
+
+// Check if fault log is silent
+bool faultLogIsSilent();
+
 #endif

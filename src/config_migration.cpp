@@ -241,13 +241,13 @@ migration_stats_t configMigrationGetStats() {
 
 void configMigrationShowReport() {
   serialLoggerLock();
-  Serial.println("\n=== MIGRATION REPORT ===");
-  Serial.printf("Keys Migrated: %lu\n", (unsigned long)last_migration_stats.keys_migrated);
-  Serial.printf("Keys Initialized: %lu\n", (unsigned long)last_migration_stats.keys_initialized);
-  Serial.printf("Keys Validated: %lu\n", (unsigned long)last_migration_stats.keys_validated);
-  Serial.printf("Errors: %lu\n", (unsigned long)last_migration_stats.errors);
-  Serial.printf("Time: %lu ms\n", (unsigned long)last_migration_stats.migration_time_ms);
-  Serial.println();
+  logPrintln("\n=== MIGRATION REPORT ===");
+  logPrintf("Keys Migrated: %lu\r\n", (unsigned long)last_migration_stats.keys_migrated);
+  logPrintf("Keys Initialized: %lu\r\n", (unsigned long)last_migration_stats.keys_initialized);
+  logPrintf("Keys Validated: %lu\r\n", (unsigned long)last_migration_stats.keys_validated);
+  logPrintf("Errors: %lu\r\n", (unsigned long)last_migration_stats.errors);
+  logPrintf("Time: %lu ms\r\n", (unsigned long)last_migration_stats.migration_time_ms);
+  logPrintln("");
   serialLoggerUnlock();
 }
 

@@ -58,7 +58,7 @@ void cmd_fs_cat(int argc, char** argv) {
 
     logPrintf("--- %s START ---\n", argv[1]);
     while (file.available()) {
-        Serial.write(file.read());
+        CLI_SERIAL.write(file.read());
     }
     logPrintf("\n--- %s END ---\n", argv[1]);
     file.close();

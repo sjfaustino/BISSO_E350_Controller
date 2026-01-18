@@ -243,16 +243,16 @@ i2c_stats_t i2cGetStats() {
 
 void i2cShowStats() {
   serialLoggerLock();
-  Serial.println("\n[I2C] === Statistics ===");
-  Serial.printf("Total: %lu | OK: %lu (%.1f%%) | Fail: %lu\n",
+  logPrintln("\r\n[I2C] === Statistics ===");
+  logPrintf("Total: %lu | OK: %lu (%.1f%%) | Fail: %lu\r\n",
                 (unsigned long)stats.transactions_total,
                 (unsigned long)stats.transactions_success, stats.success_rate,
                 (unsigned long)stats.transactions_failed);
-  Serial.printf("Retries: %lu | Recoveries: %lu\n",
+  logPrintf("Retries: %lu | Recoveries: %lu\r\n",
                 (unsigned long)stats.retries_performed,
                 (unsigned long)stats.bus_recoveries);
-  Serial.printf(
-      "Errors: NACK=%lu Time=%lu Bus=%lu\n", (unsigned long)stats.error_nack,
+  logPrintf(
+      "Errors: NACK=%lu Time=%lu Bus=%lu\r\n", (unsigned long)stats.error_nack,
       (unsigned long)stats.error_timeout, (unsigned long)stats.error_bus);
   serialLoggerUnlock();
 }

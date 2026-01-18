@@ -18,6 +18,7 @@
 static log_rate_entry_t rate_entries[LOG_RATE_LIMIT_CAPACITY];
 static uint8_t entry_count = 0;
 static bool limiter_initialized = false;
+static bool limiter_enabled = true;
 
 // ============================================================================
 // INITIALIZATION
@@ -38,7 +39,7 @@ void logRateLimiterInit() {
 // ============================================================================
 
 bool logRateLimiterCheck(uint16_t fault_id, int16_t sub_id) {
-  if (!limiter_initialized) return true;  // Allow if not initialized
+  if (!limiter_initialized || !limiter_enabled) return true;  // Allow if not initialized or disabled
 
   uint32_t now = millis();
 
@@ -125,25 +126,35 @@ uint32_t logRateLimiterGetSuppressed(uint16_t fault_id, int16_t sub_id) {
 void logRateLimiterReset() {
   memset(rate_entries, 0, sizeof(rate_entries));
   entry_count = 0;
+  limiter_enabled = true;
   logInfo("[RATE_LIMIT] Rate limiter reset");
+}
+
+void logRateLimiterSetEnabled(bool enabled) {
+  limiter_enabled = enabled;
+  logInfo("[RATE_LIMIT] Limiter %s", enabled ? "ENABLED" : "DISABLED");
+}
+
+bool logRateLimiterIsEnabled() {
+  return limiter_enabled;
 }
 
 void logRateLimiterShowStats() {
   serialLoggerLock();
-  Serial.println("\n=== LOG RATE LIMITER STATISTICS ===");
-  Serial.println("Fault_ID  Sub_ID  Last(ms)  Suppressed  Interval(ms)");
-  Serial.println("--------------------------------------------------------");
+  logPrintln("\n=== LOG RATE LIMITER STATISTICS ===");
+  logPrintln("Fault_ID  Sub_ID  Last(ms)  Suppressed  Interval(ms)");
+  logPrintln("--------------------------------------------------------");
 
   uint32_t now = millis();
   for (uint8_t i = 0; i < entry_count; i++) {
     uint32_t age = now - rate_entries[i].last_logged_ms;
-    Serial.printf("%-9u %-7d %-9lu %-11lu %-12lu\n",
+    logPrintf("%-9u %-7d %-9lu %-11lu %-12lu\n",
                   (unsigned)rate_entries[i].fault_id,
                   (int)rate_entries[i].sub_id,
                   (unsigned long)age,
                   (unsigned long)rate_entries[i].suppress_count,
                   (unsigned long)rate_entries[i].limit_interval_ms);
   }
-  Serial.println();
+  logPrintln("");
   serialLoggerUnlock();
 }

@@ -62,22 +62,22 @@ bool memoryMonitorIsCriticallyLow(uint32_t threshold) { return (ESP.getFreeHeap(
 
 void memoryMonitorPrintStats() {
   serialLoggerLock();
-  Serial.println("\n=== MEMORY DIAGNOSTICS ===");
+  logPrintln("\n=== MEMORY DIAGNOSTICS ===");
   uint32_t free = ESP.getFreeHeap();
   uint32_t used = total_heap_size - free;
   uint8_t percent = (used * 100) / total_heap_size;
   
-  Serial.printf("Total Heap:   %lu\n", (unsigned long)total_heap_size);
-  Serial.printf("Current Free: %lu (%u%% used)\n", (unsigned long)free, percent);
-  Serial.printf("Min Free:     %lu\n", (unsigned long)mem_stats.minimum_free);
-  Serial.printf("Max Used:     %lu\n", (unsigned long)mem_stats.maximum_used);
-  Serial.printf("Largest Blk:  %lu\n", (unsigned long)mem_stats.largest_block);
-  Serial.printf("Samples:      %lu\n", (unsigned long)mem_stats.sample_count);
+  logPrintf("Total Heap:   %lu\n", (unsigned long)total_heap_size);
+  logPrintf("Current Free: %lu (%u%% used)\n", (unsigned long)free, percent);
+  logPrintf("Min Free:     %lu\n", (unsigned long)mem_stats.minimum_free);
+  logPrintf("Max Used:     %lu\n", (unsigned long)mem_stats.maximum_used);
+  logPrintf("Largest Blk:  %lu\n", (unsigned long)mem_stats.largest_block);
+  logPrintf("Samples:      %lu\n", (unsigned long)mem_stats.sample_count);
   
-  if (free > (total_heap_size / 2)) Serial.println("Status: [GOOD]");
-  else if (free > (total_heap_size / 4)) Serial.println("Status: [WARN]");
-  else Serial.println("Status: [CRITICAL]");
-  Serial.println();
+  if (free > (total_heap_size / 2)) logPrintln("Status: [GOOD]");
+  else if (free > (total_heap_size / 4)) logPrintln("Status: [WARN]");
+  else logPrintln("Status: [CRITICAL]");
+  logPrintln("");
   serialLoggerUnlock();
 }
 

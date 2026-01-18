@@ -62,6 +62,9 @@ portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 #define MOTION_SPINLOCK_ENTER(location) SPINLOCK_ENTER(motionSpinlock, location)
 #define MOTION_SPINLOCK_EXIT(location) SPINLOCK_EXIT(motionSpinlock, location)
 
+// --- JITTER TRACKING STATE ---
+static uint32_t m_max_jitter_us = 0;
+
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y,
                                    ELBO_I73_AXIS_Z, ELBO_I73_AXIS_A};
 const uint8_t AXIS_TO_CONSENSO_BIT[] = {
@@ -1261,3 +1264,17 @@ void motionResetSpinlockStats() {
   logInfo("[MOTION] Spinlock timing not enabled");
 }
 #endif
+
+uint32_t motionGetMaxJitterUS() {
+  return m_max_jitter_us;
+}
+
+void motionResetMaxJitter() {
+  m_max_jitter_us = 0;
+}
+
+void motionTrackJitterUS(uint32_t jitter_us) {
+  if (jitter_us > m_max_jitter_us) {
+    m_max_jitter_us = jitter_us;
+  }
+}

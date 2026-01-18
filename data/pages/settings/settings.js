@@ -363,26 +363,17 @@ window.SettingsModule = window.SettingsModule || {
 
                     if (!await window.UI.showConfirm("Overwrite current settings with imported configuration? Device will reboot.")) return;
 
-                    const btn = document.getElementById('import-config-btn');
-                    const restore = window.UI.showSpinner(btn, "Importing...");
-
                     try {
-                        const res = await fetch('/api/config/restore', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(json)
-                        });
-                        const data = await res.json();
+                        const data = await window.API.post('config/restore', json, 'import-config-btn');
                         if (data.success) {
                             window.AlertManager.add(data.message, 'success');
                             setTimeout(() => location.reload(), 3000);
                         } else {
+                            // If API didn't throw (parsed success:false), show error
                             window.AlertManager.add(data.error || 'Import failed', 'error');
-                            restore();
                         }
-                    } catch (netErr) {
-                        window.AlertManager.add("Network error during import", 'error');
-                        restore();
+                    } catch (err) {
+                        // API client handles toast for errors
                     }
                 } catch (err) {
                     window.AlertManager.add(err.message, 'error');
@@ -392,6 +383,55 @@ window.SettingsModule = window.SettingsModule || {
         };
         input.click();
     },
+
+    async loadCliOptions() {
+        try {
+            const data = await window.API.get('config/get?category=6');
+            if (data && data.config) {
+                const echoToggle = document.getElementById('cli-echo-toggle');
+                if (echoToggle) echoToggle.checked = (data.config.cli_echo === 1);
+            }
+        } catch (e) {
+            console.warn('[Settings] CLI options load failed:', e);
+        }
+    },
+
+    async saveCliOptions() {
+        const echoToggle = document.getElementById('cli-echo-toggle');
+        const otaToggle = document.getElementById('ota-check-toggle');
+        const spinnerTarget = 'save-cli-options-btn';
+
+        try {
+            const reqs = [];
+            // Save CLI echo
+            if (echoToggle) {
+                reqs.push(window.API.post('config/set', { category: 6, key: 'cli_echo', value: echoToggle.checked ? 1 : 0 }, spinnerTarget));
+            }
+            // Save OTA check
+            if (otaToggle) {
+                reqs.push(window.API.post('config/set', { category: 6, key: 'ota_chk_en', value: otaToggle.checked ? 1 : 0 }, spinnerTarget));
+            }
+
+            await Promise.all(reqs);
+            AlertManager.add(window.i18n.t('settings.cli_saved'), 'success', 2000);
+        } catch (e) {
+            this.showError('cli-options', window.i18n.t('settings.network_error') + ' ' + e.message);
+        }
+    },
+
+    async loadOtaSettings() {
+        // OTA settings are loaded together with CLI options from the same API category
+        // This function is kept for backward compatibility but loadCliOptions handles both
+        try {
+            const data = await window.API.get('config/get?category=6', null, { silent: true }); // silent to avoid double error if both fail
+            if (data && data.config) {
+                const toggle = document.getElementById('ota-check-toggle');
+                if (toggle) toggle.checked = (data.config.ota_chk_en === 1);
+            }
+        } catch (e) {
+            console.warn('[Settings] OTA settings load failed:', e);
+        }
+    }
 
     showError(section, msg) {
         const el = document.getElementById(`${section}-error`);
@@ -441,12 +481,9 @@ window.SettingsModule = window.SettingsModule || {
 
     async loadCliOptions() {
         try {
-            const res = await fetch('/api/config/get?category=6');
-            if (res.ok) {
-                const data = await res.json();
-                const toggle = document.getElementById('cli-echo-toggle');
-                if (toggle && data.config) toggle.checked = (data.config.cli_echo === 1);
-            }
+            const data = await window.API.get('config/get?category=6');
+            const toggle = document.getElementById('cli-echo-toggle');
+            if (toggle && data.config) toggle.checked = (data.config.cli_echo === 1);
         } catch (e) {
             console.warn('[Settings] CLI options load failed:', e);
         }
@@ -459,19 +496,19 @@ window.SettingsModule = window.SettingsModule || {
         try {
             // Save CLI echo
             if (echoToggle) {
-                await fetch('/api/config/set', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category: 6, key: 'cli_echo', value: echoToggle.checked ? 1 : 0 })
+                await window.API.post('config/set', {
+                    category: 6,
+                    key: 'cli_echo',
+                    value: echoToggle.checked ? 1 : 0
                 });
             }
 
             // Save OTA check
             if (otaToggle) {
-                await fetch('/api/config/set', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category: 6, key: 'ota_chk_en', value: otaToggle.checked ? 1 : 0 })
+                await window.API.post('config/set', {
+                    category: 6,
+                    key: 'ota_chk_en',
+                    value: otaToggle.checked ? 1 : 0
                 });
             }
 
@@ -485,12 +522,9 @@ window.SettingsModule = window.SettingsModule || {
         // OTA settings are loaded together with CLI options from the same API category
         // This function is kept for backward compatibility but loadCliOptions handles both
         try {
-            const res = await fetch('/api/config/get?category=6');
-            if (res.ok) {
-                const data = await res.json();
-                const toggle = document.getElementById('ota-check-toggle');
-                if (toggle && data.config) toggle.checked = (data.config.ota_chk_en === 1);
-            }
+            const data = await window.API.get('config/get?category=6');
+            const toggle = document.getElementById('ota-check-toggle');
+            if (toggle && data.config) toggle.checked = (data.config.ota_chk_en === 1);
         } catch (e) {
             console.warn('[Settings] OTA settings load failed:', e);
         }

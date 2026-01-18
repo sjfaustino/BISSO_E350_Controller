@@ -205,9 +205,9 @@ system_performance_t perfMonitorGetSystemMetrics() {
 
 void perfMonitorPrintSummary() {
     serialLoggerLock();
-    Serial.println("\n[PERF] === Performance Summary ===");
-    Serial.println("Task            | Runs    | Avg(us)  | Max(us)  | CPU%");
-    Serial.println("-----------|---------|----------|----------|------");
+    logPrintln("\r\n[PERF] === Performance Summary ===");
+    logPrintln("Task            | Runs    | Avg(us)  | Max(us)  | CPU%");
+    logPrintln("-----------|---------|----------|----------|------");
 
     system_performance_t sys = perfMonitorGetSystemMetrics();
     uint32_t total_time = 0;
@@ -219,7 +219,7 @@ void perfMonitorPrintSummary() {
         float cpu_percent = (total_time > 0) ?
             ((float)task_metrics[i].total_runtime_us / total_time) * 100.0f : 0.0f;
 
-        Serial.printf("%-15s | %-7lu | %-8lu | %-8lu | %.1f%%\n",
+        logPrintf("%-15s | %-7lu | %-8lu | %-8lu | %.1f%%\r\n",
             task_metrics[i].task_name,
             (unsigned long)task_metrics[i].run_count,
             (unsigned long)task_metrics[i].avg_runtime_us,
@@ -227,26 +227,26 @@ void perfMonitorPrintSummary() {
             cpu_percent);
     }
 
-    Serial.printf("\nSystem CPU: %u%%, Heap: %lu bytes free\n",
+    logPrintf("\r\nSystem CPU: %u%%, Heap: %lu bytes free\r\n",
         sys.total_cpu_percent,
         (unsigned long)sys.free_heap_bytes);
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }
 
 void perfMonitorPrintDiagnostics() {
     serialLoggerLock();
-    Serial.println("\n[PERF] === Detailed Performance Diagnostics ===");
+    logPrintln("\r\n[PERF] === Detailed Performance Diagnostics ===");
 
     system_performance_t sys = perfMonitorGetSystemMetrics();
-    Serial.printf("Uptime: %lu seconds | Free Heap: %lu bytes | Min Heap: %lu bytes\n",
+    logPrintf("Uptime: %lu seconds | Free Heap: %lu bytes | Min Heap: %lu bytes\r\n",
         (unsigned long)sys.uptime_seconds,
         (unsigned long)sys.free_heap_bytes,
         (unsigned long)sys.min_free_heap_bytes);
 
-    Serial.println("\nPer-Task Metrics:");
-    Serial.println("Task            | Runs | Avg(us) | Max(us) | Min(us) | Q-Wait(us) | CPU%");
-    Serial.println("-----------|------|---------|---------|---------|------------|-----");
+    logPrintln("\r\nPer-Task Metrics:");
+    logPrintln("Task            | Runs | Avg(us) | Max(us) | Min(us) | Q-Wait(us) | CPU%");
+    logPrintln("-----------|------|---------|---------|---------|------------|-----");
 
     uint32_t total_time = 0;
     for (int i = 0; i < active_tasks; i++) {
@@ -257,7 +257,7 @@ void perfMonitorPrintDiagnostics() {
         float cpu_percent = (total_time > 0) ?
             ((float)task_metrics[i].total_runtime_us / total_time) * 100.0f : 0.0f;
 
-        Serial.printf("%-15s | %4lu | %7lu | %7lu | %7lu | %10lu | %.1f%%\n",
+        logPrintf("%-15s | %4lu | %7lu | %7lu | %7lu | %10lu | %.1f%%\r\n",
             task_metrics[i].task_name,
             (unsigned long)task_metrics[i].run_count,
             (unsigned long)task_metrics[i].avg_runtime_us,
@@ -267,7 +267,7 @@ void perfMonitorPrintDiagnostics() {
             cpu_percent);
     }
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }
 

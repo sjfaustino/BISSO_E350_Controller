@@ -5,6 +5,20 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
+// ESP32-S2/S3 USB CDC Serial - define SerialOut for internal use
+#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
+    #if ARDUINO_USB_CDC_ON_BOOT
+        #include "USB.h"
+        #include "USBCDC.h"
+        extern USBCDC USBSerial;
+        #define SerialOut USBSerial
+    #else
+        #define SerialOut Serial
+    #endif
+#else
+    #define SerialOut Serial
+#endif
+
 #define LOGGER_BUFFER_SIZE 512
 static log_level_t current_log_level = LOG_LEVEL_INFO;
 static char log_buffer[LOGGER_BUFFER_SIZE];
@@ -58,7 +72,7 @@ static void vlogPrint(log_level_t level, const char* prefix, const char* format,
   vsnprintf(log_buffer + offset, LOGGER_BUFFER_SIZE - offset, format, args);
   
   // Output to Serial (UART) only
-  Serial.println(log_buffer);
+  SerialOut.println(log_buffer);
   
   // Also write to boot log file if active
   bootLogWrite(log_buffer);
@@ -78,11 +92,11 @@ void serialLoggerInit(log_level_t log_level) {
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(ver_str, sizeof(ver_str));
 
-  Serial.println("\n------------------------------------------");
-  Serial.printf("     %s Serial Logger Init     \n", ver_str);
-  Serial.println("------------------------------------------\n");
+  SerialOut.println("\n------------------------------------------");
+  SerialOut.printf("     %s Serial Logger Init     \n", ver_str);
+  SerialOut.println("------------------------------------------\n");
   
-  Serial.printf("Log Level: %d\n\n", log_level);
+  SerialOut.printf("Log Level: %d\n\n", log_level);
 }
 
 void serialLoggerSetLevel(log_level_t log_level) {
@@ -125,7 +139,7 @@ void logPrintf(const char* format, ...) {
   
   va_list args; va_start(args, format);
   vsnprintf(log_buffer, LOGGER_BUFFER_SIZE, format, args); va_end(args);
-  Serial.print(log_buffer);
+  SerialOut.print(log_buffer);
   
   // Note: Telnet mirroring might be unsafe if networkManager locks too.
   // Ideally, use a queue for telnet. For now, this is kept but protected by serial_mutex.
@@ -142,7 +156,7 @@ void logPrintln(const char* format, ...) {
   
   va_list args; va_start(args, format);
   vsnprintf(log_buffer, LOGGER_BUFFER_SIZE, format, args); va_end(args);
-  Serial.println(log_buffer);
+  SerialOut.println(log_buffer);
   networkManager.telnetPrintln(log_buffer); // Mirror raw prints
   
   releaseSerialMutex();
@@ -177,13 +191,13 @@ static size_t boot_log_current_size = 0;
 bool bootLogInit(size_t max_size_bytes) {
     // Check if boot logging is enabled in config (default: disabled for debugging)
     if (configGetInt(KEY_BOOTLOG_EN, 0) == 0) {
-        Serial.println("[BOOTLOG] Disabled by configuration");
+        SerialOut.println("[BOOTLOG] Disabled by configuration");
         return false;
     }
     
     // Mount LittleFS if not already mounted
     if (!LittleFS.begin(false)) {
-        Serial.println("[BOOTLOG] LittleFS mount failed");
+        SerialOut.println("[BOOTLOG] LittleFS mount failed");
         return false;
     }
     
@@ -197,7 +211,7 @@ bool bootLogInit(size_t max_size_bytes) {
     // Open new log file for writing
     boot_log_file = LittleFS.open(BOOT_LOG_PATH, "w");
     if (!boot_log_file) {
-        Serial.println("[BOOTLOG] Failed to create log file");
+        SerialOut.println("[BOOTLOG] Failed to create log file");
         return false;
     }
     
@@ -210,7 +224,7 @@ bool bootLogInit(size_t max_size_bytes) {
     boot_log_current_size += strlen(header);
     boot_log_file.flush();
     
-    Serial.println("[BOOTLOG] Boot log capture started");
+    SerialOut.println("[BOOTLOG] Boot log capture started");
     return true;
 }
 
@@ -226,7 +240,7 @@ void bootLogStop() {
         boot_log_file.close();
     }
     
-    Serial.printf("[BOOTLOG] Boot log capture stopped (%u bytes)\n", boot_log_current_size);
+    SerialOut.printf("[BOOTLOG] Boot log capture stopped (%u bytes)\n", boot_log_current_size);
 }
 
 bool bootLogIsActive() {

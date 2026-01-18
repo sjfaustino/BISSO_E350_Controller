@@ -118,10 +118,10 @@ void encoderCalibrationReset(uint8_t axis) {
 
 void encoderCalibrationDiagnostics() {
   serialLoggerLock();
-  Serial.println("\n[CALIB] === Diagnostics ===");
-  Serial.printf("State: %d | Axis: %d\n", calib_state, calibrating_axis);
+  logPrintln("\n[CALIB] === Diagnostics ===");
+  logPrintf("State: %d | Axis: %d\r\n", calib_state, calibrating_axis);
   for (int i = 0; i < 4; i++) {
-    Serial.printf("  Axis %d: %s | Scale=%.2f\n", i, calib_data[i].is_valid ? "VALID" : "INVALID", calib_data[i].pulses_per_mm);
+    logPrintf("  Axis %d: %s | Scale=%.2f\r\n", i, calib_data[i].is_valid ? "VALID" : "INVALID", calib_data[i].pulses_per_mm);
   }
   serialLoggerUnlock();
 }

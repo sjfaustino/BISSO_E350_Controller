@@ -56,6 +56,7 @@
 // Forward declarations
 extern uint32_t taskGetUptime();
 extern void cmd_config_main(int argc, char** argv);
+extern void cmd_stress_test(int argc, char** argv);
 
 // Local handlers
 void debugEncodersHandler();
@@ -504,9 +505,9 @@ static String formatTimestamp(uint32_t timestamp_ms) {
 void cmd_faults_stats(int argc, char** argv) {
     fault_stats_t stats = faultGetStats();
     logPrintln("\n[FAULT] === Statistics ===");
-    logPrintf("Total: %lu\n", (unsigned long)stats.total_faults);
+    logPrintf("Total: %lu\r\n", (unsigned long)stats.total_faults);
     if (stats.total_faults > 0) {
-        logPrintf("Last: %s\n", formatTimestamp(stats.last_fault_time_ms).c_str());
+        logPrintf("Last: %s\r\n", formatTimestamp(stats.last_fault_time_ms).c_str());
     }
 }
 
@@ -824,7 +825,7 @@ void debugAllHandler() {
     logPrintln("\n[DEBUG] === FULL SYSTEM DUMP ===");
     char ver[FIRMWARE_VERSION_STRING_LEN]; 
     firmwareGetVersionString(ver, sizeof(ver));
-    logPrintf("Firmware: %s | Uptime: %lu s\n", ver, (unsigned long)taskGetUptime());
+    logPrintf("Firmware: %s | Uptime: %lu s\r\n", ver, (unsigned long)taskGetUptime());
     
     debugEncodersHandler();
     motionDiagnostics();
@@ -930,8 +931,8 @@ void cmd_web_config_show(int argc, char** argv) {
     const char* username = configGetString(KEY_WEB_USERNAME, "admin");
     uint32_t pw_changed = configGetInt(KEY_WEB_PW_CHANGED, 0);
 
-    logPrintf("Username:            %s\n", username);
-    logPrintf("Password Changed:    %s\n", pw_changed ? "YES" : "NO (default)");
+    logPrintf("Username:            %s\r\n", username);
+    logPrintf("Password Changed:    %s\r\n", pw_changed ? "YES" : "NO (default)");
     if (pw_changed == 0) {
         logWarning("[WEB CONFIG] Using default password! Please set a new password.");
         logPrintln("[WEB CONFIG] Usage: web config password <password>");
@@ -1361,7 +1362,7 @@ void cmd_log_boot(int argc, char** argv) {
     
     size_t bytes_read = bootLogRead(chunk, chunk_size);
     while (bytes_read > 0) {
-        Serial.print(chunk);
+        CLI_SERIAL.print(chunk);
         
         // If we read less than buffer size, we're done
         if (bytes_read < chunk_size - 1) break;
@@ -1477,4 +1478,5 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("ls", "List LittleFS files", cmd_fs_ls);
     cliRegisterCommand("df", "Show LittleFS status", cmd_fs_df);
     cliRegisterCommand("cat", "View LittleFS file content", cmd_fs_cat);
+    cliRegisterCommand("test", "Run system stress tests", cmd_stress_test);
 }

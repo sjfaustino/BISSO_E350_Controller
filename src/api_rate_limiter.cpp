@@ -112,24 +112,24 @@ void apiRateLimiterReset() {
 
 void apiRateLimiterDiagnostics() {
     serialLoggerLock();
-    Serial.println("\n[API_RATELIMIT] === Rate Limiter Diagnostics ===");
-    Serial.printf("Active Endpoints: %d / %d\n", active_endpoints, API_RATE_LIMIT_ENDPOINTS);
-    Serial.printf("Limit: %d req / %lu ms (%.1f req/min)\n\n",
+    logPrintln("\n[API_RATELIMIT] === Rate Limiter Diagnostics ===");
+    logPrintf("Active Endpoints: %d / %d\n", active_endpoints, API_RATE_LIMIT_ENDPOINTS);
+    logPrintf("Limit: %d req / %lu ms (%.1f req/min)\n\n",
                   API_RATE_LIMIT_REQUESTS,
                   (unsigned long)API_RATE_LIMIT_WINDOW_MS,
                   (API_RATE_LIMIT_REQUESTS * 60000.0f) / API_RATE_LIMIT_WINDOW_MS);
 
-    Serial.println("Endpoint ID        | Tokens | Blocked");
-    Serial.println("-------------------|--------|--------");
+    logPrintln("Endpoint ID        | Tokens | Blocked");
+    logPrintln("-------------------|--------|--------");
 
     for (uint8_t i = 0; i < active_endpoints; i++) {
-        Serial.printf("0x%08lX | %6lu | %7lu\n",
+        logPrintf("0x%08lX | %6lu | %7lu\n",
                      (unsigned long)buckets[i].endpoint_id,
                      (unsigned long)buckets[i].tokens,
                      (unsigned long)buckets[i].blocked_count);
     }
 
-    Serial.println("\nNote: Tokens are refilled at configured rate.");
-    Serial.println("      Blocked count resets at rate limiter reset.\n");
+    logPrintln("\nNote: Tokens are refilled at configured rate.");
+    logPrintln("      Blocked count resets at rate limiter reset.\n");
     serialLoggerUnlock();
 }

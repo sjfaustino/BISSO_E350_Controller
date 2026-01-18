@@ -187,38 +187,38 @@ size_t dashboardMetricsExportExtendedJSON(char* buffer, size_t buffer_size) {
 
 void dashboardMetricsPrint() {
     serialLoggerLock();
-    Serial.println("\n[DASHBOARD] === Real-time Metrics ===");
-    Serial.printf("Uptime: %llu ms | CPU: %u%% | Heap: %lu bytes\n",
+    logPrintln("\n[DASHBOARD] === Real-time Metrics ===");
+    logPrintf("Uptime: %llu ms | CPU: %u%% | Heap: %lu bytes\n",
                  (unsigned long long)metrics_cache.timestamp_ms,
                  metrics_cache.cpu_percent,
                  (unsigned long)metrics_cache.free_heap_bytes);
 
-    Serial.printf("Position: X=%.2f Y=%.2f Z=%.2f A=%.2f mm\n",
+    logPrintf("Position: X=%.2f Y=%.2f Z=%.2f A=%.2f mm\r\n",
                  metrics_cache.x_pos, metrics_cache.y_pos,
                  metrics_cache.z_pos, metrics_cache.a_pos);
 
-    Serial.printf("Motion: %s | Safety: %s | Alarm: %s\n",
+    logPrintf("Motion: %s | Safety: %s | Alarm: %s\r\n",
                  metrics_cache.motion_moving ? "Moving" : "Stopped",
                  metrics_cache.estop_active ? "E-STOP" : "OK",
                  metrics_cache.alarm_active ? "ALARMED" : "OK");
 
-    Serial.printf("Spindle: %.2f A | WiFi: %s (%u%%)\n",
+    logPrintf("Spindle: %.2f A | WiFi: %s (%u%%)\r\n",
                  metrics_cache.spindle_current_amps,
                  metrics_cache.wifi_connected ? "Connected" : "Disconnected",
                  metrics_cache.wifi_signal);
 
-    Serial.printf("Encoders: [");
+    logPrintf("%s", "Encoders: [");
     for (int i = 0; i < 4; i++) {
-        if (i > 0) Serial.print(" ");
+        if (i > 0) logPrintf("%s", " ");
         switch (metrics_cache.encoder_health[i]) {
-            case 0: Serial.print("OK"); break;
-            case 1: Serial.print("~"); break;
-            case 2: Serial.print("!"); break;
-            case 3: Serial.print("X"); break;
+            case 0: logPrintf("%s", "OK"); break;
+            case 1: logPrintf("%s", "~"); break;
+            case 2: logPrintf("%s", "!"); break;
+            case 3: logPrintf("%s", "X"); break;
         }
     }
-    Serial.println("]");
+    logPrintln("]");
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }

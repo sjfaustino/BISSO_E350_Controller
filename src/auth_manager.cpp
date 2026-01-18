@@ -674,33 +674,33 @@ bool authTestPassword(const char* password) {
 
 void authPrintDiagnostics(void) {
   serialLoggerLock();
-  Serial.println("\n[AUTH] === Authentication Diagnostics ===");
-  Serial.printf("Username:          %s\n", current_username);
-  Serial.printf("Credentials Loaded: %s\n", credentials_loaded ? "YES" : "NO");
-  Serial.printf("Password Change:   %s\n", password_change_required ? "REQUIRED" : "Not required");
-  Serial.printf("Hash Format:       %s\n", 
+  logPrintln("\n[AUTH] === Authentication Diagnostics ===");
+  logPrintf("Username:          %s\n", current_username);
+  logPrintf("Credentials Loaded: %s\n", credentials_loaded ? "YES" : "NO");
+  logPrintf("Password Change:   %s\n", password_change_required ? "REQUIRED" : "Not required");
+  logPrintf("Hash Format:       %s\n", 
     strncmp(stored_password_hash, "$sha256$", 8) == 0 ? "SHA-256 (secure)" : "PLAIN TEXT (insecure!)");
-  Serial.printf("Hash Length:       %d chars\n", strlen(stored_password_hash));
+  logPrintf("Hash Length:       %d chars\n", strlen(stored_password_hash));
   
   // Show partial hash for debugging (safe - only first few chars)
   if (strlen(stored_password_hash) > 20) {
-    Serial.printf("Hash Preview:      %.20s...\n", stored_password_hash);
+    logPrintf("Hash Preview:      %.20s...\n", stored_password_hash);
   }
   
-  Serial.printf("Rate Limit IPs:    %d/%d\n", rate_limit_entries, AUTH_RATE_LIMIT_MAX_IPS);
-  Serial.println();
+  logPrintf("Rate Limit IPs:    %d/%d\n", rate_limit_entries, AUTH_RATE_LIMIT_MAX_IPS);
+  logPrintln("");
   serialLoggerUnlock();
 }
 
 void cmd_auth(int argc, char** argv) {
   if (argc < 2) {
     serialLoggerLock();
-    Serial.println("\n[AUTH] === Authentication Management ===");
-    Serial.println("Usage:");
-    Serial.println("  auth diag           - Show auth diagnostics");
-    Serial.println("  auth test <pass>    - Test password verification");
-    Serial.println("  auth reload         - Reload credentials from NVS");
-    Serial.println("  auth clear_limits   - Clear all rate limits");
+    logPrintln("\n[AUTH] === Authentication Management ===");
+    logPrintln("Usage:");
+    logPrintln("  auth diag           - Show auth diagnostics");
+    logPrintln("  auth test <pass>    - Test password verification");
+    logPrintln("  auth reload         - Reload credentials from NVS");
+    logPrintln("  auth clear_limits   - Clear all rate limits");
     serialLoggerUnlock();
     return;
   }

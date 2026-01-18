@@ -48,7 +48,7 @@ void cmd_lcd_timeout(int argc, char** argv) {
 
 void cmd_lcd_main(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("\n[LCD] === LCD Control ===");
+        logPrintln("\r\n[LCD] === LCD Control ===");
         logPrintln("Usage: lcd [on|off|backlight|sleep|wakeup|timeout|status|reset]");
         logPrintln("  on        - Enable LCD and save setting");
         logPrintln("  off       - Disable LCD and save setting");
@@ -76,7 +76,7 @@ void cmd_lcd_main(int argc, char** argv) {
     } else if (strcasecmp(argv[1], "reset") == 0) {
         lcdInterfaceResetErrors();
     } else if (strcasecmp(argv[1], "status") == 0) {
-        logPrintln("\n[LCD] === Status ===");
+        logPrintln("\r\n[LCD] === Status ===");
         logPrintf("Enabled:   %s\r\n", configGetInt(KEY_LCD_EN, 1) ? "YES" : "NO");
         logPrintf("Mode:      %d\r\n", (int)lcdInterfaceGetMode());
         logPrintf("Sleeping:  %s\r\n", lcdSleepIsAsleep() ? "YES" : "NO");

@@ -5,26 +5,15 @@
 
 window.HardwareHandlers = {
     detectBaud(btnId) {
-        const btn = document.getElementById(btnId);
-        if (!btn) return;
-
-        const restore = window.UI.showSpinner(btn, window.i18n.t('hardware.detecting'));
-
-        fetch("/api/hardware/wj66/detect", { method: "POST" })
+        window.API.post("hardware/wj66/detect", {}, btnId)
             .then(() => {
                 window.Toast?.info(window.i18n.t('hardware.detect_started'));
                 setTimeout(() => location.reload(), 8000);
             })
-            .catch(() => {
-                window.Toast?.error(window.i18n.t('hardware.detect_failed'));
-                restore();
-            });
+            .catch(() => { /* API handles error toast */ });
     },
 
     detectRS485(btnId) {
-        const btn = document.getElementById(btnId);
-        if (!btn) return;
-
         const vfdEn = document.getElementById("vfd_enabled")?.checked;
         const jxk10En = document.getElementById("jxk10_enabled")?.checked;
 
@@ -33,11 +22,9 @@ window.HardwareHandlers = {
             return;
         }
 
-        const restore = window.UI.showSpinner(btn, window.i18n.t('hardware.searching'));
         window.Toast?.info(window.i18n.t('hardware.scanning'));
 
-        fetch("/api/config/detect-rs485", { method: "POST" })
-            .then(res => res.json())
+        window.API.post("config/detect-rs485", {}, btnId)
             .then(data => {
                 if (data.success) {
                     window.Toast?.success(window.i18n.t('hardware.found_modbus').replace('{baud}', data.baud));
@@ -47,18 +34,11 @@ window.HardwareHandlers = {
                     window.Toast?.error(data.error || window.i18n.t('hardware.detect_failed'));
                 }
             })
-            .catch(() => window.Toast?.error(window.i18n.t('hardware.comm_error')))
-            .finally(restore);
+            .catch(() => window.Toast?.error(window.i18n.t('hardware.comm_error')));
     },
 
     testI2C(btnId) {
-        const btn = document.getElementById(btnId);
-        if (!btn) return;
-
-        const restore = window.UI.showSpinner(btn, window.i18n.t('hardware.i2c_testing'));
-
-        fetch("/api/hardware/i2c/test", { method: "POST" })
-            .then(res => res.json())
+        window.API.post("hardware/i2c/test", {}, btnId)
             .then(data => {
                 if (data.success) {
                     const msg = window.i18n.t('hardware.i2c_test_success').replace('{count}', data.count);
@@ -68,15 +48,11 @@ window.HardwareHandlers = {
                     window.Toast?.error(window.i18n.t('hardware.i2c_test_failed'));
                 }
             })
-            .catch(() => window.Toast?.error(window.i18n.t('hardware.i2c_test_failed')))
-            .finally(restore);
+            .catch(() => { });
     },
 
     async saveConfiguration(module) {
         console.log("[Hardware] Saving configuration...");
-        const saveBtn = document.getElementById("save-config-btn");
-        const restore = saveBtn ? window.UI.showSpinner(saveBtn, window.i18n.t('hardware.saving')) : () => { };
-
         // Validation
         const vfdEn = document.getElementById("vfd_enabled")?.checked;
         const jxk10En = document.getElementById("jxk10_enabled")?.checked;
@@ -85,7 +61,6 @@ window.HardwareHandlers = {
 
         if (vfdEn && jxk10En && vfdAddr === jxk10Addr) {
             module.showStatus(window.i18n.t('hardware.addr_error'), "error");
-            restore();
             return;
         }
 
@@ -108,24 +83,16 @@ window.HardwareHandlers = {
             configValues[el.dataset.config] = el.value;
         });
 
-        // Save Pins
+        // Save Pins & Config
         try {
-            const pinRes = await fetch("/api/hardware/pins", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(pinConfig)
-            });
-            const pinData = await pinRes.json();
-
+            // Using save-config-btn as spinner target for the chain
+            const pinData = await window.API.post("hardware/pins", pinConfig, "save-config-btn");
             if (!pinData.success && !pinData.ok) throw new Error(pinData.error || "Pin save failed");
 
-            // Save Config Values
-            const configRes = await fetch("/api/config/batch", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(configValues)
-            });
-            const configData = await configRes.json();
+            // Config Values (silent=true to avoid double error if pin save succeeded but this fails? No, normal error is fine)
+            // But we don't want to spin twice/stop twice awkwardly.
+            // Actually API.post starts/stops spinner. Since we await, it will start/stop/start/stop. That's fine.
+            const configData = await window.API.post("config/batch", configValues, "save-config-btn");
 
             if (!configData.success && !configData.ok) console.error("[Hardware] Batch save error:", configData.error);
 
@@ -134,14 +101,12 @@ window.HardwareHandlers = {
             // Ask for reboot
             const shouldReboot = await window.UI.showConfirm("Configuration saved. A reboot is required to apply changes. Reboot now?");
             if (shouldReboot) {
-                fetch("/api/system/reboot", { method: "POST" });
+                window.API.post("system/reboot");
             }
 
         } catch (e) {
             console.error("[Hardware] Save error:", e);
             module.showStatus(window.i18n.t('network.error_prefix') + e.message, "error");
-        } finally {
-            restore();
         }
     },
 
@@ -150,12 +115,9 @@ window.HardwareHandlers = {
         if (!confirmed) return;
 
         module.showStatus(window.i18n.t('hardware.resetting'), "info");
-        const restore = window.UI.showSpinner("reset-defaults-btn");
 
         try {
-            const res = await fetch("/api/hardware/pins/reset", { method: "POST" });
-            const data = await res.json();
-
+            const data = await window.API.post("hardware/pins/reset", {}, "reset-defaults-btn");
             if (!data.success) throw new Error(data.error || "Reset failed");
 
             module.showStatus(window.i18n.t('hardware.reset_success'), "success");
@@ -163,7 +125,6 @@ window.HardwareHandlers = {
         } catch (e) {
             console.error("[Hardware] Reset failed:", e);
             module.showStatus("Reset failed: " + e.message, "error");
-            restore();
         }
     }
 };

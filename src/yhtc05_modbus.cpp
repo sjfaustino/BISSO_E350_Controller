@@ -207,12 +207,13 @@ void yhtc05ResetErrorCounters(void) {
 void yhtc05PrintDiagnostics(void) {
     const yhtc05_state_t* s = YhTc05.getState();
     serialLoggerLock();
-    Serial.println("\n[YH-TC05] === Diagnostics ===");
-    Serial.printf("Address:         %d\n", s->slave_address);
-    Serial.printf("RPM:             %u\n", s->rpm);
-    Serial.printf("Spinning:        %s\n", s->is_spinning ? "YES" : "NO");
-    Serial.printf("Stalled:         %s\n", s->is_stalled ? "YES" : "NO");
-    Serial.printf("Read Count:      %lu\n", (unsigned long)s->read_count);
-    Serial.printf("Errors:          %lu\n", (unsigned long)s->error_count);
+    logPrintln("\n[YH-TC05] === Diagnostics ===");
+    logPrintf("Address:         %d\r\n", s->slave_address);
+    logPrintf("RPM:             %u\r\n", s->rpm);
+    logPrintf("Spinning:        %s\r\n", s->is_spinning ? "YES" : "NO");
+    logPrintf("Stalled:         %s\r\n", s->is_stalled ? "YES" : "NO");
+    logPrintf("Read Count:      %lu\r\n", (unsigned long)s->read_count);
+    logPrintf("Errors:          %lu\r\n", (unsigned long)s->error_count);
+    logPrintln("");
     serialLoggerUnlock();
 }

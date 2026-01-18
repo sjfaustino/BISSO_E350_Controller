@@ -128,17 +128,16 @@
 
         try {
             // Send homing command to API
-            const response = await Utils.fetchWithAuth('/api/jog', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    command: 'home',
-                    axis: axis.toUpperCase()
-                })
+            const response = await window.API.post('jog', {
+                command: 'home',
+                axis: axis.toUpperCase()
             });
 
-            if (!response.ok) {
-                throw new Error(`Homing failed: ${response.status}`);
+            // API.post throws on error, so if we get here it's success.
+            // But we keep the check if the API returns a success flag in JSON, 
+            // though ApiClient usually handles non-200.
+            if (response && response.success === false) {
+                throw new Error(response.error || 'Homing failed');
             }
 
             // Simulate homing completion (in real use, poll for status)
@@ -174,11 +173,8 @@
     function startPositionPolling() {
         positionInterval = setInterval(async () => {
             try {
-                const response = await Utils.fetchWithAuth('/api/status');
-                if (response.ok) {
-                    const data = await response.json();
-                    updatePositionDisplay(data);
-                }
+                const data = await window.API.get('status');
+                updatePositionDisplay(data);
             } catch (e) {
                 // Silent fail - position display is non-critical
             }

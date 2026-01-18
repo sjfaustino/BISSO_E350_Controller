@@ -516,32 +516,32 @@ void telemetryPrintSummary() {
     system_telemetry_t t = telemetryGetSnapshot();
 
     serialLoggerLock();
-    Serial.println("\n[TELEMETRY] === System Health Summary ===");
-    Serial.printf("Health: %s | Uptime: %lu sec | CPU: %u%% | Heap: %lu bytes\n",
+    logPrintln("\r\n[TELEMETRY] === System Health Summary ===");
+    logPrintf("Health: %s | Uptime: %lu sec | CPU: %u%% | Heap: %lu bytes\r\n",
         telemetryGetHealthStatusString(t.health_status),
         (unsigned long)t.uptime_seconds,
         t.cpu_usage_percent,
         (unsigned long)t.free_heap_bytes);
 
-    Serial.printf("Motion: %s (Moving: %s)\n",
+    logPrintf("Motion: %s (Moving: %s)\r\n",
         t.motion_enabled ? "Enabled" : "Disabled",
         t.motion_moving ? "Yes" : "No");
 
-    Serial.printf("Spindle: %s (Current: %.2f A, Peak: %.2f A)\n",
+    logPrintf("Spindle: %s (Current: %.2f A, Peak: %.2f A)\r\n",
         t.spindle_enabled ? "Enabled" : "Disabled",
         t.spindle_current_amps,
         t.spindle_current_peak_amps);
 
-    Serial.printf("Safety: E-STOP %s, Alarm %s, Faults: %lu\n",
+    logPrintf("Safety: E-STOP %s, Alarm %s, Faults: %lu\r\n",
         t.estop_active ? "ACTIVE" : "OK",
         t.alarm_active ? "ACTIVE" : "OK",
         (unsigned long)t.faults_logged);
 
-    Serial.printf("Network: WiFi %s (Signal: %u%%)\n",
+    logPrintf("Network: WiFi %s (Signal: %u%%)\r\n",
         t.wifi_connected ? "Connected" : "Disconnected",
         t.wifi_signal_strength);
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }
 
@@ -549,63 +549,63 @@ void telemetryPrintDetailed() {
     system_telemetry_t t = telemetryGetSnapshot();
 
     serialLoggerLock();
-    Serial.println("\n[TELEMETRY] === Detailed System Telemetry ===");
+    logPrintln("\r\n[TELEMETRY] === Detailed System Telemetry ===");
 
-    Serial.println("=== SYSTEM ===");
-    Serial.printf("Health Status: %s\n", telemetryGetHealthStatusString(t.health_status));
-    Serial.printf("Uptime: %lu seconds\n", (unsigned long)t.uptime_seconds);
-    Serial.printf("Loop Cycles: %lu\n", (unsigned long)t.loop_cycle_count);
+    logPrintln("=== SYSTEM ===");
+    logPrintf("Health Status: %s\r\n", telemetryGetHealthStatusString(t.health_status));
+    logPrintf("Uptime: %lu seconds\r\n", (unsigned long)t.uptime_seconds);
+    logPrintf("Loop Cycles: %lu\r\n", (unsigned long)t.loop_cycle_count);
 
-    Serial.println("\n=== CPU & MEMORY ===");
-    Serial.printf("CPU Usage: %u%%\n", t.cpu_usage_percent);
-    Serial.printf("Free Heap: %lu bytes\n", (unsigned long)t.free_heap_bytes);
-    Serial.printf("Stack Used: %lu bytes\n", (unsigned long)t.stack_used_bytes);
+    logPrintln("\n=== CPU & MEMORY ===");
+    logPrintf("CPU Usage: %u%%\r\n", t.cpu_usage_percent);
+    logPrintf("Free Heap: %lu bytes\r\n", (unsigned long)t.free_heap_bytes);
+    logPrintf("Stack Used: %lu bytes\r\n", (unsigned long)t.stack_used_bytes);
 
-    Serial.println("\n=== MOTION ===");
-    Serial.printf("Enabled: %s | Moving: %s\n",
+    logPrintln("\n=== MOTION ===");
+    logPrintf("Enabled: %s | Moving: %s\r\n",
         t.motion_enabled ? "Yes" : "No",
         t.motion_moving ? "Yes" : "No");
-    Serial.printf("Position: X=%.2f Y=%.2f Z=%.2f A=%.2f mm\n",
+    logPrintf("Position: X=%.2f Y=%.2f Z=%.2f A=%.2f mm\r\n",
         t.axis_x_mm, t.axis_y_mm, t.axis_z_mm, t.axis_a_mm);
-    Serial.printf("Steps Executed: %lu\n", (unsigned long)t.steps_executed);
-    Serial.printf("Motion Errors: %lu\n", (unsigned long)t.motion_errors);
+    logPrintf("Steps Executed: %lu\r\n", (unsigned long)t.steps_executed);
+    logPrintf("Motion Errors: %lu\r\n", (unsigned long)t.motion_errors);
 
-    Serial.println("\n=== SPINDLE ===");
-    Serial.printf("Enabled: %s\n", t.spindle_enabled ? "Yes" : "No");
-    Serial.printf("Current: %.2f A (Peak: %.2f A)\n",
+    logPrintln("\n=== SPINDLE ===");
+    logPrintf("Enabled: %s\r\n", t.spindle_enabled ? "Yes" : "No");
+    logPrintf("Current: %.2f A (Peak: %.2f A)\r\n",
         t.spindle_current_amps, t.spindle_current_peak_amps);
-    Serial.printf("Errors: %lu | Overcurrent: %s | Fault: %s\n",
+    logPrintf("Errors: %lu | Overcurrent: %s | Fault: %s\r\n",
         (unsigned long)t.spindle_errors,
         t.spindle_overcurrent ? "Yes" : "No",
         t.spindle_fault ? "Yes" : "No");
 
-    Serial.println("\n=== SAFETY ===");
-    Serial.printf("E-STOP: %s\n", t.estop_active ? "ACTIVE" : "OK");
-    Serial.printf("Alarm: %s\n", t.alarm_active ? "ACTIVE" : "OK");
-    Serial.printf("Faults Logged: %lu (Critical: %lu)\n",
+    logPrintln("\n=== SAFETY ===");
+    logPrintf("E-STOP: %s\r\n", t.estop_active ? "ACTIVE" : "OK");
+    logPrintf("Alarm: %s\r\n", t.alarm_active ? "ACTIVE" : "OK");
+    logPrintf("Faults Logged: %lu (Critical: %lu)\r\n",
         (unsigned long)t.faults_logged,
         (unsigned long)t.critical_faults);
-    Serial.printf("Safety Events: %lu\n", (unsigned long)t.safety_events);
+    logPrintf("Safety Events: %lu\n", (unsigned long)t.safety_events);
 
-    Serial.println("\n=== TASKS ===");
-    Serial.printf("Slowest Task: ID %u (%lu us)\n",
+    logPrintln("\n=== TASKS ===");
+    logPrintf("Slowest Task: ID %u (%lu us)\n",
         t.slowest_task_id,
         (unsigned long)t.slowest_task_time_us);
-    Serial.printf("Task Underruns: %lu\n", (unsigned long)t.total_task_underruns);
+    logPrintf("Task Underruns: %lu\n", (unsigned long)t.total_task_underruns);
 
-    Serial.println("\n=== NETWORK ===");
-    Serial.printf("WiFi Connected: %s\n", t.wifi_connected ? "Yes" : "No");
-    Serial.printf("Signal Strength: %u%%\n", t.wifi_signal_strength);
-    Serial.printf("HTTP Requests: %lu | Errors: %lu\n",
+    logPrintln("\n=== NETWORK ===");
+    logPrintf("WiFi Connected: %s\n", t.wifi_connected ? "Yes" : "No");
+    logPrintf("Signal Strength: %u%%\n", t.wifi_signal_strength);
+    logPrintf("HTTP Requests: %lu | Errors: %lu\n",
         (unsigned long)t.http_requests_served,
         (unsigned long)t.http_errors);
 
-    Serial.println("\n=== CONFIGURATION ===");
-    Serial.printf("Config Version: %lu\n", (unsigned long)t.config_version);
-    Serial.printf("Using Defaults: %s\n", t.config_is_default ? "Yes" : "No");
-    Serial.printf("Config Changes: %lu\n", (unsigned long)t.config_changes_count);
-    Serial.printf("Watchdog Resets: %lu\n", (unsigned long)t.watchdog_resets);
+    logPrintln("\n=== CONFIGURATION ===");
+    logPrintf("Config Version: %lu\n", (unsigned long)t.config_version);
+    logPrintf("Using Defaults: %s\n", t.config_is_default ? "Yes" : "No");
+    logPrintf("Config Changes: %lu\n", (unsigned long)t.config_changes_count);
+    logPrintf("Watchdog Resets: %lu\n", (unsigned long)t.watchdog_resets);
 
-    Serial.println();
+    logPrintln("");
     serialLoggerUnlock();
 }

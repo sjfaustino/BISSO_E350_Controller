@@ -12,6 +12,8 @@
 #include "safety.h"
 #include "safety_state_machine.h"
 #include "serial_logger.h"
+#include "plc_iface.h"
+#include "network_manager.h"
 #include "system_constants.h"
 #include "task_manager.h"
 #include "watchdog_manager.h"
@@ -68,7 +70,9 @@ static void displayBootStatus() {
   lcdInterfacePrintLine(3, line);
 
   lcdInterfaceUpdate();
+  watchdogFeed("LCD");
   vTaskDelay(pdMS_TO_TICKS(2000));
+  watchdogFeed("LCD");
 
   // Page 2: WiFi status
   lcdInterfaceClear();
@@ -97,23 +101,72 @@ static void displayBootStatus() {
   }
 
   lcdInterfaceUpdate();
+  watchdogFeed("LCD");
   vTaskDelay(pdMS_TO_TICKS(2000));
+  watchdogFeed("LCD");
 
   // Page 3: I2C devices status
   lcdInterfaceClear();
   lcdInterfacePrintLine(0, "I2C Devices:");
-  lcdInterfacePrintLine(1, "PLC Out 0x24: OK");
-  lcdInterfacePrintLine(2, "LCD 0x27: OK");
+  char status_line[21];
+  snprintf(status_line, 21, "PLC 0x24: %s", plcIsHardwarePresent() ? "OK" : "MISSING");
+  lcdInterfacePrintLine(1, status_line);
+  
+  snprintf(status_line, 21, "LCD 0x27: %s", (lcdInterfaceGetMode() == LCD_MODE_I2C) ? "OK" : "MISSING");
+  lcdInterfacePrintLine(2, status_line);
+  
   lcdInterfacePrintLine(3, "Boot Complete!");
 
   lcdInterfaceUpdate();
+  watchdogFeed("LCD");
   vTaskDelay(pdMS_TO_TICKS(1500));
+  watchdogFeed("LCD");
+
+  // Page 4: Network Summary (User Requested)
+  lcdInterfaceClear();
+  lcdInterfacePrintLine(0, "      NETWORK       ");
+
+  char net_line[21];
+  
+  // Ethernet
+  String eth_ip = networkManager.getEthernetIP();
+  if (eth_ip == "0.0.0.0" || !networkManager.isEthernetConnected()) {
+    lcdInterfacePrintLine(1, "ETH DISABLED");
+  } else {
+    snprintf(net_line, 21, "ETH %s", eth_ip.c_str());
+    lcdInterfacePrintLine(1, net_line);
+  }
+
+  // WiFi
+  if (WiFi.status() != WL_CONNECTED) {
+    lcdInterfacePrintLine(2, "WIFI DISABLED");
+  } else {
+    snprintf(net_line, 21, "WIFI %s", WiFi.localIP().toString().c_str());
+    lcdInterfacePrintLine(2, net_line);
+  }
+
+  // SoftAP
+  IPAddress ap_ip = WiFi.softAPIP();
+  if (ap_ip == IPAddress(0, 0, 0, 0)) {
+    lcdInterfacePrintLine(3, "AP DISABLED");
+  } else {
+    snprintf(net_line, 21, "AP %s", ap_ip.toString().c_str());
+    lcdInterfacePrintLine(3, net_line);
+  }
+
+  lcdInterfaceUpdate();
+  // Split 5s delay to feed watchdog
+  watchdogFeed("LCD");
+  vTaskDelay(pdMS_TO_TICKS(2500));
+  watchdogFeed("LCD");
+  vTaskDelay(pdMS_TO_TICKS(2500));
+  watchdogFeed("LCD");
 }
 
 void taskLcdFunction(void *parameter) {
   TickType_t last_wake = xTaskGetTickCount();
 
-  logInfo("[LCD_TASK] [OK] Started on core 1");
+  logInfo("[LCD_TASK] [OK] Started on core 0");
   watchdogTaskAdd("LCD");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "LCD");
 

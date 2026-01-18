@@ -104,9 +104,9 @@ const char* configGetSchemaDescription(uint8_t version) {
 
 void configShowSchemaHistory() {
   serialLoggerLock();
-  Serial.println("\n=== SCHEMA HISTORY ===");
+  logPrintln("\n=== SCHEMA HISTORY ===");
   for (size_t i = 0; i < sizeof(schema_history)/sizeof(schema_history[0]); i++) {
-      Serial.printf("v%d: %s (%s)\n", schema_history[i].version, schema_history[i].description, schema_history[i].changes);
+      logPrintf("v%d: %s (%s)\n", schema_history[i].version, schema_history[i].description, schema_history[i].changes);
   }
   serialLoggerUnlock();
 }
@@ -193,12 +193,12 @@ bool configRollbackToVersion(uint8_t target_version) {
 
 void configShowMigrationStatus() {
   serialLoggerLock();
-  Serial.println("\n=== MIGRATION STATUS ===");
+  logPrintln("\n=== MIGRATION STATUS ===");
   uint8_t stored = configGetStoredSchemaVersion();
-  Serial.printf("Stored: v%d | Current: v%d\n", stored, CONFIG_SCHEMA_VERSION);
-  if (stored == CONFIG_SCHEMA_VERSION) Serial.println("Status: [SYNCED]");
-  else if (stored < CONFIG_SCHEMA_VERSION) Serial.println("Status: [UPGRADE NEEDED]");
-  else Serial.println("Status: [DOWNGRADE NEEDED]");
+  logPrintf("Stored: v%d | Current: v%d\r\n", stored, CONFIG_SCHEMA_VERSION);
+  if (stored == CONFIG_SCHEMA_VERSION) logPrintln("Status: [SYNCED]");
+  else if (stored < CONFIG_SCHEMA_VERSION) logPrintln("Status: [UPGRADE NEEDED]");
+  else logPrintln("Status: [DOWNGRADE NEEDED]");
   serialLoggerUnlock();
 }
 
@@ -211,9 +211,9 @@ void configValidateSchema() {
 
 void configShowKeyMetadata() {
   serialLoggerLock();
-  Serial.println("\n=== KEY METADATA ===");
+  logPrintln("\n=== KEY METADATA ===");
   for (int i = 0; key_metadata[i].key != NULL; i++) {
-      Serial.printf("%s (%s): %s\n", key_metadata[i].key, key_metadata[i].type, key_metadata[i].description);
+      logPrintf("%s (%s): %s\n", key_metadata[i].key, key_metadata[i].type, key_metadata[i].description);
   }
   serialLoggerUnlock();
 }

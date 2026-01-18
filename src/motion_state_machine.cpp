@@ -218,6 +218,12 @@ void state_idle_handler(Axis* axis, int32_t pos, int32_t target, bool consensus)
 }
 
 void state_wait_consenso_handler(Axis* axis, int32_t pos, int32_t target, bool consensus) {
+    // Check for hardware presence - if missing, mock consensus to allow simulation
+    if (!plcIsHardwarePresent()) {
+        MotionStateMachine::transitionTo(axis, MOTION_EXECUTING);
+        return;
+    }
+
     // Check for timeout
     if ((uint32_t)(millis() - axis->state_entry_ms) > MOTION_CONSENSO_TIMEOUT_MS) {
         faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, axis->id, 0, "Consensus Timeout");

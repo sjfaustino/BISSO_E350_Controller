@@ -100,6 +100,10 @@ static bool plcAcquireShadowMutex() {
 // ... (existing helper function plcAcquireShadowMutex) ...
 
 static bool plcWriteI2C(uint8_t address, uint8_t data, const char *context) {
+  if (!g_plc_hardware_present) {
+    return false;
+  }
+
   // CRITICAL FIX: Acquire PLC I2C mutex to prevent bus contention
   // Timeout: 200ms (PLC operations are time-sensitive but not critical)
   if (!taskLockMutex(taskGetI2cPlcMutex(), 200)) {
@@ -417,6 +421,11 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
 // ============================================================================
 
 bool elboI73GetInput(uint8_t bit, bool *success) {
+  if (!g_plc_hardware_present) {
+    if (success) *success = false;
+    return (i73_input_shadow & (1 << bit));
+  }
+
   // CRITICAL FIX: Acquire PLC I2C mutex to prevent bus contention
   // Timeout: 200ms (PLC operations are time-sensitive but not critical)
   if (!taskLockMutex(taskGetI2cPlcMutex(), 200)) {

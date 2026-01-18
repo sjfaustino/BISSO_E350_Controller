@@ -336,20 +336,20 @@ size_t apiEndpointsExportJSON(char* buffer, size_t buffer_size) {
 
 void apiEndpointsPrint() {
     serialLoggerLock();
-    Serial.println("\n[API ENDPOINTS] === Registered Endpoints ===");
-    Serial.println("Path                        | Methods            | Auth | Rate Limit");
-    Serial.println("----------------------------|-------------------|------|---------------------");
+    logPrintln("\n[API ENDPOINTS] === Registered Endpoints ===");
+    logPrintln("Path                        | Methods            | Auth | Rate Limit");
+    logPrintln("----------------------------|-------------------|------|---------------------");
 
     for (int i = 0; i < endpoint_count; i++) {
         const api_endpoint_t* ep = &api_endpoints[i];
 
-        Serial.printf("%-27s | %-18s | %-4s | %s\n",
+        logPrintf("%-27s | %-18s | %-4s | %s\n",
             ep->path,
             methodToString(ep->methods),
             ep->requires_auth ? "Yes" : "No",
             ep->rate_limit_info);
     }
 
-    Serial.printf("\nTotal endpoints: %d\n\n", endpoint_count);
+    logPrintf("\nTotal endpoints: %d\n\n", endpoint_count);
     serialLoggerUnlock();
 }

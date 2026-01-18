@@ -139,11 +139,16 @@ void taskMonitorFunction(void* parameter) {
     int stats_count = taskGetStatsCount();
     task_stats_t* stats_array = taskGetStatsArray();
 
+    static uint32_t last_health_log_ms = 0;
+    bool should_log_health = (millis() - last_health_log_ms > 5000);
+
     for (int i = 0; i < stats_count; i++) {
         // Starvation Check
         if (stats_array[i].last_run_time_ms > TASK_EXECUTION_WARNING_MS) {
-            logWarning("[MONITOR] [WARN] Task '%s' is slow: %lu ms",
-                       stats_array[i].name, (unsigned long)stats_array[i].last_run_time_ms);
+            if (should_log_health) {
+                logWarning("[MONITOR] [WARN] Task '%s' is slow: %lu ms",
+                           stats_array[i].name, (unsigned long)stats_array[i].last_run_time_ms);
+            }
         }
 
         // SECURITY FIX: Stack monitoring is now handled globally by taskUpdateStackUsage()
@@ -152,20 +157,27 @@ void taskMonitorFunction(void* parameter) {
             uint16_t high_water = stats_array[i].stack_high_water;
 
             if (high_water < STACK_CRITICAL_THRESHOLD_WORDS * 4) {  // Convert words to bytes
-                faultLogEntry(FAULT_CRITICAL, FAULT_CRITICAL_SYSTEM_ERROR, i, high_water,
-                             "CRITICAL: Stack near overflow in task '%s' (%u bytes free)",
+                if (should_log_health) {
+                    faultLogEntry(FAULT_CRITICAL, FAULT_CRITICAL_SYSTEM_ERROR, i, high_water,
+                                 "CRITICAL: Stack near overflow in task '%s' (%u bytes free)",
+                                 stats_array[i].name, high_water);
+                    logError("[MONITOR] [CRITICAL] Stack overflow imminent: %s (%u bytes free)",
                              stats_array[i].name, high_water);
-                logError("[MONITOR] [CRITICAL] Stack overflow imminent: %s (%u bytes free)",
-                         stats_array[i].name, high_water);
+                }
             }
             else if (high_water < STACK_WARNING_THRESHOLD_WORDS * 4) {
-                faultLogEntry(FAULT_WARNING, FAULT_CRITICAL_SYSTEM_ERROR, i, high_water,
-                             "WARNING: Low stack space in task '%s' (%u bytes free)",
-                             stats_array[i].name, high_water);
-                logWarning("[MONITOR] [WARN] Low stack: %s (%u bytes free)",
-                          stats_array[i].name, high_water);
+                if (should_log_health) {
+                    faultLogEntry(FAULT_WARNING, FAULT_CRITICAL_SYSTEM_ERROR, i, high_water,
+                                 "WARNING: Low stack space in task '%s' (%u bytes free)",
+                                 stats_array[i].name, high_water);
+                    logWarning("[MONITOR] [WARN] Low stack: %s (%u bytes free)",
+                              stats_array[i].name, high_water);
+                }
             }
         }
+    }
+    if (should_log_health) {
+        last_health_log_ms = millis();
     }
 
     // PHASE 5.4: Telemetry collection moved to dedicated Core 0 task

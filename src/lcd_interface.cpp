@@ -183,14 +183,25 @@ void lcdInterfaceUpdate() {
     }
     break;
 
-  case LCD_MODE_SERIAL:
+  case LCD_MODE_SERIAL: {
+    bool any_dirty = false;
     for (int i = 0; i < LCD_ROWS; i++) {
-      if (lcd_state.display_dirty[i]) {
-        logPrintf("[LCD:%d] %s\n", i, lcd_state.display[i]);
-        lcd_state.display_dirty[i] = false;
-      }
+        if (lcd_state.display_dirty[i]) {
+            any_dirty = true;
+            break;
+        }
+    }
+    
+    if (any_dirty) {
+        logPrintf("[LCD  ] +--------------------+\r\n");
+        for (int i = 0; i < LCD_ROWS; i++) {
+            logPrintf("[LCD:%d] |%-20s|\r\n", i, lcd_state.display[i]);
+            lcd_state.display_dirty[i] = false;
+        }
+        logPrintf("[LCD  ] +--------------------+\r\n");
     }
     break;
+  }
 
   case LCD_MODE_NONE:
     break;
@@ -330,14 +341,14 @@ void lcdInterfaceGetContent(char content[LCD_ROWS][LCD_COLS + 1]) {
 }
 
 void lcdInterfaceDiagnostics() {
-  logPrintln("\n[LCD] === Diagnostics ===");
-  logPrintf("Mode: %d\nI2C Found: %s\nBacklight: %s\nUpdates: %lu\nI2C Errors: %u\n",
+  logPrintln("\r\n[LCD] === Diagnostics ===");
+  logPrintf("Mode: %d\r\nI2C Found: %s\r\nBacklight: %s\r\nUpdates: %lu\r\nI2C Errors: %u\r\n",
                 lcd_state.mode, lcd_state.i2c_found ? "YES" : "NO",
                 lcd_state.backlight_on ? "ON" : "OFF",
                 (unsigned long)lcd_state.update_count,
                 lcd_state.consecutive_i2c_errors);
 
   for (int i = 0; i < LCD_ROWS; i++) {
-    logPrintf("  [%d] %s\n", i, lcd_state.display[i]);
+    logPrintf("  [%d] %s\r\n", i, lcd_state.display[i]);
   }
 }

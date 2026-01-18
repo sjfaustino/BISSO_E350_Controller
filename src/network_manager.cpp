@@ -104,7 +104,7 @@ static void tryNtpSync() {
             ntp_last_sync = now;
             char buf[32];
             strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
-            Serial.printf("[NTP] Time synced: %s UTC\r\n", buf);
+            logPrintf("[NTP] Time synced: %s UTC\r\n", buf);
             return;
         }
     }
@@ -436,7 +436,7 @@ void NetworkManager::update() {
         telnet_auth_state = TELNET_AUTH_AUTHENTICATED;
         telnet_failed_attempts = 0;
         // Log to serial first (before telnet gets prompt)
-        Serial.printf("[INFO]  [NET] Telnet Auth SUCCESS for user '%s'\r\n", telnet_username_attempt);
+        logPrintf("[INFO]  [NET] Telnet Auth SUCCESS for user '%s'\r\n", telnet_username_attempt);
         telnetClient.println("\r\nAuthentication successful.");
         telnetClient.println("Type 'help' for available commands.");
         telnetClient.print("> ");
@@ -469,7 +469,7 @@ void NetworkManager::update() {
         telnetClient.println("Goodbye.");
         telnetClient.stop();
         resetTelnetAuthState();
-        Serial.println("[INFO]  [NET] Telnet Client Logged Out");
+        logPrintln("[INFO]  [NET] Telnet Client Logged Out");
       } else if (input == "?") {
         // Real-time status query - format Grbl-compatible status
         const char* state = "Idle";
@@ -499,7 +499,7 @@ void NetworkManager::update() {
         telnetClient.print("> ");
       } else {
         // Log to serial only (not mirrored to telnet)
-        Serial.printf("[INFO]  [NET] Remote Command: %s\r\n", input.c_str());
+        logPrintf("[INFO]  [NET] Remote Command: %s\r\n", input.c_str());
         // Inject into CLI processor
         cliProcessCommand(input.c_str());
         telnetClient.print("> ");

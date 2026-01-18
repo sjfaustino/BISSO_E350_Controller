@@ -166,17 +166,17 @@ void faultRecoveryResetAll() {
 
 void faultRecoveryDiagnostics() {
     serialLoggerLock();
-    Serial.println("\n[FAULT_RECOVERY] === Recovery Status ===");
+    logPrintln("\n[FAULT_RECOVERY] === Recovery Status ===");
 
     for (int i = 0; i < 6; i++) {
         const fault_recovery_t* recovery = &recovery_data[i];
 
-        Serial.printf("\n%s:\n", faultTypeToString(recovery->type));
-        Serial.printf("  Strategy: %s\n", recoveryStrategyToString(recovery->strategy));
-        Serial.printf("  Retries: %lu/%lu\n", (unsigned long)recovery->retry_count, (unsigned long)recovery->max_retries);
-        Serial.printf("  Recovery Count: %lu\n", (unsigned long)recovery->recovery_count);
-        Serial.printf("  Last Status: %s\n", recovery->success ? "SUCCESS" : "FAILED");
-        Serial.printf("  Backoff: %lu ms\n", (unsigned long)recovery->backoff_delay_ms);
+        logPrintf("\n%s:\n", faultTypeToString(recovery->type));
+        logPrintf("  Strategy: %s\n", recoveryStrategyToString(recovery->strategy));
+        logPrintf("  Retries: %lu/%lu\n", (unsigned long)recovery->retry_count, (unsigned long)recovery->max_retries);
+        logPrintf("  Recovery Count: %lu\n", (unsigned long)recovery->recovery_count);
+        logPrintf("  Last Status: %s\n", recovery->success ? "SUCCESS" : "FAILED");
+        logPrintf("  Backoff: %lu ms\n", (unsigned long)recovery->backoff_delay_ms);
     }
     serialLoggerUnlock();
 }

@@ -160,12 +160,12 @@ void cliInit() {
 }
 
 void cliUpdate() {
-  while (Serial.available() > 0) {
-    char c = Serial.peek(); 
+  while (CLI_SERIAL.available() > 0) {
+    char c = CLI_SERIAL.peek(); 
 
     // 1. Real-time Status (?)
     if (c == '?') {
-        Serial.read();
+        CLI_SERIAL.read();
         const char* state_str = "Idle";
         if (motionIsEmergencyStopped()) state_str = "Alarm";
         else if (safetyIsAlarmed()) state_str = "Hold:1";
@@ -197,10 +197,10 @@ void cliUpdate() {
     }
 
     // 2. Real-time Overrides
-    if (c == '!') { Serial.read(); motionPause(); return; }
-    if (c == '~') { Serial.read(); motionResume(); return; }
+    if (c == '!') { CLI_SERIAL.read(); motionPause(); return; }
+    if (c == '~') { CLI_SERIAL.read(); motionResume(); return; }
     if (c == 0x18) { // Soft Reset
-        Serial.read();
+        CLI_SERIAL.read();
         motionEmergencyStop();
         logPrintln("\r\nGrbl 1.1h ['$' for help]");
         cli_pos = 0;
@@ -208,7 +208,7 @@ void cliUpdate() {
     }
 
     // 3. Command buffering
-    c = Serial.read(); 
+    c = CLI_SERIAL.read(); 
     
     // --- ESCAPE SEQUENCE HANDLING (History) ---
     if (esc_state == 0 && c == 0x1B) { // ESC
@@ -222,7 +222,7 @@ void cliUpdate() {
             if (strlen(history_buffer) > 0) {
                 // Clear current line on terminal
                 if (cli_echo_enabled) {
-                    for (int i = 0; i < cli_pos; i++) Serial.print("\b \b");
+                    for (int i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
                 }
                 
                 // Copy history to current buffer
@@ -230,7 +230,7 @@ void cliUpdate() {
                 cli_pos = strlen(cli_buffer);
                 
                 // Echo the recalled command
-                if (cli_echo_enabled) Serial.print(cli_buffer);
+                if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
             }
         }
         esc_state = 0;
@@ -249,7 +249,7 @@ void cliUpdate() {
       last_was_eol = true;
       last_eol_char = c;
 
-      if (cli_echo_enabled) Serial.println();
+      if (cli_echo_enabled) CLI_SERIAL.println();
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
         
@@ -271,12 +271,12 @@ void cliUpdate() {
       last_was_eol = false;
       if (cli_pos > 0) {
         cli_pos--;
-        if (cli_echo_enabled) Serial.print("\b \b");
+        if (cli_echo_enabled) CLI_SERIAL.print("\b \b");
       }
     } else if (c >= 32 && c < 127 && cli_pos < CLI_BUFFER_SIZE - 1) {
       last_was_eol = false;
       cli_buffer[cli_pos++] = c;
-      if (cli_echo_enabled) Serial.write(c);
+      if (cli_echo_enabled) CLI_SERIAL.write(c);
     }
   }
 }

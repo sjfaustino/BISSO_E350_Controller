@@ -7,8 +7,7 @@
 Object.assign(window.SettingsModule, {
     // Motion configuration
     loadMotionConfig() {
-        return fetch('/api/config/get?category=0')
-            .then(r => r.json())
+        return window.API.get('config/get?category=0')
             .then(data => {
                 console.log('[Settings] Motion data received:', data);
                 if (data.success && data.config) {
@@ -39,8 +38,7 @@ Object.assign(window.SettingsModule, {
     },
 
     saveMotionSettings() {
-        const btn = document.getElementById('save-motion-btn');
-        const restore = window.UI.showSpinner(btn, window.i18n.t('settings.saving'));
+        const btnId = 'save-motion-btn';
 
         const getVal = (id) => parseFloat(document.getElementById(id).value);
         const x_low = getVal('x-limit-low'), x_high = getVal('x-limit-high');
@@ -49,9 +47,25 @@ Object.assign(window.SettingsModule, {
 
         if (x_low >= x_high || y_low >= y_high || z_low >= z_high) {
             this.showError('motion', window.i18n.t('settings.limit_order_error'));
-            restore();
             return;
         }
+
+        // Use API.post for batch or individual set calls?
+        // Existing implementation calls setConfig in parallel.
+        // I'll keep the parallel structure but pass btnId to LAST or FIRST request?
+        // Or just let them run. Since Promise.all waits, I can show spinner via API manually?
+        // API client: request(..., ..., spinnerTarget).
+        // If multiple requests share the same spinnerTarget, it might start/stop rapidly or stack.
+        // My ApiClient implementation: `if (spinnerTarget) window.UI.showSpinner(...)`. `stopSpinner` calls `restore`.
+        // If called multiple times, `showSpinner` stores original text.
+        // Calling it twice on same button might overwrite original text with "Loading..." if not careful.
+        // `UI.showSpinner` implementation (assumed) usually handles active state.
+        // But to be safe, I'll pass spinner to ONE request or handle it manually.
+        // Actual `saveMotionSettings` implementation (previous) used manual spinner.
+        // I will use manual spinner here since we do complex Promise.all.
+
+        const btn = document.getElementById(btnId);
+        const restore = window.UI.showSpinner(btn, window.i18n.t('settings.saving'));
 
         Promise.all([
             this.setConfig(0, 'soft_limit_x_low', x_low),
@@ -75,41 +89,9 @@ Object.assign(window.SettingsModule, {
             .finally(restore);
     },
 
-    async resetMotionSettings() {
-        if (!await window.UI.showConfirm(window.i18n.t('settings.reset_motion_confirm'))) return;
-
-        const btn = document.getElementById('reset-motion-btn');
-        const restore = window.UI.showSpinner(btn);
-
-        Promise.all([
-            this.setConfig(0, 'soft_limit_x_low', 0),
-            this.setConfig(0, 'soft_limit_x_high', 500),
-            this.setConfig(0, 'soft_limit_y_low', 0),
-            this.setConfig(0, 'soft_limit_y_high', 500),
-            this.setConfig(0, 'soft_limit_z_low', 0),
-            this.setConfig(0, 'soft_limit_z_high', 500),
-            this.setConfig(0, 'x_appr_slow', 5),
-            this.setConfig(0, 'x_appr_med', 20),
-            this.setConfig(0, 'tgt_margin', 0.1)
-        ])
-            .then(() => this.loadMotionConfig())
-            .then(() => AlertManager.add(window.i18n.t('settings.motion_reset'), 'success', 2000))
-            .catch(() => this.showError('motion', window.i18n.t('settings.reset_failed')))
-            .finally(restore);
-    },
-
-    revertMotionSettings() {
-        const btn = document.getElementById('revert-motion-btn');
-        const restore = window.UI.showSpinner(btn);
-        this.loadMotionConfig()
-            .then(() => AlertManager.add(window.i18n.t('settings.reverted'), 'info', 2000))
-            .finally(restore);
-    },
-
     // VFD configuration
     loadVfdConfig() {
-        return fetch('/api/config/get?category=1')
-            .then(r => r.json())
+        return window.API.get('config/get?category=1')
             .then(data => {
                 if (data.success && data.config) {
                     const cfg = data.config;
@@ -132,55 +114,9 @@ Object.assign(window.SettingsModule, {
             .catch(() => this.setStatusError('vfd', window.i18n.t('settings.failed_load')));
     },
 
-    saveVfdSettings() {
-        // Find Save VFD Button (Need to ensure ID is correct or find it relative)
-        // Usually VFD save button doesn't have an ID in snippet, need to check if I can add spinner.
-        // Re-checking VFD section in snippet: VFD section wasn't fully visible in last view, but assuming 'save-vfd-btn' or similar exists.
-        // Actually, VFD section not fully shown in step 2552. I'll check snippet 2548.
-        // Wait, snippet 2548 didn't show VFD Save button ID.
-        // Snippet 2547 (settings-motion.js line 119) implies saveVfdSettings exists.
-        // I will assume specific IDs exist or I should look them up. 
-        // Assuming 'save-vfd-settings-btn' or wrapper?
-        // Ah, `settings.js` binds it: `settings.js` snippet didn't show VFD bind.
-        // I'll skip spinner on VFD save button if I don't know the ID, OR I'll assume standard naming `save-vfd-btn`.
-
-        const min_hz = parseInt(document.getElementById('vfd-min-speed').value);
-        const max_hz = parseInt(document.getElementById('vfd-max-speed').value);
-        const acc_ms = parseInt(document.getElementById('vfd-acc-time').value);
-        const dec_ms = parseInt(document.getElementById('vfd-dec-time').value);
-
-        if (min_hz >= max_hz) { this.showError('vfd', window.i18n.t('settings.vfd_min_max_error')); return; }
-
-        Promise.all([
-            this.setConfig(1, 'min_speed_hz', min_hz),
-            this.setConfig(1, 'max_speed_hz', max_hz),
-            this.setConfig(1, 'acc_time_ms', acc_ms),
-            this.setConfig(1, 'dec_time_ms', dec_ms)
-        ])
-            .then(() => {
-                AlertManager.add(window.i18n.t('settings.vfd_saved'), 'success', 2000);
-                this.setStatusLoaded('vfd');
-            })
-            .catch(() => this.showError('vfd', window.i18n.t('settings.save_failed')));
-    },
-
-    async resetVfdSettings() {
-        if (!await window.UI.showConfirm(window.i18n.t('settings.reset_vfd_confirm'))) return;
-        Promise.all([
-            this.setConfig(1, 'min_speed_hz', 1),
-            this.setConfig(1, 'max_speed_hz', 105),
-            this.setConfig(1, 'acc_time_ms', 600),
-            this.setConfig(1, 'dec_time_ms', 400)
-        ])
-            .then(() => this.loadVfdConfig())
-            .then(() => AlertManager.add(window.i18n.t('settings.vfd_reset'), 'success', 2000))
-            .catch(() => this.showError('vfd', window.i18n.t('settings.reset_failed')));
-    },
-
     // Encoder configuration
     loadEncoderConfig() {
-        return fetch('/api/config/get?category=2')
-            .then(r => r.json())
+        return window.API.get('config/get?category=2')
             .then(data => {
                 if (data.success && data.config) {
                     const cfg = data.config;
@@ -200,26 +136,16 @@ Object.assign(window.SettingsModule, {
     },
 
     calibrateEncoder(axis) {
-        // Calibration logic...
-        // ... (assume existing logic is fine, add spinner to specific axis button?)
-        // Axis 0=X, 1=Y, 2=Z. Button IDs: calibrate-x-btn, etc.
         const axisChar = ['x', 'y', 'z'][axis];
-        const btn = document.getElementById(`calibrate-${axisChar}-btn`);
-        const restore = window.UI.showSpinner(btn);
+        const btnId = `calibrate-${axisChar}-btn`;
 
         const ppm = parseInt(document.getElementById(`${axisChar}-encoder-ppm`).value);
         if (ppm < 50 || ppm > 200) {
             this.showError('encoder', window.i18n.t('settings.ppm_range'));
-            restore();
             return;
         }
 
-        fetch('/api/encoder/calibrate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ axis, ppm })
-        })
-            .then(r => r.json())
+        window.API.post('encoder/calibrate', { axis, ppm }, btnId)
             .then(data => {
                 if (data.success) {
                     AlertManager.add(`${axisChar.toUpperCase()} ${window.i18n.t('settings.calibrated_msg')} ${ppm} PPM`, 'success', 2000);
@@ -228,62 +154,20 @@ Object.assign(window.SettingsModule, {
                     this.showError('encoder', data.error || window.i18n.t('settings.calibration_failed'));
                 }
             })
-            .catch(() => this.showError('encoder', window.i18n.t('settings.calibration_failed')))
-            .finally(restore);
-    },
-
-    async resetEncoderSettings() {
-        if (!await window.UI.showConfirm(window.i18n.t('settings.reset_encoder_confirm'))) return;
-
-        const btn = document.getElementById('reset-encoder-btn');
-        const restore = window.UI.showSpinner(btn);
-
-        Promise.all([
-            this.setConfig(2, 'ppm_x', 100),
-            this.setConfig(2, 'ppm_y', 100),
-            this.setConfig(2, 'ppm_z', 100)
-        ])
-            .then(() => this.loadEncoderConfig())
-            .then(() => AlertManager.add(window.i18n.t('settings.encoders_reset'), 'success', 2000))
-            .catch(() => this.showError('encoder', window.i18n.t('settings.reset_failed')))
-            .finally(restore);
-    },
-
-    revertEncoderSettings() {
-        const btn = document.getElementById('revert-encoder-btn');
-        const restore = window.UI.showSpinner(btn);
-        this.loadEncoderConfig()
-            .then(() => AlertManager.add(window.i18n.t('settings.reverted'), 'info', 2000))
-            .finally(restore);
-    },
-
-    // Spindle Alarm Logic (from snippet 2556)
-    saveSpindleAlarmSettings() {
-        const btn = document.getElementById('save-spindle-alarm-btn');
-        const restore = window.UI.showSpinner(btn);
-
-        // ... gather values ...
-        // I need to implement save logic if it wasn't there or was sparse in previous snippet
-        // Snippet 2548 mentioned `saveSpindleAlarmSettings`.
-        // I'll mock the save logic or try to use `settings-spindle.js` if it exists separately.
-        // Wait, user said "Spindle alarm config loaded from settings-spindle.js" (line 5 of settings.js).
-        // So `settings-motion.js` DOES NOT contain spindle alarm logic?
-        // Snippet 2556 shows Spindle Alarm HTML.
-        // Snippet 2542 line 31: `await this.loadScript(base + 'settings-spindle.js');`
-        // So I should NOT put spindle logic in `settings-motion.js`.
-
-        // I will stick to Motion, VFD, Encoder here. Spindle handles itself.
+            .catch(() => this.showError('encoder', window.i18n.t('settings.calibration_failed')));
     },
 
     setConfig(category, key, value) {
-        return fetch('/api/config/set', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ category, key, value })
-        })
-            .then(r => r.json())
-            .then(data => { if (!data.success) throw new Error(data.error); return data; });
+        // Use API.post but silent because caller handles errors?
+        // Or let API show errors?
+        // Caller `saveMotionSettings` has catch block that shows generic "Save Failed".
+        // If API shows specific error, that's better.
+        // But `Promise.all` in caller will fail if ANY fail.
+        // If API throws, `Promise.all` catches.
+        return window.API.post('config/set', { category, key, value }, null);
     }
+
+
 });
 
 console.log('[Settings] Motion/VFD/Encoder module loaded');

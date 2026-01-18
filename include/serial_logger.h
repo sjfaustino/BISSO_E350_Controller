@@ -5,6 +5,23 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+// ESP32-S2/S3 USB CDC Note:
+// All serial output should use logPrintf/logPrintln from this module.
+// For CLI input functions that need Serial.available()/read(), use CLI_SERIAL.
+
+#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
+    #if ARDUINO_USB_CDC_ON_BOOT
+        #include "USB.h"
+        #include "USBCDC.h"
+        extern USBCDC USBSerial;
+        #define CLI_SERIAL USBSerial
+    #else
+        #define CLI_SERIAL Serial
+    #endif
+#else
+    #define CLI_SERIAL Serial
+#endif
+
 // ============================================================================
 // LOG LEVEL DEFINITIONS
 // ============================================================================

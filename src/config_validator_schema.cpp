@@ -470,9 +470,9 @@ size_t configExportSchemaJSON(char* buffer, size_t buffer_size) {
 
 void configPrintSchema() {
     serialLoggerLock();
-    Serial.println("\n[CONFIG SCHEMA] === Configuration Parameters ===");
-    Serial.println("Key                               | Type   | Min/Max          | Unit      | Critical");
-    Serial.println("-----------------------------|--------|------------------|-----------|----------");
+    logPrintln("\n[CONFIG SCHEMA] === Configuration Parameters ===");
+    logPrintln("Key                               | Type   | Min/Max          | Unit      | Critical");
+    logPrintln("-----------------------------|--------|------------------|-----------|----------");
 
     for (int i = 0; i < schema_count; i++) {
         const config_descriptor_t* desc = &config_schema[i];
@@ -504,12 +504,12 @@ void configPrintSchema() {
                 snprintf(range_str, sizeof(range_str), "?");
         }
 
-        Serial.printf("%-35s | %-6s | %-16s | %-9s | %s\n",
+        logPrintf("%-35s | %-6s | %-16s | %-9s | %s\r\n",
             desc->key, type_str, range_str,
             desc->unit ? desc->unit : "-",
             desc->critical ? "YES" : "no");
     }
 
-    Serial.printf("\nTotal parameters: %d\n\n", schema_count);
+    logPrintf("\r\nTotal parameters: %d\r\n\r\n", schema_count);
     serialLoggerUnlock();
 }
