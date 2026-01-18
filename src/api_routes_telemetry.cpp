@@ -86,33 +86,42 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
     // GET /api/telemetry - Alias for /api/status (backwards compatibility)
     server.on("/api/telemetry", HTTP_GET, statusHandler);
     
-    // GET /api/spindle - Spindle monitor state
+    // GET /api/spindle - Spindle monitor state (OPTIMIZED: snprintf, no heap)
     server.on("/api/spindle", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
         const spindle_monitor_state_t* state = spindleMonitorGetState();
-        JsonDocument doc;
-        doc["current_amps"] = state->current_amps;
-        doc["peak_amps"] = state->current_peak_amps;
-        doc["threshold_amps"] = state->overcurrent_threshold_amps;
-        doc["auto_pause_threshold"] = state->auto_pause_threshold_amps;
-        doc["auto_pause_count"] = state->auto_pause_count;
-        doc["overcurrent"] = state->alarm_overload;
-
-        return sendJsonResponse(response, doc);
+        
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer),
+            "{\"current_amps\":%.2f,\"peak_amps\":%.2f,\"threshold_amps\":%.2f,"
+            "\"auto_pause_threshold\":%.2f,\"auto_pause_count\":%u,\"overcurrent\":%s}",
+            state->current_amps,
+            state->current_peak_amps,
+            state->overcurrent_threshold_amps,
+            state->auto_pause_threshold_amps,
+            state->auto_pause_count,
+            state->alarm_overload ? "true" : "false"
+        );
+        
+        return response->send(200, "application/json", buffer);
     });
     
-    // GET /api/spindle/alarm - Spindle alarm thresholds
+    // GET /api/spindle/alarm - Spindle alarm thresholds (OPTIMIZED: snprintf, no heap)
     server.on("/api/spindle/alarm", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        doc["success"] = true;
-        doc["toolbreak_threshold"] = configGetFloat(KEY_SPINDL_TOOLBREAK_THR, 5.0f);
-        doc["stall_threshold"] = configGetInt(KEY_SPINDL_PAUSE_THR, 25);
-        doc["stall_timeout_ms"] = configGetInt(KEY_STALL_TIMEOUT, 2000);
-        
         const spindle_monitor_state_t* state = spindleMonitorGetState();
-        doc["alarm_tool_breakage"] = state->alarm_overload;
-        doc["alarm_stall"] = state->alarm_overload;
+        float toolbreak = configGetFloat(KEY_SPINDL_TOOLBREAK_THR, 5.0f);
+        int stall_thr = configGetInt(KEY_SPINDL_PAUSE_THR, 25);
+        int stall_timeout = configGetInt(KEY_STALL_TIMEOUT, 2000);
         
-        return sendJsonResponse(response, doc);
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer),
+            "{\"success\":true,\"toolbreak_threshold\":%.2f,\"stall_threshold\":%d,"
+            "\"stall_timeout_ms\":%d,\"alarm_tool_breakage\":%s,\"alarm_stall\":%s}",
+            toolbreak, stall_thr, stall_timeout,
+            state->alarm_overload ? "true" : "false",
+            state->alarm_overload ? "true" : "false"
+        );
+        
+        return response->send(200, "application/json", buffer);
     });
     
     // POST /api/spindle/alarm - Set spindle alarm thresholds
