@@ -138,9 +138,9 @@ void taskManagerInit() {
   // NOTE: mutex_i2c_board, mutex_i2c_plc, mutex_lcd rely on mutex_i2c
   // to ensure exclusive access to the shared Wire bus.
 
-  mutex_motion = xSemaphoreCreateMutex();
+  mutex_motion = xSemaphoreCreateRecursiveMutex();
   if (!mutex_motion) {
-    logError("[TASKS] Motion mutex creation failed!");
+    logError("[TASKS] Motion recursive mutex creation failed!");
     mutex_failure = true;
   }
 
@@ -242,12 +242,23 @@ bool taskLockMutex(SemaphoreHandle_t mutex, uint32_t timeout_ms) {
     return false;
   TickType_t ticks =
       (timeout_ms == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
+  
+  // PHASE 8: Handle recursive mutexes specifically for motion
+  if (mutex == mutex_motion) {
+    return xSemaphoreTakeRecursive(mutex, ticks) == pdTRUE;
+  }
+  
   return xSemaphoreTake(mutex, ticks) == pdTRUE;
 }
 
 void taskUnlockMutex(SemaphoreHandle_t mutex) {
-  if (mutex)
+  if (!mutex) return;
+  
+  if (mutex == mutex_motion) {
+    xSemaphoreGiveRecursive(mutex);
+  } else {
     xSemaphoreGive(mutex);
+  }
 }
 
 bool taskSendMessage(QueueHandle_t queue, const queue_message_t *msg) {

@@ -95,46 +95,43 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", buffer);
     });
     
-    // GET /api/gcode/queue (OPTIMIZED: snprintf, no heap churn)
-    server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+    // GET /api/gcode/queue (OPTIMIZED: Chunked streaming, no heap churn)
+    server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         gcode_queue_state_t state = gcodeQueueGetState();
         gcode_job_t jobs[10];
         uint16_t count = gcodeQueueGetAll(jobs, 10);
 
-        char* buffer = (char*)malloc(3072);
-        if (!buffer) return response->send(500, "application/json", "{\"error\":\"Out of memory\"}");
-        
-        char* p = buffer;
-        size_t remain = 3072;
-        int n;
+        response->setContentType("application/json");
 
-        n = snprintf(p, remain, 
+        char header[256];
+        size_t h_len = snprintf(header, sizeof(header), 
             "{\"success\":true,\"queue\":{\"total\":%u,\"pending\":%d,\"completed\":%d,\"failed\":%d,\"current_job_id\":%d,\"paused\":%s},\"jobs\":[",
             state.total_jobs, state.pending_count, state.completed_count, state.failed_count, 
             state.current_job_id, state.paused ? "true" : "false");
-        if (n > 0) { p += n; remain -= n; }
+        response->sendChunk((uint8_t*)header, h_len);
 
         for (uint16_t i = 0; i < count; i++) {
-            n = snprintf(p, remain, 
+            char job_buf[512];
+            size_t j_len = snprintf(job_buf, sizeof(job_buf), 
                 "{\"id\":%u,\"command\":\"%s\",\"status\":%d,\"queued_time\":%lu,\"start_time\":%lu,\"end_time\":%lu",
                 jobs[i].id, jobs[i].command, (int)jobs[i].status, 
                 (unsigned long)jobs[i].queued_time_ms, (unsigned long)jobs[i].start_time_ms, (unsigned long)jobs[i].end_time_ms);
-            if (n > 0) { p += n; remain -= n; }
-
+            
             if (jobs[i].status == JOB_FAILED) {
-                n = snprintf(p, remain, ",\"error\":\"%s\"", jobs[i].error);
-                if (n > 0) { p += n; remain -= n; }
+                size_t e_len = snprintf(job_buf + j_len, sizeof(job_buf) - j_len, ",\"error\":\"%s\"", jobs[i].error);
+                j_len += e_len;
             }
 
-            n = snprintf(p, remain, "}%s", (i < count - 1) ? "," : "");
-            if (n > 0) { p += n; remain -= n; }
+            size_t s_len = snprintf(job_buf + j_len, sizeof(job_buf) - j_len, "}%s", (i < count - 1) ? "," : "");
+            j_len += s_len;
+            
+            response->sendChunk((uint8_t*)job_buf, j_len);
         }
 
-        snprintf(p, remain, "]}");
+        const char* footer = "]}";
+        response->sendChunk((uint8_t*)footer, strlen(footer));
         
-        esp_err_t res = response->send(200, "application/json", buffer);
-        free(buffer);
-        return res;
+        return response->finishChunking();
     });
     
     // POST /api/gcode/queue/retry

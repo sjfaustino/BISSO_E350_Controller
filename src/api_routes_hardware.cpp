@@ -91,41 +91,37 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", buffer);
     });
 
-    // GET /api/hardware/pins (OPTIMIZED: snprintf, no heap churn)
+    // GET /api/hardware/pins (OPTIMIZED: Chunked streaming, no large buffer)
     server.on("/api/hardware/pins", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        char* buffer = (char*)malloc(8192);
-        if (!buffer) return response->send(500, "application/json", "{\"error\":\"Out of memory\"}");
-        
-        char* p = buffer;
-        size_t remain = 8192;
-        int n;
+        response->setContentType("application/json");
 
-        n = snprintf(p, remain, "{\"success\":true,\"pins\":[");
-        if (n > 0) { p += n; remain -= n; }
+        const char* header = "{\"success\":true,\"pins\":[";
+        response->sendChunk((uint8_t*)header, strlen(header));
 
         for (size_t i = 0; i < PIN_COUNT; i++) {
-            n = snprintf(p, remain, "{\"gpio\":%d,\"silk\":\"%s\",\"type\":\"%s\",\"note\":\"%s\"}%s",
+            char buf[256];
+            size_t len = snprintf(buf, sizeof(buf), "{\"gpio\":%d,\"silk\":\"%s\",\"type\":\"%s\",\"note\":\"%s\"}%s",
                 pinDatabase[i].gpio, pinDatabase[i].silk, pinDatabase[i].type, 
                 pinDatabase[i].note ? pinDatabase[i].note : "", (i < PIN_COUNT - 1) ? "," : "");
-            if (n > 0) { p += n; remain -= n; }
+            response->sendChunk((uint8_t*)buf, len);
         }
 
-        n = snprintf(p, remain, "],\"signals\":[");
-        if (n > 0) { p += n; remain -= n; }
+        const char* signals_start = "],\"signals\":[";
+        response->sendChunk((uint8_t*)signals_start, strlen(signals_start));
 
         for (size_t i = 0; i < SIGNAL_COUNT; i++) {
-            n = snprintf(p, remain, "{\"key\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"current_pin\":%d,\"default_pin\":%d}%s",
+            char buf[256];
+            size_t len = snprintf(buf, sizeof(buf), "{\"key\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"current_pin\":%d,\"default_pin\":%d}%s",
                 signalDefinitions[i].key, signalDefinitions[i].name, signalDefinitions[i].type,
                 getPin(signalDefinitions[i].key), signalDefinitions[i].default_gpio,
                 (i < SIGNAL_COUNT - 1) ? "," : "");
-            if (n > 0) { p += n; remain -= n; }
+            response->sendChunk((uint8_t*)buf, len);
         }
 
-        snprintf(p, remain, "]}");
+        const char* footer = "]}";
+        response->sendChunk((uint8_t*)footer, strlen(footer));
         
-        esp_err_t res = response->send(200, "application/json", buffer);
-        free(buffer);
-        return res;
+        return response->finishChunking();
     });
 
     // POST /api/hardware/pins

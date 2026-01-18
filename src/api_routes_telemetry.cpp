@@ -155,47 +155,44 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"success\":true}");
     });
     
-    // GET /api/history/telemetry (OPTIMIZED: snprintf, no heap)
-    server.on("/api/history/telemetry", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        char* buffer = (char*)malloc(4096);
-        if (!buffer) return response->send(500, "application/json", "{\"error\":\"Out of memory\"}");
+    // GET /api/history/telemetry (OPTIMIZED: Chunked streaming, no heap buffer)
+    server.on("/api/history/telemetry", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        response->setContentType("application/json");
         
-        char* p = buffer;
-        size_t remain = 4096;
-        int n;
-
-        n = snprintf(p, remain, "{\"success\":true,\"cpu\":[");
-        if (n > 0) { p += n; remain -= n; }
+        const char* header = "{\"success\":true,\"cpu\":[";
+        response->sendChunk((uint8_t*)header, strlen(header));
 
         for (int i = 0; i < history_count; i++) {
             int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
-            n = snprintf(p, remain, "%d%s", telemetry_history[idx].cpu, (i < history_count - 1) ? "," : "");
-            if (n > 0) { p += n; remain -= n; }
+            char val[16];
+            size_t len = snprintf(val, sizeof(val), "%d%s", telemetry_history[idx].cpu, (i < history_count - 1) ? "," : "");
+            response->sendChunk((uint8_t*)val, len);
         }
 
-        n = snprintf(p, remain, "],\"heap\":[");
-        if (n > 0) { p += n; remain -= n; }
+        const char* heap_start = "],\"heap\":[";
+        response->sendChunk((uint8_t*)heap_start, strlen(heap_start));
 
         for (int i = 0; i < history_count; i++) {
             int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
-            n = snprintf(p, remain, "%lu%s", (unsigned long)telemetry_history[idx].heap, (i < history_count - 1) ? "," : "");
-            if (n > 0) { p += n; remain -= n; }
+            char val[24];
+            size_t len = snprintf(val, sizeof(val), "%lu%s", (unsigned long)telemetry_history[idx].heap, (i < history_count - 1) ? "," : "");
+            response->sendChunk((uint8_t*)val, len);
         }
 
-        n = snprintf(p, remain, "],\"spindle_amps\":[");
-        if (n > 0) { p += n; remain -= n; }
+        const char* spindle_start = "],\"spindle_amps\":[";
+        response->sendChunk((uint8_t*)spindle_start, strlen(spindle_start));
 
         for (int i = 0; i < history_count; i++) {
             int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
-            n = snprintf(p, remain, "%.2f%s", telemetry_history[idx].spindle, (i < history_count - 1) ? "," : "");
-            if (n > 0) { p += n; remain -= n; }
+            char val[16];
+            size_t len = snprintf(val, sizeof(val), "%.2f%s", telemetry_history[idx].spindle, (i < history_count - 1) ? "," : "");
+            response->sendChunk((uint8_t*)val, len);
         }
 
-        snprintf(p, remain, "]}");
+        const char* footer = "]}";
+        response->sendChunk((uint8_t*)footer, strlen(footer));
         
-        esp_err_t res = response->send(200, "application/json", buffer);
-        free(buffer);
-        return res;
+        return response->finishChunking();
     });
     
     logDebug("[WEB] Telemetry routes registered");
