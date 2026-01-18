@@ -79,18 +79,20 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
         return sendJsonResponse(response, resp);
     });
 
-    // GET /api/gcode/state
+    // GET /api/gcode/state (OPTIMIZED: snprintf, no heap)
     server.on("/api/gcode/state", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        doc["success"] = true;
-        doc["absolute_mode"] = (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE);
-        doc["feedrate"] = gcodeParser.getCurrentFeedRate();
+        char state_str[64];
+        gcodeParser.getParserState(state_str, sizeof(state_str));
         
-        char buffer[64];
-        gcodeParser.getParserState(buffer, sizeof(buffer));
-        doc["state_str"] = buffer;
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer),
+            "{\"success\":true,\"absolute_mode\":%s,\"feedrate\":%.1f,\"state_str\":\"%s\"}",
+            (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE) ? "true" : "false",
+            gcodeParser.getCurrentFeedRate(),
+            state_str
+        );
 
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", buffer);
     });
     
     // GET /api/gcode/queue - Get queue state and job history
