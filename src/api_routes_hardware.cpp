@@ -20,32 +20,33 @@
 
 void registerHardwareRoutes(PsychicHttpServer& server) {
     
-    // GET /api/io/status
+    // GET /api/io/status (OPTIMIZED: snprintf, no heap)
     server.on("/api/io/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        doc["success"] = true;
-        
         uint8_t in_bits = elboI73GetRawState();
         uint8_t board_in = boardInputsGetRawState();
         uint8_t out_bits = elboQ73GetRawState();
         
-        doc["estop"] = (board_in & 0x08) != 0; 
-        doc["door"] = (board_in & 0x10) != 0;
-        doc["probe"] = (board_in & 0x20) != 0;
-        doc["limit_x"] = (board_in & 0x01) != 0;
-        doc["limit_y"] = (board_in & 0x02) != 0;
-        doc["limit_z"] = (board_in & 0x04) != 0;
-        
-        doc["spindle_on"] = (out_bits & 0x01) == 0;
-        doc["coolant_on"] = (out_bits & 0x02) == 0;
-        doc["vacuum_on"] = (out_bits & 0x04) == 0;
-        doc["alarm_on"] = (out_bits & 0x80) == 0;
+        char buffer[384];
+        snprintf(buffer, sizeof(buffer),
+            "{\"success\":true,"
+            "\"estop\":%s,\"door\":%s,\"probe\":%s,"
+            "\"limit_x\":%s,\"limit_y\":%s,\"limit_z\":%s,"
+            "\"spindle_on\":%s,\"coolant_on\":%s,\"vacuum_on\":%s,\"alarm_on\":%s,"
+            "\"raw_in\":%u,\"raw_out\":%u,\"raw_board\":%u}",
+            (board_in & 0x08) ? "true" : "false",
+            (board_in & 0x10) ? "true" : "false",
+            (board_in & 0x20) ? "true" : "false",
+            (board_in & 0x01) ? "true" : "false",
+            (board_in & 0x02) ? "true" : "false",
+            (board_in & 0x04) ? "true" : "false",
+            (out_bits & 0x01) == 0 ? "true" : "false",
+            (out_bits & 0x02) == 0 ? "true" : "false",
+            (out_bits & 0x04) == 0 ? "true" : "false",
+            (out_bits & 0x80) == 0 ? "true" : "false",
+            in_bits, out_bits, board_in
+        );
 
-        doc["raw_in"] = in_bits;
-        doc["raw_out"] = out_bits;
-        doc["raw_board"] = board_in;
-
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", buffer);
     });
     
     // GET /api/hardware/io
