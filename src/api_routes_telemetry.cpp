@@ -155,23 +155,47 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"success\":true}");
     });
     
-    // GET /api/history/telemetry - Historical telemetry data
+    // GET /api/history/telemetry (OPTIMIZED: snprintf, no heap)
     server.on("/api/history/telemetry", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        doc["success"] = true;
-        JsonArray cpu_arr = doc["cpu"].to<JsonArray>();
-        JsonArray heap_arr = doc["heap"].to<JsonArray>();
-        JsonArray spindle_arr = doc["spindle_amps"].to<JsonArray>();
+        char* buffer = (char*)malloc(4096);
+        if (!buffer) return response->send(500, "application/json", "{\"error\":\"Out of memory\"}");
+        
+        char* p = buffer;
+        size_t remain = 4096;
+        int n;
 
-        // Reconstruct chronological order from circular buffer
+        n = snprintf(p, remain, "{\"success\":true,\"cpu\":[");
+        if (n > 0) { p += n; remain -= n; }
+
         for (int i = 0; i < history_count; i++) {
             int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
-            cpu_arr.add(telemetry_history[idx].cpu);
-            heap_arr.add(telemetry_history[idx].heap);
-            spindle_arr.add(telemetry_history[idx].spindle);
+            n = snprintf(p, remain, "%d%s", telemetry_history[idx].cpu, (i < history_count - 1) ? "," : "");
+            if (n > 0) { p += n; remain -= n; }
         }
 
-        return sendJsonResponse(response, doc);
+        n = snprintf(p, remain, "],\"heap\":[");
+        if (n > 0) { p += n; remain -= n; }
+
+        for (int i = 0; i < history_count; i++) {
+            int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
+            n = snprintf(p, remain, "%lu%s", (unsigned long)telemetry_history[idx].heap, (i < history_count - 1) ? "," : "");
+            if (n > 0) { p += n; remain -= n; }
+        }
+
+        n = snprintf(p, remain, "],\"spindle_amps\":[");
+        if (n > 0) { p += n; remain -= n; }
+
+        for (int i = 0; i < history_count; i++) {
+            int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
+            n = snprintf(p, remain, "%.2f%s", telemetry_history[idx].spindle, (i < history_count - 1) ? "," : "");
+            if (n > 0) { p += n; remain -= n; }
+        }
+
+        snprintf(p, remain, "]}");
+        
+        esp_err_t res = response->send(200, "application/json", buffer);
+        free(buffer);
+        return res;
     });
     
     logDebug("[WEB] Telemetry routes registered");

@@ -95,38 +95,46 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", buffer);
     });
     
-    // GET /api/gcode/queue - Get queue state and job history
+    // GET /api/gcode/queue (OPTIMIZED: snprintf, no heap churn)
     server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        doc["success"] = true;
-        
         gcode_queue_state_t state = gcodeQueueGetState();
-        doc["queue"]["total"] = state.total_jobs;
-        doc["queue"]["pending"] = state.pending_count;
-        doc["queue"]["completed"] = state.completed_count;
-        doc["queue"]["failed"] = state.failed_count;
-        doc["queue"]["current_job_id"] = state.current_job_id;
-        doc["queue"]["paused"] = state.paused;
-        
-        // Get job history (last 10 jobs)
         gcode_job_t jobs[10];
         uint16_t count = gcodeQueueGetAll(jobs, 10);
+
+        char* buffer = (char*)malloc(3072);
+        if (!buffer) return response->send(500, "application/json", "{\"error\":\"Out of memory\"}");
         
-        JsonArray jobsArray = doc["jobs"].to<JsonArray>();
+        char* p = buffer;
+        size_t remain = 3072;
+        int n;
+
+        n = snprintf(p, remain, 
+            "{\"success\":true,\"queue\":{\"total\":%u,\"pending\":%d,\"completed\":%d,\"failed\":%d,\"current_job_id\":%d,\"paused\":%s},\"jobs\":[",
+            state.total_jobs, state.pending_count, state.completed_count, state.failed_count, 
+            state.current_job_id, state.paused ? "true" : "false");
+        if (n > 0) { p += n; remain -= n; }
+
         for (uint16_t i = 0; i < count; i++) {
-            JsonObject job = jobsArray.add<JsonObject>();
-            job["id"] = jobs[i].id;
-            job["command"] = jobs[i].command;
-            job["status"] = (int)jobs[i].status;
-            job["queued_time"] = jobs[i].queued_time_ms;
-            job["start_time"] = jobs[i].start_time_ms;
-            job["end_time"] = jobs[i].end_time_ms;
+            n = snprintf(p, remain, 
+                "{\"id\":%u,\"command\":\"%s\",\"status\":%d,\"queued_time\":%lu,\"start_time\":%lu,\"end_time\":%lu",
+                jobs[i].id, jobs[i].command, (int)jobs[i].status, 
+                (unsigned long)jobs[i].queued_time_ms, (unsigned long)jobs[i].start_time_ms, (unsigned long)jobs[i].end_time_ms);
+            if (n > 0) { p += n; remain -= n; }
+
             if (jobs[i].status == JOB_FAILED) {
-                job["error"] = jobs[i].error;
+                n = snprintf(p, remain, ",\"error\":\"%s\"", jobs[i].error);
+                if (n > 0) { p += n; remain -= n; }
             }
+
+            n = snprintf(p, remain, "}%s", (i < count - 1) ? "," : "");
+            if (n > 0) { p += n; remain -= n; }
         }
+
+        snprintf(p, remain, "]}");
         
-        return sendJsonResponse(response, doc);
+        esp_err_t res = response->send(200, "application/json", buffer);
+        free(buffer);
+        return res;
     });
     
     // POST /api/gcode/queue/retry
