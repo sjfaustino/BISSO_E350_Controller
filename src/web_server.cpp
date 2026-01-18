@@ -377,7 +377,7 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
 
     int n = snprintf(buffer, buffer_size,
         "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
-        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu%s%s%s%s%s%s},"
+        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu%s%s%s%s%s%s%s%s%s%s%s},"
         "\"motion_active\":%s,\"motion\":{\"position\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"a\":%.3f},\"dro_connected\":%s},"
         "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
         "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f},"
