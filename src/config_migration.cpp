@@ -28,7 +28,7 @@ static const config_default_t default_values[] = {
   // PHASE 5.10: PosiPro v2.0 Keys
   {KEY_MOTION_BUFFER_ENABLE, "1", "int32", true},
   {KEY_WIFI_SSID, "BISSO-E350-Setup", "string", true},
-  {KEY_WIFI_PASSWORD, "password", "string", true},
+  {KEY_WIFI_PASS, "password", "string", true},
   {KEY_WIFI_AP_EN, "1", "int32", true},
   {KEY_WIFI_AP_SSID, "BISSO-E350-Setup", "string", true},
   {KEY_WIFI_AP_PASS, "password", "string", true},

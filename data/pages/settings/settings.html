@@ -147,37 +147,43 @@
             <div class="card-content">
                 <div class="axis-group">
                     <h3 data-i18n="settings.x_limits">X-Axis Soft Limits (mm)</h3>
-                    <div class="setting-group">
-                        <label for="x-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
-                        <input type="number" id="x-limit-low" min="0" max="1000" class="form-control">
-                    </div>
-                    <div class="setting-group">
-                        <label for="x-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
-                        <input type="number" id="x-limit-high" min="0" max="1000" class="form-control">
+                    <div class="axis-inputs-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="setting-group" style="margin-bottom: 0;">
+                            <label for="x-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
+                            <input type="number" id="x-limit-low" min="0" max="1000" class="form-control">
+                        </div>
+                        <div class="setting-group" style="margin-bottom: 0;">
+                            <label for="x-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
+                            <input type="number" id="x-limit-high" min="0" max="1000" class="form-control">
+                        </div>
                     </div>
                 </div>
 
                 <div class="axis-group">
                     <h3 data-i18n="settings.y_limits">Y-Axis Soft Limits (mm)</h3>
-                    <div class="setting-group">
-                        <label for="y-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
-                        <input type="number" id="y-limit-low" min="0" max="1000" class="form-control">
-                    </div>
-                    <div class="setting-group">
-                        <label for="y-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
-                        <input type="number" id="y-limit-high" min="0" max="1000" class="form-control">
+                    <div class="axis-inputs-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="setting-group" style="margin-bottom: 0;">
+                            <label for="y-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
+                            <input type="number" id="y-limit-low" min="0" max="1000" class="form-control">
+                        </div>
+                        <div class="setting-group" style="margin-bottom: 0;">
+                            <label for="y-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
+                            <input type="number" id="y-limit-high" min="0" max="1000" class="form-control">
+                        </div>
                     </div>
                 </div>
 
                 <div class="axis-group">
                     <h3 data-i18n="settings.z_limits">Z-Axis Soft Limits (mm)</h3>
-                    <div class="setting-group">
-                        <label for="z-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
-                        <input type="number" id="z-limit-low" min="0" max="1000" class="form-control">
-                    </div>
-                    <div class="setting-group">
-                        <label for="z-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
-                        <input type="number" id="z-limit-high" min="0" max="1000" class="form-control">
+                    <div class="axis-inputs-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="setting-group" style="margin-bottom: 0;">
+                            <label for="z-limit-low" data-i18n="settings.lower_limit">Lower Limit:</label>
+                            <input type="number" id="z-limit-low" min="0" max="1000" class="form-control">
+                        </div>
+                        <div class="setting-group" style="margin-bottom: 0;">
+                            <label for="z-limit-high" data-i18n="settings.upper_limit">Upper Limit:</label>
+                            <input type="number" id="z-limit-high" min="0" max="1000" class="form-control">
+                        </div>
                     </div>
                 </div>
 
@@ -691,6 +697,22 @@
         font-weight: 600;
         margin-bottom: var(--space-md);
         color: var(--text-primary);
+    }
+
+    .settings-page .axis-inputs-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+        gap: var(--space-md);
+    }
+
+    .settings-page .axis-inputs-grid .setting-group {
+        margin-bottom: 0;
+    }
+
+    @media (max-width: 480px) {
+        .settings-page .axis-inputs-grid {
+            grid-template-columns: 1fr;
+        }
     }
 
     .settings-page .card-status {

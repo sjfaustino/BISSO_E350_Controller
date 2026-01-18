@@ -143,6 +143,14 @@ size_t apiConfigExportJSON(char* buffer, size_t buffer_size);
  */
 bool apiConfigImportJSON(const JsonVariant& doc);
 
+#ifdef __cplusplus
+/**
+ * @brief Populate a JsonDocument with the full system configuration.
+ * @param doc JSON document to populate.
+ */
+void apiConfigPopulate(JsonDocument& doc);
+#endif
+
 /**
  * @brief Print configuration to serial console
  */

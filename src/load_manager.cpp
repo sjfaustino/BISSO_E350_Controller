@@ -138,15 +138,15 @@ void loadManagerUpdate() {
         new_state = LOAD_STATE_CRITICAL;
     }
 
-    // PHASE 6.1: Force load state based on memory fragmentation
-    // If fragmentation is severe (>85%), force at least ELEVATED state to slow down tasks
-    if (frag_percent > 85.0f && new_state == LOAD_STATE_NORMAL) {
+    // PHASE 6.1: Force load state based on memory fragmentation (Tuned for stability)
+    // If fragmentation is severe (>80%), force at least ELEVATED state to slow down tasks
+    if (frag_percent > 80.0f && new_state == LOAD_STATE_NORMAL) {
         new_state = LOAD_STATE_ELEVATED;
     }
     
-    // If fragmentation is critical (>95%) or largest block is tiny (< 4KB), force HIGH state 
+    // If fragmentation is critical (>90%) or largest block is tiny (< 8KB), force HIGH state 
     // to suspend non-critical services (like Web UI telemetry)
-    if ((frag_percent > 95.0f || max_alloc < 4096) && new_state < LOAD_STATE_HIGH) {
+    if ((frag_percent > 90.0f || max_alloc < 8192) && new_state < LOAD_STATE_HIGH) {
         new_state = LOAD_STATE_HIGH;
     }
 

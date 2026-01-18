@@ -431,7 +431,7 @@ window.SettingsModule = window.SettingsModule || {
         } catch (e) {
             console.warn('[Settings] OTA settings load failed:', e);
         }
-    }
+    },
 
     showError(section, msg) {
         const el = document.getElementById(`${section}-error`);

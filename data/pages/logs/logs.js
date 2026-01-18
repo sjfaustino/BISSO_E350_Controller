@@ -22,6 +22,7 @@ window.LogsModule = window.LogsModule || {
         this.loadLogsFromStorage();
         this.fetchBackendLogs();
         this.setupEventListeners();
+        this.syncFiltersFromDOM();
         this.updateDisplay();
         window.addEventListener('state-changed', () => this.onStateChanged());
     },
@@ -141,7 +142,22 @@ window.LogsModule = window.LogsModule || {
             return true;
         });
 
+        // Debug: report if items are filtered
+        if (allLogs.length > 0 && this.filteredLogs.length === 0) {
+            console.warn('[Logs] All records filtered out. Active filters:', this.filters);
+        }
+
         this.updateDisplay();
+    },
+
+    syncFiltersFromDOM() {
+        const levelEl = document.getElementById('log-level-filter');
+        const sourceEl = document.getElementById('log-source-filter');
+        const searchEl = document.getElementById('log-search');
+
+        if (levelEl) this.filters.level = levelEl.value;
+        if (sourceEl) this.filters.source = sourceEl.value;
+        if (searchEl) this.filters.search = (searchEl.value || '').toLowerCase();
     },
 
     clearFilters() {
@@ -163,7 +179,12 @@ window.LogsModule = window.LogsModule || {
         if (!container) return;
 
         if (this.filteredLogs.length === 0) {
-            container.innerHTML = '<div class="log-entry log-info"><span>No logs to display</span></div>';
+            const hasFilters = this.filters.level || this.filters.source || this.filters.search;
+            const allLogs = [...this.logs, ...this.backendLogs];
+            const msg = (hasFilters && allLogs.length > 0)
+                ? 'No logs match current filters'
+                : 'No logs to display';
+            container.innerHTML = `<div class="log-entry log-info" style="justify-content:center;"><span>${msg}</span></div>`;
         } else {
             container.innerHTML = this.filteredLogs.map(log => `
                 <div class="log-entry log-${log.level.toLowerCase()}">

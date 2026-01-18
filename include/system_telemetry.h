@@ -50,6 +50,8 @@ typedef struct {
     float axis_y_mm;
     float axis_z_mm;
     float axis_a_mm;
+    float wcs_offset_mm[4];    // PHASE 5.1: X, Y, Z, A offsets
+    uint8_t active_wcs;        // PHASE 5.1: 0=G54, 1=G55, etc.
     uint32_t steps_executed;
     uint32_t motion_errors;
 

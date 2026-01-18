@@ -10,7 +10,8 @@
 #include "config_unified.h"
 #include "config_keys.h"
 #include "serial_logger.h"
-#include <ArduinoJson.h>
+#include "mcu_info.h"
+#include "firmware_version.h"
 #include <ArduinoJson.h>
 
 // External from web_server.cpp
@@ -31,17 +32,41 @@ extern int history_count;
 
 void registerTelemetryRoutes(PsychicHttpServer& server) {
     
-    // GET /api/status - System status and positions
-    server.on("/api/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+    // Handler for status/telemetry endpoints (shared logic)
+    auto statusHandler = [](PsychicRequest *request, PsychicResponse *response) {
         system_telemetry_t telemetry = telemetryGetSnapshot();
         JsonDocument doc;
         
-        doc["health"] = telemetryGetHealthStatusString(telemetry.health_status);
-        doc["uptime_sec"] = telemetry.uptime_seconds;
-        doc["cpu_percent"] = telemetry.cpu_usage_percent;
-        doc["free_heap"] = telemetry.free_heap_bytes;
-        doc["plc_hardware_present"] = telemetry.plc_hardware_present;
+        // Nested system object to match WebSocket structure (PHASE 6.5)
+        JsonObject sys = doc["system"].to<JsonObject>();
+        sys["status"] = "READY"; // Fallback, could be richer
+        sys["health"] = telemetryGetHealthStatusString(telemetry.health_status);
+        sys["uptime_sec"] = telemetry.uptime_seconds;
+        sys["cpu_percent"] = telemetry.cpu_usage_percent;
+        sys["free_heap_bytes"] = telemetry.free_heap_bytes;
+        sys["plc_hardware_present"] = telemetry.plc_hardware_present;
+        sys["firmware_version"] = "v" + String(FIRMWARE_VERSION_MAJOR) + "." + String(FIRMWARE_VERSION_MINOR) + "." + String(FIRMWARE_VERSION_PATCH);
+        sys["build_date"] = __DATE__;
+
+        // Hardware details
+        sys["hw_model"] = "BISSO E350";
+        sys["hw_mcu"] = mcuGetModelName();
         
+        char rev_str[16];
+        mcuGetRevisionString(rev_str, sizeof(rev_str));
+        sys["hw_revision"] = rev_str;
+
+        char serial_str[32];
+        uint64_t mac = ESP.getEfuseMac();
+        snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
+        sys["hw_serial"] = serial_str;
+        
+        // Memory info
+        sys["hw_psram_size"] = mcuGetPsramSize();
+        sys["hw_flash_size"] = mcuGetFlashSize();
+        sys["hw_has_psram"] = mcuHasPsram();
+
+        // Flattened fields for dashboard compatibility
         doc["x_mm"] = telemetry.axis_x_mm;
         doc["y_mm"] = telemetry.axis_y_mm;
         doc["z_mm"] = telemetry.axis_z_mm;
@@ -53,7 +78,13 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         doc["alarm"] = telemetry.alarm_active;
         
         return sendJsonResponse(response, doc);
-    });
+    };
+
+    // GET /api/status - System status and positions
+    server.on("/api/status", HTTP_GET, statusHandler);
+    
+    // GET /api/telemetry - Alias for /api/status (backwards compatibility)
+    server.on("/api/telemetry", HTTP_GET, statusHandler);
     
     // GET /api/spindle - Spindle monitor state
     server.on("/api/spindle", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {

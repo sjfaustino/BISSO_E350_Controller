@@ -98,6 +98,9 @@ bool apiConfigSave(void) {
   configSetInt(KEY_PPM_Y, current_encoder.ppm[1]);
   configSetInt(KEY_PPM_Z, current_encoder.ppm[2]);
 
+  // Flush all pending config changes (including network) to NVS
+  configUnifiedSave();
+
   logInfo("[API_CONFIG] Configuration saved to NVS");
   return true;
 }
@@ -366,13 +369,14 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
   }
 
   case CONFIG_CATEGORY_NETWORK: {
-    // Station
-    obj["wifi_ssid"] = configGetString(KEY_WIFI_SSID, ""); 
-    obj["wifi_pass"] = configGetString(KEY_WIFI_PASS, "");
+    // Station - Use String() to force ArduinoJson to copy values
+    // (configGetString uses rotating buffer that gets overwritten)
+    obj["wifi_ssid"] = String(configGetString(KEY_WIFI_SSID, "")); 
+    obj["wifi_pass"] = String(configGetString(KEY_WIFI_PASS, ""));
     // AP - Default to ENABLED (1) if missing to match system default
     obj["wifi_ap_en"] = configGetInt(KEY_WIFI_AP_EN, 1);
-    obj["wifi_ap_ssid"] = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
-    obj["wifi_ap_pass"] = configGetString(KEY_WIFI_AP_PASS, "password");
+    obj["wifi_ap_ssid"] = String(configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup"));
+    obj["wifi_ap_pass"] = String(configGetString(KEY_WIFI_AP_PASS, "password"));
     obj["eth_en"] = configGetInt(KEY_ETH_ENABLED, 0);
     break;
   }
@@ -464,10 +468,12 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
   if (!buffer || buffer_size < 256)
     return 0;
 
-  // MEMORY FIX: Use StaticJsonDocument to prevent heap fragmentation
-  // Sized for motion + VFD + encoder config (~30 key-value pairs)
   JsonDocument doc;
+  apiConfigPopulate(doc);
+  return serializeJson(doc, buffer, buffer_size);
+}
 
+void apiConfigPopulate(JsonDocument& doc) {
   // Metadata (placeholder, updated by web_server)
   doc["timestamp"] = ""; 
   doc["firmware"] = ""; 
@@ -586,8 +592,6 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
   stats["runtime_mins"] = configGetInt(KEY_RUNTIME_MINS, 0);
   stats["cycles"] = configGetInt(KEY_CYCLE_COUNT, 0);
   stats["maint_mins"] = configGetInt(KEY_LAST_MAINT_MINS, 0);
-  
-  return serializeJson(doc, buffer, buffer_size);
 }
 
 /**

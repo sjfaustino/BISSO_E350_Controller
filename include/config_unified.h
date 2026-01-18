@@ -55,6 +55,7 @@ int configGetKeyCount();
 
 void configUnifiedDiagnostics();
 void configUnifiedPrintAll();
+void* configGetMutex();
 
 // PHASE 5.1: Validated configuration getters with bounds checking
 /**

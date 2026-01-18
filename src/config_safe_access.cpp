@@ -19,7 +19,7 @@ int32_t configGetIntSafe(const char* key, int32_t default_value) {
   int32_t value = default_value;
   
   // Acquire mutex for safe access
-  if (!taskLockMutex(taskGetConfigMutex(), CONFIG_MUTEX_TIMEOUT_MS)) {
+  if (!taskLockMutex((SemaphoreHandle_t)configGetMutex(), CONFIG_MUTEX_TIMEOUT_MS)) {
     logWarning("configGetIntSafe: Mutex timeout for key '%s'", key);
     faultLogWarning(FAULT_BOOT_FAILED, "Config mutex timeout on read");
     return default_value;
@@ -29,7 +29,7 @@ int32_t configGetIntSafe(const char* key, int32_t default_value) {
   value = configGetInt(key, default_value);
   
   // Release mutex
-  taskUnlockMutex(taskGetConfigMutex());
+  taskUnlockMutex((SemaphoreHandle_t)configGetMutex());
   
   return value;
 }
@@ -47,7 +47,7 @@ bool configGetStringSafe(const char* key, char* buffer, size_t buffer_size,
   const char* result_ptr = default_value;
   
   // Acquire mutex
-  if (!taskLockMutex(taskGetConfigMutex(), CONFIG_MUTEX_TIMEOUT_MS)) {
+  if (!taskLockMutex((SemaphoreHandle_t)configGetMutex(), CONFIG_MUTEX_TIMEOUT_MS)) {
     logWarning("configGetStringSafe: Mutex timeout for key '%s'", key);
     safe_strcpy(buffer, buffer_size, default_value ? default_value : "");
     return false;
@@ -60,7 +60,7 @@ bool configGetStringSafe(const char* key, char* buffer, size_t buffer_size,
   safe_strcpy(buffer, buffer_size, result_ptr);
   
   // Release mutex
-  taskUnlockMutex(taskGetConfigMutex());
+  taskUnlockMutex((SemaphoreHandle_t)configGetMutex());
   
   return true;
 }
@@ -72,7 +72,7 @@ bool configSetIntSafe(const char* key, int32_t value) {
   }
   
   // Acquire mutex
-  if (!taskLockMutex(taskGetConfigMutex(), CONFIG_MUTEX_TIMEOUT_MS)) {
+  if (!taskLockMutex((SemaphoreHandle_t)configGetMutex(), CONFIG_MUTEX_TIMEOUT_MS)) {
     logWarning("configSetIntSafe: Mutex timeout for key '%s'", key);
     faultLogWarning(FAULT_BOOT_FAILED, "Config mutex timeout on write");
     return false;
@@ -82,7 +82,7 @@ bool configSetIntSafe(const char* key, int32_t value) {
   configSetInt(key, value);
   
   // Release mutex
-  taskUnlockMutex(taskGetConfigMutex());
+  taskUnlockMutex((SemaphoreHandle_t)configGetMutex());
   
   return true;
 }
@@ -99,7 +99,7 @@ bool configSetStringSafe(const char* key, const char* value) {
   }
   
   // Acquire mutex
-  if (!taskLockMutex(taskGetConfigMutex(), CONFIG_MUTEX_TIMEOUT_MS)) {
+  if (!taskLockMutex((SemaphoreHandle_t)configGetMutex(), CONFIG_MUTEX_TIMEOUT_MS)) {
     logWarning("configSetStringSafe: Mutex timeout for key '%s'", key);
     return false;
   }
@@ -108,7 +108,7 @@ bool configSetStringSafe(const char* key, const char* value) {
   configSetString(key, value);
   
   // Release mutex
-  taskUnlockMutex(taskGetConfigMutex());
+  taskUnlockMutex((SemaphoreHandle_t)configGetMutex());
   
   return true;
 }

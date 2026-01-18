@@ -69,10 +69,8 @@ static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *respon
     return ESP_OK;  // Response already sent
   }
   
-  // Use a reserved string to prevent heap fragmentation during construction
-  String json;
-  json.reserve(2048);
-  json = "[";
+  response->setContentType("application/json");
+  response->sendChunk((uint8_t*)"[", 1);
   
   bool first = true;
   
@@ -90,10 +88,12 @@ static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *respon
       if (file.isDirectory()) {
         listDirRecursive(fullPath.c_str());
       } else {
-        if (!first) json += ",";
+        if (!first) response->sendChunk((uint8_t*)",", 1);
         first = false;
         
-        json += "{\"path\":\"" + fullPath + "\",\"size\":" + String(file.size()) + "}";
+        char entry[256];
+        int len = snprintf(entry, sizeof(entry), "{\"path\":\"%s\",\"size\":%u}", fullPath.c_str(), (uint32_t)file.size());
+        response->sendChunk((uint8_t*)entry, len);
       }
       file = root.openNextFile();
     }
@@ -101,9 +101,9 @@ static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *respon
   };
   
   listDirRecursive("/");
-  json += "]";
+  response->sendChunk((uint8_t*)"]", 1);
   
-  return response->send(200, "application/json", json.c_str());
+  return response->finishChunking();
 }
 
 static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *response) {

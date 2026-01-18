@@ -208,7 +208,6 @@ bool taskReceiveMessage(QueueHandle_t queue, queue_message_t *msg,
 // NEW: Direct Task Notification for high-speed signaling
 void taskSignalMotionUpdate();
 
-SemaphoreHandle_t taskGetConfigMutex();
 SemaphoreHandle_t
 taskGetI2cMutex(); // DEPRECATED: Use separate board/PLC mutexes
 SemaphoreHandle_t

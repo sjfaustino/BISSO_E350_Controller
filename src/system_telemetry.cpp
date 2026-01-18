@@ -20,6 +20,7 @@
 #include "task_performance_monitor.h"
 #include "config_unified.h"
 #include "config_keys.h"
+#include "gcode_parser.h"
 #include "system_constants.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <string.h>
@@ -108,6 +109,9 @@ void telemetryUpdate() {
     float ax_y = motionGetPositionMM(1);
     float ax_z = motionGetPositionMM(2);
     float ax_a = motionGetPositionMM(3);
+    
+    float wco[4] = {0, 0, 0, 0};
+    gcodeParser.getWCO(wco);
 
     // Spindle
     bool sp_en = false;
@@ -201,6 +205,8 @@ void telemetryUpdate() {
     telemetry_cache.axis_y_mm = ax_y;
     telemetry_cache.axis_z_mm = ax_z;
     telemetry_cache.axis_a_mm = ax_a;
+    memcpy(telemetry_cache.wcs_offset_mm, wco, sizeof(wco));
+    telemetry_cache.active_wcs = (uint8_t)gcodeParser.getCurrentWCOSystem();
     telemetry_cache.spindle_enabled = sp_en;
     telemetry_cache.spindle_running = sp_running;
     telemetry_cache.spindle_current_amps = sp_current;
@@ -265,7 +271,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
     int n = snprintf(buffer, buffer_size,
         "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"plc_hardware_present\":%s,\"firmware_version\":\"v%d.%d.%d\"},"
         "\"memory\":{\"free_bytes\":%lu,\"stack_used\":%lu},"
-        "\"motion\":{\"enabled\":%s,\"moving\":%s,\"x_mm\":%.2f,\"y_mm\":%.2f,\"z_mm\":%.2f,\"a_mm\":%.2f},"
+        "\"motion\":{\"enabled\":%s,\"moving\":%s,\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,\"wco\":[%.3f,%.3f,%.3f,%.3f],\"active_wcs\":%u},"
         "\"spindle\":{\"enabled\":%s,\"running\":%s,\"current_amps\":%.2f,\"peak_amps\":%.2f,\"errors\":%lu,"
         "\"overcurrent\":%s,\"fault\":%s},"
         "\"safety\":{\"estop\":%s,\"alarm\":%s,\"faults\":%lu,\"critical\":%lu},"
@@ -284,6 +290,8 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         t.motion_enabled ? "true" : "false",
         t.motion_moving ? "true" : "false",
         t.axis_x_mm, t.axis_y_mm, t.axis_z_mm, t.axis_a_mm,
+        t.wcs_offset_mm[0], t.wcs_offset_mm[1], t.wcs_offset_mm[2], t.wcs_offset_mm[3],
+        t.active_wcs,
         t.spindle_enabled ? "true" : "false",
         t.spindle_running ? "true" : "false",
         t.spindle_current_amps,

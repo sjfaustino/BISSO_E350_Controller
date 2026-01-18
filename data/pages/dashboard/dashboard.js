@@ -41,6 +41,39 @@ window.DashboardModule = window.DashboardModule || {
             })
             .catch(err => console.warn(window.i18n.t('dashboard.failed_load_history'), err));
     },
+    zeroAll() {
+        if ("machine" === this.workCoordMode) {
+            return void AlertManager.add(window.i18n.t('dashboard.cannot_zero_machine'), "warning");
+        }
+        if (AppState.data.motion?.moving) {
+            return void AlertManager.add(window.i18n.t('dashboard.cannot_zero_moving'), "warning");
+        }
+        const t = "G92 X0 Y0 Z0 A0";
+        window.API.post("gcode", { command: t }).then(e => {
+            e.success ? AlertManager.add(window.i18n.t('dashboard.zero_all_success'), "success", 2e3) : AlertManager.add(window.i18n.t('dashboard.zero_all_failed'), "error")
+        }).catch(t => console.error("Zero All failed", t))
+    },
+    setupEventListeners() {
+        document.querySelectorAll(".card-toggle").forEach(t => { t.addEventListener("click", () => { const e = t.closest(".card").querySelector(".card-content"); e.classList.toggle("collapsed"), t.textContent = e.classList.contains("collapsed") ? "+" : "−" }) });
+        const t = document.getElementById("graph-time-range");
+        t && t.addEventListener("change", t => { this.currentTimeRange = 1e3 * parseInt(t.target.value), console.log(window.i18n.t('dashboard.time_range_changed'), this.currentTimeRange / 1e3, window.i18n.t('dashboard.seconds')), Object.values(this.graphs).forEach(t => { t && t.config && (t.config.timeWindow = this.currentTimeRange, "function" == typeof t.draw && t.draw()) }) });
+        const e = document.getElementById("export-graphs-btn");
+        e && e.addEventListener("click", () => this.exportGraphsData());
+        document.querySelectorAll(".time-btn").forEach(t => { t.addEventListener("click", () => { document.querySelectorAll(".time-btn").forEach(t => t.classList.remove("active")), t.classList.add("active"), this.currentTimeRange = parseInt(t.dataset.range), this.drawChart() }) });
+        const i = document.getElementById("dro-coord-mode"),
+            s = document.getElementById("dro-work-offset"),
+            n = document.getElementById("dro-zero-all");
+        i && (this.workCoordMode = localStorage.getItem("droCoordMode") || "machine", this.workOffset = localStorage.getItem("droWorkOffset") || "G54", this.updateCoordModeUI(), i.addEventListener("click", () => { this.workCoordMode = "machine" === this.workCoordMode ? "work" : "machine", localStorage.setItem("droCoordMode", this.workCoordMode), this.updateCoordModeUI(), this.onStateChanged() })), s && (s.value = this.workOffset || "G54", s.addEventListener("change", t => {
+            const cmd = t.target.value;
+            this.workOffset = cmd;
+            localStorage.setItem("droWorkOffset", cmd);
+            window.API.post("gcode", { command: cmd })
+                .then(res => {
+                    if (!res.success) AlertManager.add(window.i18n.t('dashboard.wcs_change_failed'), "error");
+                });
+            this.onStateChanged();
+        })), n && n.addEventListener("click", () => this.zeroAll())
+    },
     updateCoordModeUI() { const t = document.getElementById("dro-coord-mode"), e = document.getElementById("dro-mode-text"), i = document.getElementById("dro-work-offset"); e && (e.textContent = "machine" === this.workCoordMode ? window.i18n.t('dashboard.machine') : window.i18n.t('dashboard.work')), t && t.classList.toggle("work-mode", "work" === this.workCoordMode), i && (i.disabled = "machine" === this.workCoordMode) }, initializeGraphs() { if (document.getElementById("cpu-graph")) try { this.graphs.cpu = new GraphVisualizer("cpu-graph", { title: window.i18n.t('dashboard.cpu_usage'), yMin: 0, yMax: 100, unit: "%", timeWindow: this.currentTimeRange }), this.graphs.cpu.addSeries("CPU", "#10b981") } catch (t) { console.warn(window.i18n.t('dashboard.cpu_graph_init_failed'), t) } if (document.getElementById("memory-graph")) try { this.graphs.memory = new GraphVisualizer("memory-graph", { title: window.i18n.t('dashboard.free_memory'), yMin: 0, yMax: 350, unit: " KB", timeWindow: this.currentTimeRange }), this.graphs.memory.addSeries("Memory", "#3b82f6") } catch (t) { console.warn(window.i18n.t('dashboard.memory_graph_init_failed'), t) } if (document.getElementById("spindle-graph")) try { this.graphs.spindle = new GraphVisualizer("spindle-graph", { title: window.i18n.t('dashboard.spindle_current'), yMin: 0, yMax: 20, unit: " A", timeWindow: this.currentTimeRange }), this.graphs.spindle.addSeries("Current", "#f59e0b") } catch (t) { console.warn(window.i18n.t('dashboard.spindle_graph_init_failed'), t) } if (document.getElementById("temperature-graph")) try { this.graphs.temperature = new GraphVisualizer("temperature-graph", { title: window.i18n.t('dashboard.cpu_temperature'), yMin: 20, yMax: 80, unit: " °C", timeWindow: this.currentTimeRange }), this.graphs.temperature.addSeries("Temp", "#ef4444") } catch (t) { console.warn(window.i18n.t('dashboard.temperature_graph_init_failed'), t) } if (document.getElementById("latency-graph")) try { this.graphs.latency = new GraphVisualizer("latency-graph", { title: window.i18n.t('dashboard.websocket_latency'), yMin: 0, yMax: 100, unit: " ms", timeWindow: this.currentTimeRange }), this.graphs.latency.addSeries("Latency", "#8b5cf6") } catch (t) { console.warn(window.i18n.t('dashboard.latency_graph_init_failed'), t) } if (document.getElementById("motion-load-graph")) try { this.graphs.motion = new GraphVisualizer("motion-load-graph", { title: window.i18n.t('dashboard.motion_system_load'), yMin: 0, yMax: 100, unit: "%", timeWindow: this.currentTimeRange }), this.graphs.motion.addSeries("Quality", "#10b981"), this.graphs.motion.addSeries("Jitter", "#f59e0b") } catch (t) { console.warn(window.i18n.t('dashboard.motion_graph_init_failed'), t) } if (document.getElementById("wifi-graph")) try { this.graphs.wifi = new GraphVisualizer("wifi-graph", { title: window.i18n.t('dashboard.wifi_signal_quality'), yMin: 0, yMax: 100, unit: "%", timeWindow: this.currentTimeRange }), this.graphs.wifi.addSeries("Signal", "#3b82f6") } catch (t) { console.warn(window.i18n.t('dashboard.wifi_graph_init_failed'), t) } console.log(window.i18n.t('dashboard.graphs_initialized')), this.restoreHistoricalData() }, restoreHistoricalData() { const t = Date.now(); if (this.history.cpu.length > 0) { console.log(window.i18n.t('dashboard.restoring_data', { count: this.history.cpu.length }), this.history.cpu.length, window.i18n.t('dashboard.historical_data_points')); for (let e = 0; e < this.history.cpu.length; e++) { const i = t - 1e3 * (this.history.cpu.length - 1 - e); this.graphs.cpu && void 0 !== this.history.cpu[e] && this.graphs.cpu.addDataPoint("CPU", this.history.cpu[e], i), this.graphs.memory && void 0 !== this.history.memory[e] && this.graphs.memory.addDataPoint("Memory", this.history.memory[e], i), this.graphs.spindle && void 0 !== this.history.spindle[e] && this.graphs.spindle.addDataPoint("Current", this.history.spindle[e], i), this.graphs.temperature && void 0 !== this.history.temperature[e] && this.graphs.temperature.addDataPoint("Temp", this.history.temperature[e], i), this.graphs.latency && void 0 !== this.history.latency[e] && this.graphs.latency.addDataPoint("Latency", this.history.latency[e], i), this.graphs.wifi && void 0 !== this.history.wifi[e] && this.graphs.wifi.addDataPoint("Signal", this.history.wifi[e], i) } } }, onStateChanged() {
         const t = AppState.data; this.lastTelemetry = t, this.updateSystemStatus(t), this.updateMotionStatus(t), this.updateVFDStatus(t), this.updateNetworkStatus(t), this.updateLCDMirror(t), t.axis && (this.updateAxisCard("x", t.axis.x), this.updateAxisCard("y", t.axis.y), this.updateAxisCard("z", t.axis.z), this.updateDRO(t.axis));
         if (!t.axis) {
@@ -143,7 +176,43 @@ window.DashboardModule = window.DashboardModule || {
             }
         }
     },
-    updateDRO(t) { const e = AppState.data.motion?.dro_connected ?? !1; this.updateHeaderNA("header-dro", window.i18n.t('dashboard.position_dro'), e), ["x", "y", "z", "a"].forEach(i => { const s = document.getElementById(`dro-${i}`); if (s) if (e) { const e = t[i]?.position_mm ?? t[i]?.position ?? 0; s.textContent = e.toFixed(3), s.classList.toggle("negative", e < 0) } else this.setNA(s), s.classList.remove("negative") }); const i = document.getElementById("dro-status"); i && (e ? (i.textContent = window.i18n.t('dashboard.live'), i.classList.remove("offline")) : (i.textContent = window.i18n.t('dashboard.offline'), i.classList.add("offline"))) }, drawChart() { const t = document.getElementById("trendsChart"); if (!t) return; const e = t.getContext("2d"), i = t.getBoundingClientRect(); t.width = i.width, t.height = i.height; const s = 35, n = t.width - s - 10, a = t.height - 10 - 20; e.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg-primary").trim() || "#fff", e.fillRect(0, 0, t.width, t.height), e.strokeStyle = "#e5e7eb", e.lineWidth = 1, e.fillStyle = "#6b7280", e.font = "10px sans-serif", e.textAlign = "right", e.textBaseline = "middle"; for (let i = 0; i <= 4; i++) { const n = i / 4, o = 10 + a - n * a; e.beginPath(), e.moveTo(s, o), e.lineTo(t.width - 10, o), e.stroke(); const r = 100 * n; e.fillText(r.toFixed(0), 30, o) } e.textAlign = "center", e.textBaseline = "top"; const o = this.currentTimeRange / 1e3 >= 60 ? this.currentTimeRange / 6e4 + "m" : this.currentTimeRange / 1e3 + "s"; e.fillText("-" + o, s, t.height - 20 + 5), e.fillText(window.i18n.t('dashboard.now'), t.width - 10, t.height - 20 + 5); const r = Math.min(this.history.cpu.length, 60 * this.currentTimeRange), d = this.history.cpu.slice(-r), h = this.history.memory.slice(-r), l = this.history.spindle.slice(-r), c = (t, i, o, r = "#888") => { if (t && !(t.length < 2)) { e.strokeStyle = i || r, e.lineWidth = 2, e.beginPath(); for (let i = 0; i < t.length; i++) { const r = Math.max(0, Math.min(100, t[i] / o * 100)), d = s + i / Math.max(1, t.length - 1) * n, h = 10 + a - r / 100 * a; 0 === i ? e.moveTo(d, h) : e.lineTo(d, h) } e.stroke() } }, m = getComputedStyle(document.documentElement).getPropertyValue("--chart-cpu").trim() || "#10b981", p = getComputedStyle(document.documentElement).getPropertyValue("--chart-mem").trim() || "#3b82f6", u = getComputedStyle(document.documentElement).getPropertyValue("--chart-spindle").trim() || "#f59e0b"; c(d, m, 100), c(h, p, 320), c(l, u, 30), e.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-primary").trim(), e.lineWidth = 1, e.beginPath(), e.moveTo(s, 10), e.lineTo(s, t.height - 20), e.lineTo(t.width - 10, t.height - 20), e.stroke() }, updateGraphs() {
+    updateDRO(t) {
+        const e = AppState.data.motion?.dro_connected ?? !1;
+        this.updateHeaderNA("header-dro", window.i18n.t('dashboard.position_dro'), e);
+
+        // Synchronize WCS Dropdown
+        const s_wco = document.getElementById("dro-work-offset");
+        if (s_wco && t.active_wcs !== undefined) {
+            const wcs_name = "G" + (54 + t.active_wcs);
+            if (s_wco.value !== wcs_name && !s_wco.matches(":focus")) {
+                s_wco.value = wcs_name;
+                this.workOffset = wcs_name;
+                localStorage.setItem("droWorkOffset", wcs_name);
+            }
+        }
+
+        const wco = t.wco || [0, 0, 0, 0];
+        const axis_map = ["x", "y", "z", "a"];
+        axis_map.forEach((ax, idx) => {
+            const s = document.getElementById(`dro-${ax}`);
+            if (s) {
+                if (e) {
+                    let val = t[`${ax}_mm`] ?? 0;
+                    if (this.workCoordMode) { // Only apply WCO offset in work coordinate mode
+                        val -= wco[idx];
+                    }
+                    s.textContent = val.toFixed(3);
+                    s.classList.toggle("negative", val < 0);
+                } else {
+                    this.setNA(s);
+                    s.classList.remove("negative");
+                }
+            }
+        });
+        const i = document.getElementById("dro-status");
+        i && (e ? (i.textContent = window.i18n.t('dashboard.live'), i.classList.remove("offline")) : (i.textContent = window.i18n.t('dashboard.offline'), i.classList.add("offline")))
+    },
+    drawChart() { const t = document.getElementById("trendsChart"); if (!t) return; const e = t.getContext("2d"), i = t.getBoundingClientRect(); t.width = i.width, t.height = i.height; const s = 35, n = t.width - s - 10, a = t.height - 10 - 20; e.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg-primary").trim() || "#fff", e.fillRect(0, 0, t.width, t.height), e.strokeStyle = "#e5e7eb", e.lineWidth = 1, e.fillStyle = "#6b7280", e.font = "10px sans-serif", e.textAlign = "right", e.textBaseline = "middle"; for (let i = 0; i <= 4; i++) { const n = i / 4, o = 10 + a - n * a; e.beginPath(), e.moveTo(s, o), e.lineTo(t.width - 10, o), e.stroke(); const r = 100 * n; e.fillText(r.toFixed(0), 30, o) } e.textAlign = "center", e.textBaseline = "top"; const o = this.currentTimeRange / 1e3 >= 60 ? this.currentTimeRange / 6e4 + "m" : this.currentTimeRange / 1e3 + "s"; e.fillText("-" + o, s, t.height - 20 + 5), e.fillText(window.i18n.t('dashboard.now'), t.width - 10, t.height - 20 + 5); const r = Math.min(this.history.cpu.length, 60 * this.currentTimeRange), d = this.history.cpu.slice(-r), h = this.history.memory.slice(-r), l = this.history.spindle.slice(-r), c = (t, i, o, r = "#888") => { if (t && !(t.length < 2)) { e.strokeStyle = i || r, e.lineWidth = 2, e.beginPath(); for (let i = 0; i < t.length; i++) { const r = Math.max(0, Math.min(100, t[i] / o * 100)), d = s + i / Math.max(1, t.length - 1) * n, h = 10 + a - r / 100 * a; 0 === i ? e.moveTo(d, h) : e.lineTo(d, h) } e.stroke() } }, m = getComputedStyle(document.documentElement).getPropertyValue("--chart-cpu").trim() || "#10b981", p = getComputedStyle(document.documentElement).getPropertyValue("--chart-mem").trim() || "#3b82f6", u = getComputedStyle(document.documentElement).getPropertyValue("--chart-spindle").trim() || "#f59e0b"; c(d, m, 100), c(h, p, 320), c(l, u, 30), e.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-primary").trim(), e.lineWidth = 1, e.beginPath(), e.moveTo(s, 10), e.lineTo(s, t.height - 20), e.lineTo(t.width - 10, t.height - 20), e.stroke() }, updateGraphs() {
         const t = this.graphs.cpu && "MiniChart" === this.graphs.cpu.constructor.name; if (!this.historicalDataLoaded && this.history.cpu.length > 1) {
             console.log(window.i18n.t('dashboard.bulk_loading_charts', { count: this.history.cpu.length }), this.history.cpu.length, window.i18n.t('dashboard.points_to_charts')); for (let e = 0; e < this.history.cpu.length; e++)void 0 !== this.history.cpu[e] && (t ? this.graphs.cpu?.addDataPoint(this.history.cpu[e]) : this.graphs.cpu?.addDataPoint("CPU", this.history.cpu[e])), void 0 !== this.history.memory[e] && (t ? this.graphs.memory?.addDataPoint(this.history.memory[e]) : this.graphs.memory?.addDataPoint("Memory", this.history.memory[e])), void 0 !== this.history.spindle[e] && (t ? this.graphs.spindle?.addDataPoint(this.history.spindle[e]) : this.graphs.spindle?.addDataPoint("Spindle", this.history.spindle[e])), void 0 !== this.history.temperature[e] && (t ? this.graphs.temperature?.addDataPoint(this.history.temperature[e]) : this.graphs.temperature?.addDataPoint("Temp", this.history.temperature[e]));
             return this.historicalDataLoaded = !0, void console.log(window.i18n.t('dashboard.bulk_load_complete'))

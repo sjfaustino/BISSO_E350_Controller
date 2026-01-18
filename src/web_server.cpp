@@ -25,6 +25,7 @@
 #include "config_keys.h"
 #include "gcode_queue.h"
 #include "ota_manager.h"
+#include "mcu_info.h"
 #include "yhtc05_modbus.h"
 #include "firmware_version.h"
 #include "boot_validation.h"
@@ -211,7 +212,7 @@ void WebServerManager::setupRoutes() {
     });
 
     // Main static handler (serves from LittleFS /)
-    server.serveStatic("/", LittleFS, "/", "public, max-age=60");
+    server.serveStatic("/", LittleFS, "/", "public, max-age=3600");
 }
 
 void WebServerManager::begin() {
@@ -344,130 +345,118 @@ void WebServerManager::setAxisVFDError(uint8_t axis, float error_percent) {
 }
 
 // --- JSON Builder Helper ---
-void WebServerManager::buildTelemetryJson(JsonDocument& doc, const system_telemetry_t& telemetry, bool full) {
-    // System Status
-    doc["system"]["status"] = current_status.status;
-    doc["system"]["health"] = telemetryGetHealthStatusString(telemetry.health_status);
-    doc["system"]["uptime_seconds"] = current_status.uptime_sec;
-    doc["system"]["cpu_percent"] = telemetry.cpu_usage_percent;
-    doc["system"]["free_heap_bytes"] = telemetry.free_heap_bytes;
-    doc["system"]["temperature"] = telemetry.temperature;
-    
-    // Always include version and build date for UI synchronization
+// --- JSON Builder Helper is now replaced by serializeTelemetryToBuffer ---
+
+
+// PHASE 6.4: String-based JSON serialization to eliminate heap churn
+size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_size, const system_telemetry_t& telemetry, bool full) {
+    if (!buffer || buffer_size < 1024) return 0;
+
     char ver_str[32];
     snprintf(ver_str, sizeof(ver_str), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
-    doc["system"]["firmware_version"] = ver_str;
-    doc["system"]["build_date"] = __DATE__;
 
-    // PHASE 3.2: Add LCD message to telemetry for global toasts
     lcd_message_t custom_msg;
-    if (lcdMessageGet(&custom_msg)) {
-        doc["system"]["lcd_msg"] = (const char*)custom_msg.text;
-        doc["system"]["lcd_msg_id"] = custom_msg.timestamp_ms;
-    } else {
-        doc["system"]["lcd_msg"] = "";
-        doc["system"]["lcd_msg_id"] = 0;
-    }
-    
-    if (full) {
-        doc["system"]["plc_hardware_present"] = telemetry.plc_hardware_present;
+    bool has_lcd_msg = lcdMessageGet(&custom_msg);
 
-        // Hardware Info
-        doc["system"]["hw_model"] = "BISSO E350";
-        doc["system"]["hw_mcu"] = ESP.getChipModel();
-        
-        char rev_str[16];
-        snprintf(rev_str, sizeof(rev_str), "Rev %d", ESP.getChipRevision());
-        doc["system"]["hw_revision"] = rev_str;
-
-        char serial_str[32];
-        uint64_t mac = ESP.getEfuseMac();
-        snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
-        doc["system"]["hw_serial"] = serial_str;
-    }
-
-    // Phase 5.10: Explicit motion active flag for UI
-    doc["motion_active"] = motionIsMoving();
-
-    // Motion
-    doc["motion"]["position"]["x"] = current_status.x_pos;
-    doc["motion"]["position"]["y"] = current_status.y_pos;
-    doc["motion"]["position"]["z"] = current_status.z_pos;
-    doc["motion"]["position"]["a"] = current_status.a_pos;
-    doc["motion"]["dro_connected"] = current_status.dro_connected;
-    
-    // VFD / Spindle
-    doc["vfd"]["current_amps"] = current_status.vfd_current_amps;
-    doc["vfd"]["frequency_hz"] = current_status.vfd_frequency_hz;
-    doc["vfd"]["thermal_percent"] = current_status.vfd_thermal_percent;
-    doc["vfd"]["fault_code"] = current_status.vfd_fault_code;
-    doc["vfd"]["stall_threshold"] = current_status.vfd_threshold_amps;
-    doc["vfd"]["calibration_valid"] = current_status.vfd_calibration_valid;
-    doc["vfd"]["connected"] = current_status.vfd_connected;
-    doc["vfd"]["rpm"] = current_status.spindle_rpm;
-    doc["vfd"]["speed_m_s"] = current_status.spindle_speed_m_s;
-    
-    // Axis Metrics
-    for (int i = 0; i < 3; i++) {
-        const char* axis_names[] = {"x", "y", "z"};
-        doc["axis"][axis_names[i]]["quality"] = current_status.axis_metrics[i].quality_score;
-        doc["axis"][axis_names[i]]["jitter_mms"] = current_status.axis_metrics[i].jitter_mms;
-        doc["axis"][axis_names[i]]["vfd_error_percent"] = current_status.axis_metrics[i].vfd_error_percent;
-        doc["axis"][axis_names[i]]["stalled"] = (current_status.axis_metrics[i].quality_score < 10);
-    }
-    
-    // Network Status
-    doc["network"]["wifi_connected"] = telemetry.wifi_connected;
-    doc["network"]["signal_percent"] = telemetry.wifi_signal_strength;
-    doc["network"]["latency"] = 0; 
-    
-    // Execution Status - Conditional to save memory when idle
-    if (motionIsMoving()) {
-        doc["exec"]["cmd"] = motionGetCurrentCommand();
-        doc["exec"]["progress"] = motionGetExecutionProgress();
-        doc["exec"]["eta"] = motionGetEstimatedTimeRemaining();
-    }
-
-    // Parser Status (Basic)
-    doc["parser"]["absolute_mode"] = (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE);
-    float req_feedrate = gcodeParser.getCurrentFeedRate();
-    doc["parser"]["feedrate"] = req_feedrate;
-    
-    uint8_t active_axis = motionGetActiveAxis();
-    if (active_axis < MOTION_AXES) {
-        doc["parser"]["actual_feedrate"] = motionGetCalibratedFeedRate(active_axis, req_feedrate / 60.0f);
-    } else {
-        doc["parser"]["actual_feedrate"] = req_feedrate; // Fallback
-    }
-
-    // Configuration Status (Static-ish, only send if full)
-    if (full) {
-        doc["config"]["http_auth"] = (configGetInt(KEY_WEB_AUTH_ENABLED, 1) == 1);
-        doc["config"]["https"] = false; 
-        doc["config"]["websocket"] = true; 
-        doc["config"]["modbus"] = (configGetInt(KEY_VFD_EN, 0) == 1) || 
-                                (configGetInt(KEY_JXK10_ENABLED, 0) == 1) || 
-                                 (configGetInt(KEY_YHTC05_ENABLED, 0) == 1);
-    }
-
-    // LCD Mirroring - Capture current display content
     char lcd_lines[LCD_ROWS][LCD_COLS + 1];
     lcdInterfaceGetContent(lcd_lines);
-    for (int i = 0; i < LCD_ROWS; i++) {
-        doc["lcd"]["lines"][i] = lcd_lines[i];
+
+    bool moving = motionIsMoving();
+    uint8_t active_axis = motionGetActiveAxis();
+    float req_feedrate = gcodeParser.getCurrentFeedRate();
+    float actual_feedrate = (active_axis < MOTION_AXES) ? motionGetCalibratedFeedRate(active_axis, req_feedrate / 60.0f) : req_feedrate;
+
+    char rev_str[16];
+    mcuGetRevisionString(rev_str, sizeof(rev_str));
+
+    char serial_str[32];
+    uint64_t mac = ESP.getEfuseMac();
+    snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
+
+    portENTER_CRITICAL(&statusSpinlock);
+
+    int n = snprintf(buffer, buffer_size,
+        "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
+        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu%s%s%s%s%s%s},"
+        "\"motion_active\":%s,\"motion\":{\"position\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"a\":%.3f},\"dro_connected\":%s},"
+        "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
+        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f},"
+        "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s},"
+        "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s},"
+        "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s}},"
+        "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},"
+        "\"parser\":{\"absolute_mode\":%s,\"feedrate\":%.1f,\"actual_feedrate\":%.1f},"
+        "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}",
+        current_status.status,
+        telemetryGetHealthStatusString(telemetry.health_status),
+        (unsigned long)current_status.uptime_sec,
+        telemetry.cpu_usage_percent,
+        (unsigned long)telemetry.free_heap_bytes,
+        telemetry.temperature,
+        ver_str,
+        __DATE__,
+        has_lcd_msg ? (const char*)custom_msg.text : "",
+        has_lcd_msg ? (unsigned long long)custom_msg.timestamp_ms : 0ULL,
+        full ? (telemetry.plc_hardware_present ? ",\"plc_hardware_present\":true" : ",\"plc_hardware_present\":false") : "",
+        full ? ",\"hw_model\":\"BISSO E350\"" : "",
+        full ? ",\"hw_mcu\":\"" : "", full ? mcuGetModelName() : "", full ? "\"" : "",
+        full ? ",\"hw_revision\":\"" : "", full ? rev_str : "", full ? "\"" : "",
+        full ? ",\"hw_serial\":\"" : "", full ? serial_str : "", full ? "\"" : "",
+        moving ? "true" : "false",
+        current_status.x_pos, current_status.y_pos, current_status.z_pos, current_status.a_pos,
+        current_status.dro_connected ? "true" : "false",
+        current_status.vfd_current_amps, current_status.vfd_frequency_hz, current_status.vfd_thermal_percent, current_status.vfd_fault_code,
+        current_status.vfd_threshold_amps, current_status.vfd_calibration_valid ? "true" : "false", current_status.vfd_connected ? "true" : "false",
+        current_status.spindle_rpm, current_status.spindle_speed_m_s,
+        current_status.axis_metrics[0].quality_score, current_status.axis_metrics[0].jitter_mms, current_status.axis_metrics[0].vfd_error_percent, current_status.axis_metrics[0].quality_score < 10 ? "true" : "false",
+        current_status.axis_metrics[1].quality_score, current_status.axis_metrics[1].jitter_mms, current_status.axis_metrics[1].vfd_error_percent, current_status.axis_metrics[1].quality_score < 10 ? "true" : "false",
+        current_status.axis_metrics[2].quality_score, current_status.axis_metrics[2].jitter_mms, current_status.axis_metrics[2].vfd_error_percent, current_status.axis_metrics[2].quality_score < 10 ? "true" : "false",
+        telemetry.wifi_connected ? "true" : "false",
+        telemetry.wifi_signal_strength,
+        (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE) ? "true" : "false",
+        req_feedrate,
+        actual_feedrate,
+        lcd_lines[0], lcd_lines[1], lcd_lines[2], lcd_lines[3]
+    );
+
+    portEXIT_CRITICAL(&statusSpinlock);
+
+    if (n < 0 || (size_t)n >= buffer_size) return (size_t)n;
+
+    size_t offset = (size_t)n;
+
+    // Execution status if moving
+    if (moving) {
+        offset += snprintf(buffer + offset, buffer_size - offset,
+            ",\"exec\":{\"cmd\":\"%s\",\"progress\":%.1f,\"eta\":%lu}",
+            motionGetCurrentCommand(),
+            motionGetExecutionProgress(),
+            (unsigned long)motionGetEstimatedTimeRemaining());
     }
 
-    // Stack Monitor - Populate free stack space for all tracked tasks
+    // Stack Monitor
     task_stats_t* stats = taskGetStatsArray();
     int stats_count = taskGetStatsCount();
     if (stats != nullptr) {
+        offset += snprintf(buffer + offset, buffer_size - offset, ",\"stack\":{");
+        bool first = true;
         for (int i = 0; i < stats_count; i++) {
             if (stats[i].name != nullptr) {
-                // frontend dashboard.js: updateStackMonitor expects t.stack[taskName] = bytes
-                doc["stack"][stats[i].name] = stats[i].stack_high_water;
+                offset += snprintf(buffer + offset, buffer_size - offset, "%s\"%s\":%u", first ? "" : ",", stats[i].name, stats[i].stack_high_water);
+                first = false;
+                if (offset >= buffer_size - 10) break;
             }
         }
+        offset += snprintf(buffer + offset, buffer_size - offset, "}");
     }
+
+    // Close Root
+    if (offset < buffer_size - 1) {
+        buffer[offset++] = '}';
+        buffer[offset] = '\0';
+    }
+
+    return offset;
 }
 
 // --- Broadcast state to all connected WebSocket clients ---
@@ -475,7 +464,7 @@ void WebServerManager::broadcastState() {
     // PHASE 6.2: Skip broadcast if heap is critically fragmented
     // This gives the heap time to recover during file serving
     size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-    if (largest_block < 8192) {
+    if (largest_block < 10240) { // Increased to 10KB to prevent fragmentation issues
         // Heap is too fragmented - skip this broadcast cycle
         return;
     }
@@ -483,21 +472,14 @@ void WebServerManager::broadcastState() {
     // Get fresh telemetry snapshot
     system_telemetry_t telemetry = telemetryGetSnapshot();
     
-    // Build JSON payload (Protected access to current_status)
-    JsonDocument doc;
-    portENTER_CRITICAL(&statusSpinlock);
-    buildTelemetryJson(doc, telemetry, false); // Dynamic update only
-    portEXIT_CRITICAL(&statusSpinlock);
-    
-    // PHASE 6.2: Reduced buffer size to prevent stack overflow
-    // Telemetry dynamic JSON is TYPICALLY under 1KB, but with LCD+Stack it hits ~1.2KB
+    // PHASE 6.4: String-based serialization (No heap churn)
     char buffer[2048];
-    size_t len = serializeJson(doc, buffer, sizeof(buffer));
+    size_t len = serializeTelemetryToBuffer(buffer, sizeof(buffer), telemetry, false);
     
     if (len > 0 && len < sizeof(buffer)) {
         wsHandler.sendAll(buffer);
     } else if (len >= sizeof(buffer)) {
-        logError("[WS] Broadcast failed - JSON too large (%u bytes)", (uint32_t)len);
+        logError("[WS] Broadcast failed - Buffer overflow (%u bytes)", (uint32_t)len);
     }
 
     // Update history tracking

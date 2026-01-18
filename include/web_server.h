@@ -115,8 +115,8 @@ private:
     esp_err_t handleFileList(PsychicRequest *request);
     esp_err_t handleFileDelete(PsychicRequest *request);
 
-    // JSON Builder Helper (Code Audit Refactor)
-    void buildTelemetryJson(JsonDocument& doc, const system_telemetry_t& telemetry, bool full = true);
+    // JSON Builder Helpers (Code Audit Refactor)
+    size_t serializeTelemetryToBuffer(char* buffer, size_t buffer_size, const system_telemetry_t& telemetry, bool full = true);
 };
 
 extern WebServerManager webServer;

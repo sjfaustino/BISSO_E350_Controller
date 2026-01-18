@@ -821,6 +821,10 @@ void configUnifiedPrintAll() {
   serialLoggerUnlock();
 }
 
+void* configGetMutex() {
+  return (void*)config_cache_mutex;
+}
+
 // ============================================================================
 // NVS SPACE MANAGEMENT
 // ============================================================================

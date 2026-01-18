@@ -61,6 +61,8 @@ static api_route_entry_t test_routes[] = {
     {"/api/hardware/tachometer", "GET", "hardware", "Tachometer state"},
     {"/api/logs/boot", "GET", "hardware", "Boot log"},
     {"/api/logs/boot", "DELETE", "hardware", "Delete boot log"},
+    {"/api/hardware/i2c/test", "POST", "hardware", "I2C bus scan"},
+    {"/api/hardware/rs485/status", "GET", "hardware", "RS485 bus health"},
     
     // System Routes (api_routes_system.cpp)
     {"/api/config/get", "GET", "system", "Get config by category"},
@@ -69,6 +71,7 @@ static api_route_entry_t test_routes[] = {
     {"/api/config", "POST", "system", "Set config (simple)"},
     {"/api/config/batch", "POST", "system", "Batch set config"},
     {"/api/config/backup", "GET", "system", "Download full config"},
+    {"/api/config/restore", "POST", "system", "Restore config from backup"},
     {"/api/config/detect-rs485", "POST", "system", "Autodetect RS485 baud"},
     {"/api/faults", "GET", "system", "Get fault history"},
     {"/api/faults", "DELETE", "system", "Clear fault history"},

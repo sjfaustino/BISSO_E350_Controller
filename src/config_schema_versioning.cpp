@@ -51,7 +51,7 @@ static const config_key_metadata_t key_metadata[] = {
   // NEW in v2.0
   {KEY_MOTION_BUFFER_ENABLE, 2, 0, "int32", "Enable Motion Queue (0/1)", true, true},
   {KEY_WIFI_SSID, 2, 0, "string", "WiFi SSID", true, true},
-  {KEY_WIFI_PASSWORD, 2, 0, "string", "WiFi Password", true, true},
+  {KEY_WIFI_PASS, 2, 0, "string", "WiFi Password", true, true},
   {KEY_WIFI_AP_EN, 2, 0, "int32", "WiFi AP Enable (0/1)", true, true},
   {KEY_WIFI_AP_SSID, 2, 0, "string", "WiFi AP SSID", true, true},
   {KEY_WIFI_AP_PASS, 2, 0, "string", "WiFi AP Password", true, true},

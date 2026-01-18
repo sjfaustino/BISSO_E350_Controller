@@ -37,6 +37,7 @@ public:
     // WCS Helpers
     float getWorkPosition(uint8_t axis, float mpos);
     void getWCO(float* wco_array); 
+    wcs_system_t getCurrentWCOSystem() { return currentWCS; }
 
 private:
     gcode_distance_mode_t distanceMode;

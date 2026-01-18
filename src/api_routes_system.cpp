@@ -143,15 +143,8 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // GET /api/config/backup
     server.on("/api/config/backup", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        size_t bufSize = 8192;
-        char* json = (char*)malloc(bufSize);
-        if (!json) return response->send(500, "application/json", "{\"error\":\"OOM\"}");
-
-        size_t len = apiConfigExportJSON(json, bufSize);
-        (void)len;
-        
         JsonDocument doc;
-        deserializeJson(doc, json);
+        apiConfigPopulate(doc);
         
         time_t now;
         time(&now);
@@ -163,17 +156,13 @@ void registerSystemRoutes(PsychicHttpServer& server) {
         snprintf(verStr, sizeof(verStr), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
         doc["firmware"] = verStr;
         
-        String output;
-        serializeJson(doc, output);
-        free(json);
-
         char filename[128];
         char fileTime[32];
         strftime(fileTime, sizeof(fileTime), "%Y%m%d-%H%M%S", gmtime(&now));
         snprintf(filename, sizeof(filename), "attachment; filename=\"config-backup-%s.json\"", fileTime);
         
         response->addHeader("Content-Disposition", filename);
-        return response->send(200, "application/json", output.c_str());
+        return sendJsonResponse(response, doc);
     });
 
     // POST /api/config/restore
@@ -229,9 +218,9 @@ void registerSystemRoutes(PsychicHttpServer& server) {
                 item["timestamp"] = entry.timestamp;
                 item["message"] = entry.message;
                 
-                String jsonStr;
-                serializeJson(item, jsonStr);
-                response->sendChunk((uint8_t*)jsonStr.c_str(), jsonStr.length());
+                char buf[512];
+                size_t len = serializeJson(item, buf, sizeof(buf));
+                response->sendChunk((uint8_t*)buf, len);
             }
         }
         

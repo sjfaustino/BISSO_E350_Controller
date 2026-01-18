@@ -27,7 +27,7 @@ static const config_descriptor_t config_schema[] = {
         .critical = false
     },
     {
-        .key = KEY_WIFI_PASSWORD,
+        .key = KEY_WIFI_PASS,
         .type = CONFIG_TYPE_STRING,
         .string_max_len = 64,
         .default_value = "default_password",

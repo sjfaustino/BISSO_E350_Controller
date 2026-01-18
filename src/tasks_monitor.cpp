@@ -18,6 +18,7 @@
 #include "motion.h"                 // PERFORMANCE FIX: For motionEmergencyStop()
 #include "i2c_bus_recovery.h"       // ROBUSTNESS FIX: I2C bus recovery before E-STOP
 #include "load_manager.h"           // PHASE 5.3: For loadManagerUpdate()
+#include "rs485_device_registry.h"  // RS485 Watchdog
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -41,9 +42,9 @@ void taskMonitorFunction(void* parameter) {
     
     // 2. Lazy Configuration Flush
     // If settings were changed (dirty flag set), write them to NVS now to avoid stalling the main loop.
-    if (taskLockMutex(taskGetConfigMutex(), 10)) {
+    if (taskLockMutex((SemaphoreHandle_t)configGetMutex(), 10)) {
         configUnifiedFlush(); 
-        taskUnlockMutex(taskGetConfigMutex());
+        taskUnlockMutex((SemaphoreHandle_t)configGetMutex());
     }
     
     // 3. Task Stall Detection
@@ -132,6 +133,11 @@ void taskMonitorFunction(void* parameter) {
       }
       last_timeout_count = current_timeout_count;
       last_i2c_check_ms = millis();
+    }
+    
+    // 3.9. RS485 Bus Health Check
+    if (rs485CheckWatchdog()) {
+      // Watchdog alert active - logs within rs485CheckWatchdog() only first time
     }
 
     // 4. Task Health Analysis

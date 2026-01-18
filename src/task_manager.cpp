@@ -45,7 +45,6 @@ static QueueHandle_t queue_plc = NULL;
 static QueueHandle_t queue_fault = NULL;
 static QueueHandle_t queue_display = NULL;
 
-static SemaphoreHandle_t mutex_config = NULL;
 static SemaphoreHandle_t mutex_i2c = NULL; // Shared Bus Mutex
 // mutex_i2c_board, mutex_i2c_plc, mutex_lcd are aliased to mutex_i2c
 static SemaphoreHandle_t mutex_motion = NULL;
@@ -129,11 +128,6 @@ void taskManagerInit() {
   // Create Mutexes with individual error checking
   bool mutex_failure = false;
 
-  mutex_config = xSemaphoreCreateMutex();
-  if (!mutex_config) {
-    logError("[TASKS] Config mutex creation failed!");
-    mutex_failure = true;
-  }
 
   mutex_i2c = xSemaphoreCreateMutex();
   if (!mutex_i2c) {
@@ -228,7 +222,6 @@ QueueHandle_t taskGetPlcQueue() { return queue_plc; }
 QueueHandle_t taskGetFaultQueue() { return queue_fault; }
 QueueHandle_t taskGetDisplayQueue() { return queue_display; }
 
-SemaphoreHandle_t taskGetConfigMutex() { return mutex_config; }
 SemaphoreHandle_t taskGetI2cMutex() { return mutex_i2c; }
 // PHASE 5.4: Consolidated I2C Mutexes to prevent bus contention
 // All devices on the single Wire bus MUST use the same mutex.
