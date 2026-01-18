@@ -16,82 +16,90 @@
 
 void registerNetworkRoutes(PsychicHttpServer& server) {
     
-    // GET /api/network/status
+    // GET /api/network/status (OPTIMIZED: snprintf, no heap)
     server.on("/api/network/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
-        JsonDocument doc;
-        
         // WiFi Status
         bool wifi_connected = WiFi.isConnected();
-        doc["wifi_connected"] = wifi_connected;
-        doc["wifi_ssid"] = wifi_connected ? WiFi.SSID() : "--";
-        doc["wifi_ip"] = wifi_connected ? WiFi.localIP().toString() : "0.0.0.0";
-        doc["wifi_rssi"] = wifi_connected ? WiFi.RSSI() : -100;
-        doc["wifi_mac"] = WiFi.macAddress();
-        doc["wifi_gateway"] = wifi_connected ? WiFi.gatewayIP().toString() : "0.0.0.0";
-        doc["wifi_dns"] = wifi_connected ? WiFi.dnsIP().toString() : "0.0.0.0";
-        
-        // Signal quality percentage
         int rssi = WiFi.RSSI();
         int quality = 0;
         if (rssi <= -100) quality = 0;
         else if (rssi >= -50) quality = 100;
         else quality = 2 * (rssi + 100);
-        doc["signal_quality"] = quality;
 
         // Ethernet Status
         int eth_en = configGetInt(KEY_ETH_ENABLED, 0);
-        bool eth_up = false;
+        bool eth_up = eth_en ? ETH.linkUp() : false;
         
-        if (eth_en) {
-            eth_up = ETH.linkUp();
-            doc["eth_connected"] = eth_up;
-            doc["eth_ip"] = eth_up ? ETH.localIP().toString() : "0.0.0.0";
-            doc["eth_mac"] = ETH.macAddress();
-            doc["eth_speed"] = ETH.linkSpeed();
-            doc["eth_duplex"] = ETH.fullDuplex();
-            doc["eth_gateway"] = eth_up ? ETH.gatewayIP().toString() : "0.0.0.0";
+        char buffer[512];
+        if (eth_en && eth_up) {
+            snprintf(buffer, sizeof(buffer),
+                "{\"wifi_connected\":%s,\"wifi_ssid\":\"%s\",\"wifi_ip\":\"%s\",\"wifi_rssi\":%d,"
+                "\"wifi_mac\":\"%s\",\"wifi_gateway\":\"%s\",\"wifi_dns\":\"%s\",\"signal_quality\":%d,"
+                "\"eth_connected\":true,\"eth_ip\":\"%s\",\"eth_mac\":\"%s\",\"eth_speed\":%d,"
+                "\"eth_duplex\":%s,\"eth_gateway\":\"%s\",\"uptime_ms\":%lu}",
+                wifi_connected ? "true" : "false",
+                wifi_connected ? WiFi.SSID().c_str() : "--",
+                wifi_connected ? WiFi.localIP().toString().c_str() : "0.0.0.0",
+                wifi_connected ? rssi : -100,
+                WiFi.macAddress().c_str(),
+                wifi_connected ? WiFi.gatewayIP().toString().c_str() : "0.0.0.0",
+                wifi_connected ? WiFi.dnsIP().toString().c_str() : "0.0.0.0",
+                quality,
+                ETH.localIP().toString().c_str(),
+                ETH.macAddress().c_str(),
+                (int)ETH.linkSpeed(),
+                ETH.fullDuplex() ? "true" : "false",
+                ETH.gatewayIP().toString().c_str(),
+                (unsigned long)millis()
+            );
         } else {
-            doc["eth_connected"] = false;
-            doc["eth_ip"] = "0.0.0.0";
-            doc["eth_mac"] = "00:00:00:00:00:00"; 
-            doc["eth_speed"] = 0;
-            doc["eth_duplex"] = false;
-            doc["eth_gateway"] = "0.0.0.0";
+            snprintf(buffer, sizeof(buffer),
+                "{\"wifi_connected\":%s,\"wifi_ssid\":\"%s\",\"wifi_ip\":\"%s\",\"wifi_rssi\":%d,"
+                "\"wifi_mac\":\"%s\",\"wifi_gateway\":\"%s\",\"wifi_dns\":\"%s\",\"signal_quality\":%d,"
+                "\"eth_connected\":false,\"eth_ip\":\"0.0.0.0\",\"eth_mac\":\"00:00:00:00:00:00\","
+                "\"eth_speed\":0,\"eth_duplex\":false,\"eth_gateway\":\"0.0.0.0\",\"uptime_ms\":%lu}",
+                wifi_connected ? "true" : "false",
+                wifi_connected ? WiFi.SSID().c_str() : "--",
+                wifi_connected ? WiFi.localIP().toString().c_str() : "0.0.0.0",
+                wifi_connected ? rssi : -100,
+                WiFi.macAddress().c_str(),
+                wifi_connected ? WiFi.gatewayIP().toString().c_str() : "0.0.0.0",
+                wifi_connected ? WiFi.dnsIP().toString().c_str() : "0.0.0.0",
+                quality,
+                (unsigned long)millis()
+            );
         }
         
-        doc["uptime_ms"] = millis();
-        
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", buffer);
     });
 
-    // POST /api/network/reconnect
+    // POST /api/network/reconnect (OPTIMIZED: static string)
     server.on("/api/network/reconnect", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
         WiFi.disconnect();
         WiFi.begin();
         
-        JsonDocument doc;
-        doc["success"] = true;
-        doc["message"] = "Reconnection triggered";
-        
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", "{\"success\":true,\"message\":\"Reconnection triggered\"}");
     });
 
-    // GET /api/time
+    // GET /api/time (OPTIMIZED: snprintf, no heap)
     server.on("/api/time", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
         time_t now;
         struct tm timeinfo;
         time(&now);
         localtime_r(&now, &timeinfo);
 
-        char buf[64];
-        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        char formatted[32];
+        strftime(formatted, sizeof(formatted), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        
+        char buffer[128];
+        snprintf(buffer, sizeof(buffer),
+            "{\"timestamp\":%lu,\"formatted\":\"%s\",\"synced\":%s}",
+            (unsigned long)now,
+            formatted,
+            (timeinfo.tm_year > (2020 - 1900)) ? "true" : "false"
+        );
 
-        JsonDocument doc;
-        doc["timestamp"] = (uint32_t)now;
-        doc["formatted"] = buf;
-        doc["synced"] = (timeinfo.tm_year > (2020 - 1900));
-
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", buffer);
     });
 
     // POST /api/time/sync
