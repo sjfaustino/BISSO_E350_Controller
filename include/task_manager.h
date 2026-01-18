@@ -49,7 +49,7 @@
 #define TASK_STACK_TELEMETRY                                                   \
   6144 // INCREASED: 4KB->6KB to prevent overflow with stack stats and JSON buffers
 #define TASK_STACK_LCD_FORMAT                                                  \
-  3072
+  4096 // INCREASED: 3KB->4KB (Fix low stack warning)
 #define TASK_STACK_LCD                                                         \
   4096 // INCREASED: 3KB->4KB (Fix low stack warning)
 #define TASK_STACK_BOOT 2048

@@ -49,37 +49,46 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", buffer);
     });
     
-    // GET /api/hardware/io
+    // GET /api/hardware/io (OPTIMIZED: snprintf, no heap)
     server.on("/api/hardware/io", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        doc["success"] = true;
-        
         uint8_t in_bits = elboI73GetRawState();
         uint8_t out_bits = elboQ73GetRawState();
         uint8_t board_in = boardInputsGetRawState();
         
-        JsonArray inputs = doc["inputs"].to<JsonArray>();
+        char buffer[1536];
+        char* p = buffer;
+        size_t remain = sizeof(buffer);
+        int n;
+
+        n = snprintf(p, remain, "{\"success\":true,\"inputs\":[");
+        if (n > 0) { p += n; remain -= n; }
+
+        // I73 Inputs
         for (int i = 0; i < 8; i++) {
-            JsonObject in = inputs.add<JsonObject>();
-            in["state"] = (in_bits & (1 << i)) != 0;
-            in["name"] = String("I73-") + i;
+            n = snprintf(p, remain, "{\"state\":%s,\"name\":\"I73-%d\"},", 
+                (in_bits & (1 << i)) != 0 ? "true" : "false", i);
+            if (n > 0) { p += n; remain -= n; }
         }
+        // Board Inputs
         for (int i = 0; i < 8; i++) {
-            JsonObject in = inputs.add<JsonObject>();
-            in["state"] = (board_in & (1 << i)) != 0;
-            in["name"] = String("B-X") + (i+1);
+            n = snprintf(p, remain, "{\"state\":%s,\"name\":\"B-X%d\"}%s", 
+                (board_in & (1 << i)) != 0 ? "true" : "false", i+1, (i < 7) ? "," : "");
+            if (n > 0) { p += n; remain -= n; }
         }
 
-        JsonArray outputs = doc["outputs"].to<JsonArray>();
+        n = snprintf(p, remain, "],\"outputs\":[");
+        if (n > 0) { p += n; remain -= n; }
+
+        // Outputs
         for (int i = 0; i < 8; i++) {
-            JsonObject out = outputs.add<JsonObject>();
-            out["state"] = (out_bits & (1 << i)) == 0;
-            out["name"] = String("Y") + (i+1);
+            n = snprintf(p, remain, "{\"state\":%s,\"name\":\"Y%d\"}%s", 
+                (out_bits & (1 << i)) == 0 ? "true" : "false", i+1, (i < 7) ? "," : "");
+            if (n > 0) { p += n; remain -= n; }
         }
 
-        doc["estop"] = (board_in & 0x08) != 0;
-
-        return sendJsonResponse(response, doc);
+        snprintf(p, remain, "],\"estop\":%s}", (board_in & 0x08) != 0 ? "true" : "false");
+        
+        return response->send(200, "application/json", buffer);
     });
 
     // GET /api/hardware/pins

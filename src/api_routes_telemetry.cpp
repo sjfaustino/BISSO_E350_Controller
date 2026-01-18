@@ -32,52 +32,53 @@ extern int history_count;
 
 void registerTelemetryRoutes(PsychicHttpServer& server) {
     
-    // Handler for status/telemetry endpoints (shared logic)
+    // Handler for status/telemetry endpoints (OPTIMIZED: snprintf, no heap)
     auto statusHandler = [](PsychicRequest *request, PsychicResponse *response) {
         system_telemetry_t telemetry = telemetryGetSnapshot();
-        JsonDocument doc;
-        
-        // Nested system object to match WebSocket structure (PHASE 6.5)
-        JsonObject sys = doc["system"].to<JsonObject>();
-        sys["status"] = "READY"; // Fallback, could be richer
-        sys["health"] = telemetryGetHealthStatusString(telemetry.health_status);
-        sys["uptime_sec"] = telemetry.uptime_seconds;
-        sys["cpu_percent"] = telemetry.cpu_usage_percent;
-        sys["free_heap_bytes"] = telemetry.free_heap_bytes;
-        sys["plc_hardware_present"] = telemetry.plc_hardware_present;
-        sys["firmware_version"] = "v" + String(FIRMWARE_VERSION_MAJOR) + "." + String(FIRMWARE_VERSION_MINOR) + "." + String(FIRMWARE_VERSION_PATCH);
-        sys["build_date"] = __DATE__;
-
-        // Hardware details
-        sys["hw_model"] = "BISSO E350";
-        sys["hw_mcu"] = mcuGetModelName();
         
         char rev_str[16];
         mcuGetRevisionString(rev_str, sizeof(rev_str));
-        sys["hw_revision"] = rev_str;
 
         char serial_str[32];
         uint64_t mac = ESP.getEfuseMac();
         snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
-        sys["hw_serial"] = serial_str;
-        
-        // Memory info
-        sys["hw_psram_size"] = mcuGetPsramSize();
-        sys["hw_flash_size"] = mcuGetFlashSize();
-        sys["hw_has_psram"] = mcuHasPsram();
 
-        // Flattened fields for dashboard compatibility
-        doc["x_mm"] = telemetry.axis_x_mm;
-        doc["y_mm"] = telemetry.axis_y_mm;
-        doc["z_mm"] = telemetry.axis_z_mm;
-        doc["a_mm"] = telemetry.axis_a_mm;
+        char buffer[2048];
+        snprintf(buffer, sizeof(buffer),
+            "{\"system\":{"
+            "\"status\":\"READY\",\"health\":\"%s\",\"uptime_sec\":%lu,"
+            "\"cpu_percent\":%d,\"free_heap_bytes\":%lu,\"plc_hardware_present\":%s,"
+            "\"firmware_version\":\"v%d.%d.%d\",\"build_date\":\"%s\","
+            "\"hw_model\":\"BISSO E350\",\"hw_mcu\":\"%s\",\"hw_revision\":\"%s\","
+            "\"hw_serial\":\"%s\",\"hw_psram_size\":%zu,\"hw_flash_size\":%zu,"
+            "\"hw_has_psram\":%s"
+            "},"
+            "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
+            "\"motion_enabled\":%s,\"motion_moving\":%s,\"estop\":%s,\"alarm\":%s}",
+            telemetryGetHealthStatusString(telemetry.health_status),
+            (unsigned long)telemetry.uptime_seconds,
+            telemetry.cpu_usage_percent,
+            (unsigned long)telemetry.free_heap_bytes,
+            telemetry.plc_hardware_present ? "true" : "false",
+            FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH,
+            __DATE__,
+            mcuGetModelName(),
+            rev_str,
+            serial_str,
+            mcuGetPsramSize(),
+            mcuGetFlashSize(),
+            mcuHasPsram() ? "true" : "false",
+            telemetry.axis_x_mm,
+            telemetry.axis_y_mm,
+            telemetry.axis_z_mm,
+            telemetry.axis_a_mm,
+            telemetry.motion_enabled ? "true" : "false",
+            telemetry.motion_moving ? "true" : "false",
+            telemetry.estop_active ? "true" : "false",
+            telemetry.alarm_active ? "true" : "false"
+        );
         
-        doc["motion_enabled"] = telemetry.motion_enabled;
-        doc["motion_moving"] = telemetry.motion_moving;
-        doc["estop"] = telemetry.estop_active;
-        doc["alarm"] = telemetry.alarm_active;
-        
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", buffer);
     };
 
     // GET /api/status - System status and positions
