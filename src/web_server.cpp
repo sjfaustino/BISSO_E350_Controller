@@ -477,7 +477,12 @@ void WebServerManager::broadcastState() {
     size_t len = serializeTelemetryToBuffer(buffer, sizeof(buffer), telemetry, false);
     
     if (len > 0 && len < sizeof(buffer)) {
-        wsHandler.sendAll(buffer);
+        // Wrap in try-catch to prevent crash if clients disconnect during broadcast
+        try {
+            wsHandler.sendAll(buffer);
+        } catch (...) {
+            logWarning("[WS] Broadcast failed - client disconnected");
+        }
     } else if (len >= sizeof(buffer)) {
         logError("[WS] Broadcast failed - Buffer overflow (%u bytes)", (uint32_t)len);
     }
