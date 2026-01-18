@@ -211,15 +211,11 @@ void registerSystemRoutes(PsychicHttpServer& server) {
                 if (!first) response->sendChunk((uint8_t*)",", 1);
                 first = false;
 
-                JsonDocument item;
-                item["code"] = entry.code;
-                item["description"] = faultCodeToString(entry.code);
-                item["severity"] = faultSeverityToString(entry.severity);
-                item["timestamp"] = entry.timestamp;
-                item["message"] = entry.message;
-                
                 char buf[512];
-                size_t len = serializeJson(item, buf, sizeof(buf));
+                size_t len = snprintf(buf, sizeof(buf),
+                    "{\"code\":%d,\"description\":\"%s\",\"severity\":\"%s\",\"timestamp\":%lu,\"message\":\"%s\"}",
+                    entry.code, faultCodeToString(entry.code), faultSeverityToString(entry.severity),
+                    (unsigned long)entry.timestamp, entry.message);
                 response->sendChunk((uint8_t*)buf, len);
             }
         }
@@ -241,30 +237,36 @@ void registerSystemRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"success\":true}");
     });
 
-    // GET /api/ota/check
+    // GET /api/ota/check (OPTIMIZED: snprintf)
     server.on("/api/ota/check", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         const UpdateCheckResult* res = otaGetCachedResult();
         
-        JsonDocument doc;
-        doc["check_complete"] = otaCheckComplete();
-        doc["available"] = res->available;
-        doc["latest_version"] = res->latest_version;
-        doc["url"] = res->download_url;
-        doc["notes"] = res->release_notes;
+        char buffer[1024];
+        snprintf(buffer, sizeof(buffer),
+            "{\"check_complete\":%s,\"available\":%s,\"latest_version\":\"%s\",\"url\":\"%s\",\"notes\":\"%s\"}",
+            otaCheckComplete() ? "true" : "false",
+            res->available ? "true" : "false",
+            res->latest_version,
+            res->download_url,
+            res->release_notes
+        );
         
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", buffer);
     });
 
-    // GET /api/ota/latest
+    // GET /api/ota/latest (OPTIMIZED: snprintf)
     server.on("/api/ota/latest", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
         const UpdateCheckResult* result = otaGetCachedResult();
-        JsonDocument doc;
-        doc["available"] = result->available;
-        doc["latest_version"] = result->latest_version;
-        doc["download_url"] = result->download_url;
-        doc["release_notes"] = result->release_notes;
+        char buffer[1024];
+        snprintf(buffer, sizeof(buffer),
+            "{\"available\":%s,\"latest_version\":\"%s\",\"download_url\":\"%s\",\"release_notes\":\"%s\"}",
+            result->available ? "true" : "false",
+            result->latest_version,
+            result->download_url,
+            result->release_notes
+        );
         
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", buffer);
     });
     
     // POST /api/ota/update
@@ -293,13 +295,16 @@ void registerSystemRoutes(PsychicHttpServer& server) {
         }
     });
     
-    // GET /api/ota/status
+    // GET /api/ota/status (OPTIMIZED: snprintf)
     server.on("/api/ota/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        doc["updating"] = otaIsUpdating();
-        doc["progress"] = otaGetProgress();
+        char buffer[128];
+        snprintf(buffer, sizeof(buffer),
+            "{\"updating\":%s,\"progress\":%d}",
+            otaIsUpdating() ? "true" : "false",
+            otaGetProgress()
+        );
         
-        return sendJsonResponse(response, doc);
+        return response->send(200, "application/json", buffer);
     });
 
     // POST /api/system/reboot
