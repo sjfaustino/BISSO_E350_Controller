@@ -27,7 +27,16 @@ typedef enum {
     CONFIG_CATEGORY_SAFETY = 3,         // Safety thresholds
     CONFIG_CATEGORY_THERMAL = 4,        // Thermal protection
     CONFIG_CATEGORY_NETWORK = 5,        // WiFi/Ethernet settings
-    CONFIG_CATEGORY_SYSTEM = 6          // System settings (CLI, OTA, etc.)
+    CONFIG_CATEGORY_SYSTEM = 6,         // System settings (CLI, OTA, etc.)
+    CONFIG_CATEGORY_SPINDLE = 7,        // JXK10, Tach, Pause
+    CONFIG_CATEGORY_SERIAL = 8,         // Baud rates, I2C speed
+    CONFIG_CATEGORY_HARDWARE = 9,       // Pin mapping
+    CONFIG_CATEGORY_BEHAVIOR = 10,      // Jog speed, Accel, Margins
+    CONFIG_CATEGORY_CALIBRATION = 11,   // Speed calibration
+    CONFIG_CATEGORY_POSITIONS = 12,     // Safe/User positions
+    CONFIG_CATEGORY_WCS = 13,           // Work Coordinate Systems
+    CONFIG_CATEGORY_SECURITY = 14,      // Credentials
+    CONFIG_CATEGORY_STATS = 15          // Runtime, Cycle count
 } config_category_t;
 
 /**
@@ -71,7 +80,7 @@ void apiConfigInit(void);
  * @param json_doc Output JSON document
  * @return true if successful
  */
-bool apiConfigGet(config_category_t category, JsonDocument& json_doc);
+bool apiConfigGet(config_category_t category, JsonVariant json_doc);
 
 /**
  * @brief Set configuration value with validation
@@ -100,7 +109,7 @@ bool apiConfigValidate(config_category_t category, const char* key, JsonVariant 
  * @param json_doc Output JSON document with schema
  * @return true if successful
  */
-bool apiConfigGetSchema(config_category_t category, JsonDocument& json_doc);
+bool apiConfigGetSchema(config_category_t category, JsonVariant json_doc);
 
 /**
  * @brief Trigger encoder calibration for specified axis

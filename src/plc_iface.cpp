@@ -463,6 +463,10 @@ bool elboI73GetInput(uint8_t bit, bool *success) {
   return (i73_input_shadow & (1 << bit));
 }
 
+void elboI73Refresh() {
+  elboI73GetInput(0, nullptr);
+}
+
 void elboDiagnostics() {
   logPrintln("\n[PLC] === IO Diagnostics ===");
 

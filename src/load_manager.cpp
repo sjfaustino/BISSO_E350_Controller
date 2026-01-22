@@ -124,7 +124,11 @@ void loadManagerUpdate() {
     // State machine: determine new state based on CPU usage
     load_state_t new_state = load_state.current_state;
 
-    if (cpu_usage < LOAD_THRESHOLD_NORMAL) {
+    // PHASE 14: Boot-up grace period (15 seconds)
+    // Prevents system alerts during initial network/FS/startup spikes
+    if (millis() < 15000) {
+        new_state = LOAD_STATE_NORMAL;
+    } else if (cpu_usage < LOAD_THRESHOLD_NORMAL) {
         // Normal operation
         new_state = LOAD_STATE_NORMAL;
     } else if (cpu_usage < LOAD_THRESHOLD_ELEVATED) {
@@ -136,6 +140,26 @@ void loadManagerUpdate() {
     } else {
         // Critical load
         new_state = LOAD_STATE_CRITICAL;
+    }
+
+    // PHASE 14: State Damping (Hysteresis)
+    // Only upgrade state if condition persists, or downgrade if it drops significantly
+    static uint32_t last_state_change_request = 0;
+    static load_state_t pending_state = LOAD_STATE_NORMAL;
+    
+    if (new_state != load_state.current_state) {
+        if (new_state != pending_state) {
+            pending_state = new_state;
+            last_state_change_request = millis();
+        }
+        
+        // Require 3 seconds of consistent load to change state (unless it's CRITICAL upgrade)
+        uint32_t damping_time = (new_state == LOAD_STATE_CRITICAL) ? 1000 : 3000;
+        if (millis() - last_state_change_request < damping_time) {
+            new_state = load_state.current_state; // Keep current state for now
+        }
+    } else {
+        pending_state = new_state;
     }
 
     // PHASE 6.1: Force load state based on memory fragmentation (Tuned for stability)

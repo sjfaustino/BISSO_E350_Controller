@@ -141,28 +141,55 @@ void registerSystemRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", resp);
     });
 
-    // GET /api/config/backup
+    // GET /api/config/backup (OPTIMIZED: Streaming/Chunked)
     server.on("/api/config/backup", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        apiConfigPopulate(doc);
+        response->setContentType("application/json");
         
         time_t now;
         time(&now);
         char timeStr[32];
         strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
-        doc["timestamp"] = timeStr;
         
         char verStr[32];
         snprintf(verStr, sizeof(verStr), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
-        doc["firmware"] = verStr;
-        
+
         char filename[128];
         char fileTime[32];
         strftime(fileTime, sizeof(fileTime), "%Y%m%d-%H%M%S", gmtime(&now));
         snprintf(filename, sizeof(filename), "attachment; filename=\"config-backup-%s.json\"", fileTime);
-        
         response->addHeader("Content-Disposition", filename);
-        return sendJsonResponse(response, doc);
+
+        // Start response
+        response->sendHeaders();
+        
+        // Metadata
+        char meta[128];
+        snprintf(meta, sizeof(meta), "{\"timestamp\":\"%s\",\"firmware\":\"%s\"", timeStr, verStr);
+        response->sendChunk((uint8_t*)meta, strlen(meta));
+
+        // Categories
+        const char* categories[] = {
+            "motion", "vfd", "encoder", "network", "system", 
+            "spindle", "serial", "hardware", "behavior", 
+            "calibration", "positions", "wcs", "security", "stats"
+        };
+        
+        uint8_t buffer[1024];
+        ChunkPrinter printer(response, buffer, sizeof(buffer));
+
+        for (int i = 0; i < 14; i++) {
+            char cat_header[32];
+            snprintf(cat_header, sizeof(cat_header), ",\"%s\":", categories[i]);
+            response->sendChunk((uint8_t*)cat_header, strlen(cat_header));
+            
+            JsonDocument catDoc;
+            apiConfigGet((config_category_t)i, catDoc);
+            serializeJson(catDoc, printer);
+            printer.flush();
+        }
+
+        response->sendChunk((uint8_t*)"}", 1);
+        return response->finishChunking();
     });
 
     // POST /api/config/restore

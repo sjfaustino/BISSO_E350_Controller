@@ -34,9 +34,7 @@ void boardInputsInit() {
   // Check if buttons are enabled in config (default: DISABLED for testing)
   buttons_enabled = configGetInt(KEY_BUTTONS_ENABLED, 0) != 0;
   if (!buttons_enabled) {
-    logInfo("[INPUTS] Physical buttons DISABLED (btn_en=0 or not set)");
-    device_present = false;
-    return;
+    logInfo("[INPUTS] Physical buttons functionally DISABLED (diagnostics only)");
   }
 
   // 1. Resolve Pin Mappings via HAL
@@ -46,25 +44,25 @@ void boardInputsInit() {
   int8_t pin_resume = getPin("input_resume");
 
   // 2. Validate and Generate Bitmasks
-  // The KC868-A16 Input Expander (0x24) handles Virtual Pins 0-7 (X1-X8).
+  // The KC868-A16 Input Expander (0x22) handles Virtual Pins 100-107 (X1-X8).
   // We enforce bounds checking to prevent invalid shifts.
 
-  if (pin_estop >= 0 && pin_estop < 8) {
-    mask_estop = (1 << pin_estop);
+  if (pin_estop >= 100 && pin_estop <= 107) {
+    mask_estop = (1 << (pin_estop - 100));
   } else {
-    logError("[INPUTS] Invalid E-Stop Pin %d. Defaulting to P3 (X4).",
+    logError("[INPUTS] Invalid E-Stop Pin %d. Defaulting to X4 (103).",
              pin_estop);
     mask_estop = (1 << 3); // Fallback: P3 (X4)
   }
 
-  if (pin_pause >= 0 && pin_pause < 8) {
-    mask_pause = (1 << pin_pause);
+  if (pin_pause >= 100 && pin_pause <= 107) {
+    mask_pause = (1 << (pin_pause - 100));
   } else {
     mask_pause = (1 << 4); // Fallback: P4 (X5)
   }
 
-  if (pin_resume >= 0 && pin_resume < 8) {
-    mask_resume = (1 << pin_resume);
+  if (pin_resume >= 100 && pin_resume <= 107) {
+    mask_resume = (1 << (pin_resume - 100));
   } else {
     mask_resume = (1 << 5); // Fallback: P5 (X6)
   }
@@ -73,8 +71,7 @@ void boardInputsInit() {
       "[INPUTS] Fast Path Mapped: Estop=0x%02X, Pause=0x%02X, Resume=0x%02X",
       mask_estop, mask_pause, mask_resume);
 
-  // 3. Hardware Bus Init
-  // THREAD SAFETY FIX: Protect I2C bus access with mutex
+  // 3. Hardware Bus Init (Always attempt detection for diagnostics)
   uint8_t temp_data = 0xFF;
   i2c_result_t result = I2C_RESULT_UNKNOWN_ERROR;
   SemaphoreHandle_t i2c_mutex = taskGetI2cBoardMutex();
@@ -85,7 +82,6 @@ void boardInputsInit() {
   } else {
     logWarning(
         "[INPUTS] I2C mutex not available during init (expected at boot)");
-    // During init, mutex might not be created yet - safe to call directly
     result = i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &temp_data, 1);
   }
 
@@ -95,9 +91,8 @@ void boardInputsInit() {
     logInfo("[INPUTS] Board detected (0x%02X)", BOARD_INPUT_I2C_ADDR);
   } else {
     device_present = false;
-    logWarning("[INPUTS] Board NOT connected (0x%02X) - buttons disabled",
+    logWarning("[INPUTS] Board NOT detected (0x%02X)",
                BOARD_INPUT_I2C_ADDR);
-    // Don't log as error - device may be intentionally disconnected
   }
 }
 
@@ -105,32 +100,19 @@ button_state_t boardInputsUpdate() {
   button_state_t state = {false, false, false, false};
   static uint32_t invalid_until = 0;
 
-  // Skip polling if buttons are disabled via config
-  if (!buttons_enabled) {
-    state.connection_ok = true; // Not a connection error, just disabled
-    state.estop_active = false; // Safe default: E-Stop not active
-    return state;
-  }
-
-  // Skip polling entirely if device wasn't detected at init
-  // This prevents continuous I2C errors when buttons aren't connected
+  // 1. Hardware Presence Guard
   if (!device_present) {
     state.connection_ok = false;
-    state.estop_active = false; // Safe default: E-Stop not active
     return state;
   }
 
-  // Fast fail backoff to prevent bus hammering on persistent faults
+  // 2. Backoff Guard (Persistent Faults)
   if (millis() < invalid_until) {
     state.connection_ok = false;
-    // Return potentially stale but safe state
-    state.estop_active = (input_cache & mask_estop);
     return state;
   }
 
-  // THREAD SAFETY FIX: Protect I2C bus access with mutex
-  // Multiple tasks may call this function concurrently (safety task, telemetry,
-  // etc.)
+  // 3. Hardware Read (Always update cache for diagnostics)
   SemaphoreHandle_t i2c_mutex = taskGetI2cBoardMutex();
   i2c_result_t result = I2C_RESULT_UNKNOWN_ERROR;
 
@@ -138,18 +120,21 @@ button_state_t boardInputsUpdate() {
     result = i2cReadWithRetry(BOARD_INPUT_I2C_ADDR, &input_cache, 1);
     xSemaphoreGive(i2c_mutex);
   } else {
-    // Mutex timeout - bus busy or deadlock
     state.connection_ok = false;
     return state;
   }
 
   if (result != I2C_RESULT_OK) {
     state.connection_ok = false;
-    // Backoff for 500ms if I2C fails implies bus issues
-    invalid_until = millis() + 500;
+    invalid_until = millis() + 500; // Backoff
     return state;
   }
   state.connection_ok = true;
+
+  // 4. Skip Button Logic if disabled
+  if (!buttons_enabled) {
+    return state;
+  }
 
   // --- STABILITY FILTER (DEBOUNCE) ---
   // Iterate through all 8 bits of the input byte

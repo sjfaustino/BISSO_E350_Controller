@@ -70,6 +70,7 @@ void elboInit();
 bool elboI73GetInput(uint8_t bit, bool *success = nullptr);
 
 // New API - correct signal control
+void elboI73Refresh();   // Public periodic refresh
 void plcSetAxisSelect(uint8_t axis);     // 0=X, 1=Y, 2=Z, 255=none
 void plcSetDirection(bool positive);     // true=+, false=-
 void plcSetSpeed(uint8_t speed_profile); // 0=fast, 1=medium, 2=slow

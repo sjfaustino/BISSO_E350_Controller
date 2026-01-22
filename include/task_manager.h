@@ -38,20 +38,20 @@
 #define TASK_STACK_MOTION                                                      \
   4096 // Keep 4K for motion planner
 #define TASK_STACK_ENCODER                                                     \
-  4096 // REDUCED: 6KB->4KB (Avg usage ~1.5KB)
+  3072 // REDUCED: 4KB->3KB
 #define TASK_STACK_PLC_COMM 2048
 #define TASK_STACK_I2C_MANAGER                                                 \
   3072
 #define TASK_STACK_CLI                                                         \
-  8192
+  4096 // REDUCED: 8KB->4KB
 #define TASK_STACK_FAULT_LOG 3072
-#define TASK_STACK_MONITOR 6144
+#define TASK_STACK_MONITOR 4096 // TUNED: 6KB->4KB (HWM 732 bytes was too low at 3KB)
 #define TASK_STACK_TELEMETRY                                                   \
-  6144 // INCREASED: 4KB->6KB to prevent overflow with stack stats and JSON buffers
+  6144 // TUNED: 8KB->6KB (HWM 484 bytes was too low at 5KB)
 #define TASK_STACK_LCD_FORMAT                                                  \
   4096 // INCREASED: 3KB->4KB (Fix low stack warning)
 #define TASK_STACK_LCD                                                         \
-  4096 // INCREASED: 3KB->4KB (Fix low stack warning)
+  4096 // KEPT: 4KB (HWM 932 bytes was too low at 3KB)
 #define TASK_STACK_BOOT 2048
 
 // WARNING: AsyncWebServer handlers create JsonDocument on stack!
@@ -100,7 +100,7 @@
 // timeout needed, indicates I2C bus/device failure → better to fail fast than
 // hang system.
 #define I2C_TIMEOUT_BASE_MS 50
-#define I2C_TIMEOUT_MAX_MS 100
+#define I2C_TIMEOUT_MAX_MS 150
 #define I2C_TIMEOUT_SCALE 0.5f
 
 // ============================================================================

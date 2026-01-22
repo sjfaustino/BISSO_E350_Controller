@@ -9,6 +9,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
+#include "motion_buffer.h"  // For buffer telemetry
 #include "motion_state.h" // Added for execution tracking
 #include "api_config.h"
 #include "serial_logger.h"
@@ -77,12 +78,12 @@ void WebServerManager::init() {
     logPrintln("[WEB] Init with REST API");
     otaInit();
     
-    // TUNE: Keep sufficient stack for HTTP parsing, single socket to prevent fragmentation
-    server.config.stack_size = 8192;  // Reverted - 4KB was too small for file serving
-    server.config.max_open_sockets = 1; // Sequential requests only - prevents fragmentation
+    // TUNE: Increase parallel sockets to 6 for Dashboard stability (many assets + WS)
+    server.config.stack_size = 8192;
+    server.config.max_open_sockets = 6; // Allow 6 parallel (browser standard)
     server.config.lru_purge_enable = true;
-    server.config.send_wait_timeout = 5; // Increased timeout for slower single-connection
-    server.config.recv_wait_timeout = 5;
+    server.config.send_wait_timeout = 15; // More headroom for chunked deliveries
+    server.config.recv_wait_timeout = 15;
 
     // Mount Filesystem (format on first failure for new/corrupted flash)
     if (!LittleFS.begin(false)) {
@@ -218,10 +219,9 @@ void WebServerManager::setupRoutes() {
 void WebServerManager::begin() {
     logPrintln("[WEB] Starting Server");
     
-    // PHASE 6.2: Memory-safe configuration
-    // Single socket prevents concurrent allocations that fragment heap
-    // Browser queues requests; slightly slower but much more stable
-    server.config.max_open_sockets = 1;
+    // PHASE 6.2: Memory-safe configuration (Optimized for standard browser parallelism)
+    // 4 sockets provide a good balance between concurrency and heap usage.
+    server.config.max_open_sockets = 4;
     server.config.max_uri_handlers = 40;
     
     server.start(); 
@@ -378,7 +378,7 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
     int n = snprintf(buffer, buffer_size,
         "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
         "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu%s%s%s%s%s%s%s%s%s%s%s},"
-        "\"motion_active\":%s,\"motion\":{\"position\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"a\":%.3f},\"dro_connected\":%s},"
+        "\"motion_active\":%s,\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"position\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"a\":%.3f},\"dro_connected\":%s},"
         "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
         "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f},"
         "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s},"
@@ -403,6 +403,9 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         full ? ",\"hw_revision\":\"" : "", full ? rev_str : "", full ? "\"" : "",
         full ? ",\"hw_serial\":\"" : "", full ? serial_str : "", full ? "\"" : "",
         moving ? "true" : "false",
+        moving ? "true" : "false",
+        motionBuffer.available(),
+        motionBuffer.getCapacity(),
         current_status.x_pos, current_status.y_pos, current_status.z_pos, current_status.a_pos,
         current_status.dro_connected ? "true" : "false",
         current_status.vfd_current_amps, current_status.vfd_frequency_hz, current_status.vfd_thermal_percent, current_status.vfd_fault_code,

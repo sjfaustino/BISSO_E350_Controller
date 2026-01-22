@@ -49,77 +49,94 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", buffer);
     });
     
-    // GET /api/hardware/io (OPTIMIZED: snprintf, no heap)
+    // GET /api/hardware/io (STABLE: Chunked streaming, no large buffer)
     server.on("/api/hardware/io", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         uint8_t in_bits = elboI73GetRawState();
         uint8_t out_bits = elboQ73GetRawState();
         uint8_t board_in = boardInputsGetRawState();
         
-        char buffer[1536];
-        char* p = buffer;
-        size_t remain = sizeof(buffer);
+        response->setContentType("application/json");
+        response->sendHeaders();
+
+        char chunk[256];
         int n;
 
-        n = snprintf(p, remain, "{\"success\":true,\"inputs\":[");
-        if (n > 0) { p += n; remain -= n; }
+        response->sendChunk((uint8_t*)"{\"success\":true,\"inputs\":[", 26);
 
-        // I73 Inputs
+        // Board Inputs (Bank 1: X1-X8 @ 0x22)
         for (int i = 0; i < 8; i++) {
-            n = snprintf(p, remain, "{\"state\":%s,\"name\":\"I73-%d\"},", 
-                (in_bits & (1 << i)) != 0 ? "true" : "false", i);
-            if (n > 0) { p += n; remain -= n; }
+            n = snprintf(chunk, sizeof(chunk), "{\"state\":%s,\"name\":\"X%d\"},", 
+                (board_in & (1 << i)) != 0 ? "true" : "false", i + 1);
+            response->sendChunk((uint8_t*)chunk, n);
         }
-        // Board Inputs
+        // I73 Inputs (Bank 2: X9-X16 @ 0x21)
         for (int i = 0; i < 8; i++) {
-            n = snprintf(p, remain, "{\"state\":%s,\"name\":\"B-X%d\"}%s", 
-                (board_in & (1 << i)) != 0 ? "true" : "false", i+1, (i < 7) ? "," : "");
-            if (n > 0) { p += n; remain -= n; }
+            n = snprintf(chunk, sizeof(chunk), "{\"state\":%s,\"name\":\"X%d\"}%s", 
+                (in_bits & (1 << i)) != 0 ? "true" : "false", i + 9, (i < 7) ? "," : "");
+            response->sendChunk((uint8_t*)chunk, n);
         }
 
-        n = snprintf(p, remain, "],\"outputs\":[");
-        if (n > 0) { p += n; remain -= n; }
+        response->sendChunk((uint8_t*)"],\"outputs\":[", 14);
 
         // Outputs
         for (int i = 0; i < 8; i++) {
-            n = snprintf(p, remain, "{\"state\":%s,\"name\":\"Y%d\"}%s", 
+            n = snprintf(chunk, sizeof(chunk), "{\"state\":%s,\"name\":\"Y%d\"}%s", 
                 (out_bits & (1 << i)) == 0 ? "true" : "false", i+1, (i < 7) ? "," : "");
-            if (n > 0) { p += n; remain -= n; }
+            response->sendChunk((uint8_t*)chunk, n);
         }
 
-        snprintf(p, remain, "],\"estop\":%s}", (board_in & 0x08) != 0 ? "true" : "false");
+        n = snprintf(chunk, sizeof(chunk), "],\"estop\":%s}", (board_in & 0x08) != 0 ? "true" : "false");
+        response->sendChunk((uint8_t*)chunk, n);
         
-        return response->send(200, "application/json", buffer);
+        return response->finishChunking();
     });
 
-    // GET /api/hardware/pins (OPTIMIZED: Chunked streaming, no large buffer)
+    // GET /api/hardware/pins (FIXED: Overflow-safe efficient chunked streaming)
     server.on("/api/hardware/pins", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         response->setContentType("application/json");
+        response->sendHeaders(); // CRITICAL: Must send headers before first chunk
 
-        const char* header = "{\"success\":true,\"pins\":[";
-        response->sendChunk((uint8_t*)header, strlen(header));
+        response->sendChunk((uint8_t*)"{\"success\":true,\"pins\":[", 24);
+
+        char chunk[1024];
+        char* p = chunk;
+        size_t rem = sizeof(chunk);
+
+        auto flushIfFull = [&](size_t needed) {
+            if (needed >= rem) {
+                response->sendChunk((uint8_t*)chunk, p - chunk);
+                p = chunk;
+                rem = sizeof(chunk);
+            }
+        };
 
         for (size_t i = 0; i < PIN_COUNT; i++) {
-            char buf[256];
-            size_t len = snprintf(buf, sizeof(buf), "{\"gpio\":%d,\"silk\":\"%s\",\"type\":\"%s\",\"note\":\"%s\"}%s",
+            char entry[256];
+            int n = snprintf(entry, sizeof(entry), "{\"gpio\":%d,\"silk\":\"%s\",\"type\":\"%s\",\"note\":\"%s\"}%s",
                 pinDatabase[i].gpio, pinDatabase[i].silk, pinDatabase[i].type, 
                 pinDatabase[i].note ? pinDatabase[i].note : "", (i < PIN_COUNT - 1) ? "," : "");
-            response->sendChunk((uint8_t*)buf, len);
+            
+            flushIfFull(n);
+            memcpy(p, entry, n);
+            p += n; rem -= n;
         }
+        response->sendChunk((uint8_t*)chunk, p - chunk);
+        p = chunk; rem = sizeof(chunk);
 
-        const char* signals_start = "],\"signals\":[";
-        response->sendChunk((uint8_t*)signals_start, strlen(signals_start));
-
+        response->sendChunk((uint8_t*)"],\"signals\":[", 13);
         for (size_t i = 0; i < SIGNAL_COUNT; i++) {
-            char buf[256];
-            size_t len = snprintf(buf, sizeof(buf), "{\"key\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"current_pin\":%d,\"default_pin\":%d}%s",
+            char entry[256];
+            int n = snprintf(entry, sizeof(entry), "{\"key\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"current_pin\":%d,\"default_pin\":%d}%s",
                 signalDefinitions[i].key, signalDefinitions[i].name, signalDefinitions[i].type,
                 getPin(signalDefinitions[i].key), signalDefinitions[i].default_gpio,
                 (i < SIGNAL_COUNT - 1) ? "," : "");
-            response->sendChunk((uint8_t*)buf, len);
-        }
 
-        const char* footer = "]}";
-        response->sendChunk((uint8_t*)footer, strlen(footer));
+            flushIfFull(n);
+            memcpy(p, entry, n);
+            p += n; rem -= n;
+        }
+        response->sendChunk((uint8_t*)chunk, p - chunk);
+        response->sendChunk((uint8_t*)"]}", 2);
         
         return response->finishChunking();
     });

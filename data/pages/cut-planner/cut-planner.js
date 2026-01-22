@@ -321,9 +321,31 @@ if (typeof window.CutPlanner === 'undefined') {
 
         run(jobType) {
             const gcode = this.generate(jobType);
-            if (confirm(window.i18n?.t('cut_planner.confirm_run') || 'Run this cutting job now?')) {
-                this.executeGcode(gcode);
-            }
+            this.executeGcode(gcode);
+        },
+
+        async waitForBufferSpace() {
+            return new Promise((resolve) => {
+                const startTime = Date.now();
+                const check = () => {
+                    const motion = AppState.data?.motion;
+                    const count = motion?.buffer_count || 0;
+                    const capacity = motion?.buffer_capacity || 32;
+
+                    // Allow filling up to Capacity - 4 slots to maintain high throughput
+                    if (count < (capacity - 4)) {
+                        resolve();
+                    } else {
+                        // If we've been waiting too long (>30s), something might be wrong
+                        if (Date.now() - startTime > 30000) {
+                            console.warn('[CutPlanner] Buffer space wait timeout');
+                            return resolve();
+                        }
+                        setTimeout(check, 100);
+                    }
+                };
+                check();
+            });
         },
 
         async executeGcode(gcode) {
@@ -333,21 +355,49 @@ if (typeof window.CutPlanner === 'undefined') {
                     .filter(l => l);
 
                 AlertManager.add(window.i18n?.t('cut_planner.starting_job') || 'Starting...', 'info', 2000);
+                await this.waitForIdle();
 
                 for (const line of lines) {
                     if (line.startsWith('G0') || line.startsWith('G1')) {
-                        await this.waitForIdle();
+                        await this.waitForBufferSpace();
                     }
-                    const response = await fetch('/api/gcode', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ command: line })
-                    });
-                    if (!response.ok) throw new Error(`API error`);
+
+                    let success = false;
+                    let attempts = 0;
+                    const maxAttempts = 3;
+
+                    while (!success && attempts < maxAttempts) {
+                        try {
+                            const response = await fetch('/api/gcode', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ command: line })
+                            });
+
+                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                            const result = await response.json();
+                            if (result.success) {
+                                success = true;
+                            } else {
+                                console.warn(`[CutPlanner] Rejected ${line}: ${result.error}. Waiting...`);
+                                await new Promise(r => setTimeout(r, 1000));
+                                attempts++;
+                            }
+                        } catch (e) {
+                            console.error(`[CutPlanner] Network error: ${e.message}. Retrying...`);
+                            await new Promise(r => setTimeout(r, 2000));
+                            attempts++;
+                        }
+                    }
+
+                    if (!success) throw new Error(`Failed to send command: ${line}`);
                 }
+
                 await this.waitForIdle();
                 AlertManager.add(window.i18n?.t('cut_planner.job_completed') || 'Done!', 'success', 3000);
             } catch (error) {
+                console.error('[CutPlanner] Job Error:', error);
                 AlertManager.add(`Error: ${error.message}`, 'error', 5000);
             }
         },

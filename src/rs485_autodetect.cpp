@@ -12,6 +12,16 @@
 #include <Arduino.h>
 
 int32_t rs485AutodetectBaud(void) {
+    // Suspend RS485 bus activity during scan
+    rs485SetBusPaused(true);
+    
+    // Acquire bus mutex (critical for preventing background task interference)
+    if (!rs485TakeBus(500)) {
+        logError("[RS485_DET] Failed to acquire bus mutex for scan");
+        rs485SetBusPaused(false);
+        return -1;
+    }
+
     const uint32_t rates[] = {9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200};
     uint32_t found_rate = 0;
     
@@ -92,6 +102,12 @@ int32_t rs485AutodetectBaud(void) {
         uint32_t restore_rate = configGetInt(KEY_RS485_BAUD, 9600);
         rs485SetBaudRate(restore_rate);
     }
+    
+    // Release bus mutex
+    rs485ReleaseBus();
+    
+    // Resume background activity
+    rs485SetBusPaused(false);
     
     return found_rate;
 }

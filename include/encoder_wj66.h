@@ -32,6 +32,9 @@ void wj66SetZero(uint8_t axis);
 bool wj66SetBaud(uint32_t baud);
 uint32_t wj66Autodetect(); 
 
+// Task-level processing (if not using RS-485 registry)
+void wj66ProcessSerial();
+
 void wj66Diagnostics();
 
 #endif

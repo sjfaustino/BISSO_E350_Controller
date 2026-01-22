@@ -31,8 +31,11 @@ void taskEncoderFunction(void* parameter) {
   while (1) {
     perfMonitorTaskStart(PERF_TASK_ID_ENCODER);
     // RUN THE CENTRAL RS-485 BUS HANDLER
-    // This handles both WJ66 and Modbus devices (JXK-10, Altivar31, YH-TC05)
+    // This handles both WJ66 (if in RS485 mode) and Modbus devices (JXK-10, Altivar31, YH-TC05)
     rs485HandleBus();
+    
+    // WJ66 HANDLE SERIAL (if in HT mode)
+    wj66ProcessSerial();
     
     // Position/Status updates for motion engine
     encoderMotionUpdate();

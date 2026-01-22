@@ -1,6 +1,7 @@
 #include "memory_monitor.h"
 #include "serial_logger.h"
 #include "system_events.h"
+#include "load_manager.h" // PHASE 14
 #include <esp_heap_caps.h>
 
 // FIX: Fully initialize struct to suppress warnings
@@ -29,7 +30,17 @@ void memoryMonitorUpdate() {
   if (!mem_monitor_initialized) { memoryMonitorInit(); return; }
 
   uint32_t current_free = ESP.getFreeHeap();
-  uint32_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+  
+  // PHASE 14: Optimize expensive heap scanning
+  // Only check largest block every 1s (Normal) or 5s (Load) to save CPU cycles
+  static uint32_t last_block_check = 0;
+  uint32_t check_interval = loadManagerIsUnderLoad() ? 5000 : 1000;
+  uint32_t now = millis();
+  
+  if (now - last_block_check >= check_interval) {
+    mem_stats.largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+    last_block_check = now;
+  }
 
   mem_stats.current_free = current_free;
   if (current_free < mem_stats.minimum_free) mem_stats.minimum_free = current_free;
@@ -37,7 +48,6 @@ void memoryMonitorUpdate() {
   uint32_t used = total_heap_size - current_free;
   if (used > mem_stats.maximum_used) mem_stats.maximum_used = used;
 
-  mem_stats.largest_block = largest_block;
   mem_stats.sample_count++;
 
   // PHASE 5.10: Signal low memory event when free heap drops below 25%

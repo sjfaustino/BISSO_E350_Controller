@@ -48,28 +48,30 @@ void lcdInterfaceInit() {
   lcd_state.last_update = millis();
   lcd_state.update_count = 0;
 
-  // FIX: Wire.begin() is called by PLC init, so don't call it again to avoid
-  // I2C deadlock Just probe for LCD presence on the already-initialized I2C bus
+  // Probing for LCD presence (try common addresses 0x27 and 0x3F)
+  uint8_t addresses[] = {0x27, 0x3F};
+  uint8_t found_addr = 0;
 
-  // CRITICAL FIX: Acquire LCD mutex if available (during boot, mutex may not
-  // exist yet)
+  // CRITICAL FIX: Acquire LCD mutex if available
   SemaphoreHandle_t lcd_mutex = taskGetLcdMutex();
   bool mutex_locked = false;
   if (lcd_mutex != NULL) {
     mutex_locked = taskLockMutex(lcd_mutex, 1000); // 1s timeout for init
-    if (!mutex_locked) {
-      logWarning("[LCD] Could not acquire mutex for init");
+  }
+
+  for (uint8_t addr : addresses) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      found_addr = addr;
+      break;
     }
   }
 
-  Wire.beginTransmission(LCD_I2C_ADDR);
-  if (Wire.endTransmission() == 0) {
+  if (found_addr != 0) {
     lcd_state.i2c_found = true;
 
     // Initialize LiquidCrystal_I2C (20x4 display)
-    // Standard pin mapping: RS=0, RW=1, E=2, BL=3 (most common PCF8574
-    // backpack)
-    lcd_i2c = new LiquidCrystal_I2C(LCD_I2C_ADDR, LCD_COLS, LCD_ROWS);
+    lcd_i2c = new LiquidCrystal_I2C(found_addr, LCD_COLS, LCD_ROWS);
     if (lcd_i2c) {
       // Extended initialization with delays for reliable startup
       lcd_i2c->init();
@@ -85,15 +87,14 @@ void lcdInterfaceInit() {
       lcd_i2c->print("LCD Init OK");
 
       lcd_state.mode = LCD_MODE_I2C;
-      logInfo("[LCD] [OK] I2C LCD Initialized at 0x%02X (20x4)",
-                    LCD_I2C_ADDR);
+      logInfo("[LCD] [OK] I2C LCD Initialized at 0x%02X (20x4)", found_addr);
     } else {
       lcd_state.mode = LCD_MODE_SERIAL;
       logError("[LCD] Failed to allocate LiquidCrystal_I2C, using Serial");
     }
   } else {
     lcd_state.mode = LCD_MODE_SERIAL;
-    logWarning("[LCD] I2C Not Found, using Serial simulation");
+    logWarning("[LCD] I2C Not Found (tried 0x27, 0x3F), using Serial simulation");
   }
 
   // Release mutex if we locked it
@@ -101,7 +102,9 @@ void lcdInterfaceInit() {
     taskUnlockMutex(lcd_mutex);
   }
 
-  // PHASE 4.0: Respect LCD_EN setting
+  // LCD Enable Logic:
+  // - Default is ON (configGetInt returns 1 if key doesn't exist)
+  // - If user explicitly disabled it (lcd_en=0), respect that choice
   if (configGetInt(KEY_LCD_EN, 1) == 0) {
     logInfo("[LCD] Disabled via configuration");
     lcdInterfaceSetMode(LCD_MODE_NONE);
@@ -133,51 +136,46 @@ void lcdInterfaceUpdate() {
   switch (lcd_state.mode) {
   case LCD_MODE_I2C:
     if (lcd_i2c) {
-      // CRITICAL FIX: Acquire LCD mutex to prevent I2C bus contention
-      // Timeout: 100ms is reasonable for LCD updates (non-critical operation)
-      if (taskLockMutex(taskGetLcdMutex(), 100)) {
-        // CRITICAL FIX: Protect I2C operations with error detection
-        // If I2C fails (Error 263 = hardware not responding), fall back to
-        // serial
-        bool i2c_error = false;
-        for (int i = 0; i < LCD_ROWS && !i2c_error; i++) {
-          if (lcd_state.display_dirty[i]) {
+      // PHASE 14: Granular I2C locking to prevent bus hogging
+      for (int i = 0; i < LCD_ROWS; i++) {
+        if (lcd_state.display_dirty[i]) {
+          // Acquire mutex for this row only (50ms timeout is plenty for 1 row)
+          if (taskLockMutex(taskGetLcdMutex(), 50)) {
             // Check I2C bus health before operation
             Wire.beginTransmission(LCD_I2C_ADDR);
             if (Wire.endTransmission() != 0) {
-              // I2C device not responding - log warning and skip this frame
-              // Do NOT switch to Serial mode permanently - retry next frame
               static uint32_t last_lcd_err = 0;
               if (millis() - last_lcd_err > 2000) {
-                logWarning("[LCD] I2C write failed - skipping frame");
+                logWarning("[LCD] I2C write failed - skipping line %d", i);
                 last_lcd_err = millis();
               }
-              i2c_error = true;
               lcd_state.consecutive_i2c_errors++;
-              break;
+              taskUnlockMutex(taskGetLcdMutex());
+              continue; // Try next row later
             }
 
             lcd_i2c->setCursor(0, i);
-            // Print with explicit 20-character padding to clear old text
-            // Format: %-20s pads with spaces on the right
             char padded_line[LCD_COLS + 1];
-            snprintf(padded_line, sizeof(padded_line), "%-20s",
-                     lcd_state.display[i]);
+            snprintf(padded_line, sizeof(padded_line), "%-20s", lcd_state.display[i]);
             lcd_i2c->print(padded_line);
             lcd_state.display_dirty[i] = false;
+            
+            taskUnlockMutex(taskGetLcdMutex());
+            
+            // Success! Clear error counter
+            lcd_state.consecutive_i2c_errors = 0;
+            
+            // Brief yield to allow other I2C tasks (Safety/PLC) to run
+            vTaskDelay(1);
+          } else {
+            // Mutex timeout for this row
+            lcd_state.consecutive_i2c_errors++;
+            static uint32_t last_log = 0;
+            if (millis() - last_log > 5000) {
+              logWarning("[LCD] LCD mutex timeout for row %d", i);
+              last_log = millis();
+            }
           }
-        }
-        taskUnlockMutex(taskGetLcdMutex());
-        
-        // Success! Clear error counter
-        lcd_state.consecutive_i2c_errors = 0;
-      } else {
-        // Mutex timeout - skip this update cycle (LCD is non-critical)
-        lcd_state.consecutive_i2c_errors++;
-        static uint32_t last_log = 0;
-        if (millis() - last_log > 5000) {
-          logWarning("[LCD] LCD mutex timeout - skipping update");
-          last_log = millis();
         }
       }
     }
@@ -308,7 +306,10 @@ void lcdInterfaceClear() {
   if (lcd_i2c) {
     lcd_i2c->clear();
   }
-  logInfo("[LCD] [OK] Cleared");
+  // Only log in Serial mode (when no hardware LCD, log is the "display")
+  if (lcd_state.mode == LCD_MODE_SERIAL) {
+    logInfo("[LCD] [OK] Cleared");
+  }
 }
 
 void lcdInterfaceBacklight(bool on) {
@@ -351,4 +352,33 @@ void lcdInterfaceDiagnostics() {
   for (int i = 0; i < LCD_ROWS; i++) {
     logPrintf("  [%d] %s\r\n", i, lcd_state.display[i]);
   }
+}
+
+void lcdInterfaceTest() {
+    if (!lcd_i2c) return;
+    
+    logInfo("[LCD] Running hardware test...");
+    
+    if (taskLockMutex(taskGetLcdMutex(), 1000)) {
+        lcd_i2c->clear();
+        lcd_i2c->backlight();
+        
+        for (int i = 0; i < LCD_ROWS; i++) {
+            lcd_i2c->setCursor(0, i);
+            char test_line[21];
+            snprintf(test_line, 21, "ROW %d: 0123456789ABC", i);
+            lcd_i2c->print(test_line);
+            delay(100);
+        }
+        
+        delay(2000);
+        lcd_i2c->clear();
+        taskUnlockMutex(taskGetLcdMutex());
+        
+        // Mark all lines as dirty to force refresh from buffer
+        for (int i = 0; i < LCD_ROWS; i++) lcd_state.display_dirty[i] = true;
+        logInfo("[LCD] Test complete. Display should restore soon.");
+    } else {
+        logError("[LCD] Could not acquire mutex for test");
+    }
 }

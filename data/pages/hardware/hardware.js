@@ -38,7 +38,7 @@ window.HardwareModule = window.HardwareModule || {
     renderPinConfiguration(e) {
         console.log("[Hardware] Rendering pin configuration");
         document.querySelectorAll(".pin-select").forEach(el => {
-            if (el.disabled) return;
+            if (el.disabled || el.dataset.keepOptions === "true") return;
             const t = el.dataset.signal;
             el.innerHTML = '<option value="">' + window.i18n.t('hardware.select_pin') + '</option>';
 
@@ -72,8 +72,8 @@ window.HardwareModule = window.HardwareModule || {
 
             if (!el.value) {
                 switch (t) {
-                    case "wj66_rx": el.value = 14; break;
-                    case "wj66_tx": el.value = 33; break;
+                    case "wj66_rx": el.value = 16; break;
+                    case "wj66_tx": el.value = 13; break;
                     case "output_status_green": el.value = 124; break;
                     case "output_status_yellow": el.value = 125; break;
                     case "output_status_red": el.value = 126; break;
@@ -124,6 +124,18 @@ window.HardwareModule = window.HardwareModule || {
         addUsage(25, "Ethernet RXD0"); addUsage(26, "Ethernet RXD1");
         addUsage(27, "Ethernet CRS_DV");
         addUsage(4, "LCD Display (SDA)"); addUsage(5, "LCD Display (SCL)");
+
+        // WJ66 Encoder pins based on interface selection
+        const wj66Iface = document.getElementById("wj66_interface")?.value;
+        if (wj66Iface == "1") {  // Use == to handle both "1" and 1
+            // RS485 mode - GPIO16/GPIO13
+            addUsage(16, "WJ66 Encoder (RX)");
+            addUsage(13, "WJ66 Encoder (TX)");
+        } else {
+            // HT1/HT2 mode - GPIO14/GPIO33
+            addUsage(14, "WJ66 Encoder (RX)");
+            addUsage(33, "WJ66 Encoder (TX)");
+        }
 
         let html = `
             <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
@@ -179,20 +191,35 @@ window.HardwareModule = window.HardwareModule || {
                 if (el && val !== undefined) el.value = val;
             };
 
-            setChecked("status_light_enabled", data.status_light_en);
-            setChecked("eth_enabled", data.eth_en);
-            setChecked("lcd_enabled", data.lcd_en);
-            setChecked("buzzer_enabled", data.buzzer_en);
-            setChecked("vfd_enabled", data.vfd_en);
-            setValue("vfd_addr", data.vfd_addr);
-            setChecked("jxk10_enabled", data.jxk10_en);
-            setValue("jxk10_addr", data.jxk10_addr);
-            setChecked("tach_enabled", data.yhtc05_en);
-            setValue("tach_addr", data.yhtc05_addr);
-            setValue("wj66_baud", data.encoder_baud || "9600");
-            setValue("rs485_baud", data.rs485_baud || "9600");
-            setValue("i2c_speed", data.i2c_speed || "100000");
+            // System-level enable flags (nested under data.system)
+            const sys = data.system || {};
+            setChecked("status_light_enabled", sys.status_light_en);
+            setChecked("lcd_enabled", sys.lcd_en);
+            setChecked("buzzer_enabled", sys.buzzer_en);
 
+            // Network-level flags (nested under data.network)
+            const net = data.network || {};
+            setChecked("eth_enabled", net.eth_en);
+
+            // Spindle-level flags (nested under data.spindle)
+            const spindle = data.spindle || {};
+            setChecked("vfd_enabled", spindle.jxk10_en);  // VFD uses JXK10 enable
+            setValue("vfd_addr", data.vfd?.address);
+            setChecked("jxk10_enabled", spindle.jxk10_en);
+            setValue("jxk10_addr", spindle.jxk10_addr);
+            setChecked("tach_enabled", spindle.yhtc05_en);
+            setValue("tach_addr", spindle.yhtc05_addr);
+
+            // Serial communication settings
+            const serial = data.serial || {};
+            setValue("wj66_baud", serial.encoder_baud || "9600");
+            setValue("wj66_interface", serial.encoder_iface != null ? serial.encoder_iface : "1");
+            setValue("wj66_address", serial.encoder_addr != null ? serial.encoder_addr : "1");
+            setValue("wj66_protocol", serial.enc_proto != null ? serial.enc_proto : "0");
+            setValue("rs485_baud", serial.rs485_baud || "9600");
+            setValue("i2c_speed", serial.i2c_speed || "100000");
+
+            this.updateWJ66Interface();
             this.renderPinSummary();
         }).catch(e => console.warn("[Hardware] Config load error:", e));
     },
@@ -223,6 +250,37 @@ window.HardwareModule = window.HardwareModule || {
                 this.showStatus(window.i18n.t('hardware.reloaded'), "info");
             };
         }
+
+        const interfaceEl = document.getElementById("wj66_interface");
+        if (interfaceEl) {
+            interfaceEl.onchange = () => this.updateWJ66Interface();
+        }
+    },
+
+    updateWJ66Interface() {
+        const interfaceEl = document.getElementById("wj66_interface");
+        if (!interfaceEl) return;
+
+        const isRS485 = interfaceEl.value === "1";
+        const badge = document.getElementById("wj66-protocol-badge");
+        const note = document.getElementById("wj66-rs485-note");
+        const rxEl = document.getElementById("wj66_rx");
+        const txEl = document.getElementById("wj66_tx");
+
+        if (isRS485) {
+            if (badge) badge.textContent = "RS485 Modbus/ASCII";
+            if (note) note.style.display = "block";
+            if (rxEl) { rxEl.value = "16"; rxEl.disabled = true; }
+            if (txEl) { txEl.value = "13"; txEl.disabled = true; }
+        } else {
+            if (badge) badge.textContent = "RS232 TTL";
+            if (note) note.style.display = "none";
+            if (rxEl) { rxEl.disabled = false; if (rxEl.value == "16") rxEl.value = "14"; }
+            if (txEl) { txEl.disabled = false; if (txEl.value == "13") txEl.value = "33"; }
+        }
+
+        // Update pin summary to reflect the new interface
+        this.renderPinSummary();
     },
 
     showStatus(msg, type) {

@@ -77,22 +77,48 @@
         <div class="card device-card">
             <div class="card-header device-header wj66">
                 <h3 data-i18n="hardware.wj66_encoder">📡 WJ66 Encoder</h3>
-                <span class="device-protocol">RS232 TTL</span>
+                <span class="device-protocol" id="wj66-protocol-badge">RS232 TTL</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="wj66_rx" data-i18n="hardware.rx_pin">RX Pin:</label>
-                    <select class="pin-select" id="wj66_rx" data-signal="wj66_rx">
-                        <option value="14">HT1 (GPIO14)</option>
-                        <option value="32">HT3 (GPIO32)</option>
+                    <label for="wj66_interface" data-i18n="hardware.interface">Interface:</label>
+                    <select class="config-select" id="wj66_interface" data-config="encoder_iface" style="flex: 1;">
+                        <option value="0">RS232 (HT Pins)</option>
+                        <option value="1">RS485 (Shared Bus)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="wj66_tx" data-i18n="hardware.tx_pin">TX Pin:</label>
-                    <select class="pin-select" id="wj66_tx" data-signal="wj66_tx">
-                        <option value="33">HT2 (GPIO33)</option>
-                        <option value="32">HT3 (GPIO32)</option>
+                    <label for="wj66_address" data-i18n="hardware.address">Device Address:</label>
+                    <input type="number" class="config-select" id="wj66_address" data-config="encoder_addr" min="0"
+                        max="99" style="flex: 1;">
+                </div>
+                <div class="pin-row">
+                    <label for="wj66_protocol" data-i18n="hardware.protocol">Protocol:</label>
+                    <select class="config-select" id="wj66_protocol" data-config="enc_proto" style="flex: 1;">
+                        <option value="0">ASCII (#XX\r)</option>
+                        <option value="1">Modbus RTU</option>
                     </select>
+                </div>
+                <div id="wj66-pin-configs">
+                    <div class="pin-row">
+                        <label for="wj66_rx" data-i18n="hardware.rx_pin">RX Pin:</label>
+                        <select class="pin-select" id="wj66_rx" data-signal="wj66_rx" data-keep-options="true">
+                            <option value="14">HT1 (GPIO14)</option>
+                            <option value="32">HT3 (GPIO32)</option>
+                            <option value="16">RS485_A (GPIO16)</option>
+                        </select>
+                    </div>
+                    <div class="pin-row">
+                        <label for="wj66_tx" data-i18n="hardware.tx_pin">TX Pin:</label>
+                        <select class="pin-select" id="wj66_tx" data-signal="wj66_tx" data-keep-options="true">
+                            <option value="33">HT2 (GPIO33)</option>
+                            <option value="32">HT3 (GPIO32)</option>
+                            <option value="13">RS485_B (GPIO13)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="device-note" id="wj66-rs485-note" style="display: none;">
+                    In RS485 mode, pins are fixed to 16/13 and baud rate matches the Bus Baud.
                 </div>
             </div>
         </div>

@@ -35,7 +35,9 @@ static rs485_registry_state_t registry = {
     .total_transactions = 0,
     .total_errors = 0,
     .last_successful_response_ms = 0,
-    .watchdog_alert_active = false
+    .watchdog_alert_active = false,
+    .bus_paused = false,
+    .bus_mutex = NULL
 };
 
 // ============================================================================
@@ -45,8 +47,9 @@ static rs485_registry_state_t registry = {
 bool rs485RegistryInit(uint32_t baud_rate) {
     if (baud_rate == 0) baud_rate = RS485_DEFAULT_BAUD_RATE;
     
-    memset(&registry, 0, sizeof(registry));
+    // registry.devices and device_count are preserved
     registry.baud_rate = baud_rate;
+    if (!registry.bus_mutex) registry.bus_mutex = xSemaphoreCreateRecursiveMutex();
     registry.last_switch_time_ms = millis();
     registry.last_successful_response_ms = millis();  // Assume healthy at start
     registry.watchdog_alert_active = false;
@@ -187,6 +190,7 @@ static rs485_device_t* selectNextDevice(void) {
 }
 
 bool rs485Update(void) {
+    if (registry.bus_paused) return false;
     uint32_t now = millis();
     
     // Enforce inter-frame delay
@@ -198,14 +202,14 @@ bool rs485Update(void) {
     if (registry.bus_busy) {
         rs485_device_t* current = registry.devices[registry.current_device_index];
         if (current && current->pending_response) {
-            if (now - current->last_poll_time_ms > 100) {
+            if (now - current->last_poll_time_ms > 500) {
                 // Timeout
                 current->pending_response = false;
                 current->error_count++;
                 current->consecutive_errors++;
                 registry.bus_busy = false;
                 registry.total_errors++;
-                logWarning("[RS485] Timeout: %s", current->name);
+                logWarning("[RS485] Timeout: %s (after 500ms)", current->name);
             }
         }
         return false;
@@ -230,6 +234,7 @@ bool rs485Update(void) {
         registry.bus_busy = true;
         registry.last_switch_time_ms = now;
         registry.total_transactions++;
+        logDebug("[RS485] Poll -> %s (Addr %d)", next->name, next->slave_address);
         return true;
     }
     
@@ -273,6 +278,12 @@ static uint16_t bus_rx_idx = 0;
 static uint32_t last_byte_time_ms = 0;
 
 void rs485HandleBus(void) {
+    if (!registry.bus_mutex) return;
+    
+    if (xSemaphoreTakeRecursive((SemaphoreHandle_t)registry.bus_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+        return; // Bus busy or locked by another task
+    }
+
     // 1. Run the scheduler/poller
     rs485Update();
     
@@ -287,6 +298,7 @@ void rs485HandleBus(void) {
             if (bus_rx_idx < sizeof(bus_rx_buffer)) {
                 bus_rx_buffer[bus_rx_idx++] = b;
                 last_byte_time_ms = now;
+                // logDebug("R: %02X '%c'", b, (b >= 32) ? b : '.');
             }
         }
         
@@ -294,8 +306,8 @@ void rs485HandleBus(void) {
         if (bus_rx_idx > 0) {
             bool frame_complete = false;
             
-            // Heuristic 1: Silence timeout (5ms is standard for 9600-19200 baud)
-            if (now - last_byte_time_ms > 5) {
+            // Heuristic 1: Silence timeout (50ms for slow ASCII devices)
+            if (now - last_byte_time_ms > 50) {
                 frame_complete = true;
             }
             // Heuristic 2: Buffer full
@@ -304,6 +316,7 @@ void rs485HandleBus(void) {
             }
             
             if (frame_complete) {
+                logDebug("[RS485] RX Frame (%d bytes)", bus_rx_idx);
                 rs485ProcessResponse(bus_rx_buffer, bus_rx_idx);
                 bus_rx_idx = 0;
             }
@@ -315,6 +328,8 @@ void rs485HandleBus(void) {
         }
         bus_rx_idx = 0;
     }
+    
+    xSemaphoreGiveRecursive((SemaphoreHandle_t)registry.bus_mutex);
 }
 
 bool rs485IsBusAvailable(void) {
@@ -354,8 +369,14 @@ uint32_t rs485GetBaudRate(void) {
 // ============================================================================
 
 bool rs485Send(const uint8_t* data, uint8_t len) {
-    if (!bus_serial || !data) return false;
-    return (bus_serial->write(data, len) == len);
+    if (!bus_serial || !data || !registry.bus_mutex) return false;
+    
+    bool ok = false;
+    if (xSemaphoreTakeRecursive((SemaphoreHandle_t)registry.bus_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        ok = (bus_serial->write(data, len) == len);
+        xSemaphoreGiveRecursive((SemaphoreHandle_t)registry.bus_mutex);
+    }
+    return ok;
 }
 
 int rs485Available(void) {
@@ -363,16 +384,23 @@ int rs485Available(void) {
 }
 
 bool rs485Receive(uint8_t* data, uint8_t* len) {
-    if (!bus_serial || !data || !len) return false;
-    int avail = bus_serial->available();
-    if (avail == 0) {
-        *len = 0;
-        return false;
+    if (!bus_serial || !data || !len || !registry.bus_mutex) return false;
+    
+    bool ok = false;
+    if (xSemaphoreTakeRecursive((SemaphoreHandle_t)registry.bus_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        int avail = bus_serial->available();
+        if (avail > 0) {
+            int to_read = (avail < (int)*len) ? avail : *len;
+            int bytes_read = bus_serial->readBytes(data, to_read);
+            *len = (uint8_t)bytes_read;
+            ok = (bytes_read > 0);
+        } else {
+            *len = 0;
+            ok = false;
+        }
+        xSemaphoreGiveRecursive((SemaphoreHandle_t)registry.bus_mutex);
     }
-    int to_read = (avail < (int)*len) ? avail : *len;
-    int bytes_read = bus_serial->readBytes(data, to_read);
-    *len = (uint8_t)bytes_read;
-    return (bytes_read > 0);
+    return ok;
 }
 
 void rs485ClearBuffer(void) {
@@ -386,6 +414,15 @@ void rs485SetDeviceEnabled(rs485_device_t* device, bool enabled) {
         device->enabled = enabled;
         logInfo("[RS485] %s: %s", device->name, enabled ? "enabled" : "disabled");
     }
+}
+
+bool rs485TakeBus(uint32_t timeout_ms) {
+    if (!registry.bus_mutex) return false;
+    return xSemaphoreTakeRecursive((SemaphoreHandle_t)registry.bus_mutex, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
+}
+
+void rs485ReleaseBus(void) {
+    if (registry.bus_mutex) xSemaphoreGiveRecursive((SemaphoreHandle_t)registry.bus_mutex);
 }
 
 // ============================================================================
@@ -479,4 +516,23 @@ void rs485ClearWatchdogAlert(void) {
     registry.watchdog_alert_active = false;
     registry.last_successful_response_ms = millis();
     logInfo("[RS485] Watchdog alert cleared");
+}
+
+void rs485SetBusPaused(bool paused) {
+    registry.bus_paused = paused;
+    if (paused) {
+        logInfo("[RS485] Bus ACTIVITY SUSPENDED (Maintenance Mode)");
+        // Clear any pending state
+        registry.bus_busy = false;
+        for (uint8_t i = 0; i < registry.device_count; i++) {
+            registry.devices[i]->pending_response = false;
+        }
+    } else {
+        logInfo("[RS485] Bus activity RESUMED");
+        registry.last_switch_time_ms = millis();
+    }
+}
+
+bool rs485IsBusPaused(void) {
+    return registry.bus_paused;
 }

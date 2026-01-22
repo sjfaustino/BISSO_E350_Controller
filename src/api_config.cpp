@@ -339,8 +339,8 @@ bool apiConfigSet(config_category_t category, const char *key,
 /**
  * @brief Get configuration as JSON
  */
-bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
-  JsonObject obj = json_doc.to<JsonObject>();
+bool apiConfigGet(config_category_t category, JsonVariant doc) {
+  JsonObject obj = doc.is<JsonObject>() ? doc.as<JsonObject>() : doc.to<JsonObject>();
 
   switch (category) {
   case CONFIG_CATEGORY_MOTION: {
@@ -378,13 +378,105 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
     obj["wifi_ap_ssid"] = String(configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup"));
     obj["wifi_ap_pass"] = String(configGetString(KEY_WIFI_AP_PASS, "password"));
     obj["eth_en"] = configGetInt(KEY_ETH_ENABLED, 0);
+    obj["eth_dhcp"] = configGetInt(KEY_ETH_DHCP, 1);
+    obj["eth_ip"] = configGetString(KEY_ETH_IP, "");
     break;
   }
 
   case CONFIG_CATEGORY_SYSTEM: {
-      obj["cli_echo"] = configGetInt(KEY_CLI_ECHO, 1); // Default is Enabled (echo ON) for usability
+      obj["buzzer_en"] = configGetInt(KEY_BUZZER_EN, 1);
+      obj["status_light_en"] = configGetInt(KEY_STATUS_LIGHT_EN, 0);
+      obj["recovery_en"] = configGetInt(KEY_RECOV_EN, 1);
+      obj["lcd_en"] = configGetInt(KEY_LCD_EN, 1);
+      obj["bootlog_en"] = configGetInt(KEY_BOOTLOG_EN, 1);
+      obj["cli_echo"] = configGetInt(KEY_CLI_ECHO, 1); // Default ON for usability
       obj["ota_chk_en"] = configGetInt(KEY_OTA_CHECK_EN, 0);
       break;
+  }
+
+  case CONFIG_CATEGORY_SPINDLE: {
+    obj["jxk10_en"] = configGetInt(KEY_JXK10_ENABLED, 0);
+    obj["jxk10_addr"] = configGetInt(KEY_JXK10_ADDR, 1);
+    obj["yhtc05_en"] = configGetInt(KEY_YHTC05_ENABLED, 0);
+    obj["yhtc05_addr"] = configGetInt(KEY_YHTC05_ADDR, 3);
+    obj["pause_en"] = configGetInt(KEY_SPINDL_PAUSE_EN, 1);
+    break;
+  }
+
+  case CONFIG_CATEGORY_SERIAL: {
+    obj["encoder_baud"] = configGetInt(KEY_ENC_BAUD, 9600);
+    obj["encoder_iface"] = configGetInt(KEY_ENC_INTERFACE, 1);
+    obj["encoder_addr"] = configGetInt(KEY_ENC_ADDR, 0);
+    obj["enc_proto"] = configGetInt(KEY_ENC_PROTO, 0); // 0=ASCII, 1=Modbus
+    obj["rs485_baud"] = configGetInt(KEY_RS485_BAUD, 9600);
+    obj["i2c_speed"] = configGetInt(KEY_I2C_SPEED, 100000);
+    break;
+  }
+
+  case CONFIG_CATEGORY_HARDWARE: {
+    for (size_t i = 0; i < SIGNAL_COUNT; i++) {
+      obj[signalDefinitions[i].key] = getPin(signalDefinitions[i].key);
+    }
+    break;
+  }
+
+  case CONFIG_CATEGORY_BEHAVIOR: {
+    obj["jog_speed"] = configGetInt(KEY_DEFAULT_SPEED, 3000);
+    obj["jog_accel"] = configGetInt(KEY_DEFAULT_ACCEL, 500);
+    obj["x_approach"] = configGetInt(KEY_X_APPROACH, 5);            // Final approach (SLOW) - 5mm
+    obj["x_approach_med"] = configGetInt(KEY_X_APPROACH_MED, 20);   // Medium approach - 20mm
+    obj["target_margin"] = configGetFloat(KEY_TARGET_MARGIN, 0.1f); // Target position margin - 0.1mm
+    obj["buf_en"] = configGetInt(KEY_MOTION_BUFFER_ENABLE, 0);
+    obj["strict_limits"] = configGetInt(KEY_MOTION_STRICT_LIMITS, 0);
+    obj["stop_timeout"] = configGetInt(KEY_STOP_TIMEOUT, 2000);
+    obj["stall_timeout"] = configGetInt(KEY_STALL_TIMEOUT, 1000);
+    obj["buttons_en"] = configGetInt(KEY_BUTTONS_ENABLED, 1);
+    break;
+  }
+
+  case CONFIG_CATEGORY_CALIBRATION: {
+    obj["spd_x"] = configGetFloat(KEY_SPEED_CAL_X, 1.0f);
+    obj["spd_y"] = configGetFloat(KEY_SPEED_CAL_Y, 1.0f);
+    obj["spd_z"] = configGetFloat(KEY_SPEED_CAL_Z, 1.0f);
+    obj["spd_a"] = configGetFloat(KEY_SPEED_CAL_A, 1.0f);
+    break;
+  }
+
+  case CONFIG_CATEGORY_POSITIONS: {
+    obj["safe_x"] = configGetFloat(KEY_POS_SAFE_X, 0.0f);
+    obj["safe_y"] = configGetFloat(KEY_POS_SAFE_Y, 0.0f);
+    obj["safe_z"] = configGetFloat(KEY_POS_SAFE_Z, 0.0f);
+    obj["safe_a"] = configGetFloat(KEY_POS_SAFE_A, 0.0f);
+    obj["p1_x"] = configGetFloat(KEY_POS_1_X, 0.0f);
+    obj["p1_y"] = configGetFloat(KEY_POS_1_Y, 0.0f);
+    obj["p1_z"] = configGetFloat(KEY_POS_1_Z, 0.0f);
+    obj["p1_a"] = configGetFloat(KEY_POS_1_A, 0.0f);
+    break;
+  }
+
+  case CONFIG_CATEGORY_WCS: {
+    char wcsKey[16];
+    for (int s = 0; s < 6; s++) {
+      for (int a = 0; a < 4; a++) {
+        snprintf(wcsKey, sizeof(wcsKey), "g%d_%c", 54 + s, "xyza"[a]);
+        obj[wcsKey] = configGetFloat(wcsKey, 0.0f);
+      }
+    }
+    break;
+  }
+
+  case CONFIG_CATEGORY_SECURITY: {
+    obj["web_user"] = configGetString(KEY_WEB_USERNAME, "admin");
+    obj["web_pass"] = configGetString(KEY_WEB_PASSWORD, "bisso");
+    obj["ota_pass"] = configGetString(KEY_OTA_PASSWORD, "bisso-ota");
+    break;
+  }
+
+  case CONFIG_CATEGORY_STATS: {
+    obj["runtime_mins"] = configGetInt(KEY_RUNTIME_MINS, 0);
+    obj["cycles"] = configGetInt(KEY_CYCLE_COUNT, 0);
+    obj["maint_mins"] = configGetInt(KEY_LAST_MAINT_MINS, 0);
+    break;
   }
 
   default:
@@ -397,7 +489,7 @@ bool apiConfigGet(config_category_t category, JsonDocument &json_doc) {
 /**
  * @brief Get configuration schema
  */
-bool apiConfigGetSchema(config_category_t category, JsonDocument &json_doc) {
+bool apiConfigGetSchema(config_category_t category, JsonVariant json_doc) {
   JsonObject obj = json_doc.to<JsonObject>();
 
   switch (category) {
@@ -478,120 +570,20 @@ void apiConfigPopulate(JsonDocument& doc) {
   doc["timestamp"] = ""; 
   doc["firmware"] = ""; 
 
-  // 1. Motion Config
-  JsonObject motion = doc["motion"].to<JsonObject>();
-  JsonDocument motionDoc; apiConfigGet(CONFIG_CATEGORY_MOTION, motionDoc);
-  motion.set(motionDoc.as<JsonObject>());
-  // Add extras not in category getter
-  motion["home_enable"] = configGetInt(KEY_HOME_ENABLE, 0);
-  motion["home_fast"] = configGetInt(KEY_HOME_PROFILE_FAST, 100);
-  motion["home_slow"] = configGetInt(KEY_HOME_PROFILE_SLOW, 20);
-
-  // 2. VFD Config (hardware settings only - speed/timing are fixed in Altivar31)
-  JsonObject vfd = doc["vfd"].to<JsonObject>();
-  vfd["enabled"] = configGetInt(KEY_VFD_EN, 0);
-  vfd["address"] = configGetInt(KEY_VFD_ADDR, 2);
-
-  // 3. Encoder Config
-  JsonObject encoder = doc["encoder"].to<JsonObject>();
-  JsonDocument encDoc; apiConfigGet(CONFIG_CATEGORY_ENCODER, encDoc);
-  encoder.set(encDoc.as<JsonObject>());
-  encoder["feedback_en"] = configGetInt(KEY_ENC_FEEDBACK, 0);
-
-  // 4. Network
-  JsonObject net = doc["network"].to<JsonObject>();
-  // Use NVS-stored credentials, not currently connected ones
-  net["wifi_ssid"] = configGetString(KEY_WIFI_SSID, "");
-  net["wifi_pass"] = configGetString(KEY_WIFI_PASS, "");
-  net["wifi_ap_en"] = configGetInt(KEY_WIFI_AP_EN, 0);
-  net["wifi_ap_ssid"] = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
-  net["wifi_ap_pass"] = configGetString(KEY_WIFI_AP_PASS, "password");
-  net["eth_en"] = configGetInt(KEY_ETH_ENABLED, 1);
-  net["eth_dhcp"] = configGetInt(KEY_ETH_DHCP, 1);
-  net["eth_ip"] = configGetString(KEY_ETH_IP, "");
-
-  // 5. System/Peripherals
-  JsonObject sys = doc["system"].to<JsonObject>();
-  sys["buzzer_en"] = configGetInt(KEY_BUZZER_EN, 1);
-  sys["status_light_en"] = configGetInt(KEY_STATUS_LIGHT_EN, 0);
-  sys["recovery_en"] = configGetInt(KEY_RECOV_EN, 1);
-  sys["lcd_en"] = configGetInt(KEY_LCD_EN, 1);
-  sys["bootlog_en"] = configGetInt(KEY_BOOTLOG_EN, 1);
-  sys["cli_echo"] = configGetInt(KEY_CLI_ECHO, 1);  // Default ON for usability
-  sys["ota_chk_en"] = configGetInt(KEY_OTA_CHECK_EN, 0);
-  
-  // 6. Spindle (JXK10/Tach)
-  JsonObject spindle = doc["spindle"].to<JsonObject>();
-  spindle["jxk10_en"] = configGetInt(KEY_JXK10_ENABLED, 0);
-  spindle["jxk10_addr"] = configGetInt(KEY_JXK10_ADDR, 1);
-  spindle["yhtc05_en"] = configGetInt(KEY_YHTC05_ENABLED, 0);
-  spindle["yhtc05_addr"] = configGetInt(KEY_YHTC05_ADDR, 3);
-  spindle["pause_en"] = configGetInt(KEY_SPINDL_PAUSE_EN, 1);
-
-  // 7. Serial Communication
-  JsonObject serial = doc["serial"].to<JsonObject>();
-  serial["encoder_baud"] = configGetInt(KEY_ENC_BAUD, 9600);
-  serial["rs485_baud"] = configGetInt(KEY_RS485_BAUD, 9600);
-  serial["i2c_speed"] = configGetInt(KEY_I2C_SPEED, 100000);
-
-  // 8. Hardware Pins (Dynamic Mapping)
-  JsonObject hw = doc["hardware"].to<JsonObject>();
-  for (size_t i = 0; i < SIGNAL_COUNT; i++) {
-      hw[signalDefinitions[i].key] = getPin(signalDefinitions[i].key);
-  }
-
-  // 8. Motion Behavior & Safety
-  JsonObject behavior = doc["behavior"].to<JsonObject>();
-  behavior["jog_speed"] = configGetInt(KEY_DEFAULT_SPEED, 3000);
-  behavior["jog_accel"] = configGetInt(KEY_DEFAULT_ACCEL, 500);
-  behavior["x_approach"] = configGetInt(KEY_X_APPROACH, 5);            // Final approach (SLOW) - 5mm
-  behavior["x_approach_med"] = configGetInt(KEY_X_APPROACH_MED, 20);   // Medium approach - 20mm
-  behavior["target_margin"] = configGetFloat(KEY_TARGET_MARGIN, 0.1f); // Target position margin - 0.1mm
-  behavior["buf_en"] = configGetInt(KEY_MOTION_BUFFER_ENABLE, 0);
-  behavior["strict_limits"] = configGetInt(KEY_MOTION_STRICT_LIMITS, 0);
-  behavior["stop_timeout"] = configGetInt(KEY_STOP_TIMEOUT, 2000);
-  behavior["stall_timeout"] = configGetInt(KEY_STALL_TIMEOUT, 1000);
-  behavior["buttons_en"] = configGetInt(KEY_BUTTONS_ENABLED, 1);
-
-  // 9. Speed Calibration
-  JsonObject cal = doc["calibration"].to<JsonObject>();
-  cal["spd_x"] = configGetFloat(KEY_SPEED_CAL_X, 1.0f);
-  cal["spd_y"] = configGetFloat(KEY_SPEED_CAL_Y, 1.0f);
-  cal["spd_z"] = configGetFloat(KEY_SPEED_CAL_Z, 1.0f);
-  cal["spd_a"] = configGetFloat(KEY_SPEED_CAL_A, 1.0f);
-
-  // 10. Positions (Safe/User)
-  JsonObject pos = doc["positions"].to<JsonObject>();
-  pos["safe_x"] = configGetFloat(KEY_POS_SAFE_X, 0.0f);
-  pos["safe_y"] = configGetFloat(KEY_POS_SAFE_Y, 0.0f);
-  pos["safe_z"] = configGetFloat(KEY_POS_SAFE_Z, 0.0f);
-  pos["safe_a"] = configGetFloat(KEY_POS_SAFE_A, 0.0f);
-  pos["p1_x"] = configGetFloat(KEY_POS_1_X, 0.0f);
-  pos["p1_y"] = configGetFloat(KEY_POS_1_Y, 0.0f);
-  pos["p1_z"] = configGetFloat(KEY_POS_1_Z, 0.0f);
-  pos["p1_a"] = configGetFloat(KEY_POS_1_A, 0.0f);
-
-  // 11. Work Coordinate Systems (G54-G59)
-  JsonObject wcs = doc["wcs"].to<JsonObject>();
-  char wcsKey[16];
-  for (int s = 0; s < 6; s++) {
-      for (int a = 0; a < 4; a++) {
-          snprintf(wcsKey, sizeof(wcsKey), "g%d_%c", 54 + s, "xyza"[a]);
-          wcs[wcsKey] = configGetFloat(wcsKey, 0.0f);
-      }
-  }
-
-  // 12. Security (Credentials)
-  JsonObject sec = doc["security"].to<JsonObject>();
-  sec["web_user"] = configGetString(KEY_WEB_USERNAME, "admin");
-  sec["web_pass"] = configGetString(KEY_WEB_PASSWORD, "bisso");
-  sec["ota_pass"] = configGetString(KEY_OTA_PASSWORD, "bisso-ota");
-
-  // 13. Statistics/Counters
-  JsonObject stats = doc["stats"].to<JsonObject>();
-  stats["runtime_mins"] = configGetInt(KEY_RUNTIME_MINS, 0);
-  stats["cycles"] = configGetInt(KEY_CYCLE_COUNT, 0);
-  stats["maint_mins"] = configGetInt(KEY_LAST_MAINT_MINS, 0);
+  apiConfigGet(CONFIG_CATEGORY_MOTION, doc["motion"]);
+  apiConfigGet(CONFIG_CATEGORY_VFD, doc["vfd"]);
+  apiConfigGet(CONFIG_CATEGORY_ENCODER, doc["encoder"]);
+  apiConfigGet(CONFIG_CATEGORY_NETWORK, doc["network"]);
+  apiConfigGet(CONFIG_CATEGORY_SYSTEM, doc["system"]);
+  apiConfigGet(CONFIG_CATEGORY_SPINDLE, doc["spindle"]);
+  apiConfigGet(CONFIG_CATEGORY_SERIAL, doc["serial"]);
+  apiConfigGet(CONFIG_CATEGORY_HARDWARE, doc["hardware"]);
+  apiConfigGet(CONFIG_CATEGORY_BEHAVIOR, doc["behavior"]);
+  apiConfigGet(CONFIG_CATEGORY_CALIBRATION, doc["calibration"]);
+  apiConfigGet(CONFIG_CATEGORY_POSITIONS, doc["positions"]);
+  apiConfigGet(CONFIG_CATEGORY_WCS, doc["wcs"]);
+  apiConfigGet(CONFIG_CATEGORY_SECURITY, doc["security"]);
+  apiConfigGet(CONFIG_CATEGORY_STATS, doc["stats"]);
 }
 
 /**
@@ -689,6 +681,9 @@ bool apiConfigImportJSON(const JsonVariant& doc) {
   if (doc["serial"].is<JsonObject>()) {
      JsonObject sr = doc["serial"];
      if (sr["encoder_baud"].is<int>()) configSetInt(KEY_ENC_BAUD, sr["encoder_baud"]);
+     if (sr["encoder_iface"].is<int>()) configSetInt(KEY_ENC_INTERFACE, sr["encoder_iface"]);
+     if (sr["encoder_addr"].is<int>()) configSetInt(KEY_ENC_ADDR, sr["encoder_addr"]);
+     if (sr["enc_proto"].is<int>()) configSetInt(KEY_ENC_PROTO, sr["enc_proto"]);
      if (sr["rs485_baud"].is<int>()) configSetInt(KEY_RS485_BAUD, sr["rs485_baud"]);
      if (sr["i2c_speed"].is<int>()) configSetInt(KEY_I2C_SPEED, sr["i2c_speed"]);
   }

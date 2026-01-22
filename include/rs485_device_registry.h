@@ -98,6 +98,8 @@ typedef struct {
     // Watchdog state
     uint32_t last_successful_response_ms;       // Last successful response timestamp
     bool watchdog_alert_active;                 // True if alert has been raised
+    bool bus_paused;                            // True to suspend all registry activity
+    void* bus_mutex;                            // Mutex for bus access
 } rs485_registry_state_t;
 
 // Watchdog timeout (ms) - alert if no response in this time
@@ -277,6 +279,30 @@ bool rs485CheckWatchdog(void);
  * @brief Clear watchdog alert (call after user acknowledges)
  */
 void rs485ClearWatchdogAlert(void);
+
+/**
+ * @brief Pause or resume all RS-485 bus activity
+ * @param paused true to pause, false to resume
+ */
+void rs485SetBusPaused(bool paused);
+
+/**
+ * @brief Check if bus is currently paused
+ * @return true if paused
+ */
+bool rs485IsBusPaused(void);
+
+/**
+ * @brief Manually take control of the RS-485 bus (locks others out)
+ * @param timeout_ms How long to wait for the bus
+ * @return true if successful
+ */
+bool rs485TakeBus(uint32_t timeout_ms);
+
+/**
+ * @brief Release manual control of the RS-485 bus
+ */
+void rs485ReleaseBus(void);
 
 #ifdef __cplusplus
 }

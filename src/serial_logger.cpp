@@ -43,7 +43,7 @@ static bool acquireSerialMutex() {
   if (!mutex_initialized || !serial_mutex) return false;
   
   // Use 50ms timeout to avoid deadlocks
-  return xSemaphoreTake(serial_mutex, pdMS_TO_TICKS(50)) == pdTRUE;
+  return xSemaphoreTakeRecursive(serial_mutex, pdMS_TO_TICKS(50)) == pdTRUE;
 }
 
 /**
@@ -51,7 +51,7 @@ static bool acquireSerialMutex() {
  */
 static void releaseSerialMutex() {
   if (serial_mutex) {
-    xSemaphoreGive(serial_mutex);
+    xSemaphoreGiveRecursive(serial_mutex);
   }
 }
 
@@ -83,7 +83,7 @@ static void vlogPrint(log_level_t level, const char* prefix, const char* format,
 void serialLoggerInit(log_level_t log_level) {
   // Initialize mutex explicitly
   if (!mutex_initialized) {
-    serial_mutex = xSemaphoreCreateMutex();
+    serial_mutex = xSemaphoreCreateRecursiveMutex();
     mutex_initialized = true;
   }
   

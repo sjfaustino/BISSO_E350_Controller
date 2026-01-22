@@ -109,9 +109,9 @@ const SignalDef signalDefinitions[] = {
     {"output_status_red",    "Status Red",        "Status light red",     126, "output", "o_st_red"},
     {"output_buzzer",        "Buzzer",            "Audible alarm",        127, "output", "o_buzz"},
 
-    // WJ66 Encoder (RS232)
-    {"wj66_rx", "WJ66 RX", "Encoder RX", 14, "input", "wj66_rx"},
-    {"wj66_tx", "WJ66 TX", "Encoder TX", 33, "output", "wj66_tx"}
+    // WJ66 Encoder (RS232 -> RS485 Converter)
+    {"wj66_rx", "WJ66 RX", "Encoder RX", 16, "input", "wj66_rx"},
+    {"wj66_tx", "WJ66 TX", "Encoder TX", 13, "output", "wj66_tx"}
 };
 
 constexpr size_t SIGNAL_COUNT = sizeof(signalDefinitions)/sizeof(signalDefinitions[0]);

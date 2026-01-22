@@ -18,6 +18,7 @@
 #include "motion.h"
 #include "motion_planner.h"
 #include "motion_state.h"
+#include "motion_buffer.h"       // PHASE 5.11: Check buffer state in motionIsMoving
 #include "motion_state_machine.h" // PHASE 5.10: Formal state machine
 #include "plc_iface.h"
 #include "safety.h"

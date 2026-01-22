@@ -146,7 +146,7 @@ class AppState {
      */
     static data = {
         system: { status: 'INITIALIZING', health: 'unknown', cpu_percent: 0, free_heap_bytes: 0, firmware_version: '--', uptime_seconds: 0, plc_hardware_present: false, lcd_msg: '', lcd_msg_id: 0 },
-        motion: { position: { x: 0, y: 0, z: 0, a: 0 }, moving: false, status: 'STOPPED' },
+        motion: { position: { x: 0, y: 0, z: 0, a: 0 }, moving: false, buffer_count: 0, buffer_capacity: 32, status: 'STOPPED' },
         safety: { estop: false, alarm: false },
         vfd: { current_amps: 0, frequency_hz: 0, thermal_percent: 0, fault_code: 0, stall_threshold: 0, calibration_valid: false, connected: false },
         axis: {

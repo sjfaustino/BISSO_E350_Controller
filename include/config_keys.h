@@ -103,6 +103,8 @@
 #define KEY_ENC_INTERFACE                                                      \
   "enc_iface" // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)
 #define KEY_ENC_BAUD "encoder_baud" // WJ66 baud rate
+#define KEY_ENC_ADDR "encoder_addr" // WJ66 address (default 0)
+#define KEY_ENC_PROTO "enc_proto"   // WJ66 protocol (0=ASCII, 1=Modbus RTU)
 #define KEY_RS485_BAUD "rs485_baud" // Global RS-485 bus baud rate
 #define KEY_I2C_SPEED "i2c_speed"   // I2C bus speed in Hz (100000 or 400000)
 

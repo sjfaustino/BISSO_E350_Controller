@@ -47,6 +47,7 @@ void taskSafetyFunction(void *parameter) {
     // NOTE: boardInputsUpdate() manages its own mutex internally
 
     button_state_t btns = boardInputsUpdate();
+    elboI73Refresh(); // Ensure auxiliary inputs (Bank 2) are also polled for diagnostics
 
     if (btns.connection_ok) {
       // E-STOP

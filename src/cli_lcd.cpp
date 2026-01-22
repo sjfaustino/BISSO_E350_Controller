@@ -11,6 +11,7 @@
 #include "serial_logger.h"
 #include <string.h>
 #include <stdlib.h>
+#include <Wire.h>
 
 void cmd_lcd_on() {
     configSetInt(KEY_LCD_EN, 1);
@@ -49,7 +50,7 @@ void cmd_lcd_timeout(int argc, char** argv) {
 void cmd_lcd_main(int argc, char** argv) {
     if (argc < 2) {
         logPrintln("\r\n[LCD] === LCD Control ===");
-        logPrintln("Usage: lcd [on|off|backlight|sleep|wakeup|timeout|status|reset]");
+        logPrintln("Usage: lcd [on|off|backlight|sleep|wakeup|timeout|status|reset|scan|test]");
         logPrintln("  on        - Enable LCD and save setting");
         logPrintln("  off       - Disable LCD and save setting");
         logPrintln("  reset     - Reset I2C errors and try to re-enable I2C mode");
@@ -58,6 +59,8 @@ void cmd_lcd_main(int argc, char** argv) {
         logPrintln("  wakeup    - Force display to wake up");
         logPrintln("  timeout   - Set sleep timeout in seconds (0=never)");
         logPrintln("  status    - Show LCD status");
+        logPrintln("  scan      - Scan I2C bus for LCD backpack (0x27, 0x3F)");
+        logPrintln("  test      - Run hardware test pattern");
         return;
     }
 
@@ -82,6 +85,20 @@ void cmd_lcd_main(int argc, char** argv) {
         logPrintf("Sleeping:  %s\r\n", lcdSleepIsAsleep() ? "YES" : "NO");
         logPrintf("Timeout:   %lu sec\r\n", (unsigned long)lcdSleepGetTimeout());
         lcdInterfaceDiagnostics();
+    } else if (strcasecmp(argv[1], "scan") == 0) {
+        logPrintln("\r\n[LCD] Scanning I2C Bus for LCD...");
+        uint8_t addrs[] = {0x27, 0x3F};
+        bool found = false;
+        for (uint8_t a : addrs) {
+            Wire.beginTransmission(a);
+            if (Wire.endTransmission() == 0) {
+                logInfo("[LCD] Found LCD at 0x%02X", a);
+                found = true;
+            }
+        }
+        if (!found) logWarning("[LCD] No LCD found at standard addresses (0x27, 0x3F)");
+    } else if (strcasecmp(argv[1], "test") == 0) {
+        lcdInterfaceTest();
     } else {
         logWarning("[LCD] Unknown subcommand: %s", argv[1]);
     }

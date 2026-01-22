@@ -155,42 +155,61 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"success\":true}");
     });
     
-    // GET /api/history/telemetry (OPTIMIZED: Chunked streaming, no heap buffer)
+    // GET /api/history/telemetry (FIXED: Overflow-safe consolidated chunked streaming)
     server.on("/api/history/telemetry", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         response->setContentType("application/json");
+        response->sendHeaders(); 
         
-        const char* header = "{\"success\":true,\"cpu\":[";
-        response->sendChunk((uint8_t*)header, strlen(header));
+        char chunk[512]; 
+        char* p = chunk;
+        size_t rem = sizeof(chunk);
 
+        auto flushIfFull = [&](size_t needed) {
+            if (needed >= rem) {
+                response->sendChunk((uint8_t*)chunk, p - chunk);
+                p = chunk;
+                rem = sizeof(chunk);
+            }
+        };
+
+        // 1. CPU Array
+        response->sendChunk((uint8_t*)"{\"success\":true,\"cpu\":[", 23);
         for (int i = 0; i < history_count; i++) {
             int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
             char val[16];
-            size_t len = snprintf(val, sizeof(val), "%d%s", telemetry_history[idx].cpu, (i < history_count - 1) ? "," : "");
-            response->sendChunk((uint8_t*)val, len);
+            int n = snprintf(val, sizeof(val), "%d%s", telemetry_history[idx].cpu, (i < history_count - 1) ? "," : "");
+            flushIfFull(n);
+            memcpy(p, val, n);
+            p += n; rem -= n;
         }
+        response->sendChunk((uint8_t*)chunk, p - chunk);
+        p = chunk; rem = sizeof(chunk);
 
-        const char* heap_start = "],\"heap\":[";
-        response->sendChunk((uint8_t*)heap_start, strlen(heap_start));
-
-        for (int i = 0; i < history_count; i++) {
-            int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
-            char val[24];
-            size_t len = snprintf(val, sizeof(val), "%lu%s", (unsigned long)telemetry_history[idx].heap, (i < history_count - 1) ? "," : "");
-            response->sendChunk((uint8_t*)val, len);
-        }
-
-        const char* spindle_start = "],\"spindle_amps\":[";
-        response->sendChunk((uint8_t*)spindle_start, strlen(spindle_start));
-
+        // 2. Heap Array
+        response->sendChunk((uint8_t*)"],\"heap\":[", 10);
         for (int i = 0; i < history_count; i++) {
             int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
             char val[16];
-            size_t len = snprintf(val, sizeof(val), "%.2f%s", telemetry_history[idx].spindle, (i < history_count - 1) ? "," : "");
-            response->sendChunk((uint8_t*)val, len);
+            int n = snprintf(val, sizeof(val), "%lu%s", (unsigned long)telemetry_history[idx].heap, (i < history_count - 1) ? "," : "");
+            flushIfFull(n);
+            memcpy(p, val, n);
+            p += n; rem -= n;
         }
+        response->sendChunk((uint8_t*)chunk, p - chunk);
+        p = chunk; rem = sizeof(chunk);
 
-        const char* footer = "]}";
-        response->sendChunk((uint8_t*)footer, strlen(footer));
+        // 3. Spindle Array + Footer
+        response->sendChunk((uint8_t*)"],\"spindle_amps\":[", 18);
+        for (int i = 0; i < history_count; i++) {
+            int idx = (history_head - history_count + i + HISTORY_BUFFER_SIZE) % HISTORY_BUFFER_SIZE;
+            char val[16];
+            int n = snprintf(val, sizeof(val), "%.2f%s", telemetry_history[idx].spindle, (i < history_count - 1) ? "," : "");
+            flushIfFull(n);
+            memcpy(p, val, n);
+            p += n; rem -= n;
+        }
+        response->sendChunk((uint8_t*)chunk, p - chunk);
+        response->sendChunk((uint8_t*)"]}", 2);
         
         return response->finishChunking();
     });

@@ -45,12 +45,28 @@
                     throw new Error(errorMsg);
                 }
 
-                // Handle JSON Response
+                // Handle JSON Response (Safe-Parsing if header is wrong)
                 const contentType = response.headers.get("content-type");
+                const text = await response.text();
+
                 if (contentType && contentType.includes("application/json")) {
-                    return await response.json();
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        return text;
+                    }
                 }
-                return await response.text();
+
+                // If it looks like JSON, try to parse it anyway (robustness against bad headers)
+                if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        return text;
+                    }
+                }
+
+                return text;
 
             } catch (error) {
                 clearTimeout(id);

@@ -221,8 +221,8 @@ void cmd_dio_main(int argc, char** argv) {
     static const char* output2_labels[] = {"AirBlast", "Lube", "Alarm", "Ready", "Running", "Error", "Out-15", "Out-16"};
     
     struct { uint8_t addr; const char* name; const char** labels; bool is_output; } banks[] = {
-        {0x21, "INPUTS-SAFE", input1_labels, false},
-        {0x22, "INPUTS-AUX", input2_labels, false},
+        {0x22, "INPUTS-SAFE", input1_labels, false},
+        {0x21, "INPUTS-AUX", input2_labels, false},
         {0x24, "OUTPUTS-MAIN", output1_labels, true},
         {0x25, "OUTPUTS-AUX", output2_labels, true}
     };
@@ -525,8 +525,180 @@ void cmd_faults_main(int argc, char** argv) {
 // INDIVIDUAL DIAGNOSTICS
 // ============================================================================
 void cmd_timeout_diag(int argc, char** argv) { timeoutShowDiagnostics(); }
-void cmd_encoder_diag(int argc, char** argv) { encoderMotionDiagnostics(); }
-void cmd_encoder_baud_detect(int argc, char** argv) { encoderDetectBaudRate(); }
+
+// ============================================================================
+// RS-485 DIRECT BUS ACCESS
+// ============================================================================
+void cmd_rs485_raw(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("[RS485] Usage: rs485 raw <string>");
+        logPrintln("  Example: rs485 raw #00\\r");
+        return;
+    }
+
+    // Convert escaped characters like \r to actual values
+    char payload[64];
+    strncpy(payload, argv[1], sizeof(payload)-1);
+    payload[sizeof(payload)-1] = '\0';
+    
+    char* r = strstr(payload, "\\r");
+    if (r) { *r = '\r'; memmove(r+1, r+2, strlen(r+2)+1); }
+    char* n = strstr(payload, "\\n");
+    if (n) { *n = '\n'; memmove(n+1, n+2, strlen(n+2)+1); }
+
+    logPrintf("[RS485] Sending: %s (%d bytes)\r\n", argv[1], (int)strlen(payload));
+    
+    // Clear buffer first
+    rs485ClearBuffer();
+    
+    if (!rs485Send((const uint8_t*)payload, strlen(payload))) {
+        logError("[RS485] Failed to send");
+        return;
+    }
+
+    // Wait for response
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    
+    uint8_t rx_buf[128];
+    uint8_t rx_len = 0;
+    if (rs485Receive(rx_buf, &rx_len) && rx_len > 0) {
+        logPrintf("[RS485] Received %d bytes: ", rx_len);
+        for (int i = 0; i < rx_len; i++) {
+            if (rx_buf[i] >= 32 && rx_buf[i] <= 126) logPrintf("%c", rx_buf[i]);
+            else logPrintf("[%02X]", rx_buf[i]);
+        }
+        logPrintln("");
+    } else {
+        logWarning("[RS485] No response received");
+    }
+}
+
+void cmd_rs485_hex(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("[RS485] Usage: rs485 hex <hex bytes...>");
+        logPrintln("  Example: rs485 hex 23 30 30 0D (sends #00\\r)");
+        return;
+    }
+
+    uint8_t payload[64];
+    uint8_t len = 0;
+    
+    for (int i = 1; i < argc && len < sizeof(payload); i++) {
+        payload[len++] = (uint8_t)strtol(argv[i], NULL, 16);
+    }
+
+    logPrintf("[RS485] Sending Hex (%d bytes)\r\n", len);
+    rs485ClearBuffer();
+    
+    if (!rs485Send(payload, len)) {
+        logError("[RS485] Failed to send");
+        return;
+    }
+
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    
+    uint8_t rx_buf[128];
+    uint8_t rx_len = 0;
+    if (rs485Receive(rx_buf, &rx_len) && rx_len > 0) {
+        logPrintf("[RS485] Received %d bytes: ", rx_len);
+        for (int i = 0; i < rx_len; i++) {
+            if (rx_buf[i] >= 32 && rx_buf[i] <= 126) logPrintf("%c", rx_buf[i]);
+            else logPrintf("[%02X]", rx_buf[i]);
+        }
+        logPrintln("");
+    } else {
+        logWarning("[RS485] No response received");
+    }
+}
+
+void cmd_rs485_diag(int argc, char** argv) { (void)argc; (void)argv; rs485PrintDiagnostics(); }
+void cmd_rs485_reset(int argc, char** argv) { (void)argc; (void)argv; rs485ResetErrorCounters(); }
+
+void cmd_rs485_main(int argc, char** argv) {
+    static const cli_subcommand_t subcmds[] = {
+        {"raw",     cmd_rs485_raw,          "Send raw string to bus and show response"},
+        {"hex",     cmd_rs485_hex,          "Send hex bytes to bus (e.g. 23 30 30 0D)"},
+        {"diag",    cmd_rs485_diag,         "Show bus registry diagnostics"},
+        {"reset",   cmd_rs485_reset,        "Reset error counters"}
+    };
+    cliDispatchSubcommand("[RS485]", argc, argv, subcmds, sizeof(subcmds)/sizeof(subcmds[0]), 1);
+}
+
+void cmd_encoder_diag(int argc, char** argv) { (void)argc; (void)argv; encoderMotionDiagnostics(); }
+void cmd_encoder_test(int argc, char** argv) { (void)argc; (void)argv; wj66Diagnostics(); }
+void cmd_encoder_baud_detect(int argc, char** argv) { (void)argc; (void)argv; wj66Autodetect(); }
+
+void cmd_encoder_read(int argc, char** argv) {
+    int n_reads = 10;
+    if (argc >= 3) {
+        n_reads = atoi(argv[2]);
+        if (n_reads <= 0) n_reads = 1;
+    }
+
+    logPrintf("[ENCODER] Reading %d times (0.5s interval)...\r\n", n_reads);
+    logPrintln("| Axis 0    | Axis 1    | Axis 2    | Axis 3    |");
+    logPrintln("+-----------+-----------+-----------+-----------+");
+
+    for (int i = 0; i < n_reads; i++) {
+        logPrintf("| %9ld | %9ld | %9ld | %9ld |\r\n",
+                  (long)wj66GetPosition(0),
+                  (long)wj66GetPosition(1),
+                  (long)wj66GetPosition(2),
+                  (long)wj66GetPosition(3));
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+}
+
+void cmd_encoder_status(int argc, char** argv) {
+    (void)argc; (void)argv;
+    const encoder_hal_config_t* config = encoderHalGetConfig();
+    if (!config) return;
+
+    logPrintln("\n[ENCODER] === Configuration & Status Dashboard ===");
+    logPrintln("+-----------------+---------------------------------------+");
+    logPrintf("| Interface       | %-37s |\r\n", encoderHalGetInterfaceName(config->interface));
+    logPrintf("| Pins            | RX:%-2d TX:%-2d                             |\r\n", config->rx_pin, config->tx_pin);
+    logPrintf("| Baud Rate       | %-37lu |\r\n", (unsigned long)config->baud_rate);
+    int proto = configGetInt(KEY_ENC_PROTO, 0);
+    logPrintf("| Protocol        | %-37s |\r\n", (proto == 1) ? "Modbus RTU" : "ASCII (#XX\\r)");
+    logPrintf("| Address         | %-37d |\r\n", configGetInt(KEY_ENC_ADDR, 0));
+    logPrintln("+-----------------+---------------------------------------+");
+    logPrintln("| Axis | Position  | Status | Age (ms)  | Read Count      |");
+    logPrintln("+------+-----------+--------+-----------+-----------------+");
+
+    for (int i = 0; i < 4; i++) {
+        int32_t pos = wj66GetPosition(i);
+        uint32_t age = wj66GetAxisAge(i);
+        const char* status = wj66IsStale(i) ? "STALE" : "OK";
+        // Note: Read count isn't directly exposed in header, but we can show status/age
+        logPrintf("|  %d   | %9ld | %-6s | %9lu |                 |\r\n", i, (long)pos, status, (unsigned long)age);
+    }
+    logPrintln("+------+-----------+--------+-----------+-----------------+");
+
+    encoderMotionDiagnostics();
+}
+
+void cmd_encoder_protocol(int argc, char** argv) {
+    if (argc < 3) {
+        int current = configGetInt(KEY_ENC_PROTO, 0);
+        logPrintf("[ENCODER] Current Protocol: %s (%d)\r\n", (current == 1) ? "Modbus RTU" : "ASCII (#XX\\r)", current);
+        logPrintln("Usage: encoder protocol <0|1>");
+        logPrintln("  0: ASCII mode (Default, eg: #01\\r -> !+0000.00,...)");
+        logPrintln("  1: Modbus RTU mode (Read Holding Registers FC03)");
+        return;
+    }
+
+    int proto = atoi(argv[2]);
+    if (proto != 0 && proto != 1) {
+        logError("[ENCODER] Invalid protocol: %d (use 0 or 1)", proto);
+        return;
+    }
+
+    configSetInt(KEY_ENC_PROTO, proto);
+    configUnifiedSave();
+    logInfo("[ENCODER] Protocol set to %s. Changes will take effect on next poll.", 
+            (proto == 1) ? "Modbus RTU" : "ASCII");
+}
 
 // ============================================================================
 // ENCODER CONFIGURATION (WJ66 INTERFACE MANAGEMENT)
@@ -647,9 +819,15 @@ void cmd_encoder_config_main(int argc, char** argv) {
 void cmd_encoder_main(int argc, char** argv) {
     // Table-driven subcommand dispatch (P1: DRY improvement)
     static const cli_subcommand_t subcmds[] = {
-        {"diag",   cmd_encoder_diag,        "Run encoder diagnostics"},
+        {"status", cmd_encoder_status,      "Unified dashboard (config + runtime)"},
+        {"read",   cmd_encoder_read,        "Display encoder positions N times (default 10) every 0.5s"},
+        {"diag",   cmd_encoder_diag,        "Run encoder integration diagnostics"},
+        {"test",   cmd_encoder_test,        "Show raw encoder counts and hardware stats"},
         {"baud",   cmd_encoder_baud_detect, "Auto-detect baud rate"},
-        {"config", cmd_encoder_config_main, "Configure encoder interface"}
+        {"scan",   cmd_encoder_baud_detect, "Alias for baud (scan for encoder)"},
+        {"poll",   cmd_encoder_test,        "One-shot poll showing raw response (alias for test)"},
+        {"config",   cmd_encoder_config_main, "Configure encoder interface"},
+        {"protocol", cmd_encoder_protocol,    "Set protocol: 0=ASCII (#XX\\r), 1=Modbus RTU"}
     };
     
     cliDispatchSubcommand("[ENCODER]", argc, argv, subcmds, 
@@ -1257,23 +1435,6 @@ void cmd_telemetry_main(int argc, char** argv) {
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
-// ============================================================================
-// RS-485 REGISTRY DIAGNOSTICS
-// ============================================================================
-void cmd_rs485_diag(int argc, char** argv) {
-    (void)argc; (void)argv;
-    rs485PrintDiagnostics();
-}
-
-void cmd_rs485_main(int argc, char** argv) {
-    // Table-driven subcommand dispatch (P1: DRY improvement)
-    static const cli_subcommand_t subcmds[] = {
-        {"diag", cmd_rs485_diag, "Show RS-485 bus diagnostics"}
-    };
-    
-    cliDispatchSubcommand("[RS485]", argc, argv, subcmds, 
-                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
-}
 
 // ============================================================================
 // CUTTING ANALYTICS COMMANDS

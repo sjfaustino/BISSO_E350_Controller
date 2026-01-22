@@ -141,6 +141,28 @@ static void resetTelnetAuthState() {
   memset(telnet_username_attempt, 0, sizeof(telnet_username_attempt));
 }
 
+// WiFi event handler - detects auth failures to stop redundant reconnect loops
+static void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
+  switch (event) {
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: {
+      uint8_t reason = info.wifi_sta_disconnected.reason;
+      // 202 = WIFI_REASON_AUTH_FAIL, 15 = WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT
+      if (reason == 202 || reason == 15) {
+        logError("[WIFI] Auth Failed (Reason: %u). Stopping auto-reconnect to protect encoder bus.", reason);
+        WiFi.setAutoReconnect(false);
+      } else {
+        logDebug("[WIFI] Disconnected (Reason: %u)", reason);
+      }
+      break;
+    }
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+      logInfo("[WIFI] [OK] IP Address: %s", WiFi.localIP().toString().c_str());
+      break;
+    default:
+      break;
+  }
+}
+
 // Ethernet event handler - called by WiFi event system
 static void onEthernetEvent(WiFiEvent_t event) {
   switch (event) {
@@ -190,8 +212,9 @@ void NetworkManager::initEthernet() {
   
   logInfo("[ETH] Initializing LAN8720 Ethernet PHY...");
   
-  // Register event handler before starting ETH
+  // Register event handlers before starting interfaces
   WiFi.onEvent(onEthernetEvent);
+  WiFi.onEvent(onWiFiEvent);
   
   // Start Ethernet with KC868-A16 pin configuration
   if (ETH.begin(ETH_PHY_ADDR, -1, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE)) {

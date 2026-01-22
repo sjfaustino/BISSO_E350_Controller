@@ -24,18 +24,50 @@ static const char* wifiGetStatusString(wl_status_t status) {
 }
 
 void cmd_wifi_scan(int argc, char** argv) {
+    bool force = (argc >= 3 && strcasecmp(argv[2], "force") == 0);
+    
+    if (force) {
+        logPrintln("[WIFI] Forcing scan by disconnecting first...");
+        WiFi.disconnect();
+        delay(500);
+    }
+
     logPrintln("[WIFI] Scanning...");
     // Scan without disconnecting to avoid breaking existing sessions
     int n = WiFi.scanNetworks(false, false, false, 300); // Fast scan
-    if (n == 0) logPrintln("[WIFI] No networks found.");
-    else {
+    
+    if (n < 0) {
+        if (n == -1) { // WIFI_SCAN_RUNNING
+            logPrintln("[WIFI] Scan already in progress.");
+        } else {
+            logPrintf("[WIFI] Scan failed (Error code: %d).\n", n);
+            logPrintln("[WIFI] TIP: If you have invalid credentials saved, they might be blocking the scan.");
+            logPrintln("[WIFI] TIP: Try 'wifi scan force' or 'wifi disconnect' first.");
+        }
+    } else if (n == 0) {
+        logPrintln("[WIFI] No networks found.");
+    } else {
         logPrintf("[WIFI] Found %d networks:\r\n", n);
         for (int i = 0; i < n; ++i) {
-            logPrintf("  %2d: %-32.32s | %d dBm\r\n", i+1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
+            logPrintf("  %2d: %-32.32s | %d dBm %s\r\n", 
+                      i+1, 
+                      WiFi.SSID(i).c_str(), 
+                      WiFi.RSSI(i),
+                      (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "(Open)" : "(Encrypted)");
             delay(10);
         }
     }
     WiFi.scanDelete();
+}
+
+void cmd_wifi_disconnect(int argc, char** argv) {
+    logPrintln("[WIFI] Disconnecting and stopping auto-reconnect...");
+    WiFi.setAutoReconnect(false);
+    WiFi.disconnect(true, true); // eraseap = false, stopSTA = true? wait, signature is (eraseap, set_at_startup) or similar
+    // Actually in ESP32 Arduino: WiFi.disconnect(bool wifioff = false, bool eraseap = false)
+    WiFi.disconnect(false, false);
+    logPrintln("[WIFI] [OK] Background connection loop stopped.");
+    logPrintln("[WIFI] Use 'wifi connect' or 'wifi scan' now.");
 }
 
 void cmd_wifi_connect(int argc, char** argv) {
@@ -45,6 +77,7 @@ void cmd_wifi_connect(int argc, char** argv) {
     }
     logPrintf("[WIFI] Connecting to '%s'...\n", argv[2]);
     WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true); // Re-enable auto-reconnect
     WiFi.begin(argv[2], argv[3]);
 
     // CRITICAL FIX: Non-blocking connection to prevent freezing motion control
@@ -119,9 +152,10 @@ void cmd_wifi_ap(int argc, char **argv) {
 void cmd_wifi_main(int argc, char **argv) {
   // Table-driven subcommand dispatch (P1: DRY improvement)
   static const cli_subcommand_t subcmds[] = {
-      {"scan",    cmd_wifi_scan,    "Scan for networks"},
-      {"connect", cmd_wifi_connect, "Connect to network"},
-      {"status",  cmd_wifi_status,  "Show connection status"},
+      {"scan",       cmd_wifi_scan,       "Scan for networks"},
+      {"connect",    cmd_wifi_connect,    "Connect to network"},
+      {"disconnect", cmd_wifi_disconnect, "Disconnect/Stop auto-reconnect"},
+      {"status",     cmd_wifi_status,     "Show connection status"},
       {"ap",      cmd_wifi_ap,      "Configure Access Point"}
   };
 
