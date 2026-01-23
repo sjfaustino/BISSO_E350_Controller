@@ -186,7 +186,14 @@
         "queue_paused": "⚠️ Fila Pausada - Trabalho Falhou",
         "retry_start": "🔁 Repetir do Início",
         "resume": "▶️ Continuar",
-        "skip": "⏭️ Saltar"
+        "skip": "⏭️ Saltar",
+        "preview": "PRÉ-VISUALIZAÇÃO DO CAMINHO",
+        "zoom_in": "Aumentar Zoom",
+        "zoom_out": "Diminuir Zoom",
+        "reset_view": "Redefinir Vista",
+        "rapid_moves": "Movimentos Rápidos",
+        "cutting_moves": "Movimentos de Corte",
+        "current_pos": "Posição Atual"
     },
     "homing": {
         "title": "🏠 Assistente de Homing",

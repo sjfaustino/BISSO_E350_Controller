@@ -83,6 +83,19 @@ void wj66Init() {
   uint32_t config_baud = configGetInt(KEY_ENC_BAUD, WJ66_BAUD);
   uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS485_RXD2);
   
+  // PHASE 6.3: Harmonize baud rates if sharing RS485 bus
+  // If we are on Interface 1 (RS485), we MUST use the global rs485_baud
+  // to prevent port re-init conflicts and watchdog triggers.
+  if (config_iface == 1) {
+    uint32_t bus_baud = configGetInt(KEY_RS485_BAUD, 0);
+    if (bus_baud != 0 && bus_baud != config_baud) {
+        logInfo("[WJ66] Syncing encoder baud %lu -> bus baud %lu (RS485 mode)", 
+                (unsigned long)config_baud, (unsigned long)bus_baud);
+        config_baud = bus_baud;
+        // Optionally save back to keep UI in sync, but for now we just use it
+    }
+  }
+
   // Sanity check
   if (config_baud < 1200 || config_baud > 115200) config_baud = 9600;
 
@@ -122,9 +135,9 @@ void wj66Init() {
   // Interface 1 = RS485 (GPIO 16/13)
   if (config_iface == 1) {
     rs485RegisterDevice(&wj66_device);
-    logInfo("[WJ66] Ready (Registered with RS485 bus)");
+    logInfo("[WJ66] Ready (Registered with RS485 bus @ %lu baud)", (unsigned long)config_baud);
   } else {
-    logInfo("[WJ66] Ready (Using Serial interface on HT pins)");
+    logInfo("[WJ66] Ready (Using Serial interface on HT pins @ %lu baud)", (unsigned long)config_baud);
   }
 }
 
@@ -156,24 +169,26 @@ bool wj66SetBaud(uint32_t baud) {
 }
 
 uint32_t wj66Autodetect() {
-    logInfo("[WJ66] Starting Auto-detect...");
+    logInfo("[WJ66] Starting robust Auto-detect...");
     
     // Suspend RS485 bus activity during scan
     rs485SetBusPaused(true);
     
     // Acquire bus mutex (critical for preventing background task interference)
-    if (!rs485TakeBus(500)) {
+    if (!rs485TakeBus(1000)) {
         logError("[WJ66] Failed to acquire bus mutex for scan");
         rs485SetBusPaused(false);
         return 0;
     }
 
-    vTaskDelay(200 / portTICK_PERIOD_MS); // Let any current poll finish and bus settle
+    vTaskDelay(200 / portTICK_PERIOD_MS); 
     
     const uint32_t rates[] = {9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200};
     uint32_t found_rate = 0;
-    
-    // Select serial channel based on hardware config
+    int found_addr = -1;
+    int found_proto = -1;
+
+    // Select serial channel based on current config
 #if !defined(CONFIG_IDF_TARGET_ESP32S2)
     uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS485_RXD2);
     HardwareSerial* s = (config_iface == 1) ? &Serial2 : &Serial1;
@@ -181,122 +196,121 @@ uint32_t wj66Autodetect() {
     HardwareSerial* s = &Serial1;
 #endif
 
-    int found_addr = -1;
+    logInfo("[WJ66] Scanning on %s...", (config_iface == 1) ? "Serial2 (RS485)" : "Serial1 (HT)");
 
     for (uint32_t rate : rates) {
-        vTaskDelay(20 / portTICK_PERIOD_MS); // Feed WDT
-        
-        logInfo("[WJ66] Trying %lu...", (unsigned long)rate);
+        logInfo("[WJ66] Trying %lu baud...", (unsigned long)rate);
         s->updateBaudRate(rate);
-        vTaskDelay(50 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
         
-        // Flush any inbound noise
-        while(s->available()) s->read();
+        while(s->available()) s->read(); // Flush noise
         
-        // Probing addresses
-        int proto = configGetInt(KEY_ENC_PROTO, 0);
-        int max_addr = (proto == 1) ? 2 : 1; // Try 1-2 for Modbus, 0-1 for ASCII
-        
-        for (int addr_to_try = 0; addr_to_try <= max_addr; addr_to_try++) {
-            if (proto == 1 && addr_to_try == 0) continue; 
-            
-            bool got_response = false;
-            // For Modbus, we try a few variations if the first one fails
-            int variations = (proto == 1) ? 2 : 1; 
-            for (int var = 0; var < variations; var++) {
-                uint16_t reg_addr = (var == 0) ? 0x0010 : 0x0000;
-                
-                if (proto == 1) {
-                    uint8_t frame[8];
-                    modbusReadRegistersRequest((uint8_t)addr_to_try, reg_addr, 8, frame);
-                    // Also try FC 04 if FC 03 fails? Let's stick to 03 for now but log.
-                    logPrintf("[WJ66] Probing Modbus Addr %d, Reg 0x%04X...\r\n", addr_to_try, reg_addr);
-                    s->write(frame, 8);
-                } else {
-                    char cmd[8];
-                    snprintf(cmd, sizeof(cmd), "#%02d2\r", addr_to_try); // Use #AA2\r for all axes
-                    logPrintf("[WJ66] Probing ASCII Addr %d...\r\n", addr_to_try);
-                    s->print(cmd);
+        // Try BOTH protocols at each baud rate
+        for (int proto_to_try = 0; proto_to_try <= 1; proto_to_try++) {
+            // Address range 0-10 covers most defaults and common setups
+            for (int addr_to_try = 0; addr_to_try <= 10; addr_to_try++) {
+                // Broadcast check (#AA\r) only for ASCII and only once per baud rate
+                if (proto_to_try == 0 && addr_to_try == 0) {
+                    logDebug("[WJ66] Probing ASCII Broadcast (#AA)...");
+                    s->print("#AA\r");
+                    s->flush();
+                    s->setTimeout(150);
+                    uint8_t buf[32];
+                    int len = s->readBytes(buf, sizeof(buf)-1);
+                    if (len > 0) {
+                        buf[len] = '\0';
+                        logInfo("[WJ66] Received response to Broadcast: %s", (char*)buf);
+                        // Extract address from response if possible (!01, !02, etc)
+                        char* excl = strchr((char*)buf, '!');
+                        if (excl && isdigit(excl[1])) {
+                             addr_to_try = atoi(excl + 1);
+                             logInfo("[WJ66] Detected Address: %d", addr_to_try);
+                        }
+                    }
                 }
-                s->flush();
-                
-                // Wait for response and verify
-                s->setTimeout(100); 
-                uint32_t start = millis();
-                while (millis() - start < 250) {
-                    if (s->available()) {
-                        uint8_t buf[64];
-                        int len = s->readBytes(buf, sizeof(buf)-1);
+
+                bool got_response = false;
+                if (proto_to_try == 1) {
+                    // MODBUS PROBE
+                    if (addr_to_try == 0) continue; // Modbus dev 0 is broadcast-only
+                    uint8_t frame[8];
+                    // Try FC03 on reg 0x0010 (Position)
+                    modbusReadRegistersRequest((uint8_t)addr_to_try, 0x0010, 8, frame);
+                    s->write(frame, 8);
+                    s->flush();
+                    s->setTimeout(150);
+                    uint8_t resp[64];
+                    int len = s->readBytes(resp, sizeof(resp));
+                    if (len >= 5 && resp[0] == addr_to_try && resp[1] == 0x03 && modbusVerifyCrc(resp, len)) {
+                        got_response = true;
+                    }
+                } else {
+                    // ASCII PROBE
+                    // Try BOTH #01\r and #012\r patterns
+                    const char* probes[] = {"#%02d\r", "#%02d2\r"};
+                    for (int p_idx = 0; p_idx < 2; p_idx++) {
+                        char cmd[16];
+                        snprintf(cmd, sizeof(cmd), probes[p_idx], addr_to_try);
+                        s->print(cmd);
+                        s->flush();
+                        s->setTimeout(150);
+                        uint8_t resp[64];
+                        int len = s->readBytes(resp, sizeof(resp));
                         if (len > 0) {
-                            buf[len] = '\0';
-                            
-                            logPrintf("[WJ66] Raw Response (%d bytes): ", len);
-                            for (int i = 0; i < len; i++) {
-                                if (buf[i] >= 32 && buf[i] <= 126) logPrintf("%c", buf[i]);
-                                else logPrintf("[%02X]", (uint8_t)buf[i]);
+                            resp[len] = '\0';
+                            // If we see signatures, it's definitely a WJ66
+                            if (strchr((char*)resp, '!') || strchr((char*)resp, '>')) {
+                                got_response = true;
+                                break;
                             }
-                            logPrintln("");
-
-                            if (proto == 1) {
-                                // Modbus Validation
-                                if (len >= 5 && buf[0] == addr_to_try && buf[1] == 0x03 && modbusVerifyCrc(buf, len)) {
-                                    logInfo("[WJ66] Found Modbus @ %lu baud, Addr %d!", (unsigned long)rate, addr_to_try);
-                                    found_rate = rate;
-                                    found_addr = addr_to_try;
-                                    got_response = true;
-                                    break;
-                                } else if (buf[0] == '!' || buf[0] == '>') {
-                                    logWarning("[WJ66] Detected ASCII response while in Modbus mode! Device may need protocol switch.");
-                                }
-                            } else {
-                            // ASCII Validation (Heuristic)
-                            char* buf_s = (char*)buf;
-                            char* sig_ptr = strchr(buf_s, '!');
-                            if (!sig_ptr) sig_ptr = strchr(buf_s, '>');
-                            char* start_ptr = sig_ptr ? sig_ptr : buf_s;
-                            
-                            int commas = 0, digits = 0;
-                            for (int i = 0; start_ptr[i] != '\0'; i++) {
-                                if (start_ptr[i] == ',') commas++;
-                                if (isdigit(start_ptr[i])) digits++;
+                            // Fallback: If we see digits and commas, it's probably a match
+                            int digits = 0, commas = 0;
+                            for(int i=0; i<len; i++) {
+                                if(isdigit(resp[i])) digits++;
+                                if(resp[i] == ',') commas++;
                             }
-
-                            if (commas >= 1 && digits >= 4) {
-                                logInfo("[WJ66] Found ASCII @ %lu baud, Addr %d!", (unsigned long)rate, addr_to_try);
-                                found_rate = rate;
-                                found_addr = addr_to_try;
+                            if (digits >= 4 && commas >= 1) {
                                 got_response = true;
                                 break;
                             }
                         }
                     }
                 }
-                vTaskDelay(10 / portTICK_PERIOD_MS);
+
+                if (got_response) {
+                    found_rate = rate;
+                    found_addr = addr_to_try;
+                    found_proto = proto_to_try;
+                    logInfo("[WJ66] FOUND: %s @ %lu baud, Addr %d!", 
+                             (found_proto == 1) ? "Modbus" : "ASCII", 
+                             (unsigned long)found_rate, found_addr);
+                    break;
+                }
+                vTaskDelay(5 / portTICK_PERIOD_MS); // Yield
             }
-                if (got_response) break;
-                while(s->available()) s->read(); // Flush garbage
-            }
-            if (got_response) break;
+            if (found_rate) break;
         }
         if (found_rate) break;
     }
     
-    // Restore to found or saved rate
-    uint32_t final_rate = found_rate ? found_rate : configGetInt(KEY_ENC_BAUD, WJ66_BAUD);
-    s->updateBaudRate(final_rate);
-    
     if (found_rate) {
         configSetInt(KEY_ENC_BAUD, (int)found_rate);
         configSetInt(KEY_ENC_ADDR, found_addr);
+        configSetInt(KEY_ENC_PROTO, found_proto);
+        
+        uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, 1);
+        if (config_iface == 1) {
+            logInfo("[WJ66] Syncing global RS485 baud -> %lu", (unsigned long)found_rate);
+            configSetInt(KEY_RS485_BAUD, (int)found_rate);
+        }
         configUnifiedSave();
     } else {
-        logError("[WJ66] Autodetect failed");
+        logError("[WJ66] Auto-detect failed to find any responding device.");
+        // Restore previous baud rate to serial port
+        s->updateBaudRate(configGetInt(KEY_ENC_BAUD, WJ66_BAUD));
     }
     
-    // Release bus mutex
     rs485ReleaseBus();
-    
-    // Re-enable RS485 bus
     rs485SetBusPaused(false);
     return found_rate;
 }
@@ -588,16 +602,21 @@ void wj66SetZero(uint8_t axis) {
 }
 
 void wj66Diagnostics() {
+  const encoder_hal_config_t* hal = encoderHalGetConfig();
   logPrintln("\n=== ENCODER STATUS ===");
+  logPrintf("Interface: %d (%s)\n", hal->interface, encoderHalGetInterfaceName(hal->interface));
+  logPrintf("Baud Rate: %lu\n", (unsigned long)hal->baud_rate);
   logPrintf("Status: %d\nErrors: %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
   logPrintf("Waiting: %s\n", wj66_state.waiting_for_response ? "YES" : "NO");
   
   for (int i = 0; i < WJ66_AXES; i++) {
-    logPrintf("  Axis %d: Raw=%ld | Offset=%ld | NET=%ld\n", 
+    uint32_t age = wj66GetAxisAge(i);
+    logPrintf("  Axis %d: Raw=%ld | Offset=%ld | NET=%ld | Age=%lu ms\n", 
         i, 
         (long)wj66_state.position[i], 
         (long)wj66_state.zero_offset[i],
-        (long)(wj66_state.position[i] - wj66_state.zero_offset[i])
+        (long)(wj66_state.position[i] - wj66_state.zero_offset[i]),
+        (unsigned long)age
     );
   }
 }

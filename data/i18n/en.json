@@ -187,7 +187,14 @@
         "queue_paused": "⚠️ Queue Paused - Job Failed",
         "retry_start": "🔁 Retry from Start",
         "resume": "▶️ Resume",
-        "skip": "⏭️ Skip"
+        "skip": "⏭️ Skip",
+        "preview": "PATH PREVIEW",
+        "zoom_in": "Zoom In",
+        "zoom_out": "Zoom Out",
+        "reset_view": "Reset View",
+        "rapid_moves": "Rapid Moves",
+        "cutting_moves": "Cutting Moves",
+        "current_pos": "Current Position"
     },
     "homing": {
         "title": "🏠 Homing Wizard",

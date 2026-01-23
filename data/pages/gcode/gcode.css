@@ -4,3 +4,17 @@
 .gcode-container {
     padding: 20px;
 }
+
+/* Path Visualizer */
+.visualizer-container {
+    background: #1a1a2e;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    position: relative;
+}
+
+.visualizer-container canvas {
+    display: block;
+    width: 100%;
+    height: 300px;
+}

@@ -221,10 +221,18 @@ bool apiConfigValidate(config_category_t category, const char *key,
   case CONFIG_CATEGORY_SAFETY:
   case CONFIG_CATEGORY_THERMAL:
   case CONFIG_CATEGORY_NETWORK:
+  case CONFIG_CATEGORY_SPINDLE:
+  case CONFIG_CATEGORY_SERIAL:
+  case CONFIG_CATEGORY_HARDWARE:
+  case CONFIG_CATEGORY_BEHAVIOR:
+  case CONFIG_CATEGORY_CALIBRATION:
+  case CONFIG_CATEGORY_POSITIONS:
+  case CONFIG_CATEGORY_WCS:
+  case CONFIG_CATEGORY_SECURITY:
+  case CONFIG_CATEGORY_STATS:
+  default:
     // No specific validation yet
     break;
-
-    return false;
   }
 
   return true;
@@ -284,6 +292,14 @@ bool apiConfigSet(config_category_t category, const char *key,
       current_encoder.ppm[1] = value.as<uint16_t>();
     } else if (strstr(key, "ppm_z")) {
       current_encoder.ppm[2] = value.as<uint16_t>();
+    } else if (strcmp(key, "encoder_baud") == 0) {
+        // PHASE 6.3: Synchronization
+        uint32_t baud = value.as<uint32_t>();
+        configSetInt(KEY_ENC_BAUD, baud);
+        if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
+            logInfo("[API_CONFIG] Syncing rs485_baud -> %lu (RS485 shared)", (unsigned long)baud);
+            configSetInt(KEY_RS485_BAUD, baud);
+        }
     }
     break;
 
@@ -325,6 +341,14 @@ bool apiConfigSet(config_category_t category, const char *key,
         configSetInt(KEY_CLI_ECHO, value.as<int>());
     } else if (strcmp(key, "ota_chk_en") == 0) {
         configSetInt(KEY_OTA_CHECK_EN, value.as<int>());
+    } else if (strcmp(key, KEY_RS485_BAUD) == 0) {
+        // PHASE 6.3: If RS485 is shared with Encoder, sync them
+        uint32_t baud = value.as<uint32_t>();
+        configSetInt(KEY_RS485_BAUD, baud);
+        if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
+            logInfo("[API_CONFIG] Syncing encoder_baud -> %lu (RS485 shared)", (unsigned long)baud);
+            configSetInt(KEY_ENC_BAUD, baud);
+        }
     }
     break;
 

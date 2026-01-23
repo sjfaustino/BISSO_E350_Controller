@@ -57,8 +57,8 @@ bool rs485RegistryInit(uint32_t baud_rate) {
     // Initialize RS485 UART
     bus_serial->begin(baud_rate, SERIAL_8N1, 16, 13);
     
-    logInfo("[RS485] Registry initialized on Serial2 (baud: %lu, max devices: %d)",
-            (unsigned long)baud_rate, RS485_MAX_DEVICES);
+    logInfo("[RS485] Registry initialized on Serial2 (baud: %lu, RX:16 TX:13)",
+            (unsigned long)baud_rate);
     return true;
 }
 
@@ -209,7 +209,8 @@ bool rs485Update(void) {
                 current->consecutive_errors++;
                 registry.bus_busy = false;
                 registry.total_errors++;
-                logWarning("[RS485] Timeout: %s (after 500ms)", current->name);
+                logWarning("[RS485] Timeout: %s (Addr %d, after 500ms)", 
+                           current->name, current->slave_address);
             }
         }
         return false;

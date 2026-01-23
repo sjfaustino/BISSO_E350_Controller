@@ -105,59 +105,40 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", buffer);
     });
     
-    // GET /api/gcode/queue (FIXED: Overflow-safe consolidated chunked streaming)
-    server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+    // GET /api/gcode/queue
+    server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
         gcode_queue_state_t state = gcodeQueueGetState();
         gcode_job_t jobs[10];
         uint16_t count = gcodeQueueGetAll(jobs, 10);
 
-        response->setContentType("application/json");
-        response->sendHeaders();
-
-        char header[256];
-        size_t h_len = snprintf(header, sizeof(header), 
-            "{\"success\":true,\"queue\":{\"total\":%u,\"pending\":%d,\"completed\":%d,\"failed\":%d,\"current_job_id\":%d,\"paused\":%s},\"jobs\":[",
-            state.total_jobs, state.pending_count, state.completed_count, state.failed_count, 
-            state.current_job_id, state.paused ? "true" : "false");
-        response->sendChunk((uint8_t*)header, h_len);
-
-        char chunk[1024];
-        char* p = chunk;
-        size_t rem = sizeof(chunk);
-
-        auto flushIfFull = [&](size_t needed) {
-            if (needed >= rem) {
-                response->sendChunk((uint8_t*)chunk, p - chunk);
-                p = chunk;
-                rem = sizeof(chunk);
-            }
-        };
-
-        for (uint16_t i = 0; i < count; i++) {
-            char job_buf[512];
-            int j_len = snprintf(job_buf, sizeof(job_buf), 
-                "{\"id\":%u,\"command\":\"%s\",\"status\":%d,\"queued_time\":%lu,\"start_time\":%lu,\"end_time\":%lu",
-                jobs[i].id, jobs[i].command, (int)jobs[i].status, 
-                (unsigned long)jobs[i].queued_time_ms, (unsigned long)jobs[i].start_time_ms, (unsigned long)jobs[i].end_time_ms);
-            
-            if (jobs[i].status == JOB_FAILED) {
-                int e_len = snprintf(job_buf + j_len, sizeof(job_buf) - j_len, ",\"error\":\"%s\"", jobs[i].error);
-                j_len += e_len;
-            }
-
-            int s_len = snprintf(job_buf + j_len, sizeof(job_buf) - j_len, "}%s", (i < count - 1) ? "," : "");
-            j_len += s_len;
-            
-            flushIfFull(j_len);
-            memcpy(p, job_buf, j_len);
-            p += j_len; rem -= j_len;
-        }
-        response->sendChunk((uint8_t*)chunk, p - chunk);
-
-        const char* footer = "]}";
-        response->sendChunk((uint8_t*)footer, strlen(footer));
+        JsonDocument doc;
+        doc["success"] = true;
         
-        return response->finishChunking();
+        JsonObject qObj = doc["queue"].to<JsonObject>();
+        qObj["total"] = state.total_jobs;
+        qObj["pending"] = state.pending_count;
+        qObj["completed"] = state.completed_count;
+        qObj["failed"] = state.failed_count;
+        qObj["current_job_id"] = state.current_job_id;
+        qObj["paused"] = state.paused;
+
+        JsonArray jArr = doc["jobs"].to<JsonArray>();
+        for (uint16_t i = 0; i < count; i++) {
+            JsonObject j = jArr.add<JsonObject>();
+            j["id"] = jobs[i].id;
+            j["command"] = (const char*)jobs[i].command;
+            j["status"] = (int)jobs[i].status;
+            j["queued_time"] = (unsigned long)jobs[i].queued_time_ms;
+            j["start_time"] = (unsigned long)jobs[i].start_time_ms;
+            j["end_time"] = (unsigned long)jobs[i].end_time_ms;
+            if (jobs[i].status == JOB_FAILED) {
+                j["error"] = (const char*)jobs[i].error;
+            }
+        }
+
+        String output;
+        serializeJson(doc, output);
+        return response->send(200, "application/json", output.c_str());
     });
     
     // POST /api/gcode/queue/retry
