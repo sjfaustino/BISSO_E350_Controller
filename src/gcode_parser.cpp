@@ -439,8 +439,8 @@ void GCodeParser::handleM114() {
     float a_deg = 0.0f;
 
     // Get calibration data for A axis (from hardware_config.h)
-    if (machineCal.A.pulses_per_degree > 0) {
-        a_deg = a_counts / machineCal.A.pulses_per_degree;
+    if (machineCal.axes[3].pulses_per_degree > 0) {
+        a_deg = a_counts / machineCal.axes[3].pulses_per_degree;
     } else {
         // Fallback to default scale factor if calibration not set
         a_deg = a_counts / 1000.0f;  // MOTION_POSITION_SCALE_FACTOR_DEG

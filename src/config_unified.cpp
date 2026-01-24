@@ -336,6 +336,13 @@ void configSetDefaults() {
     prefs.putFloat(KEY_SPINDL_TOOLBREAK_THR, 5.0f);
   if (!prefs.isKey(KEY_SPINDL_PAUSE_THR))
     prefs.putInt(KEY_SPINDL_PAUSE_THR, 25);
+  // PHASE 5.0: Consolidated Spindle/JXK10 Defaults
+  if (!prefs.isKey(KEY_JXK10_ADDR))
+    prefs.putInt(KEY_JXK10_ADDR, 1);
+  if (!prefs.isKey(KEY_JXK10_ENABLED))
+    prefs.putInt(KEY_JXK10_ENABLED, 1);
+  if (!prefs.isKey(KEY_SPINDLE_THRESHOLD))
+    prefs.putInt(KEY_SPINDLE_THRESHOLD, 30);
 
   // WEB SERVER CREDENTIALS
   if (!prefs.isKey(KEY_WEB_USERNAME))

@@ -25,6 +25,8 @@
         "memory_free": "Memory Free",
         "saw_monitor": "Saw Blade Monitor",
         "sys_trends": "System Trends",
+        "efficiency": "Blade Efficiency",
+        "maint_req": "Maintenance Required",
         "cpu_pct": "CPU %",
         "mem_kb": "Memory (KB/1000)",
         "spindle_amp": "Spindle (A/10)",

@@ -244,10 +244,10 @@ void state_executing_handler(Axis* axis, int32_t pos, int32_t target, bool conse
     // Get scale factor for this axis
     float scale = MOTION_POSITION_SCALE_FACTOR;
     switch (axis->id) {
-        case 0: scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
-        case 1: scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
-        case 2: scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
-        case 3: scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG; break;
+        case 0: scale = (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 1: scale = (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 2: scale = (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 3: scale = (machineCal.axes[3].pulses_per_degree > 0) ? machineCal.axes[3].pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG; break;
     }
     int32_t margin_counts = (int32_t)(margin_mm * scale);
     if (margin_counts < 1) margin_counts = 1; // Minimum 1 count margin
@@ -283,10 +283,10 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
     // Get scale factor for this axis
     float scale = MOTION_POSITION_SCALE_FACTOR;
     switch (axis->id) {
-        case 0: scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
-        case 1: scale = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
-        case 2: scale = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
-        case 3: scale = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG; break;
+        case 0: scale = (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 1: scale = (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 2: scale = (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm : MOTION_POSITION_SCALE_FACTOR; break;
+        case 3: scale = (machineCal.axes[3].pulses_per_degree > 0) ? machineCal.axes[3].pulses_per_degree : MOTION_POSITION_SCALE_FACTOR_DEG; break;
     }
     int32_t margin_counts = (int32_t)(margin_mm * scale);
     if (margin_counts < 1) margin_counts = 1;

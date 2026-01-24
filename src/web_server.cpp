@@ -312,6 +312,12 @@ void WebServerManager::setSpindleSpeed(float speed_m_s) {
     portEXIT_CRITICAL(&statusSpinlock);
 }
 
+void WebServerManager::setSpindleEfficiency(float load_ratio) {
+    portENTER_CRITICAL(&statusSpinlock);
+    current_status.spindle_efficiency = load_ratio;
+    portEXIT_CRITICAL(&statusSpinlock);
+}
+
 void WebServerManager::setAxisQualityScore(uint8_t axis, uint32_t quality_score) {
     if (axis < 3) {
         portENTER_CRITICAL(&statusSpinlock);
@@ -340,6 +346,14 @@ void WebServerManager::setAxisVFDError(uint8_t axis, float error_percent) {
     if (axis < 3) {
         portENTER_CRITICAL(&statusSpinlock);
         current_status.axis_metrics[axis].vfd_error_percent = error_percent;
+        portEXIT_CRITICAL(&statusSpinlock);
+    }
+}
+
+void WebServerManager::setAxisMaintenanceWarning(uint8_t axis, bool warned) {
+    if (axis < 3) {
+        portENTER_CRITICAL(&statusSpinlock);
+        current_status.axis_metrics[axis].maintenance_warning = warned;
         portEXIT_CRITICAL(&statusSpinlock);
     }
 }
@@ -380,10 +394,10 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu%s%s%s%s%s%s%s%s%s%s%s},"
         "\"motion_active\":%s,\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"position\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"a\":%.3f},\"dro_connected\":%s},"
         "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
-        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f},"
-        "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s},"
-        "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s},"
-        "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s}},"
+        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f},"
+        "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
+        "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
+        "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s}},"
         "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},"
         "\"parser\":{\"absolute_mode\":%s,\"feedrate\":%.1f,\"actual_feedrate\":%.1f},"
         "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}",
@@ -410,10 +424,10 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         current_status.dro_connected ? "true" : "false",
         current_status.vfd_current_amps, current_status.vfd_frequency_hz, current_status.vfd_thermal_percent, current_status.vfd_fault_code,
         current_status.vfd_threshold_amps, current_status.vfd_calibration_valid ? "true" : "false", current_status.vfd_connected ? "true" : "false",
-        current_status.spindle_rpm, current_status.spindle_speed_m_s,
-        current_status.axis_metrics[0].quality_score, current_status.axis_metrics[0].jitter_mms, current_status.axis_metrics[0].vfd_error_percent, current_status.axis_metrics[0].quality_score < 10 ? "true" : "false",
-        current_status.axis_metrics[1].quality_score, current_status.axis_metrics[1].jitter_mms, current_status.axis_metrics[1].vfd_error_percent, current_status.axis_metrics[1].quality_score < 10 ? "true" : "false",
-        current_status.axis_metrics[2].quality_score, current_status.axis_metrics[2].jitter_mms, current_status.axis_metrics[2].vfd_error_percent, current_status.axis_metrics[2].quality_score < 10 ? "true" : "false",
+        current_status.spindle_rpm, current_status.spindle_speed_m_s, current_status.spindle_efficiency,
+        current_status.axis_metrics[0].quality_score, current_status.axis_metrics[0].jitter_mms, current_status.axis_metrics[0].vfd_error_percent, current_status.axis_metrics[0].quality_score < 10 ? "true" : "false", current_status.axis_metrics[0].maintenance_warning ? "true" : "false",
+        current_status.axis_metrics[1].quality_score, current_status.axis_metrics[1].jitter_mms, current_status.axis_metrics[1].vfd_error_percent, current_status.axis_metrics[1].quality_score < 10 ? "true" : "false", current_status.axis_metrics[1].maintenance_warning ? "true" : "false",
+        current_status.axis_metrics[2].quality_score, current_status.axis_metrics[2].jitter_mms, current_status.axis_metrics[2].vfd_error_percent, current_status.axis_metrics[2].quality_score < 10 ? "true" : "false", current_status.axis_metrics[2].maintenance_warning ? "true" : "false",
         telemetry.wifi_connected ? "true" : "false",
         telemetry.wifi_signal_strength,
         (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE) ? "true" : "false",

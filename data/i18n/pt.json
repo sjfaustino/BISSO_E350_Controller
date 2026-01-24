@@ -25,6 +25,8 @@
         "memory_free": "Memória Livre",
         "saw_monitor": "Monitor da Serra",
         "sys_trends": "Tendências do Sistema",
+        "efficiency": "Eficiência da Lâmina",
+        "maint_req": "Manutenção Necessária",
         "cpu_pct": "CPU %",
         "mem_kb": "Memória (KB/1000)",
         "spindle_amp": "Spindle (A/10)",

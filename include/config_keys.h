@@ -109,14 +109,10 @@
 #define KEY_I2C_SPEED "i2c_speed"   // I2C bus speed in Hz (100000 or 400000)
 
 // --- SPINDLE CURRENT SENSOR ---
-#define KEY_SPINDLE_ENABLED                                                    \
-  "spindl_en" // Enable/disable spindle current monitoring (0=disable, 1=enable)
-#define KEY_SPINDLE_ADDRESS                                                    \
-  "spindl_addr" // JXK-10 Modbus slave address (1-247, default 1)
-#define KEY_SPINDLE_THRESHOLD                                                  \
-  "spindl_thr" // Overcurrent threshold in integer amperes (30 = 30A)
-#define KEY_SPINDLE_POLL_MS                                                    \
-  "spindl_poll" // Poll interval in milliseconds (default 1000)
+#define KEY_SPINDLE_ENABLED   KEY_JXK10_ENABLED
+#define KEY_SPINDLE_ADDRESS   KEY_JXK10_ADDR
+#define KEY_SPINDLE_THRESHOLD "spindl_thr" // Overcurrent threshold in integer amperes (30 = 30A)
+#define KEY_SPINDLE_POLL_MS   "spindl_poll" // Poll interval in milliseconds (default 1000)
 #define KEY_SPINDLE_RATED_RPM                                                  \
   "spindl_rpm"  // Rated Spindle RPM (default 1400)
 #define KEY_BLADE_DIAMETER_MM                                                  \

@@ -80,6 +80,9 @@ public:
   float velocity_counts_ms;       // Velocity in counts/ms (for prediction)
   bool prediction_stale_logged;   // True if stale prediction warning was logged
 
+  // Distance tracking for maintenance
+  double accumulated_distance_units; // Total units moved since reset
+
 private:
   bool _error_logged;
 };

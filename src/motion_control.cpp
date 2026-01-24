@@ -26,6 +26,7 @@
 #include "spindle_current_monitor.h" // PHASE 5.0: Spindle current monitoring
 #include "system_constants.h"
 #include "task_manager.h"
+#include "web_server.h"
 #include "hardware_config.h"
 #include "system_tuning.h"
 #include <freertos/FreeRTOS.h>
@@ -147,6 +148,9 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
       if (ppm > 0.0f) {
         current_velocity_mm_s =
             ((float)delta_pos / (float)dt_ms) * 1000.0f / ppm;
+        
+        // Accumulate distance in units (mm or degrees)
+        accumulated_distance_units += (double)abs(delta_pos) / (double)ppm;
       } else {
         current_velocity_mm_s = 0.0f;
       }
@@ -216,25 +220,20 @@ void motionInit() {
     axes[i].init(i);
     axes[i].soft_limit_min = -500000;
     axes[i].soft_limit_max = 500000;
+    
+    // Load accumulated distance from NVS
+    char d_key[16];
+    snprintf(d_key, sizeof(d_key), "dist_%d_m", i);
+    axes[i].accumulated_distance_units = (double)configGetFloat(d_key, 0.0f) * 1000.0; // Store as mm internally
   }
   motionPlanner.init();
   MotionStateMachine::init(); // PHASE 5.10: Initialize formal state machine
   autoReportInit(); // PHASE 4.0: Initialize auto-report system
   lcdSleepInit();   // PHASE 4.0: Initialize LCD sleep system
 
-  // PHASE 5.0: Initialize spindle current monitoring (disabled by default)
-  int spindle_enabled =
-      configGetInt(KEY_SPINDLE_ENABLED, 0); // Default: DISABLED
-  if (spindle_enabled) {
-    uint8_t spindle_addr = configGetInt(KEY_SPINDLE_ADDRESS, 1);
-    float spindle_threshold = (float)configGetInt(KEY_SPINDLE_THRESHOLD, 30);
-    if (!spindleMonitorInit(spindle_addr, spindle_threshold)) {
-      logWarning("[MOTION] Failed to initialize spindle current monitor");
-    }
-  } else {
-    spindleMonitorSetEnabled(false);
-    logInfo("[SPINDLE] Monitoring DISABLED (spindl_en=0 or not set)");
-  }
+  // PHASE 5.0: Spindle current monitoring
+  // Initialization moved to main.cpp to prevent double-init and key conflation.
+  // motion_control.cpp now only uses the global spindle monitor instance.
 
   motionSetPLCAxisDirection(255, false, false);
 }
@@ -405,6 +404,58 @@ void motionUpdate() {
 
   taskUnlockMutex(taskGetMotionMutex());
 
+  // PHASE 5.3: Periodic Distance Persistence & Maintenance Checks
+  // Optimization: Only save if distance delta > 100m or 1 hour has passed to preserve Flash health
+  static uint32_t last_dist_save_ms = 0;
+  static double last_saved_dist[3] = {0, 0, 0};
+  static bool first_run = true;
+
+  if (first_run) {
+      for (int i = 0; i < 3; i++) last_saved_dist[i] = axes[i].accumulated_distance_units;
+      first_run = false;
+  }
+
+  uint32_t now = millis();
+  bool should_save = (now - last_dist_save_ms > 3600000); // Hourly save fallback
+  
+  if (!should_save) {
+      for (int i = 0; i < 3; i++) {
+          if (abs(axes[i].accumulated_distance_units - last_saved_dist[i]) > 100000.0) { // 100,000mm = 100m
+              should_save = true;
+              break;
+          }
+      }
+  }
+
+  if (should_save) {
+      last_dist_save_ms = now;
+      bool changed = false;
+      for (int i = 0; i < 3; i++) {
+          float dist_m = (float)(axes[i].accumulated_distance_units / 1000.0);
+          
+          // Only update config if there's a practical change
+          if (abs(axes[i].accumulated_distance_units - last_saved_dist[i]) > 1000.0) { // 1m resolution for NVS
+              char d_key[16];
+              snprintf(d_key, sizeof(d_key), "dist_%d_m", i);
+              configSetFloat(d_key, dist_m);
+              last_saved_dist[i] = axes[i].accumulated_distance_units;
+              changed = true;
+          }
+
+          // Maintenance Check: Default 50km (50000m)
+          float maint_threshold = 50000.0f; 
+          bool warned = (dist_m > maint_threshold);
+          webServer.setAxisMaintenanceWarning(i, warned);
+          
+          if (warned) {
+              logWarning("[MOTION] Axis %d maintenance threshold exceeded (%.1f km)", i, dist_m / 1000.0f);
+          }
+      }
+      if (changed) {
+          configUnifiedSave();
+      }
+  }
+
   // PHASE 4.0: Check if auto-report interval elapsed (non-blocking)
   autoReportUpdate();
 
@@ -470,23 +521,17 @@ float motionGetPositionMM(uint8_t axis) {
   portEXIT_CRITICAL(&motionSpinlock);
 
   float scale = 1.0f;
-
-  if (axis == 0)
-    scale = (machineCal.X.pulses_per_mm > 0)
-                ? machineCal.X.pulses_per_mm
-                : (float)MOTION_POSITION_SCALE_FACTOR;
-  else if (axis == 1)
-    scale = (machineCal.Y.pulses_per_mm > 0)
-                ? machineCal.Y.pulses_per_mm
-                : (float)MOTION_POSITION_SCALE_FACTOR;
-  else if (axis == 2)
-    scale = (machineCal.Z.pulses_per_mm > 0)
-                ? machineCal.Z.pulses_per_mm
-                : (float)MOTION_POSITION_SCALE_FACTOR;
-  else if (axis == 3)
-    scale = (machineCal.A.pulses_per_degree > 0)
-                ? machineCal.A.pulses_per_degree
-                : (float)MOTION_POSITION_SCALE_FACTOR_DEG;
+  if (axis < 4) {
+      if (axis == 3) {
+          scale = (machineCal.axes[axis].pulses_per_degree > 0)
+                      ? machineCal.axes[axis].pulses_per_degree
+                      : (float)MOTION_POSITION_SCALE_FACTOR_DEG;
+      } else {
+          scale = (machineCal.axes[axis].pulses_per_mm > 0)
+                      ? machineCal.axes[axis].pulses_per_mm
+                      : (float)MOTION_POSITION_SCALE_FACTOR;
+      }
+  }
 
   return (float)counts / scale;
 }
@@ -672,14 +717,14 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
 
   float targets[] = {x, y, z, a};
   float scales[] = {
-      (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm
-                                       : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm
-                                       : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm
-                                       : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.A.pulses_per_degree > 0)
-          ? machineCal.A.pulses_per_degree
+      (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm
+                                             : (float)MOTION_POSITION_SCALE_FACTOR,
+      (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm
+                                             : (float)MOTION_POSITION_SCALE_FACTOR,
+      (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm
+                                             : (float)MOTION_POSITION_SCALE_FACTOR,
+      (machineCal.axes[3].pulses_per_degree > 0)
+          ? machineCal.axes[3].pulses_per_degree
           : (float)MOTION_POSITION_SCALE_FACTOR_DEG};
 
   uint8_t target_axis = 255;
@@ -767,11 +812,7 @@ speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed_mm_s) {
     // Convert speed_mm_s to mm_min for comparison with calibration
     float speed_mm_min = speed_mm_s * 60.0f;
 
-    AxisCalibration* cal = nullptr;
-    if (axis == 0) cal = &machineCal.X;
-    else if (axis == 1) cal = &machineCal.Y;
-    else if (axis == 2) cal = &machineCal.Z;
-    else cal = &machineCal.A;
+    AxisCalibration* cal = &machineCal.axes[axis];
 
     // Find the profile whose calibrated speed is closest to the requested speed
     float d1 = fabsf(speed_mm_min - cal->speed_slow_mm_min);
@@ -788,11 +829,7 @@ float motionGetCalibratedFeedRate(uint8_t axis, float speed_mm_s) {
     
     if (axis >= MOTION_AXES) return 0.0f;
     
-    AxisCalibration* cal = nullptr;
-    if (axis == 0) cal = &machineCal.X;
-    else if (axis == 1) cal = &machineCal.Y;
-    else if (axis == 2) cal = &machineCal.Z;
-    else cal = &machineCal.A;
+    AxisCalibration* cal = &machineCal.axes[axis];
 
     if (prof == SPEED_PROFILE_1) return cal->speed_slow_mm_min;
     if (prof == SPEED_PROFILE_2) return cal->speed_med_mm_min;
@@ -842,14 +879,14 @@ bool motionSetPosition(float x, float y, float z, float a) {
   // Convert mm to counts for each axis
   float positions[] = {x, y, z, a};
   float scales[] = {
-      (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm
-                                       : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm
-                                       : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm
-                                       : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.A.pulses_per_degree > 0)
-          ? machineCal.A.pulses_per_degree
+      (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm
+                                             : (float)MOTION_POSITION_SCALE_FACTOR,
+      (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm
+                                             : (float)MOTION_POSITION_SCALE_FACTOR,
+      (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm
+                                             : (float)MOTION_POSITION_SCALE_FACTOR,
+      (machineCal.axes[3].pulses_per_degree > 0)
+          ? machineCal.axes[3].pulses_per_degree
           : (float)MOTION_POSITION_SCALE_FACTOR_DEG};
 
   // Set positions for all axes

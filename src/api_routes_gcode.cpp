@@ -69,9 +69,9 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
             if (fp) f = atof(fp + 1);
             
             // Use calibration speeds (med speed as default representative)
-            float max_axis_speed = machineCal.X.speed_med_mm_min;
-            if (y > x && y > z) max_axis_speed = machineCal.Y.speed_med_mm_min;
-            if (z > x && z > y) max_axis_speed = machineCal.Z.speed_med_mm_min;
+            float max_axis_speed = machineCal.axes[0].speed_med_mm_min;
+            if (y > x && y > z) max_axis_speed = machineCal.axes[1].speed_med_mm_min;
+            if (z > x && z > y) max_axis_speed = machineCal.axes[2].speed_med_mm_min;
             
             // Use minimum of feedrate and calibrated speed
             float effective_speed = (f > 0 && f < max_axis_speed) ? f : max_axis_speed;

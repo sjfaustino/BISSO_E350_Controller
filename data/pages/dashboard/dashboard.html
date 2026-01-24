@@ -138,6 +138,14 @@
                     <span data-i18n="dashboard.rpm_label">RPM</span>: <span id="spindle-rpm">--</span> |
                     <span data-i18n="dashboard.speed_label">Speed</span>: <span id="spindle-speed">-- m/s</span>
                 </div>
+                <!-- Efficiency Gauge (Load Meter) -->
+                <div style="margin-top: 15px;">
+                    <div class="card-label" data-i18n="dashboard.efficiency">Blade Efficiency</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="efficiency-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="card-subtext" id="efficiency-value">--</div>
+                </div>
             </div>
         </div>
     </div>
@@ -180,6 +188,7 @@
         <div class="card">
             <div class="card-header">
                 <h2 id="header-axis-x" data-i18n="dashboard.axis_x_qual">X Axis Quality</h2>
+                <div class="maint-icon hidden" id="axis-x-maint" title="Maintenance Required">🔧</div>
                 <button class="card-toggle" data-toggle="axis-x">−</button>
             </div>
             <div class="card-content">
@@ -215,6 +224,7 @@
         <div class="card">
             <div class="card-header">
                 <h2 id="header-axis-y" data-i18n="dashboard.axis_y_qual">Y Axis Quality</h2>
+                <div class="maint-icon hidden" id="axis-y-maint" title="Maintenance Required">🔧</div>
                 <button class="card-toggle" data-toggle="axis-y">−</button>
             </div>
             <div class="card-content">
@@ -250,6 +260,7 @@
         <div class="card">
             <div class="card-header">
                 <h2 id="header-axis-z" data-i18n="dashboard.axis_z_qual">Z Axis Quality</h2>
+                <div class="maint-icon hidden" id="axis-z-maint" title="Maintenance Required">🔧</div>
                 <button class="card-toggle" data-toggle="axis-z">−</button>
             </div>
             <div class="card-content">

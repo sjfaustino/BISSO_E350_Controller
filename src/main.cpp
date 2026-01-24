@@ -30,6 +30,7 @@
 #include "job_recovery.h"  // Power loss recovery
 #include "operator_alerts.h"  // Buzzer and tower light
 #include "spindle_current_monitor.h" // PHASE 5.0
+#include "job_manager.h" // G-Code Job Manager
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -110,10 +111,13 @@ bool init_recovery_wrapper() { recoveryInit(); return true; }
 bool init_alerts_wrapper() { buzzerInit(); statusLightInit(); return true; }
 // PHASE 5.0: Initialize Spindle Monitor with default JXK-10 address (1) and threshold (30A)
 bool init_spindle_wrapper() { 
-    uint8_t addr = (uint8_t)configGetInt(KEY_JXK10_ADDR, 1);
-    float thr = (float)configGetInt(KEY_SPINDL_PAUSE_THR, 30);
+    uint8_t addr = (uint8_t)configGetInt(KEY_JXK10_ADDR, 1); // Consolidate on single key
+    // Fix: Use dedicated threshold key for shutdown, NOT pause threshold
+    float thr = (float)configGetInt(KEY_SPINDLE_THRESHOLD, 30);
     return spindleMonitorInit(addr, thr); 
 }
+
+bool init_job_wrapper() { jobManager.init(); return true; }
 
 // YH-TC05 Tachometer
 #include "yhtc05_modbus.h"
@@ -181,7 +185,9 @@ void setup() {
   BOOT_INIT("Recovery", init_recovery_wrapper, (boot_status_code_t)21);
   BOOT_INIT("Alerts", init_alerts_wrapper, (boot_status_code_t)22);
   // PHASE 5.0: Spindle Current Monitor
+  // PHASE 5.0: Spindle Current Monitor
   BOOT_INIT("Spindle Mon", init_spindle_wrapper, (boot_status_code_t)23);
+  BOOT_INIT("Job Manager", init_job_wrapper, (boot_status_code_t)24);
 
 
   logInfo("[BOOT] Validating system health...");
@@ -229,6 +235,7 @@ volatile uint32_t accumulated_loop_count = 0;
 
 void loop() {
   networkManager.update();
+  jobManager.update();
   accumulated_loop_count++;
   delay(10); 
 }

@@ -17,10 +17,7 @@ MachineCalibration machineCal;
 
 // Helper to get a pointer to the AxisCalibration data for a given index (0=X, 1=Y, 2=Z, 3=A)
 static AxisCalibration* getAxisCalPtr(uint8_t axis) {
-    if (axis == 0) return &machineCal.X;
-    if (axis == 1) return &machineCal.Y;
-    if (axis == 2) return &machineCal.Z;
-    if (axis == 3) return &machineCal.A;
+    if (axis < 4) return &machineCal.axes[axis];
     return NULL;
 }
 

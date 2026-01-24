@@ -239,13 +239,13 @@ void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
   const float def_ang = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
 
   float sx =
-      (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : def_lin;
+      (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm : def_lin;
   float sy =
-      (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : def_lin;
+      (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm : def_lin;
   float sz =
-      (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : def_lin;
-  float sa = (machineCal.A.pulses_per_degree > 0)
-                 ? machineCal.A.pulses_per_degree
+      (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm : def_lin;
+  float sa = (machineCal.axes[3].pulses_per_degree > 0)
+                 ? machineCal.axes[3].pulses_per_degree
                  : def_ang;
 
   // --- SENSOR CONNECTIVITY CHECK ---

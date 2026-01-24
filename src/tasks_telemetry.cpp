@@ -121,6 +121,24 @@ void taskTelemetryFunction(void *parameter) {
     
     webServer.setVFDConnected(vfd_alive);
 
+    // 3.5. Operator Improvements: Blade Efficiency & Surface Speed
+    // Calculate "Load Metric" (Efficiency): Spindle Amps / (Feedrate + epsilon)
+    // feedrate is currently the override (0.0 to 2.0). If we want actual mm/s:
+    float actual_feedrate_mm_s = 0.0f;
+    uint8_t active_axis = motionGetActiveAxis();
+    if (active_axis < 3) {
+        actual_feedrate_mm_s = abs(motionGetVelocity(active_axis));
+    }
+    
+    float efficiency = 0.0f;
+    if (actual_feedrate_mm_s > 0.1f && vfd_current > 1.0f) {
+        efficiency = vfd_current / actual_feedrate_mm_s;
+    }
+    
+    // Broadcast efficiency and raw surface speed to Web UI
+    // Note: setSpindleSpeed already calculates m/s at line 107
+    webServer.setSpindleEfficiency(efficiency);
+
     // Check DRO connection health using staleness (timeout)
     // wj66IsStale(0) checks if last successful read was > 500ms ago
     bool dro_alive = !wj66IsStale(0);
@@ -130,14 +148,14 @@ void taskTelemetryFunction(void *parameter) {
     // VFD) Update axis metrics for active axis only BUGFIX: Use motion
     // controller's active axis instead of velocity heuristic
     // motionGetActiveAxis() returns 0-2 for active axis, 255 if none
-    uint8_t active_axis = motionGetActiveAxis();
+    active_axis = motionGetActiveAxis();
 
     // Get current axis positions (velocity calculation would require motion
     // state) For now, use zero velocity as motion timing is handled by motion
     // controller
-    float x_vel = 0.0f;
-    float y_vel = 0.0f;
-    float z_vel = 0.0f;
+    float x_vel = motionGetVelocity(0);
+    float y_vel = motionGetVelocity(1);
+    float z_vel = motionGetVelocity(2);
     float feedrate =
         motionGetFeedOverride(); // Use feed override as proxy for feedrate
 

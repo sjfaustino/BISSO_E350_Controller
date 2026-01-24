@@ -159,6 +159,26 @@ spinlock reset     # Reset all counters
 
 ---
 
+### `axis` - Per-Axis Motion Quality
+**Description:** Real-time analysis of the motion system health. Detects mechanical jitter, encoder stalls, and communication errors.
+
+**Syntax:**
+```
+axis status      # Summary dash for all axes
+axis <letter>    # Deep dive for X, Y, Z, or A
+```
+
+**Output Example (`axis X`):**
+```text
+[AXIS X] DIAGNOSTICS:
+  Quality Score:  98.5%
+  Jitter Amp:     1.2 counts (0.012mm)
+  Comm Errors:    2
+  State:          STABLE
+```
+
+---
+
 ### `debug` - System Info Dump
 
 **Description:** Comprehensive dump of internal state for factory debugging.
@@ -1820,20 +1840,38 @@ echo on save
 
 ### `config` - Configuration Management
 
-**Description:** View and modify NVS configuration parameters.
+**Description:** View, modify, and backup NVS configuration parameters. Handles both internal logic and reactive hardware settings.
 
 **Syntax:**
 ```
-config                      # Show help
-config list                 # List all config keys
-config get <key>            # Get value
-config set <key> <value>    # Set value
-config save                 # Save to NVS
-config load                 # Reload from NVS
-config reset                # Reset to defaults (DANGEROUS)
-config export               # Export to JSON
-config import <json>        # Import from JSON
+config list                 # List all available keys
+config get <key>            # Read a specific value
+config set <key> <value>    # Change a setting
+config save                 # Persist all pending changes to Flash
+config export               # Dump current config as reusable JSON
+config import               # Enter interactive JSON import mode
+config reset                # Wipe everything (FACTORY RESET)
 ```
+
+**JSON Bulk Operations (Fleet Management):**
+The `export` and `import` commands allow you to copy a specific machine "personality" to another controller.
+
+**Example Export:**
+```json
+{
+  "config": {
+    "ppm_0": 100.5,
+    "speed_cal_0": 1000,
+    "limit_max_0": 500000
+  }
+}
+```
+
+**Using Config Import:**
+1. Type `config import`
+2. Paste the JSON block into the terminal.
+3. Press **Enter twice** to confirm.
+4. Type `config save` to make it permanent.
 
 **Example - Get Value:**
 ```
@@ -1982,16 +2020,42 @@ calibrate ppmm <axis> reset           # Reset to defaults
 
 ---
 
-### `vfd diagnostics` - VFD Health Diagnostics
-
-**Description:** Altivar31 VFD telemetry and diagnostics.
+### `vfd` - VFD System Management
+**Description:** Comprehensive control and monitoring of the Schneider Altivar 31 VFD.
 
 **Syntax:**
 ```
-vfd diagnostics                 # Show help
-vfd diagnostics status          # Show VFD status
-vfd diagnostics faults          # Show fault history
+vfd diagnostics status    # Real-time telemetry snap
+vfd diagnostics thermal   # Watch heat trends
+vfd config margin 20      # Set stall sensitivity (%)
+vfd config timeout 2000   # Set stall delay (ms)
+vfd config enable on      # Toggle active safety
 ```
+
+**Parameters:**
+| Parameter | Range | Default | Description |
+|:---|:---|:---|:---|
+| margin | 5-100% | 20% | Sensitivity for stall trigger |
+| timeout| 100-60000 | 2000ms | Delay before alarm |
+
+---
+
+### `calibrate vfd current` - Load Baseline Setup
+**Description:** Guided 3-phase workflow to teach the system what "normal" cutting looks like.
+
+**Syntax:**
+```
+calibrate vfd current start     # Begin Phase 1 (Idle)
+calibrate vfd current confirm   # Accept measurement & Move to next
+calibrate vfd current finish    # Calc thresholds & Save
+calibrate vfd current abort     # Exit safely
+```
+
+**Workflow Summary:**
+1. **Phase 1**: Run blade in AIR (no stone).
+2. **Phase 2**: Perform standard stone cut.
+3. **Phase 3**: (Optional) Heavy-load cut.
+4. **Calculated**: Stall threshold is set to `(Standard_Avg * Margin)`.
 
 ---
 
@@ -2171,7 +2235,35 @@ These commands are processed immediately, even during active motion.
 │ config save        - Persist changes                            │
 ├──────────────────────────────────────────────────────────────────┤
 │ EMERGENCY: estop on    │    REBOOT: reboot                      │
-└──────────────────────────────────────────────────────────────────┘
+### `log` - Event & Boot Log Viewer
+**Description:** Review system events and boot-time messages for troubleshooting connectivity or crash loops.
+
+**Syntax:**
+```
+log boot      # Dump first 512 bytes of boot sequence
+log enable on # Toggle log capture to Flash
+```
+
+---
+
+### `ls`, `df`, `cat` - Filesystem Management
+**Description:** Direct access to the LittleFS internal storage (where Web UI and logs reside).
+
+**Syntax:**
+```
+ls            # List files in root directory
+df            # Show disk usage (Flash capacity)
+cat <file>    # Print content of a specific file
+```
+
+---
+
+### `auth` & `web_setpass` - Security
+**Syntax:**
+```
+auth status           # Check session health
+web_setpass <secret>  # Update Dashboard password (requires save)
+```
 ```
 
 

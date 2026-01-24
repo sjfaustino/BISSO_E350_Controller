@@ -90,8 +90,8 @@ void autoReportUpdate() {
         float a_deg = 0.0f;
 
         extern MachineCalibration machineCal;
-        if (machineCal.A.pulses_per_degree > 0) {
-            a_deg = a_counts / machineCal.A.pulses_per_degree;
+        if (machineCal.axes[3].pulses_per_degree > 0) {
+            a_deg = a_counts / machineCal.axes[3].pulses_per_degree;
         } else {
             a_deg = a_counts / 1000.0f;  // MOTION_POSITION_SCALE_FACTOR_DEG
         }

@@ -45,12 +45,14 @@ public:
     // Spindle Metrics (RPM, Surface Speed)
     void setSpindleRPM(float rpm);
     void setSpindleSpeed(float speed_m_s);
+    void setSpindleEfficiency(float load_ratio);
 
     // Axis Metrics (PHASE 5.6: Per-axis motion validation)
     void setAxisQualityScore(uint8_t axis, uint32_t quality_score);
     void setAxisJitterAmplitude(uint8_t axis, float jitter_mms);
     void setAxisStalled(uint8_t axis, bool is_stalled);
     void setAxisVFDError(uint8_t axis, float error_percent);
+    void setAxisMaintenanceWarning(uint8_t axis, bool warned);
 
     // Push state to all connected WebSocket clients
     void broadcastState();
@@ -85,6 +87,7 @@ private:
         bool dro_connected;
         float spindle_rpm;
         float spindle_speed_m_s;
+        float spindle_efficiency;
 
         // Axis metrics (PHASE 5.6) - per-axis
         struct {
@@ -92,6 +95,7 @@ private:
             float jitter_mms;
             bool stalled;
             float vfd_error_percent;
+            bool maintenance_warning;
         } axis_metrics[3];  // 0=X, 1=Y, 2=Z
     } current_status;
 

@@ -175,6 +175,16 @@ window.DashboardModule = window.DashboardModule || {
                 h.style.color = "var(--color-critical)";
             }
         }
+
+        // Maintenance Status Icon
+        const maintIcon = document.getElementById(`${s}-maint`);
+        if (maintIcon) {
+            if (i && e && e.maint) {
+                maintIcon.classList.remove("hidden");
+            } else {
+                maintIcon.classList.add("hidden");
+            }
+        }
     },
     updateDRO(t) {
         const e = AppState.data.motion?.dro_connected ?? !1;

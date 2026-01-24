@@ -71,7 +71,7 @@ bool encoderCalibrationFinalize(uint8_t axis) {
   calib_data[axis].is_valid = true;
   calib_data[axis].last_calibrated = millis();
   
-  float target_scale = (axis == 3) ? machineCal.A.pulses_per_degree : machineCal.X.pulses_per_mm;
+  float target_scale = (axis == 3) ? machineCal.axes[3].pulses_per_degree : machineCal.axes[axis].pulses_per_mm;
   if (target_scale > 0.0f) {
       double error_percent = fabs(scale_factor - target_scale) / target_scale;
       if (error_percent > ENCODER_PPM_TOLERANCE) { 
@@ -132,10 +132,8 @@ void encoderCalibrationSetPPM(uint8_t axis, double ppm) {
     calib_data[axis].is_valid = true;
     calib_data[axis].last_calibrated = millis();
     
-    if (axis == 0) machineCal.X.pulses_per_mm = (float)ppm;
-    else if (axis == 1) machineCal.Y.pulses_per_mm = (float)ppm;
-    else if (axis == 2) machineCal.Z.pulses_per_mm = (float)ppm;
-    else if (axis == 3) machineCal.A.pulses_per_degree = (float)ppm;
+    if (axis == 3) machineCal.axes[3].pulses_per_degree = (float)ppm;
+    else machineCal.axes[axis].pulses_per_mm = (float)ppm;
     
     logInfo("[CALIB] Axis %d scale set to %.3f. Saving...", axis, ppm);
     saveAllCalibration();

@@ -128,10 +128,7 @@ struct AxisCalibration {
 };
 
 struct MachineCalibration {
-    AxisCalibration X;
-    AxisCalibration Y;
-    AxisCalibration Z;
-    AxisCalibration A;
+    AxisCalibration axes[4]; // 0=X, 1=Y, 2=Z, 3=A
 };
 
 extern MachineCalibration machineCal;

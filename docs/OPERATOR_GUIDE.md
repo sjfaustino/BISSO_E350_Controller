@@ -1629,6 +1629,37 @@ Complete the [Pre-Startup Checklist](#pre-startup-checklist) every morning.
 
 **Time Required**: 4-6 hours, **requires qualified technician**
 
+### Automated Maintenance Tracking (v3.2)
+
+The system now automatically tracks the accumulated travel distance for each axis to ensure timely greasing and mechanical inspection.
+
+#### How it Works:
+1. **Distance Accumulation**: Every millimeter of movement is counted.
+2. **Flash Protection (SafeSave)**: To preserve the longevity of the controller's internal memory (NVS), distance is only saved to permanent storage after **100 meters of movement** or **1 hour of idle time**. This reduces memory wear by over 90%.
+3. **Thresholds**: The default maintenance interval is **50 km (50,000 meters)**.
+
+#### Visual Indicators:
+When an axis exceeds its maintenance threshold:
+- A **Pulsing Wrench Icon (🔧)** will appear on the specific axis card in the Web Dashboard.
+- A warning will be logged to the system event log.
+
+```text
+    AXIS STATUS CARD (Dashboard)
+    +------------------------------------------+
+    | [ X Axis Quality ]          [🔧 SERVICE ]|
+    |                                          |
+    |  Score: 98%   [||||||||||||||||||--]     |
+    |  Jitter: 0.002 mm/s                      |
+    +------------------------------------------+
+```
+
+#### Action Required:
+1. Perform the required lubrication or inspection for that axis.
+2. Clear the distance counter using the CLI: `config set dist_0_m 0` (for X axis).
+3. The wrench icon will disappear immediately.
+
+---
+
 ### Maintenance Record Template
 
 Use this template to track maintenance:
@@ -2011,7 +2042,63 @@ Update Age:      20 ms          <-- Age of the last hardware update
 
 ---
 
-## 14. Contact Information for Support
+## 14. New Operator Features (v3.2)
+
+Version 3.2 introduces advanced stone cutting analytics and hardware safety optimizations.
+
+### 14.1. Blade Efficiency Monitoring (Load Meter)
+
+Operators can now monitor the "Efficiency" of the cutting process. This metric compares how much electrical current the Spindle VFD is drawing relative to how fast the axis is moving (Feedrate).
+
+#### The Efficiency Logic:
+```text
+Efficiency = Spindle_Current (Amps) / Feedrate (mm/s)
+```
+- **Low Values (Optimal)**: The blade is sharp and cutting through the material with ease.
+- **High Values (Warning)**: The blade is struggling. This often indicates a dull blade, material that is too hard for the current feedrate, or insufficient coolant flow.
+
+#### Web UI Gauge:
+The "Blade Efficiency" gauge color-codes the load for quick visual status:
+- **Green (Optimal)**: Load < 60%
+- **Yellow (Warning)**: Load 60% - 80% (Consider slowing down)
+- **Red (Critical)**: Load > 80% (Risk of tool breakage or motor stall)
+
+```text
+    SAW BLADE MONITOR
+    +------------------------------------------+
+    | [ Spindle Status ]              (o) RUN  |
+    |                                          |
+    |  RPM: 2800 | Speed: 44.5 m/s             |
+    |                                          |
+    |  Blade Efficiency (Load Meter)           |
+    |  [###########---------]  1.42            |
+    |  (OPTIMAL)                               |
+    +------------------------------------------+
+```
+
+---
+
+### 14.2. Surface Speed Guide
+
+Stone materials require specific "Surface Speeds" (the speed at which the blade teeth hit the stone) for optimal finish and tool life. The system now calculates this in real-time based on your VFD RPM.
+
+#### Recommended Surface Speeds (m/s):
+| Stone Type | Recommended Speed (m/s) |
+|:---|:---|
+| **Soft Marble** | 25 - 35 m/s |
+| **Standard Granite** | 35 - 45 m/s |
+| **Hard Quartz/Quartzite** | 45 - 55 m/s |
+
+#### Troubleshooting Efficiency/Speed Errors:
+| Error Symptom | Possible Cause | Solution |
+|:---|:---|:---|
+| **Efficiency shows "--"** | Spindle VFD disconnected | Check Modbus cables to Spindle Sensor. |
+| **Efficiency is very high** | Feedrate is near zero | Efficiency is only valid during active cutting. |
+| **Blade "screaming"** | Surface speed too high | Reduce VFD RPM until speed is in the recommended range. |
+
+---
+
+## 15. Contact Information for Support
 
 **For Technical Issues**:
 - Serial Console Error Codes → Note exact error message and system state

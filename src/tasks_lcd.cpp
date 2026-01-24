@@ -243,16 +243,16 @@ void taskLcdFunction(void *parameter) {
         const float def_ang = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
 
         if (active_axis == 0) { // X axis
-          float sx = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : def_lin;
+          float sx = (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm : def_lin;
           target_mm = target_counts / sx;
         } else if (active_axis == 1) { // Y axis
-          float sy = (machineCal.Y.pulses_per_mm > 0) ? machineCal.Y.pulses_per_mm : def_lin;
+          float sy = (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm : def_lin;
           target_mm = target_counts / sy;
         } else if (active_axis == 2) { // Z axis
-          float sz = (machineCal.Z.pulses_per_mm > 0) ? machineCal.Z.pulses_per_mm : def_lin;
+          float sz = (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm : def_lin;
           target_mm = target_counts / sz;
         } else if (active_axis == 3) { // A axis
-          float sa = (machineCal.A.pulses_per_degree > 0) ? machineCal.A.pulses_per_degree : def_ang;
+          float sa = (machineCal.axes[3].pulses_per_degree > 0) ? machineCal.axes[3].pulses_per_degree : def_ang;
           target_mm = target_counts / sa;
           unit = "°";
           current_mm = motionGetPosition(3) / sa;

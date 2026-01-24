@@ -24,11 +24,8 @@ typedef struct {
 } calibration_run_t;
 
 // Helper to get the correct axis pointer
-AxisCalibration* getAxisCalPtrForCli(uint8_t axis) {
-    if (axis == 0) return &machineCal.X;
-    if (axis == 1) return &machineCal.Y;
-    if (axis == 2) return &machineCal.Z;
-    if (axis == 3) return &machineCal.A;
+static AxisCalibration* getAxisCalPtrForCli(uint8_t axis) {
+    if (axis < 4) return &machineCal.axes[axis];
     return NULL;
 }
 

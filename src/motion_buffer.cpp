@@ -55,17 +55,17 @@ bool MotionBuffer::push_unsafe(float x, float y, float z, float a,
 
   // CRITICAL FIX: Convert from MM to encoder counts to prevent float drift
   // All motion planning uses integer math; only convert to MM for display
-  float x_scale = (machineCal.X.pulses_per_mm > 0)
-                      ? machineCal.X.pulses_per_mm
+  float x_scale = (machineCal.axes[0].pulses_per_mm > 0)
+                      ? machineCal.axes[0].pulses_per_mm
                       : MOTION_POSITION_SCALE_FACTOR;
-  float y_scale = (machineCal.Y.pulses_per_mm > 0)
-                      ? machineCal.Y.pulses_per_mm
+  float y_scale = (machineCal.axes[1].pulses_per_mm > 0)
+                      ? machineCal.axes[1].pulses_per_mm
                       : MOTION_POSITION_SCALE_FACTOR;
-  float z_scale = (machineCal.Z.pulses_per_mm > 0)
-                      ? machineCal.Z.pulses_per_mm
+  float z_scale = (machineCal.axes[2].pulses_per_mm > 0)
+                      ? machineCal.axes[2].pulses_per_mm
                       : MOTION_POSITION_SCALE_FACTOR;
-  float a_scale = (machineCal.A.pulses_per_degree > 0)
-                      ? machineCal.A.pulses_per_degree
+  float a_scale = (machineCal.axes[3].pulses_per_degree > 0)
+                      ? machineCal.axes[3].pulses_per_degree
                       : MOTION_POSITION_SCALE_FACTOR_DEG;
 
   buffer[head].x_counts = (int32_t)(x * x_scale);

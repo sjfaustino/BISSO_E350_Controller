@@ -72,17 +72,17 @@ bool MotionPlanner::checkBufferDrain(uint8_t &active_axis) {
     // CRITICAL FIX: Convert counts back to MM only when calling motion control
     // Motion control API still uses MM, but buffer stores counts to prevent
     // drift
-    float x_scale = (machineCal.X.pulses_per_mm > 0)
-                        ? machineCal.X.pulses_per_mm
+    float x_scale = (machineCal.axes[0].pulses_per_mm > 0)
+                        ? machineCal.axes[0].pulses_per_mm
                         : MOTION_POSITION_SCALE_FACTOR;
-    float y_scale = (machineCal.Y.pulses_per_mm > 0)
-                        ? machineCal.Y.pulses_per_mm
+    float y_scale = (machineCal.axes[1].pulses_per_mm > 0)
+                        ? machineCal.axes[1].pulses_per_mm
                         : MOTION_POSITION_SCALE_FACTOR;
-    float z_scale = (machineCal.Z.pulses_per_mm > 0)
-                        ? machineCal.Z.pulses_per_mm
+    float z_scale = (machineCal.axes[2].pulses_per_mm > 0)
+                        ? machineCal.axes[2].pulses_per_mm
                         : MOTION_POSITION_SCALE_FACTOR;
-    float a_scale = (machineCal.A.pulses_per_degree > 0)
-                        ? machineCal.A.pulses_per_degree
+    float a_scale = (machineCal.axes[3].pulses_per_degree > 0)
+                        ? machineCal.axes[3].pulses_per_degree
                         : MOTION_POSITION_SCALE_FACTOR_DEG;
 
     float x_mm = (float)cmd.x_counts / x_scale;
@@ -154,7 +154,7 @@ void MotionPlanner::applyDynamicApproach(Axis *axis, uint8_t active_axis,
   int32_t approach_med_mm = configGetInt(KEY_X_APPROACH_MED, 20);   // Medium approach - default 20mm
 
   // Use X-axis calibration for scaling
-  float scale = (machineCal.X.pulses_per_mm > 0) ? machineCal.X.pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
+  float scale = (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm : MOTION_POSITION_SCALE_FACTOR;
   
   // Convert mm thresholds to encoder counts
   int32_t threshold_slow_counts = (int32_t)(approach_slow_mm * scale);
