@@ -293,10 +293,12 @@ void GCodeParser::handleG10(const char* line) {
     };
 
     float val;
-    if(parseCode(line, 'X', val)) wcs_offsets[sys_idx][0] = mPos[0] - val;
-    if(parseCode(line, 'Y', val)) wcs_offsets[sys_idx][1] = mPos[1] - val;
-    if(parseCode(line, 'Z', val)) wcs_offsets[sys_idx][2] = mPos[2] - val;
-    if(parseCode(line, 'A', val)) wcs_offsets[sys_idx][3] = mPos[3] - val;
+    const char axis_chars[] = "XYZA";
+    for (int a = 0; a < 4; a++) {
+        if (parseCode(line, axis_chars[a], val)) {
+            wcs_offsets[sys_idx][a] = mPos[a] - val;
+        }
+    }
 
     saveWCS(sys_idx);
     logInfo("[GCODE] Updated G%d Offsets", 54 + sys_idx);
@@ -428,33 +430,19 @@ void GCodeParser::handleM117(const char* line) {
 void GCodeParser::handleM114() {
     // M114 Get Position (standard gcode format)
     // Reports: X:<value> Y:<value> Z:<value> A:<value>
-    // Units: mm for X/Y/Z, degrees for A (rotary axis)
-
-    float x_mm = motionGetPositionMM(0);
-    float y_mm = motionGetPositionMM(1);
-    float z_mm = motionGetPositionMM(2);
-
-    // For A axis (rotary), convert counts to degrees using calibration
-    int32_t a_counts = motionGetPosition(3);
-    float a_deg = 0.0f;
-
-    // Get calibration data for A axis (from hardware_config.h)
-    if (machineCal.axes[3].pulses_per_degree > 0) {
-        a_deg = a_counts / machineCal.axes[3].pulses_per_degree;
-    } else {
-        // Fallback to default scale factor if calibration not set
-        a_deg = a_counts / 1000.0f;  // MOTION_POSITION_SCALE_FACTOR_DEG
+    
+    char response[128];
+    float pos[4];
+    for (int i = 0; i < 4; i++) {
+        pos[i] = motionGetPositionMM(i);
     }
 
-    // Report current position in standard Grbl format
-    char response[80];
     snprintf(response, sizeof(response),
-             "[POS:X:%.1f Y:%.1f Z:%.1f A:%.1f]",
-             x_mm, y_mm, z_mm, a_deg);
+             "[POS:X:%.3f Y:%.3f Z:%.3f A:%.3f]",
+             pos[0], pos[1], pos[2], pos[3]);
 
     logPrintln(response);
-    logInfo("[GCODE] M114 Position: X:%.1f Y:%.1f Z:%.1f A:%.1f",
-            x_mm, y_mm, z_mm, a_deg);
+    logInfo("[GCODE] M114 %s", response);
 }
 
 // PHASE 4.0: M115 - Firmware info (standard gcode command)
@@ -739,10 +727,14 @@ void GCodeParser::handleG92(const char* line) {
     // Parse any axis values provided
     float val;
     bool has_any = false;
-    if (parseCode(line, 'X', val)) { curM[0] = val; has_any = true; }
-    if (parseCode(line, 'Y', val)) { curM[1] = val; has_any = true; }
-    if (parseCode(line, 'Z', val)) { curM[2] = val; has_any = true; }
-    if (parseCode(line, 'A', val)) { curM[3] = val; has_any = true; }
+    const char axis_chars[] = "XYZA";
+
+    for (int i = 0; i < 4; i++) {
+        if (parseCode(line, axis_chars[i], val)) {
+            curM[i] = val;
+            has_any = true;
+        }
+    }
 
     if (!has_any) {
         logWarning("[GCODE] G92 requires at least one axis value (X/Y/Z/A)");

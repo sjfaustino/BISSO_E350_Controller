@@ -511,6 +511,20 @@ motion_state_t motionGetState(uint8_t axis) {
   return s;
 }
 
+float motionGetAxisScale(uint8_t axis) {
+  if (axis >= MOTION_AXES) return 1.0f;
+
+  if (axis == 3) { // Rotary axis
+      return (machineCal.axes[axis].pulses_per_degree > 0)
+                 ? machineCal.axes[axis].pulses_per_degree
+                 : (float)MOTION_POSITION_SCALE_FACTOR_DEG;
+  } else { // Linear axes (0, 1, 2)
+      return (machineCal.axes[axis].pulses_per_mm > 0)
+                 ? machineCal.axes[axis].pulses_per_mm
+                 : (float)MOTION_POSITION_SCALE_FACTOR;
+  }
+}
+
 float motionGetPositionMM(uint8_t axis) {
   if (axis >= MOTION_AXES)
     return 0.0f;
@@ -520,20 +534,7 @@ float motionGetPositionMM(uint8_t axis) {
   int32_t counts = axes[axis].position;
   portEXIT_CRITICAL(&motionSpinlock);
 
-  float scale = 1.0f;
-  if (axis < 4) {
-      if (axis == 3) {
-          scale = (machineCal.axes[axis].pulses_per_degree > 0)
-                      ? machineCal.axes[axis].pulses_per_degree
-                      : (float)MOTION_POSITION_SCALE_FACTOR_DEG;
-      } else {
-          scale = (machineCal.axes[axis].pulses_per_mm > 0)
-                      ? machineCal.axes[axis].pulses_per_mm
-                      : (float)MOTION_POSITION_SCALE_FACTOR;
-      }
-  }
-
-  return (float)counts / scale;
+  return (float)counts / motionGetAxisScale(axis);
 }
 
 float motionGetVelocity(uint8_t axis) {
@@ -716,23 +717,13 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   }
 
   float targets[] = {x, y, z, a};
-  float scales[] = {
-      (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm
-                                             : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm
-                                             : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm
-                                             : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.axes[3].pulses_per_degree > 0)
-          ? machineCal.axes[3].pulses_per_degree
-          : (float)MOTION_POSITION_SCALE_FACTOR_DEG};
 
   uint8_t target_axis = 255;
   int32_t target_pos = 0;
   int cnt = 0;
 
   for (int i = 0; i < MOTION_AXES; i++) {
-    int32_t t = (int32_t)(targets[i] * scales[i]);
+    int32_t t = (int32_t)(targets[i] * motionGetAxisScale(i));
     if (abs(t - wj66GetPosition(i)) > 1) {
       cnt++;
       target_axis = i;
@@ -878,20 +869,10 @@ bool motionSetPosition(float x, float y, float z, float a) {
 
   // Convert mm to counts for each axis
   float positions[] = {x, y, z, a};
-  float scales[] = {
-      (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm
-                                             : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm
-                                             : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm
-                                             : (float)MOTION_POSITION_SCALE_FACTOR,
-      (machineCal.axes[3].pulses_per_degree > 0)
-          ? machineCal.axes[3].pulses_per_degree
-          : (float)MOTION_POSITION_SCALE_FACTOR_DEG};
 
   // Set positions for all axes
   for (uint8_t i = 0; i < MOTION_AXES; i++) {
-    int32_t new_pos = (int32_t)(positions[i] * scales[i]);
+    int32_t new_pos = (int32_t)(positions[i] * motionGetAxisScale(i));
     axes[i].position = new_pos;
     axes[i].target_position = new_pos;
     logInfo("[MOTION] Axis %d position set to %.3f mm (%ld counts)", i,

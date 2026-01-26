@@ -130,6 +130,7 @@ void motionDiagnostics();
 int32_t motionGetPosition(uint8_t axis);
 int32_t motionGetTarget(uint8_t axis);
 float motionGetPositionMM(uint8_t axis);
+float motionGetAxisScale(uint8_t axis);
 float motionGetVelocity(uint8_t axis); // Get current velocity in mm/s
 motion_state_t motionGetState(uint8_t axis);
 bool motionIsMoving();

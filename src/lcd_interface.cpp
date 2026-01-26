@@ -14,6 +14,7 @@
 #include "encoder_wj66.h"
 #include "config_unified.h"
 #include "config_keys.h"
+#include "motion.h"
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 #include <stdio.h>
@@ -235,18 +236,10 @@ void lcdInterfacePrintAxes(int32_t x_counts, int32_t y_counts, int32_t z_counts,
   char line1[48];
   char line2[48];
 
-  const float def_lin = (float)MOTION_POSITION_SCALE_FACTOR;
-  const float def_ang = (float)MOTION_POSITION_SCALE_FACTOR_DEG;
-
-  float sx =
-      (machineCal.axes[0].pulses_per_mm > 0) ? machineCal.axes[0].pulses_per_mm : def_lin;
-  float sy =
-      (machineCal.axes[1].pulses_per_mm > 0) ? machineCal.axes[1].pulses_per_mm : def_lin;
-  float sz =
-      (machineCal.axes[2].pulses_per_mm > 0) ? machineCal.axes[2].pulses_per_mm : def_lin;
-  float sa = (machineCal.axes[3].pulses_per_degree > 0)
-                 ? machineCal.axes[3].pulses_per_degree
-                 : def_ang;
+  float sx = motionGetAxisScale(0);
+  float sy = motionGetAxisScale(1);
+  float sz = motionGetAxisScale(2);
+  float sa = motionGetAxisScale(3);
 
   // --- SENSOR CONNECTIVITY CHECK ---
   // Increased buffer sizes to 12 to ensure room for null terminator

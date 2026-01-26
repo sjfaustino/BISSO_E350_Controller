@@ -221,29 +221,21 @@ static void addToCacheFloat(const char *key, float val) {
 
 static int32_t validateInt(const char *key, int32_t value) {
   // 1. Pulses Per MM/Degree (Must be positive)
-  if (strcmp(key, KEY_PPM_X) == 0 || strcmp(key, KEY_PPM_Y) == 0 ||
-      strcmp(key, KEY_PPM_Z) == 0 || strcmp(key, KEY_PPM_A) == 0) {
+  if (strstr(key, "ppm_") != NULL) {
     if (value <= 0) {
-      logError("[CONFIG] Invalid PPM value %d (Must be > 0)", (long)value);
+      logError("[CONFIG] Invalid PPM value %ld (Must be > 0)", (long)value);
       return 1000; // Default safe value
     }
   }
 
   // 2. Timeout Safety
   if (strcmp(key, KEY_STALL_TIMEOUT) == 0) {
-    if (value < 100)
-      return 100; // Minimum 100ms
-    if (value > 60000)
-      return 60000; // Max 60s
+    return (value < 100) ? 100 : (value > 60000 ? 60000 : value);
   }
 
   // 3. Profiles (0-2)
-  if (strcmp(key, KEY_HOME_PROFILE_FAST) == 0 ||
-      strcmp(key, KEY_HOME_PROFILE_SLOW) == 0) {
-    if (value < 0)
-      return 0;
-    if (value > 2)
-      return 2;
+  if (strstr(key, "home_prof_") != NULL) {
+    return (value < 0) ? 0 : (value > 2 ? 2 : value);
   }
 
   return value;
@@ -251,10 +243,8 @@ static int32_t validateInt(const char *key, int32_t value) {
 
 static float validateFloat(const char *key, float value) {
   // 1. Acceleration / Speed (Must be positive)
-  if (strcmp(key, KEY_DEFAULT_ACCEL) == 0 ||
-      strcmp(key, KEY_DEFAULT_SPEED) == 0) {
-    if (value < 0.1f)
-      return 0.1f;
+  if (strstr(key, "default_") != NULL && (strstr(key, "accel") || strstr(key, "speed"))) {
+    if (value < 0.1f) return 0.1f;
   }
   return value;
 }
