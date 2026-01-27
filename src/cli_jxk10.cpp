@@ -82,35 +82,33 @@ static void cmd_jxk10_disable() {
 }
 
 // ============================================================================
-// MAIN COMMAND HANDLER
+// WRAPPER FUNCTIONS (for table-driven dispatch)
+// ============================================================================
+
+static void wrap_jxk10_read(int argc, char** argv) { (void)argc; (void)argv; cmd_jxk10_read(); }
+static void wrap_jxk10_info(int argc, char** argv) { (void)argc; (void)argv; cmd_jxk10_info(); }
+static void wrap_jxk10_status(int argc, char** argv) { (void)argc; (void)argv; cmd_jxk10_status(); }
+static void wrap_jxk10_enable(int argc, char** argv) { (void)argc; (void)argv; cmd_jxk10_enable(); }
+static void wrap_jxk10_disable(int argc, char** argv) { (void)argc; (void)argv; cmd_jxk10_disable(); }
+
+// ============================================================================
+// MAIN COMMAND HANDLER (P7: Table-Driven Dispatch)
 // ============================================================================
 
 void cmd_jxk10_main(int argc, char** argv) {
+    static const cli_subcommand_t subcmds[] = {
+        {"read",    wrap_jxk10_read,    "Read current value"},
+        {"info",    wrap_jxk10_info,    "Show device info (address, baud, stats)"},
+        {"addr",    cmd_jxk10_addr,     "Change slave address"},
+        {"status",  wrap_jxk10_status,  "Show full diagnostics"},
+        {"enable",  wrap_jxk10_enable,  "Enable JXK-10 in config"},
+        {"disable", wrap_jxk10_disable, "Disable JXK-10 in config"}
+    };
+
     if (argc < 2) {
         logPrintln("\n[JXK10] === JXK-10 Current Sensor ===");
-        CLI_USAGE("jxk10", "[read|info|addr|status|enable|disable]");
-        CLI_HELP_LINE("read", "Read current value");
-        CLI_HELP_LINE("info", "Show device info (address, baud, stats)");
-        CLI_HELP_LINE("addr", "Change slave address");
-        CLI_HELP_LINE("status", "Show full diagnostics");
-        CLI_HELP_LINE("enable", "Enable JXK-10 in config");
-        CLI_HELP_LINE("disable", "Disable JXK-10 in config");
-        return;
     }
 
-    if (strcasecmp(argv[1], "read") == 0) {
-        cmd_jxk10_read();
-    } else if (strcasecmp(argv[1], "info") == 0) {
-        cmd_jxk10_info();
-    } else if (strcasecmp(argv[1], "addr") == 0) {
-        cmd_jxk10_addr(argc, argv);
-    } else if (strcasecmp(argv[1], "status") == 0) {
-        cmd_jxk10_status();
-    } else if (strcasecmp(argv[1], "enable") == 0) {
-        cmd_jxk10_enable();
-    } else if (strcasecmp(argv[1], "disable") == 0) {
-        cmd_jxk10_disable();
-    } else {
-        logWarning("[JXK10] Unknown subcommand: %s", argv[1]);
-    }
+    cliDispatchSubcommand("[JXK10]", argc, argv, subcmds,
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }

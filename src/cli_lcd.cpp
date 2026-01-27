@@ -47,59 +47,64 @@ void cmd_lcd_timeout(int argc, char** argv) {
     lcdSleepSetTimeout(seconds);
 }
 
+// ============================================================================
+// WRAPPER/HANDLER FUNCTIONS (for table-driven dispatch)
+// ============================================================================
+
+static void wrap_lcd_on(int argc, char** argv) { (void)argc; (void)argv; cmd_lcd_on(); }
+static void wrap_lcd_off(int argc, char** argv) { (void)argc; (void)argv; cmd_lcd_off(); }
+static void wrap_lcd_sleep(int argc, char** argv) { (void)argc; (void)argv; lcdSleepSleep(); }
+static void wrap_lcd_wakeup(int argc, char** argv) { (void)argc; (void)argv; lcdSleepWakeup(); }
+static void wrap_lcd_reset(int argc, char** argv) { (void)argc; (void)argv; lcdInterfaceResetErrors(); }
+static void wrap_lcd_test(int argc, char** argv) { (void)argc; (void)argv; lcdInterfaceTest(); }
+
+static void wrap_lcd_status(int argc, char** argv) {
+    (void)argc; (void)argv;
+    logPrintln("\r\n[LCD] === Status ===");
+    logPrintf("Enabled:   %s\r\n", configGetInt(KEY_LCD_EN, 1) ? "YES" : "NO");
+    logPrintf("Mode:      %d\r\n", (int)lcdInterfaceGetMode());
+    logPrintf("Sleeping:  %s\r\n", lcdSleepIsAsleep() ? "YES" : "NO");
+    logPrintf("Timeout:   %lu sec\r\n", (unsigned long)lcdSleepGetTimeout());
+    lcdInterfaceDiagnostics();
+}
+
+static void wrap_lcd_scan(int argc, char** argv) {
+    (void)argc; (void)argv;
+    logPrintln("\r\n[LCD] Scanning I2C Bus for LCD...");
+    uint8_t addrs[] = {0x27, 0x3F};
+    bool found = false;
+    for (uint8_t a : addrs) {
+        Wire.beginTransmission(a);
+        if (Wire.endTransmission() == 0) {
+            logInfo("[LCD] Found LCD at 0x%02X", a);
+            found = true;
+        }
+    }
+    if (!found) logWarning("[LCD] No LCD found at standard addresses (0x27, 0x3F)");
+}
+
+// ============================================================================
+// MAIN COMMAND HANDLER (P7: Table-Driven Dispatch)
+// ============================================================================
+
 void cmd_lcd_main(int argc, char** argv) {
+    static const cli_subcommand_t subcmds[] = {
+        {"on",        wrap_lcd_on,        "Enable LCD and save setting"},
+        {"off",       wrap_lcd_off,       "Disable LCD and save setting"},
+        {"backlight", cmd_lcd_backlight,  "Control backlight (on/off)"},
+        {"sleep",     wrap_lcd_sleep,     "Force display to sleep"},
+        {"wakeup",    wrap_lcd_wakeup,    "Force display to wake up"},
+        {"timeout",   cmd_lcd_timeout,    "Set sleep timeout in seconds (0=never)"},
+        {"reset",     wrap_lcd_reset,     "Reset I2C errors and re-enable"},
+        {"status",    wrap_lcd_status,    "Show LCD status"},
+        {"scan",      wrap_lcd_scan,      "Scan I2C bus for LCD backpack"},
+        {"test",      wrap_lcd_test,      "Run hardware test pattern"}
+    };
+
     if (argc < 2) {
         logPrintln("\r\n[LCD] === LCD Control ===");
-        CLI_USAGE("lcd", "[on|off|backlight|sleep|wakeup|timeout|status|reset|scan|test]");
-        CLI_HELP_LINE("on", "Enable LCD and save setting");
-        CLI_HELP_LINE("off", "Disable LCD and save setting");
-        CLI_HELP_LINE("reset", "Reset I2C errors and try to re-enable I2C mode");
-        CLI_HELP_LINE("backlight", "Control backlight (on/off)");
-        CLI_HELP_LINE("sleep", "Force display to sleep");
-        CLI_HELP_LINE("wakeup", "Force display to wake up");
-        CLI_HELP_LINE("timeout", "Set sleep timeout in seconds (0=never)");
-        CLI_HELP_LINE("status", "Show LCD status");
-        CLI_HELP_LINE("scan", "Scan I2C bus for LCD backpack (0x27, 0x3F)");
-        CLI_HELP_LINE("test", "Run hardware test pattern");
-        return;
     }
 
-    if (strcasecmp(argv[1], "on") == 0) {
-        cmd_lcd_on();
-    } else if (strcasecmp(argv[1], "off") == 0) {
-        cmd_lcd_off();
-    } else if (strcasecmp(argv[1], "backlight") == 0) {
-        cmd_lcd_backlight(argc, argv);
-    } else if (strcasecmp(argv[1], "sleep") == 0) {
-        lcdSleepSleep();
-    } else if (strcasecmp(argv[1], "wakeup") == 0) {
-        lcdSleepWakeup();
-    } else if (strcasecmp(argv[1], "timeout") == 0) {
-        cmd_lcd_timeout(argc, argv);
-    } else if (strcasecmp(argv[1], "reset") == 0) {
-        lcdInterfaceResetErrors();
-    } else if (strcasecmp(argv[1], "status") == 0) {
-        logPrintln("\r\n[LCD] === Status ===");
-        logPrintf("Enabled:   %s\r\n", configGetInt(KEY_LCD_EN, 1) ? "YES" : "NO");
-        logPrintf("Mode:      %d\r\n", (int)lcdInterfaceGetMode());
-        logPrintf("Sleeping:  %s\r\n", lcdSleepIsAsleep() ? "YES" : "NO");
-        logPrintf("Timeout:   %lu sec\r\n", (unsigned long)lcdSleepGetTimeout());
-        lcdInterfaceDiagnostics();
-    } else if (strcasecmp(argv[1], "scan") == 0) {
-        logPrintln("\r\n[LCD] Scanning I2C Bus for LCD...");
-        uint8_t addrs[] = {0x27, 0x3F};
-        bool found = false;
-        for (uint8_t a : addrs) {
-            Wire.beginTransmission(a);
-            if (Wire.endTransmission() == 0) {
-                logInfo("[LCD] Found LCD at 0x%02X", a);
-                found = true;
-            }
-        }
-        if (!found) logWarning("[LCD] No LCD found at standard addresses (0x27, 0x3F)");
-    } else if (strcasecmp(argv[1], "test") == 0) {
-        lcdInterfaceTest();
-    } else {
-        logWarning("[LCD] Unknown subcommand: %s", argv[1]);
-    }
+    cliDispatchSubcommand("[LCD]", argc, argv, subcmds,
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
