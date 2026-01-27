@@ -117,25 +117,36 @@ bool apiConfigReset(void) {
 }
 
 /**
- * @brief Validate soft limit configuration
- * PHASE 5.10: Changed from uint16_t to int32_t to support negative limits
- * (e.g., machines with coordinate systems crossing zero: min=-500, max=500)
+ * @brief P4 DRY: Generic integer range validator
+ * Consolidates common validation pattern used by soft limits, VFD speeds, PPM, etc.
  */
-static bool validateSoftLimit(const char *key, JsonVariant value,
-                              char *error_msg, size_t error_msg_len) {
+static bool validateIntRange(JsonVariant value, int32_t min_val, int32_t max_val,
+                             const char* field_name, const char* unit,
+                             char* error_msg, size_t error_msg_len) {
   if (!value.is<int>()) {
-    snprintf(error_msg, error_msg_len,
-             "Soft limit must be numeric (-10000 to +10000 mm)");
+    snprintf(error_msg, error_msg_len, "%s must be numeric (%d to %d %s)",
+             field_name, (int)min_val, (int)max_val, unit ? unit : "");
     return false;
   }
 
   int32_t val = value.as<int32_t>();
-  if (val < -10000 || val > 10000) {
-    snprintf(error_msg, error_msg_len, "Soft limit must be between -10000 and +10000 mm");
+  if (val < min_val || val > max_val) {
+    snprintf(error_msg, error_msg_len, "%s must be between %d and %d %s",
+             field_name, (int)min_val, (int)max_val, unit ? unit : "");
     return false;
   }
 
   return true;
+}
+
+/**
+ * @brief Validate soft limit configuration
+ * PHASE 5.10: Changed from uint16_t to int32_t to support negative limits
+ */
+static bool validateSoftLimit(const char *key, JsonVariant value,
+                              char *error_msg, size_t error_msg_len) {
+  (void)key;
+  return validateIntRange(value, -10000, 10000, "Soft limit", "mm", error_msg, error_msg_len);
 }
 
 /**
@@ -143,18 +154,8 @@ static bool validateSoftLimit(const char *key, JsonVariant value,
  */
 static bool validateVfdSpeed(const char *key, JsonVariant value,
                              char *error_msg, size_t error_msg_len) {
-  if (!value.is<uint16_t>()) {
-    snprintf(error_msg, error_msg_len, "Speed must be numeric (1-105 Hz)");
-    return false;
-  }
-
-  uint16_t val = value.as<uint16_t>();
-  if (val < 1 || val > 105) {
-    snprintf(error_msg, error_msg_len, "Speed must be between 1 and 105 Hz");
-    return false;
-  }
-
-  return true;
+  (void)key;
+  return validateIntRange(value, 1, 105, "Speed", "Hz", error_msg, error_msg_len);
 }
 
 /**
@@ -162,19 +163,10 @@ static bool validateVfdSpeed(const char *key, JsonVariant value,
  */
 static bool validateEncoderPpm(const char *key, JsonVariant value,
                                char *error_msg, size_t error_msg_len) {
-  if (!value.is<uint16_t>()) {
-    snprintf(error_msg, error_msg_len, "PPM must be numeric (50-200)");
-    return false;
-  }
-
-  uint16_t val = value.as<uint16_t>();
-  if (val < 50 || val > 200) {
-    snprintf(error_msg, error_msg_len, "PPM must be between 50 and 200");
-    return false;
-  }
-
-  return true;
+  (void)key;
+  return validateIntRange(value, 50, 200, "PPM", "", error_msg, error_msg_len);
 }
+
 
 /**
  * @brief Validate configuration change

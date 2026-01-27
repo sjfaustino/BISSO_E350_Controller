@@ -529,65 +529,9 @@ void cmd_timeout_diag(int argc, char** argv) { timeoutShowDiagnostics(); }
 // ============================================================================
 // RS-485 DIRECT BUS ACCESS
 // ============================================================================
-void cmd_rs485_raw(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[RS485] Usage: rs485 raw <string>");
-        logPrintln("  Example: rs485 raw #00\\r");
-        return;
-    }
 
-    // Convert escaped characters like \r to actual values
-    char payload[64];
-    strncpy(payload, argv[1], sizeof(payload)-1);
-    payload[sizeof(payload)-1] = '\0';
-    
-    char* r = strstr(payload, "\\r");
-    if (r) { *r = '\r'; memmove(r+1, r+2, strlen(r+2)+1); }
-    char* n = strstr(payload, "\\n");
-    if (n) { *n = '\n'; memmove(n+1, n+2, strlen(n+2)+1); }
-
-    logPrintf("[RS485] Sending: %s (%d bytes)\r\n", argv[1], (int)strlen(payload));
-    
-    // Clear buffer first
-    rs485ClearBuffer();
-    
-    if (!rs485Send((const uint8_t*)payload, strlen(payload))) {
-        logError("[RS485] Failed to send");
-        return;
-    }
-
-    // Wait for response
-    vTaskDelay(200 / portTICK_PERIOD_MS);
-    
-    uint8_t rx_buf[128];
-    uint8_t rx_len = 0;
-    if (rs485Receive(rx_buf, &rx_len) && rx_len > 0) {
-        logPrintf("[RS485] Received %d bytes: ", rx_len);
-        for (int i = 0; i < rx_len; i++) {
-            if (rx_buf[i] >= 32 && rx_buf[i] <= 126) logPrintf("%c", rx_buf[i]);
-            else logPrintf("[%02X]", rx_buf[i]);
-        }
-        logPrintln("");
-    } else {
-        logWarning("[RS485] No response received");
-    }
-}
-
-void cmd_rs485_hex(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("[RS485] Usage: rs485 hex <hex bytes...>");
-        logPrintln("  Example: rs485 hex 23 30 30 0D (sends #00\\r)");
-        return;
-    }
-
-    uint8_t payload[64];
-    uint8_t len = 0;
-    
-    for (int i = 1; i < argc && len < sizeof(payload); i++) {
-        payload[len++] = (uint8_t)strtol(argv[i], NULL, 16);
-    }
-
-    logPrintf("[RS485] Sending Hex (%d bytes)\r\n", len);
+// P1 DRY: Common helper for RS-485 send/receive operations
+static void rs485_send_and_receive(const uint8_t* payload, size_t len) {
     rs485ClearBuffer();
     
     if (!rs485Send(payload, len)) {
@@ -609,6 +553,45 @@ void cmd_rs485_hex(int argc, char** argv) {
     } else {
         logWarning("[RS485] No response received");
     }
+}
+
+void cmd_rs485_raw(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("[RS485] Usage: rs485 raw <string>");
+        logPrintln("  Example: rs485 raw #00\\r");
+        return;
+    }
+
+    // Convert escaped characters like \r to actual values
+    char payload[64];
+    strncpy(payload, argv[1], sizeof(payload)-1);
+    payload[sizeof(payload)-1] = '\0';
+    
+    char* r = strstr(payload, "\\r");
+    if (r) { *r = '\r'; memmove(r+1, r+2, strlen(r+2)+1); }
+    char* n = strstr(payload, "\\n");
+    if (n) { *n = '\n'; memmove(n+1, n+2, strlen(n+2)+1); }
+
+    logPrintf("[RS485] Sending: %s (%d bytes)\r\n", argv[1], (int)strlen(payload));
+    rs485_send_and_receive((const uint8_t*)payload, strlen(payload));
+}
+
+void cmd_rs485_hex(int argc, char** argv) {
+    if (argc < 2) {
+        logPrintln("[RS485] Usage: rs485 hex <hex bytes...>");
+        logPrintln("  Example: rs485 hex 23 30 30 0D (sends #00\\r)");
+        return;
+    }
+
+    uint8_t payload[64];
+    uint8_t len = 0;
+    
+    for (int i = 1; i < argc && len < sizeof(payload); i++) {
+        payload[len++] = (uint8_t)strtol(argv[i], NULL, 16);
+    }
+
+    logPrintf("[RS485] Sending Hex (%d bytes)\r\n", len);
+    rs485_send_and_receive(payload, len);
 }
 
 void cmd_rs485_diag(int argc, char** argv) { (void)argc; (void)argv; rs485PrintDiagnostics(); }
