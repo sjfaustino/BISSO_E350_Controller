@@ -1,111 +1,310 @@
-# 📟 BISSO E350 - THE DEFINITIVE G-CODE MASTER REFERENCE (V1.7) 📟
+# 📟 BISSO E350 - THE DEFINITIVE G-CODE MASTER REFERENCE (V2.0) 📟
 
 ```text
-   ____  ____ ___  ____  _____     ____  _____ _____ 
+   ____  ____  ___  ____  _____     ____  _____ _____ 
   / ___|/ ___/ _ \|  _ \| ____|   |  _ \| ____|  ___|
  | |  _| |  | | | | | | |  _|     | |_) |  _| | |_   
  | |_| | |__| |_| | |_| | |___    |  _ <| |___|  _|  
   \____|\____\___/|____/|_____|   |_| \_\_____|_|    
                                                      
           MOTION CONTROL & G-CODE SPECIFICATION
+          =======================================
+          4-AXIS SEQUENTIAL BRIDGE SAW CONTROLLER
 ```
 
+---
+
 ## 📜 Overview
-Welcome to the absolute "Bible" of G-Code for the BISSO E350 (PosiPro) Controller. This document is a high-verbosity technical manual and educational guide designed to bridge the gap between CNC theory and industrial bridge saw reality.
 
-> [!NOTE]
-> Even if you are familiar with standard G-code, please read this reference carefully. The BISSO E350 has unique hardware architectural constraints—such as a **Single Shared VFD** and **Sequential Axis Motion**—that differ from traditional 3-axis CNC mills.
+Welcome to the **DEFINITIVE** G-Code reference for the BISSO E350 (PosiPro) CNC Controller. This document is a high-verbosity technical manual and educational guide designed to bridge the gap between CNC theory and industrial bridge saw reality.
 
----
-
-### 🎓 Key CNC Concepts Explained
-To get the most out of this manual, you must understand these three fundamental concepts:
-
-1.  **Modal vs. Non-Modal**: 
-    -   **Modal** commands (like `G0`, `G90`, or `G54`) stay active until changed. If you send `G91` (Incremental), everything will be incremental until you send `G90`.
-    -   **Non-Modal** (One-Shot) commands (like `G4` or `G10`) only apply to the line they are written on.
-2.  **Machine Coordinates (MCS) vs. Work Coordinates (WCS)**:
-    -   **MCS** is the physical ruler of the machine (from the limit switches).
-    -   **WCS** is the "Fake" ruler you place on top of your stone slab so that the corner of the stone is exactly `X=0, Y=0`.
-3.  **Feedrate (`F`)**: 
-    -   The speed at which the machine moves during a cut. In our system, these are mapped to internal PLC speed profiles because we do not have direct analog control over the VFD frequency during a move.
+> [!IMPORTANT]
+> Even if you are familiar with standard G-code, please read this reference carefully. The BISSO E350 has unique hardware architectural constraints—such as a **Single Shared VFD** and **Sequential Axis Motion**—that differ from traditional 3-axis CNC mills or routers.
 
 ---
 
-### 📖 The 7-Layer Information Standard
-Every command in this manual is documented with the following seven sections:
-1.  **Command Syntax**: The exact format and spelling required.
-2.  **Description**: A simple, clear explanation of what the command does in plain English.
-3.  **Parameters**: A list of all letters and numbers you can include.
-4.  **How it works**: A deep technical explanation of the internal logic, PLC interaction, and electronic signals.
-5.  **Usage Example**: A real-world example of the command being used.
-6.  **Expected Output**: What the machine will print back to you to confirm it worked.
-7.  **Industrial Use Case**: A scenario explaining why a bridge-saw operator would use this command.
+## 🏗️ Hardware Architecture & Constraints
+
+Understanding the BISSO E350 hardware is **CRITICAL** for effective G-code programming:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    BISSO E350 SYSTEM ARCHITECTURE                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ┌─────────────┐     RS-485      ┌─────────────────────────────┐   │
+│   │   ESP32     │─────────────────│  SIEMENS S7-200 PLC        │   │
+│   │  Controller │                 │  (Motion Sequencer)         │   │
+│   └─────────────┘                 └───────────┬─────────────────┘   │
+│          │                                    │                      │
+│          │ I2C                         Contactor Control             │
+│          │                                    │                      │
+│   ┌──────┴──────┐                    ┌────────┴─────────┐           │
+│   │  PCF8574    │                    │ ALTIVAR 31 VFD   │           │
+│   │  I/O Expdr  │                    │  (Single Motor)  │           │
+│   └─────────────┘                    └────────┬─────────┘           │
+│                                               │                      │
+│                              ┌────────────────┼────────────────┐    │
+│                              │                │                │    │
+│                         ┌────┴────┐      ┌────┴────┐     ┌─────┴──┐ │
+│                         │ X MOTOR │      │ Y MOTOR │     │Z MOTOR │ │
+│                         │(Carriage)│      │(Bridge) │     │(Blade) │ │
+│                         └─────────┘      └─────────┘     └────────┘ │
+│                                                                      │
+│            ★ CRITICAL: Only ONE motor can run at a time! ★           │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Hardware Constraints
+
+| Constraint | Description | Impact on G-Code |
+|------------|-------------|------------------|
+| **Single VFD** | One Altivar 31 drives all axis motors via contactors | Axes move **sequentially**, never simultaneously |
+| **PLC Contactors** | Motor selection happens in PLC, not ESP32 | Automatic sequencing: Z→Y→X for moves |
+| **22kW Spindle** | Same VFD can drive the saw blade motor | M3/M5 controls spindle |
+| **A-Axis Manual** | Rotary head has no motor; encoder-only | G28 A is skipped; manual positioning only |
+| **WJ66 Encoders** | Hall-effect pulse counting at 1000 Hz | High-precision positioning (0.01mm) |
+
+---
+
+## 🎓 Key CNC Concepts Explained
+
+Before diving into commands, understand these fundamental concepts:
+
+### 1. Modal vs. Non-Modal Commands
+
+```
+MODAL (Sticky) Commands:             NON-MODAL (One-Shot) Commands:
+┌──────────────────────────────┐     ┌──────────────────────────────┐
+│ G0  - Rapid mode             │     │ G4  - Dwell (wait)           │
+│ G1  - Linear feed mode       │     │ G10 - Save offsets           │
+│ G90 - Absolute coordinates   │     │ G28 - Home cycle             │
+│ G91 - Incremental coords     │     │ G30 - Go to preset           │
+│ G54-G59 - Work coord select  │     │ G53 - Machine coords move    │
+└──────────────────────────────┘     └──────────────────────────────┘
+        ↓                                      ↓
+  Stays active until changed!       Only affects the current line!
+```
+
+### 2. Machine Coordinates (MCS) vs Work Coordinates (WCS)
+
+```
+                         MACHINE ORIGIN (0,0)
+                              ↓
+    ┌─────────────────────────★─────────────────────────────────┐
+    │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ MACHINE TABLE ▓▓▓▓▓▓▓▓│
+    │                                                           │
+    │                    SLAB CORNER → ☆ ← YOUR WORK ORIGIN     │
+    │                              ┌─────────────────┐          │
+    │   G54 offset = 500mm ───────>│    GRANITE     │          │
+    │                              │     SLAB       │          │
+    │                              │                │          │
+    │                              └─────────────────┘          │
+    │                                                           │
+    └───────────────────────────────────────────────────────────┘
+    
+    G-Code says: G0 X100 Y50
+    
+    With G54 selected:
+    - Work Position:    X=100,  Y=50   ← What you see in UI
+    - Machine Position: X=600, Y=150   ← Where machine actually is
+          (100 + 500 offset)   (50 + 100 offset)
+```
+
+### 3. Feedrate (F Value)
+
+The `F` value specifies cutting speed in **mm/min**:
+
+```
+F value → PLC Speed Profile Mapping:
+
+  F50-500 mm/min  → SLOW Profile  (V/S - Vari-Speed, precise cuts)
+  F500-2000       → MEDIUM Profile (Standard cutting)
+  F2000+          → FAST Profile  (Rapid traverse, blade in air)
+  
+  Note: The PLC has fixed speed profiles. The F value maps to the 
+  closest available profile, not infinitely variable speed.
+```
 
 ---
 
 ## 🏃 MOTION CODES (MODAL GROUP 1)
 
+---
+
 ### `G0` - Rapid Positioning
+
 **Command Syntax:**
-`G0 [X<pos>] [Y<pos>] [Z<pos>] [A<pos>]`
+```gcode
+G0 [X<pos>] [Y<pos>] [Z<pos>] [A<pos>]
+```
 
 **Description:**
-`G0` tells the machine to move as fast as possible to a specific location. It is used when the blade is in the air and not touching any stone. Think of it as "Transport Mode."
+`G0` tells the machine to move as **fast as possible** to a specific location. Used when the blade is **NOT** in contact with material—think "Transport Mode" or "Aircut Movement."
 
 **Parameters:**
-- `X<pos>`: Target coordinate for the Carriage (left/right).
-- `Y<pos>`: Target coordinate for the Bridge (forward/back).
-- `Z<pos>`: Target coordinate for the Blade Height (up/down).
-- `A<pos>`: Target coordinate for the Rotary Head (manual angle).
+| Parameter | Description | Valid Range | Default |
+|-----------|-------------|-------------|---------|
+| `X<pos>` | Carriage position (left/right) | -500 to 5000 mm | Current X |
+| `Y<pos>` | Bridge position (forward/back) | -500 to 3500 mm | Current Y |
+| `Z<pos>` | Blade height (up/down) | 0 to 1000 mm | Current Z |
+| `A<pos>` | Rotary head angle (if encoder-equipped) | 0 to 90° | Current A |
 
-**How it works:**
-1.  **Coordinate Mapping**: The controller takes your coordinates and applies any active "Zero" offsets (WCS).
-2.  **Sequential Safety**: Because the Bisso E350 uses a single shared motor drive (Altivar 31 VFD), the axes move one at a time. The controller automatically sequences the moves (Z first, then Y, then X) to ensure the blade is lifted before the bridge moves.
-3.  **PLC Speed Selection**: The ESP32 sends a signal to the Siemens PLC to engage the **FAST** speed profile. This is done by triggering the `SPEED_FAST` relay on the PCF8574 expander.
-4.  **Encoder Feedback**: The machine monitors the WJ66 encoders at 1000Hz and stops precisely when the target is reached.
+**How It Works (Internal Mechanics):**
 
-**Usage Example:**
-`G0 X1500 Y2000`
+```
+Step 1: COORDINATE RESOLUTION
+┌─────────────────────────────────────────────────────────────┐
+│ User sends: G0 X1500 Y2000                                   │
+│                                                              │
+│ Parser applies WCS offset (if G54-G59 active):               │
+│   Machine_X = User_X + G54_Offset_X                          │
+│   Machine_Y = User_Y + G54_Offset_Y                          │
+│                                                              │
+│ If G91 (incremental): Machine_X = Current_X + User_X         │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+Step 2: SAFETY SEQUENCING
+┌─────────────────────────────────────────────────────────────┐
+│ Order of movement for SAFETY (blade must lift first):        │
+│                                                              │
+│   1. Z-axis raise (if Z target is HIGHER than current)       │
+│   2. Y-axis move (after Z is safe)                           │
+│   3. X-axis move (after Y is complete)                       │
+│   4. Z-axis lower (if Z target is LOWER than current)        │
+│                                                              │
+│ This prevents the blade from crashing into the stone!        │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+Step 3: PLC SPEED SELECTION
+┌─────────────────────────────────────────────────────────────┐
+│ ESP32 sends command to PLC via I2C:                          │
+│   - Assert SPEED_FAST relay (maximum traverse speed)         │
+│   - Assert direction relay (FWD or REV)                      │
+│   - Assert AXIS_SELECT relay (X, Y, or Z)                    │
+│   - Assert RUN signal                                        │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+Step 4: ENCODER FEEDBACK LOOP
+┌─────────────────────────────────────────────────────────────┐
+│ WJ66 encoder provides pulse feedback at 1000 Hz:             │
+│                                                              │
+│   Current_Pulses = Read_Encoder(axis)                        │
+│   Current_MM = Current_Pulses / $100  (pulses per mm)        │
+│                                                              │
+│   When |Target_MM - Current_MM| < 0.01 mm:                   │
+│     → Clear RUN signal                                       │
+│     → Report "ok"                                            │
+└─────────────────────────────────────────────────────────────┘
+```
 
-**Expected Output:**
+**Usage Examples:**
+
+```gcode
+; Example 1: Move to absolute position
+G90          ; Ensure absolute coordinates
+G0 X1500     ; Move X to 1500mm
+
+; Example 2: Multi-axis rapid
+G0 X1500 Y2000 Z50   ; Move to position (sequential: Z→Y→X)
+
+; Example 3: Incremental rapid
+G91          ; Switch to incremental
+G0 X100      ; Move 100mm RIGHT from current position
+G90          ; Switch back to absolute
+
+; Example 4: Return to start
+G0 X0 Y0     ; Go to work coordinate origin
+```
+
+**Expected Console Output:**
 ```text
 ok
-[MOTION] Moving X to 1500.000... (Profile: FAST)
-[MOTION] Moving Y to 2000.000... (Profile: FAST)
+[MOTION] G0 Rapid: X=1500.000 Y=2000.000 (Fast Profile)
+[MOTION] Sequence: Z↑ → Y → X
 ok
 ```
 
-**Industrial Use Case:**
-Moving the blade from the "parking" corner to the start of a slab before beginning a cut. This saves time between jobs.
+**Possible Errors & Solutions:**
+
+| Error | Meaning | Solution |
+|-------|---------|----------|
+| `error:9` | Limit switch triggered | Home the machine (`$H`), clear alarm |
+| `error:3` | Motion rejected (busy) | Wait for current move to complete |
+| `error:22` | Soft limit exceeded | Reduce target value within `$130-$132` limits |
+| `[ESTOP]` | Emergency stop active | Release physical E-Stop button, reset with `M999` |
+
+**Industrial Use Cases:**
+- Moving blade from garage position to slab start before cutting
+- Repositioning between different slabs on the table
+- Returning to home position after job completion
 
 ---
 
-### `G1` - Linear Cutting Move
+### `G1` - Linear Cutting Move (Controlled Feed)
+
 **Command Syntax:**
-`G1 [X<pos>] [Y<pos>] [Z<pos>] [A<pos>] [F<feed>]`
+```gcode
+G1 [X<pos>] [Y<pos>] [Z<pos>] [A<pos>] [F<feed>]
+```
 
 **Description:**
-`G1` is the "Precise Cutting" mode. It moves the blade at a controlled speed defined by the `F` value. This is the command used for the actual process of sawing stone.
+`G1` is the **precision cutting** command. It moves the blade at a controlled feedrate specified by `F`, used when the blade is **IN CONTACT** with stone.
 
 **Parameters:**
-- `X, Y, Z, A`: Target coordinates.
-- `F<feed>`: Specified speed in millimeters per minute (mm/min).
+| Parameter | Description | Valid Range | Default |
+|-----------|-------------|-------------|---------|
+| `X<pos>` | Target X position | Machine limits | Current X |
+| `Y<pos>` | Target Y position | Machine limits | Current Y |
+| `Z<pos>` | Target Z position | Machine limits | Current Z |
+| `A<pos>` | Target A position | 0-90° | Current A |
+| `F<feed>` | Cutting speed (mm/min) | 10-5000 | Last F value (modal) |
 
-**How it works:**
-1.  **Feedrate Mapping**: The ESP32 reads the `F` value and compares it to the calibrated speed table.
-2.  **Profile Handshake**:
-    - If `F` is slow (e.g., 50–500), it selects the **SLOW (V/S)** PLC profile.
-    - If `F` is standard (e.g., 500–2000), it selects the **MEDIUM** PLC profile.
-3.  **Motor Engagement**: The PLC triggers the motor contactor for the specific axis and keeps the motor energized until the encoder reaches the target.
+**How It Works:**
 
-**Usage Example:**
-`G1 Y3000 F1200`
+```
+FEEDRATE → PLC PROFILE MAPPING:
+┌────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│    F value (mm/min)         PLC Speed Profile                  │
+│    ────────────────         ─────────────────                  │
+│    10 - 499                 SLOW (V/S Motor Start)             │
+│    500 - 1999               MEDIUM (Standard Cutting)          │
+│    2000+                    FAST (Rapid Traverse)              │
+│                                                                 │
+│    NOTE: F is MODAL - once set, it applies to all G1 commands  │
+│          until changed!                                         │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+```
 
-**Expected Output:**
+**Usage Examples:**
+
+```gcode
+; Example 1: Simple cutting pass
+G1 Y3000 F800    ; Feed Y at 800 mm/min (medium speed)
+
+; Example 2: Z plunge into material
+G1 Z-50 F100     ; Slow plunge at 100 mm/min
+
+; Example 3: Multiple moves (F is sticky)
+G1 Y1000 F1200   ; Set feed to 1200, move Y
+G1 Y2000         ; Still at F1200 (modal)
+G1 Y3000 F500    ; Change to slower feed
+
+; Example 4: Cutting sequence
+G0 Z5            ; Rapid to safe Z height
+G0 X100 Y0       ; Position at cut start
+G1 Z-30 F50      ; Plunge into stone slowly
+G1 Y3000 F1000   ; Make the cut!
+G0 Z5            ; Retract blade
+```
+
+**Expected Console Output:**
 ```text
 ok
-[MOTION] Moving Y to 3000.000... (Profile: MEDIUM)
+[MOTION] G1 Linear: Y=3000.000 F=1000.000 (Medium Profile)
 ok
 ```
 
@@ -116,497 +315,1011 @@ Feeding the bridge forward at a steady 1200 mm/min to cut through a 3cm slab of 
 
 ## 📏 DISTANCE MODES (MODAL GROUP 3)
 
+---
+
 ### `G90` - Absolute Positioning Mode
+
 **Command Syntax:**
-`G90`
+```gcode
+G90
+```
 
 **Description:**
-Tells the machine to measure all coordinates from the system "Zero." If you say `X100`, the machine goes to the 100mm mark on its map.
+Sets **absolute** coordinate mode. All subsequent coordinates are measured from the **work coordinate origin** (defined by G54-G59).
 
-**How it works:**
-The firmware sets a global flag called `distanceMode` to `ABSOLUTE`. All subsequent math calculations for axis targets use the literal coordinate relative to the origin.
+**How It Works:**
+```
+ABSOLUTE MODE (G90):
+                    
+    Work Origin (0,0,0)
+           ↓
+           ★───────────────────────────→ +X
+           │
+           │  G0 X100 means: "Go to 100mm on the X ruler"
+           │       ↓
+           │   ┌───●───┐
+           │   │Target │
+           ↓   └───────┘
+          +Y
+          
+    Current position: X=50
+    Command: G0 X100
+    Result: Machine moves to X=100 (NOT X=150!)
+```
 
 **Usage Example:**
-`G90`
+```gcode
+G90              ; Absolute mode
+G0 X100 Y200     ; Go to position (100, 200)
+G0 X200 Y300     ; Go to position (200, 300) - NOT (100+200, 200+300)
+```
 
 **Expected Output:**
-`ok`
+```text
+ok
+```
 
 **Industrial Use Case:**
-Most automated G-code files are written in `G90` so that every point on the slab is a known, fixed location.
+Most G-code files generated by CAM software use G90 (absolute) because every point on the slab is defined as a known location on the coordinate grid.
 
 ---
 
 ### `G91` - Incremental Positioning Mode
+
 **Command Syntax:**
-`G91`
+```gcode
+G91
+```
 
 **Description:**
-Tells the machine to treat coordinates as a "distance to add" to the current spot. If you are at 100mm and say `X10`, you will end up at 110mm.
+Sets **incremental** coordinate mode. All coordinates are treated as **distances to add** to the current position.
 
-**How it works:**
-Sets `distanceMode` to `RELATIVE`. The target calculation becomes `New_Target = Current_Position + User_Request`.
+**How It Works:**
+```
+INCREMENTAL MODE (G91):
+
+    Current Position
+           ↓
+           ●═══════════════→ +X
+           ║                ↑
+           ║     G0 X50 means: "Move 50mm from HERE"
+           ║                ↓
+           ║            ┌───●───┐
+           ║            │New Pos│
+           ↓            └───────┘
+          +Y
+          
+    Current position: X=100
+    Command: G0 X50
+    Result: Machine moves to X=150 (100 + 50)
+```
 
 **Usage Example:**
-`G91`
-`G0 X10`
-
-**Expected Output:**
-`ok`
+```gcode
+G91              ; Incremental mode
+G0 X10           ; Move 10mm to the right
+G0 X10           ; Move another 10mm (now at original+20)
+G0 X-5           ; Move 5mm LEFT
+G90              ; Return to absolute mode
+```
 
 **Industrial Use Case:**
-Used when "jogging" or manually fine-tuning the blade position. If you notice the cut is 2mm off, you can send `G91 G0 X-2` to adjust it.
+- Manual jogging: "Move 2mm to the right to align with the chalk mark"
+- Repeated patterns: "Make 5 cuts, each 100mm apart"
+- Fine adjustment: "The cut is 1.5mm off—nudge it over"
 
 ---
 
 ## 📍 COORDINATE SYSTEMS (MODAL GROUP 12)
 
-### `G54` to `G59` - Work Coordinate Selection
+---
+
+### `G54` through `G59` - Work Coordinate System Selection
+
 **Command Syntax:**
-`G54` through `G59`
+```gcode
+G54    ; Select Work Coordinate System 1 (default)
+G55    ; Select Work Coordinate System 2
+G56    ; Select Work Coordinate System 3
+G57    ; Select Work Coordinate System 4
+G58    ; Select Work Coordinate System 5
+G59    ; Select Work Coordinate System 6
+```
 
 **Description:**
-These are "Memory Slots" for different Zero points. You can save the corner of Slab A as `G54` and Slab B as `G55`.
+These commands select one of **six** stored work coordinate systems. Each WCS stores X, Y, Z, and A offsets, allowing you to define multiple "Zero" points for different slabs or fixtures.
 
-**How it works:**
-The ESP32 stores an array of 6 sets of offsets in persistent Flash memory (NVS). When you select a system, it subtracts those offsets from your G-code coordinates to find the true "Machine" position.
+**How It Works:**
+```
+WORK COORDINATE SYSTEMS:
+┌──────────────────────────────────────────────────────────────────┐
+│                       MACHINE TABLE                               │
+│                                                                   │
+│   Machine (0,0)                                                   │
+│        ★─────────────────────────────────────────────────────→   │
+│        │                                                          │
+│        │    G54 ☆ (Offset: X=500, Y=100)                         │
+│        │         ┌──────────────┐                                │
+│        │         │   SLAB #1    │                                │
+│        │         └──────────────┘                                │
+│        │                                                          │
+│        │              G55 ☆ (Offset: X=1800, Y=100)              │
+│        │                   ┌──────────────┐                      │
+│        │                   │   SLAB #2    │                      │
+│        │                   └──────────────┘                      │
+│        ↓                                                          │
+└──────────────────────────────────────────────────────────────────┘
+
+With G54 active: G0 X0 Y0 → Machine goes to (500, 100)
+With G55 active: G0 X0 Y0 → Machine goes to (1800, 100)
+```
 
 **Usage Example:**
-`G55`
+```gcode
+G54              ; Select first slab origin
+G0 X0 Y0         ; Move to slab 1 corner
+G1 Y1000 F800    ; Cut slab 1
+
+G55              ; Select second slab origin
+G0 X0 Y0         ; Move to slab 2 corner (different physical location!)
+G1 Y1000 F800    ; Cut slab 2
+```
 
 **Expected Output:**
-`[WCS] Selected: G55 (Offset X:100.0 Y:50.0)`
+```text
+[WCS] Selected: G55 (Offset X:1800.0 Y:100.0)
+ok
+```
 
 **Industrial Use Case:**
-Positioning two slabs on one table and switching between them with a single command without ever having to physically re-zero the machine.
+When you have multiple slabs on the table, set up G54 for slab 1, G55 for slab 2, etc. You can then run the same G-code file on each slab by simply changing the WCS selector.
+
+---
+
+### `G10 L20` - Set Work Coordinate Offset
+
+**Command Syntax:**
+```gcode
+G10 L20 P<system> [X<val>] [Y<val>] [Z<val>] [A<val>]
+```
+
+**Description:**
+Sets the work coordinate offset so that the **current machine position** becomes the specified value. "Where I am standing right now—call it X=0, Y=0."
+
+**Parameters:**
+| Parameter | Description | Valid Values |
+|-----------|-------------|--------------|
+| `L20` | Required—L-word specifying "set offset" mode | Must be 20 |
+| `P<system>` | WCS system number | 1-6 (G54-G59) |
+| `X<val>` | What X should read at current position | Any number |
+| `Y<val>` | What Y should read at current position | Any number |
+| `Z<val>` | What Z should read at current position | Any number |
+| `A<val>` | What A should read at current position | Any number |
+
+**How It Works:**
+```
+SETTING THE ZERO POINT:
+
+  Step 1: Physically jog machine to the CORNER of your slab
+  
+  Step 2: Send G10 L20 P1 X0 Y0
+  
+  Step 3: Math that happens internally:
+          ┌────────────────────────────────────────────────────┐
+          │ Current Machine Position = (1523.456, 847.123)    │
+          │ You want this to read as  = (0, 0)                │
+          │                                                    │
+          │ New G54 Offset = Current - Desired                │
+          │                = (1523.456 - 0, 847.123 - 0)      │
+          │                = (1523.456, 847.123)              │
+          │                                                    │
+          │ Offset is saved to NVS Flash (survives reboot!)    │
+          └────────────────────────────────────────────────────┘
+          
+  Step 4: Now G0 X0 Y0 will always return to that corner!
+```
+
+**Usage Examples:**
+```gcode
+; Zero the current position in G54
+G10 L20 P1 X0 Y0
+
+; Set current position as X=100 in G55
+G10 L20 P2 X100
+
+; Set all axes (rare, but possible)
+G10 L20 P1 X0 Y0 Z0 A0
+```
+
+**Expected Output:**
+```text
+[GCODE] Updated G54 Offsets
+ok
+```
+
+**Industrial Use Case:**
+Operator brings the blade directly over the corner of a new slab, then commands `G10 L20 P1 X0 Y0` to establish that point as the origin for all subsequent cuts.
 
 ---
 
 ## ⚡ UTILITIES (NON-MODAL)
 
-### `G4` - Dwell (Wait)
+---
+
+### `G4` - Dwell (Pause/Wait)
+
 **Command Syntax:**
-`G4 P<ms>` or `G4 S<sec>`
+```gcode
+G4 P<milliseconds>
+G4 S<seconds>
+```
 
 **Description:**
-Forces the machine to stop and wait for a count of time.
+Pauses the machine for a specified time. The spindle continues running and coolant stays on—only axis motion pauses.
 
 **Parameters:**
-- `P`: Time in milliseconds.
-- `S`: Time in seconds.
+| Parameter | Description | Valid Range |
+|-----------|-------------|-------------|
+| `P<ms>` | Dwell time in **milliseconds** | 1 - 600000 (10 min) |
+| `S<sec>` | Dwell time in **seconds** | 0.1 - 600 |
 
-**How it works:**
-The controller enters the `MOTION_DWELL` state and ignores all new commands until the internal timer reaches the target. This does NOT block safety logic—E-Stops still work during a dwell.
+> [!NOTE]
+> If both P and S are specified, S (seconds) takes precedence.
 
-**Usage Example:**
-`G4 S5` (Wait 5 seconds)
+**How It Works:**
+```
+DWELL STATE MACHINE:
+┌──────────────────────────────────────────────────────────────┐
+│                                                               │
+│   1. Parser receives G4 S5                                    │
+│   2. Motion controller enters DWELL state                     │
+│   3. Timer starts counting                                    │
+│   4. All G-code processing PAUSES (queued commands wait)      │
+│   5. SAFETY STILL ACTIVE! E-Stop will still trigger!          │
+│   6. After 5 seconds, exit DWELL → "ok"                       │
+│                                                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Usage Examples:**
+```gcode
+; Wait for 5 seconds (let water flood the cut area)
+G4 S5
+
+; Wait for 500 milliseconds (half second pause between cuts)
+G4 P500
+
+; 10-second pause for blade change
+M0                   ; Optional: M0 pauses indefinitely
+; OR
+G4 S10              ; Fixed 10-second pause
+```
 
 **Expected Output:**
 ```text
 ok
-[MOTION] Dwelling for 5000ms...
+[MOTION] Dwell: 5000 ms
 ok
 ```
 
 **Industrial Use Case:**
-Allowing the water pump to flood the cutting area for 5 seconds before the blade actually starts moving into the stone.
-
----
-
-### `G10` - Save Offsets
-**Command Syntax:**
-`G10 L20 P<sys> [X<val>] [Y<val>]`
-
-**Description:**
-Tells the machine: "Where you are currently standing, call that coordinate X-Value."
-
-**How it works:**
-Calculates the math: `New_Offset = Current_Machine_Pos - Goal_Value`. This is written to the Flash memory immediately so it survives a power-off.
-
-**Usage Example:**
-`G10 L20 P1 X0`
-
-**Expected Output:**
-`ok`
-
-**Industrial Use Case:**
-Bringing the blade to the corner of a slab and declaring it as the "Zero" point ($X=0, Y=0$) for a new job.
+- Allowing the water pump to flood the cutting area before the blade enters the stone
+- Brief pause after plunge to let blade reach full RPM
+- Timing delay in automated sequences
 
 ---
 
 ### `G28` - Homing Sequence
+
 **Command Syntax:**
-`G28 [X Y Z A]`
+```gcode
+G28 [X] [Y] [Z] [A]
+```
 
 **Description:**
-The primary "Find Zero" routine. It searches for the physical metal limit switches to calibrate the machine's internal map.
+Runs the automatic homing sequence to find the **physical limit switches** and establish the machine coordinate origin. This is how the machine "knows" where it is.
 
-**How it works:**
-1.  **Safety Lift**: Moves Z axis to the upper limit first.
-2.  **Sequential Logic**: Homes axes one by one as permitted by the shared PLC contactors.
-3.  **Latch**: Once a switch is hit, it records that exact pulse count as "Zero."
+**Parameters:**
+| Parameter | Description |
+|-----------|-------------|
+| No params | Home ALL axes (Z→Y→X) |
+| `X` | Home X axis only |
+| `Y` | Home Y axis only |
+| `Z` | Home Z axis only |
+| `A` | **Skipped** - A-axis has no motor |
 
-**Usage Example:**
-`G28`
+**How It Works:**
+```
+HOMING SEQUENCE (G28 with no parameters):
+┌────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│  PHASE 1: Z-AXIS HOMING (CRITICAL - LIFT BLADE FIRST!)             │
+│  ═══════════════════════════════════════════════════════════════   │
+│     1. Move Z in positive direction (UP) at SLOW speed             │
+│     2. When Z limit switch triggers:                                │
+│        → Stop motor immediately                                     │
+│        → Record encoder position as Z_MAX                           │
+│        → Set Z machine position = $132 (Z max travel)               │
+│                                                                     │
+│  PHASE 2: Y-AXIS HOMING                                             │
+│  ═══════════════════════════════════════════════════════════════   │
+│     1. Move Y toward home switch (configurable direction)           │
+│     2. On switch trigger: set Y = 0                                 │
+│                                                                     │
+│  PHASE 3: X-AXIS HOMING                                             │
+│  ═══════════════════════════════════════════════════════════════   │
+│     1. Move X toward home switch                                    │
+│     2. On switch trigger: set X = 0                                 │
+│                                                                     │
+│  NOTE: A-axis is SKIPPED - operator must manually position          │
+│                                                                     │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Usage Examples:**
+```gcode
+; Home all axes (recommended at power-up)
+G28
+
+; Home only Z (useful after E-stop recovery)
+G28 Z
+
+; Home X and Y (leave Z where it is)
+G28 X Y
+```
 
 **Expected Output:**
 ```text
 ok
 [MOTION] G28 Homing: X=1 Y=1 Z=1 A=0(manual)
-[MOTION] Homing sequence completed
+[MOTION] Homing Z...
+[MOTION] Z home found at 952.500 mm
+[MOTION] Homing Y...
+[MOTION] Y home found at 0.000 mm
+[MOTION] Homing X...
+[MOTION] X home found at 0.000 mm
+[MOTION] Homing sequence completed successfully
 ok
 ```
 
+**Possible Errors:**
+
+| Error | Meaning | Solution |
+|-------|---------|----------|
+| `G28 homing disabled` | `home_enable` config is off | Set `config set home_enable 1` |
+| `Homing failed - timeout` | Limit switch not triggered in time | Check switch wiring, increase timeout |
+| `A homing skipped` | Normal - A-axis has no motor | Position A manually |
+
 **Industrial Use Case:**
-Run every morning upon power-up to ensure the machine knows its absolute travel limits.
+Run `G28` every morning at power-up to ensure the machine knows its absolute position. This is required before any automatic cutting operations.
 
 ---
 
-### `G30` - Safe Spots
+### `G30` - Go to Predefined Position
+
 **Command Syntax:**
-`G30 [P0|P1]`
+```gcode
+G30 [P<id>]
+```
 
 **Description:**
-Moves to a predefined "Parking Spot."
+Moves to a **predefined "parking" position** stored in configuration. Useful for tool changes, cleaning, or end-of-job parking.
 
 **Parameters:**
-- `P0`: Go to "Machine Safe" position (Park).
-- `P1`: Go to "Tool Change/Clean" position.
+| Parameter | Description | Valid Values |
+|-----------|-------------|--------------|
+| `P0` or none | Safe Position (blade parking) | Default |
+| `P1` | Predefined Position 1 (tool change) | Configurable |
 
-**How it works:**
-Loads fixed coordinates from the `config_keys.h` definitions and executes a standard `G0` rapid move.
-
-**Usage Example:**
-`G30 P1`
-
-**Expected Output:**
-`ok`
-
-**Industrial Use Case:**
-Retracting the blade to a far corner so the operator can safely clean the table with a hose.
-
----
-
-### `G53` - Direct Machine Command
-**Command Syntax:**
-`G53 G0 X100`
-
-**Description:**
-Tells the machine: "Ignore my saved Slab Zeros for just one move and use the physical machine ruler."
-
-**How it works:**
-Temporarily disables the WCS offset calculation in the parser for a single line of code.
+**How It Works:**
+```
+PREDEFINED POSITIONS (stored in NVS config):
+┌────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  P0 (Safe Position):                                            │
+│      KEY_POS_SAFE_X, KEY_POS_SAFE_Y, KEY_POS_SAFE_Z, _A         │
+│      Typical: X=0, Y=0, Z=500 (blade fully raised, at corner)   │
+│                                                                 │
+│  P1 (Tool Change Position):                                     │
+│      KEY_POS_1_X, KEY_POS_1_Y, KEY_POS_1_Z, _A                  │
+│      Typical: X=1500, Y=1500, Z=500 (center of table, high)     │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+```
 
 **Usage Example:**
-`G53 G0 X0`
+```gcode
+; Park at safe position (after job completion)
+G30
 
-**Expected Output:**
-`ok`
-
-**Industrial Use Case:**
-Programmatically moving the bridge to a "Safe Zone" far away from the workpiece regardless of where the slab origin was set.
-
----
-
-### `G92` - Coordinate Displacement
-**Command Syntax:**
-`G92 X0 Y0`
-
-**Description:**
-A temporary, non-permanent "Zero" reset.
-
-**How it works:**
-Applies a math shift to the parser's reporting engine. Unlike `G10`, these values are often lost when the machine is rebooted.
-
-**Usage Example:**
-`G92 X0`
-
-**Expected Output:**
-`ok`
-
-**Industrial Use Case:**
-Quickly setting a new zero for a small "one-off" cut without disturbing the permanent work coordinates stored in `G54`.
-
----
-
-## 🔌 CONTROL CODES (M-CODES)
-
-### `M226` - Intelligent Pin Wait
-**Command Syntax:**
-`M226 P<pin> S<state> [A<type>] [T<timeout>]`
-
-**Description:**
-The "Wait for Signal" command. Pauses the machine until a sensor or switch is triggered.
-
-**Parameters:**
-- `P<pin>`: The input number (0–7).
-- `S<state>`: Wait for ON (1) or OFF (0).
-- `A<type>` (Optional): `0` for PLC board, `1` for Controller board.
-- `T<timeout>` (Optional): Seconds before giving up (Alarm).
-
-**How it works:**
-Enters the `MOTION_WAIT_PIN` state. It performs a loop checking the I2C inputs every 10ms. G-code execution is frozen until the condition is met.
-
-**Usage Example:**
-`M226 P4 S1 T10`
+; Go to tool change position
+G30 P1
+```
 
 **Expected Output:**
 ```text
-ok
-[MOTION] Waiting for Pin 4 (State: 1, Interface: PLC)...
-[MOTION] Pin condition met. Resuming.
+[GCODE] G30 Go to Safe Position: X:0.0 Y:0.0 Z:500.0 A:0.0
 ok
 ```
 
 **Industrial Use Case:**
-Waiting for a "VFD Ready" or "Compressed Air pressure OK" signal before starting the cut.
+At the end of every job, send `G30` to park the blade in the safe corner so the operator can hose down the table without hitting the machine.
 
 ---
 
-### `M0` / `M1` - Program Stop
+### `G53` - Machine Coordinates Mode (One-Shot)
+
+**Command Syntax:**
+```gcode
+G53 G0 X<pos> Y<pos> Z<pos>
+G53 G1 X<pos> Y<pos> Z<pos> F<feed>
+```
+
 **Description:**
-Pauses the job. The operator must physically press "Start" to continue.
+Temporarily **ignores all WCS offsets** for a single move, using raw machine coordinates. The next command returns to normal WCS mode.
+
+**How It Works:**
+```
+MACHINE COORDINATES BYPASS:
+┌────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  Normal:     G0 X100 → Move to Work_X=100 + WCS_Offset         │
+│                                                                 │
+│  With G53:   G53 G0 X100 → Move to Machine_X=100 (no offset!)  │
+│                                                                 │
+│  ONLY affects the command on the SAME LINE as G53!              │
+│  Next command returns to normal WCS mode.                       │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+```
 
 **Usage Example:**
-`M0`
-
-**Expected Output:**
-`[PAUSE] Program paused - press resume to continue`
+```gcode
+G54                    ; Normal work coordinates
+G0 X0 Y0               ; Go to work origin (with offset)
+G53 G0 X0 Y0           ; Go to MACHINE origin (ignoring offset!)
+G0 X0 Y0               ; Back to work origin (WCS restored)
+```
 
 **Industrial Use Case:**
-Stopping the machine to allow the operator to change the blade angle or turn the stone slab.
+Moving to the machine's physical corner regardless of which slab is on the table—useful for maintenance or recalibration.
 
 ---
 
-### `M2` - Job Finished
-**Description:**
-Stops all activities and clears all pending moves. 
+### `G92` - Set Position (Coordinate Shift)
 
-**How it works:**
-Resets the parser state, flushes the motion buffers, and puts the controller back into `IDLE` mode.
-
----
-
-### `M3` / `M5` - Spindle Management
 **Command Syntax:**
-`M3` (ON), `M5` (OFF)
+```gcode
+G92 [X<val>] [Y<val>] [Z<val>] [A<val>]
+```
 
 **Description:**
-Turns the 22kW Saw Blade motor ON or OFF.
+Sets the **current position** to the specified values WITHOUT moving. This is a temporary, session-based zero that may be lost on reboot (unlike G10 L20).
 
-**How it works:**
-Specifically triggers the PCF8574 output pin labeled `SPEED_FAST` which acts as the Spindle Run signal in the current hardware configuration.
+> [!WARNING]
+> G92 offsets are additive to WCS offsets and can cause confusion. Prefer `G10 L20` for permanent offset changes.
 
 **Usage Example:**
-`M3`
+```gcode
+; Set current position as X=0 (temporary)
+G92 X0
 
-**Expected Output:**
-`ok`
+; Set all axes to origin
+G92 X0 Y0 Z0 A0
+```
+
+**Industrial Use Case:**
+Quick, temporary zero for a single job—used when you don't want to disturb the permanent G54 offset.
 
 ---
 
-### `M112` - Emergency Halt
-**Description:**
-Digital E-Stop. Halts EVERYTHING immediately.
+## 🔌 MACHINE CONTROL CODES (M-CODES)
 
-**How it works:**
-Forcefully kills the `RUN` signal to the PLC and locks the motion engine in an `ALARM` state.
+---
+
+### `M0` / `M1` - Program Stop (Pause)
+
+**Command Syntax:**
+```gcode
+M0    ; Mandatory stop - always pauses
+M1    ; Optional stop - pauses unless "skip optional stops" is enabled
+```
+
+**Description:**
+Pauses the job. The operator must **press the physical Resume button** or send `~` to continue.
+
+**How It Works:**
+```
+PAUSE STATE MACHINE:
+┌────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   1. M0/M1 received                                             │
+│   2. Motion controller enters PAUSED state                      │
+│   3. All axes stop (decelerate gracefully)                      │
+│   4. LCD displays: "PAUSED: Resume?"                            │
+│   5. Controller WAITS for:                                       │
+│      - Physical Resume button OR                                 │
+│      - Serial '~' character OR                                   │
+│      - Web UI "Resume" button                                    │
+│   6. On resume: continue from exact pause point                  │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Expected Output:**
+```text
+[PAUSE] Program paused - press resume to continue
+```
+
+**Industrial Use Case:**
+- Blade change during a long job
+- Material inspection before continuing
+- Operator coffee break 😄
+
+---
+
+### `M2` - Program End
+
+**Command Syntax:**
+```gcode
+M2
+```
+
+**Description:**
+Signals the **end of the G-code program**. Clears all pending motion, resets parser state, returns to idle.
+
+**Industrial Use Case:**
+Always place `M2` at the end of your G-code files to signal proper program termination.
+
+---
+
+### `M3` / `M5` - Spindle Control
+
+**Command Syntax:**
+```gcode
+M3    ; Spindle ON (blade motor start)
+M5    ; Spindle OFF (blade motor stop)
+```
+
+**Description:**
+Controls the 22kW saw blade motor through the VFD.
+
+> [!CAUTION]
+> On the BISSO E350, the spindle and axis motors share the same VFD. M3 enables "speed mode" but the spindle typically runs only when axes are NOT moving. The PLC handles this interlock.
+
+**How It Works:**
+- `M3` sets the `SPEED_1` relay on the PCF8574 I/O expander
+- The PLC interprets this as "spindle run request"
+- Actual motor start depends on VFD ready signal
+
+---
+
+### `M112` - Emergency Stop (Software E-Stop)
+
+**Command Syntax:**
+```gcode
+M112
+```
+
+**Description:**
+Triggers an **immediate software emergency stop**. All motion halts, system enters ALARM state.
+
+> [!WARNING]
+> This is equivalent to pressing the physical E-Stop button. Machine must be reset with `M999` or power cycle before continuing.
 
 ---
 
 ### `M114` - Report Position
-**Description:**
-Asks the machine: "Where are you standing right now?"
 
-**Expected Output:**
-`[POS:X:500.125 Y:200.000 Z:-10.000 A:0.000]`
-
-**Industrial Use Case:**
-Checking the exact depth of a cut remotely from a PC.
-
----
-
-### `M115` - Serial Identification
-**Description:**
-Asks the machine: "Who are you?" 
-
-**Expected Output:**
-`[VER:3.5.25 BISSO-E350 CAPABILITY:4-axis,M154]`
-
----
-
-### `M117` - LCD Message
 **Command Syntax:**
-`M117 <text>`
+```gcode
+M114
+```
 
 **Description:**
-Prints a custom message on the 20x4 LCD screen for the operator.
-
-**Usage Example:**
-`M117 CUT FINISHED`
-
----
-
-### `M154` - Automatic Reporting
-**Description:**
-Starts sending position updates to the computer every second automatically.
-
-**Usage Example:**
-`M154 S1`
-
----
-
-### `M255` - Energy Save
-**Description:**
-Sets the timer for the LCD backlight to turn off.
-
-**Usage Example:**
-`M255 S60` (Sleep after 1 minute)
-
----
-
-### `M999` - System Resync
-**Command Syntax:**
-`M999`
-
-**Description:**
-The "Fix-It" command. If the parser gets confused or an error message won't go away, use this to reboot the G-code engine.
-
-**How it works:**
-1.  **Clear Flags**: Resets the pause, incremental, and machine-coordinate flags.
-2.  **Buffer Flush**: Clears the internal string processing buffers.
-3.  **State Re-sync**: Polls the motion state to ensure truth between the parser and the motors.
-
-**Usage Example:**
-`M999`
+Reports the current position of all axes in both work and machine coordinates.
 
 **Expected Output:**
-`[GCODE] Parser resynced. Ready.`
+```text
+[POS:X:1234.567 Y:890.123 Z:50.000 A:0.000]
+```
 
-**Industrial Use Case:**
-Recovering from a "Parser Timeout" or a malformed G-code file error without having to cycle the main power switch.
+---
+
+### `M115` - Report Firmware Info
+
+**Command Syntax:**
+```gcode
+M115
+```
+
+**Description:**
+Reports firmware version and machine capabilities.
+
+**Expected Output:**
+```text
+[VER:3.5.26 BISSO-E350]
+[OPT:B#,M,T#]
+[CAPABILITY:4-axis]
+[CAPABILITY:adaptive-feed]
+[CAPABILITY:G4-dwell]
+[CAPABILITY:M114-position]
+[CAPABILITY:M154-auto-report]
+[CAPABILITY:M117-lcd-msg]
+[CAPABILITY:WCS-6-system]
+[CAPABILITY:soft-limits]
+```
+
+---
+
+### `M117` - Display LCD Message
+
+**Command Syntax:**
+```gcode
+M117 <text>
+```
+
+**Description:**
+Displays a custom message on the 20x4 LCD screen. Message displays for 10 seconds then clears.
+
+**Usage Examples:**
+```gcode
+M117 CUTTING EDGE 1 OF 5
+M117 JOB COMPLETE!
+M117 CHANGE BLADE NOW
+```
+
+---
+
+### `M154` - Position Auto-Report
+
+**Command Syntax:**
+```gcode
+M154 S<interval>
+```
+
+**Description:**
+Enables automatic position reporting at the specified interval.
+
+**Parameters:**
+| Parameter | Description | Valid Range |
+|-----------|-------------|-------------|
+| `S0` | Disable auto-report | - |
+| `S1` | Report every 1 second | 1-60 seconds |
+
+**Usage Example:**
+```gcode
+M154 S1    ; Report position every second
+M154 S0    ; Stop auto-reporting
+```
+
+---
+
+### `M226` - Wait for Pin State
+
+**Command Syntax:**
+```gcode
+M226 P<pin> S<state> [A<type>] [T<timeout>]
+```
+
+**Description:**
+Pauses program execution until an input pin reaches a specified state. Used for sensor-based interlocks.
+
+**Parameters:**
+| Parameter | Description | Valid Values |
+|-----------|-------------|--------------|
+| `P<pin>` | Pin number | 0-7 (I2C) or 0-39 (GPIO) |
+| `S<state>` | Wait for this state | 0=LOW, 1=HIGH |
+| `A<type>` | Pin interface type | 0=I73, 1=Board, 2=GPIO |
+| `T<timeout>` | Timeout in seconds | 0=never, 1-300 |
+
+**Usage Example:**
+```gcode
+; Wait for VFD ready signal (pin 3 goes HIGH)
+M226 P3 S1 T10
+
+; Wait for coolant pressure OK
+M226 P5 S1 A1 T5
+```
+
+---
+
+### `M255` - LCD Sleep Timeout
+
+**Command Syntax:**
+```gcode
+M255 S<seconds>
+```
+
+**Description:**
+Sets the LCD backlight auto-off timeout for energy saving.
+
+**Parameters:**
+| Parameter | Description |
+|-----------|-------------|
+| `S0` | Never sleep (always on) |
+| `S60` | Sleep after 60 seconds |
+| `S300` | Sleep after 5 minutes |
+
+---
+
+### `M999` - System Reset/Resync
+
+**Command Syntax:**
+```gcode
+M999
+```
+
+**Description:**
+Resets the G-code parser and clears error/alarm states without rebooting. The "fix-it" command.
+
+**When To Use:**
+- After E-stop recovery
+- Parser timeout errors
+- After M112 software E-stop
+- Any "stuck" condition
+
+**Expected Output:**
+```text
+[GCODE] Parser resynced. Ready.
+ok
+```
 
 ---
 
 ## 🕹️ JOGGING & REAL-TIME CONTROLS
 
-### `$` - Grbl Settings Report
-**Command Syntax:**
-`$`
-
-**Description:**
-The "Configuration Inspector." It prints a list of all internal tuning values (like motor scaling and speed limits) using the standard Grbl `$ID=Value` format.
-
-**How it works:**
-Queries the NVS system for all keys starting with `ppm_` and `limit_`. It formats them into a numbered list that third-party CNC software can understand.
-
-**Expected Output:**
-```text
-$100=200.000
-$101=200.000
-$110=1500.000
-...
-ok
-```
+These commands are processed **immediately** (not queued) for real-time machine control.
 
 ---
 
 ### `?` - Real-Time Status Report
+
 **Command Syntax:**
-`?` (Single character, no Enter required)
+```text
+?
+```
+(Single character, no Enter required)
 
 **Description:**
-The "Heartbeat" of the machine. It provides a one-line summary of where the machine is and what it is currently doing (Moving, Homing, Alarmed, or Idle).
+Returns instant status report showing machine state, position, and buffer status.
 
-**How it works:**
-This character is intercepted by the Serial Interrupt *instantly*. It bypasses the command buffer. The CPU immediately prints the current state string, Machine Position (MPos), Work Position (WPos), and Buffer status.
+**Response Format:**
+```text
+<State|MPos:X,Y,Z,A|WPos:X,Y,Z,A|Bf:buffer,127|FS:feed,spindle>
+```
 
-**Expected Output:**
-`<Run|MPos:100.000,50.000,0.000,0.000|WPos:0.000,0.000,0.000,0.000|Bf:30,127|FS:1200,0>`
+**State Values:**
+| State | Meaning |
+|-------|---------|
+| `Idle` | Ready for commands |
+| `Run` | Executing motion |
+| `Hold:0` | Paused (M0/M1) |
+| `Hold:1` | Safety pause (alarm) |
+| `Home` | Homing in progress |
+| `Alarm` | Error condition |
+
+**Example Output:**
+```text
+<Run|MPos:1234.000,567.000,50.000,0.000|WPos:100.000,50.000,50.000,0.000|Bf:28,127|FS:1200,0>
+```
 
 ---
 
 ### `!` - Feed Hold (Pause)
+
 **Command Syntax:**
-`!` (Single character)
+```text
+!
+```
+(Single character)
 
 **Description:**
-The "Soft Stop." It tells the machine to stop whatever it is doing immediately, but without losing its place in the program.
-
-**How it works:**
-Instantly clears the `RUN` bit to the PLC and freezes the internal motion segment. It preserves the "Distance Remaining" so that you can resume the cut later.
+**Instantly** stops axis motion, preserving the current program position. Resume with `~`.
 
 ---
 
 ### `~` - Cycle Start (Resume)
+
 **Command Syntax:**
-`~` (Single character)
+```text
+~
+```
+(Single character)
 
 **Description:**
-The "Go" button. It resumes execution after a `!` hold or an `M0` pause.
+Resumes motion after `!` (feed hold) or `M0/M1` (program pause).
 
 ---
 
-### `Ctrl-X` - Soft Reset
+### `Ctrl-X` / `0x18` - Soft Reset
+
 **Command Syntax:**
-`0x18` (Hex character)
+```text
+Ctrl-X    (ASCII 0x18)
+```
 
 **Description:**
-The "Panic Button." It stops all motion, clears all buffers, and re-initializes the controller without a full hardware reboot.
+Performs a **software reset**—stops all motion, clears buffers, re-initializes. Does not reboot the ESP32.
 
 ---
 
 ### `$J=` - Safe Jogging
+
 **Command Syntax:**
-`$J=G91 X<dist> F<speed>`
+```gcode
+$J=G91 X<dist> F<speed>
+$J=G90 X<pos> F<speed>
+```
 
 **Description:**
-The "manual control" mode. Allows you to move the machine using a joystick or arrow keys in small steps. Unlike `G0/G1`, Jogging moves can be cancelled instantly without leaving the machine in an error state.
+Special jogging mode for manual axis positioning. Unlike G0/G1:
+- Can be cancelled instantly with `!` or `0x85`
+- Does not affect G-code program state
+- Safe for pendant/joystick control
 
-**Usage Example:**
-`$J=G91 X100 F1500` (Jog X right by 100mm)
+**Usage Examples:**
+```gcode
+; Jog X right by 100mm at 1500 mm/min
+$J=G91 X100 F1500
 
-**Industrial Use Case:**
-Aligning the blade precisely with a chalk mark on the stone slab before starting a cut.
+; Jog Y forward by 50mm
+$J=G91 Y50 F1000
+
+; Jog to absolute work position
+$J=G90 X500 Y300 F2000
+```
+
+**Error Codes:**
+| Error | Meaning |
+|-------|---------|
+| `error:8` | Not idle (already moving) |
+| `error:3` | Motion rejected |
+| `error:33` | Invalid axis value |
 
 ---
 
 ## ⚙️ CONFIGURATION SETTINGS ($)
 
-### `$100-$103` - Axis Scaling (Pulses per mm)
-**Syntax:** `$100=Value` (X), `$101=Value` (Y), `$102=Value` (Z), `$103=Value` (A)
-
-**Description:**
-The "Ruler Calibration." Tells the controller how many electrical clicks from the encoder equal one millimeter of movement.
-
-**How it works:**
-The motion engine uses this as a multiplication factor. If `$100=200`, and you ask for 1mm, the engine waits for 200 pulses from the WJ66 interface.
+These Grbl-compatible settings configure machine parameters. Changes are saved to NVS Flash.
 
 ---
 
-### `$110-$113` - Speed Calibration
-**Syntax:** `$110=Value` (X), `$111=Value` (Y), `$112=Value` (Z), `$113=Value` (A)
+### Reading Settings
 
-**Description:**
-Records the "Real World" speed of the FAST speed profile in mm/min. Used to ensure the time-remaining estimates are accurate.
+**Command:** `$` (show all settings)
+
+**Output:**
+```text
+$100=200.000      ; X pulses per mm
+$101=200.000      ; Y pulses per mm
+$102=200.000      ; Z pulses per mm
+$103=200.000      ; A pulses per mm (if applicable)
+$110=1500.000     ; X max speed (mm/min)
+$111=1500.000     ; Y max speed (mm/min)
+$112=500.000      ; Z max speed (mm/min)
+$113=500.000      ; A max speed (mm/min)
+$120=100.000      ; Default acceleration
+$130=5000.000     ; X max travel (mm)
+$131=3500.000     ; Y max travel (mm)
+$132=1000.000     ; Z max travel (mm)
+ok
+```
 
 ---
 
-### `$120` - Default Acceleration
-**Description:**
-Sets how "aggressively" the internal software calculates the lead-in to a move. 
+### Setting Values
+
+**Command:** `$<id>=<value>`
+
+**Example:**
+```text
+$100=250          ; Set X pulses per mm to 250
+$130=4500         ; Set X max travel to 4500mm
+```
 
 ---
 
-### `$130-$132` - Hard Workspace Limits
-**Syntax:** `$130=Value` (X), `$131=Value` (Y), `$132=Value` (Z)
+### Setting Reference Table
 
-**Description:**
-Defines the "End of the Rails." If the machine travels beyond these numbers, it will trigger an immediate emergency stop to prevent physical damage.
+| Setting | Description | Default | Unit |
+|---------|-------------|---------|------|
+| `$100` | X-axis encoder scale (pulses/mm) | 200 | pulses/mm |
+| `$101` | Y-axis encoder scale | 200 | pulses/mm |
+| `$102` | Z-axis encoder scale | 200 | pulses/mm |
+| `$103` | A-axis encoder scale | 200 | pulses/deg |
+| `$110` | X-axis maximum speed | 1500 | mm/min |
+| `$111` | Y-axis maximum speed | 1500 | mm/min |
+| `$112` | Z-axis maximum speed | 500 | mm/min |
+| `$113` | A-axis maximum speed | 500 | deg/min |
+| `$120` | Default acceleration | 100 | mm/sec² |
+| `$130` | X-axis maximum travel (soft limit) | 5000 | mm |
+| `$131` | Y-axis maximum travel | 3500 | mm |
+| `$132` | Z-axis maximum travel | 1000 | mm |
 
 ---
 
-**Version:** 1.7 Ultimate Master  
+### Other Grbl Commands
+
+| Command | Description |
+|---------|-------------|
+| `$H` | Run homing cycle (same as G28) |
+| `$G` | Show parser state (active modal codes) |
+
+---
+
+## 🔧 ERROR CODES REFERENCE
+
+When something goes wrong, the controller returns error codes in Grbl format:
+
+| Code | Name | Description | Solution |
+|------|------|-------------|----------|
+| `error:1` | Unknown command | Command not recognized | Check spelling |
+| `error:3` | Unsupported | Feature not available | Check firmware version |
+| `error:8` | Not idle | Command requires idle state | Wait for motion to complete |
+| `error:9` | Limit switch | Soft or hard limit triggered | Move away from limit, clear alarm |
+| `error:20` | G-code parse error | Invalid G-code syntax | Check command format |
+| `error:22` | Soft limit exceeded | Target outside $130-$132 range | Reduce target value |
+| `error:33` | Invalid value | Numeric parameter out of range | Check parameter format |
+
+---
+
+## 📋 COMPLETE COMMAND QUICK REFERENCE
+
+### Motion Commands
+| Command | Description |
+|---------|-------------|
+| `G0 X Y Z A` | Rapid positioning |
+| `G1 X Y Z A F` | Linear cutting move |
+| `G28 X Y Z A` | Homing sequence |
+| `G30 P0/P1` | Go to predefined position |
+| `$J=G91 X F` | Safe jogging |
+
+### Coordinate Commands
+| Command | Description |
+|---------|-------------|
+| `G54-G59` | Select work coordinate system |
+| `G90` | Absolute coordinates |
+| `G91` | Incremental coordinates |
+| `G92 X Y Z A` | Set position (temporary) |
+| `G10 L20 P X Y Z A` | Set WCS offset (permanent) |
+| `G53 G0 X Y Z` | Machine coordinates (one-shot) |
+
+### Utility Commands
+| Command | Description |
+|---------|-------------|
+| `G4 P/S` | Dwell (wait) |
+| `M0/M1` | Program stop/pause |
+| `M2` | Program end |
+| `M3/M5` | Spindle on/off |
+| `M112` | Emergency stop |
+| `M999` | System reset |
+
+### Reporting Commands
+| Command | Description |
+|---------|-------------|
+| `?` | Status report |
+| `$` | Show settings |
+| `$G` | Parser state |
+| `M114` | Position report |
+| `M115` | Firmware info |
+
+### Real-Time Controls
+| Command | Description |
+|---------|-------------|
+| `!` | Feed hold |
+| `~` | Resume |
+| `Ctrl-X` | Soft reset |
+
+---
+
+**Document Version:** 2.0 Ultimate Master  
+**Last Updated:** 2026-01-27  
+**Firmware Compatibility:** v3.5.x+  
 **Author:** Antigravity (DeepMind Advanced Agentic Coding)  
-**Machine:** BISSO E350 PosiPro CNC  
-**Source Truth:** firmware:v3.5.25 / cli_base.cpp / gcode_parser.cpp
+**Machine:** BISSO E350 PosiPro 4-Axis CNC Bridge Saw
+
+---
+
+> [!TIP]
+> For CLI commands (config, diagnostics, wifi, etc.), see [CLI_COMMANDS_REFERENCE.md](CLI_COMMANDS_REFERENCE.md)
