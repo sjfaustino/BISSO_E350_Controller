@@ -17,6 +17,150 @@
 
 static bool validateBool(JsonVariant value, char* error_msg, size_t len);
 
+// ============================================================================
+// P2 DRY: Table-driven config field descriptors for import/export
+// ============================================================================
+
+typedef enum {
+  CFG_INT,
+  CFG_FLOAT,
+  CFG_STRING
+} config_field_type_t;
+
+typedef struct {
+  const char* json_key;    // Key in JSON object
+  const char* config_key;  // Key in config system (NVS)
+  config_field_type_t type;
+} config_field_t;
+
+/**
+ * @brief Import fields from JSON object using field descriptors
+ * @param obj Source JSON object
+ * @param fields Array of field descriptors
+ * @param count Number of field descriptors
+ */
+static void importFields(JsonObject& obj, const config_field_t* fields, size_t count) {
+  for (size_t i = 0; i < count; i++) {
+    switch (fields[i].type) {
+      case CFG_INT:
+        if (obj[fields[i].json_key].is<int>()) {
+          configSetInt(fields[i].config_key, obj[fields[i].json_key].as<int>());
+        }
+        break;
+      case CFG_FLOAT:
+        if (obj[fields[i].json_key].is<float>()) {
+          configSetFloat(fields[i].config_key, obj[fields[i].json_key].as<float>());
+        }
+        break;
+      case CFG_STRING:
+        if (obj[fields[i].json_key].is<const char*>()) {
+          configSetString(fields[i].config_key, obj[fields[i].json_key].as<const char*>());
+        }
+        break;
+    }
+  }
+}
+
+// Field descriptor tables for each config section
+static const config_field_t motion_fields[] = {
+  {"soft_limit_x_low", KEY_X_LIMIT_MIN, CFG_INT},
+  {"soft_limit_x_high", KEY_X_LIMIT_MAX, CFG_INT},
+  {"soft_limit_y_low", KEY_Y_LIMIT_MIN, CFG_INT},
+  {"soft_limit_y_high", KEY_Y_LIMIT_MAX, CFG_INT},
+  {"soft_limit_z_low", KEY_Z_LIMIT_MIN, CFG_INT},
+  {"soft_limit_z_high", KEY_Z_LIMIT_MAX, CFG_INT},
+  {"home_enable", KEY_HOME_ENABLE, CFG_INT},
+  {"home_fast", KEY_HOME_PROFILE_FAST, CFG_INT},
+  {"home_slow", KEY_HOME_PROFILE_SLOW, CFG_INT},
+};
+
+static const config_field_t vfd_fields[] = {
+  {"enabled", KEY_VFD_EN, CFG_INT},
+  {"address", KEY_VFD_ADDR, CFG_INT},
+};
+
+static const config_field_t encoder_fields[] = {
+  {"ppm_x", KEY_PPM_X, CFG_INT},
+  {"ppm_y", KEY_PPM_Y, CFG_INT},
+  {"ppm_z", KEY_PPM_Z, CFG_INT},
+  {"feedback_en", KEY_ENC_FEEDBACK, CFG_INT},
+};
+
+static const config_field_t network_int_fields[] = {
+  {"wifi_ap_en", KEY_WIFI_AP_EN, CFG_INT},
+  {"eth_en", KEY_ETH_ENABLED, CFG_INT},
+  {"eth_dhcp", KEY_ETH_DHCP, CFG_INT},
+};
+
+static const config_field_t network_str_fields[] = {
+  {"wifi_ssid", KEY_WIFI_SSID, CFG_STRING},
+  {"wifi_pass", KEY_WIFI_PASS, CFG_STRING},
+  {"wifi_ap_ssid", KEY_WIFI_AP_SSID, CFG_STRING},
+  {"wifi_ap_pass", KEY_WIFI_AP_PASS, CFG_STRING},
+};
+
+static const config_field_t system_fields[] = {
+  {"buzzer_en", KEY_BUZZER_EN, CFG_INT},
+  {"status_light_en", KEY_STATUS_LIGHT_EN, CFG_INT},
+  {"recovery_en", KEY_RECOV_EN, CFG_INT},
+  {"lcd_en", KEY_LCD_EN, CFG_INT},
+  {"bootlog_en", KEY_BOOTLOG_EN, CFG_INT},
+  {"cli_echo", KEY_CLI_ECHO, CFG_INT},
+  {"ota_chk_en", KEY_OTA_CHECK_EN, CFG_INT},
+};
+
+static const config_field_t spindle_fields[] = {
+  {"jxk10_en", KEY_JXK10_ENABLED, CFG_INT},
+  {"jxk10_addr", KEY_JXK10_ADDR, CFG_INT},
+  {"yhtc05_en", KEY_YHTC05_ENABLED, CFG_INT},
+  {"yhtc05_addr", KEY_YHTC05_ADDR, CFG_INT},
+  {"pause_en", KEY_SPINDL_PAUSE_EN, CFG_INT},
+};
+
+static const config_field_t serial_fields[] = {
+  {"encoder_baud", KEY_ENC_BAUD, CFG_INT},
+  {"encoder_iface", KEY_ENC_INTERFACE, CFG_INT},
+  {"encoder_addr", KEY_ENC_ADDR, CFG_INT},
+  {"enc_proto", KEY_ENC_PROTO, CFG_INT},
+  {"rs485_baud", KEY_RS485_BAUD, CFG_INT},
+  {"i2c_speed", KEY_I2C_SPEED, CFG_INT},
+};
+
+static const config_field_t behavior_int_fields[] = {
+  {"jog_speed", KEY_DEFAULT_SPEED, CFG_INT},
+  {"jog_accel", KEY_DEFAULT_ACCEL, CFG_INT},
+  {"x_approach", KEY_X_APPROACH, CFG_INT},
+  {"x_approach_med", KEY_X_APPROACH_MED, CFG_INT},
+  {"buf_en", KEY_MOTION_BUFFER_ENABLE, CFG_INT},
+  {"strict_limits", KEY_MOTION_STRICT_LIMITS, CFG_INT},
+  {"stop_timeout", KEY_STOP_TIMEOUT, CFG_INT},
+  {"stall_timeout", KEY_STALL_TIMEOUT, CFG_INT},
+  {"buttons_en", KEY_BUTTONS_ENABLED, CFG_INT},
+};
+
+static const config_field_t behavior_float_fields[] = {
+  {"target_margin", KEY_TARGET_MARGIN, CFG_FLOAT},
+};
+
+static const config_field_t calibration_fields[] = {
+  {"spd_x", KEY_SPEED_CAL_X, CFG_FLOAT},
+  {"spd_y", KEY_SPEED_CAL_Y, CFG_FLOAT},
+  {"spd_z", KEY_SPEED_CAL_Z, CFG_FLOAT},
+  {"spd_a", KEY_SPEED_CAL_A, CFG_FLOAT},
+};
+
+static const config_field_t positions_fields[] = {
+  {"safe_x", KEY_POS_SAFE_X, CFG_FLOAT},
+  {"safe_y", KEY_POS_SAFE_Y, CFG_FLOAT},
+  {"safe_z", KEY_POS_SAFE_Z, CFG_FLOAT},
+  {"safe_a", KEY_POS_SAFE_A, CFG_FLOAT},
+  {"p1_x", KEY_POS_1_X, CFG_FLOAT},
+  {"p1_y", KEY_POS_1_Y, CFG_FLOAT},
+  {"p1_z", KEY_POS_1_Z, CFG_FLOAT},
+  {"p1_a", KEY_POS_1_A, CFG_FLOAT},
+};
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 
 // Configuration defaults (matching Altivar 31 + system constraints)
@@ -622,6 +766,8 @@ void apiConfigPrint(void) {
  * @brief Import configuration from JSON
  * @param doc JSON document containing configuration
  * @return true if import successful
+ * 
+ * P2 DRY: Uses table-driven importFields() helper instead of individual if statements
  */
 bool apiConfigImportJSON(const JsonVariant& doc) {
   if (doc.isNull()) return false;
@@ -629,82 +775,47 @@ bool apiConfigImportJSON(const JsonVariant& doc) {
   // 1. Motion Config
   if (doc["motion"].is<JsonObject>()) {
     JsonObject m = doc["motion"];
-    if (m["soft_limit_x_low"].is<int>()) configSetInt(KEY_X_LIMIT_MIN, m["soft_limit_x_low"]);
-    if (m["soft_limit_x_high"].is<int>()) configSetInt(KEY_X_LIMIT_MAX, m["soft_limit_x_high"]);
-    if (m["soft_limit_y_low"].is<int>()) configSetInt(KEY_Y_LIMIT_MIN, m["soft_limit_y_low"]);
-    if (m["soft_limit_y_high"].is<int>()) configSetInt(KEY_Y_LIMIT_MAX, m["soft_limit_y_high"]);
-    if (m["soft_limit_z_low"].is<int>()) configSetInt(KEY_Z_LIMIT_MIN, m["soft_limit_z_low"]);
-    if (m["soft_limit_z_high"].is<int>()) configSetInt(KEY_Z_LIMIT_MAX, m["soft_limit_z_high"]);
-    
-    // Extras
-    if (m["home_enable"].is<int>()) configSetInt(KEY_HOME_ENABLE, m["home_enable"]);
-    if (m["home_fast"].is<int>()) configSetInt(KEY_HOME_PROFILE_FAST, m["home_fast"]);
-    if (m["home_slow"].is<int>()) configSetInt(KEY_HOME_PROFILE_SLOW, m["home_slow"]);
+    importFields(m, motion_fields, ARRAY_SIZE(motion_fields));
   }
 
   // 2. VFD Config
   if (doc["vfd"].is<JsonObject>()) {
     JsonObject v = doc["vfd"];
-    if (v["enabled"].is<int>()) configSetInt(KEY_VFD_EN, v["enabled"]);
-    if (v["address"].is<int>()) configSetInt(KEY_VFD_ADDR, v["address"]);
+    importFields(v, vfd_fields, ARRAY_SIZE(vfd_fields));
   }
 
   // 3. Encoder Config
   if (doc["encoder"].is<JsonObject>()) {
     JsonObject e = doc["encoder"];
-    if (e["ppm_x"].is<int>()) configSetInt(KEY_PPM_X, e["ppm_x"]);
-    if (e["ppm_y"].is<int>()) configSetInt(KEY_PPM_Y, e["ppm_y"]);
-    if (e["ppm_z"].is<int>()) configSetInt(KEY_PPM_Z, e["ppm_z"]);
-    if (e["feedback_en"].is<int>()) configSetInt(KEY_ENC_FEEDBACK, e["feedback_en"]);
+    importFields(e, encoder_fields, ARRAY_SIZE(encoder_fields));
   }
 
-  // 4. Network
+  // 4. Network (has both int and string fields)
   if (doc["network"].is<JsonObject>()) {
     JsonObject n = doc["network"];
-    if (n["wifi_ap_en"].is<int>()) configSetInt(KEY_WIFI_AP_EN, n["wifi_ap_en"]);
-    if (n["eth_en"].is<int>()) configSetInt(KEY_ETH_ENABLED, n["eth_en"]);
-    if (n["eth_dhcp"].is<int>()) configSetInt(KEY_ETH_DHCP, n["eth_dhcp"]);
-    // Credentials might be skipped for security or included
-    if (n["wifi_ssid"].is<const char*>()) configSetString(KEY_WIFI_SSID, n["wifi_ssid"]);
-    if (n["wifi_pass"].is<const char*>()) configSetString(KEY_WIFI_PASS, n["wifi_pass"]);
-    if (n["wifi_ap_ssid"].is<const char*>()) configSetString(KEY_WIFI_AP_SSID, n["wifi_ap_ssid"]);
-    if (n["wifi_ap_pass"].is<const char*>()) configSetString(KEY_WIFI_AP_PASS, n["wifi_ap_pass"]);
+    importFields(n, network_int_fields, ARRAY_SIZE(network_int_fields));
+    importFields(n, network_str_fields, ARRAY_SIZE(network_str_fields));
   }
 
   // 5. System
   if (doc["system"].is<JsonObject>()) {
     JsonObject s = doc["system"];
-    if (s["buzzer_en"].is<int>()) configSetInt(KEY_BUZZER_EN, s["buzzer_en"]);
-    if (s["status_light_en"].is<int>()) configSetInt(KEY_STATUS_LIGHT_EN, s["status_light_en"]);
-    if (s["recovery_en"].is<int>()) configSetInt(KEY_RECOV_EN, s["recovery_en"]);
-    if (s["lcd_en"].is<int>()) configSetInt(KEY_LCD_EN, s["lcd_en"]);
-    if (s["bootlog_en"].is<int>()) configSetInt(KEY_BOOTLOG_EN, s["bootlog_en"]);
-    if (s["cli_echo"].is<int>()) configSetInt(KEY_CLI_ECHO, s["cli_echo"]);
-    if (s["ota_chk_en"].is<int>()) configSetInt(KEY_OTA_CHECK_EN, s["ota_chk_en"]);
+    importFields(s, system_fields, ARRAY_SIZE(system_fields));
   }
 
   // 6. Spindle
   if (doc["spindle"].is<JsonObject>()) {
-     JsonObject sp = doc["spindle"];
-     if (sp["jxk10_en"].is<int>()) configSetInt(KEY_JXK10_ENABLED, sp["jxk10_en"]);
-     if (sp["jxk10_addr"].is<int>()) configSetInt(KEY_JXK10_ADDR, sp["jxk10_addr"]);
-     if (sp["yhtc05_en"].is<int>()) configSetInt(KEY_YHTC05_ENABLED, sp["yhtc05_en"]);
-     if (sp["yhtc05_addr"].is<int>()) configSetInt(KEY_YHTC05_ADDR, sp["yhtc05_addr"]);
-     if (sp["pause_en"].is<int>()) configSetInt(KEY_SPINDL_PAUSE_EN, sp["pause_en"]);
+    JsonObject sp = doc["spindle"];
+    importFields(sp, spindle_fields, ARRAY_SIZE(spindle_fields));
   }
 
   // 7. Serial
   if (doc["serial"].is<JsonObject>()) {
-     JsonObject sr = doc["serial"];
-     if (sr["encoder_baud"].is<int>()) configSetInt(KEY_ENC_BAUD, sr["encoder_baud"]);
-     if (sr["encoder_iface"].is<int>()) configSetInt(KEY_ENC_INTERFACE, sr["encoder_iface"]);
-     if (sr["encoder_addr"].is<int>()) configSetInt(KEY_ENC_ADDR, sr["encoder_addr"]);
-     if (sr["enc_proto"].is<int>()) configSetInt(KEY_ENC_PROTO, sr["enc_proto"]);
-     if (sr["rs485_baud"].is<int>()) configSetInt(KEY_RS485_BAUD, sr["rs485_baud"]);
-     if (sr["i2c_speed"].is<int>()) configSetInt(KEY_I2C_SPEED, sr["i2c_speed"]);
+    JsonObject sr = doc["serial"];
+    importFields(sr, serial_fields, ARRAY_SIZE(serial_fields));
   }
 
-  // 8. Hardware Pins
+  // 8. Hardware Pins (special handling - uses setPin instead of configSet)
   if (doc["hardware"].is<JsonObject>()) {
     JsonObject h = doc["hardware"];
     for (size_t i = 0; i < SIGNAL_COUNT; i++) {
@@ -715,41 +826,23 @@ bool apiConfigImportJSON(const JsonVariant& doc) {
     }
   }
 
-  // 9. Behavior
+  // 9. Behavior (has both int and float fields)
   if (doc["behavior"].is<JsonObject>()) {
     JsonObject b = doc["behavior"];
-    if (b["jog_speed"].is<int>()) configSetInt(KEY_DEFAULT_SPEED, b["jog_speed"]);
-    if (b["jog_accel"].is<int>()) configSetInt(KEY_DEFAULT_ACCEL, b["jog_accel"]);
-    if (b["x_approach"].is<int>()) configSetInt(KEY_X_APPROACH, b["x_approach"]);
-    if (b["x_approach_med"].is<int>()) configSetInt(KEY_X_APPROACH_MED, b["x_approach_med"]);
-    if (b["target_margin"].is<float>()) configSetFloat(KEY_TARGET_MARGIN, b["target_margin"]);
-    if (b["buf_en"].is<int>()) configSetInt(KEY_MOTION_BUFFER_ENABLE, b["buf_en"]);
-    if (b["strict_limits"].is<int>()) configSetInt(KEY_MOTION_STRICT_LIMITS, b["strict_limits"]);
-    if (b["stop_timeout"].is<int>()) configSetInt(KEY_STOP_TIMEOUT, b["stop_timeout"]);
-    if (b["stall_timeout"].is<int>()) configSetInt(KEY_STALL_TIMEOUT, b["stall_timeout"]);
-    if (b["buttons_en"].is<int>()) configSetInt(KEY_BUTTONS_ENABLED, b["buttons_en"]);
+    importFields(b, behavior_int_fields, ARRAY_SIZE(behavior_int_fields));
+    importFields(b, behavior_float_fields, ARRAY_SIZE(behavior_float_fields));
   }
 
   // 10. Calibration
   if (doc["calibration"].is<JsonObject>()) {
     JsonObject c = doc["calibration"];
-    if (c["spd_x"].is<float>()) configSetFloat(KEY_SPEED_CAL_X, c["spd_x"]);
-    if (c["spd_y"].is<float>()) configSetFloat(KEY_SPEED_CAL_Y, c["spd_y"]);
-    if (c["spd_z"].is<float>()) configSetFloat(KEY_SPEED_CAL_Z, c["spd_z"]);
-    if (c["spd_a"].is<float>()) configSetFloat(KEY_SPEED_CAL_A, c["spd_a"]);
+    importFields(c, calibration_fields, ARRAY_SIZE(calibration_fields));
   }
 
   // 11. Positions
   if (doc["positions"].is<JsonObject>()) {
-     JsonObject p = doc["positions"];
-     if (p["safe_x"].is<float>()) configSetFloat(KEY_POS_SAFE_X, p["safe_x"]);
-     if (p["safe_y"].is<float>()) configSetFloat(KEY_POS_SAFE_Y, p["safe_y"]);
-     if (p["safe_z"].is<float>()) configSetFloat(KEY_POS_SAFE_Z, p["safe_z"]);
-     if (p["safe_a"].is<float>()) configSetFloat(KEY_POS_SAFE_A, p["safe_a"]);
-     if (p["p1_x"].is<float>()) configSetFloat(KEY_POS_1_X, p["p1_x"]);
-     if (p["p1_y"].is<float>()) configSetFloat(KEY_POS_1_Y, p["p1_y"]);
-     if (p["p1_z"].is<float>()) configSetFloat(KEY_POS_1_Z, p["p1_z"]);
-     if (p["p1_a"].is<float>()) configSetFloat(KEY_POS_1_A, p["p1_a"]);
+    JsonObject p = doc["positions"];
+    importFields(p, positions_fields, ARRAY_SIZE(positions_fields));
   }
 
   return true;
