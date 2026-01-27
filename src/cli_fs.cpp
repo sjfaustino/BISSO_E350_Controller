@@ -46,7 +46,7 @@ void cmd_fs_df(int argc, char** argv) {
 
 void cmd_fs_cat(int argc, char** argv) {
     if (argc < 2) {
-        logError("Usage: cat <filename>");
+        CLI_USAGE("cat", "<filename>");
         return;
     }
 

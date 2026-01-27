@@ -4,7 +4,7 @@
 
 void cmd_job_start(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("Usage: job start <filename>");
+        CLI_USAGE("job_start", "<filename>");
         return;
     }
     if (jobManager.startJob(argv[1])) {
