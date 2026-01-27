@@ -46,7 +46,7 @@ static void cmd_jxk10_info() {
 
 static void cmd_jxk10_addr(int argc, char** argv) {
     if (argc < 3) {
-        logPrintln("Usage: jxk10 addr <new_address>");
+        CLI_USAGE("jxk10", "addr <new_address>");
         logPrintln("  Address range: 0-254");
         logPrintln("  NOTE: Power cycle required after change!");
         return;
@@ -88,13 +88,13 @@ static void cmd_jxk10_disable() {
 void cmd_jxk10_main(int argc, char** argv) {
     if (argc < 2) {
         logPrintln("\n[JXK10] === JXK-10 Current Sensor ===");
-        logPrintln("Usage: jxk10 [read|info|addr|status|enable|disable]");
-        logPrintln("  read    - Read current value");
-        logPrintln("  info    - Show device info (address, baud, stats)");
-        logPrintln("  addr    - Change slave address");
-        logPrintln("  status  - Show full diagnostics");
-        logPrintln("  enable  - Enable JXK-10 in config");
-        logPrintln("  disable - Disable JXK-10 in config");
+        CLI_USAGE("jxk10", "[read|info|addr|status|enable|disable]");
+        CLI_HELP_LINE("read", "Read current value");
+        CLI_HELP_LINE("info", "Show device info (address, baud, stats)");
+        CLI_HELP_LINE("addr", "Change slave address");
+        CLI_HELP_LINE("status", "Show full diagnostics");
+        CLI_HELP_LINE("enable", "Enable JXK-10 in config");
+        CLI_HELP_LINE("disable", "Disable JXK-10 in config");
         return;
     }
 

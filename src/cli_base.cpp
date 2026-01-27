@@ -429,7 +429,7 @@ void cmd_help(int argc, char** argv) { cliPrintHelp(); }
 void cmd_echo(int argc, char** argv) {
   if (argc < 2) {
     logInfo("Echo is currently %s", cli_echo_enabled ? "ON" : "OFF");
-    logInfo("Usage: echo [on|off] [save]");
+    CLI_USAGE("echo", "[on|off] [save]");
     return;
   }
   

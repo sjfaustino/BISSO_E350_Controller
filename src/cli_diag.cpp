@@ -310,19 +310,19 @@ void cmd_selftest(int argc, char** argv) {
     // PHASE 5.2: Enhanced self-test with sub-commands
     if (argc > 1 && strcmp(argv[1], "help") == 0) {
         logPrintln("\n[SELFTEST] === Self-Test Suite ===");
-        logPrintln("Usage: selftest [command] [options]");
-        logPrintln("  (no args)     Run comprehensive test suite");
-        logPrintln("  quick         Quick health check (fast tests only)");
-        logPrintln("  memory        Memory subsystem tests");
-        logPrintln("  i2c           I2C bus and device tests");
-        logPrintln("  storage       LittleFS and NVS tests");
-        logPrintln("  motion        Motion system tests");
-        logPrintln("  spindle       Spindle monitor tests");
-        logPrintln("  safety        Safety system tests");
-        logPrintln("  network       Network and WiFi tests");
-        logPrintln("  watchdog      Watchdog timer tests");
-        logPrintln("  list          List all available tests");
-        logPrintln("  help          Show this message");
+        CLI_USAGE("selftest", "[command] [options]");
+        CLI_HELP_LINE("(no args)", "Run comprehensive test suite");
+        CLI_HELP_LINE("quick", "Quick health check (fast tests only)");
+        CLI_HELP_LINE("memory", "Memory subsystem tests");
+        CLI_HELP_LINE("i2c", "I2C bus and device tests");
+        CLI_HELP_LINE("storage", "LittleFS and NVS tests");
+        CLI_HELP_LINE("motion", "Motion system tests");
+        CLI_HELP_LINE("spindle", "Spindle monitor tests");
+        CLI_HELP_LINE("safety", "Safety system tests");
+        CLI_HELP_LINE("network", "Network and WiFi tests");
+        CLI_HELP_LINE("watchdog", "Watchdog timer tests");
+        CLI_HELP_LINE("list", "List all available tests");
+        CLI_HELP_LINE("help", "Show this message");
         return;
     }
 
@@ -665,7 +665,7 @@ void cmd_encoder_protocol(int argc, char** argv) {
     if (argc < 3) {
         int current = configGetInt(KEY_ENC_PROTO, 0);
         logPrintf("[ENCODER] Current Protocol: %s (%d)\r\n", (current == 1) ? "Modbus RTU" : "ASCII (#XX\\r)", current);
-        logPrintln("Usage: encoder protocol <0|1>");
+        CLI_USAGE("encoder", "protocol <0|1>");
         logPrintln("  0: ASCII mode (Default, eg: #01\\r -> !+0000.00,...)");
         logPrintln("  1: Modbus RTU mode (Read Holding Registers FC03)");
         return;
@@ -1448,7 +1448,7 @@ void cmd_cutting_main(int argc, char** argv) {
         float sce = atof(argv[2]);
         cuttingSetSCEBaseline(sce);
     } else {
-        logPrintln("Usage: cutting [diag|start|stop|reset|depth <mm>|blade <mm>|baseline <sce>]");
+        CLI_USAGE("cutting", "[diag|start|stop|reset|depth <mm>|blade <mm>|baseline <sce>]");
     }
 }
 
@@ -1457,7 +1457,7 @@ void cmd_cutting_main(int argc, char** argv) {
 // ============================================================================
 void cmd_nvs_main(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("Usage: nvs [stats | dump | cleanup]");
+        CLI_USAGE("nvs", "[stats | dump | cleanup]");
         return;
     }
     
@@ -1471,7 +1471,7 @@ void cmd_nvs_main(int argc, char** argv) {
         } else if (strcmp(argv[2], "faults") == 0) {
             faultClearHistory();
         } else {
-            logPrintln("Usage: nvs cleanup [legacy|faults]");
+            CLI_USAGE("nvs", "cleanup [legacy|faults]");
         }
     } else if (strcmp(argv[1], "clear") == 0) {
         logPrintln("Use 'config factory_reset' or 'nvs erase' (if implemented) to clear.");

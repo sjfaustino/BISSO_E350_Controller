@@ -5,6 +5,7 @@
  */
 
 #include "auth_manager.h"
+#include "cli.h"
 #include "config_unified.h"
 #include "serial_logger.h"
 #include "system_constants.h"
@@ -606,7 +607,7 @@ void authClearRateLimit(const char* ip_address) {
 void cmd_web_setpass(int argc, char** argv) {
   if (argc < 2) {
     logPrintln("\n[AUTH] === Web Password Management (CLI) ===");
-    logPrintln("Usage: web_setpass <new_password>");
+    CLI_USAGE("web_setpass", "<new_password>");
     logPrintln("Note: Password must be at least 8 characters");
     logPrintln("      Requires 3 character types (lower/upper/digit/symbol)");
     return;
@@ -696,11 +697,11 @@ void cmd_auth(int argc, char** argv) {
   if (argc < 2) {
     serialLoggerLock();
     logPrintln("\n[AUTH] === Authentication Management ===");
-    logPrintln("Usage:");
-    logPrintln("  auth diag           - Show auth diagnostics");
-    logPrintln("  auth test <pass>    - Test password verification");
-    logPrintln("  auth reload         - Reload credentials from NVS");
-    logPrintln("  auth clear_limits   - Clear all rate limits");
+    CLI_USAGE("auth", "[diag|test|reload|clear_limits]");
+    CLI_HELP_LINE("diag", "Show auth diagnostics");
+    CLI_HELP_LINE("test <pass>", "Test password verification");
+    CLI_HELP_LINE("reload", "Reload credentials from NVS");
+    CLI_HELP_LINE("clear_limits", "Clear all rate limits");
     serialLoggerUnlock();
     return;
   }

@@ -101,7 +101,7 @@ void cmd_estop_main(int argc, char** argv) {
 
 void cmd_soft_limits(int argc, char** argv) {
   if (argc < 4) {
-    logPrintln("Usage: limit <axis> <min> <max> [enable]");
+    CLI_USAGE("limit", "<axis> <min> <max> [enable]");
     return;
   }
   
@@ -155,7 +155,7 @@ void cmd_spinlock_main(int argc, char** argv) {
     
     if (argc < 2) {
         logPrintln("[SPINLOCK] === Spinlock Timing Diagnostics ===");
-        logPrintln("Usage: spinlock [stats | reset]");
+        CLI_USAGE("spinlock", "[stats | reset]");
         logPrintln("Purpose: Audit spinlock durations (>10us -> mutex)");
         // Usage printed by helper below anyway if we pass argc < 2, but let's keep the header
     }

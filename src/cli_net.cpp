@@ -107,11 +107,11 @@ void cmd_wifi_status(int argc, char** argv) {
 void cmd_wifi_ap(int argc, char **argv) {
   if (argc < 3) {
     logPrintln("\n[WIFI] === AP Mode Management ===");
-    logPrintln("Usage:");
-    logPrintln("  wifi ap on            - Enable AP mode");
-    logPrintln("  wifi ap off           - Disable AP mode");
-    logPrintln("  wifi ap set <s|p> <v> - Set SSID(s) or Password(p)");
-    logPrintln("  wifi ap status        - Show current AP configuration");
+    CLI_USAGE("wifi", "ap [on|off|set|status]");
+    CLI_HELP_LINE("on", "Enable AP mode");
+    CLI_HELP_LINE("off", "Disable AP mode");
+    CLI_HELP_LINE("set <s|p> <v>", "Set SSID(s) or Password(p)");
+    CLI_HELP_LINE("status", "Show current AP configuration");
     return;
   }
 
@@ -292,7 +292,7 @@ void ethTrackError() {
 void cmd_ota_setpass(int argc, char** argv) {
     if (argc < 2) {
         logPrintln("\n[OTA] === OTA Password Management ===");
-        logPrintln("Usage: ota_setpass <new_password>");
+        CLI_USAGE("ota_setpass", "<new_password>");
         logPrintln("Note: Password must be at least 8 characters");
         logPrintln("      Requires reboot to take effect");
 

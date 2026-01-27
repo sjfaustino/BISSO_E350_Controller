@@ -29,7 +29,7 @@ void cmd_lcd_off() {
 
 void cmd_lcd_backlight(int argc, char** argv) {
     if (argc < 3) {
-        logPrintln("Usage: lcd backlight [on|off]");
+        CLI_USAGE("lcd", "backlight [on|off]");
         return;
     }
     bool on = (strcasecmp(argv[2], "on") == 0);
@@ -40,7 +40,7 @@ void cmd_lcd_backlight(int argc, char** argv) {
 void cmd_lcd_timeout(int argc, char** argv) {
     if (argc < 3) {
         logPrintf("Current timeout: %lu seconds\r\n", (unsigned long)lcdSleepGetTimeout());
-        logPrintln("Usage: lcd timeout <seconds>");
+        CLI_USAGE("lcd", "timeout <seconds>");
         return;
     }
     uint32_t seconds = strtoul(argv[2], NULL, 10);
@@ -50,17 +50,17 @@ void cmd_lcd_timeout(int argc, char** argv) {
 void cmd_lcd_main(int argc, char** argv) {
     if (argc < 2) {
         logPrintln("\r\n[LCD] === LCD Control ===");
-        logPrintln("Usage: lcd [on|off|backlight|sleep|wakeup|timeout|status|reset|scan|test]");
-        logPrintln("  on        - Enable LCD and save setting");
-        logPrintln("  off       - Disable LCD and save setting");
-        logPrintln("  reset     - Reset I2C errors and try to re-enable I2C mode");
-        logPrintln("  backlight - Control backlight (on/off)");
-        logPrintln("  sleep     - Force display to sleep");
-        logPrintln("  wakeup    - Force display to wake up");
-        logPrintln("  timeout   - Set sleep timeout in seconds (0=never)");
-        logPrintln("  status    - Show LCD status");
-        logPrintln("  scan      - Scan I2C bus for LCD backpack (0x27, 0x3F)");
-        logPrintln("  test      - Run hardware test pattern");
+        CLI_USAGE("lcd", "[on|off|backlight|sleep|wakeup|timeout|status|reset|scan|test]");
+        CLI_HELP_LINE("on", "Enable LCD and save setting");
+        CLI_HELP_LINE("off", "Disable LCD and save setting");
+        CLI_HELP_LINE("reset", "Reset I2C errors and try to re-enable I2C mode");
+        CLI_HELP_LINE("backlight", "Control backlight (on/off)");
+        CLI_HELP_LINE("sleep", "Force display to sleep");
+        CLI_HELP_LINE("wakeup", "Force display to wake up");
+        CLI_HELP_LINE("timeout", "Set sleep timeout in seconds (0=never)");
+        CLI_HELP_LINE("status", "Show LCD status");
+        CLI_HELP_LINE("scan", "Scan I2C bus for LCD backpack (0x27, 0x3F)");
+        CLI_HELP_LINE("test", "Run hardware test pattern");
         return;
     }
 
