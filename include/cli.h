@@ -47,13 +47,10 @@ typedef struct cli_command_t {
 // CORE CLI FUNCTIONS
 // ============================================================================
 void cliInit();
-void cliCleanup();
 void cliUpdate();
 void cliProcessCommand(const char* cmd);
 void cliPrintHelp();
-void cliPrintPrompt();
 bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handler);
-int cliGetCommandCount();
 
 // --- Table Rendering Helpers (Box Drawing) ---
 void cliPrintTableHeader(int w1, int w2, int w3, int w4 = 0, int w5 = 0);

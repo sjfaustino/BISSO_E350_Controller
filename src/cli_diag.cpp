@@ -1686,6 +1686,10 @@ void cmd_memory_leak_check(int argc, char** argv) {
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
+    // Initialize baseline tracking for runtime and memory leak detection
+    runtimeInit();
+    memoryLeakInit();
+    
     cliRegisterCommand("memory", "Heap memory diagnostics", cmd_memory_main);
     cliRegisterCommand("faults", "Fault log management", cmd_faults_main);
     cliRegisterCommand("encoder", "Encoder management", cmd_encoder_main);
