@@ -136,16 +136,7 @@ bool init_yhtc05_wrapper() {
        else { logError("[BOOT] Init %s [FAIL]", name); bootMarkFailed(name, "Init failed", code); } } while (0)
 
 void setup() {
-  // ESP32-S2/S3 with USB CDC requires USBSerial instead of Serial
-  #if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
-    #if ARDUINO_USB_CDC_ON_BOOT
-      USBSerial.begin(115200);
-    #else
-      Serial.begin(115200);
-    #endif
-  #else
-    Serial.begin(115200);
-  #endif
+  Serial.begin(115200);
   delay(1000);
   serialLoggerInit(LOG_LEVEL);
   

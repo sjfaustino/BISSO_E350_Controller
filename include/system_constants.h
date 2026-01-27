@@ -8,12 +8,12 @@
 #ifndef SYSTEM_CONSTANTS_H
 #define SYSTEM_CONSTANTS_H
 
+#include "board_variant.h"  // Board-specific GPIO definitions
 
 // ============================================================================
 // HARDWARE PIN CONFIGURATION
 // ============================================================================
-#define PIN_I2C_SDA 4   
-#define PIN_I2C_SCL 5   
+// I2C pins (PIN_I2C_SDA, PIN_I2C_SCL) defined in board_variant.h   
 
 // ============================================================================
 // MOTION CONTROL CONSTANTS

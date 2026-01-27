@@ -57,7 +57,7 @@ The ESP32 controller **replaces a broken ELBO positioning controller**. It inter
 │                                                                         │
 │  ┌─────────────────────┐          ┌─────────────────────┐             │
 │  │   ESP32 Controller  │◄────────►│   Siemens S5 PLC    │             │
-│  │   (KC868-A16 v1.5)  │  PCF8574 │   (Original)        │             │
+│  │   (KC868-A16 v1.6)  │  PCF8574 │   (Original)        │             │
 │  │                     │  I/O     │                     │             │
 │  │  • Position control │          │  • Contactor control│             │
 │  │  • User interface   │          │  • VFD speed ref    │             │
@@ -91,12 +91,15 @@ The ESP32 controller **replaces a broken ELBO positioning controller**. It inter
 
 ### ESP32 Controller Board
 
-| Parameter | Value |
-|-----------|-------|
-| Board | KC868-A16 v1.5 |
-| MCU | ESP32-WROOM-32E |
-| Role | Replaces broken ELBO positioning controller |
-| Communication | RS-232 (encoders), RS-485 (Modbus), I2C, WiFi |
+| Parameter | v1.6 (Standard) | v3.1 (Upgrade) |
+|-----------|-----------------|----------------|
+| **MCU** | ESP32-WROOM-32E | ESP32-S3-N16R8 |
+| **Flash** | 4 MB | 16 MB |
+| **PSRAM** | None | 8 MB |
+| **Ethernet** | LAN8720A (RMII) | W5500 (SPI) |
+| **Role** | Positioning Controller | Positioning Controller |
+| **Env Flag** | `BOARD_KC868_A16_V16` | `BOARD_KC868_A16_V31` |
+| **Build Target**| `esp32dev` | `esp32s3-kc868-a16-v31` |
 
 ---
 
@@ -419,10 +422,10 @@ The WJ66 encoder interfaces output position data via RS-232:
 
 Shared RS-485 bus for Modbus devices:
 
-| Parameter | Value |
-|-----------|-------|
-| RX Pin | GPIO 16 |
-| TX Pin | GPIO 13 |
+| Parameter | v1.6 (GPIO) | v3.1 (GPIO) | Notes |
+|-----------|-------------|-------------|-------|
+| **RX Pin** | 16 | 17 | Shared RS-485 bus |
+| **TX Pin** | 13 | 16 | Shared RS-485 bus |
 
 | Device | Address | Priority | Notes |
 |--------|---------|----------|-------|
@@ -433,11 +436,11 @@ Shared RS-485 bus for Modbus devices:
 
 ### I2C Bus
 
-| Parameter | Value |
-|-----------|-------|
-| SDA Pin | GPIO 4 |
-| SCL Pin | GPIO 5 |
-| Frequency | 100 kHz |
+| Parameter | v1.6 (GPIO) | v3.1 (GPIO) | Notes |
+|-----------|-------------|-------------|-------|
+| **SDA Pin** | 4 | 9 | System I2C bus |
+| **SCL Pin** | 5 | 10 | System I2C bus |
+| **Frequency** | 100 kHz | 100 kHz | Standard mode |
 
 | Device | Address | Function |
 |--------|---------|----------|
@@ -463,4 +466,6 @@ Shared RS-485 bus for Modbus devices:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-01-26 | 1.1.1 | Corrected standard board version from v1.5 to v1.6 |
+| 2026-01-26 | 1.1.0 | Added support for KC868-A16 v3.1 (ESP32-S3-N16R8) |
 | 2026-01-01 | 1.0.0 | Initial documentation |

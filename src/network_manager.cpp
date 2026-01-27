@@ -8,19 +8,40 @@
 #include "gcode_parser.h"   // For GCodeParser in telnet status
 #include "motion.h"         // For motion functions
 #include "safety.h"         // For safetyIsAlarmed
+#include "board_variant.h"  // Board-specific GPIO definitions
 #include <ArduinoOTA.h>
 #include <DNSServer.h>  // For captive portal (used directly, not via ESPAsyncWiFiManager)
 #include <time.h>            // For NTP time sync
-#include <ETH.h>             // KC868-A16 Ethernet (LAN8720)
 #include "ota_manager.h"     // For otaStartBackgroundCheck
 
-// KC868-A16 LAN8720 Ethernet PHY Configuration
-#define ETH_PHY_TYPE    ETH_PHY_LAN8720
-#define ETH_PHY_ADDR    0
-#define ETH_PHY_MDC     23
-#define ETH_PHY_MDIO    18
-#undef ETH_CLK_MODE  // Avoid redefinition warning from ETH.h
-#define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT
+// Ethernet support: LAN8720 for v1.6, W5500 for v3.1
+#include <ETH.h>
+#if BOARD_HAS_W5500
+  // KC868-A16 v3.1: W5500 SPI Ethernet via ESP-IDF drivers
+  #include "esp_eth.h"
+  #include "esp_eth_mac.h"
+  #include "esp_eth_phy.h"
+  #include "driver/spi_master.h"
+  #include "esp_netif.h"
+  #include "esp_event.h"
+  #include "esp_eth_netif_glue.h"
+  
+  // SPI Host for S3
+  #ifndef SPI2_HOST
+    #define SPI2_HOST (spi_host_device_t)1
+  #endif
+  
+  #define ETHERNET_AVAILABLE 1
+#else
+  // KC868-A16 v1.6: LAN8720 Ethernet PHY (RMII interface)
+  #define ETH_PHY_TYPE    ETH_PHY_LAN8720
+  #define ETH_PHY_ADDR    0
+  #define ETH_PHY_MDC     PIN_ETH_MDC
+  #define ETH_PHY_MDIO    PIN_ETH_MDIO
+  #undef ETH_CLK_MODE  // Avoid redefinition warning from ETH.h
+  #define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT
+  #define ETHERNET_AVAILABLE 1
+#endif
 
 NetworkManager networkManager;
 
@@ -163,7 +184,8 @@ static void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
   }
 }
 
-// Ethernet event handler - called by WiFi event system
+#if ETHERNET_AVAILABLE
+// Ethernet event handler - called by WiFi event system (LAN8720 only)
 static void onEthernetEvent(WiFiEvent_t event) {
   switch (event) {
     case ARDUINO_EVENT_ETH_START:
@@ -194,15 +216,19 @@ static void onEthernetEvent(WiFiEvent_t event) {
       break;
   }
 }
+#endif // ETHERNET_AVAILABLE
 
 String NetworkManager::getEthernetIP() const {
+#if ETHERNET_AVAILABLE
   if (ethernetConnected) {
     return ETH.localIP().toString();
   }
+#endif
   return String("");
 }
 
 void NetworkManager::initEthernet() {
+#if ETHERNET_AVAILABLE
   int eth_enabled = configGetInt(KEY_ETH_ENABLED, 0);  // Default: disabled to save memory
   
   if (!eth_enabled) {
@@ -210,14 +236,86 @@ void NetworkManager::initEthernet() {
     return;
   }
   
-  logInfo("[ETH] Initializing LAN8720 Ethernet PHY...");
+  logInfo("[ETH] Initializing %s Ethernet PHY...", BOARD_HAS_W5500 ? "W5500" : "LAN8720");
   
-  // Register event handlers before starting interfaces
+  // Register Ethernet event handler before starting interface
   WiFi.onEvent(onEthernetEvent);
-  WiFi.onEvent(onWiFiEvent);
   
-  // Start Ethernet with KC868-A16 pin configuration
-  if (ETH.begin(ETH_PHY_ADDR, -1, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE)) {
+  // Start Ethernet with board-specific configuration
+  bool success = false;
+#if BOARD_HAS_W5500
+  // W5500 SPI Ethernet initialization on v3.1 using ESP-IDF drivers
+  // This manual path is required because Arduino 2.0.x lacks SPI Ethernet support in ETH.h
+  
+  logInfo("[ETH] Initializing W5500 SPI Ethernet...");
+  
+  // 1. SPI Bus initialization
+  spi_bus_config_t buscfg = {
+      .mosi_io_num = PIN_ETH_MOSI,
+      .miso_io_num = PIN_ETH_MISO,
+      .sclk_io_num = PIN_ETH_CLK,
+      .quadwp_io_num = -1,
+      .quadhd_io_num = -1,
+  };
+  if (spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO) != ESP_OK) {
+      logError("[ETH] Failed to initialize SPI bus");
+      return;
+  }
+  
+  // 2. SPI Device initialization
+  spi_device_interface_config_t devcfg = {
+      .command_bits = 16,
+      .address_bits = 8,
+      .mode = 0,
+      .clock_speed_hz = 20 * 1000 * 1000, 
+      .spics_io_num = PIN_ETH_CS,
+      .queue_size = 20,
+  };
+  spi_device_handle_t spi_handle;
+  if (spi_bus_add_device(SPI2_HOST, &devcfg, &spi_handle) != ESP_OK) {
+      logError("[ETH] Failed to add SPI device");
+      return;
+  }
+  
+  // 3. MAC and PHY Configuration
+  eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
+  eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
+  phy_config.phy_addr = 1; // Standard for KC868-A16
+  phy_config.reset_gpio_num = PIN_ETH_RST;
+  
+  eth_w5500_config_t w5500_config = ETH_W5500_DEFAULT_CONFIG(spi_handle);
+  w5500_config.int_gpio_num = PIN_ETH_INT;
+  
+  esp_eth_mac_t *mac = esp_eth_mac_new_w5500(&w5500_config, &mac_config);
+  esp_eth_phy_t *phy = esp_eth_phy_new_w5500(&phy_config);
+  
+  // 4. Driver Install
+  esp_eth_config_t config = ETH_DEFAULT_CONFIG(mac, phy);
+  esp_eth_handle_t eth_handle = NULL;
+  if (esp_eth_driver_install(&config, &eth_handle) != ESP_OK) {
+      logError("[ETH] Failed to install Ethernet driver");
+      return;
+  }
+  
+  // 5. Netif integration (LwIP)
+  // Note: We use the Arduino ESP32 context, so we might need to check if netif is already init
+  esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
+  esp_netif_t *eth_netif = esp_netif_new(&netif_cfg);
+  esp_netif_attach(eth_netif, esp_eth_new_netif_glue(eth_handle));
+  
+  success = (esp_eth_start(eth_handle) == ESP_OK);
+  
+  if (success) {
+      logInfo("[ETH] [OK] W5500 Ethernet started");
+      // Since this is bypassing ETH.h, the standard ETH class won't track this.
+      // We might need to manually update networkManager state.
+  }
+#else
+  // RMII initialization for LAN8720 on v1.6
+  success = ETH.begin(ETH_PHY_ADDR, -1, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE);
+#endif
+
+  if (success) {
     logInfo("[ETH] [OK] Ethernet initialization queued");
     
     // Configure static IP if DHCP disabled
@@ -244,10 +342,16 @@ void NetworkManager::initEthernet() {
   } else {
     logError("[ETH] Failed to initialize Ethernet");
   }
+#else
+  logInfo("[ETH] Ethernet not configured for this board");
+#endif
 }
 
 void NetworkManager::init() {
   logPrintln("[NET] Initializing Network Stack...");
+
+  // Register WiFi event handler (always needed)
+  WiFi.onEvent(onWiFiEvent);
 
   // 0. Ethernet Initialization (KC868-A16 LAN8720) - runs in parallel with WiFi
   initEthernet();

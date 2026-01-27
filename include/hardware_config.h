@@ -3,6 +3,7 @@
 #pragma once
 #include <Arduino.h>
 #include <cstdint>
+#include "board_variant.h"  // Board-specific GPIO definitions
 
 // Forward declaration for CLI types
 typedef void (*cli_handler_t)(int argc, char** argv);
@@ -58,18 +59,18 @@ constexpr PinInfo pinDatabase[] = {
     {130, "Y15", "output", "12-30V", "10A", "A32 only"},
     {131, "Y16", "output", "12-30V", "10A", "A32 only"},
 
-    // Direct GPIO pins (actual ESP32 GPIO numbers)
-    {14, "HT1", "both", "3.3V", "5mA", "GPIO14 – WJ66 RX"},
-    {33, "HT2", "both", "3.3V", "5mA", "GPIO33 – WJ66 TX"},
-    {32, "HT3", "both", "3.3V", "5mA", "GPIO32 – Free"},
-    {16, "RS485_A", "input", "3.3V", "5mA", "GPIO16 – RS485 RXD"},
-    {13, "RS485_B", "output", "3.3V", "5mA", "GPIO13 – RS485 TXD"},
+    // Direct GPIO pins (board-variant specific, see board_variant.h)
+    {PIN_1WIRE_HT1, "HT1", "both", "3.3V", "5mA", "1-Wire / WJ66 RX"},
+    {PIN_1WIRE_HT2, "HT2", "both", "3.3V", "5mA", "1-Wire / WJ66 TX"},
+    {PIN_1WIRE_HT3, "HT3", "both", "3.3V", "5mA", "1-Wire / Free"},
+    {PIN_RS485_RX, "RS485_A", "input", "3.3V", "5mA", "RS485 RXD"},
+    {PIN_RS485_TX, "RS485_B", "output", "3.3V", "5mA", "RS485 TXD"},
 
-    // Analog channels (actual ESP32 ADC GPIOs) - CH1-CH4 on KC868-A16 silkscreen
-    {36, "CH1", "analog", "0-20mA", "20mA", "GPIO36 – Current loop ADC"},
-    {34, "CH2", "analog", "0-20mA", "20mA", "GPIO34 – Current loop ADC"},
-    {35, "CH3", "analog", "0-5V",   "1mA",  "GPIO35 – Voltage ADC"},
-    {39, "CH4", "analog", "0-5V",   "1mA",  "GPIO39 – Voltage ADC"}
+    // Analog channels (board-variant specific)
+    {PIN_ANALOG_CH1, "CH1", "analog", "0-20mA", "20mA", "Current loop ADC"},
+    {PIN_ANALOG_CH2, "CH2", "analog", "0-20mA", "20mA", "Current loop ADC"},
+    {PIN_ANALOG_CH3, "CH3", "analog", "0-5V",   "1mA",  "Voltage ADC"},
+    {PIN_ANALOG_CH4, "CH4", "analog", "0-5V",   "1mA",  "Voltage ADC"}
 };
 
 constexpr size_t PIN_COUNT = sizeof(pinDatabase)/sizeof(pinDatabase[0]);

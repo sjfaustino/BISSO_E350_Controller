@@ -75,7 +75,7 @@ pio device monitor -b 115200
 
 | Component | Model | Purpose |
 |:----------|:------|:--------|
-| **Controller** | KC868-A16 v1.5 | ESP32-WROOM-32E industrial controller |
+| **Controller** | KC868-A16 v1.6 | ESP32-WROOM-32E industrial controller |
 | **Axis VFD** | Schneider Altivar 31 | Shared VFD for X/Y/Z axis motors |
 | **Spindle VFD** | Control Techniques Unidrive SP | 22kW saw blade motor |
 | **Encoders** | WJ66 DRO Reader (RS-232) | 4-axis position feedback |

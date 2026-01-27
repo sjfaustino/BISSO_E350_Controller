@@ -7,14 +7,8 @@
 
 // ESP32-S2/S3 USB CDC Serial - define SerialOut for internal use
 #if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
-    #if ARDUINO_USB_CDC_ON_BOOT
-        #include "USB.h"
-        #include "USBCDC.h"
-        extern USBCDC USBSerial;
-        #define SerialOut USBSerial
-    #else
-        #define SerialOut Serial
-    #endif
+    // For S2/S3, Serial is redirected to USB CDC via platformio build_flags
+    #define SerialOut Serial
 #else
     #define SerialOut Serial
 #endif

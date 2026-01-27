@@ -10,14 +10,8 @@
 // For CLI input functions that need Serial.available()/read(), use CLI_SERIAL.
 
 #if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
-    #if ARDUINO_USB_CDC_ON_BOOT
-        #include "USB.h"
-        #include "USBCDC.h"
-        extern USBCDC USBSerial;
-        #define CLI_SERIAL USBSerial
-    #else
-        #define CLI_SERIAL Serial
-    #endif
+    // For S2/S3, Serial is redirected to USB CDC via platformio build_flags
+    #define CLI_SERIAL Serial
 #else
     #define CLI_SERIAL Serial
 #endif

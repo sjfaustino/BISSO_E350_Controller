@@ -98,13 +98,14 @@ static const encoder_interface_config_t* findInterfaceConfig(encoder_interface_t
  */
 static HardwareSerial* getSerialByUart(uint8_t uart_num) {
     switch (uart_num) {
-#if !defined(CONFIG_IDF_TARGET_ESP32S2)
-        // On S2, Serial is USBCDC type, not HardwareSerial - skip case 0
+#if !defined(CONFIG_IDF_TARGET_ESP32S2) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+        // On S2/S3 with USB CDC, Serial is HWCDC type, not HardwareSerial - skip case 0
         case 0: return &Serial;
 #endif
         case 1: return &Serial1;
 #if !defined(CONFIG_IDF_TARGET_ESP32S2)
         // ESP32-S2 only has UART0 and UART1, Serial2 not available
+        // ESP32-S3 does have UART2
         case 2: return &Serial2;
 #endif
         default: return NULL;
