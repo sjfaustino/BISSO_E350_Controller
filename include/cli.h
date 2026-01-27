@@ -8,6 +8,31 @@
 #define CLI_MAX_ARGS 16
 #define CLI_MAX_COMMANDS 128
 
+// ============================================================================
+// P3 DRY: CLI Usage Helper Macros
+// Provides consistent formatting for command help and usage messages
+// ============================================================================
+
+/**
+ * @brief Print a usage line for a command
+ * @param cmd Command name (e.g., "config")
+ * @param usage Usage pattern (e.g., "get <key> | set <key> <value>")
+ */
+#define CLI_USAGE(cmd, usage) logPrintln("[" cmd "] Usage: " cmd " " usage)
+
+/**
+ * @brief Print a formatted help line for a subcommand
+ * @param subcmd Subcommand name (e.g., "get")
+ * @param desc Description of the subcommand
+ */
+#define CLI_HELP_LINE(subcmd, desc) logPrintf("  %-12s %s\r\n", subcmd, desc)
+
+/**
+ * @brief Print an example command line
+ * @param example Example command (e.g., "config get wifi_ssid")
+ */
+#define CLI_EXAMPLE(example) logPrintln("  Example: " example)
+
 // Definition of the shared command structure
 typedef void (*cli_handler_t)(int argc, char** argv);
 
