@@ -55,91 +55,60 @@ void cliRegisterConfigCommands() {
   cliRegisterCommand("config", "Configuration management", cmd_config_main);
 }
 
-void cmd_config_main(int argc, char **argv) {
-  if (argc < 2) {
-    logPrintln("\n[CONFIG] === Configuration Management ===");
-    logPrintln("[CONFIG] Usage: config [command] <parameter>");
-    logPrintln("[CONFIG] Commands:");
-    logPrintln("  get <key> - Show value of a specific key.");
-    logPrintln("  set       - Set value: config set <key> <val>");
-    logPrintln("  dump      - List ALL configuration keys and values.");
-    logPrintln("  show      - Show diagnostic summary.");
-    logPrintln("  save      - Force save current configuration cache to NVS.");
-    logPrintln("  reset     - Reset ALL configuration settings to factory defaults.");
-    logPrintln("  validate  - Run full consistency validation report on the config.");
-    logPrintln("  schema    - Show schema version history and key metadata.");
-    logPrintln("  migrate   - Automatically migrate configuration schema to current version.");
-    logPrintln("  rollback  - Rollback schema to a specific version.");
-    logPrintln("\n[PHASE 2] New Commands:");
-    logPrintln("  export    - Export configuration as JSON.");
-    logPrintln("  import    - Import configuration from JSON.");
-    logPrintln("\n[PHASE 5.1] Backup/Restore:");
-    logPrintln("  backup    - Save current configuration to NVS backup.");
-    logPrintln("  restore   - Load configuration from NVS backup.");
-    logPrintln("  showbkp   - Display stored backup configuration.");
-    logPrintln("  clrbkp    - Clear backup from NVS.");
-    logPrintln("\n[NVS Management]:");
-    logPrintln("  nvs stats - Show NVS storage usage.");
-    logPrintln("  nvs erase - DANGER: Erase all NVS data and reboot.");
+// ============================================================================
+// CONFIG NVS SUBCOMMAND HANDLER
+// ============================================================================
+
+static void cmd_config_nvs(int argc, char **argv) {
+  if (argc < 3) {
+    CLI_USAGE("config", "nvs <stats|erase>");
     return;
   }
-
-  if (strcasecmp(argv[1], "get") == 0)
-    cmd_config_get(argc, argv);
-  else if (strcasecmp(argv[1], "set") == 0)
-    cmd_config_set(argc, argv);
-  else if (strcasecmp(argv[1], "dump") == 0)
-    cmd_config_dump(argc, argv);
-  else if (strcasecmp(argv[1], "show") == 0)
-    cmd_config_show(argc, argv);
-  else if (strcasecmp(argv[1], "save") == 0)
-    cmd_config_save(argc, argv);
-  else if (strcasecmp(argv[1], "reset") == 0)
-    cmd_config_reset(argc, argv);
-  else if (strcasecmp(argv[1], "validate") == 0)
-    cmd_config_validate(argc, argv);
-  else if (strcasecmp(argv[1], "schema") == 0)
-    cmd_config_schema_show(argc, argv);
-  else if (strcasecmp(argv[1], "migrate") == 0)
-    cmd_config_migrate(argc, argv);
-  else if (strcasecmp(argv[1], "export") == 0)
-    cmd_config_export(argc, argv);
-  else if (strcasecmp(argv[1], "import") == 0)
-    cmd_config_import(argc, argv);
-  else if (strcasecmp(argv[1], "backup") == 0)
-    cmd_config_backup(argc, argv);
-  else if (strcasecmp(argv[1], "restore") == 0)
-    cmd_config_restore(argc, argv);
-  else if (strcasecmp(argv[1], "showbkp") == 0)
-    cmd_config_show_backup(argc, argv);
-  else if (strcasecmp(argv[1], "clrbkp") == 0)
-    cmd_config_clear_backup(argc, argv);
-  else if (strcasecmp(argv[1], "nvs") == 0) {
-    if (argc < 3) {
-      logPrintln("[CONFIG] Usage: config nvs <stats|erase>");
-      return;
-    }
-    if (strcasecmp(argv[2], "stats") == 0) {
-      configLogNvsStats();
-    } else if (strcasecmp(argv[2], "erase") == 0) {
-      logWarning("[NVS] This will ERASE ALL configuration and REBOOT!");
-      logWarning("[NVS] Press Ctrl+C within 3 seconds to abort...");
-      delay(3000);
-      configEraseNvs();
-    } else {
-      logWarning("[NVS] Unknown nvs command: %s", argv[2]);
-    }
-  }
-  else if (strcasecmp(argv[1], "rollback") == 0) {
-    if (argc < 3) {
-      logError("[CONFIG] Usage: config rollback <version>");
-      return;
-    }
-    cmd_config_rollback(argc, argv);
+  if (strcasecmp(argv[2], "stats") == 0) {
+    configLogNvsStats();
+  } else if (strcasecmp(argv[2], "erase") == 0) {
+    logWarning("[NVS] This will ERASE ALL configuration and REBOOT!");
+    logWarning("[NVS] Press Ctrl+C within 3 seconds to abort...");
+    delay(3000);
+    configEraseNvs();
   } else {
-    logWarning("[CONFIG] Error: Unknown parameter '%s'.", argv[1]);
+    logWarning("[NVS] Unknown nvs command: %s", argv[2]);
   }
 }
+
+// ============================================================================
+// MAIN CONFIG HANDLER (P5: Table-Driven Dispatch)
+// ============================================================================
+
+void cmd_config_main(int argc, char **argv) {
+  static const cli_subcommand_t subcmds[] = {
+    {"get",      cmd_config_get,          "Show value of a specific key"},
+    {"set",      cmd_config_set,          "Set value: config set <key> <val>"},
+    {"dump",     cmd_config_dump,         "List ALL configuration keys/values"},
+    {"show",     cmd_config_show,         "Show diagnostic summary"},
+    {"save",     cmd_config_save,         "Force save cache to NVS"},
+    {"reset",    cmd_config_reset,        "Reset ALL settings to factory defaults"},
+    {"validate", cmd_config_validate,     "Run full consistency validation"},
+    {"schema",   cmd_config_schema_show,  "Show schema version history"},
+    {"migrate",  cmd_config_migrate,      "Migrate schema to current version"},
+    {"rollback", cmd_config_rollback,     "Rollback schema to a version"},
+    {"export",   cmd_config_export,       "Export configuration as JSON"},
+    {"import",   cmd_config_import,       "Import configuration from JSON"},
+    {"backup",   cmd_config_backup,       "Save config to NVS backup"},
+    {"restore",  cmd_config_restore,      "Load config from NVS backup"},
+    {"showbkp",  cmd_config_show_backup,  "Display stored backup"},
+    {"clrbkp",   cmd_config_clear_backup, "Clear backup from NVS"},
+    {"nvs",      cmd_config_nvs,          "NVS management (stats|erase)"}
+  };
+
+  if (argc < 2) {
+    logPrintln("\n[CONFIG] === Configuration Management ===");
+  }
+
+  cliDispatchSubcommand("[CONFIG]", argc, argv, subcmds,
+                        sizeof(subcmds) / sizeof(subcmds[0]), 1);
+}
+
 
 void cmd_config_get(int argc, char **argv) {
   if (argc < 3) {
