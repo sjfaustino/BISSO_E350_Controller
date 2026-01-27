@@ -24,13 +24,16 @@ static cutting_analytics_state_t analytics = {
         .motor_efficiency = 0.85f,
         .blade_width_mm = 3.0f,
         .cut_depth_mm = 20.0f,
-        .power_factor = 0.8f
+        .power_factor = 0.8f,
+        .blade_diameter_mm = 350.0f,  // ITEM 7: 350mm blade default
+        .optimal_sfpm = 4500.0f       // ITEM 7: Optimal surface feet/min for stone
     },
     .current_amps = 0.0f,
     .rpm = 0.0f,
     .feed_rate_mms = 0.0f,
     .power_watts = 0.0f,
     .mrr_mm3s = 0.0f,
+    .surface_speed_mpm = 0.0f,  // ITEM 7: Surface speed
     .sce_jmm3 = 0.0f,
     .avg_current_amps = 0.0f,
     .avg_power_watts = 0.0f,
@@ -126,6 +129,14 @@ void cuttingAnalyticsUpdate(void) {
         analytics.sce_jmm3 = analytics.power_watts / analytics.mrr_mm3s;
     } else {
         analytics.sce_jmm3 = 0.0f;  // Not cutting or feed too slow
+    }
+    
+    // ITEM 7: Calculate Surface Speed (m/min)
+    // Surface Speed = π × D × RPM / 1000
+    if (analytics.rpm > 0) {
+        analytics.surface_speed_mpm = 3.14159f * analytics.config.blade_diameter_mm * analytics.rpm / 1000.0f;
+    } else {
+        analytics.surface_speed_mpm = 0.0f;
     }
     
     // 5. Update rolling averages
@@ -315,6 +326,20 @@ void cuttingPrintDiagnostics(void) {
     logPrintf("Efficiency:    %.0f%%\r\n", analytics.config.motor_efficiency * 100.0f);
     logPrintf("Blade Width:   %.1f mm\r\n", analytics.config.blade_width_mm);
     logPrintf("Cut Depth:     %.1f mm\r\n", analytics.config.cut_depth_mm);
+    logPrintf("Blade Dia:     %.0f mm\r\n", analytics.config.blade_diameter_mm);
+    
+    // ITEM 7: Surface Speed Recommendation
+    logPrintln("\n[Surface Speed]");
+    float optimal_mpm = analytics.config.optimal_sfpm * 0.3048f;  // Convert SFPM to m/min
+    logPrintf("Current:       %.1f m/min\r\n", analytics.surface_speed_mpm);
+    logPrintf("Optimal:       %.1f m/min (%.0f SFPM)\r\n", optimal_mpm, analytics.config.optimal_sfpm);
+    if (analytics.surface_speed_mpm > 0 && analytics.rpm > 0) {
+        float deviation_pct = ((analytics.surface_speed_mpm - optimal_mpm) / optimal_mpm) * 100.0f;
+        logPrintf("Deviation:     %+.1f%%\r\n", deviation_pct);
+        if (fabs(deviation_pct) > 20.0f) {
+            logWarning("[CUTTING] !!! Surface speed outside optimal range !!!");
+        }
+    }
     
     if (analytics.session_active || analytics.session.start_time_ms > 0) {
         logPrintln("\n[Session]");

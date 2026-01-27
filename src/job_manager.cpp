@@ -12,6 +12,8 @@
 #include "fault_logging.h"
 #include "config_unified.h"
 #include "config_keys.h"
+#include "cutting_analytics.h"  // ITEM 3: Session summary at job end
+#include "operator_alerts.h"    // ITEM 3: Job complete alert
 #include <LittleFS.h>
 
 JobManager jobManager;
@@ -61,7 +63,26 @@ void JobManager::update() {
             file_open = false;
             status.state = JOB_COMPLETED;
             status.duration_ms = millis() - status.start_time;
-            logInfo("[JOB] Job Completed in %lu ms", status.duration_ms);
+            
+            // ITEM 3: Display session summary at job end
+            cuttingEndSession();
+            const cutting_session_t* session = cuttingGetSession();
+            logPrintln("\n[JOB] ========== JOB COMPLETE ==========");
+            logPrintf("[JOB] Duration:   %.1f seconds\n", status.duration_ms / 1000.0f);
+            logPrintf("[JOB] Lines:      %lu / %lu\n", 
+                     (unsigned long)status.current_line, (unsigned long)status.total_lines);
+            if (session && session->total_energy_joules > 0) {
+                logPrintf("[JOB] Energy:     %.1f J (%.4f kWh)\n", 
+                         session->total_energy_joules, 
+                         session->total_energy_joules / 3600000.0f);
+                logPrintf("[JOB] Material:   %.1f mm³\n", session->total_material_mm3);
+                logPrintf("[JOB] Peak Amps:  %.2f A\n", session->peak_current_amps);
+            }
+            logPrintln("[JOB] ======================================");
+            
+            // Trigger job complete alert (buzzer + status light)
+            alertJobComplete();
+            
             return;
         }
     }
@@ -80,6 +101,18 @@ bool JobManager::startJob(const char* filename) {
         return false;
     }
 
+    // ITEM 2: Count total lines for ETA estimation
+    File countFile = LittleFS.open(filename, "r");
+    if (countFile) {
+        uint32_t lineCount = 0;
+        while (countFile.available()) {
+            if (countFile.read() == '\n') lineCount++;
+        }
+        status.total_lines = lineCount;
+        countFile.close();
+        logInfo("[JOB] File has %lu lines", (unsigned long)lineCount);
+    }
+
     jobFile = LittleFS.open(filename, "r");
     if (!jobFile) {
         logError("[JOB] Failed to open file");
@@ -89,7 +122,6 @@ bool JobManager::startJob(const char* filename) {
     file_open = true;
     strncpy(status.filename, filename, 63);
     status.current_line = 0;
-    status.total_lines = 0; 
     status.start_time = millis();
     status.state = JOB_RUNNING;
     

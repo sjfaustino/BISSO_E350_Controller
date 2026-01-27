@@ -29,6 +29,8 @@ typedef struct {
     float blade_width_mm;       // Blade kerf width (default 3.0mm)
     float cut_depth_mm;         // Current cutting depth (default 20.0mm)
     float power_factor;         // Power factor (default 0.8 for induction motor)
+    float blade_diameter_mm;    // ITEM 7: Blade diameter for surface speed (default 350mm)
+    float optimal_sfpm;         // ITEM 7: Optimal surface feet/min for material (default 4500)
 } cutting_config_t;
 
 // ============================================================================
@@ -66,6 +68,7 @@ typedef struct {
     float feed_rate_mms;        // Latest feed rate (mm/s)
     float power_watts;          // Calculated power
     float mrr_mm3s;             // Material removal rate (mm³/s)
+    float surface_speed_mpm;    // ITEM 7: Surface speed (m/min)
     float sce_jmm3;             // Specific cutting energy (J/mm³)
     
     // Running statistics

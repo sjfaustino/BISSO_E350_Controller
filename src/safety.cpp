@@ -342,6 +342,17 @@ void safetyTriggerAlarm(const char *reason, safety_fault_t fault_type) {
   logPrintf("[SAFETY] Fault Count: %lu\n",
                 (unsigned long)safety_state.fault_count);
 
+  // ITEM 4: E-Stop Recovery Guidance - Help operator understand what to check
+  logPrintln("\n[SAFETY] ======== RECOVERY CHECKLIST ========");
+  logPrintln("[SAFETY] Before resetting alarm, CHECK:");
+  logPrintln("  1. Emergency stop button released");
+  logPrintln("  2. Safety guards in place");
+  logPrintln("  3. Material clamps secure");
+  logPrintln("  4. Blade clear of obstruction");
+  logPrintln("  5. Coolant level adequate");
+  logPrintln("[SAFETY] Use 'safety reset' when ready");
+  logPrintln("[SAFETY] ====================================\n");
+
   // CRITICAL: Deadlock-Safe Emergency Stop (Code Audit)
   // motionEmergencyStop() uses 10ms timeout to prevent deadlock
   // If Motion task holds mutex while blocked on I2C, E-stop still succeeds
