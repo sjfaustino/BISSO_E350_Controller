@@ -273,6 +273,81 @@ void cliUpdate() {
         cli_pos--;
         if (cli_echo_enabled) CLI_SERIAL.print("\b \b");
       }
+    } else if (c == '\t') {
+      // C4: TAB COMPLETION
+      last_was_eol = false;
+      if (cli_pos > 0) {
+        cli_buffer[cli_pos] = '\0';
+        
+        // Find matching commands
+        int match_count = 0;
+        int last_match = -1;
+        const char* common_prefix = nullptr;
+        size_t common_len = 0;
+        
+        for (int i = 0; i < command_count; i++) {
+          if (strncasecmp(commands[i].command, cli_buffer, cli_pos) == 0) {
+            match_count++;
+            last_match = i;
+            
+            // Track common prefix among matches
+            if (common_prefix == nullptr) {
+              common_prefix = commands[i].command;
+              common_len = strlen(common_prefix);
+            } else {
+              // Find common length
+              size_t j = cli_pos;
+              while (j < common_len && commands[i].command[j] && 
+                     tolower(common_prefix[j]) == tolower(commands[i].command[j])) {
+                j++;
+              }
+              common_len = j;
+            }
+          }
+        }
+        
+        if (match_count == 1) {
+          // Single match - complete it
+          const char* cmd = commands[last_match].command;
+          
+          // Clear current input and replace with match
+          if (cli_echo_enabled) {
+            for (uint16_t i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
+          }
+          
+          strcpy(cli_buffer, cmd);
+          cli_pos = strlen(cmd);
+          cli_buffer[cli_pos++] = ' ';  // Add space after command
+          cli_buffer[cli_pos] = '\0';
+          
+          if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
+        } else if (match_count > 1) {
+          // Multiple matches - complete common prefix and show options
+          if (common_len > (size_t)cli_pos) {
+            // Extend to common prefix
+            if (cli_echo_enabled) {
+              for (uint16_t i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
+            }
+            strncpy(cli_buffer, common_prefix, common_len);
+            cli_buffer[common_len] = '\0';
+            cli_pos = common_len;
+            if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
+          } else {
+            // Show all matches
+            CLI_SERIAL.println();
+            for (int i = 0; i < command_count; i++) {
+              if (strncasecmp(commands[i].command, cli_buffer, cli_pos) == 0) {
+                CLI_SERIAL.print(commands[i].command);
+                CLI_SERIAL.print("  ");
+              }
+            }
+            CLI_SERIAL.println();
+            CLI_SERIAL.print("> ");  // Simple prompt
+            if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
+          }
+        }
+        // No matches - do nothing (beep could be added)
+      }
     } else if (c >= 32 && c < 127 && cli_pos < CLI_BUFFER_SIZE - 1) {
       last_was_eol = false;
       cli_buffer[cli_pos++] = c;

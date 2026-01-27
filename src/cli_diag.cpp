@@ -45,6 +45,7 @@
 #include "system_constants.h"
 #include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion quality diagnostics
 #include "cutting_analytics.h"      // Stone cutting analytics
+#include "job_manager.h"            // C2: For diag summary job status
 #include <LittleFS.h>               // Boot log file operations
 #include <stdlib.h>
 #include <string.h>
@@ -1575,6 +1576,113 @@ void cmd_log_main(int argc, char** argv) {
 }
 
 // ============================================================================
+// C2: DIAG SUMMARY - One-command critical stats dump
+// ============================================================================
+void cmd_diag_summary(int argc, char** argv) {
+    (void)argc; (void)argv;
+    
+    uint32_t uptime_sec = millis() / 1000;
+    uint32_t hours = uptime_sec / 3600;
+    uint32_t mins = (uptime_sec % 3600) / 60;
+    
+    logPrintln("\n[DIAG] =========== SYSTEM SUMMARY ===========");
+    logPrintf("Uptime:     %02lu:%02lu:%02lu\n", (unsigned long)hours, (unsigned long)mins, (unsigned long)(uptime_sec % 60));
+    
+    // Memory
+    size_t free_heap = esp_get_free_heap_size();
+    size_t min_heap = esp_get_minimum_free_heap_size();
+    logPrintf("Heap:       %u KB free (min: %u KB)\n", (unsigned)(free_heap/1024), (unsigned)(min_heap/1024));
+    
+    // CPU
+    uint8_t cpu = taskGetCpuUsage();
+    logPrintf("CPU:        %u%%\n", cpu);
+    
+    // Safety
+    bool alarm = safetyIsAlarmed();
+    bool estop = emergencyStopIsActive();
+    logPrintf("Safety:     %s%s%s\n", 
+             (!alarm && !estop) ? "OK" : "",
+             alarm ? "ALARM " : "",
+             estop ? "E-STOP" : "");
+    
+    // Spindle
+    const spindle_monitor_state_t* spindle = spindleMonitorGetState();
+    if (spindle->enabled) {
+        logPrintf("Spindle:    %.1f A (peak %.1f A)\n", spindle->current_amps, spindle->current_peak_amps);
+    }
+    
+    // Network
+    if (WiFi.status() == WL_CONNECTED) {
+        logPrintf("WiFi:       %s (%d dBm)\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    } else {
+        logPrintln("WiFi:       Disconnected");
+    }
+    
+    // Job
+    extern JobManager jobManager;
+    job_status_t job = jobManager.getStatus();
+    if (job.state == JOB_RUNNING) {
+        float progress = job.total_lines > 0 ? (float)job.current_line / job.total_lines * 100 : 0;
+        logPrintf("Job:        %.1f%% (%lu/%lu lines)\n", progress, (unsigned long)job.current_line, (unsigned long)job.total_lines);
+    } else {
+        const char* states[] = {"Idle", "Running", "Paused", "Complete", "Error"};
+        logPrintf("Job:        %s\n", states[job.state < 5 ? job.state : 0]);
+    }
+    
+    // Faults
+    fault_stats_t faults = faultGetStats();
+    logPrintf("Faults:     %lu total\n", (unsigned long)faults.total_faults);
+    
+    logPrintln("=============================================");
+}
+
+// ============================================================================
+// S3: MEMORY LEAK DETECTION
+// ============================================================================
+static uint32_t leak_baseline_heap = 0;
+static uint32_t leak_baseline_time = 0;
+
+void memoryLeakInit() {
+    leak_baseline_heap = esp_get_free_heap_size();
+    leak_baseline_time = millis();
+}
+
+void cmd_memory_leak_check(int argc, char** argv) {
+    (void)argc; (void)argv;
+    
+    uint32_t current_heap = esp_get_free_heap_size();
+    uint32_t elapsed_ms = millis() - leak_baseline_time;
+    float elapsed_hours = elapsed_ms / 3600000.0f;
+    
+    logPrintln("\n[MEMORY] === Memory Leak Analysis ===");
+    logPrintf("Baseline:    %u KB (set %.1f hours ago)\n", (unsigned)(leak_baseline_heap/1024), elapsed_hours);
+    logPrintf("Current:     %u KB\n", (unsigned)(current_heap/1024));
+    
+    int32_t delta = (int32_t)current_heap - (int32_t)leak_baseline_heap;
+    float delta_pct = (leak_baseline_heap > 0) ? (delta * 100.0f / leak_baseline_heap) : 0;
+    
+    logPrintf("Change:      %+d bytes (%+.1f%%)\n", delta, delta_pct);
+    
+    // Minimum heap ever seen
+    size_t min_heap = esp_get_minimum_free_heap_size();
+    logPrintf("All-time min: %u KB\n", (unsigned)(min_heap/1024));
+    
+    // Leak warning thresholds
+    if (delta_pct < -10.0f && elapsed_hours > 1.0f) {
+        logWarning("[MEMORY] !!! POTENTIAL LEAK: >10%% loss over %.1f hours !!!", elapsed_hours);
+    } else if (delta_pct < -5.0f && elapsed_hours > 0.5f) {
+        logWarning("[MEMORY] Gradual memory loss detected (%.1f%%)", delta_pct);
+    } else {
+        logPrintln("[MEMORY] No significant leak detected");
+    }
+    
+    if (argc >= 2 && strcasecmp(argv[1], "reset") == 0) {
+        memoryLeakInit();
+        logInfo("[MEMORY] Baseline reset to current heap");
+    }
+}
+
+// ============================================================================
 // REGISTRATION
 // ============================================================================
 void cliRegisterDiagCommands() {
@@ -1611,6 +1719,12 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("dio", "Digital I/O status display", cmd_dio_main);
     cliRegisterCommand("spindle", "Spindle monitor & alarms", cmd_spindle_main);
     cliRegisterCommand("cutting", "Stone cutting analytics", cmd_cutting_main);
+    
+    // C2: Quick summary command
+    cliRegisterCommand("diag", "System diagnostic summary", cmd_diag_summary);
+    
+    // S3: Memory leak detection  
+    cliRegisterCommand("memleak", "Memory leak analysis", cmd_memory_leak_check);
     
     // Boot log viewer
     cliRegisterCommand("log", "Log management (boot log viewer)", cmd_log_main);
