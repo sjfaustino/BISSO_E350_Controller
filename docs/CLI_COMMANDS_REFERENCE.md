@@ -2024,6 +2024,28 @@ web config username admin # Set username
 web config password MySecurePass123
 ```
 
+**How It Works:**
+```
+CREDENTIAL STORAGE ARCHITECTURE:
+┌─────────────────────────────────────────────────────────────┐
+│                          NVS Flash                          │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐  │
+│  │ KEY_WEB_USERNAME│  │ KEY_WEB_PASSWORD│  │KEY_WEB_PW   │  │
+│  │    "admin"      │  │   (plaintext)   │  │  _CHANGED   │  │
+│  └────────┬────────┘  └────────┬────────┘  └──────┬──────┘  │
+│           │                    │                  │         │
+└───────────┼────────────────────┼──────────────────┼─────────┘
+            └────────────────────┼──────────────────┘
+                                 ↓
+              ┌─────────────────────────────────────┐
+              │     WebServer.loadCredentials()     │
+              │   Called on boot and after changes  │
+              └─────────────────────────────────────┘
+```
+
+> [!WARNING]
+> Passwords are stored in plaintext in NVS. Physical access to the device allows extraction.
+
 ---
 
 ### `api` - API Rate Limiter Diagnostics
@@ -2054,6 +2076,28 @@ Requests in window: 45
 Window size: 60 seconds
 Limit per client: 100 req/min
 Blocked requests: 0
+```
+
+**How It Works:**
+```
+SLIDING WINDOW RATE LIMITER:
+┌────────────────────────────────────────────────────────────────┐
+│                     60-Second Window                           │
+│  ┌──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┐   │
+│  │5 │3 │7 │2 │4 │6 │1 │8 │3 │2 │4 │1 │5 │2 │3 │4 │2 │1 │3 │   │
+│  └──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┘   │
+│  ←────────────────────────────────────────────────────────→   │
+│           Window slides with time (FIFO queue)                │
+│                                                                │
+│   Total requests in window = 66                                │
+│   Limit = 100 req/window                                       │
+│   Status = ALLOWED (34 remaining)                              │
+└────────────────────────────────────────────────────────────────┘
+
+DOS PROTECTION:
+  • Per-IP tracking with HashMap
+  • Burst allowance for legitimate batch operations
+  • Auto-cleanup of stale entries every 5 minutes
 ```
 
 ---
@@ -2092,6 +2136,31 @@ Y      987     2      0.03mm    GOOD
 Z      456     0      0.02mm    GOOD
 ```
 
+**How It Works:**
+```
+MOTION QUALITY METRICS COLLECTION:
+┌─────────────────────────────────────────────────────────────────┐
+│                     AXIS SYNCHRONIZATION MODULE                  │
+│                                                                  │
+│   For each move command:                                         │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │  1. Record TARGET position from G-code                   │  │
+│   │  2. Execute move via PLC                                 │  │
+│   │  3. Wait for ACTUAL position from encoder                │  │
+│   │  4. Calculate DEVIATION = |Target - Actual|              │  │
+│   │  5. Update running statistics:                           │  │
+│   │     • Total moves count                                  │  │
+│   │     • Error count (deviation > threshold)                │  │
+│   │     • Average/Max deviation                              │  │
+│   └──────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│   STATUS CLASSIFICATION:                                         │
+│   • GOOD:    Deviation < 0.05mm, Error rate < 1%                 │
+│   • WARNING: Deviation < 0.1mm, Error rate < 5%                  │
+│   • BAD:     Deviation ≥ 0.1mm or Error rate ≥ 5%                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `debug` - System Debug Utilities
@@ -2116,6 +2185,28 @@ Advanced debugging commands for system internals.
 debug all
 ```
 
+**How It Works:**
+```
+DEBUG ALL - COMPLETE SYSTEM DUMP:
+┌────────────────────────────────────────────────────────────────┐
+│  1. FIRMWARE INFO       │ Version, uptime, build date         │
+├──────────────────────────┼─────────────────────────────────────┤
+│  2. ENCODER STATUS      │ WJ66 diagnostics, pulse counts      │
+├──────────────────────────┼─────────────────────────────────────┤
+│  3. MOTION STATE        │ Current position, motion buffer     │
+├──────────────────────────┼─────────────────────────────────────┤
+│  4. SAFETY STATUS       │ E-stop, limits, alarms              │
+├──────────────────────────┼─────────────────────────────────────┤
+│  5. ELBO VFD STATE      │ VFD communication, parameters       │
+├──────────────────────────┼─────────────────────────────────────┤
+│  6. CONFIG CACHE        │ Configuration table integrity       │
+├──────────────────────────┼─────────────────────────────────────┤
+│  7. WATCHDOG STATUS     │ Last feed time, timeout count       │
+├──────────────────────────┼─────────────────────────────────────┤
+│  8. TASK STATS          │ FreeRTOS task health                 │
+└────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `timeouts` - Timeout Diagnostics
@@ -2127,6 +2218,23 @@ timeouts
 
 **Description:**
 Shows diagnostic information about communication timeouts across all subsystems.
+
+**How It Works:**
+```
+TIMEOUT TRACKING:
+┌─────────────────────────────────────────────────────────────┐
+│  Subsystem          Last OK      Timeouts   State          │
+├─────────────────────────────────────────────────────────────┤
+│  RS485 (JXK-10)     2.1s ago     3          OK             │
+│  RS485 (WJ66)       0.5s ago     0          OK             │
+│  I2C (PCF8574)      0.1s ago     1          OK             │
+│  WiFi               5.2s ago     0          OK             │
+│  Modbus (VFD)       1.8s ago     12         WARNING        │
+└─────────────────────────────────────────────────────────────┘
+
+Timeout thresholds configured per-subsystem for optimal
+balance between responsiveness and false-positive avoidance.
+```
 
 ---
 
@@ -2147,6 +2255,31 @@ Manages the system watchdog timer that prevents system hangs.
 | `feed` | Manually feed the watchdog |
 | `stats` | Show watchdog statistics |
 
+**How It Works:**
+```
+WATCHDOG TIMER ARCHITECTURE:
+┌─────────────────────────────────────────────────────────────────┐
+│                     ESP32 TASK WATCHDOG                          │
+│                                                                  │
+│   ┌─────────────┐     Feed every      ┌─────────────────────┐   │
+│   │  Main Loop  │ ─────5 seconds ────→│   WDT Counter      │   │
+│   │   Task      │                     │   (resets to 0)     │   │
+│   └─────────────┘                     └──────────┬──────────┘   │
+│                                                  │              │
+│   If counter reaches timeout (default 30s):     │              │
+│                                                  ↓              │
+│                              ┌─────────────────────────────┐    │
+│                              │   SYSTEM RESET + PANIC LOG  │    │
+│                              │   (saved to NVS for review) │    │
+│                              └─────────────────────────────┘    │
+│                                                                  │
+│   STATS TRACKED:                                                 │
+│   • Last feed timestamp                                          │
+│   • Total resets caused by WDT                                   │
+│   • Longest time between feeds                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `task` - Task Monitoring
@@ -2164,6 +2297,27 @@ Monitors FreeRTOS task status and performance.
 |------------|-------------|
 | `list` | Show all running tasks |
 | `stats` | Show task statistics |
+
+**How It Works:**
+```
+FREERTOS TASK MONITORING:
+┌─────────────────────────────────────────────────────────────────┐
+│                      TASK REGISTRY                               │
+│                                                                  │
+│   Each registered task is tracked via task_stats_t:              │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │  • TaskHandle_t handle     - FreeRTOS task handle        │  │
+│   │  • const char* name        - Human-readable name         │  │
+│   │  • UBaseType_t priority    - Task priority (0-24)        │  │
+│   │  • uint32_t stack_high_water - Minimum free stack ever   │  │
+│   │  • uint32_t run_count      - Times task has executed     │  │
+│   │  • uint32_t total_time_ms  - Cumulative execution time   │  │
+│   │  • uint32_t max_run_time_ms - Longest single execution   │  │
+│   └──────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│   Stats updated by perfMonitor via hardware timer interrupts     │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -2187,6 +2341,29 @@ Y     987654    987650    4 counts
 Z     456789    456790    1 count
 ```
 
+**How It Works:**
+```
+DEVIATION DETECTION PIPELINE:
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│   1. COMMANDED POSITION (from G-code parser)                     │
+│      └── Target calculated from G0/G1 + WCS offset               │
+│                          │                                       │
+│   2. EXPECTED COUNTS     │                                       │
+│      └── Target × $100 (pulses/mm) = expected encoder value      │
+│                          │                                       │
+│   3. ACTUAL COUNTS       ↓                                       │
+│      └── WJ66 encoder reading after move complete                │
+│                          │                                       │
+│   4. DEVIATION = |Expected - Actual|                             │
+│                          │                                       │
+│   5. ALERT THRESHOLDS:   ↓                                       │
+│      • < 10 counts: Normal (mechanical backlash)                 │
+│      • 10-50 counts: Warning (check coupling/belt)               │
+│      • > 50 counts: Error (slip or encoder fault)                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `fault_recovery` - Fault Recovery Status
@@ -2198,6 +2375,30 @@ fault_recovery
 
 **Description:**
 Shows status of all fault recovery mechanisms and auto-recovery attempts.
+
+**How It Works:**
+```
+FAULT RECOVERY STATE MACHINE:
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│   FAULT DETECTED ─────→ RECOVERY ATTEMPT ─────→ SUCCESS/FAIL    │
+│         │                     │                      │          │
+│         ↓                     ↓                      ↓          │
+│   ┌──────────┐         ┌───────────────┐      ┌─────────────┐   │
+│   │ Log fault│         │ Execute       │      │ Clear fault │   │
+│   │ to NVS   │         │ recovery      │      │ OR escalate │   │
+│   │          │         │ procedure     │      │ to alarm    │   │
+│   └──────────┘         └───────────────┘      └─────────────┘   │
+│                                                                  │
+│   RECOVERY PROCEDURES:                                           │
+│   • RS485 timeout → Retry with exponential backoff               │
+│   • Encoder loss  → Re-initialize WJ66, re-home if needed        │
+│   • I2C error     → Bus reset, re-enumerate devices              │
+│   • VFD fault     → Clear fault register, restart sequence       │
+│                                                                  │
+│   MAX RETRIES: 3 per fault type before escalating to ALARM      │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -2220,6 +2421,28 @@ Motion             |        5 |      2048 |   12345 |     15678 |    125
 Encoder            |        6 |      1024 |   98765 |      5432 |     12
 LCD                |        2 |       512 |    4567 |      1234 |     45
 CLI                |        3 |      2048 |     890 |      2345 |     89
+```
+
+**How It Works:**
+```
+STACK HIGH WATER MARK (HWM) INTERPRETATION:
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│   STACK ALLOCATION:                                              │
+│   ┌────────────────────────────────────────────────────────────┐│
+│   │████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░││
+│   │← Used (grows →)    │         Free (HWM) →              │  ││
+│   └────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│   • HWM = Minimum free bytes EVER during task lifetime          │
+│   • If HWM approaches 0 → Stack overflow risk!                  │
+│   • Recommended: Keep HWM > 25% of allocated stack              │
+│                                                                  │
+│   TIMING METRICS:                                                │
+│   • Time(ms) = Total CPU time consumed by task                   │
+│   • Max(ms) = Longest single execution (detect blocking)        │
+│   • If Max >> Average → Task may have blocking calls            │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -2263,6 +2486,38 @@ Linear Distance:  12.5 m
 Area Cut:         0.375 m²
 Current SCE:      42.5 kWh/m³
 Blade Efficiency: 94%
+```
+
+**How It Works:**
+```
+SPECIFIC CUTTING ENERGY (SCE) CALCULATION:
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│   SCE = Energy Consumed / Volume Removed                         │
+│                                                                  │
+│   Where:                                                         │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │  Energy (kWh) = ∫ Power(t) dt                            │  │
+│   │                 └── From VFD current × voltage readings  │  │
+│   │                                                          │  │
+│   │  Volume (m³) = Linear Distance × Blade Width × Depth     │  │
+│   │                └── From encoder travel during G1 moves   │  │
+│   └──────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│   BLADE EFFICIENCY:                                              │
+│   Efficiency % = (Baseline SCE / Current SCE) × 100              │
+│                                                                  │
+│   • Baseline = SCE with new blade (set via `cutting baseline`)   │
+│   • As blade wears → SCE increases → Efficiency decreases        │
+│   • Alert when efficiency < 70% (blade change recommended)       │
+│                                                                  │
+│   DATA SOURCES:                                                  │
+│   ┌────────────┐    ┌────────────┐    ┌────────────┐            │
+│   │  JXK-10    │    │   WJ66     │    │  Session   │            │
+│   │  Current   │──→ │  Distance  │──→ │  Analytics │            │
+│   │  Sensor    │    │  Encoders  │    │  Module    │            │
+│   └────────────┘    └────────────┘    └────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
