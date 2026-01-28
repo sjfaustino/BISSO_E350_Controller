@@ -256,6 +256,21 @@ echo off save   # Disable echo and save permanently
 [CLI] Echo is now ON
 ```
 
+**How It Works:**
+```
+ECHO CONTROL:
+┌─────────────────────────────────────────────────────────────────┐
+│  Terminal Type       Echo Needed?                                  │
+│  ───────────────────────────────────────────────────────────   │
+│  Web Serial Monitor  NO (browser echoes)                          │
+│  PuTTY/Telnet        YES (raw terminal)                           │
+│  Arduino IDE         NO (auto-echoes)                             │
+│  CNCjs/UGS           NO (G-code sender)                           │
+│                                                                    │
+│  The `save` flag stores preference to NVS for boot default.       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 2. 🕹️ GRBL COMPATIBILITY COMMANDS
@@ -1585,6 +1600,26 @@ telemetry <subcommand>
 | `status` | Show telemetry status |
 | `stream` | Start real-time streaming |
 | `stop` | Stop streaming |
+
+**How It Works:**
+```
+TELEMETRY STREAMING:
+┌─────────────────────────────────────────────────────────────────┐
+│  Real-time data broadcast:                                         │
+│  • Position: All 4 axes (X, Y, Z, A)                              │
+│  • Velocity: Calculated from encoder deltas                       │
+│  • Spindle: RPM and current (Amps)                                │
+│  • Status: Machine state, alarms, limits                          │
+│                                                                    │
+│  STREAM FORMAT:                                                    │
+│  JSON @ 10Hz for WebSocket clients                                │
+│  Compact binary for bandwidth-limited channels                    │
+│                                                                    │
+│  Used by:                                                          │
+│  • Web UI real-time DRO                                           │
+│  • External data logging systems                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
