@@ -164,12 +164,18 @@ void loop() {
             
             // 2. Bottom Line: Value (Right-justified)
             display.setTextSize(2);
-            // If value is negative and 4 digits (e.g. -3500.0), it's 7 chars.
-            // On a 72px screen, 7 chars at Size 2 (12px/char) will clip (84px).
-            // We shift left slightly for negative numbers.
-            int x_pos = (val < 0) ? -12 : 0; 
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%.1f", val);
+            int len = strlen(buf);
+            
+            // Calculate X to right-justify in the 72px physical area
+            // Each Size 2 char is 12px wide.
+            int textWidth = len * 12;
+            int x_pos = 72 - textWidth;
+            if (x_pos < 0) x_pos = 0; // Cap at left edge if too long (e.g. -3500.0)
+            
             display.setCursor(x_pos + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
-            display.printf("%.1f", val);
+            display.print(buf);
             
             // 3. Small Uptime (corner) - Moved to bottom edge to stay out of the way
             display.setTextSize(1);
