@@ -84,6 +84,7 @@ if (typeof window.CutPlanner === 'undefined') {
                         depth: parseFloat(document.getElementById('drill-depth').value) || 30,
                         peckDepth: parseFloat(document.getElementById('drill-peck-depth').value) || 5,
                         dwellTime: parseFloat(document.getElementById('drill-dwell').value) || 0.5,
+                        startupDelay: parseFloat(document.getElementById('drill-startup-delay').value) || 2.0,
                         speed: document.getElementById('drill-speed').value || 'medium',
                         startCorner: document.getElementById('drill-start-corner').value || 'top-left'
                     };
@@ -337,6 +338,7 @@ if (typeof window.CutPlanner === 'undefined') {
                 'G90              ; Absolute positioning',
                 'M8               ; Coolant ON',
                 'M3               ; Drill ON',
+                `G4 P${p.startupDelay.toFixed(1)}          ; Wait for VFD ramp-up`,
                 ''
             ];
 

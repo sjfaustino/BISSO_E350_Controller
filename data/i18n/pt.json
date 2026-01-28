@@ -151,6 +151,7 @@
         "cutout_y": "Altura Y do Corte (mm)",
         "peck_depth": "Profundidade Passo (mm)",
         "dwell_time": "Tempo Pausa (seg)",
+        "startup_delay": "Atraso de Arranque (seg)",
         "descent_speed": "Velocidade Descida",
         "start_corner": "Canto Inicial",
         "speed_slow": "Lenta",

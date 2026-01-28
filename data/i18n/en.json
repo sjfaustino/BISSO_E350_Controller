@@ -152,6 +152,7 @@
         "cutout_y": "Cutout Height Y (mm)",
         "peck_depth": "Peck Depth (mm)",
         "dwell_time": "Dwell Time (sec)",
+        "startup_delay": "Startup Delay (sec)",
         "descent_speed": "Descent Speed",
         "start_corner": "Starting Corner",
         "speed_slow": "Slow",
