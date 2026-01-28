@@ -252,27 +252,27 @@ void NetworkManager::initEthernet() {
   logInfo("[ETH] Initializing W5500 SPI Ethernet...");
   
   // 1. SPI Bus initialization
-  spi_bus_config_t buscfg = {
-      .mosi_io_num = PIN_ETH_MOSI,
-      .miso_io_num = PIN_ETH_MISO,
-      .sclk_io_num = PIN_ETH_CLK,
-      .quadwp_io_num = -1,
-      .quadhd_io_num = -1,
-  };
+  spi_bus_config_t buscfg = {}; 
+  buscfg.mosi_io_num = PIN_ETH_MOSI;
+  buscfg.miso_io_num = PIN_ETH_MISO;
+  buscfg.sclk_io_num = PIN_ETH_CLK;
+  buscfg.quadwp_io_num = -1;
+  buscfg.quadhd_io_num = -1;
+
   if (spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO) != ESP_OK) {
       logError("[ETH] Failed to initialize SPI bus");
       return;
   }
   
   // 2. SPI Device initialization
-  spi_device_interface_config_t devcfg = {
-      .command_bits = 16,
-      .address_bits = 8,
-      .mode = 0,
-      .clock_speed_hz = 20 * 1000 * 1000, 
-      .spics_io_num = PIN_ETH_CS,
-      .queue_size = 20,
-  };
+  spi_device_interface_config_t devcfg = {};
+  devcfg.command_bits = 16;
+  devcfg.address_bits = 8;
+  devcfg.mode = 0;
+  devcfg.clock_speed_hz = 20 * 1000 * 1000;
+  devcfg.spics_io_num = PIN_ETH_CS;
+  devcfg.queue_size = 20;
+
   spi_device_handle_t spi_handle;
   if (spi_bus_add_device(SPI2_HOST, &devcfg, &spi_handle) != ESP_OK) {
       logError("[ETH] Failed to add SPI device");
