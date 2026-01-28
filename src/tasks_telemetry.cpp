@@ -28,6 +28,8 @@
 #include "task_performance_monitor.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <esp_now.h>
+#include "telemetry_packet.h"
 #include <math.h> // For isnan() sensor validation
 
 // External reference to the global WebServer instance
@@ -211,6 +213,28 @@ void taskTelemetryFunction(void *parameter) {
     // Trigger the broadcast to all connected clients (with VFD and axis
     // metrics)
     webServer.broadcastState();
+
+    // PHASE 7.0: ESP-NOW Remote DRO Broadcast
+    // Broadcast machine position to dedicated hardware remotes
+    static uint32_t last_esp_now_broadcast = 0;
+    if (millis() - last_esp_now_broadcast > 100) { // 10Hz broadcast
+        TelemetryPacket pkt;
+        pkt.x = motionGetPositionMM(0);
+        pkt.y = motionGetPositionMM(1);
+        pkt.z = motionGetPositionMM(2);
+        
+        // Map system status to packet enum (0=READY, 1=MOVING, 2=ALARM, 3=E-STOP)
+        pkt.status = 0; // READY
+        if (motionIsEmergencyStopped()) pkt.status = 3;
+        else if (safetyIsAlarmed()) pkt.status = 2;
+        else if (motionIsMoving()) pkt.status = 1;
+        
+        pkt.uptime = taskGetUptime();
+        
+        uint8_t broadcast_mac[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+        esp_now_send(broadcast_mac, (uint8_t *)&pkt, sizeof(pkt));
+        last_esp_now_broadcast = millis();
+    }
 
     watchdogFeed("Telemetry");
     perfMonitorTaskEnd(PERF_TASK_ID_TELEMETRY);

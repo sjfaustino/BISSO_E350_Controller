@@ -13,6 +13,8 @@
 #include <DNSServer.h>  // For captive portal (used directly, not via ESPAsyncWiFiManager)
 #include <time.h>            // For NTP time sync
 #include "ota_manager.h"     // For otaStartBackgroundCheck
+#include <esp_now.h>
+#include <WiFi.h>
 
 // Ethernet support: LAN8720 for v1.6, W5500 for v3.1
 #include <ETH.h>
@@ -466,6 +468,23 @@ void NetworkManager::init() {
   // 4. Start background OTA update check (non-blocking)
   // DISABLED: Moved to main.cpp setup() for synchronous check at boot (better memory management)
   // otaStartBackgroundCheck();
+
+  // 5. Initialize ESP-NOW for Remote DRO
+  if (esp_now_init() == ESP_OK) {
+    logInfo("[NET] [OK] ESP-NOW initialized for Remote DRO");
+    
+    // Add broadcast peer
+    esp_now_peer_info_t peerInfo = {};
+    memset(peerInfo.peer_addr, 0xFF, 6); // Broadcast address
+    peerInfo.channel = 0;  // Use current channel
+    peerInfo.encrypt = false;
+    
+    if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+      logError("[NET] Failed to add ESP-NOW broadcast peer");
+    }
+  } else {
+    logError("[NET] Failed to initialize ESP-NOW");
+  }
 }
 
 void NetworkManager::update() {
