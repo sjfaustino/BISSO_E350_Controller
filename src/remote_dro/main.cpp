@@ -201,11 +201,12 @@ void setup() {
     display.clearDisplay();
     display.drawBitmap(OLED_X_OFFSET, LOGO_Y_OFFSET, logo_posipro_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
     
-    // Add centered version number below logo
+    // Add centered version number overimposed on the bottom of the logo
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
-    // 128px screen, "v1.0.0" is 6 chars * 6px = 36px wide. (128-36)/2 = 46.
-    display.setCursor(46, LOGO_Y_OFFSET + 42); 
+    // 128px wide screen center calculation: (128 - (6 chars * 6px))/2 = 46.
+    // 64px high screen bottom-line calculation: 64 - 8px font - 1px margin = 55.
+    display.setCursor(46, 55); 
     display.print("v1.0.0");
     
     display.display();
