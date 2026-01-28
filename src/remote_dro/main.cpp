@@ -40,19 +40,40 @@ const float MOVEMENT_THRESHOLD = 0.5f; // mm change to trigger giant text
 
 // Helper for drawing arrows on 0.42" OLED
 void drawArrow(char axis, bool positive) {
-    display.setTextSize(2);
-    display.setCursor(0 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); // Top Left
+    int bx = 0 + OLED_X_OFFSET;
+    int by = 12 + OLED_Y_OFFSET;
+    int size = 14;
     
     if (axis == 'X') {
-        if (positive) display.print("->"); // Right arrow simplified
-        else display.print("<-");         // Left arrow simplified
+        if (positive) { // Right
+            display.drawLine(bx, by + 7, bx + size, by + 7, WHITE);
+            display.drawLine(bx + size, by + 7, bx + size - 4, by + 3, WHITE);
+            display.drawLine(bx + size, by + 7, bx + size - 4, by + 11, WHITE);
+        } else { // Left
+            display.drawLine(bx + size, by + 7, bx, by + 7, WHITE);
+            display.drawLine(bx, by + 7, bx + 4, by + 3, WHITE);
+            display.drawLine(bx, by + 7, bx + 4, by + 11, WHITE);
+        }
     } else if (axis == 'Y') {
-        // Since SSD1306 standard font lacks ↗/↙, we use + / - symbols as indicators or simplified text
-        if (positive) display.print("UR"); // Up-Right
-        else display.print("DL");         // Down-Left
+        if (positive) { // Up-Right (↗)
+            display.drawLine(bx, by + size, bx + size, by, WHITE);
+            display.drawLine(bx + size, by, bx + size - 6, by, WHITE);
+            display.drawLine(bx + size, by, bx + size, by + 6, WHITE);
+        } else { // Down-Left (↙)
+            display.drawLine(bx + size, by, bx, by + size, WHITE);
+            display.drawLine(bx, by + size, bx + 6, by + size, WHITE);
+            display.drawLine(bx, by + size, bx, by + size - 6, WHITE);
+        }
     } else if (axis == 'Z') {
-        if (positive) display.print("^");  // Up
-        else display.print("v");          // Down
+        if (positive) { // Up
+            display.drawLine(bx + 7, by + size, bx + 7, by, WHITE);
+            display.drawLine(bx + 7, by, bx + 3, by + 4, WHITE);
+            display.drawLine(bx + 7, by, bx + 11, by + 4, WHITE);
+        } else { // Down
+            display.drawLine(bx + 7, by, bx + 7, by + size, WHITE);
+            display.drawLine(bx + 7, by + size, bx + 3, by + size - 4, WHITE);
+            display.drawLine(bx + 7, by + size, bx + 11, by + size - 4, WHITE);
+        }
     }
 }
 
@@ -115,8 +136,8 @@ void loop() {
     static bool isPaused = false;
 
     if (!isPaused) {
-        if (millis() - lastSimUpdate > 500) {
-            // Randomly pick an axis to "move" every 0.5s from -3500 to 3500
+        if (millis() - lastSimUpdate > 1000) { // Slowed down simulation to 1Hz
+            // Randomly pick an axis to "move" every 1s from -3500 to 3500
             int axis = random(0, 3);
             if (axis == 0) data.x = (float)random(-MAX_MACHINE_DIM * 10, MAX_MACHINE_DIM * 10) / 10.0f;
             else if (axis == 1) data.y = (float)random(-MAX_MACHINE_DIM * 10, MAX_MACHINE_DIM * 10) / 10.0f;
@@ -238,5 +259,5 @@ void loop() {
     }
     
     display.display();
-    delay(100); // 10Hz refresh
+    delay(1000); // 1Hz refresh
 }
