@@ -868,6 +868,19 @@ M2
 **Description:**
 Signals the **end of the G-code program**. Clears all pending motion, resets parser state, returns to idle.
 
+**How It Works:**
+```
+PROGRAM END SEQUENCE:
+┌────────────────────────────────────────────────────────────────┐
+│  1. Complete any queued moves                                      │
+│  2. Stop spindle (implicit M5)                                     │
+│  3. Reset parser modal states to defaults                         │
+│  4. Clear motion planner buffer                                   │
+│  5. Set machine state to IDLE                                     │
+│  6. Ready for next program                                        │
+└────────────────────────────────────────────────────────────────┘
+```
+
 **Industrial Use Case:**
 Always place `M2` at the end of your G-code files to signal proper program termination.
 
@@ -904,6 +917,19 @@ M112
 **Description:**
 Triggers an **immediate software emergency stop**. All motion halts, system enters ALARM state.
 
+**How It Works:**
+```
+SOFTWARE E-STOP SEQUENCE:
+┌────────────────────────────────────────────────────────────────┐
+│  1. IMMEDIATE motor disable (all axes)                            │
+│  2. VFD stop command sent                                         │
+│  3. Set ALARM state flag                                          │
+│  4. Clear motion planner queue                                    │
+│  5. Log event to fault history                                    │
+│  6. Require M999 or power cycle to clear                          │
+└────────────────────────────────────────────────────────────────┘
+```
+
 > [!WARNING]
 > This is equivalent to pressing the physical E-Stop button. Machine must be reset with `M999` or power cycle before continuing.
 
@@ -918,6 +944,17 @@ M114
 
 **Description:**
 Reports the current position of all axes in both work and machine coordinates.
+
+**How It Works:**
+```
+POSITION REPORT:
+┌────────────────────────────────────────────────────────────────┐
+│  1. Read current encoder counts from WJ66                         │
+│  2. Convert to mm using $100/$101/$102/$103 scale                 │
+│  3. Calculate Work Position = Machine Position - WCS Offset       │
+│  4. Format and output to serial                                   │
+└────────────────────────────────────────────────────────────────┘
+```
 
 **Expected Output:**
 ```text
@@ -969,6 +1006,21 @@ M117 JOB COMPLETE!
 M117 CHANGE BLADE NOW
 ```
 
+**How It Works:**
+```
+LCD MESSAGE DISPLAY:
+┌────────────────────────────────────────────────────────────────┐
+│  20x4 LCD Character Display:                                       │
+│                                                                    │
+│  Row 0: Normal status line                                        │
+│  Row 1: Position X/Y                                              │
+│  Row 2: Position Z/A                                              │
+│  Row 3: → M117 MESSAGE APPEARS HERE (20 chars max)               │
+│                                                                    │
+│  Message auto-clears after 10 seconds                             │
+└────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `M154` - Position Auto-Report
@@ -991,6 +1043,20 @@ Enables automatic position reporting at the specified interval.
 ```gcode
 M154 S1    ; Report position every second
 M154 S0    ; Stop auto-reporting
+```
+
+**How It Works:**
+```
+AUTO-REPORT MECHANISM:
+┌────────────────────────────────────────────────────────────────┐
+│  Timer-based position broadcast:                                   │
+│                                                                    │
+│  • Creates FreeRTOS timer at specified interval                   │
+│  • On tick: queries encoder positions                             │
+│  • Outputs M114-format position string                            │
+│  • Used by G-code senders for real-time DRO                       │
+│  • S0 stops and deletes the timer                                 │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1022,6 +1088,21 @@ M226 P3 S1 T10
 M226 P5 S1 A1 T5
 ```
 
+**How It Works:**
+```
+PIN WAIT STATE MACHINE:
+┌────────────────────────────────────────────────────────────────┐
+│  1. Parse pin number, state, type, timeout                        │
+│  2. Start timeout timer (if T>0)                                  │
+│  3. Poll pin via appropriate interface:                           │
+│     • A0: I73 input expander (PCF8574 @ 0x20)                     │
+│     • A1: Board GPIO pins                                         │
+│     • A2: ESP32 GPIO direct                                       │
+│  4. Pin matches state → Continue program                          │
+│  5. Timeout expires → ALARM (operator must clear)                 │
+└────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `M255` - LCD Sleep Timeout
@@ -1040,6 +1121,20 @@ Sets the LCD backlight auto-off timeout for energy saving.
 | `S0` | Never sleep (always on) |
 | `S60` | Sleep after 60 seconds |
 | `S300` | Sleep after 5 minutes |
+
+**How It Works:**
+```
+LCD SLEEP MANAGEMENT:
+┌────────────────────────────────────────────────────────────────┐
+│  Backlight control to extend LCD lifespan:                        │
+│                                                                    │
+│  • Timer resets on any machine activity                          │
+│  • Serial commands wake display                                   │
+│  • Button presses wake display                                    │
+│  • Motion starting wakes display                                  │
+│  • Timeout reached → backlight OFF (content remains)             │
+└────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1063,6 +1158,21 @@ Resets the G-code parser and clears error/alarm states without rebooting. The "f
 ```text
 [GCODE] Parser resynced. Ready.
 ok
+```
+
+**How It Works:**
+```
+PARSER RESYNC SEQUENCE:
+┌────────────────────────────────────────────────────────────────┐
+│  1. Clear ALARM state flags                                       │
+│  2. Reset parser modal states (G0 G54 G90 G94 M5)                 │
+│  3. Clear motion planner queue                                    │
+│  4. Reset serial input buffer                                     │
+│  5. Re-sync encoder positions                                     │
+│  6. Return to IDLE state                                          │
+│                                                                    │
+│  NOTE: Does NOT re-home. Position may be unknown after E-stop.    │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
