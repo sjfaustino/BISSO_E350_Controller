@@ -25,8 +25,14 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // Data state
 TelemetryPacket data;
+TelemetryPacket prevData;
 bool dataReceived = false;
 uint32_t lastPacketTime = 0;
+
+// Movement detection state
+char activeAxis = ' ';
+uint32_t lastMoveTime = 0;
+const float MOVEMENT_THRESHOLD = 0.5f; // mm change to trigger giant text
 
 // Callback when data is received
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
@@ -90,33 +96,67 @@ void loop() {
         display.setCursor(0 + OLED_X_OFFSET, 22 + OLED_Y_OFFSET);
         display.println("controller...");
     } else {
-        // Display Coordinates
-        display.setTextSize(1);
-        display.setCursor(0 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
+        // --- Movement Detection ---
+        bool moved = false;
+        if (abs(data.x - prevData.x) > MOVEMENT_THRESHOLD) { activeAxis = 'X'; moved = true; }
+        else if (abs(data.y - prevData.y) > MOVEMENT_THRESHOLD) { activeAxis = 'Y'; moved = true; }
+        else if (abs(data.z - prevData.z) > MOVEMENT_THRESHOLD) { activeAxis = 'Z'; moved = true; }
         
-        switch(data.status) {
-            case 0: display.print("READY"); break;
-            case 1: display.print("MOVING"); break;
-            case 2: display.print("ALARM"); break;
-            case 3: display.print("E-STOP"); break;
-            default: display.print("UNKNOWN"); break;
+        if (moved) {
+            lastMoveTime = millis();
         }
+        prevData = data;
 
-        display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
-        display.printf("%lus", data.uptime);
+        // --- Render Logic ---
+        bool showGiant = (activeAxis != ' ' && (millis() - lastMoveTime < 1000));
 
-        // X Axis
-        display.setTextSize(1); // Smaller text for 72x40 screen
-        display.setCursor(0 + OLED_X_OFFSET, 10 + OLED_Y_OFFSET);
-        display.printf("X:%7.1f", data.x);
-        
-        // Y Axis
-        display.setCursor(0 + OLED_X_OFFSET, 20 + OLED_Y_OFFSET);
-        display.printf("Y:%7.1f", data.y);
-        
-        // Z Axis
-        display.setCursor(0 + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
-        display.printf("Z:%7.1f", data.z);
+        if (showGiant) {
+            // Giant Text Mode: Only show the moving axis
+            display.setTextSize(1);
+            display.setCursor(0 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
+            display.printf("MOVING %c", activeAxis);
+            
+            display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
+            display.printf("%lus", data.uptime);
+
+            display.setTextSize(2); // Giant text for the value
+            display.setCursor(0 + OLED_X_OFFSET, 18 + OLED_Y_OFFSET);
+            
+            float val = 0;
+            if (activeAxis == 'X') val = data.x;
+            else if (activeAxis == 'Y') val = data.y;
+            else if (activeAxis == 'Z') val = data.z;
+            
+            display.printf("%c:%7.1f", activeAxis, val);
+        } else {
+            // Normal 3-Axis View
+            display.setTextSize(1);
+            display.setCursor(0 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
+            
+            switch(data.status) {
+                case 0: display.print("READY"); break;
+                case 1: display.print("MOVING"); break;
+                case 2: display.print("ALARM"); break;
+                case 3: display.print("E-STOP"); break;
+                default: display.print("UNKNOWN"); break;
+            }
+
+            display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
+            display.printf("%lus", data.uptime);
+
+            // X Axis
+            display.setTextSize(1);
+            display.setCursor(0 + OLED_X_OFFSET, 10 + OLED_Y_OFFSET);
+            display.printf("X:%7.1f", data.x);
+            
+            // Y Axis
+            display.setCursor(0 + OLED_X_OFFSET, 20 + OLED_Y_OFFSET);
+            display.printf("Y:%7.1f", data.y);
+            
+            // Z Axis
+            display.setCursor(0 + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
+            display.printf("Z:%7.1f", data.z);
+        }
     }
     
     display.display();
