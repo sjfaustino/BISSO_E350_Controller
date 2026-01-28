@@ -98,11 +98,11 @@ void loop() {
 
     if (!isPaused) {
         if (millis() - lastSimUpdate > 500) {
-            // Randomly pick an axis to "move" every 0.5s
+            // Randomly pick an axis to "move" every 0.5s from -3500 to 3500
             int axis = random(0, 3);
-            if (axis == 0) data.x = (float)random(0, MAX_MACHINE_DIM * 10) / 10.0f;
-            else if (axis == 1) data.y = (float)random(0, MAX_MACHINE_DIM * 10) / 10.0f;
-            else data.z = (float)random(0, 500 * 10) / 10.0f;
+            if (axis == 0) data.x = (float)random(-MAX_MACHINE_DIM * 10, MAX_MACHINE_DIM * 10) / 10.0f;
+            else if (axis == 1) data.y = (float)random(-MAX_MACHINE_DIM * 10, MAX_MACHINE_DIM * 10) / 10.0f;
+            else data.z = (float)random(-500 * 10, 500 * 10) / 10.0f;
             
             data.status = 1; // MOVING
             data.uptime = millis() / 1000;
@@ -162,11 +162,14 @@ void loop() {
             display.setCursor(28 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); 
             display.print(activeAxis);
             
-            // 2. Bottom Line: Value (Right-justified with 1 decimal)
+            // 2. Bottom Line: Value (Right-justified)
             display.setTextSize(2);
-            display.setCursor(0 + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
-            // %6.1f ensures 6 characters total (e.g. "3500.0"), right-justified
-            display.printf("%6.1f", val);
+            // If value is negative and 4 digits (e.g. -3500.0), it's 7 chars.
+            // On a 72px screen, 7 chars at Size 2 (12px/char) will clip (84px).
+            // We shift left slightly for negative numbers.
+            int x_pos = (val < 0) ? -12 : 0; 
+            display.setCursor(x_pos + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
+            display.printf("%.1f", val);
             
             // 3. Small Uptime (corner) - Moved to bottom edge to stay out of the way
             display.setTextSize(1);
