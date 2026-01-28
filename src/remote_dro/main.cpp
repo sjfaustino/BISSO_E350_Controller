@@ -140,13 +140,14 @@ void loop() {
             else if (activeAxis == 'Z') val = data.z;
 
             // 1. Top Line: Axis Label (Centered)
+            // Added +2 vertical padding to avoid clipping top of 16px high characters
             display.setTextSize(2);
-            display.setCursor(28 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET); // Approximate center for single char
+            display.setCursor(28 + OLED_X_OFFSET, 2 + OLED_Y_OFFSET); 
             display.print(activeAxis);
             
             // 2. Bottom Line: Value
             display.setTextSize(2);
-            display.setCursor(0 + OLED_X_OFFSET, 20 + OLED_Y_OFFSET);
+            display.setCursor(0 + OLED_X_OFFSET, 22 + OLED_Y_OFFSET);
             display.printf("%7.1f", val);
             
             // 3. Small Uptime (corner)
