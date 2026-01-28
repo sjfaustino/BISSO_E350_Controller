@@ -170,6 +170,30 @@ Legend:
 - `PLC_Q6.0`  = PLC energizes the Y contactor so the shared VFD is routed to that axis.  
 - `PLC_Q8.0`  = PLC READY stays high the whole time unless there's a fault.
 
+**How It Works:**
+```
+COMPLETE MOTION SEQUENCE STATE MACHINE:
+┌────────────────────────────────────────────────────────────────────────────┐
+│  STATE 0: IDLE                                                              │
+│   └─► ESP32 waits for PLC_READY (Q8.0 = HIGH)                              │
+│                                                                             │
+│  STATE 1: REQUEST                                                           │
+│   └─► ESP32 asserts: Axis + Direction + Speed + RUN                        │
+│                                                                             │
+│  STATE 2: ACK WAIT                                                          │
+│   └─► Wait for PLC_ACK pulse (Q8.1) - confirms contactor energized         │
+│   └─► Timeout after 500ms → FAULT                                          │
+│                                                                             │
+│  STATE 3: MOVING                                                            │
+│   └─► Monitor encoder position via WJ66                                    │
+│   └─► Check PLC_INHIBIT (Q8.2) for safety stops                            │
+│                                                                             │
+│  STATE 4: COMPLETE                                                          │
+│   └─► Target reached → Drop Axis + RUN bits                                │
+│   └─► PLC drops contactor → Return to STATE 0                              │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 5. Safety Notes

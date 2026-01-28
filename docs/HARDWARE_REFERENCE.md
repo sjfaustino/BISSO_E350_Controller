@@ -309,6 +309,23 @@ The WJ66 is an **encoder-to-serial converter** that reads encoder signals and ou
 | Quantity | 4 (one per axis) |
 | Purpose | Position feedback for X, Y, Z, A axes |
 
+**How It Works:**
+```
+ENCODER SIGNAL PATH:
+┌────────────────────────────────────────────────────────────────┐
+│  Incremental      WJ66         RS-232       ESP32           │
+│   Encoder    ───── Module ───── Serial ───── UART          │
+│   (A/B/Z)          |                         |              │
+│                    |                         |              │
+│              Quadrature                  Position          │
+│              Decoding                    (32-bit count)    │
+│              4x Interpolation             @ 50Hz poll      │
+└────────────────────────────────────────────────────────────────┘
+
+WJ66 converts quadrature pulses to absolute count.
+ESP32 polls position every 20ms for real-time feedback.
+```
+
 **Note:** The WJ66 is available in RS-232 and RS-485 variants. This installation uses the **RS-232 only** version.
 
 ### Current Sensor (JXK-10)
@@ -337,6 +354,21 @@ Read Current:  01 03 00 0E 00 01 E5 C9
 Read Config:   01 03 00 04 00 02 85 CA
 ```
 
+**How It Works:**
+```
+CURRENT MONITORING CHAIN:
+┌────────────────────────────────────────────────────────────────┐
+│  Motor     Hall       JXK-10     RS-485      ESP32          │
+│  Cable ───── Sensor ───── ADC ───── Modbus ───── Polling     │
+│                         |                      |            │
+│                   AC 0-50A               Stall Detection    │
+│                   0.1A resolution        @ 10Hz poll rate   │
+└────────────────────────────────────────────────────────────────┘
+
+Non-invasive Hall effect sensor clamps around motor cable.
+No electrical connection to motor power circuit.
+```
+
 ---
 
 ## Safety Systems
@@ -354,6 +386,25 @@ The software E-Stop button connects to **ESP32 only**:
 - Does NOT cut motor power directly
 - Triggers software stop commands
 - Secondary safety layer only
+
+**How It Works:**
+```
+SAFETY SYSTEM HIERARCHY:
+┌────────────────────────────────────────────────────────────────┐
+│  LEVEL 0 (Highest Priority):                                  │
+│  • Hardware E-Stop (Red Mushroom Button)                      │
+│  • Hardwired to main contactor                                │
+│  • Cuts ALL power regardless of software state                │
+│                                                                │
+│  LEVEL 1:                                                      │
+│  • PLC Safety Interlocks (Siemens S5)                         │
+│  • Guards VFD operation, door switches                        │
+│                                                                │
+│  LEVEL 2:                                                      │
+│  • Software E-Stop (ESP32 → PLC signal)                       │
+│  • Stall detection, soft limits                               │
+└────────────────────────────────────────────────────────────────┘
+```
 
 > ⚠️ **WARNING**: The software E-Stop is NOT a substitute for the hardware E-Stop. Always use the red mushroom button for emergencies.
 
@@ -383,6 +434,22 @@ The ESP32 uses PCF8574 I/O expanders to interface with the PLC and other I/O:
 | 5 | Y6 | SPEED_FAST | Fast/rapid speed |
 | 6 | Y7 | SPEED_MEDIUM | Medium speed |
 | 7 | Y8 | SPEED_SLOW | Very slow (V/S - leveling mode) |
+
+**How It Works:**
+```
+PCF8574 OUTPUT CONTROL:
+┌────────────────────────────────────────────────────────────────┐
+│  ESP32                  PCF8574 @ 0x24              PLC       │
+│    |                         |                       |        │
+│   I2C  ───────────────  8-bit Latch  ──────────── Optocoupler │
+│  Write                      |                       Inputs   │
+│                       Open-Drain                              │
+│                       (Active LOW)                            │
+└────────────────────────────────────────────────────────────────┘
+
+Output byte 0xFE = Bit 0 LOW = X axis selected
+Output byte 0xFF = All HIGH = No axis selected
+```
 
 > ⚠️ **Active-Low Logic**: Bit cleared (0) = signal ON, bit set (1) = signal OFF
 
