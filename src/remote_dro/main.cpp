@@ -38,6 +38,14 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
 void setup() {
     Serial.begin(115200);
     
+    // 0. Initialize I2C with hardware-specific pins (from platformio.ini)
+#if defined(OLED_SDA) && defined(OLED_SCL)
+    Wire.begin(OLED_SDA, OLED_SCL);
+    Serial.printf("I2C initialized on SDA:%d, SCL:%d\n", OLED_SDA, OLED_SCL);
+#else
+    Wire.begin(); // Default pins
+#endif
+    
     // 1. Initialize Display
     if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         Serial.println(F("SSD1306 allocation failed"));
