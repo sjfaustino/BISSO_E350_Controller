@@ -337,6 +337,95 @@
         </div>
     </div>
 
+    <!-- Corner Drilling (Sink Cutout) -->
+    <div class="card" id="card-corner-drilling">
+        <div class="card-header">
+            <h2 data-i18n="cut_planner.corner_drilling">Corner Drilling</h2>
+        </div>
+        <div class="card-content">
+            <div class="card-diagram">
+                <svg viewBox="0 0 140 100" class="operation-svg">
+                    <!-- Base block -->
+                    <polygon points="10,55 28,40 112,40 94,55" fill="url(#baseTop)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="10,55 94,55 94,88 10,88" fill="url(#baseFront)" stroke="#5a8299"
+                        stroke-width="0.8" />
+                    <polygon points="94,55 112,40 112,73 94,88" fill="#7aa0c2" stroke="#5a8299" stroke-width="0.8" />
+                    <!-- Stone slab with 4 corner holes -->
+                    <polygon points="22,45 38,32 98,32 82,45" fill="url(#woodTop)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="22,45 82,45 82,54 22,54" fill="url(#woodFront)" stroke="#a87030"
+                        stroke-width="0.7" />
+                    <polygon points="82,45 98,32 98,41 82,54" fill="#d09850" stroke="#a87030" stroke-width="0.7" />
+                    <!-- Corner holes (circles on top surface) -->
+                    <circle cx="32" cy="38" r="4" fill="#1a1a1a" stroke="#333" stroke-width="0.5" />
+                    <circle cx="52" cy="38" r="4" fill="#1a1a1a" stroke="#333" stroke-width="0.5" />
+                    <circle cx="72" cy="38" r="4" fill="#1a1a1a" stroke="#333" stroke-width="0.5" />
+                    <circle cx="92" cy="38" r="4" fill="#1a1a1a" stroke="#333" stroke-width="0.5" />
+                    <!-- Rectangle outline showing cutout area -->
+                    <rect x="28" y="34" width="68" height="12" fill="none" stroke="#ff4757" stroke-width="1"
+                        stroke-dasharray="3 2" />
+                    <!-- Drill bit (simplified) -->
+                    <line x1="32" y1="10" x2="32" y2="30" stroke="#888" stroke-width="3" />
+                    <polygon points="29,30 35,30 32,38" fill="#666" stroke="#444" stroke-width="0.5" />
+                    <!-- Down arrow -->
+                    <line x1="32" y1="12" x2="32" y2="25" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)" />
+                </svg>
+            </div>
+            <p class="card-description" data-i18n="cut_planner.corner_drilling_desc">Drill 4 corner holes for sink
+                cutout preparation. Holes serve as clearance for saw blade corners.</p>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="drill-hole-diameter" data-i18n="cut_planner.hole_diameter">Hole Diameter (mm)</label>
+                    <input type="number" id="drill-hole-diameter" value="30" min="10" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="drill-cutout-x" data-i18n="cut_planner.cutout_x">Cutout Width X (mm)</label>
+                    <input type="number" id="drill-cutout-x" value="450" min="50" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="drill-cutout-y" data-i18n="cut_planner.cutout_y">Cutout Height Y (mm)</label>
+                    <input type="number" id="drill-cutout-y" value="400" min="50" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="drill-depth" data-i18n="cut_planner.total_depth">Total Depth (mm)</label>
+                    <input type="number" id="drill-depth" value="30" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="drill-peck-depth" data-i18n="cut_planner.peck_depth">Peck Depth (mm)</label>
+                    <input type="number" id="drill-peck-depth" value="5" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="drill-dwell" data-i18n="cut_planner.dwell_time">Dwell Time (sec)</label>
+                    <input type="number" id="drill-dwell" value="0.5" min="0" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="drill-speed" data-i18n="cut_planner.descent_speed">Descent Speed</label>
+                    <select id="drill-speed">
+                        <option value="slow" data-i18n="cut_planner.speed_slow">Slow</option>
+                        <option value="medium" selected data-i18n="cut_planner.speed_medium">Medium</option>
+                        <option value="fast" data-i18n="cut_planner.speed_fast">Fast</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="drill-start-corner" data-i18n="cut_planner.start_corner">Starting Corner</label>
+                    <select id="drill-start-corner">
+                        <option value="top-left" selected data-i18n="cut_planner.corner_top_left">Top Left</option>
+                        <option value="top-right" data-i18n="cut_planner.corner_top_right">Top Right</option>
+                        <option value="bottom-right" data-i18n="cut_planner.corner_bottom_right">Bottom Right</option>
+                        <option value="bottom-left" data-i18n="cut_planner.corner_bottom_left">Bottom Left</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-ghost" onclick="CutPlanner.preview('corner-drilling')"
+                    data-i18n="cut_planner.preview">Preview G-Code</button>
+                <button class="btn btn-success" onclick="CutPlanner.run('corner-drilling')"
+                    data-i18n="cut_planner.run_job">Run Job</button>
+            </div>
+        </div>
+    </div>
+
     <!-- G-Code Preview Modal -->
     <div id="gcode-preview-modal" class="modal hidden">
         <div class="modal-content">
