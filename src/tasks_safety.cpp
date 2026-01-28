@@ -89,7 +89,9 @@ void taskSafetyFunction(void *parameter) {
           last_resume_press = now;
         }
       }
-    } else {
+    } else if (bootIsSubsystemHealthy("Inputs")) { 
+      // PHASE 16: Only log periodic errors if the device was actually detected at boot.
+      // If the board is known-missing (bare DevKit), stay silent to avoid CLI spam.
       static uint32_t last_io_err = 0;
       if (now - last_io_err > 5000) {
         faultLogEntry(FAULT_ERROR, FAULT_I2C_ERROR, -1, BOARD_INPUT_I2C_ADDR,

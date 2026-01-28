@@ -209,8 +209,16 @@ bool rs485Update(void) {
                 current->consecutive_errors++;
                 registry.bus_busy = false;
                 registry.total_errors++;
-                logWarning("[RS485] Timeout: %s (Addr %d, after 500ms)", 
-                           current->name, current->slave_address);
+                
+                // PHASE 16: Reduced spam for bare board/bench debugging.
+                // Log the first 3 errors to notify the user, then stay silent.
+                if (current->consecutive_errors <= 3) {
+                    logWarning("[RS485] Timeout: %s (Addr %d, after 500ms)", 
+                               current->name, current->slave_address);
+                    if (current->consecutive_errors == 3) {
+                        logInfo("[RS485] %s timeout logging silenced until success.", current->name);
+                    }
+                }
             }
         }
         return false;

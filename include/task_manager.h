@@ -34,7 +34,7 @@
 //       - Deep call chains in complex state machines
 
 #define TASK_STACK_SAFETY                                                      \
-  3072 // REDUCED: 4KB->3KB (Avg usage ~1.5KB)
+  4096 // INCREASED: 3KB->4KB (Fix low stack warning on S3)
 #define TASK_STACK_MOTION                                                      \
   4096 // Keep 4K for motion planner
 #define TASK_STACK_ENCODER                                                     \
