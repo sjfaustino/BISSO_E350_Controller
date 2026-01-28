@@ -16,8 +16,8 @@
 #include "../telemetry_packet.h" // Shared structure
 
 // --- Configuration ---
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+#define SCREEN_WIDTH 72  // 0.42" OLED resolution
+#define SCREEN_HEIGHT 40
 #define OLED_RESET    -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -61,6 +61,11 @@ void setup() {
 
     // 2. Initialize ESP-NOW
     WiFi.mode(WIFI_STA);
+    
+    // Antena/WiFi Stability Fix (from AliExpress reviews)
+    // These tiny boards have poor antenna isolation. Reducing TX power improves stability.
+    WiFi.setTxPower(WIFI_POWER_8_5dBm);
+    
     if (esp_now_init() != ESP_OK) {
         Serial.println("Error initializing ESP-NOW");
         return;
@@ -93,21 +98,21 @@ void loop() {
             default: display.print("UNKNOWN"); break;
         }
 
-        display.setCursor(80, 0);
+        display.setCursor(45, 0);
         display.printf("%lus", data.uptime);
 
         // X Axis
-        display.setTextSize(2);
-        display.setCursor(0, 16);
-        display.printf("X %7.1f", data.x);
+        display.setTextSize(1); // Smaller text for 72x40 screen
+        display.setCursor(0, 10);
+        display.printf("X:%7.1f", data.x);
         
         // Y Axis
-        display.setCursor(0, 32);
-        display.printf("Y %7.1f", data.y);
+        display.setCursor(0, 20);
+        display.printf("Y:%7.1f", data.y);
         
         // Z Axis
-        display.setCursor(0, 48);
-        display.printf("Z %7.1f", data.z);
+        display.setCursor(0, 30);
+        display.printf("Z:%7.1f", data.z);
     }
     
     display.display();
