@@ -145,10 +145,10 @@ void loop() {
             display.setCursor(28 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); 
             display.print(activeAxis);
             
-            // 2. Bottom Line: Value
+            // 2. Bottom Line: Value (No decimals in Giant mode for clarity)
             display.setTextSize(2);
             display.setCursor(0 + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
-            display.printf("%7.1f", val);
+            display.printf("%.0f", val);
             
             // 3. Small Uptime (corner) - Moved to bottom edge to stay out of the way
             display.setTextSize(1);
