@@ -16,8 +16,10 @@
 #include "../telemetry_packet.h" // Shared structure
 
 // --- Configuration ---
-#define SCREEN_WIDTH 72  // 0.42" OLED resolution
-#define SCREEN_HEIGHT 40
+#define SCREEN_WIDTH 128 // Use full controller width (128) to handle hardware offsets
+#define SCREEN_HEIGHT 64 // Use full controller height to clear all residuals
+#define OLED_X_OFFSET 28 // 0.42" OLEDs are often centered at column 28
+#define OLED_Y_OFFSET 15 // Increased from 12 to 15 to fix top clipping
 #define OLED_RESET    -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -54,8 +56,9 @@ void setup() {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(1);
-    display.setCursor(0,0);
+    display.setCursor(0 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
     display.println("BISSO E350 DRO");
+    display.setCursor(0 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET);
     display.println("Connecting...");
     display.display();
 
@@ -79,16 +82,17 @@ void loop() {
     
     // Check for timeout (1 second)
     if (millis() - lastPacketTime > 1000) {
-        display.setCursor(0, 0);
+        display.setCursor(0 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
         display.setTextSize(1);
         display.println("OFFLINE");
-        display.setCursor(0, 20);
+        display.setCursor(0 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET);
         display.println("Waiting for");
+        display.setCursor(0 + OLED_X_OFFSET, 22 + OLED_Y_OFFSET);
         display.println("controller...");
     } else {
         // Display Coordinates
         display.setTextSize(1);
-        display.setCursor(0, 0);
+        display.setCursor(0 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
         
         switch(data.status) {
             case 0: display.print("READY"); break;
@@ -98,20 +102,20 @@ void loop() {
             default: display.print("UNKNOWN"); break;
         }
 
-        display.setCursor(45, 0);
+        display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
         display.printf("%lus", data.uptime);
 
         // X Axis
         display.setTextSize(1); // Smaller text for 72x40 screen
-        display.setCursor(0, 10);
+        display.setCursor(0 + OLED_X_OFFSET, 10 + OLED_Y_OFFSET);
         display.printf("X:%7.1f", data.x);
         
         // Y Axis
-        display.setCursor(0, 20);
+        display.setCursor(0 + OLED_X_OFFSET, 20 + OLED_Y_OFFSET);
         display.printf("Y:%7.1f", data.y);
         
         // Z Axis
-        display.setCursor(0, 30);
+        display.setCursor(0 + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
         display.printf("Z:%7.1f", data.z);
     }
     
