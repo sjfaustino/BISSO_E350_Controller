@@ -38,6 +38,24 @@ char activeAxis = ' ';
 uint32_t lastMoveTime = 0;
 const float MOVEMENT_THRESHOLD = 0.5f; // mm change to trigger giant text
 
+// Helper for drawing arrows on 0.42" OLED
+void drawArrow(char axis, bool positive) {
+    display.setTextSize(2);
+    display.setCursor(0 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); // Top Left
+    
+    if (axis == 'X') {
+        if (positive) display.print("->"); // Right arrow simplified
+        else display.print("<-");         // Left arrow simplified
+    } else if (axis == 'Y') {
+        // Since SSD1306 standard font lacks ↗/↙, we use + / - symbols as indicators or simplified text
+        if (positive) display.print("UR"); // Up-Right
+        else display.print("DL");         // Down-Left
+    } else if (axis == 'Z') {
+        if (positive) display.print("^");  // Up
+        else display.print("v");          // Down
+    }
+}
+
 // Callback when data is received
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
     if (len == sizeof(TelemetryPacket)) {
@@ -150,42 +168,36 @@ void loop() {
         bool showGiant = (activeAxis != ' ' && (millis() - lastMoveTime < 1000));
 
         if (showGiant) {
-            // Giant Text Mode: Centered Axis on top, Position on bottom
-            float val = 0;
-            if (activeAxis == 'X') val = data.x;
-            else if (activeAxis == 'Y') val = data.y;
-            else if (activeAxis == 'Z') val = data.z;
+            // --- Advanced Giant Text Mode ---
+            float absVal = abs(val);
+            bool isNeg = (val < 0);
 
-            // 1. Top Line: Axis Label (Centered)
-            // Shifted way down (+12 total) to fix severe top clipping on tiny OLED
+            // 1. Top Line: Arrow (Left), Axis (Center), Minus (Right)
+            drawArrow(activeAxis, !isNeg);
+            
+            // Axis Label (Center)
             display.setTextSize(2);
-            if (val < 0) {
-                // Show "X (-)" for negative values. Total 5 chars = 60px.
-                // 72 - 60 = 12px left margin / 2 = 6px.
-                display.setCursor(6 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET);
-                display.printf("%c (-)", activeAxis);
-            } else {
-                // Center single char. 72 - 12 = 60px / 2 = 30px.
-                display.setCursor(30 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); 
-                display.print(activeAxis);
+            display.setCursor(30 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET);
+            display.print(activeAxis);
+            
+            // Minus Signal (Right)
+            if (isNeg) {
+                display.setCursor(60 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET);
+                display.print("-");
             }
             
-            // 2. Bottom Line: Value (Right-justified)
+            // 2. Bottom Line: Value (Absolute, Right-justified)
             display.setTextSize(2);
             char buf[16];
-            snprintf(buf, sizeof(buf), "%.1f", val);
-            int len = strlen(buf);
-            
-            // Calculate X to right-justify in the 72px physical area
-            // Each Size 2 char is 12px wide.
-            int textWidth = len * 12;
+            snprintf(buf, sizeof(buf), "%.1f", absVal);
+            int textWidth = strlen(buf) * 12; // Size 2 is 12px wide
             int x_pos = 72 - textWidth;
-            if (x_pos < 0) x_pos = 0; // Cap at left edge if too long (e.g. -3500.0)
+            if (x_pos < 0) x_pos = 0;
             
             display.setCursor(x_pos + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
             display.print(buf);
-            
-            // 3. Small Uptime (corner) - Moved to bottom edge to stay out of the way
+
+            // 3. Small Uptime (bottom corner)
             display.setTextSize(1);
             display.setCursor(45 + OLED_X_OFFSET, 50 + OLED_Y_OFFSET);
             display.printf("%lus", data.uptime);
