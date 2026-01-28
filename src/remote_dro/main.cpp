@@ -259,5 +259,5 @@ void loop() {
     }
     
     display.display();
-    delay(1000); // 1Hz refresh
+    delay(2000); // 0.5Hz refresh (2s delay)
 }
