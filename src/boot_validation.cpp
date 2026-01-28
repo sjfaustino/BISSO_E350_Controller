@@ -143,8 +143,11 @@ bool bootValidateAllSystems() {
     }
     
     can_proceed = true;
-  } else if (healthy_count >= (subsystem_count - 2)) {
-    logWarning("[BOOT] [WARN] DEGRADED MODE.");
+  } else if (healthy_count >= 2) { 
+    // PHASE 16: Relaxed validation for bare boards/bench debugging.
+    // As long as at least 2 subsystems (usually Fault Log + Config) are OK, 
+    // we allow booting into DEGRADED mode so the CLI and Web Server can start.
+    logWarning("[BOOT] [WARN] %d subsystems failed. Entering DEGRADED MODE.", failed_count);
     degraded_mode = true;
     boot_seq.boot_validation_passed = true;
     boot_seq.overall_status = BOOT_OK;
