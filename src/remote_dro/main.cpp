@@ -169,6 +169,11 @@ void loop() {
 
         if (showGiant) {
             // --- Advanced Giant Text Mode ---
+            float val = 0;
+            if (activeAxis == 'X') val = data.x;
+            else if (activeAxis == 'Y') val = data.y;
+            else if (activeAxis == 'Z') val = data.z;
+
             float absVal = abs(val);
             bool isNeg = (val < 0);
 
