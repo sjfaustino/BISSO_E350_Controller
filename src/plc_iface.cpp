@@ -31,7 +31,8 @@
 
 // Shadow Registers
 static uint8_t i73_input_shadow = 0x00; // Default 0 (Inactive) to prevent phantom inputs on vanilla ESP32
-static uint8_t q73_shadow_register = 0xFF; // All OFF (active-low: 1=OFF, 0=ON)
+static uint8_t q73_shadow_register = 0xFF; // Bank 1: All OFF (active-low: 1=OFF, 0=ON)
+static uint8_t q73_aux_shadow = 0xFF;      // Bank 2: All OFF (active-low)
 
 // CRITICAL FIX: Mutex to protect shadow register access
 // Multiple tasks can call elboSetDirection(), elboSetSpeedProfile(),
@@ -123,7 +124,7 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char *context) {
   if (res == I2C_RESULT_OK) {
     // PHASE 5.7: Fix - Clear dirty flag on successful I2C write
     // Shadow register is now in sync with hardware
-    if (address == ADDR_Q73_OUTPUT) {
+    if (address == ADDR_Q73_OUTPUT || address == ADDR_Q73_AUX) {
       q73_shadow_dirty = false;
     }
     return true;
@@ -134,7 +135,7 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char *context) {
   faultLogEntry(FAULT_ERROR, FAULT_I2C_ERROR, -1, address, context);
 
   // PHASE 5.7: I2C write failed - shadow register might be out of sync
-  if (address == ADDR_Q73_OUTPUT) {
+  if (address == ADDR_Q73_OUTPUT || address == ADDR_Q73_AUX) {
     q73_shadow_dirty = true;
   }
 
@@ -178,6 +179,13 @@ void elboInit() {
       if (plcWriteI2C(ADDR_Q73_OUTPUT, q73_shadow_register, "Init Q73")) {
           logInfo("[PLC] Q73 Output Board OK (Addr 0x%02X)", ADDR_Q73_OUTPUT);
           board_detected = true;
+          
+          // Also try to detect the AUX board (some systems might not have it)
+          if (plcWriteI2C(ADDR_Q73_AUX, q73_aux_shadow, "Init Q73 AUX")) {
+              logInfo("[PLC] Q73 AUX Board OK (Addr 0x%02X)", ADDR_Q73_AUX);
+          } else {
+              logWarning("[PLC] Q73 AUX Board not found (Optional)");
+          }
           break;
       }
       faultLogWarning(FAULT_PLC_COMM_LOSS, "Q73 Board detection retry");
@@ -313,12 +321,15 @@ void plcClearAllOutputs() {
   }
 
   q73_shadow_register = 0xFF; // All OFF (active-low)
+  q73_aux_shadow = 0xFF;      // All AUX OFF
 
-  uint8_t register_copy = q73_shadow_register;
+  uint8_t reg1 = q73_shadow_register;
+  uint8_t reg2 = q73_aux_shadow;
   xSemaphoreGive(plc_shadow_mutex);
   
   if (!plc_in_transaction) {
-    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Clear All");
+    plcWriteI2C(ADDR_Q73_OUTPUT, reg1, "Clear All");
+    plcWriteI2C(ADDR_Q73_AUX, reg2, "Clear AUX");
   }
 }
 
@@ -331,10 +342,12 @@ void plcCommitOutputs() {
     return;
   }
 
-  uint8_t register_copy = q73_shadow_register;
+  uint8_t reg1 = q73_shadow_register;
+  uint8_t reg2 = q73_aux_shadow;
   xSemaphoreGive(plc_shadow_mutex);
   
-  plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Commit");
+  plcWriteI2C(ADDR_Q73_OUTPUT, reg1, "Commit");
+  plcWriteI2C(ADDR_Q73_AUX, reg2, "Commit AUX");
 }
 
 /**
@@ -350,6 +363,28 @@ void plcBeginTransaction() {
 void plcEndTransaction() {
   plc_in_transaction = false;
   plcCommitOutputs(); // Force write now
+}
+
+void plcSetAuxRelay(uint8_t bit, bool state) {
+  if (bit > 7) return;
+
+  if (!plcAcquireShadowMutex()) {
+    logError("[PLC] plcSetAuxRelay FAILED (shadow register dirty)");
+    return;
+  }
+
+  if (state) {
+    q73_aux_shadow &= ~(1 << bit); // Active-low ON
+  } else {
+    q73_aux_shadow |= (1 << bit);  // Active-low OFF
+  }
+
+  uint8_t register_copy = q73_aux_shadow;
+  xSemaphoreGive(plc_shadow_mutex);
+
+  if (!plc_in_transaction) {
+    plcWriteI2C(ADDR_Q73_AUX, register_copy, "Set Aux Relay");
+  }
 }
 
 // ============================================================================
@@ -485,7 +520,8 @@ void elboDiagnostics() {
     logWarning("[PLC] Could not acquire shadow mutex for diagnostics");
   }
 
-  logPrintf("Output Register: 0x%02X\n", output_reg);
+  logPrintf("Output Reg 1: 0x%02X (Bank 1)\n", output_reg);
+  logPrintf("Output Reg 2: 0x%02X (Bank 2)\n", q73_aux_shadow);
   logPrintf("Input Register:  0x%02X\n", i73_input_shadow);
 
   // PHASE 5.7: Fix - Display shadow register health
@@ -499,6 +535,11 @@ void elboDiagnostics() {
     Wire.beginTransmission(ADDR_Q73_OUTPUT);
     uint8_t err = Wire.endTransmission();
     logPrintf("Q73 (0x%02X) Status: %s\n", ADDR_Q73_OUTPUT,
+                  (err == 0) ? "OK" : "ERROR");
+                  
+    Wire.beginTransmission(ADDR_Q73_AUX);
+    err = Wire.endTransmission();
+    logPrintf("AUX (0x%02X) Status: %s\n", ADDR_Q73_AUX,
                   (err == 0) ? "OK" : "ERROR");
     taskUnlockMutex(taskGetI2cPlcMutex());
   } else {
@@ -517,3 +558,5 @@ bool plcIsHardwarePresent() { return g_plc_hardware_present; }
 uint8_t elboI73GetRawState() { return i73_input_shadow; }
 
 uint8_t elboQ73GetRawState() { return q73_shadow_register; }
+
+uint8_t elboQ73GetAuxRawState() { return q73_aux_shadow; }

@@ -198,10 +198,9 @@ static void onEthernetEvent(WiFiEvent_t event) {
       logInfo("[ETH] Ethernet link up");
       break;
     case ARDUINO_EVENT_ETH_GOT_IP:
-      logInfo("[ETH] [OK] IP: %s, Speed: %dMbps, %s", 
-              ETH.localIP().toString().c_str(),
-              ETH.linkSpeed(),
-              ETH.fullDuplex() ? "Full Duplex" : "Half Duplex");
+      logInfo("[ETH] [OK] IP: %s, Speed: %dMbps", 
+              networkManager.getEthernetIP().c_str(),
+              networkManager.getEthernetLinkSpeed());
       networkManager.ethernetConnected = true;
       networkManager.ethernetLinkSpeed = ETH.linkSpeed();
       break;
@@ -227,6 +226,19 @@ String NetworkManager::getEthernetIP() const {
   }
 #endif
   return String("");
+}
+
+String NetworkManager::getEthernetMAC() const {
+#if ETHERNET_AVAILABLE
+    uint8_t mac_addr[6];
+    if (esp_read_mac(mac_addr, ESP_MAC_ETH) == ESP_OK) {
+        char mac_str[18];
+        snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+        return String(mac_str);
+    }
+#endif
+    return String("00:00:00:00:00:00");
 }
 
 void NetworkManager::initEthernet() {

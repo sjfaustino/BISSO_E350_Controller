@@ -15,7 +15,8 @@
 // I2C ADDRESS CONFIGURATION
 // ============================================================================
 #define ADDR_I73_INPUT 0x21  // Limit Switches & Sensors (PCF8574)
-#define ADDR_Q73_OUTPUT 0x24 // Relays & VFD Control   (PCF8574)
+#define ADDR_Q73_OUTPUT 0x24 // Relays & VFD Control   (PCF8574) - Bank 1 (Y1-Y8)
+#define ADDR_Q73_AUX    0x25 // Relays Auxiliary (PCF8574)     - Bank 2 (Y9-Y16)
 
 // ============================================================================
 // I73 INPUT MAP (Read-Only)
@@ -76,6 +77,7 @@ void plcSetDirection(bool positive);     // true=+, false=-
 void plcSetSpeed(uint8_t speed_profile); // 0=fast, 1=medium, 2=slow
 void plcClearAllOutputs();               // Clear all outputs (stop)
 void plcCommitOutputs();                 // Write shadow register to I2C
+void plcSetAuxRelay(uint8_t bit, bool state); // Control Bank 2 (Y9-Y16)
 
 // Transaction API for batching I2C writes
 void plcBeginTransaction();              // Delay I2C writes until EndTransaction
@@ -92,7 +94,8 @@ void elboDiagnostics();
 uint32_t elboGetMutexTimeoutCount();
 bool elboIsShadowRegisterDirty();
 bool plcIsHardwarePresent();  // Returns false if PLC I2C board not detected at boot
-uint8_t elboI73GetRawState(); // Returns current input byte
-uint8_t elboQ73GetRawState(); // Returns current output byte shadow
+uint8_t elboI73GetRawState();            // Read input shadow
+uint8_t elboQ73GetRawState();            // Read output shadow (Bank 1)
+uint8_t elboQ73GetAuxRawState();         // Read output shadow (Bank 2)
 
 #endif // PLC_IFACE_H

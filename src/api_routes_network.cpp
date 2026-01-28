@@ -5,6 +5,7 @@
  */
 
 #include "api_routes.h"
+#include "network_manager.h"
 #include "config_unified.h"
 #include "config_keys.h"
 #include "serial_logger.h"
@@ -26,52 +27,29 @@ void registerNetworkRoutes(PsychicHttpServer& server) {
         else if (rssi >= -50) quality = 100;
         else quality = 2 * (rssi + 100);
 
-        // Ethernet Status - ONLY access ETH if enabled in config
-        int eth_en = configGetInt(KEY_ETH_ENABLED, 0);
+        // Ethernet Status - Use NetworkManager instead of ETH object to avoid null handle log spam
+        bool eth_connected = networkManager.isEthernetConnected();
         
         char buffer[512];
-        if (eth_en) {
-            // Only call ETH functions if ethernet is enabled
-            bool eth_up = ETH.linkUp();
-            snprintf(buffer, sizeof(buffer),
-                "{\"wifi_connected\":%s,\"wifi_ssid\":\"%s\",\"wifi_ip\":\"%s\",\"wifi_rssi\":%d,"
-                "\"wifi_mac\":\"%s\",\"wifi_gateway\":\"%s\",\"wifi_dns\":\"%s\",\"signal_quality\":%d,"
-                "\"eth_connected\":%s,\"eth_ip\":\"%s\",\"eth_mac\":\"%s\",\"eth_speed\":%d,"
-                "\"eth_duplex\":%s,\"eth_gateway\":\"%s\",\"uptime_ms\":%lu}",
-                wifi_connected ? "true" : "false",
-                wifi_connected ? WiFi.SSID().c_str() : "--",
-                wifi_connected ? WiFi.localIP().toString().c_str() : "0.0.0.0",
-                wifi_connected ? rssi : -100,
-                WiFi.macAddress().c_str(),
-                wifi_connected ? WiFi.gatewayIP().toString().c_str() : "0.0.0.0",
-                wifi_connected ? WiFi.dnsIP().toString().c_str() : "0.0.0.0",
-                quality,
-                eth_up ? "true" : "false",
-                eth_up ? ETH.localIP().toString().c_str() : "0.0.0.0",
-                ETH.macAddress().c_str(),
-                eth_up ? (int)ETH.linkSpeed() : 0,
-                eth_up ? (ETH.fullDuplex() ? "true" : "false") : "false",
-                eth_up ? ETH.gatewayIP().toString().c_str() : "0.0.0.0",
-                (unsigned long)millis()
-            );
-        } else {
-            // Ethernet disabled - don't call any ETH functions
-            snprintf(buffer, sizeof(buffer),
-                "{\"wifi_connected\":%s,\"wifi_ssid\":\"%s\",\"wifi_ip\":\"%s\",\"wifi_rssi\":%d,"
-                "\"wifi_mac\":\"%s\",\"wifi_gateway\":\"%s\",\"wifi_dns\":\"%s\",\"signal_quality\":%d,"
-                "\"eth_connected\":false,\"eth_ip\":\"0.0.0.0\",\"eth_mac\":\"00:00:00:00:00:00\","
-                "\"eth_speed\":0,\"eth_duplex\":false,\"eth_gateway\":\"0.0.0.0\",\"uptime_ms\":%lu}",
-                wifi_connected ? "true" : "false",
-                wifi_connected ? WiFi.SSID().c_str() : "--",
-                wifi_connected ? WiFi.localIP().toString().c_str() : "0.0.0.0",
-                wifi_connected ? rssi : -100,
-                WiFi.macAddress().c_str(),
-                wifi_connected ? WiFi.gatewayIP().toString().c_str() : "0.0.0.0",
-                wifi_connected ? WiFi.dnsIP().toString().c_str() : "0.0.0.0",
-                quality,
-                (unsigned long)millis()
-            );
-        }
+        snprintf(buffer, sizeof(buffer),
+            "{\"wifi_connected\":%s,\"wifi_ssid\":\"%s\",\"wifi_ip\":\"%s\",\"wifi_rssi\":%d,"
+            "\"wifi_mac\":\"%s\",\"wifi_gateway\":\"%s\",\"wifi_dns\":\"%s\",\"signal_quality\":%d,"
+            "\"eth_connected\":%s,\"eth_ip\":\"%s\",\"eth_mac\":\"%s\",\"eth_speed\":%d,"
+            "\"uptime_ms\":%lu}",
+            wifi_connected ? "true" : "false",
+            wifi_connected ? WiFi.SSID().c_str() : "--",
+            wifi_connected ? WiFi.localIP().toString().c_str() : "0.0.0.0",
+            wifi_connected ? rssi : -100,
+            WiFi.macAddress().c_str(),
+            wifi_connected ? WiFi.gatewayIP().toString().c_str() : "0.0.0.0",
+            wifi_connected ? WiFi.dnsIP().toString().c_str() : "0.0.0.0",
+            quality,
+            eth_connected ? "true" : "false",
+            eth_connected ? networkManager.getEthernetIP().c_str() : "0.0.0.0",
+            networkManager.getEthernetMAC().c_str(),
+            (int)networkManager.getEthernetLinkSpeed(),
+            (unsigned long)millis()
+        );
         
         return response->send(200, "application/json", buffer);
     });

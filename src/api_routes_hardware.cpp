@@ -25,6 +25,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         uint8_t in_bits = elboI73GetRawState();
         uint8_t board_in = boardInputsGetRawState();
         uint8_t out_bits = elboQ73GetRawState();
+        uint8_t aux_bits = elboQ73GetAuxRawState();
         
         char buffer[384];
         snprintf(buffer, sizeof(buffer),
@@ -32,18 +33,18 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
             "\"estop\":%s,\"door\":%s,\"probe\":%s,"
             "\"limit_x\":%s,\"limit_y\":%s,\"limit_z\":%s,"
             "\"spindle_on\":%s,\"coolant_on\":%s,\"vacuum_on\":%s,\"alarm_on\":%s,"
-            "\"raw_in\":%u,\"raw_out\":%u,\"raw_board\":%u}",
-            (board_in & 0x08) ? "true" : "false",
-            (board_in & 0x10) ? "true" : "false",
-            (board_in & 0x20) ? "true" : "false",
-            (board_in & 0x01) ? "true" : "false",
-            (board_in & 0x02) ? "true" : "false",
-            (board_in & 0x04) ? "true" : "false",
-            (out_bits & 0x01) == 0 ? "true" : "false",
-            (out_bits & 0x02) == 0 ? "true" : "false",
-            (out_bits & 0x04) == 0 ? "true" : "false",
-            (out_bits & 0x80) == 0 ? "true" : "false",
-            in_bits, out_bits, board_in
+            "\"raw_in\":%u,\"raw_out\":%u,\"raw_aux\":%u,\"raw_board\":%u}",
+            (board_in & 0x08) ? "true" : "false", // X4
+            (board_in & 0x10) ? "true" : "false", // X5
+            (board_in & 0x20) ? "true" : "false", // X6
+            (board_in & 0x01) ? "true" : "false", // X1
+            (board_in & 0x02) ? "true" : "false", // X2
+            (board_in & 0x04) ? "true" : "false", // X3
+            (out_bits & 0x01) == 0 ? "true" : "false", // Y1 Spindle
+            (aux_bits & 0x10) == 0 ? "true" : "false", // Y13 Coolant (Bit 4)
+            (aux_bits & 0x20) == 0 ? "true" : "false", // Y14 Vacuum (Bit 5)
+            (out_bits & 0x80) == 0 ? "true" : "false", // Y8 Alarm
+            in_bits, out_bits, aux_bits, board_in
         );
 
         return response->send(200, "application/json", buffer);
@@ -78,10 +79,17 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
 
         response->sendChunk((uint8_t*)"],\"outputs\":[", 14);
 
-        // Outputs
+        // Outputs (Bank 1: Y1-Y8)
+        for (int i = 0; i < 8; i++) {
+            n = snprintf(chunk, sizeof(chunk), "{\"state\":%s,\"name\":\"Y%d\"},", 
+                (out_bits & (1 << i)) == 0 ? "true" : "false", i+1);
+            response->sendChunk((uint8_t*)chunk, n);
+        }
+        // Outputs (Bank 2: Y9-Y16)
+        uint8_t aux_bits = elboQ73GetAuxRawState();
         for (int i = 0; i < 8; i++) {
             n = snprintf(chunk, sizeof(chunk), "{\"state\":%s,\"name\":\"Y%d\"}%s", 
-                (out_bits & (1 << i)) == 0 ? "true" : "false", i+1, (i < 7) ? "," : "");
+                (aux_bits & (1 << i)) == 0 ? "true" : "false", i+9, (i < 7) ? "," : "");
             response->sendChunk((uint8_t*)chunk, n);
         }
 

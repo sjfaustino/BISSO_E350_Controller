@@ -110,6 +110,10 @@ const SignalDef signalDefinitions[] = {
     {"output_status_red",    "Status Red",        "Status light red",     126, "output", "o_st_red"},
     {"output_buzzer",        "Buzzer",            "Audible alarm",        127, "output", "o_buzz"},
 
+    // Auxiliary Peripherals (Y13-Y16, Virtual 128-131)
+    {"output_coolant",       "Coolant Relay",     "Flood coolant control", 128, "output", "o_cool"},
+    {"output_vacuum",        "Vacuum Relay",      "Vacuum/Dust control",   129, "output", "o_vac"},
+
     // WJ66 Encoder (RS232 -> RS485 Converter)
     {"wj66_rx", "WJ66 RX", "Encoder RX", 16, "input", "wj66_rx"},
     {"wj66_tx", "WJ66 TX", "Encoder TX", 13, "output", "wj66_tx"}

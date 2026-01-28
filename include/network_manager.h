@@ -30,6 +30,7 @@ public:
     // Ethernet status (KC868-A16 LAN8720)
     bool isEthernetConnected() const { return ethernetConnected; }
     String getEthernetIP() const;
+    String getEthernetMAC() const;
     uint8_t getEthernetLinkSpeed() const { return ethernetLinkSpeed; }
     
     // Public for event handler access
