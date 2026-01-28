@@ -4,8 +4,8 @@
  * Target: ESP32 / ESP32-S3 / ESP32-C3
  * Display: 0.96" OLED (SSD1306 I2C) on SDA/SCL pins
  * 
- * This sketch receives X, Y, Z coordinates from the main controller
- * with sub-10ms latency for a dedicated handheld display.
+ * This is part of the BISSO E350 project.
+ * Build with: pio run -e remote_dro
  */
 
 #include <esp_now.h>
@@ -13,6 +13,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include "../telemetry_packet.h" // Shared structure
 
 // --- Configuration ---
 #define SCREEN_WIDTH 128
@@ -20,13 +21,7 @@
 #define OLED_RESET    -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// --- Data Structure (MUST MATCH CONTROLLER) ---
-struct TelemetryPacket {
-    float x, y, z;
-    uint32_t status;
-    uint32_t uptime;
-};
-
+// Data state
 TelemetryPacket data;
 bool dataReceived = false;
 uint32_t lastPacketTime = 0;
@@ -87,6 +82,7 @@ void loop() {
             case 1: display.print("MOVING"); break;
             case 2: display.print("ALARM"); break;
             case 3: display.print("E-STOP"); break;
+            default: display.print("UNKNOWN"); break;
         }
 
         display.setCursor(80, 0);
@@ -95,17 +91,17 @@ void loop() {
         // X Axis
         display.setTextSize(2);
         display.setCursor(0, 16);
-        display.printf("X %7.2f", data.x);
+        display.printf("X %7.1f", data.x);
         
         // Y Axis
         display.setCursor(0, 32);
-        display.printf("Y %7.2f", data.y);
+        display.printf("Y %7.1f", data.y);
         
         // Z Axis
         display.setCursor(0, 48);
-        display.printf("Z %7.2f", data.z);
+        display.printf("Z %7.1f", data.z);
     }
     
     display.display();
-    delay(50); // 20Hz refresh is plenty for human eyes
+    delay(100); // 10Hz refresh
 }
