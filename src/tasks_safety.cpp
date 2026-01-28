@@ -4,6 +4,7 @@
  */
 
 #include "board_inputs.h"
+#include "boot_validation.h"
 #include "fault_logging.h"
 #include "motion.h"
 #include "motion_state.h" // <-- CRITICAL FIX: Provides motionIsMoving
