@@ -26,7 +26,7 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // --- Debug Configuration ---
-#define SIMULATE_MOVEMENT 1  // Set to 1 to test Giant-Text UI without machine connection
+#define SIMULATE_MOVEMENT 0  // Set to 1 to test Giant-Text UI without machine connection
 #define MAX_MACHINE_DIM   3500.0f
 
 // Data state
