@@ -93,18 +93,35 @@ void loop() {
 #if SIMULATE_MOVEMENT
     // Fake data for UI testing
     static uint32_t lastSimUpdate = 0;
-    if (millis() - lastSimUpdate > 500) {
-        // Randomly pick an axis to "move" every 0.5s
-        int axis = random(0, 3);
-        if (axis == 0) data.x = (float)random(0, MAX_MACHINE_DIM * 10) / 10.0f;
-        else if (axis == 1) data.y = (float)random(0, MAX_MACHINE_DIM * 10) / 10.0f;
-        else data.z = (float)random(0, 500 * 10) / 10.0f;
-        
-        data.status = 1; // MOVING
-        data.uptime = millis() / 1000;
-        lastPacketTime = millis();
-        dataReceived = true;
-        lastSimUpdate = millis();
+    static uint32_t lastPauseTime = 0;
+    static bool isPaused = false;
+
+    if (!isPaused) {
+        if (millis() - lastSimUpdate > 500) {
+            // Randomly pick an axis to "move" every 0.5s
+            int axis = random(0, 3);
+            if (axis == 0) data.x = (float)random(0, MAX_MACHINE_DIM * 10) / 10.0f;
+            else if (axis == 1) data.y = (float)random(0, MAX_MACHINE_DIM * 10) / 10.0f;
+            else data.z = (float)random(0, 500 * 10) / 10.0f;
+            
+            data.status = 1; // MOVING
+            data.uptime = millis() / 1000;
+            lastPacketTime = millis();
+            dataReceived = true;
+            lastSimUpdate = millis();
+        }
+
+        // Pause every 5 seconds of "movement"
+        if (millis() - lastPauseTime > 5000) {
+            isPaused = true;
+            lastPauseTime = millis();
+        }
+    } else {
+        // Stay paused for 2 seconds to show normal display
+        if (millis() - lastPauseTime > 2000) {
+            isPaused = false;
+            lastPauseTime = millis();
+        }
     }
 #endif
 
@@ -145,10 +162,11 @@ void loop() {
             display.setCursor(28 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); 
             display.print(activeAxis);
             
-            // 2. Bottom Line: Value (No decimals in Giant mode for clarity)
+            // 2. Bottom Line: Value (Right-justified with 1 decimal)
             display.setTextSize(2);
             display.setCursor(0 + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
-            display.printf("%.0f", val);
+            // %6.1f ensures 6 characters total (e.g. "3500.0"), right-justified
+            display.printf("%6.1f", val);
             
             // 3. Small Uptime (corner) - Moved to bottom edge to stay out of the way
             display.setTextSize(1);
