@@ -327,13 +327,8 @@ void loop() {
             int x_pos = 72 - textWidth;
             if (x_pos < 0) x_pos = 0;
             
-            display.setCursor(x_pos + OLED_X_OFFSET, 34 + OLED_Y_OFFSET);
+            display.setCursor(x_pos + OLED_X_OFFSET, 36 + OLED_Y_OFFSET); 
             display.print(buf);
-
-            // 3. Small Uptime (Top corner to avoid bottom-edge artifacts)
-            display.setTextSize(1);
-            display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
-            display.printf("%lus", data.uptime);
         } else {
             // Normal 3-Axis View
             display.setTextSize(1);
@@ -346,9 +341,6 @@ void loop() {
                 case 3: display.print("E-STOP"); break;
                 default: display.print("UNKNOWN"); break;
             }
-
-            display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
-            display.printf("%lus", data.uptime);
 
             // X Axis
             display.setTextSize(1);
