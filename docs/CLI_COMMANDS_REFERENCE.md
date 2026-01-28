@@ -1996,6 +1996,277 @@ ota_setpass <password>
 
 ---
 
+## 13. 🛠️ ADVANCED DIAGNOSTICS
+
+---
+
+### `web` - Web Server Configuration
+
+**Syntax:**
+```
+web config <subcommand>
+```
+
+**Description:**
+Manages web server credentials and configuration.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `show` | Display current web server credentials |
+| `username <name>` | Set web UI username (3-32 chars) |
+| `password <pass>` | Set web UI password (4-64 chars) |
+
+**Usage Examples:**
+```
+web config show           # Show current credentials
+web config username admin # Set username
+web config password MySecurePass123
+```
+
+---
+
+### `api` - API Rate Limiter Diagnostics
+
+**Syntax:**
+```
+api <subcommand>
+```
+
+**Description:**
+Monitors and manages the API rate limiting system that prevents DoS attacks.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `diag` | Show rate limiter diagnostics |
+| `reset` | Reset all rate limit counters |
+
+**Usage Example:**
+```
+api diag
+```
+
+**Expected Output:**
+```text
+[API] === Rate Limiter Diagnostics ===
+Requests in window: 45
+Window size: 60 seconds
+Limit per client: 100 req/min
+Blocked requests: 0
+```
+
+---
+
+### `axis` - Per-Axis Motion Quality Diagnostics
+
+**Syntax:**
+```
+axis <subcommand> [axis]
+```
+
+**Description:**
+Monitors motion quality metrics for each axis, useful for detecting mechanical issues.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `status` | Show all axes quality summary |
+| `detail <X\|Y\|Z>` | Show detailed diagnostics for axis |
+| `reset <X\|Y\|Z\|all>` | Reset quality metrics |
+
+**Usage Examples:**
+```
+axis status          # Overview of all axes
+axis detail X        # Detailed X-axis diagnostics
+axis reset all       # Clear all metrics
+```
+
+**Expected Output:**
+```text
+[AXIS] === Motion Quality Status (All Axes) ===
+Axis  Moves  Errors  Deviation  Status
+──────────────────────────────────────────
+X     1234     0      0.01mm    GOOD
+Y      987     2      0.03mm    GOOD
+Z      456     0      0.02mm    GOOD
+```
+
+---
+
+### `debug` - System Debug Utilities
+
+**Syntax:**
+```
+debug <subcommand>
+```
+
+**Description:**
+Advanced debugging commands for system internals.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `encoders` | Show encoder debug info |
+| `config` | Show configuration debug info |
+| `all` | Full system dump |
+
+**Usage Example:**
+```
+debug all
+```
+
+---
+
+### `timeouts` - Timeout Diagnostics
+
+**Syntax:**
+```
+timeouts
+```
+
+**Description:**
+Shows diagnostic information about communication timeouts across all subsystems.
+
+---
+
+### `wdt` - Watchdog Management
+
+**Syntax:**
+```
+wdt <subcommand>
+```
+
+**Description:**
+Manages the system watchdog timer that prevents system hangs.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `status` | Show watchdog status |
+| `feed` | Manually feed the watchdog |
+| `stats` | Show watchdog statistics |
+
+---
+
+### `task` - Task Monitoring
+
+**Syntax:**
+```
+task <subcommand>
+```
+
+**Description:**
+Monitors FreeRTOS task status and performance.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `list` | Show all running tasks |
+| `stats` | Show task statistics |
+
+---
+
+### `encoder_deviation` - Encoder Deviation Diagnostics
+
+**Syntax:**
+```
+encoder_deviation
+```
+
+**Description:**
+Analyzes encoder position deviation from expected values. High deviation indicates mechanical slip, encoder errors, or calibration issues.
+
+**Expected Output:**
+```text
+[ENCODER DEVIATION] === Diagnostics ===
+Axis  Expected  Actual    Deviation
+──────────────────────────────────────
+X     1234567   1234560   7 counts
+Y     987654    987650    4 counts
+Z     456789    456790    1 count
+```
+
+---
+
+### `fault_recovery` - Fault Recovery Status
+
+**Syntax:**
+```
+fault_recovery
+```
+
+**Description:**
+Shows status of all fault recovery mechanisms and auto-recovery attempts.
+
+---
+
+### `task_list` - Detailed Task List
+
+**Syntax:**
+```
+task_list
+```
+
+**Description:**
+Shows detailed FreeRTOS task information including priority, stack usage, and timing.
+
+**Expected Output:**
+```text
+[TASK] === Detailed Task List ===
+Task Name          | Priority | Stack HWM | Runs    | Time(ms)  | Max(ms)
+-------------------|----------|-----------|---------|-----------|--------
+Motion             |        5 |      2048 |   12345 |     15678 |    125
+Encoder            |        6 |      1024 |   98765 |      5432 |     12
+LCD                |        2 |       512 |    4567 |      1234 |     45
+CLI                |        3 |      2048 |     890 |      2345 |     89
+```
+
+---
+
+### `cutting` - Stone Cutting Analytics
+
+**Syntax:**
+```
+cutting <subcommand> [args...]
+```
+
+**Description:**
+Manages cutting session analytics including specific cutting energy (SCE), blade wear estimation, and production statistics.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `diag` | Show cutting diagnostics (default) |
+| `start` | Start a cutting session |
+| `stop` | Stop the current session |
+| `reset` | Reset cutting statistics |
+| `depth <mm>` | Set cutting depth |
+| `blade <mm>` | Set blade width |
+| `baseline <sce>` | Set SCE baseline value |
+
+**Usage Examples:**
+```
+cutting                   # Show current diagnostics
+cutting start             # Begin tracking session
+cutting depth 30          # Set 30mm cutting depth
+cutting blade 4.5         # Set blade width
+cutting stop              # End session
+```
+
+**Expected Output:**
+```text
+[CUTTING] === Session Diagnostics ===
+Session Active:   YES
+Duration:         00:45:32
+Linear Distance:  12.5 m
+Area Cut:         0.375 m²
+Current SCE:      42.5 kWh/m³
+Blade Efficiency: 94%
+```
+
+---
+
 ## 📊 COMPLETE COMMAND QUICK REFERENCE
 
 ### System Commands
@@ -2056,6 +2327,21 @@ ota_setpass <password>
 | `runtime` | Uptime counter |
 | `test` | Stress tests |
 
+### Advanced Diagnostics
+| Command | Description |
+|---------|-------------|
+| `web` | Web server config |
+| `api` | API rate limiter |
+| `axis` | Motion quality metrics |
+| `debug` | System debug utilities |
+| `timeouts` | Timeout diagnostics |
+| `wdt` | Watchdog management |
+| `task` | Task monitoring |
+| `encoder_deviation` | Encoder deviation |
+| `fault_recovery` | Fault recovery status |
+| `task_list` | Detailed task list |
+| `cutting` | Cutting analytics |
+
 ### Hardware
 | Command | Description |
 |---------|-------------|
@@ -2091,10 +2377,10 @@ ota_setpass <password>
 
 ---
 
-**Document Version:** 2.0 Ultimate Master  
-**Last Updated:** 2026-01-27  
+**Document Version:** 2.1 Ultimate Master  
+**Last Updated:** 2026-01-28  
 **Firmware Compatibility:** v3.5.x+  
-**Total Commands Documented:** 70+  
+**Total Commands Documented:** 81+  
 **Author:** Antigravity (DeepMind Advanced Agentic Coding)  
 **Machine:** BISSO E350 PosiPro 4-Axis CNC Bridge Saw
 
