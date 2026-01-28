@@ -23,6 +23,10 @@
 #define OLED_RESET    -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+// --- Debug Configuration ---
+#define SIMULATE_MOVEMENT 1  // Set to 1 to test Giant-Text UI without machine connection
+#define MAX_MACHINE_DIM   3500.0f
+
 // Data state
 TelemetryPacket data;
 TelemetryPacket prevData;
@@ -86,6 +90,24 @@ void setup() {
 void loop() {
     display.clearDisplay();
     
+#if SIMULATE_MOVEMENT
+    // Fake data for UI testing
+    static uint32_t lastSimUpdate = 0;
+    if (millis() - lastSimUpdate > 500) {
+        // Randomly pick an axis to "move" every 0.5s
+        int axis = random(0, 3);
+        if (axis == 0) data.x = (float)random(0, MAX_MACHINE_DIM * 10) / 10.0f;
+        else if (axis == 1) data.y = (float)random(0, MAX_MACHINE_DIM * 10) / 10.0f;
+        else data.z = (float)random(0, 500 * 10) / 10.0f;
+        
+        data.status = 1; // MOVING
+        data.uptime = millis() / 1000;
+        lastPacketTime = millis();
+        dataReceived = true;
+        lastSimUpdate = millis();
+    }
+#endif
+
     // Check for timeout (1 second)
     if (millis() - lastPacketTime > 1000) {
         display.setCursor(0 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
@@ -111,23 +133,26 @@ void loop() {
         bool showGiant = (activeAxis != ' ' && (millis() - lastMoveTime < 1000));
 
         if (showGiant) {
-            // Giant Text Mode: Only show the moving axis
-            display.setTextSize(1);
-            display.setCursor(0 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
-            display.printf("MOVING %c", activeAxis);
-            
-            display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
-            display.printf("%lus", data.uptime);
-
-            display.setTextSize(2); // Giant text for the value
-            display.setCursor(0 + OLED_X_OFFSET, 18 + OLED_Y_OFFSET);
-            
+            // Giant Text Mode: Centered Axis on top, Position on bottom
             float val = 0;
             if (activeAxis == 'X') val = data.x;
             else if (activeAxis == 'Y') val = data.y;
             else if (activeAxis == 'Z') val = data.z;
+
+            // 1. Top Line: Axis Label (Centered)
+            display.setTextSize(2);
+            display.setCursor(28 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET); // Approximate center for single char
+            display.print(activeAxis);
             
-            display.printf("%c:%7.1f", activeAxis, val);
+            // 2. Bottom Line: Value
+            display.setTextSize(2);
+            display.setCursor(0 + OLED_X_OFFSET, 20 + OLED_Y_OFFSET);
+            display.printf("%7.1f", val);
+            
+            // 3. Small Uptime (corner)
+            display.setTextSize(1);
+            display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
+            display.printf("%lus", data.uptime);
         } else {
             // Normal 3-Axis View
             display.setTextSize(1);
