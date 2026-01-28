@@ -19,7 +19,7 @@
 #define SCREEN_WIDTH 128 // Use full controller width (128) to handle hardware offsets
 #define SCREEN_HEIGHT 64 // Use full controller height to clear all residuals
 #define OLED_X_OFFSET 28 // 0.42" OLEDs are often centered at column 28
-#define OLED_Y_OFFSET 14 // Visual center for 0.42" OLED (was 13, 12 clipped top)
+#define OLED_Y_OFFSET 20 // Shifted down significantly (was 14, still too high)
 #define OLED_RESET    -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
