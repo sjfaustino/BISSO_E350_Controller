@@ -158,6 +158,12 @@ void elboInit() {
   // Use configured speed, defaulting to 100KHz (Standard Mode)
   uint32_t i2c_speed = configGetInt(KEY_I2C_SPEED, 100000);
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, i2c_speed);
+  
+  // PHASE 16: Enable internal pull-ups for stability on bare DevKits
+  // (KC868 board has external ones, but bare boards usually don't)
+  pinMode(PIN_I2C_SDA, INPUT_PULLUP);
+  pinMode(PIN_I2C_SCL, INPUT_PULLUP);
+  
   Wire.setTimeOut(100); // Reduce I2C timeout from 1000ms to 100ms
   logInfo("[PLC] I2C initialized at %lu Hz", (unsigned long)i2c_speed);
   delay(10);            // Allow bus to settle
