@@ -19,7 +19,8 @@
 #define SCREEN_WIDTH 128 // Use full controller width (128) to handle hardware offsets
 #define SCREEN_HEIGHT 64 // Use full controller height to clear all residuals
 #define OLED_X_OFFSET 28 // 0.42" OLEDs are often centered at column 28
-#define OLED_Y_OFFSET 20 // Shifted down significantly (was 14, still too high)
+#define OLED_Y_OFFSET 12 // Locked for main DRO UI consistency
+#define LOGO_Y_OFFSET 26 // Significantly shifted down for visual centering
 #define OLED_RESET    -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -192,13 +193,13 @@ void setup() {
     
     // Draw Boot Logo - Stage 1 (Saw)
     display.clearDisplay();
-    display.drawBitmap(OLED_X_OFFSET, OLED_Y_OFFSET, logo_saw_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
+    display.drawBitmap(OLED_X_OFFSET, LOGO_Y_OFFSET, logo_saw_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
     display.display();
     delay(1000); // Show for 1 second
     
     // Draw Boot Logo - Stage 2 (POSIPRO)
     display.clearDisplay();
-    display.drawBitmap(OLED_X_OFFSET, OLED_Y_OFFSET, logo_posipro_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
+    display.drawBitmap(OLED_X_OFFSET, LOGO_Y_OFFSET, logo_posipro_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
     display.display();
     delay(1000); // Show for 1 second
     
