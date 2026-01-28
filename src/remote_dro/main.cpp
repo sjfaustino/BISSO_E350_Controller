@@ -200,6 +200,14 @@ void setup() {
     // Draw Boot Logo - Stage 2 (POSIPRO)
     display.clearDisplay();
     display.drawBitmap(OLED_X_OFFSET, LOGO_Y_OFFSET, logo_posipro_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
+    
+    // Add centered version number below logo
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    // 128px screen, "v1.0.0" is 6 chars * 6px = 36px wide. (128-36)/2 = 46.
+    display.setCursor(46, LOGO_Y_OFFSET + 42); 
+    display.print("v1.0.0");
+    
     display.display();
     delay(1000); // Show for 1 second
     
