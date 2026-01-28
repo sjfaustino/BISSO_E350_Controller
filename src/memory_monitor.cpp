@@ -5,7 +5,7 @@
 #include <esp_heap_caps.h>
 
 // FIX: Fully initialize struct to suppress warnings
-static memory_stats_t mem_stats = {0, 0, 0, 0, 0, 0, 0};
+static memory_stats_t mem_stats = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static bool mem_monitor_initialized = false;
 static uint32_t total_heap_size = 0;
 
@@ -14,16 +14,27 @@ static bool low_memory_event_active = false;
 
 void memoryMonitorInit() {
   logInfo("[MEM] Initializing...");
-  total_heap_size = ESP.getHeapSize();
-  mem_stats.current_free = ESP.getFreeHeap();
+  total_heap_size = heap_caps_get_total_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  mem_stats.current_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   mem_stats.minimum_free = mem_stats.current_free;
   mem_stats.maximum_used = 0;
   mem_stats.allocations_count = 0;
   mem_stats.deallocations_count = 0;
-  mem_stats.largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+  mem_stats.largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   mem_stats.sample_count = 0;
+  
+  // PSRAM detection
+  mem_stats.psram_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+  if (mem_stats.psram_total > 0) {
+    mem_stats.psram_current_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    mem_stats.psram_largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    logInfo("[MEM] [OK] Internal: %lu bytes, PSRAM: %lu bytes", 
+            (unsigned long)total_heap_size, (unsigned long)mem_stats.psram_total);
+  } else {
+    logInfo("[MEM] [OK] Internal: %lu bytes, PSRAM: NOT FOUND", (unsigned long)total_heap_size);
+  }
+  
   mem_monitor_initialized = true;
-  logInfo("[MEM] [OK] Heap: %lu bytes", (unsigned long)total_heap_size);
 }
 
 void memoryMonitorUpdate() {
@@ -38,7 +49,11 @@ void memoryMonitorUpdate() {
   uint32_t now = millis();
   
   if (now - last_block_check >= check_interval) {
-    mem_stats.largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+    mem_stats.largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (mem_stats.psram_total > 0) {
+      mem_stats.psram_current_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+      mem_stats.psram_largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    }
     last_block_check = now;
   }
 
@@ -82,6 +97,13 @@ void memoryMonitorPrintStats() {
   logPrintf("Min Free:     %lu\n", (unsigned long)mem_stats.minimum_free);
   logPrintf("Max Used:     %lu\n", (unsigned long)mem_stats.maximum_used);
   logPrintf("Largest Blk:  %lu\n", (unsigned long)mem_stats.largest_block);
+  
+  if (mem_stats.psram_total > 0) {
+    logPrintf("PSRAM Total:  %lu\n", (unsigned long)mem_stats.psram_total);
+    logPrintf("PSRAM Free:   %lu\n", (unsigned long)mem_stats.psram_current_free);
+    logPrintf("PSRAM Large:  %lu\n", (unsigned long)mem_stats.psram_largest_block);
+  }
+  
   logPrintf("Samples:      %lu\n", (unsigned long)mem_stats.sample_count);
   
   if (free > (total_heap_size / 2)) logPrintln("Status: [GOOD]");

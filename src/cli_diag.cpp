@@ -1053,34 +1053,46 @@ void cmd_memory_detailed(int argc, char** argv) {
 
     // Update memory monitor
     extern void memoryMonitorUpdate();
-    extern uint32_t memoryMonitorGetFreeHeap();
-    extern uint32_t memoryMonitorGetTotalHeap();
-    extern uint32_t memoryMonitorGetMinFreeHeap();
-    extern uint32_t memoryMonitorGetLargestFreeBlock();
-
     memoryMonitorUpdate();
+    
+    memory_stats_t* stats = memoryMonitorGetStats();
+    
+    uint32_t internal_total = memoryMonitorGetTotalHeap();
+    uint32_t internal_free = memoryMonitorGetFreeHeap();
+    uint32_t internal_used = internal_total - internal_free;
+    uint32_t internal_largest = memoryMonitorGetLargestFreeBlock();
 
-    uint32_t total = memoryMonitorGetTotalHeap();
-    uint32_t free = memoryMonitorGetFreeHeap();
-    uint32_t min_free = memoryMonitorGetMinFreeHeap();
-    uint32_t largest = memoryMonitorGetLargestFreeBlock();
-    uint32_t used = total - free;
+    logPrintf("\r\nInternal Heap (DRAM):\r\n");
+    logPrintf("  Total:      %lu bytes\r\n", (unsigned long)internal_total);
+    logPrintf("  Used:       %lu bytes (%.1f%%)\r\n", (unsigned long)internal_used, (internal_used * 100.0f) / internal_total);
+    logPrintf("  Free:       %lu bytes (%.1f%%)\r\n", (unsigned long)internal_free, (internal_free * 100.0f) / internal_total);
+    logPrintf("  Largest:    %lu bytes (max contiguous)\r\n", (unsigned long)internal_largest);
+    logPrintf("  Min Free:   %lu bytes (lowest ever)\r\n", (unsigned long)stats->minimum_free);
 
-    logPrintf("\r\nHeap Summary:\r\n");
-    logPrintf("  Total:      %lu bytes\r\n", (unsigned long)total);
-    logPrintf("  Used:       %lu bytes (%.1f%%)\r\n", (unsigned long)used, (used * 100.0f) / total);
-    logPrintf("  Free:       %lu bytes (%.1f%%)\r\n", (unsigned long)free, (free * 100.0f) / total);
-    logPrintf("  Minimum:    %lu bytes (lowest ever)\r\n", (unsigned long)min_free);
-    logPrintf("  Largest Block: %lu bytes (max contiguous)\r\n", (unsigned long)largest);
-
-    // Fragmentation estimate
-    if (largest > 0 && free > 0) {
-        float fragmentation = 100.0f * (1.0f - ((float)largest / free));
-        logPrintf("\r\nFragmentation: %.1f%%\r\n", fragmentation);
-        if (fragmentation > 50) {
-            logPrintln("[WARN] High memory fragmentation detected!");
-        }
+    // Internal Fragmentation
+    if (internal_largest > 0 && internal_free > 0) {
+        float frag = 100.0f * (1.0f - ((float)internal_largest / internal_free));
+        logPrintf("  Frag:       %.1f%%\r\n", frag);
     }
+
+    if (stats->psram_total > 0) {
+        uint32_t psram_used = stats->psram_total - stats->psram_current_free;
+        logPrintf("\r\nExternal Heap (PSRAM):\r\n");
+        logPrintf("  Total:      %lu bytes\r\n", (unsigned long)stats->psram_total);
+        logPrintf("  Used:       %lu bytes (%.1f%%)\r\n", (unsigned long)psram_used, (psram_used * 100.0f) / stats->psram_total);
+        logPrintf("  Free:       %lu bytes (%.1f%%)\r\n", (unsigned long)stats->psram_current_free, (stats->psram_current_free * 100.0f) / stats->psram_total);
+        logPrintf("  Largest:    %lu bytes (max contiguous)\r\n", (unsigned long)stats->psram_largest_block);
+        
+        // PSRAM Fragmentation
+        if (stats->psram_largest_block > 0 && stats->psram_current_free > 0) {
+            float pfrag = 100.0f * (1.0f - ((float)stats->psram_largest_block / stats->psram_current_free));
+            logPrintf("  Frag:       %.1f%%\r\n", pfrag);
+        }
+    } else {
+        logPrintf("\r\nExternal Heap (PSRAM): NOT FOUND\r\n");
+    }
+
+    logPrintf("\r\nSamples:      %lu\r\n", (unsigned long)stats->sample_count);
 }
 
 // ============================================================================

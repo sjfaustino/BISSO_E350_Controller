@@ -9,13 +9,18 @@
 // ============================================================================
 
 typedef struct {
-  uint32_t current_free;        // Current free heap
-  uint32_t minimum_free;        // Minimum free heap observed
-  uint32_t maximum_used;        // Maximum heap used
+  uint32_t current_free;        // Current free internal heap
+  uint32_t minimum_free;        // Minimum free internal heap observed
+  uint32_t maximum_used;        // Maximum internal heap used
   uint32_t allocations_count;   // Number of allocations
   uint32_t deallocations_count; // Number of deallocations
-  uint32_t largest_block;       // Largest contiguous block available
+  uint32_t largest_block;       // Largest contiguous internal block
   uint32_t sample_count;        // Number of samples collected
+  
+  // PSRAM metrics (if available)
+  uint32_t psram_current_free;   // Current free PSRAM
+  uint32_t psram_total;          // Total PSRAM size
+  uint32_t psram_largest_block;  // Largest contiguous PSRAM block
 } memory_stats_t;
 
 // ============================================================================
