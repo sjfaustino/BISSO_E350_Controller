@@ -379,6 +379,24 @@ Shows the currently active G-code modal states.
 ok
 ```
 
+**How It Works:**
+```
+MODAL STATE TRACKING:
+┌─────────────────────────────────────────────────────────────┐
+│  The parser tracks these modal groups:                       │
+│                                                              │
+│  [GC:G0 G54 G90 G94 M5]                                     │
+│       │   │   │   │  │                                      │
+│       │   │   │   │  └── Spindle state (M3/M4/M5)          │
+│       │   │   │   └───── Feed mode (G93=inv, G94=mm/min)   │
+│       │   │   └───────── Distance mode (G90=abs, G91=inc)  │
+│       │   └───────────── Work coord system (G54-G59)       │
+│       └───────────────── Motion mode (G0=rapid, G1=linear) │
+│                                                              │
+│  Modal states persist until changed by a new command.        │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `?` - Real-Time Status (Grbl)
@@ -406,6 +424,27 @@ Returns immediate status report with position, state, and buffer status.
 | `Bf` | Buffer status (plan slots, RX buffer) |
 | `FS` | Feed and spindle (feed%, spindle RPM) |
 
+**How It Works:**
+```
+REAL-TIME STATUS QUERY (bypasses command queue):
+┌─────────────────────────────────────────────────────────────┐
+│  '?' received on UART                                        │
+│         │                                                    │
+│         ↓                                                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  ISR immediately samples:                           │    │
+│  │  • Motion controller state                          │    │
+│  │  • Encoder positions (all 4 axes)                   │    │
+│  │  • G-code buffer occupancy                          │    │
+│  │  • Current feed rate and spindle state              │    │
+│  └─────────────────────────────────────────────────────┘    │
+│         │                                                    │
+│         ↓                                                    │
+│  Format as Grbl-compatible status string                     │
+│  Send immediately (does NOT wait for ok)                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `!` - Feed Hold (Pause)
@@ -418,6 +457,24 @@ Returns immediate status report with position, state, and buffer status.
 
 **Description:**
 Immediately pauses all axis motion. Program position is preserved.
+
+**How It Works:**
+```
+FEED HOLD STATE TRANSITION:
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│   RUNNING ───────('!')───────→ HOLD:0 (Decelerating)        │
+│      ↑                              │                        │
+│      │                              ↓                        │
+│     ('~')                      HOLD:1 (Stopped)              │
+│      │                              │                        │
+│      └──────────────────────────────┘                        │
+│                                                              │
+│   Motion buffer is PRESERVED, not cleared                    │
+│   Spindle continues running (safety: blade in cut)          │
+│   Resume from exact pause point with '~'                     │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -432,6 +489,18 @@ Immediately pauses all axis motion. Program position is preserved.
 **Description:**
 Resumes motion after a feed hold (`!`) or program pause (M0/M1).
 
+**How It Works:**
+```
+CYCLE START SEQUENCE:
+┌─────────────────────────────────────────────────────────────┐
+│  1. Verify system in HOLD state (not ALARM)                  │
+│  2. Check E-stop not active                                  │
+│  3. Transition to RUNNING state                              │
+│  4. Resume motion from preserved position                    │
+│  5. Continue executing queued G-code blocks                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `Ctrl-X` / `0x18` - Soft Reset
@@ -444,6 +513,23 @@ Ctrl-X
 
 **Description:**
 Performs a software reset—stops motion, clears buffers, reinitializes without rebooting.
+
+**How It Works:**
+```
+SOFT RESET SEQUENCE:
+┌─────────────────────────────────────────────────────────────┐
+│  1. IMMEDIATELY stop all axis motion (decel to zero)         │
+│  2. Clear G-code motion queue                                │
+│  3. Reset parser state to defaults (G0 G54 G90)              │
+│  4. Clear any ALARM state (not E-STOP)                       │
+│  5. Re-initialize serial receive buffer                      │
+│  6. Output startup banner:                                   │
+│     "Grbl 1.1f ['$' for help]"                               │
+│                                                              │
+│  NOTE: Does NOT reboot ESP32 - much faster than `reboot`     │
+│        Position is LOST - rehome after soft reset            │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -648,6 +734,26 @@ Used entries: 89
 Free entries: 38
 ```
 
+**How It Works:**
+```
+NVS (NON-VOLATILE STORAGE) ARCHITECTURE:
+┌─────────────────────────────────────────────────────────────────┐
+│                      ESP32 FLASH                                  │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐    │
+│  │   NVS       │  │   LittleFS  │  │   OTA_0/1   │    │
+│  │  Partition  │  │  (Web UI)   │  │  (Firmware) │    │
+│  └──────┬────────┘  └───────────────┘  └───────────────┘    │
+│         │                                                       │
+│         └─────────────────────────────────┐                  │
+│                             ↓                                    │
+│   Key-Value Storage:                                              │
+│   • Type-safe (int, float, string, blob)                          │
+│   • Wear-leveling built-in                                        │
+│   • Power-fail safe (journaling)                                  │
+│   • ~20KB usable storage                                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 4. 🏃 MOTION CONTROL
@@ -663,6 +769,25 @@ motionstatus
 
 **Description:**
 Shows detailed internal motion state for all axes.
+
+**How It Works:**
+```
+MOTION STATUS DATA SOURCES:
+┌─────────────────────────────────────────────────────────────────┐
+│  Per-Axis Report:                                                  │
+│  • Target position (from last G-code command)                     │
+│  • Actual position (from WJ66 encoder)                            │
+│  • Distance remaining                                             │
+│  • Current velocity (counts/ms)                                   │
+│  • Axis state (IDLE, MOVING, HOMING, ERROR)                       │
+│  • Limit switch status                                            │
+│                                                                    │
+│  System-level:                                                     │
+│  • Motion buffer depth (queued commands)                          │
+│  • Active feedrate override                                       │
+│  • Current WCS offset applied                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -938,6 +1063,27 @@ Violations (>50): 0
 > [!TIP]
 > If max time exceeds 50µs frequently, the code should be refactored to use a mutex.
 
+**How It Works:**
+```
+SPINLOCK TIMING INSTRUMENTATION:
+┌─────────────────────────────────────────────────────────────────┐
+│  Spinlocks disable interrupts for atomic access                    │
+│  to shared data structures:                                       │
+│                                                                    │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │  portENTER_CRITICAL()  ←── Start timestamp         │ │
+│  │       ... critical code ...                        │ │
+│  │  portEXIT_CRITICAL()   ←── End timestamp           │ │
+│  │       duration = end - start                       │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  THRESHOLDS:                                                       │
+│  • Normal: < 10µs        (OK for ISR-safe operations)             │
+│  • Warning: 10-50µs     (May impact real-time response)           │
+│  • Violation: > 50µs    (Risk of missed encoder edges)            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 5. 📡 NETWORK & CONNECTIVITY
@@ -1159,6 +1305,24 @@ ota <subcommand>
 | `status` | Show OTA update status |
 | `cancel` | Cancel pending update |
 
+**How It Works:**
+```
+OTA (OVER-THE-AIR) UPDATE PROCESS:
+┌─────────────────────────────────────────────────────────────────┐
+│  1. Upload firmware.bin via Web UI                                 │
+│  2. Firmware written to INACTIVE OTA partition                     │
+│  3. CRC32 checksum verified                                        │
+│  4. Bootloader updated to boot from new partition                  │
+│  5. System reboots into new firmware                               │
+│  6. If boot fails → automatic rollback to previous                │
+│                                                                    │
+│  SAFETY:                                                           │
+│  • Dual partition scheme prevents bricking                        │
+│  • Rollback if new firmware doesn't confirm boot                  │
+│  • Progress shown via `ota status`                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `web_setpass` - Set Web UI Password
@@ -1190,6 +1354,24 @@ auth
 
 **Description:**
 Shows authentication manager status and active sessions.
+
+**How It Works:**
+```
+AUTHENTICATION SYSTEM:
+┌─────────────────────────────────────────────────────────────────┐
+│  Session Management:                                               │
+│  • Web UI uses HTTP Basic Auth + session tokens                   │
+│  • Session timeout: 30 minutes (configurable)                     │
+│  • Max concurrent sessions: 5                                     │
+│                                                                    │
+│  Telnet Auth:                                                      │
+│  • Same password as web UI                                        │
+│  • 3 failed attempts = 5 minute lockout                           │
+│                                                                    │
+│  Serial Console:                                                   │
+│  • No authentication (physical access assumed trusted)            │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1435,8 +1617,24 @@ Encoder          8%    2048    1024
 LCD              3%    2048    512
 Telemetry        2%    4096    1536
 CLI              1%    4096    2048
-─────────────────────────────────────────
+---─────────────────────────────────────────
 Total CPU: 26%
+```
+
+**How It Works:**
+```
+TASK PERFORMANCE MONITORING:
+┌─────────────────────────────────────────────────────────────────┐
+│  FreeRTOS Instrumentation:                                         │
+│  • CPU% = Task run time / total scheduler time                    │
+│  • Stack = Allocated stack size (bytes)                           │
+│  • High Water = Minimum free stack ever (lower = closer to crash) │
+│                                                                    │
+│  ALERTS:                                                           │
+│  • If High Water < 256 bytes → Stack overflow risk                │
+│  • If CPU% > 80% → System may become unresponsive                 │
+│  • If any task stalled → Watchdog will trigger reset              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1461,6 +1659,25 @@ Idle Time:        667 hours
 Power Cycles:     89
 ```
 
+**How It Works:**
+```
+RUNTIME TRACKING:
+┌─────────────────────────────────────────────────────────────────┐
+│  Session Uptime:                                                   │
+│  • Counted from boot via millis()                                 │
+│                                                                    │
+│  Total Runtime:                                                    │
+│  • Saved to NVS every 10 minutes                                  │
+│  • Persists across reboots                                        │
+│                                                                    │
+│  Cutting Time:                                                     │
+│  • Accumulated when spindle is running AND motion active          │
+│  • Used for blade life estimation                                 │
+│                                                                    │
+│  Efficiency = Cutting Time / Total Runtime × 100%                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `test` - System Stress Tests
@@ -1483,6 +1700,29 @@ Deliberately stresses system components to identify weak points.
 
 > [!CAUTION]
 > Stress tests may cause temporary system instability. Do NOT run during cutting operations!
+
+**How It Works:**
+```
+STRESS TEST METHODOLOGY:
+┌─────────────────────────────────────────────────────────────────┐
+│  TEST CPU:                                                         │
+│  • Runs tight loop with calculations                              │
+│  • Measures time to complete fixed iterations                     │
+│  • Detects thermal throttling                                     │
+│                                                                    │
+│  TEST MEMORY:                                                      │
+│  • Allocates/frees blocks of increasing size                      │
+│  • Tests heap fragmentation resilience                            │
+│                                                                    │
+│  TEST I2C:                                                         │
+│  • Rapid read/write cycles to all I2C devices                     │
+│  • Detects intermittent connection issues                         │
+│                                                                    │
+│  TEST FULL:                                                        │
+│  • Runs all tests sequentially                                    │
+│  • Reports overall system health score                            │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1591,6 +1831,24 @@ encoder <subcommand> [args...]
 | `config` | Show/set configuration |
 | `protocol` | Show protocol settings |
 
+**How It Works:**
+```
+WJ66 ENCODER INTERFACE:
+┌─────────────────────────────────────────────────────────────────┐
+│  RS485 @ 57600 baud, 8N1                                           │
+│                                                                    │
+│   ESP32 ─── TX/RX ─── WJ66 4-Axis Counter Module               │
+│                                                                    │
+│  REGISTER MAP:                                                     │
+│  0x00-0x03: X-axis count (32-bit signed)                          │
+│  0x04-0x07: Y-axis count                                          │
+│  0x08-0x0B: Z-axis count                                          │
+│  0x0C-0x0F: A-axis count                                          │
+│                                                                    │
+│  UPDATE RATE: 50Hz (20ms polling interval)                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `spindle` - Spindle Current Monitor
@@ -1623,6 +1881,21 @@ Stall Limit:  25.0 A
 Status:       NORMAL
 ```
 
+**How It Works:**
+```
+SPINDLE CURRENT MONITORING PIPELINE:
+┌─────────────────────────────────────────────────────────────────┐
+│  JXK-10 Sensor ─── RS485 ─── ESP32 ─── Stall Detection      │
+│                                                                    │
+│  THRESHOLDS:                                                       │
+│  • No-Load Base: Measured during calibration (spindle idle)       │
+│  • Stall Limit: Base + configurable margin (default 25A)          │
+│  • Peak tracking: Highest current seen in session                 │
+│                                                                    │
+│  If current > Stall Limit for > 500ms → STALL ALARM triggered    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `jxk10` - JXK-10 Current Sensor
@@ -1641,6 +1914,23 @@ jxk10 <subcommand>
 | `status` | Full diagnostics |
 | `enable` | Enable sensor |
 | `disable` | Disable sensor |
+
+**How It Works:**
+```
+JXK-10 MODBUS INTERFACE:
+┌─────────────────────────────────────────────────────────────────┐
+│  Modbus RTU @ 9600 baud, Address 0x02 (configurable)              │
+│                                                                    │
+│  REGISTERS:                                                        │
+│  0x0000: Current reading (A × 10, e.g., 152 = 15.2A)              │
+│  0x0001: Device type                                              │
+│  0x0002: Slave address                                            │
+│                                                                    │
+│  COMMANDS:                                                         │
+│  • jxk10 addr <new>: Change address (requires power cycle)        │
+│  • jxk10 enable/disable: Control polling                          │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1670,6 +1960,24 @@ lcd <subcommand>
 lcd timeout 60
 ```
 
+**How It Works:**
+```
+LCD I2C ARCHITECTURE:
+┌─────────────────────────────────────────────────────────────────┐
+│  20x4 Character LCD @ I2C address 0x27                            │
+│                                                                    │
+│  DISPLAY ZONES:                                                    │
+│  ┌────────────────────┐                                           │
+│  │Row 0: Status     │  IDLE/RUNNING/ALARM                         │
+│  │Row 1: Position   │  X:100.00 Y:50.00                           │
+│  │Row 2: Position   │  Z:25.00  A:0.00                            │
+│  │Row 3: Info       │  Spindle RPM, Feed%                         │
+│  └────────────────────┘                                           │
+│                                                                    │
+│  Sleep timeout saves backlight lifespan                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ### `dio` - Digital I/O Status
@@ -1696,6 +2004,24 @@ OUTPUTS (Q73 @ 0x21):
   OUT1 [X_REV]:  0  │  OUT5 [SPEED_2]:  0
   OUT2 [Y_FWD]:  0  │  OUT6 [RUN_SIG]:  0
   OUT3 [Y_REV]:  0  │  OUT7 [SPARE]:    0
+```
+
+**How It Works:**
+```
+DIGITAL I/O HARDWARE:
+┌─────────────────────────────────────────────────────────────────┐
+│  KinCony KC868-A16 PLC Board                                       │
+│                                                                    │
+│  I73 INPUT EXPANDER (0x20):                                        │
+│  • 8x optocoupled inputs (24VDC compatible)                       │
+│  • Directly connected to limit switches, E-stop, VFD ready        │
+│  • Polled every 10ms for fast response                            │
+│                                                                    │
+│  Q73 OUTPUT EXPANDER (0x21):                                       │
+│  • 8x relay outputs (5A @ 250VAC rated)                           │
+│  • Controls motor direction, speed selection                      │
+│  • State changes atomic to prevent glitches                       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1730,6 +2056,26 @@ JXK10_CURRENT   0x02     NORMAL    ONLINE    98.5%
 ALTIVAR31_VFD   0x03     NORMAL    ONLINE    99.2%
 ```
 
+**How It Works:**
+```
+RS485 DEVICE REGISTRY:
+┌─────────────────────────────────────────────────────────────────┐
+│  Priority-Based Scheduling:                                        │
+│                                                                    │
+│  HIGH Priority (50Hz):                                            │
+│  • WJ66 Encoder - Position feedback (most critical)               │
+│                                                                    │
+│  NORMAL Priority (10Hz):                                          │
+│  • JXK-10 Current Sensor                                          │
+│  • Altivar31 VFD                                                   │
+│                                                                    │
+│  Bus Sharing:                                                      │
+│  • Single RS485 bus shared by all devices                         │
+│  • Scheduler alternates between devices by priority               │
+│  • Retries with exponential backoff on timeout                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 9. 🗂️ FILESYSTEM & LOGGING
@@ -1758,6 +2104,22 @@ Listing directory: /
   [DIR]  pages
   [FILE] config.json            4096 bytes
   [FILE] boot.log               1234 bytes
+```
+
+**How It Works:**
+```
+LITTLEFS FILESYSTEM:
+┌─────────────────────────────────────────────────────────────────┐
+│  1.5MB Partition on ESP32 SPI Flash                                │
+│                                                                    │
+│  /                                                                 │
+│  ├── /data/          (Job files, fault logs)                      │
+│  ├── /logs/          (System logs)                                 │
+│  ├── /pages/         (Web UI HTML/JS/CSS)                          │
+│  └── config.json     (Runtime config cache)                       │
+│                                                                    │
+│  Power-fail safe with wear leveling                               │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1814,6 +2176,24 @@ log <subcommand>
 | `boot` | Show boot log |
 | `enable` | Enable logging |
 | `delete` | Delete log files |
+
+**How It Works:**
+```
+LOGGING ARCHITECTURE:
+┌─────────────────────────────────────────────────────────────────┐
+│  LOG DESTINATIONS:                                                 │
+│  • Serial (always, for debugging)                                 │
+│  • Telnet (if connected)                                          │
+│  • LittleFS file (persistent, if enabled)                         │
+│                                                                    │
+│  LOG LEVELS:                                                       │
+│  DEBUG < INFO < WARNING < ERROR < FATAL                           │
+│                                                                    │
+│  BOOT LOG:                                                         │
+│  • Captures startup sequence and any errors                       │
+│  • Essential for post-mortem debugging                            │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1906,6 +2286,25 @@ vfd <subcommand>
 | `config` | VFD configuration |
 | `calibrate` | Current baseline calibration |
 
+**How It Works:**
+```
+VFD (VARIABLE FREQUENCY DRIVE) CONTROL:
+┌─────────────────────────────────────────────────────────────────┐
+│  Schneider Altivar31 VFD                                           │
+│  • Modbus RTU @ 19200 baud                                         │
+│  • Controls spindle motor (up to 15HP)                             │
+│                                                                    │
+│  COMMANDS:                                                         │
+│  • Start/Stop via M3/M5 G-codes                                   │
+│  • Speed set via S parameter (RPM)                                │
+│  • Fault read and clear via Modbus                                │
+│                                                                    │
+│  CALIBRATION:                                                      │
+│  • Measures no-load current as baseline                           │
+│  • Used for stall detection and blade efficiency                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 11. 📋 JOB MANAGEMENT
@@ -1968,6 +2367,24 @@ ETA:       15 min 23 sec
            [####----------------]
 ```
 
+**How It Works:**
+```
+JOB ETA CALCULATION:
+┌─────────────────────────────────────────────────────────────────┐
+│  ETA Algorithm:                                                    │
+│                                                                    │
+│  1. Pre-parse file to count total lines                           │
+│  2. Track lines_processed / total_lines = progress %              │
+│  3. Measure elapsed_time / lines_processed = time_per_line        │
+│  4. remaining_lines × time_per_line = ETA                         │
+│                                                                    │
+│  ACCURACY FACTORS:                                                 │
+│  • Feed override changes affect ETA dynamically                   │
+│  • Dwells (G4) add fixed time                                     │
+│  • Complex moves take longer than simple rapid moves              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 12. 🔐 SECURITY COMMANDS
@@ -2010,10 +2427,6 @@ web config <subcommand>
 **Description:**
 Manages web server credentials and configuration.
 
-**Subcommands:**
-| Subcommand | Description |
-|------------|-------------|
-| `show` | Display current web server credentials |
 | `username <name>` | Set web UI username (3-32 chars) |
 | `password <pass>` | Set web UI password (4-64 chars) |
 
