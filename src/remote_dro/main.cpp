@@ -159,8 +159,16 @@ void loop() {
             // 1. Top Line: Axis Label (Centered)
             // Shifted way down (+12 total) to fix severe top clipping on tiny OLED
             display.setTextSize(2);
-            display.setCursor(28 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); 
-            display.print(activeAxis);
+            if (val < 0) {
+                // Show "X (-)" for negative values. Total 5 chars = 60px.
+                // 72 - 60 = 12px left margin / 2 = 6px.
+                display.setCursor(6 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET);
+                display.printf("%c (-)", activeAxis);
+            } else {
+                // Center single char. 72 - 12 = 60px / 2 = 30px.
+                display.setCursor(30 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); 
+                display.print(activeAxis);
+            }
             
             // 2. Bottom Line: Value (Right-justified)
             display.setTextSize(2);
