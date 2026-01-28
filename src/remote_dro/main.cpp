@@ -140,19 +140,19 @@ void loop() {
             else if (activeAxis == 'Z') val = data.z;
 
             // 1. Top Line: Axis Label (Centered)
-            // Added +2 vertical padding to avoid clipping top of 16px high characters
+            // Shifted way down (+12 total) to fix severe top clipping on tiny OLED
             display.setTextSize(2);
-            display.setCursor(28 + OLED_X_OFFSET, 2 + OLED_Y_OFFSET); 
+            display.setCursor(28 + OLED_X_OFFSET, 12 + OLED_Y_OFFSET); 
             display.print(activeAxis);
             
             // 2. Bottom Line: Value
             display.setTextSize(2);
-            display.setCursor(0 + OLED_X_OFFSET, 22 + OLED_Y_OFFSET);
+            display.setCursor(0 + OLED_X_OFFSET, 30 + OLED_Y_OFFSET);
             display.printf("%7.1f", val);
             
-            // 3. Small Uptime (corner)
+            // 3. Small Uptime (corner) - Moved to bottom edge to stay out of the way
             display.setTextSize(1);
-            display.setCursor(45 + OLED_X_OFFSET, 0 + OLED_Y_OFFSET);
+            display.setCursor(45 + OLED_X_OFFSET, 50 + OLED_Y_OFFSET);
             display.printf("%lus", data.uptime);
         } else {
             // Normal 3-Axis View
