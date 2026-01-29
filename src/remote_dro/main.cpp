@@ -139,7 +139,12 @@ void enterDeepSleep() {
 
 void setup() {
     Serial.begin(115200);
+    // Wait for USB Serial to initialize (max 2 seconds)
+    // This is required for native USB CDC on ESP32-C3 to show initial logs
+    uint32_t start = millis();
+    while (!Serial && (millis() - start) < 2000);
     
+    Serial.println("\n--- BISSO E350 Remote DRO starting ---");
     pinMode(STATUS_LED, OUTPUT);
     digitalWrite(STATUS_LED, HIGH); // Start OFF (Active LOW)
     pinMode(BOOT_BUTTON, INPUT_PULLUP);
@@ -149,7 +154,8 @@ void setup() {
     currentChannel = prefs.getUChar("last_chan", 1);
     if (currentChannel < 1 || currentChannel > 13) currentChannel = 1;
 
-    // 1. Configure Power Management BEFORE WiFi
+    // 1. Configure Power Management 
+    // NOTE: This prioritizes battery. USB Serial may be disrupted during sleep.
     esp_pm_config_esp32c3_t pm_config = {
         .max_freq_mhz = 160,
         .min_freq_mhz = 10,
@@ -184,7 +190,7 @@ void setup() {
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(46, 55); 
-    display.print("v1.3.0");
+    display.print("v1.3.2");
     
     // Show Temp on boot
     display.setCursor(28+OLED_X_OFFSET, 0+OLED_Y_OFFSET);
@@ -271,8 +277,10 @@ void loop() {
 
         if (now - lastHopTime > HOP_INTERVAL_MS) {
             currentChannel++;
-            if (currentChannel > MAX_CHANNELS) currentChannel = 1;
-            
+            if (currentChannel > MAX_CHANNELS) {
+                currentChannel = 1;
+                Serial.printf("Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
+            }
             esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
             lastHopTime = now;
         }
