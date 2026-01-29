@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <esp_wifi.h>
 
+#include "../logos.h"
+
 // PIN definitions handled by PIO build flags for TFT_eSPI
 // But we need to handle LEDs and Buttons here
 #ifndef TDISPLAY_BUTTON_1
@@ -47,18 +49,17 @@ void HAL_TDisplay::setScreenOn(bool on) {
 
 void HAL_TDisplay::showSplash(const char* version, float temp) {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setTextSize(2);
-    tft.setCursor(20, 40);
-    tft.println("BISSO E350");
-    tft.setCursor(20, 70);
-    tft.println("REMOTE DRO");
     
+    // Custom PosiPro Logo (135x92) centered on 240x135
+    int x = (240 - 135) / 2;
+    int y = (135 - 92) / 2;
+    
+    tft.drawXBitmap(x, y, logo_posipro_tdisplay_bmp, 135, 92, TFT_WHITE);
+    
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextSize(1);
-    tft.setCursor(20, 100);
-    tft.printf("Version: %s", version);
-    tft.setCursor(20, 115);
-    tft.printf("System Temp: %.1fC", temp);
+    tft.setCursor(x + 40, y + 92 + 5); 
+    tft.printf("%s", version);
     
     delay(2000);
 }
