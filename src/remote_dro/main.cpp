@@ -211,7 +211,7 @@ void setup() {
         display.setTextSize(1);
         display.setTextColor(SSD1306_WHITE);
         display.setCursor(46, 55); 
-        display.print("v1.3.6");
+        display.print("v1.3.7");
         
         // Show Temp on boot
         display.setCursor(28+OLED_X_OFFSET, 0+OLED_Y_OFFSET);
@@ -227,7 +227,7 @@ void setup() {
     esp_wifi_set_ps(WIFI_PS_MIN_MODEM); // Enable modem sleep 
     
     esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
-    Serial.printf("[v1.3.5] Starting search on channel %d (System: %.1fC)\n", currentChannel, getSystemTemp());
+    Serial.printf("[v1.3.7] Starting search on channel %d (System: %.1fC)\n", currentChannel, getSystemTemp());
 
     if (esp_now_init() != ESP_OK) {
         return;
@@ -301,14 +301,14 @@ void loop() {
             currentChannel++;
             if (currentChannel > MAX_CHANNELS) {
                 currentChannel = 1;
-                Serial.printf("[v1.3.6] Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
+                Serial.printf("[v1.3.7] Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
             }
             esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
             lastHopTime = now;
         }
 
-        // Stealth Sniffing Timeout: If we woke up by timer and found nothing in 20s, go back to sleep.
-        if (stealthMode && (now - sessionStartTime > 20000)) {
+        // Stealth Sniffing Timeout: If we woke up by timer and found nothing in 5s, go back to sleep.
+        if (stealthMode && (now - sessionStartTime > 5000)) {
             Serial.println("Stealth check complete - no controller. Sleeping.");
             enterDeepSleep();
         }
