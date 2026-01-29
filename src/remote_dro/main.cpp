@@ -1,22 +1,14 @@
-/**
- * BISSO E350 - Remote DRO Receiver (ESP-NOW)
- * 
- * Target: ESP32 / ESP32-S3 / ESP32-C3
- * Display: 0.96" OLED (SSD1306 I2C) on SDA/SCL pins
- * 
- * This is part of the BISSO E350 project.
- * Build with: pio run -e remote_dro
- */
-
 #include <esp_now.h>
 #include <WiFi.h>
-#include <esp_wifi.h>         // Required for channel hopping
+#include <esp_wifi.h>         
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <Preferences.h>      // For channel persistence
+#include <Preferences.h>      
+#include <esp_pm.h>           // For Power Management
+#include <esp_sleep.h>        // For Light Sleep
 #include "../telemetry_packet.h" 
-#include "logos.h"            // Boot bitmaps (Saw, POSIPRO)
+#include "logos.h"
 
 // --- Configuration ---
 #define SCREEN_WIDTH 128 
@@ -27,10 +19,12 @@
 #define OLED_RESET    -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// --- Fast Hopping Configuration ---
-#define HOP_INTERVAL_MS 150   // Fast scan: 150ms per channel
-#define DATA_TIMEOUT_MS 3000  // 3s without data triggers a re-scan
-#define MAX_CHANNELS 13
+// --- Power & Timing Configuration ---
+#define HOP_INTERVAL_MS 150   
+#define DATA_TIMEOUT_MS 3000  
+#define HEARTBEAT_MS    100   // Main controller broadcasts at 10Hz
+#define SLEEP_GUARD_MS  15    // Wake up 15ms before expected packet
+#define MAX_CHANNELS    13
 
 // Data state
 TelemetryPacket data;
@@ -94,7 +88,6 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
         dataReceived = true;
         lastPacketTime = millis();
         
-        // If we were hopping and received a valid packet, LOCK this channel
         if (isHopping) {
             isHopping = false;
             prefs.putUChar("last_chan", currentChannel);
@@ -110,6 +103,14 @@ void setup() {
     prefs.begin("dro_cfg", false);
     currentChannel = prefs.getUChar("last_chan", 1);
     if (currentChannel < 1 || currentChannel > 13) currentChannel = 1;
+
+    // 1. Configure Power Management BEFORE WiFi
+    esp_pm_config_esp32c3_t pm_config = {
+        .max_freq_mhz = 160,
+        .min_freq_mhz = 10,
+        .light_sleep_enable = true
+    };
+    esp_pm_configure(&pm_config);
 
     // Initialize I2C
 #if defined(OLED_SDA) && defined(OLED_SCL)
@@ -133,15 +134,15 @@ void setup() {
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(46, 55); 
-    display.print("v1.1.0");
+    display.print("v1.2.0");
     display.display();
     delay(1000);
     
     // ESP-NOW Initial Setting
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_8_5dBm);
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM); // Enable modem sleep 
     
-    // Set to the last known channel before initializing ESP-NOW
     esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
     Serial.printf("Starting search on channel %d\n", currentChannel);
 
@@ -156,7 +157,6 @@ void loop() {
 
     // --- Channel Hopping State Machine ---
     if (now - lastPacketTime > DATA_TIMEOUT_MS) {
-        // We are officially "OFFLINE"
         if (!isHopping) {
             isHopping = true;
             lastHopTime = now;
@@ -169,8 +169,6 @@ void loop() {
             
             esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
             lastHopTime = now;
-            // Note: Serial printing here might slow down hopping, keeping it for debug for now
-            // Serial.printf("Hopping to CH:%d\n", currentChannel);
         }
     }
 
@@ -186,12 +184,10 @@ void loop() {
         display.setCursor(0 + OLED_X_OFFSET, 22 + OLED_Y_OFFSET);
         display.printf("Channel %d", currentChannel);
         
-        // Animated scanning bar
         int barWidth = (now / 100) % 72;
         display.drawFastHLine(0 + OLED_X_OFFSET, 35+OLED_Y_OFFSET, barWidth, WHITE);
     } else {
         // --- Active DRO UI ---
-        // Movement Detection
         bool moved = false;
         if (abs(data.x - prevData.x) > MOVEMENT_THRESHOLD) { activeAxis = 'X'; moved = true; }
         else if (abs(data.y - prevData.y) > MOVEMENT_THRESHOLD) { activeAxis = 'Y'; moved = true; }
@@ -254,5 +250,20 @@ void loop() {
     }
     
     display.display();
-    delay(50); // Increased update rate for smoother hopping UI
+
+    // --- Synchronized Light Sleep ---
+    // Calculate if we can "nap" between heartbeats
+    if (!isHopping) {
+        uint32_t timeSinceLastPacket = millis() - lastPacketTime;
+        if (timeSinceLastPacket < (HEARTBEAT_MS - SLEEP_GUARD_MS)) {
+            uint32_t napDuration = (HEARTBEAT_MS - SLEEP_GUARD_MS) - timeSinceLastPacket;
+            if (napDuration > 10) { // Only sleep if it's worth it
+                // Enable timer wake up for the calculated nap duration
+                esp_sleep_enable_timer_wakeup(napDuration * 1000); // ms to us
+                esp_light_sleep_start();
+            }
+        }
+    } else {
+        delay(50); // Standard delay while hopping to keep UI responsive
+    }
 }
