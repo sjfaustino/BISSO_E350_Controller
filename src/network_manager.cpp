@@ -261,6 +261,15 @@ void NetworkManager::initEthernet() {
   // W5500 SPI Ethernet initialization on v3.1 using ESP-IDF drivers
   // This manual path is required because Arduino 2.0.x lacks SPI Ethernet support in ETH.h
   
+  // Phase 7.1: Safety check for pin conflict on v3.1 (ESP32-S3)
+  // GPIO 43/44 are used for UART0 console by default. If USB CDC is NOT used,
+  // initializing SPI on these pins will cause a crash/boot-loop.
+#if !ARDUINO_USB_CDC_ON_BOOT
+  logWarning("[ETH] W5500 pin conflict detected! (Console on UART0 uses GPIO 43/44)");
+  logWarning("[ETH] Ethernet initialization aborted for stability.");
+  return;
+#endif
+
   logInfo("[ETH] Initializing W5500 SPI Ethernet...");
   
   // 1. SPI Bus initialization
@@ -321,8 +330,9 @@ void NetworkManager::initEthernet() {
   
   if (success) {
       logInfo("[ETH] [OK] W5500 Ethernet started");
-      // Since this is bypassing ETH.h, the standard ETH class won't track this.
-      // We might need to manually update networkManager state.
+      // Since this is bypassing ETH.h, we manually update the state
+      networkManager.ethernetConnected = true;
+      networkManager.ethernetLinkSpeed = 100; // W5500 is 10/100, assume 100 for status
   }
 #else
   // RMII initialization for LAN8720 on v1.6
