@@ -52,6 +52,8 @@ uint32_t lastHopTime = 0;
 bool screenOn = true;
 uint32_t lastMoveTimeStrict = 0;
 float lastPositionX = 0, lastPositionY = 0, lastPositionZ = 0;
+bool stealthMode = false;
+uint32_t sessionStartTime = 0;
 
 Preferences prefs;
 
@@ -106,6 +108,12 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
         dataReceived = true;
         lastPacketTime = millis();
         
+        if (stealthMode) {
+            stealthMode = false;
+            display.ssd1306_command(SSD1306_DISPLAYON);
+            Serial.println("Machine detected! Exiting stealth mode...");
+        }
+
         if (isHopping) {
             isHopping = false;
             prefs.putUChar("last_chan", currentChannel);
@@ -141,6 +149,13 @@ void enterDeepSleep() {
 
 void setup() {
     Serial.begin(115200);
+    
+    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    if (cause == ESP_SLEEP_WAKEUP_TIMER) {
+        stealthMode = true;
+    }
+    sessionStartTime = millis();
+
     // Safety wait for USB CDC
     uint32_t start = millis();
     while (!Serial && (millis() - start) < 2000);
@@ -180,26 +195,31 @@ void setup() {
     if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         for(;;);
     }
+    if (stealthMode) {
+        display.ssd1306_command(SSD1306_DISPLAYOFF);
+    }
     
-    // Boot Logos
-    display.clearDisplay();
-    display.drawBitmap(OLED_X_OFFSET, LOGO_Y_OFFSET, logo_saw_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
-    display.display();
-    delay(1000);
-    
-    display.clearDisplay();
-    display.drawBitmap(OLED_X_OFFSET, LOGO_Y_OFFSET, logo_posipro_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(46, 55); 
-    display.print("v1.3.5");
-    
-    // Show Temp on boot
-    display.setCursor(28+OLED_X_OFFSET, 0+OLED_Y_OFFSET);
-    display.printf("%.1fC", getSystemTemp());
-    
-    display.display();
-    delay(2000); // 2 second silent wait after showing version and temp.
+    if (!stealthMode) {
+        // Boot Logos
+        display.clearDisplay();
+        display.drawBitmap(OLED_X_OFFSET, LOGO_Y_OFFSET, logo_saw_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
+        display.display();
+        delay(1000);
+        
+        display.clearDisplay();
+        display.drawBitmap(OLED_X_OFFSET, LOGO_Y_OFFSET, logo_posipro_bmp, 72, 40, SSD1306_WHITE, SSD1306_BLACK);
+        display.setTextSize(1);
+        display.setTextColor(SSD1306_WHITE);
+        display.setCursor(46, 55); 
+        display.print("v1.3.6");
+        
+        // Show Temp on boot
+        display.setCursor(28+OLED_X_OFFSET, 0+OLED_Y_OFFSET);
+        display.printf("%.1fC", getSystemTemp());
+        
+        display.display();
+        delay(2000); // 2 second silent wait after showing version and temp.
+    }
     
     // ESP-NOW Initial Setting
     WiFi.mode(WIFI_STA);
@@ -281,10 +301,16 @@ void loop() {
             currentChannel++;
             if (currentChannel > MAX_CHANNELS) {
                 currentChannel = 1;
-                Serial.printf("[v1.3.5] Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
+                Serial.printf("[v1.3.6] Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
             }
             esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
             lastHopTime = now;
+        }
+
+        // Stealth Sniffing Timeout: If we woke up by timer and found nothing in 20s, go back to sleep.
+        if (stealthMode && (now - sessionStartTime > 20000)) {
+            Serial.println("Stealth check complete - no controller. Sleeping.");
+            enterDeepSleep();
         }
     }
 
