@@ -119,28 +119,38 @@ float getSystemTemp() {
     return tsens_out;
 }
 
-void enterDeepSleep() {
-    Serial.println("Entering Deep Sleep...");
+void enterLongSleep() {
+    Serial.println("Entering Ultra-Low Power Mode (Light Sleep)...");
     display.clearDisplay();
     display.display();
     display.ssd1306_command(SSD1306_DISPLAYOFF);
     
-    // Configure Wake Sources
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_WAKE_MS * 1000); // 5 minutes
-    esp_deep_sleep_enable_gpio_wakeup(1ULL << BOOT_BUTTON, ESP_GPIO_WAKEUP_GPIO_LOW);
+    // Configure Wake Sources for Light Sleep
+    // GPIO 9 (BOOT button) is valid for Light Sleep wakeup
+    gpio_wakeup_enable((gpio_num_t)BOOT_BUTTON, GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_WAKE_MS * 1000); 
     
     // Final LED indicator (long blink)
     digitalWrite(STATUS_LED, LOW); // ON
     delay(500);
     digitalWrite(STATUS_LED, HIGH); // OFF
     
-    esp_deep_sleep_start();
+    // Using light sleep because GPIO 9 is not an RTC-compatible pin for Deep Sleep on C3
+    esp_light_sleep_start();
+    
+    // After waking up from Light Sleep, the code continues here
+    // Re-enable display and return to main logic
+    display.ssd1306_command(SSD1306_DISPLAYON);
+    lastPacketTime = millis(); // Reset timers to prevent immediate re-entry
+    lastMoveTimeStrict = millis();
+    screenOn = true;
+    Serial.println("Woke up from Long Sleep");
 }
 
 void setup() {
     Serial.begin(115200);
-    // Wait for USB Serial to initialize (max 2 seconds)
-    // This is required for native USB CDC on ESP32-C3 to show initial logs
+    // Safety wait for USB CDC
     uint32_t start = millis();
     while (!Serial && (millis() - start) < 2000);
     
@@ -190,14 +200,14 @@ void setup() {
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(46, 55); 
-    display.print("v1.3.2");
+    display.print("v1.3.4");
     
     // Show Temp on boot
     display.setCursor(28+OLED_X_OFFSET, 0+OLED_Y_OFFSET);
     display.printf("%.1fC", getSystemTemp());
     
     display.display();
-    delay(1000);
+    delay(2000); // 2 second silent wait after showing version and temp.
     
     // ESP-NOW Initial Setting
     WiFi.mode(WIFI_STA);
@@ -237,7 +247,7 @@ void loop() {
 
     // --- Deep Sleep Logic ---
     if (now - lastPacketTime > DEEP_SLEEP_TIMEOUT_MS) {
-        enterDeepSleep();
+        enterLongSleep();
     }
 
     // --- Movement Detection (Strict for Power Management) ---
@@ -279,7 +289,7 @@ void loop() {
             currentChannel++;
             if (currentChannel > MAX_CHANNELS) {
                 currentChannel = 1;
-                Serial.printf("Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
+                Serial.printf("[v1.3.4] Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
             }
             esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
             lastHopTime = now;
