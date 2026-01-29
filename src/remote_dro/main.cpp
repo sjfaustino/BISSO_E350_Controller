@@ -21,6 +21,7 @@
 
 #define STATUS_LED    8  // Blue LED on SuperMini C3
 #define BOOT_BUTTON   9  // BOOT button on SuperMini C3 (Active LOW)
+#define WAKE_BUTTON   0  // RTC-capable GPIO for Deep Sleep Wakeup (Pin D0)
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -119,16 +120,15 @@ float getSystemTemp() {
     return tsens_out;
 }
 
-void enterLongSleep() {
-    Serial.println("Entering Ultra-Low Power Mode (Light Sleep)...");
+void enterDeepSleep() {
+    Serial.println("Entering Deep Sleep...");
     display.clearDisplay();
     display.display();
     display.ssd1306_command(SSD1306_DISPLAYOFF);
     
-    // Configure Wake Sources for Light Sleep
-    // GPIO 9 (BOOT button) is valid for Light Sleep wakeup
-    gpio_wakeup_enable((gpio_num_t)BOOT_BUTTON, GPIO_INTR_LOW_LEVEL);
-    esp_sleep_enable_gpio_wakeup();
+    // Configure Wake Sources for Deep Sleep
+    // GPIO 0-5 are valid RTC wakeups on ESP32-C3. Pin 9 is NOT.
+    esp_deep_sleep_enable_gpio_wakeup(1ULL << WAKE_BUTTON, ESP_GPIO_WAKEUP_GPIO_LOW);
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP_WAKE_MS * 1000); 
     
     // Final LED indicator (long blink)
@@ -136,16 +136,7 @@ void enterLongSleep() {
     delay(500);
     digitalWrite(STATUS_LED, HIGH); // OFF
     
-    // Using light sleep because GPIO 9 is not an RTC-compatible pin for Deep Sleep on C3
-    esp_light_sleep_start();
-    
-    // After waking up from Light Sleep, the code continues here
-    // Re-enable display and return to main logic
-    display.ssd1306_command(SSD1306_DISPLAYON);
-    lastPacketTime = millis(); // Reset timers to prevent immediate re-entry
-    lastMoveTimeStrict = millis();
-    screenOn = true;
-    Serial.println("Woke up from Long Sleep");
+    esp_deep_sleep_start();
 }
 
 void setup() {
@@ -158,6 +149,7 @@ void setup() {
     pinMode(STATUS_LED, OUTPUT);
     digitalWrite(STATUS_LED, HIGH); // Start OFF (Active LOW)
     pinMode(BOOT_BUTTON, INPUT_PULLUP);
+    pinMode(WAKE_BUTTON, INPUT_PULLUP);
 
     // Initialize Preferences
     prefs.begin("dro_cfg", false);
@@ -200,7 +192,7 @@ void setup() {
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(46, 55); 
-    display.print("v1.3.4");
+    display.print("v1.3.5");
     
     // Show Temp on boot
     display.setCursor(28+OLED_X_OFFSET, 0+OLED_Y_OFFSET);
@@ -215,7 +207,7 @@ void setup() {
     esp_wifi_set_ps(WIFI_PS_MIN_MODEM); // Enable modem sleep 
     
     esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
-    Serial.printf("Starting search on channel %d (System: %.1fC)\n", currentChannel, getSystemTemp());
+    Serial.printf("[v1.3.5] Starting search on channel %d (System: %.1fC)\n", currentChannel, getSystemTemp());
 
     if (esp_now_init() != ESP_OK) {
         return;
@@ -247,7 +239,7 @@ void loop() {
 
     // --- Deep Sleep Logic ---
     if (now - lastPacketTime > DEEP_SLEEP_TIMEOUT_MS) {
-        enterLongSleep();
+        enterDeepSleep();
     }
 
     // --- Movement Detection (Strict for Power Management) ---
@@ -289,7 +281,7 @@ void loop() {
             currentChannel++;
             if (currentChannel > MAX_CHANNELS) {
                 currentChannel = 1;
-                Serial.printf("[v1.3.4] Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
+                Serial.printf("[v1.3.5] Still searching... Full sweep done. System Temp: %.1fC\n", getSystemTemp());
             }
             esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
             lastHopTime = now;
