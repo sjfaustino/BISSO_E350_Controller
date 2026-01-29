@@ -137,10 +137,9 @@ bool init_yhtc05_wrapper() {
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
-  serialLoggerInit(LOG_LEVEL);
+  delay(2000);  // Allow USB CDC or UART to initialize
   
-  // bootLogInit(32768);
+  serialLoggerInit(LOG_LEVEL);
   
   boot_time_ms = millis();
 
@@ -154,10 +153,9 @@ void setup() {
   BOOT_INIT("Watchdog", init_watchdog_wrapper, BOOT_ERROR_WATCHDOG);
   BOOT_INIT("Config", init_config_wrapper, BOOT_ERROR_CONFIG);
   BOOT_INIT("Schema", init_schema_wrapper, BOOT_ERROR_SCHEMA);
-  BOOT_INIT("Auth", init_auth_wrapper, (boot_status_code_t)20);  // PHASE 5.10: SHA-256 auth
+  BOOT_INIT("Auth", init_auth_wrapper, (boot_status_code_t)20);
 
   // CRITICAL: Initialize task manager BEFORE Motion to create mutexes/queues
-  // Motion buffer needs mutex during init, so this must come first
   taskManagerInit();
 
   BOOT_INIT("PLC", init_plc_wrapper, BOOT_ERROR_PLC_IFACE);
