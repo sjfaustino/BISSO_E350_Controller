@@ -280,9 +280,14 @@ void NetworkManager::initEthernet() {
   buscfg.quadwp_io_num = -1;
   buscfg.quadhd_io_num = -1;
 
-  if (spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO) != ESP_OK) {
-      logError("[ETH] Failed to initialize SPI bus");
-      return;
+  esp_err_t spi_result = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+  if (spi_result != ESP_OK) {
+      // ESP_ERR_INVALID_STATE means bus already initialized (e.g., by SD card)
+      if (spi_result != ESP_ERR_INVALID_STATE) {
+          logError("[ETH] Failed to initialize SPI bus (0x%x)", spi_result);
+          return;
+      }
+      logInfo("[ETH] SPI bus already initialized (shared bus)");
   }
   
   // 2. SPI Device initialization

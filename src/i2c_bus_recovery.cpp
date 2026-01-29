@@ -67,11 +67,16 @@ i2c_bus_status_t i2cCheckBusStatus() {
   // Instead, just check if the bus is in a good state by probing a known device
   // A simple beginTransmission/endTransmission to a known device is sufficient
 
-  // Quick probe to PLC output board (always present)
+  // Quick probe to PLC output board (usually present on KC868-A16)
+  // NOTE: On a vanilla ESP32 devkit with no I2C devices, this will return NACK (2).
+  //       This is NORMAL and does NOT indicate a bus error.
   Wire.beginTransmission(0x24); // ADDR_Q73_OUTPUT
   uint8_t err = Wire.endTransmission();
 
   if (err == 0) {
+    return I2C_BUS_OK;
+  } else if (err == 2) {
+    // NACK - device not present, but bus is OK
     return I2C_BUS_OK;
   } else if (err == 4) {
     // Unknown error - bus might be stuck
