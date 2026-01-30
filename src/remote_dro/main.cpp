@@ -198,31 +198,44 @@ void loop() {
 
     // --- Rendering (Only if screen is on) ---
     if (screenOn) {
-        if (isHopping) {
-            hal->drawSearching(currentChannel, hal->getSystemTemp(), false);
-        } else {
-            // --- Active DRO UI ---
-            bool movedUI = false;
-            if (abs(data.x - prevData.x) > UI_MOVE_THRESHOLD) { activeAxis = 'X'; movedUI = true; }
-            else if (abs(data.y - prevData.y) > UI_MOVE_THRESHOLD) { activeAxis = 'Y'; movedUI = true; }
-            else if (abs(data.z - prevData.z) > UI_MOVE_THRESHOLD) { activeAxis = 'Z'; movedUI = true; }
-            
-            if (movedUI) {
-                lastMoveTimeUI = now;
-            }
-            prevData = data;
-
-            bool showGiant = (activeAxis != ' ' && (now - lastMoveTimeUI < 1000));
-
-            if (showGiant) {
-                float val = 0;
-                if (activeAxis == 'X') val = data.x;
-                else if (activeAxis == 'Y') val = data.y;
-                else if (activeAxis == 'Z') val = data.z;
-                hal->drawGiantDRO(activeAxis, val, val >= 0);
+        static uint32_t lastRenderTime = 0;
+        if (now - lastRenderTime > 66) { // ~15 FPS Max for UI
+            if (isHopping) {
+                hal->drawSearching(currentChannel, hal->getSystemTemp(), false);
             } else {
-                hal->drawActiveDRO(data, currentChannel);
+                // --- Active DRO UI ---
+                bool movedUI = false;
+                if (abs(data.x - prevData.x) > UI_MOVE_THRESHOLD) { activeAxis = 'X'; movedUI = true; }
+                else if (abs(data.y - prevData.y) > UI_MOVE_THRESHOLD) { activeAxis = 'Y'; movedUI = true; }
+                else if (abs(data.z - prevData.z) > UI_MOVE_THRESHOLD) { activeAxis = 'Z'; movedUI = true; }
+                
+                if (movedUI) {
+                    lastMoveTimeUI = now;
+                }
+                prevData = data;
+
+#ifdef SIMULATION_MODE
+                // In simulation, force the active axis to cycle every 3 seconds so we see all Giant views
+                int axisCycle = (now / 3000) % 3;
+                if (axisCycle == 0) activeAxis = 'X';
+                else if (axisCycle == 1) activeAxis = 'Y';
+                else activeAxis = 'Z';
+                lastMoveTimeUI = now; 
+#endif
+
+                bool showGiant = (activeAxis != ' ' && (now - lastMoveTimeUI < 1000));
+
+                if (showGiant) {
+                    float val = 0;
+                    if (activeAxis == 'X') val = data.x;
+                    else if (activeAxis == 'Y') val = data.y;
+                    else if (activeAxis == 'Z') val = data.z;
+                    hal->drawGiantDRO(activeAxis, val, val >= 0);
+                } else {
+                    hal->drawActiveDRO(data, currentChannel);
+                }
             }
+            lastRenderTime = now;
         }
     }
 

@@ -86,54 +86,132 @@ void HAL_TDisplay::drawSearching(uint8_t channel, float temp, bool fullSweep) {
 }
 
 void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel) {
-    tft.fillScreen(TFT_BLACK);
+    int w = tft.width();
     
-    // Status Bar
-    tft.fillRect(0, 0, 240, 20, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE);
-    tft.setTextSize(1);
-    tft.setCursor(5, 5);
-    switch(data.status) {
-        case 0: tft.print("READY"); break;
-        case 1: tft.setTextColor(TFT_GREEN); tft.print("MOVING"); break;
-        case 2: tft.setTextColor(TFT_ORANGE); tft.print("ALARM"); break;
-        case 3: tft.setTextColor(TFT_RED); tft.print("E-STOP"); break;
+    // Track previous state to avoid redundant drawing
+    static uint32_t lastDrawStatus = 99;
+    static float lx=0, ly=0, lz=0;
+    static uint8_t lastChannel = 0;
+
+    int labelX = 20; // Margin from safety zone
+    int valueX = 75;
+
+    // 1. Static Elements - Redraw ONLY on major change (Status/Channel/New Entry)
+    if (data.status != lastDrawStatus || channel != lastChannel) {
+        uint16_t statusColor = TFT_DARKGREY;
+        const char* statusText = "READY";
+        switch(data.status) {
+            case 0: statusColor = TFT_BLUE; statusText = "READY"; break;
+            case 1: statusColor = TFT_GREEN; statusText = "MOVING"; break;
+            case 2: statusColor = TFT_ORANGE; statusText = "ALARM"; break;
+            case 3: statusColor = TFT_RED; statusText = "E-STOP"; break;
+        }
+
+        if (lastDrawStatus == 99) tft.fillScreen(TFT_BLACK);
+
+        tft.fillRect(0, 0, w, 24, statusColor);
+        tft.setTextColor(TFT_WHITE);
+        tft.setTextSize(2);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString(statusText, w/2, 12);
+        
+        tft.setTextSize(1);
+        tft.setTextColor(TFT_YELLOW);
+        tft.setTextDatum(TR_DATUM);
+        tft.drawString(String("CH" + String(channel)).c_str(), w - 5, 5);
+        
+        // Draw the static labels ONCE
+        tft.setTextSize(3);
+        tft.setTextDatum(ML_DATUM);
+        tft.setTextColor(TFT_CYAN, TFT_BLACK);   tft.drawString("X:", labelX, 45);
+        tft.setTextColor(TFT_MAGENTA, TFT_BLACK);tft.drawString("Y:", labelX, 80);
+        tft.setTextColor(TFT_YELLOW, TFT_BLACK); tft.drawString("Z:", labelX, 115);
+
+        lastDrawStatus = data.status;
+        lastChannel = channel;
+    }
+
+    // 2. Dynamic Numbers - Only redraw the numeric value area (Right Justified)
+    tft.setTextSize(3);
+    tft.setTextDatum(MR_DATUM); // Middle Right
+    
+    int rightX = w - 10; // Right margin
+    int padLength = 160; // Enough to clear labels area if needed
+    tft.setTextPadding(padLength); 
+
+    if (data.x != lx) {
+        tft.setTextColor(TFT_CYAN, TFT_BLACK);
+        tft.drawFloat(data.x, 2, rightX, 45);
+        lx = data.x;
     }
     
-    tft.setTextColor(TFT_YELLOW);
-    tft.setCursor(180, 5);
-    tft.printf("CH %d", channel);
-
-    // DRO Values
-    tft.setTextSize(3);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    if (data.y != ly) {
+        tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
+        tft.drawFloat(data.y, 2, rightX, 80);
+        ly = data.y;
+    }
     
-    tft.setCursor(10, 30);
-    tft.printf("X: %8.1f", data.x);
-    tft.setCursor(10, 65);
-    tft.printf("Y: %8.1f", data.y);
-    tft.setCursor(10, 100);
-    tft.printf("Z: %8.1f", data.z);
+    if (data.z != lz) {
+        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+        tft.drawFloat(data.z, 2, rightX, 115);
+        lz = data.z;
+    }
 }
 
 void HAL_TDisplay::drawGiantDRO(char axis, float value, bool positive) {
-    tft.fillScreen(TFT_BLACK);
-    
-    uint16_t color = TFT_WHITE;
-    if (axis == 'X') color = TFT_CYAN;
-    else if (axis == 'Y') color = TFT_MAGENTA;
-    else if (axis == 'Z') color = TFT_YELLOW;
+    int w = tft.width();
+    int h = tft.height();
 
-    drawArrow(axis, positive, 180, 40, 40);
-    
-    tft.setTextColor(color, TFT_BLACK);
-    tft.setTextSize(4);
-    tft.setCursor(20, 20);
-    tft.print(axis);
-    
-    tft.setTextSize(6);
-    tft.setCursor(20, 70);
-    tft.printf("%.1f", value);
+    static char lastAxis = ' ';
+    static float lastVal = 999999;
+
+    // Redraw background/static parts only when axis changes
+    if (axis != lastAxis) {
+        tft.fillScreen(TFT_BLACK);
+        
+        uint16_t color = TFT_WHITE;
+        if (axis == 'X') color = TFT_CYAN;
+        else if (axis == 'Y') color = TFT_MAGENTA;
+        else if (axis == 'Z') color = TFT_YELLOW;
+
+        tft.setTextColor(color, TFT_BLACK);
+        tft.setTextSize(4);
+        tft.setTextDatum(TC_DATUM); // Top Center
+        tft.drawString(String(axis).c_str(), w/2, 5); // Centered at top
+        
+        lastAxis = axis;
+        lastVal = 999999; // Force value redraw
+    }
+
+    // Dynamic numeric value - Large and Right Justified
+    if (value != lastVal) {
+        uint16_t color = (axis == 'X') ? TFT_CYAN : (axis == 'Y' ? TFT_MAGENTA : TFT_YELLOW);
+        tft.setTextColor(color, TFT_BLACK);
+        
+        // --- Number (Absolute) ---
+        tft.setTextSize(6);
+        tft.setTextDatum(MR_DATUM); // Middle Right
+        int rightX = w - 10;
+        tft.setTextPadding(w - 20);
+        tft.drawFloat(fabs(value), 1, rightX, h/2 + 20); // Use absolute value
+        
+        // --- Minus Sign / Indicator Area ---
+        // Clear old indicator area
+        tft.fillRect(w - 60, 5, 55, 40, TFT_BLACK);
+        
+        if (value < 0) {
+            tft.setTextColor(TFT_RED);
+            tft.setTextSize(4);
+            tft.setTextDatum(TR_DATUM);
+            tft.drawString("-", w - 10, 5);
+        }
+        
+        // --- Direction Arrow - Top Left like SuperMini ---
+        tft.fillRect(5, 5, 40, 40, TFT_BLACK); // Clear arrow area
+        drawArrow(axis, positive, 5, 5, 30);
+        
+        lastVal = value;
+    }
 }
 
 void HAL_TDisplay::drawArrow(char axis, bool positive, int x, int y, int size) {
