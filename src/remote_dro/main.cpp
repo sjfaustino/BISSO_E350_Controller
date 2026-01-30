@@ -78,6 +78,13 @@ void setup() {
     // HAL Initialization
     hal->init();
     stealthMode = hal->isStealthWake();
+
+#ifdef SIMULATION_MODE
+    stealthMode = false; // Simulation never starts in stealth
+    isHopping = false;   // Start showing data immediately
+    Serial.println("SIMULATION MODE ACTIVE");
+#endif
+
     sessionStartTime = millis();
 
     Serial.printf("\n--- BISSO E350 Remote DRO %s starting ---\n", VERSION_STR);
@@ -114,6 +121,23 @@ void setup() {
 void loop() {
     uint32_t now = millis();
     hal->update();
+
+#ifdef SIMULATION_MODE
+    // Generate Fake Data
+    static uint32_t lastSimTime = 0;
+    if (now - lastSimTime > 100) { // 10Hz Update
+        float t = now / 1000.0f;
+        data.x = 100.0f + 50.0f * sin(t * 0.5f);
+        data.y = -25.0f + 10.0f * cos(t * 0.8f);
+        data.z = 10.5f + 2.0f * sin(t * 1.2f);
+        data.status = ( (now / 5000) % 4 ); // Cycle through READY, MOVING, ALARM, E-STOP
+        
+        dataReceived = true;
+        lastPacketTime = now;
+        isHopping = false;
+        lastSimTime = now;
+    }
+#endif
 
     // --- Deep Sleep Logic ---
     if (now - lastPacketTime > DEEP_SLEEP_TIMEOUT_MS) {
