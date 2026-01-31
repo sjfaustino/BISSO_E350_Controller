@@ -208,7 +208,7 @@ window.DashboardModule = window.DashboardModule || {
             if (s) {
                 if (e) {
                     let val = t[`${ax}_mm`] ?? 0;
-                    if (this.workCoordMode) { // Only apply WCO offset in work coordinate mode
+                    if (this.workCoordMode === "work") { // Only apply WCO offset in work coordinate mode
                         val -= wco[idx];
                     }
                     s.textContent = val.toFixed(3);

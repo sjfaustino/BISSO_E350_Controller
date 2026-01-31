@@ -717,46 +717,33 @@ void GCodeParser::handleG53(const char* line) {
 
 // PHASE 5.1: G92 - Set Position / Calibration
 void GCodeParser::handleG92(const char* line) {
-    // G92 Set Position / Calibration
-    // Sets the current position to the specified value (without moving)
-    // Useful for calibration after manual adjustment
-    // G92 X0 Y0 Z0 A0        - Set all axes to origin
-    // G92 Z100               - Set Z to 100mm (material height)
-    // G92 X10.5 Y-5.2 Z50.0  - Set specific coordinates
-
-    // Get current machine positions first
-    float curM[4] = {
+    // PHASE 5.4: G92 Set Work Offset (Temporary Shift)
+    // Instead of overwriting machine position (which absolute scales will undo)
+    // we set a temporary shift in the G-code parser's G92 offset system.
+    
+    // We use wcs_offsets[5] (G59) or similar for G92? 
+    // Actually, Grbl/LinuxCNC use a separate G92 offset.
+    // For now, let's keep it simple: G92 sets the offset for G54-G59 
+    // so current machine position results in the requested value.
+    
+    float mPos[4] = {
         motionGetPositionMM(0), motionGetPositionMM(1),
         motionGetPositionMM(2), motionGetPositionMM(3)
     };
 
     // Parse any axis values provided
     float val;
-    bool has_any = false;
     const char axis_chars[] = "XYZA";
 
     for (int i = 0; i < 4; i++) {
         if (parseCode(line, axis_chars[i], val)) {
-            curM[i] = val;
-            has_any = true;
+            // We want (mPos - offset) = val  =>  offset = mPos - val
+            wcs_offsets[currentWCS][i] = mPos[i] - val;
         }
     }
 
-    if (!has_any) {
-        logWarning("[GCODE] G92 requires at least one axis value (X/Y/Z/A)");
-        return;
-    }
-
-    logInfo("[GCODE] G92 Set Position - X:%.1f Y:%.1f Z:%.1f A:%.1f",
-            curM[0], curM[1], curM[2], curM[3]);
-
-    // Set the position without moving
-    if (!motionSetPosition(curM[0], curM[1], curM[2], curM[3])) {
-        logError("[GCODE] G92 failed - axis busy or error");
-        return;
-    }
-
-    logInfo("[GCODE] G92 Position set successfully");
+    saveWCS(currentWCS);
+    logInfo("[GCODE] G92 Work Offset set for G%d", 54 + currentWCS);
 }
 
 // PHASE 5.1: M0/M1 - Program Stop / Pause
