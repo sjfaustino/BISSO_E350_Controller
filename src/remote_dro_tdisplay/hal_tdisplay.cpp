@@ -153,14 +153,14 @@ void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, i
         drawSignalIcon(w - 53, 3, rssi);
         drawBatteryIcon(w - 22, 3, batteryPct);
 
-        // Draw the static labels (Larger Vertical 32px)
-        int labelX = 15;
-        tft.setTextFont(2);
-        tft.setTextSize(2); // 32px Height
+        // Draw the static labels (Smooth 18pt FreeFont)
+        int labelX = 10;
+        tft.setFreeFont(FF19); // FreeSans18pt7b
+        tft.setTextSize(1);
         tft.setTextDatum(ML_DATUM);
-        tft.setTextColor(0x07FF, TFT_BLACK); tft.drawString("X:", labelX, 38); 
-        tft.setTextColor(0xF81F, TFT_BLACK); tft.drawString("Y:", labelX, 75); 
-        tft.setTextColor(0xFFE0, TFT_BLACK); tft.drawString("Z:", labelX, 112); 
+        tft.setTextColor(0x07FF, TFT_BLACK); tft.drawString("X:", labelX, 41); 
+        tft.setTextColor(0xF81F, TFT_BLACK); tft.drawString("Y:", labelX, 78); 
+        tft.setTextColor(0xFFE0, TFT_BLACK); tft.drawString("Z:", labelX, 115); 
 
         _lastStatus = data.status;
         _lastChannel = channel;
@@ -184,28 +184,28 @@ void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, i
         _lastBatteryPct = batteryPct;
     }
 
-    // 2. Dynamic Numbers (Chunky 32px Font)
+    // 2. Dynamic Numbers (Smooth 18pt FreeFont)
     int rightX = w - 8;
-    tft.setTextPadding(180); 
-    tft.setTextFont(2); 
-    tft.setTextSize(2);
+    tft.setTextPadding(185); 
+    tft.setFreeFont(FF19); 
+    tft.setTextSize(1);
     tft.setTextDatum(MR_DATUM);
 
     if (data.x != _lx) {
         tft.setTextColor(0x07FF, TFT_BLACK);
-        tft.drawFloat(data.x, 2, rightX, 38);
+        tft.drawFloat(data.x, 2, rightX, 41);
         _lx = data.x;
     }
     
     if (data.y != _ly) {
         tft.setTextColor(0xF81F, TFT_BLACK);
-        tft.drawFloat(data.y, 2, rightX, 75); 
+        tft.drawFloat(data.y, 2, rightX, 78); 
         _ly = data.y;
     }
     
     if (data.z != _lz) {
         tft.setTextColor(0xFFE0, TFT_BLACK);
-        tft.drawFloat(data.z, 2, rightX, 112); 
+        tft.drawFloat(data.z, 2, rightX, 115); 
         _lz = data.z;
     }
 }

@@ -1,10 +1,14 @@
 #ifndef HAL_TDISPLAY_H
 #define HAL_TDISPLAY_H
 
+#define LOAD_GFXFF 1
 #include <TFT_eSPI.h>
 #include <esp_pm.h>
 #include <esp_sleep.h>
 #include "telemetry_packet.h"
+
+// Standard GFX Free Font Utility (Local Copy)
+#include "Free_Fonts.h"
 
 enum UIState {
     UI_STATE_BOOT,
