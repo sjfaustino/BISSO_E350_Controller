@@ -428,32 +428,45 @@ uint8_t elboGetSpeedProfile() {
 }
 
 void elboQ73SetRelay(uint8_t relay_bit, bool state) {
-  if (relay_bit > 7)
+  if (relay_bit > 15) // Support up to 16 outputs (0-15)
     return;
 
-  // PHASE 5.7: Fix - Use retry helper instead of simple timeout
-  // CRITICAL BUG FIX: Previous code returned early on mutex timeout,
-  // leaving shadow register out of sync with hardware
+  // PHASE 5.7: Fix - Use retry helper
   if (!plcAcquireShadowMutex()) {
     logError("[PLC] SetRelay FAILED for bit %d (shadow register dirty)",
              relay_bit);
     return;
   }
 
-  // Active-low: 0 = relay ON, 1 = relay OFF
-  if (state) {
-    q73_shadow_register &= ~(1 << relay_bit); // Clear bit = ON
-  } else {
-    q73_shadow_register |= (1 << relay_bit); // Set bit = OFF
-  }
+  uint8_t target_addr;
+  uint8_t register_val;
 
-  // Make a copy for I2C write before releasing mutex
-  uint8_t register_copy = q73_shadow_register;
+  // Active-low logic: 0 = ON, 1 = OFF
+  if (relay_bit < 8) {
+      // Bank 1 (Y1-Y8) -> ADDR_Q73_OUTPUT
+      if (state) {
+        q73_shadow_register &= ~(1 << relay_bit);
+      } else {
+        q73_shadow_register |= (1 << relay_bit);
+      }
+      register_val = q73_shadow_register;
+      target_addr = ADDR_Q73_OUTPUT;
+  } else {
+      // Bank 2 (Y9-Y16) -> ADDR_Q73_AUX
+      uint8_t aux_bit = relay_bit - 8;
+      if (state) {
+        q73_aux_shadow &= ~(1 << aux_bit);
+      } else {
+        q73_aux_shadow |= (1 << aux_bit);
+      }
+      register_val = q73_aux_shadow;
+      target_addr = ADDR_Q73_AUX;
+  }
 
   xSemaphoreGive(plc_shadow_mutex);
 
   if (!plc_in_transaction) {
-    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Relay");
+    plcWriteI2C(target_addr, register_val, "Set Relay");
   }
 }
 
