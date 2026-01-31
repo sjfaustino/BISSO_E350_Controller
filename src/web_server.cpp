@@ -392,7 +392,8 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
     int n = snprintf(buffer, buffer_size,
         "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
         "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu%s%s%s%s%s%s%s%s%s%s%s},"
-        "\"motion_active\":%s,\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"position\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"a\":%.3f},\"dro_connected\":%s},"
+        "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
+        "\"motion_active\":%s,\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},"
         "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
         "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f},"
         "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
@@ -416,11 +417,11 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         full ? ",\"hw_mcu\":\"" : "", full ? mcuGetModelName() : "", full ? "\"" : "",
         full ? ",\"hw_revision\":\"" : "", full ? rev_str : "", full ? "\"" : "",
         full ? ",\"hw_serial\":\"" : "", full ? serial_str : "", full ? "\"" : "",
+        telemetry.axis_x_mm, telemetry.axis_y_mm, telemetry.axis_z_mm, telemetry.axis_a_mm,
         moving ? "true" : "false",
         moving ? "true" : "false",
         motionBuffer.available(),
         motionBuffer.getCapacity(),
-        current_status.x_pos, current_status.y_pos, current_status.z_pos, current_status.a_pos,
         current_status.dro_connected ? "true" : "false",
         current_status.vfd_current_amps, current_status.vfd_frequency_hz, current_status.vfd_thermal_percent, current_status.vfd_fault_code,
         current_status.vfd_threshold_amps, current_status.vfd_calibration_valid ? "true" : "false", current_status.vfd_connected ? "true" : "false",
