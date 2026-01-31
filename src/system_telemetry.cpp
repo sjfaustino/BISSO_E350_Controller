@@ -440,7 +440,7 @@ size_t telemetryExportDeltaJSON(char* buffer, size_t buffer_size, bool full_upda
         // Return compact version for full update
         offset += snprintf(buffer + offset, buffer_size - offset,
             "\"full\":true,\"health\":\"%s\",\"uptime\":%lu,\"cpu\":%u,\"heap\":%lu,"
-            "\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"a\":%.2f,"
+            "\"x_mm\":%.2f,\"y_mm\":%.2f,\"z_mm\":%.2f,\"a_mm\":%.2f,"
             "\"estop\":%s,\"moving\":%s,\"wifi\":%s}",
             telemetryGetHealthStatusString(current.health_status),
             (unsigned long)current.uptime_seconds,
@@ -498,10 +498,10 @@ size_t telemetryExportDeltaJSON(char* buffer, size_t buffer_size, bool full_upda
     ADD_DELTA_BOOL("alarm", alarm_active);
     ADD_DELTA_BOOL("wifi", wifi_connected);
     ADD_DELTA_UINT("signal", wifi_signal_strength);
-    ADD_DELTA_FLOAT("x", axis_x_mm, 2);
-    ADD_DELTA_FLOAT("y", axis_y_mm, 2);
-    ADD_DELTA_FLOAT("z", axis_z_mm, 2);
-    ADD_DELTA_FLOAT("a", axis_a_mm, 2);
+    ADD_DELTA_FLOAT("x_mm", axis_x_mm, 2);
+    ADD_DELTA_FLOAT("y_mm", axis_y_mm, 2);
+    ADD_DELTA_FLOAT("z_mm", axis_z_mm, 2);
+    ADD_DELTA_FLOAT("a_mm", axis_a_mm, 2);
     ADD_DELTA_FLOAT("spindle_a", spindle_current_amps, 2);
     ADD_DELTA_UINT("faults", faults_logged);
 
