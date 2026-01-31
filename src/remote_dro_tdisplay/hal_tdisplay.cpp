@@ -68,7 +68,7 @@ void HAL_TDisplay::showSplash(const char* version, float temp) {
     delay(3000); 
 }
 
-void HAL_TDisplay::drawSearching(uint8_t channel, float temp, bool fullSweep, int8_t rssi) {
+void HAL_TDisplay::drawSearching(uint8_t channel, float temp, bool fullSweep, int8_t rssi, int batteryPct) {
     // Force clear on state transition
     if (_lastState != UI_STATE_SEARCHING) {
         tft.fillScreen(TFT_BLACK);
@@ -86,13 +86,16 @@ void HAL_TDisplay::drawSearching(uint8_t channel, float temp, bool fullSweep, in
         _lastState = UI_STATE_SEARCHING;
         _lastChannel = 0; // Force channel redraw
         _lastRssi = -101; // Force signal redraw
+        _lastBatteryPct = -1; // Force battery redraw
     }
 
-    // Dynamic Signal bars while searching (if any signal detected)
+    // Dynamic Signal & Battery bars while searching
     int bucket = (rssi <= -95) ? 0 : (rssi > -60 ? 4 : (rssi > -75 ? 3 : (rssi > -85 ? 2 : 1)));
-    if (bucket != _lastRssi) {
-        drawSignalIcon(tft.width() - 22, 5, rssi);
+    if (bucket != _lastRssi || batteryPct != _lastBatteryPct) {
+        drawBatteryIcon(tft.width() - 55, 5, batteryPct);
+        drawSignalIcon(tft.width() - 25, 5, rssi);
         _lastRssi = bucket;
+        _lastBatteryPct = batteryPct;
     }
 
     // 2. Dynamic Channel Number
@@ -115,7 +118,7 @@ void HAL_TDisplay::drawSearching(uint8_t channel, float temp, bool fullSweep, in
     tft.fillRect(11 + progressWidth, 106, maxWidth - progressWidth, 12, TFT_BLACK); 
 }
 
-void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, int8_t rssi) {
+void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, int8_t rssi, int batteryPct) {
     int w = tft.width();
     
     // Status colors
@@ -144,9 +147,10 @@ void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, i
         tft.setTextFont(2);
         tft.setTextColor(TFT_YELLOW);
         tft.setTextDatum(MR_DATUM);
-        tft.drawString("CH" + String(channel), w - 28, 11);
+        tft.drawString("CH" + String(channel), w - 58, 11);
         
-        // Signal Icon (Initial draw)
+        // Initial draw of status icons
+        drawBatteryIcon(w - 53, 3, batteryPct);
         drawSignalIcon(w - 22, 3, rssi);
 
         // Draw the static labels
@@ -160,15 +164,23 @@ void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, i
         _lastStatus = data.status;
         _lastChannel = channel;
         _lastRssi = (rssi <= -95) ? 0 : (rssi > -60 ? 4 : (rssi > -75 ? 3 : (rssi > -85 ? 2 : 1)));
+        _lastBatteryPct = batteryPct;
         _lx = 99999; _ly = 99999; _lz = 99999;
     }
 
-    // Signal Icon Dynamic Update (only if bucket changes)
+    // Icons Dynamic Update
     int bucket = (rssi <= -95) ? 0 : (rssi > -60 ? 4 : (rssi > -75 ? 3 : (rssi > -85 ? 2 : 1)));
-    if (bucket != _lastRssi) {
-        tft.fillRect(w - 22, 0, 22, 22, statusColor);
+    if (bucket != _lastRssi || batteryPct != _lastBatteryPct) {
+        tft.fillRect(w - 55, 0, 55, 22, statusColor);
+        tft.setTextFont(2);
+        tft.setTextColor(TFT_YELLOW);
+        tft.setTextDatum(MR_DATUM);
+        tft.drawString("CH" + String(channel), w - 58, 11);
+        
+        drawBatteryIcon(w - 53, 3, batteryPct);
         drawSignalIcon(w - 22, 3, rssi);
         _lastRssi = bucket;
+        _lastBatteryPct = batteryPct;
     }
 
     // 2. Dynamic Numbers
@@ -271,6 +283,38 @@ void HAL_TDisplay::drawSignalIcon(int x, int y, int8_t rssi) {
         tft.drawLine(x, y + 10, x + 4, y + 14, TFT_RED);
         tft.drawLine(x + 4, y + 10, x, y + 14, TFT_RED);
     }
+}
+
+void HAL_TDisplay::drawBatteryIcon(int x, int y, int percentage) {
+    if (percentage < 0) percentage = 0;
+    if (percentage > 100) percentage = 100;
+
+    uint16_t color = TFT_GREEN;
+    if (percentage <= 20) color = TFT_RED;
+    else if (percentage <= 45) color = TFT_YELLOW;
+
+    // Draw battery body
+    tft.drawRect(x, y + 4, 18, 10, TFT_WHITE);
+    tft.fillRect(x + 18, y + 7, 2, 4, TFT_WHITE); // Terminal
+
+    // Draw fill
+    int fillW = (percentage * 14) / 100;
+    if (fillW > 0) {
+        tft.fillRect(x + 2, y + 6, fillW, 6, color);
+    }
+}
+
+float HAL_TDisplay::getBatteryVoltage() {
+    uint16_t v = analogRead(34);
+    float battery_voltage = ((float)v / 4095.0) * 2.0 * 3.3 * 1.1;
+    return battery_voltage;
+}
+
+int HAL_TDisplay::getBatteryPercentage() {
+    float v = getBatteryVoltage();
+    if (v >= 4.2) return 100;
+    if (v <= 3.2) return 0;
+    return (int)((v - 3.2) * 100 / (4.2 - 3.2));
 }
 
 void HAL_TDisplay::drawArrow(char axis, bool positive, int x, int y, int size) {

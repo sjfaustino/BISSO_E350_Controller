@@ -20,10 +20,13 @@ public:
     void update();
     void setScreenOn(bool on);
     void showSplash(const char* version, float temp);
-    void drawSearching(uint8_t channel, float temp, bool fullSweep, int8_t rssi);
-    void drawActiveDRO(const TelemetryPacket& data, uint8_t channel, int8_t rssi);
+    void drawSearching(uint8_t channel, float temp, bool fullSweep, int8_t rssi, int batteryPct);
+    void drawActiveDRO(const TelemetryPacket& data, uint8_t channel, int8_t rssi, int batteryPct);
     void drawGiantDRO(char axis, float value, bool positive);
     void drawSignalIcon(int x, int y, int8_t rssi);
+    void drawBatteryIcon(int x, int y, int percentage);
+    float getBatteryVoltage();
+    int getBatteryPercentage();
     void enterDeepSleep(uint32_t wakeAfterMs);
     void setupModemSleep();
     void enterLightSleep(uint32_t durationMs);
@@ -37,6 +40,7 @@ private:
     uint32_t _lastStatus = 99;
     uint8_t _lastChannel = 0;
     int8_t _lastRssi = 0;
+    int _lastBatteryPct = 0;
     char _lastAxis = ' ';
     float _lx=0, _ly=0, _lz=0;
 

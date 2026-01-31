@@ -49,6 +49,8 @@ const float UI_MOVE_THRESHOLD = 0.5f;
 int8_t lastRssi = -100;
 uint32_t packetsReceivedThisSecond = 0;
 uint32_t lastHealthCheck = 0;
+int currentBatteryPct = 0;
+uint32_t lastBatteryCheck = 0;
 
 // Callback when data is received (Legacy v2.x format)
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
@@ -159,6 +161,12 @@ void loop() {
         packetsReceivedThisSecond = 0;
         lastHealthCheck = now;
     }
+    
+    // --- Battery Sampling (Every 10 seconds) ---
+    if (now - lastBatteryCheck > 10000 || lastBatteryCheck == 0) {
+        currentBatteryPct = hal->getBatteryPercentage();
+        lastBatteryCheck = now;
+    }
 
 #ifdef SIMULATION_MODE
     // Generate Fake Data
@@ -241,7 +249,7 @@ void loop() {
         static uint32_t lastRenderTime = 0;
         if (now - lastRenderTime > 66) { // ~15 FPS Max for UI
             if (isHopping) {
-                hal->drawSearching(currentChannel, hal->getSystemTemp(), false, lastRssi);
+                hal->drawSearching(currentChannel, hal->getSystemTemp(), false, lastRssi, currentBatteryPct);
             } else {
                 // --- Active DRO UI ---
                 bool movedUI = false;
@@ -272,7 +280,7 @@ void loop() {
                     else if (activeAxis == 'Z') val = data.z;
                     hal->drawGiantDRO(activeAxis, val, val >= 0);
                 } else {
-                    hal->drawActiveDRO(data, currentChannel, lastRssi);
+                    hal->drawActiveDRO(data, currentChannel, lastRssi, currentBatteryPct);
                 }
             }
             lastRenderTime = now;
