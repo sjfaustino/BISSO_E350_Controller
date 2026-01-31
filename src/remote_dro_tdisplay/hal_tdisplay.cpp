@@ -1,4 +1,6 @@
 #include "hal_tdisplay.h"
+#define LOAD_GFXFF 1
+#include "Free_Fonts.h"
 #include <WiFi.h>
 #include <esp_wifi.h>
 
@@ -153,9 +155,9 @@ void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, i
         drawSignalIcon(w - 53, 3, rssi);
         drawBatteryIcon(w - 22, 3, batteryPct);
 
-        // Draw the static labels (Smooth 18pt FreeFont)
+        // Draw the static labels (Retro Mono 18pt)
         int labelX = 10;
-        tft.setFreeFont(FF19); // FreeSans18pt7b
+        tft.setFreeFont(FF7); // FreeMonoBold18pt7b
         tft.setTextSize(1);
         tft.setTextDatum(ML_DATUM);
         tft.setTextColor(0x07FF, TFT_BLACK); tft.drawString("X:", labelX, 41); 
@@ -184,10 +186,10 @@ void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, i
         _lastBatteryPct = batteryPct;
     }
 
-    // 2. Dynamic Numbers (Smooth 18pt FreeFont)
+    // 2. Dynamic Numbers (Retro Mono 18pt)
     int rightX = w - 8;
     tft.setTextPadding(185); 
-    tft.setFreeFont(FF19); 
+    tft.setFreeFont(FF7); 
     tft.setTextSize(1);
     tft.setTextDatum(MR_DATUM);
 
