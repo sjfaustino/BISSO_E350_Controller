@@ -68,119 +68,131 @@ void HAL_TDisplay::showSplash(const char* version, float temp) {
     delay(3000); 
 }
 
-void HAL_TDisplay::drawSearching(uint8_t channel, float temp, bool fullSweep) {
-    static uint8_t lastChan = 0;
-    static bool firstDraw = true;
-
-    // 1. Static Backdrop (Only once)
-    if (firstDraw) {
+void HAL_TDisplay::drawSearching(uint8_t channel, float temp, bool fullSweep, int8_t rssi) {
+    // Force clear on state transition
+    if (_lastState != UI_STATE_SEARCHING) {
         tft.fillScreen(TFT_BLACK);
         
-        tft.setTextColor(TFT_RED, TFT_BLACK);
-        tft.setTextFont(4); // Professional high-res
-        tft.setTextSize(1);
+        tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+        tft.setTextFont(2); 
         tft.setTextDatum(TL_DATUM);
-        tft.drawString("OFFLINE", 10, 10);
+        tft.drawString("DISCONNECTED", 10, 10);
         
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextFont(2);
-        tft.drawString("Scanning ESP-NOW Channels...", 10, 40);
+        tft.setTextFont(4);
+        tft.setTextDatum(TL_DATUM);
+        tft.drawString("Searching Controller...", 10, 40);
         
-        firstDraw = false;
-        lastChan = 0; // Force update
+        _lastState = UI_STATE_SEARCHING;
+        _lastChannel = 0; // Force channel redraw
+        _lastRssi = -101; // Force signal redraw
+    }
+
+    // Dynamic Signal bars while searching (if any signal detected)
+    int bucket = (rssi <= -95) ? 0 : (rssi > -60 ? 4 : (rssi > -75 ? 3 : (rssi > -85 ? 2 : 1)));
+    if (bucket != _lastRssi) {
+        drawSignalIcon(tft.width() - 22, 5, rssi);
+        _lastRssi = bucket;
     }
 
     // 2. Dynamic Channel Number
-    if (channel != lastChan) {
+    if (channel != _lastChannel) {
         tft.setTextFont(4);
-        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+        tft.setTextColor(0xFFE0, TFT_BLACK); // Yellow
         tft.setTextDatum(TL_DATUM);
-        tft.setTextPadding(180); // Increased padding to ensure full string clearing
-        tft.drawString("Channel: " + String(channel) + "  ", 10, 65);
-        lastChan = channel;
+        tft.setTextPadding(220); 
+        tft.drawString("Channel: " + String(channel), 10, 75);
+        _lastChannel = channel;
     }
     
-    // 3. Dynamic Progress Bar (Proportional to Channel 1-13)
+    // 3. Dynamic Progress Bar
     int maxWidth = 220;
     int progressWidth = (channel * maxWidth) / 13;
     if (progressWidth > maxWidth) progressWidth = maxWidth;
 
-    tft.drawRect(10, 95, maxWidth + 2, 14, TFT_BLUE);
-    tft.fillRect(11, 96, progressWidth, 12, TFT_CYAN);
-    tft.fillRect(11 + progressWidth, 96, maxWidth - progressWidth, 12, TFT_BLACK); 
+    tft.drawRect(10, 105, maxWidth + 2, 14, 0x001F); // Blue
+    tft.fillRect(11, 106, progressWidth, 12, 0x07FF); // Cyan
+    tft.fillRect(11 + progressWidth, 106, maxWidth - progressWidth, 12, TFT_BLACK); 
 }
 
-void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel) {
+void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, int8_t rssi) {
     int w = tft.width();
     
-    // Track previous state to avoid redundant drawing
-    static uint32_t lastDrawStatus = 99;
-    static float lx=0, ly=0, lz=0;
-    static uint8_t lastChannel = 0;
+    // Status colors
+    uint16_t statusColor = TFT_DARKGREY;
+    const char* statusText = "READY";
+    switch(data.status) {
+        case 0: statusColor = 0x2124; statusText = "READY"; break; // Metallic 
+        case 1: statusColor = 0x03E0; statusText = "MOVING"; break; // Green
+        case 2: statusColor = 0xFBE0; statusText = "ALARM!"; break; // Orange
+        case 3: statusColor = 0xF800; statusText = "E-STOP!"; break; // Red
+    }
 
-    int labelX = 20; // Margin from safety zone
-    int valueX = 75;
-
-    // 1. Static Elements - Redraw ONLY on major change (Status/Channel/New Entry)
-    if (data.status != lastDrawStatus || channel != lastChannel) {
-        uint16_t statusColor = TFT_DARKGREY;
-        const char* statusText = "READY";
-        switch(data.status) {
-            case 0: statusColor = TFT_BLUE; statusText = "READY"; break;
-            case 1: statusColor = TFT_GREEN; statusText = "MOVING"; break;
-            case 2: statusColor = TFT_ORANGE; statusText = "ALARM"; break;
-            case 3: statusColor = TFT_RED; statusText = "E-STOP"; break;
+    // Force clear and label redraw on state transition or major change
+    if (_lastState != UI_STATE_ACTIVE || data.status != _lastStatus || channel != _lastChannel) {
+        if (_lastState != UI_STATE_ACTIVE) {
+            tft.fillScreen(TFT_BLACK);
+            _lastState = UI_STATE_ACTIVE;
         }
 
-        if (lastDrawStatus == 99) tft.fillScreen(TFT_BLACK);
-
-        tft.fillRect(0, 0, w, 24, statusColor);
+        tft.fillRect(0, 0, w, 22, statusColor);
         tft.setTextColor(TFT_WHITE);
-        tft.setTextFont(2); // 16px sharp font
-        tft.setTextSize(1);
-        tft.setTextDatum(MC_DATUM);
-        tft.drawString(statusText, w/2, 12);
+        tft.setTextFont(2);
+        tft.setTextDatum(ML_DATUM);
+        tft.drawString(statusText, 5, 11);
         
         tft.setTextFont(2);
         tft.setTextColor(TFT_YELLOW);
-        tft.setTextDatum(TR_DATUM);
-        tft.drawString(String("CH" + String(channel)).c_str(), w - 5, 5);
+        tft.setTextDatum(MR_DATUM);
+        tft.drawString("CH" + String(channel), w - 28, 11);
         
-        // Draw the static labels ONCE
-        tft.setTextFont(4); // 26px font
-        tft.setTextSize(1); // No scaling needed, it's natively smooth
-        tft.setTextDatum(ML_DATUM);
-        tft.setTextColor(TFT_CYAN, TFT_BLACK);   tft.drawString("X:", labelX, 45);
-        tft.setTextColor(TFT_MAGENTA, TFT_BLACK);tft.drawString("Y:", labelX, 80);
-        tft.setTextColor(TFT_YELLOW, TFT_BLACK); tft.drawString("Z:", labelX, 115);
+        // Signal Icon (Initial draw)
+        drawSignalIcon(w - 22, 3, rssi);
 
-        lastDrawStatus = data.status;
-        lastChannel = channel;
+        // Draw the static labels
+        int labelX = 20;
+        tft.setTextFont(4);
+        tft.setTextDatum(ML_DATUM);
+        tft.setTextColor(0x07FF, TFT_BLACK); tft.drawString("X:", labelX, 45); 
+        tft.setTextColor(0xF81F, TFT_BLACK); tft.drawString("Y:", labelX, 80); 
+        tft.setTextColor(0xFFE0, TFT_BLACK); tft.drawString("Z:", labelX, 115); 
+
+        _lastStatus = data.status;
+        _lastChannel = channel;
+        _lastRssi = (rssi <= -95) ? 0 : (rssi > -60 ? 4 : (rssi > -75 ? 3 : (rssi > -85 ? 2 : 1)));
+        _lx = 99999; _ly = 99999; _lz = 99999;
     }
 
-    // 2. Dynamic Numbers - Standard High-Res Dashboard (v1.6.4)
+    // Signal Icon Dynamic Update (only if bucket changes)
+    int bucket = (rssi <= -95) ? 0 : (rssi > -60 ? 4 : (rssi > -75 ? 3 : (rssi > -85 ? 2 : 1)));
+    if (bucket != _lastRssi) {
+        tft.fillRect(w - 22, 0, 22, 22, statusColor);
+        drawSignalIcon(w - 22, 3, rssi);
+        _lastRssi = bucket;
+    }
+
+    // 2. Dynamic Numbers
     int rightX = w - 10;
     tft.setTextPadding(160); 
     tft.setTextFont(4); 
-    tft.setTextSize(1);
     tft.setTextDatum(MR_DATUM);
 
-    if (data.x != lx) {
-        tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    if (data.x != _lx) {
+        tft.setTextColor(0x07FF, TFT_BLACK);
         tft.drawFloat(data.x, 2, rightX, 45);
-        lx = data.x;
+        _lx = data.x;
     }
     
-    if (data.y != ly) {
-        tft.setTextColor(TFT_MAGENTA, TFT_BLACK);
-        tft.drawFloat(data.y, 2, rightX, 85); 
-        ly = data.y;
+    if (data.y != _ly) {
+        tft.setTextColor(0xF81F, TFT_BLACK);
+        tft.drawFloat(data.y, 2, rightX, 80); 
+        _ly = data.y;
     }
     
-    if (data.z != lz) {
-        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-        tft.drawFloat(data.z, 2, rightX, 120); 
-        lz = data.z;
+    if (data.z != _lz) {
+        tft.setTextColor(0xFFE0, TFT_BLACK);
+        tft.drawFloat(data.z, 2, rightX, 115); 
+        _lz = data.z;
     }
 }
 
@@ -188,28 +200,26 @@ void HAL_TDisplay::drawGiantDRO(char axis, float value, bool positive) {
     int w = tft.width();
     int h = tft.height();
 
-    static char lastAxis = ' ';
-    static float lastVal = 999999;
-
-    // 1. Redraw background/static parts ONLY when axis changes
-    if (axis != lastAxis) {
+    // 1. Redraw background/static parts ONLY when axis changes or state transition
+    if (_lastState != UI_STATE_GIANT || axis != _lastAxis) {
         tft.fillScreen(TFT_BLACK);
+        _lastState = UI_STATE_GIANT;
         
         // --- Axis Name (Top Center) - Font 4 Scaled (Bold) ---
-        uint16_t color = (axis == 'X') ? TFT_CYAN : (axis == 'Y' ? TFT_MAGENTA : TFT_YELLOW);
+        uint16_t color = (axis == 'X') ? 0x07FF : (axis == 'Y' ? 0xF81F : 0xFFE0);
         tft.setTextColor(color, TFT_BLACK);
         tft.setTextFont(4); 
         tft.setTextSize(2); // ~52px
         tft.setTextDatum(TC_DATUM);
         tft.drawString(String(axis).c_str(), w/2, 2); 
 
-        lastAxis = axis;
-        lastVal = 999999; 
+        _lastAxis = axis;
+        _lx = 999999; // Using _lx as proxy for huge value comparison
     }
 
     // 2. Dynamic Update - Huge and Right Justified
-    if (value != lastVal) {
-        uint16_t color = (axis == 'X') ? TFT_CYAN : (axis == 'Y' ? TFT_MAGENTA : TFT_YELLOW);
+    if (value != _lx) {
+        uint16_t color = (axis == 'X') ? 0x07FF : (axis == 'Y' ? 0xF81F : 0xFFE0);
         
         // --- Number (Absolute Integer) - Font 8 ---
         tft.setTextFont(8); // Huge 75px
@@ -235,7 +245,31 @@ void HAL_TDisplay::drawGiantDRO(char axis, float value, bool positive) {
         tft.fillRect(5, 5, 40, 40, TFT_BLACK);
         drawArrow(axis, positive, 5, 5, 30);
         
-        lastVal = value;
+        _lx = value;
+    }
+}
+
+void HAL_TDisplay::drawSignalIcon(int x, int y, int8_t rssi) {
+    // Determine number of bars
+    int bars = 0;
+    uint16_t color = 0xF800; // Red
+    if (rssi > -60) { bars = 4; color = 0x07E0; } // Green
+    else if (rssi > -75) { bars = 3; color = 0xAFE5; } // Lime
+    else if (rssi > -85) { bars = 2; color = 0xFFE0; } // Yellow
+    else if (rssi > -95) { bars = 1; color = 0xF800; } // Red
+    
+    // Draw 4 bar placeholders (shadowed dark bars)
+    for (int i=0; i<4; i++) {
+        int bh = 4 + (i * 3);
+        int by = y + 14 - bh;
+        // Bar background
+        tft.fillRect(x + (i*5), by, 3, bh, (i < bars) ? color : 0x4208); // 0x4208 = Dark Grey
+    }
+    
+    // If absolutely no signal, draw a tiny red x next to bars
+    if (rssi <= -100) {
+        tft.drawLine(x, y + 10, x + 4, y + 14, TFT_RED);
+        tft.drawLine(x + 4, y + 10, x, y + 14, TFT_RED);
     }
 }
 

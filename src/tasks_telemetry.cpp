@@ -28,6 +28,7 @@
 #include "task_performance_monitor.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <WiFi.h>
 #include <esp_now.h>
 #include "telemetry_packet.h"
 #include <math.h> // For isnan() sensor validation
@@ -57,173 +58,112 @@ void taskTelemetryFunction(void *parameter) {
         continue;
     }
 
-    // 1. Update System Telemetry (PHASE 5.1)
-    // Collect comprehensive system metrics for API and diagnostics
-    telemetryUpdate();
+    // --- PHASE 5.1 & 5.3: Heavy Telemetry Sampling (Throttled to 1Hz) ---
+    static uint32_t last_heavy_telemetry = 0;
+    bool runHeavy = (millis() - last_heavy_telemetry >= 1000);
 
-    // 2. Update Phase 5.3 Modules
-    // Advanced encoder diagnostics, load management, and dashboard metrics
-    encoderDiagnosticsUpdate();
-    dashboardMetricsUpdate();
-    
-    // 2.5. Update Stone Cutting Analytics
-    cuttingAnalyticsUpdate();
+    if (runHeavy) {
+        // 1. Update System Telemetry (PHASE 5.1)
+        telemetryUpdate();
 
-    // 3. Telemetry Processing (Registry Integrated)
-    // VFD polling is now handled by the RS-485 registry.
-    // We just process the latest data here.
-    float current_amps = altivar31GetCurrentAmps();
-    if (!isnan(current_amps) && current_amps > 0.0f && current_amps <= 100.0f) {
-        vfdCalibrationSampleCurrent(current_amps);
-    }
+        // 2. Update Phase 5.3 Modules
+        encoderDiagnosticsUpdate();
+        dashboardMetricsUpdate();
+        
+        // 2.5. Update Stone Cutting Analytics
+        cuttingAnalyticsUpdate();
 
-    // Push VFD telemetry to web UI (PHASE 5.5k)
-    // CRITICAL: Sanitize sensor data before sending to web UI
-    // Replace NaN/invalid values with safe defaults (0.0) to prevent UI corruption
-    // NOTE: Spindle Current comes from JXK-10, Frequency/Thermal from Altivar (Axis VFD)
-    float vfd_current = jxk10GetCurrentAmps();
-    float vfd_frequency = altivar31GetFrequencyHz();
-    int16_t vfd_thermal = altivar31GetThermalState();
-
-    // Check connection health (heuristic: < 5 consecutive errors AND recent data AND multiple successful reads)
-    // For Spindle Card, we check JXK-10 connection status since it provides the primary metric (Current)
-    const jxk10_state_t* jxk_state = jxk10GetState();
-    bool vfd_alive = jxk_state 
-                     && jxk_state->enabled 
-                     && (jxk_state->read_count > 5) // Require >5 successful reads to rule out noise
-                     && (jxk_state->consecutive_errors < 5)
-                     && (millis() - jxk_state->last_read_time_ms < 5000); // 5s timeout
-
-    // Spindle RPM & Surface Speed Logic (Inferred from Current)
-    // TODO: Future: Use YH-TC05 sensor via yhtc05GetRPM() when hardware is installed.
-    // If current > 1.0A (running), assume Rated RPM
-    int rated_rpm = configGetInt(KEY_SPINDLE_RATED_RPM, 1400);
-    int blade_dia = configGetInt(KEY_BLADE_DIAMETER_MM, 350);
-    
-    float current_rpm = 0.0f;
-    if (vfd_alive && vfd_current > 1.0f) {
-        current_rpm = (float)rated_rpm;
-    }
-    
-    // speed (m/s) = (RPM * PI * Dia_mm) / 60000
-    float current_speed = (current_rpm * 3.14159f * (float)blade_dia) / 60000.0f;
-    
-    webServer.setSpindleRPM(current_rpm);
-    webServer.setSpindleSpeed(current_speed);
-
-    webServer.setVFDCurrent(
-        isnan(vfd_current) || vfd_current < 0.0f ? 0.0f : vfd_current);
-    webServer.setVFDFrequency(
-        isnan(vfd_frequency) || vfd_frequency < 0.0f ? 0.0f : vfd_frequency);
-    webServer.setVFDThermalState(
-        (vfd_thermal < 0 || vfd_thermal > 200) ? 0 : vfd_thermal);
-    webServer.setVFDFaultCode(altivar31GetFaultCode());
-    webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
-    webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
-    
-    webServer.setVFDConnected(vfd_alive);
-
-    // 3.5. Operator Improvements: Blade Efficiency & Surface Speed
-    // Calculate "Load Metric" (Efficiency): Spindle Amps / (Feedrate + epsilon)
-    // feedrate is currently the override (0.0 to 2.0). If we want actual mm/s:
-    float actual_feedrate_mm_s = 0.0f;
-    uint8_t active_axis = motionGetActiveAxis();
-    if (active_axis < 3) {
-        actual_feedrate_mm_s = abs(motionGetVelocity(active_axis));
-    }
-    
-    float efficiency = 0.0f;
-    if (actual_feedrate_mm_s > 0.1f && vfd_current > 1.0f) {
-        efficiency = vfd_current / actual_feedrate_mm_s;
-    }
-    
-    // Broadcast efficiency and raw surface speed to Web UI
-    // Note: setSpindleSpeed already calculates m/s at line 107
-    webServer.setSpindleEfficiency(efficiency);
-
-    // Check DRO connection health using staleness (timeout)
-    // wj66IsStale(0) checks if last successful read was > 500ms ago
-    bool dro_alive = !wj66IsStale(0);
-    webServer.setDROConnected(dro_alive);
-
-    // 4. PHASE 5.6: Axis Synchronization Validation (Per-axis multiplexed
-    // VFD) Update axis metrics for active axis only BUGFIX: Use motion
-    // controller's active axis instead of velocity heuristic
-    // motionGetActiveAxis() returns 0-2 for active axis, 255 if none
-    active_axis = motionGetActiveAxis();
-
-    // Get current axis positions (velocity calculation would require motion
-    // state) For now, use zero velocity as motion timing is handled by motion
-    // controller
-    float x_vel = motionGetVelocity(0);
-    float y_vel = motionGetVelocity(1);
-    float z_vel = motionGetVelocity(2);
-    float feedrate =
-        motionGetFeedOverride(); // Use feed override as proxy for feedrate
-
-    // CRITICAL: Sanitize VFD frequency before passing to axis synchronization
-    // Use already-validated vfd_frequency from above (lines 83, 87)
-    // If invalid, use 0.0 to prevent axis synchronization corruption
-    float vfd_freq_safe =
-        (isnan(vfd_frequency) || vfd_frequency < 0.0f) ? 0.0f : vfd_frequency;
-
-    // Update per-axis synchronization metrics
-    axisSynchronizationUpdate(active_axis, x_vel, y_vel, z_vel, vfd_freq_safe,
-                              feedrate);
-
-    // Push axis metrics to web server (BUGFIX: with mutex protection)
-    axisSynchronizationLock();
-    const all_axes_metrics_t *all_metrics = axisSynchronizationGetAllMetrics();
-    if (all_metrics) {
-      for (int axis = 0; axis < 3; axis++) {
-        const axis_metrics_t *metrics = axisSynchronizationGetAxisMetrics(axis);
-        if (metrics) {
-          webServer.setAxisQualityScore(axis, metrics->quality_score);
-          webServer.setAxisJitterAmplitude(axis, metrics->velocity_jitter_mms);
-          webServer.setAxisStalled(axis, metrics->stalled);
-          webServer.setAxisVFDError(axis, metrics->vfd_encoder_error_percent);
+        // 3. Telemetry Processing (Registry Integrated)
+        float current_amps = altivar31GetCurrentAmps();
+        if (!isnan(current_amps) && current_amps > 0.0f && current_amps <= 100.0f) {
+            vfdCalibrationSampleCurrent(current_amps);
         }
-      }
+
+        float vfd_current = jxk10GetCurrentAmps();
+        float vfd_frequency = altivar31GetFrequencyHz();
+        int16_t vfd_thermal = altivar31GetThermalState();
+
+        const jxk10_state_t* jxk_state = jxk10GetState();
+        bool vfd_alive = jxk_state 
+                         && jxk_state->enabled 
+                         && (jxk_state->read_count > 5)
+                         && (jxk_state->consecutive_errors < 5)
+                         && (millis() - jxk_state->last_read_time_ms < 5000);
+
+        int rated_rpm = configGetInt(KEY_SPINDLE_RATED_RPM, 1400);
+        int blade_dia = configGetInt(KEY_BLADE_DIAMETER_MM, 350);
+        float current_rpm = (vfd_alive && vfd_current > 1.0f) ? (float)rated_rpm : 0.0f;
+        float current_speed = (current_rpm * 3.14159f * (float)blade_dia) / 60000.0f;
+        
+        webServer.setSpindleRPM(current_rpm);
+        webServer.setSpindleSpeed(current_speed);
+        webServer.setVFDCurrent(isnan(vfd_current) || vfd_current < 0.0f ? 0.0f : vfd_current);
+        webServer.setVFDFrequency(isnan(vfd_frequency) || vfd_frequency < 0.0f ? 0.0f : vfd_frequency);
+        webServer.setVFDThermalState((vfd_thermal < 0 || vfd_thermal > 200) ? 0 : vfd_thermal);
+        webServer.setVFDFaultCode(altivar31GetFaultCode());
+        webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
+        webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
+        webServer.setVFDConnected(vfd_alive);
+
+        float actual_feedrate_mm_s = 0.0f;
+        uint8_t active_axis = motionGetActiveAxis();
+        if (active_axis < 3) actual_feedrate_mm_s = abs(motionGetVelocity(active_axis));
+        
+        float efficiency = (actual_feedrate_mm_s > 0.1f && vfd_current > 1.0f) ? vfd_current / actual_feedrate_mm_s : 0.0f;
+        webServer.setSpindleEfficiency(efficiency);
+
+        bool dro_alive = !wj66IsStale(0);
+        webServer.setDROConnected(dro_alive);
+
+        active_axis = motionGetActiveAxis();
+        float x_vel = motionGetVelocity(0);
+        float y_vel = motionGetVelocity(1);
+        float z_vel = motionGetVelocity(2);
+        float feedrate = motionGetFeedOverride();
+        float vfd_freq_safe = (isnan(vfd_frequency) || vfd_frequency < 0.0f) ? 0.0f : vfd_frequency;
+
+        axisSynchronizationUpdate(active_axis, x_vel, y_vel, z_vel, vfd_freq_safe, feedrate);
+
+        axisSynchronizationLock();
+        const all_axes_metrics_t *all_metrics = axisSynchronizationGetAllMetrics();
+        if (all_metrics) {
+            for (int axis = 0; axis < 3; axis++) {
+                const axis_metrics_t *metrics = axisSynchronizationGetAxisMetrics(axis);
+                if (metrics) {
+                    webServer.setAxisQualityScore(axis, metrics->quality_score);
+                    webServer.setAxisJitterAmplitude(axis, metrics->velocity_jitter_mms);
+                    webServer.setAxisStalled(axis, metrics->stalled);
+                    webServer.setAxisVFDError(axis, metrics->vfd_encoder_error_percent);
+                }
+            }
+        }
+        axisSynchronizationUnlock();
+
+        webServer.setSystemUptime(taskGetUptime());
+
+        const char *status_str = "READY";
+        if (motionIsEmergencyStopped()) status_str = "E-STOP";
+        else if (safetyIsAlarmed()) status_str = "ALARMED";
+        else if (motionIsMoving()) status_str = "MOVING";
+
+        webServer.setSystemStatus(status_str);
+
+        // Broadcast to WebUI clients (1Hz is sufficient for browser)
+        webServer.broadcastState();
+        last_heavy_telemetry = millis();
     }
-    axisSynchronizationUnlock();
 
-    // 5. Web Telemetry Broadcast
-    // Push real-time state to the Web UI via WebSockets.
-
-    // Use the Motion State Accessors to get physical units (MM)
-    webServer.setAxisPosition('X', motionGetPositionMM(0));
-    webServer.setAxisPosition('Y', motionGetPositionMM(1));
-    webServer.setAxisPosition('Z', motionGetPositionMM(2));
-    webServer.setAxisPosition('A', motionGetPositionMM(3));
-
-    webServer.setSystemUptime(taskGetUptime());
-
-    // Determine high-level system status string
-    const char *status = "READY";
-    if (motionIsEmergencyStopped()) {
-      status = "E-STOP";
-    } else if (safetyIsAlarmed()) {
-      status = "ALARMED";
-    } else if (motionIsMoving()) {
-      status = "MOVING";
-    }
-
-    webServer.setSystemStatus(status);
-
-    // Trigger the broadcast to all connected clients (with VFD and axis
-    // metrics)
-    webServer.broadcastState();
-
-    // PHASE 7.0: ESP-NOW Remote DRO Broadcast
-    // Broadcast machine position to dedicated hardware remotes
+    // PHASE 7.0: ESP-NOW Remote DRO Broadcast (10Hz)
+    // Runs at 10Hz, task base is 50ms (20Hz) to ensure we always hit our 100ms window even under load
     static uint32_t last_esp_now_broadcast = 0;
-    if (millis() - last_esp_now_broadcast > 100) { // 10Hz broadcast
+    if (millis() - last_esp_now_broadcast >= 95) { 
         TelemetryPacket pkt;
+        pkt.signature = 0x42495353; // "BISS"
+        pkt.channel = (uint8_t)WiFi.channel();
         pkt.x = motionGetPositionMM(0);
         pkt.y = motionGetPositionMM(1);
         pkt.z = motionGetPositionMM(2);
         
-        // Map system status to packet enum (0=READY, 1=MOVING, 2=ALARM, 3=E-STOP)
         pkt.status = 0; // READY
         if (motionIsEmergencyStopped()) pkt.status = 3;
         else if (safetyIsAlarmed()) pkt.status = 2;

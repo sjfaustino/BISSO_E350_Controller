@@ -15,6 +15,7 @@
 #include "ota_manager.h"     // For otaStartBackgroundCheck
 #include <esp_now.h>
 #include <WiFi.h>
+#include <esp_wifi.h>
 
 // Ethernet support: LAN8720 for v1.6, W5500 for v3.1
 #include <ETH.h>
@@ -438,6 +439,8 @@ void NetworkManager::init() {
 
   // Try to connect to saved network without blocking
   WiFi.setAutoReconnect(true); // Ensure it tries to reconnect if disconnected
+  WiFi.setTxPower(WIFI_POWER_19_5dBm); // MAX POWER for strongest link
+  esp_wifi_set_ps(WIFI_PS_NONE);       // Disable power save
   WiFi.begin(); // Uses credentials from previous autoConnect()
 
   // Don't wait for connection - boot continues

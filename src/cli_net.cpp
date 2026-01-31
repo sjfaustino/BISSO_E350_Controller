@@ -99,6 +99,7 @@ void cmd_wifi_status(int argc, char** argv) {
     logPrintf("  MAC:    %s\r\n", WiFi.macAddress().c_str());
     if (WiFi.status() == WL_CONNECTED) {
         logPrintf("  SSID:   %s\r\n", WiFi.SSID().c_str());
+        logPrintf("  Channel:%d\r\n", WiFi.channel());
         logPrintf("  IP:     %s\r\n", WiFi.localIP().toString().c_str());
         logPrintf("  RSSI:   %d dBm\r\n", WiFi.RSSI());
     }

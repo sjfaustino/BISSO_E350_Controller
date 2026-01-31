@@ -10,9 +10,9 @@
 HAL_TDisplay* hal = new HAL_TDisplay();
 
 // --- Configuration ---
-#define VERSION_STR          "v1.0.0"
-#define HOP_INTERVAL_MS      150   
-#define DATA_TIMEOUT_MS      3000  
+#define VERSION_STR          "v1.0.1"
+#define HOP_INTERVAL_MS      350   
+#define DATA_TIMEOUT_MS      5000  
 #define HEARTBEAT_MS         100   
 #define SLEEP_GUARD_MS       15    
 #define MAX_CHANNELS         13
@@ -30,6 +30,7 @@ uint32_t lastPacketTime = 0;
 uint8_t currentChannel = 1;
 bool isHopping = true;
 uint32_t lastHopTime = 0;
+int consecutivePackets = 0; // Require multiple packets to lock
 
 // Power state
 bool screenOn = true;
@@ -45,9 +46,29 @@ char activeAxis = ' ';
 uint32_t lastMoveTimeUI = 0;
 const float UI_MOVE_THRESHOLD = 0.5f; 
 
-// Callback when data is received
+int8_t lastRssi = -100;
+uint32_t packetsReceivedThisSecond = 0;
+uint32_t lastHealthCheck = 0;
+
+// Callback when data is received (Legacy v2.x format)
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
     if (len == sizeof(TelemetryPacket)) {
+        TelemetryPacket* pkt = (TelemetryPacket*)incomingData;
+        
+        // Verify protocol signature to prevent phantom locks
+        if (pkt->signature != 0x42495353) return;
+
+        packetsReceivedThisSecond++;
+
+        // Assisted Locking: If the controller is on a different channel than we are currently 
+        // tuning to (due to radio bleed/interference), force sync immediately.
+        if (pkt->channel > 0 && pkt->channel <= 13 && pkt->channel != currentChannel) {
+            Serial.printf(">>> Channel Mismatch! Controller is on %d, we were on %d. Syncing...\n", pkt->channel, currentChannel);
+            currentChannel = pkt->channel;
+            esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
+            prefs.putUChar("last_chan", currentChannel);
+        }
+
         memcpy(&data, incomingData, sizeof(data));
         dataReceived = true;
         lastPacketTime = millis();
@@ -59,9 +80,14 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
         }
 
         if (isHopping) {
-            isHopping = false;
-            prefs.putUChar("last_chan", currentChannel);
-            Serial.printf("Data found on Channel %d\n", currentChannel);
+            consecutivePackets++;
+            if (consecutivePackets >= 3) {
+                isHopping = false;
+                prefs.putUChar("last_chan", currentChannel);
+                Serial.printf(">>> Strong signal verified! Locking onto Channel %d\n", currentChannel);
+            }
+        } else {
+            consecutivePackets = 10; // Keep state high while connected
         }
     }
 }
@@ -94,10 +120,10 @@ void setup() {
         hal->setScreenOn(false);
     }
     
-    // ESP-NOW Initial Setting
+    // ESP-NOW Initial Setting - MAX POWER for strongest signal
     WiFi.mode(WIFI_STA);
-    WiFi.setTxPower(WIFI_POWER_8_5dBm);
-    hal->setupModemSleep();
+    WiFi.setTxPower(WIFI_POWER_19_5dBm); // Highest stable setting
+    esp_wifi_set_ps(WIFI_PS_NONE);       // Disable all power saving
     
     esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
     Serial.printf("[%s] Starting search on channel %d (System: %.1fC)\n", VERSION_STR, currentChannel, hal->getSystemTemp());
@@ -115,6 +141,24 @@ void setup() {
 void loop() {
     uint32_t now = millis();
     hal->update();
+
+    // --- Signal Intensity Calculation (Packets Per Second) ---
+    if (now - lastHealthCheck > 1000) {
+        // Broadcast is 10Hz. We show raw "truth" as requested.
+        // 9-10 pkts = 4 bars (-50dBm) - Solid link
+        // 6-8 pkts = 3 bars (-65dBm) - Moderate loss
+        // 3-5 pkts = 2 bars (-80dBm) - Heavy loss
+        // 1-2 pkts = 1 bar (-90dBm) - Near disconnect
+        // 0 pkts = 0 bars (-100dBm) - Offline
+        if (packetsReceivedThisSecond >= 9) lastRssi = -50;
+        else if (packetsReceivedThisSecond >= 6) lastRssi = -65;
+        else if (packetsReceivedThisSecond >= 3) lastRssi = -80;
+        else if (packetsReceivedThisSecond >= 1) lastRssi = -90;
+        else lastRssi = -100;
+
+        packetsReceivedThisSecond = 0;
+        lastHealthCheck = now;
+    }
 
 #ifdef SIMULATION_MODE
     // Generate Fake Data
@@ -167,9 +211,11 @@ void loop() {
 
     // --- Channel Hopping State Machine ---
     if (now - lastPacketTime > DATA_TIMEOUT_MS) {
+        lastRssi = -100; // Reset signal strength on timeout
         if (!isHopping) {
             isHopping = true;
             lastHopTime = now;
+            consecutivePackets = 0;
             Serial.println("Connection lost. Resuming channel hop...");
         }
 
@@ -195,7 +241,7 @@ void loop() {
         static uint32_t lastRenderTime = 0;
         if (now - lastRenderTime > 66) { // ~15 FPS Max for UI
             if (isHopping) {
-                hal->drawSearching(currentChannel, hal->getSystemTemp(), false);
+                hal->drawSearching(currentChannel, hal->getSystemTemp(), false, lastRssi);
             } else {
                 // --- Active DRO UI ---
                 bool movedUI = false;
@@ -226,23 +272,20 @@ void loop() {
                     else if (activeAxis == 'Z') val = data.z;
                     hal->drawGiantDRO(activeAxis, val, val >= 0);
                 } else {
-                    hal->drawActiveDRO(data, currentChannel);
+                    hal->drawActiveDRO(data, currentChannel, lastRssi);
                 }
             }
             lastRenderTime = now;
         }
     }
 
-    // --- Synchronized Light Sleep ---
+    // --- Nap mode disabled for debugging and better reliability ---
+    /*
     if (!isHopping && screenOn) {
-        uint32_t timeSinceLastPacket = millis() - lastPacketTime;
-        if (timeSinceLastPacket < (HEARTBEAT_MS - SLEEP_GUARD_MS)) {
-            uint32_t napDuration = (HEARTBEAT_MS - SLEEP_GUARD_MS) - timeSinceLastPacket;
-            if (napDuration > 10) {
-                hal->enterLightSleep(napDuration);
-            }
-        }
+        ...
     } else {
         delay(50); 
     }
+    */
+    delay(10); // Standard loop delay
 }

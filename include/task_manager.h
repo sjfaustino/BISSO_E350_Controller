@@ -79,7 +79,7 @@
 #define TASK_PERIOD_FAULT_LOG 500
 #define TASK_PERIOD_MONITOR 1000
 #define TASK_PERIOD_TELEMETRY                                                  \
-  1000 // PHASE 5.4: Background collection same rate as monitor
+  50 // PHASE 5.4: High-frequency base (20Hz) to ensure stable 10Hz DRO updates
 #define TASK_PERIOD_LCD_FORMAT                                                 \
   200 // PHASE 5.4: Format strings same rate as display
 // PHASE 3.1: Increased from 100ms to 20ms (50Hz) to match encoder update
