@@ -92,8 +92,8 @@ void HAL_TDisplay::drawSearching(uint8_t channel, float temp, bool fullSweep, in
     // Dynamic Signal & Battery bars while searching
     int bucket = (rssi <= -95) ? 0 : (rssi > -60 ? 4 : (rssi > -75 ? 3 : (rssi > -85 ? 2 : 1)));
     if (bucket != _lastRssi || batteryPct != _lastBatteryPct) {
-        drawBatteryIcon(tft.width() - 55, 5, batteryPct);
-        drawSignalIcon(tft.width() - 25, 5, rssi);
+        drawSignalIcon(tft.width() - 55, 5, rssi);
+        drawBatteryIcon(tft.width() - 25, 5, batteryPct);
         _lastRssi = bucket;
         _lastBatteryPct = batteryPct;
     }
@@ -150,8 +150,8 @@ void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, i
         tft.drawString("CH" + String(channel), w - 58, 11);
         
         // Initial draw of status icons
-        drawBatteryIcon(w - 53, 3, batteryPct);
-        drawSignalIcon(w - 22, 3, rssi);
+        drawSignalIcon(w - 53, 3, rssi);
+        drawBatteryIcon(w - 22, 3, batteryPct);
 
         // Draw the static labels
         int labelX = 20;
@@ -177,8 +177,8 @@ void HAL_TDisplay::drawActiveDRO(const TelemetryPacket& data, uint8_t channel, i
         tft.setTextDatum(MR_DATUM);
         tft.drawString("CH" + String(channel), w - 58, 11);
         
-        drawBatteryIcon(w - 53, 3, batteryPct);
-        drawSignalIcon(w - 22, 3, rssi);
+        drawSignalIcon(w - 53, 3, rssi);
+        drawBatteryIcon(w - 22, 3, batteryPct);
         _lastRssi = bucket;
         _lastBatteryPct = batteryPct;
     }
