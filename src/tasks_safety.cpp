@@ -54,8 +54,9 @@ void taskSafetyFunction(void *parameter) {
       // E-STOP
       if (btns.estop_active) {
         if (!emergencyStopIsActive()) {
-          faultLogEntry(FAULT_CRITICAL, FAULT_ESTOP_ACTIVATED, -1, 1,
-                        "Physical E-STOP Button Pressed");
+          uint8_t raw = boardInputsGetRawState();
+          faultLogEntry(FAULT_CRITICAL, FAULT_ESTOP_ACTIVATED, -1, (int32_t)raw,
+                        "Physical E-STOP Pressed (Raw: 0x%02X)", raw);
           emergencyStopSetActive(true);
         }
       }

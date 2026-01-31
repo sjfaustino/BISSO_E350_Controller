@@ -26,6 +26,7 @@
 // Conclusion: Adequate for full encoder frame ✓
 #define MAX_BYTES_PER_CYCLE 64
 #define WJ66_TIMEOUT_MS 500
+#define WJ66_MAX_DELTA_COUNTS 100000 // ROBUSTNESS: Discard any jump >100k counts/cycle as noise
 
 // Internal State
 struct {
@@ -473,6 +474,15 @@ static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void
         if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             int axes_limit = (commas + 1 > WJ66_AXES) ? WJ66_AXES : commas + 1;
             for (int i = 0; i < axes_limit; i++) {
+                // ROBUSTNESS: Sanity check for huge jumps (serial noise filter)
+                // If the jump is >100k counts and it's not the first reading, ignore it.
+                int32_t delta = abs(current_values[i] - wj66_state.position[i]);
+                if (wj66_state.read_count[i] > 0 && delta > WJ66_MAX_DELTA_COUNTS) {
+                    logWarning("[WJ66] Noise detected on Axis %d! Jumped %ld counts (Current: %ld, New: %ld). Discarding frame.",
+                               i, (long)delta, (long)wj66_state.position[i], (long)current_values[i]);
+                    continue;
+                }
+
                 wj66_state.position[i] = current_values[i];
                 wj66_state.last_read[i] = millis();
                 wj66_state.read_count[i]++;

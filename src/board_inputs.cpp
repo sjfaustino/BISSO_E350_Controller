@@ -18,8 +18,9 @@ static bool buttons_enabled =
 // inside the high-frequency (5ms) safety loop.
 // --- STABILITY FILTER (DEBOUNCE) ---
 // To filter electrical noise, an input must remain stable for 
-// DEBOUNCE_STABILITY_REQUIRED consecutive polls (5ms each = 15ms total)
-#define DEBOUNCE_STABILITY_REQUIRED 3
+// DEBOUNCE_STABILITY_REQUIRED consecutive polls (5ms each).
+// INCREASED: 3 -> 15 (75ms) to filter out power glitches and floating pin noise
+#define DEBOUNCE_STABILITY_REQUIRED 15
 static uint8_t debounced_input_cache = 0x00; // Default 0
 static uint8_t input_stability_count[8] = {0};
 static uint8_t last_raw_input = 0x00; // Default 0
@@ -171,9 +172,17 @@ button_state_t boardInputsUpdate() {
   // E-STOP: NC (Normally Closed). Active = High (Open Circuit/Pressed)
   // Buttons: NO (Normally Open). Active = Low (Short to Ground)
 
-  state.estop_active = (debounced_input_cache & mask_estop);
-  state.pause_pressed = !(debounced_input_cache & mask_pause);
-  state.resume_pressed = !(debounced_input_cache & mask_resume);
+  // ROBUSTNESS: Only allow physical triggers if buttons are enabled in config.
+  // This prevents floating pins on unconnected hardware from causing ghost events.
+  if (buttons_enabled) {
+      state.estop_active = (debounced_input_cache & mask_estop);
+      state.pause_pressed = !(debounced_input_cache & mask_pause);
+      state.resume_pressed = !(debounced_input_cache & mask_resume);
+  } else {
+      state.estop_active = false;
+      state.pause_pressed = false;
+      state.resume_pressed = false;
+  }
 
   return state;
 }
