@@ -39,7 +39,9 @@
   // KC868-A16 v1.6: LAN8720 Ethernet PHY (RMII interface)
   #define ETH_PHY_TYPE    ETH_PHY_LAN8720
   #define ETH_PHY_ADDR    0
+  #undef ETH_PHY_MDC  // Avoid redefinition warning (default 23)
   #define ETH_PHY_MDC     PIN_ETH_MDC
+  #undef ETH_PHY_MDIO // Avoid redefinition warning (default 18)
   #define ETH_PHY_MDIO    PIN_ETH_MDIO
   #undef ETH_CLK_MODE  // Avoid redefinition warning from ETH.h
   #define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT
