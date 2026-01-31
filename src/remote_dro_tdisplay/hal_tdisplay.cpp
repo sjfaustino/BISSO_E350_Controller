@@ -276,10 +276,10 @@ void HAL_TDisplay::drawSignalIcon(int x, int y, int8_t rssi) {
     
     // Draw 4 bar placeholders (shadowed dark bars)
     for (int i=0; i<4; i++) {
-        int bh = 4 + (i * 3);
+        int bh = 5 + (i * 3); // Taller: 5, 8, 11, 14px
         int by = y + 14 - bh;
         // Bar background
-        tft.fillRect(x + (i*5), by, 3, bh, (i < bars) ? color : 0x4208); // 0x4208 = Dark Grey
+        tft.fillRect(x + (i*5), by + 2, 3, bh, (i < bars) ? color : 0x4208); // Offset by +2 for 14px center
     }
     
     // If absolutely no signal, draw a tiny red x next to bars
@@ -297,14 +297,14 @@ void HAL_TDisplay::drawBatteryIcon(int x, int y, int percentage) {
     if (percentage <= 20) color = TFT_RED;
     else if (percentage <= 45) color = TFT_YELLOW;
 
-    // Draw battery body
-    tft.drawRect(x, y + 4, 18, 10, TFT_WHITE);
-    tft.fillRect(x + 18, y + 7, 2, 4, TFT_WHITE); // Terminal
+    // Draw battery body (Taller: 14px high)
+    tft.drawRect(x, y + 2, 20, 14, TFT_WHITE);
+    tft.fillRect(x + 20, y + 6, 2, 6, TFT_WHITE); // Terminal
 
     // Draw fill
-    int fillW = (percentage * 14) / 100;
+    int fillW = (percentage * 16) / 100;
     if (fillW > 0) {
-        tft.fillRect(x + 2, y + 6, fillW, 6, color);
+        tft.fillRect(x + 2, y + 4, fillW, 10, color);
     }
 }
 
