@@ -121,6 +121,13 @@ void registerSystemRoutes(PsychicHttpServer& server) {
                 continue;
             }
             
+            // PHASE 6.4: Map legacy UI keys to short NVS keys (Fix for status light sync)
+            if (strcmp(key, "status_light_en") == 0) {
+                configSetInt(KEY_STATUS_LIGHT_EN, val.as<int32_t>());
+                count++;
+                continue;
+            }
+
             if (val.is<int>() || val.is<long>()) {
                 configSetInt(key, val.as<int32_t>());
             } else if (val.is<float>() || val.is<double>()) {
