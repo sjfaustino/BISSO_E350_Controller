@@ -278,6 +278,36 @@ static const config_descriptor_t config_schema[] = {
         .critical = false
     },
     {
+        .key = "status_light_en",
+        .type = CONFIG_TYPE_INT,
+        .int_min = 0,
+        .int_max = 1,
+        .default_value = "0",
+        .description = "Enable status light (1=on, 0=off)",
+        .unit = "bool",
+        .critical = false
+    },
+    {
+        .key = "buzzer_en",
+        .type = CONFIG_TYPE_INT,
+        .int_min = 0,
+        .int_max = 1,
+        .default_value = "0",
+        .description = "Enable alarm buzzer (1=on, 0=off)",
+        .unit = "bool",
+        .critical = false
+    },
+    {
+        .key = "lcd_en",
+        .type = CONFIG_TYPE_INT,
+        .int_min = 0,
+        .int_max = 1,
+        .default_value = "1",
+        .description = "Enable LCD display (1=on, 0=off)",
+        .unit = "bool",
+        .critical = false
+    },
+    {
         .key = "system_watchdog_timeout_s",
         .type = CONFIG_TYPE_INT,
         .int_min = 5,
