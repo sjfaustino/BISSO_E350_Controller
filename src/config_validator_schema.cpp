@@ -308,6 +308,46 @@ static const config_descriptor_t config_schema[] = {
         .critical = false
     },
     {
+        .key = "status_light_green",
+        .type = CONFIG_TYPE_INT,
+        .int_min = 1,
+        .int_max = 16,
+        .default_value = "13",
+        .description = "Green status light pin (1-16)",
+        .unit = "pin",
+        .critical = false
+    },
+    {
+        .key = "status_light_yellow",
+        .type = CONFIG_TYPE_INT,
+        .int_min = 1,
+        .int_max = 16,
+        .default_value = "14",
+        .description = "Yellow status light pin (1-16)",
+        .unit = "pin",
+        .critical = false
+    },
+    {
+        .key = "status_light_red",
+        .type = CONFIG_TYPE_INT,
+        .int_min = 1,
+        .int_max = 16,
+        .default_value = "15",
+        .description = "Red status light pin (1-16)",
+        .unit = "pin",
+        .critical = false
+    },
+    {
+        .key = "buzzer_pin",
+        .type = CONFIG_TYPE_INT,
+        .int_min = 1,
+        .int_max = 16,
+        .default_value = "16",
+        .description = "Buzzer pin (1-16)",
+        .unit = "pin",
+        .critical = false
+    },
+    {
         .key = "system_watchdog_timeout_s",
         .type = CONFIG_TYPE_INT,
         .int_min = 5,

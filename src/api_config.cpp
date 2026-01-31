@@ -102,11 +102,15 @@ static const config_field_t network_str_fields[] = {
 static const config_field_t system_fields[] = {
   {"buzzer_en", KEY_BUZZER_EN, CFG_INT},
   {"status_light_en", KEY_STATUS_LIGHT_EN, CFG_INT},
+  {"status_light_green", KEY_STATUS_LIGHT_GREEN, CFG_INT},
+  {"status_light_yellow", KEY_STATUS_LIGHT_YELLOW, CFG_INT},
+  {"status_light_red", KEY_STATUS_LIGHT_RED, CFG_INT},
   {"recovery_en", KEY_RECOV_EN, CFG_INT},
   {"lcd_en", KEY_LCD_EN, CFG_INT},
   {"bootlog_en", KEY_BOOTLOG_EN, CFG_INT},
   {"cli_echo", KEY_CLI_ECHO, CFG_INT},
   {"ota_chk_en", KEY_OTA_CHECK_EN, CFG_INT},
+  {"buzzer_pin", KEY_BUZZER_PIN, CFG_INT},
 };
 
 static const config_field_t spindle_fields[] = {
@@ -477,6 +481,14 @@ bool apiConfigSet(config_category_t category, const char *key,
         configSetInt(KEY_CLI_ECHO, value.as<int>());
     } else if (strcmp(key, "ota_chk_en") == 0) {
         configSetInt(KEY_OTA_CHECK_EN, value.as<int>());
+    } else if (strcmp(key, "status_light_green") == 0) {
+        configSetInt(KEY_STATUS_LIGHT_GREEN, value.as<int>());
+    } else if (strcmp(key, "status_light_yellow") == 0) {
+        configSetInt(KEY_STATUS_LIGHT_YELLOW, value.as<int>());
+    } else if (strcmp(key, "status_light_red") == 0) {
+        configSetInt(KEY_STATUS_LIGHT_RED, value.as<int>());
+    } else if (strcmp(key, "buzzer_pin") == 0) {
+        configSetInt(KEY_BUZZER_PIN, value.as<int>());
     } else if (strcmp(key, KEY_RS485_BAUD) == 0) {
         // PHASE 6.3: If RS485 is shared with Encoder, sync them
         uint32_t baud = value.as<uint32_t>();
@@ -546,11 +558,15 @@ bool apiConfigGet(config_category_t category, JsonVariant doc) {
   case CONFIG_CATEGORY_SYSTEM: {
       obj["buzzer_en"] = configGetInt(KEY_BUZZER_EN, 1);
       obj["status_light_en"] = configGetInt(KEY_STATUS_LIGHT_EN, 0);
+      obj["status_light_green"] = configGetInt(KEY_STATUS_LIGHT_GREEN, 13);
+      obj["status_light_yellow"] = configGetInt(KEY_STATUS_LIGHT_YELLOW, 14);
+      obj["status_light_red"] = configGetInt(KEY_STATUS_LIGHT_RED, 15);
       obj["recovery_en"] = configGetInt(KEY_RECOV_EN, 1);
       obj["lcd_en"] = configGetInt(KEY_LCD_EN, 1);
       obj["bootlog_en"] = configGetInt(KEY_BOOTLOG_EN, 1);
       obj["cli_echo"] = configGetInt(KEY_CLI_ECHO, 1); // Default ON for usability
       obj["ota_chk_en"] = configGetInt(KEY_OTA_CHECK_EN, 0);
+      obj["buzzer_pin"] = configGetInt(KEY_BUZZER_PIN, 16);
       break;
   }
 

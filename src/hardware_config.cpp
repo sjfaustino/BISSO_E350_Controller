@@ -7,6 +7,7 @@
 
 #include "hardware_config.h"
 #include "config_unified.h"
+#include "config_keys.h"
 #include "serial_logger.h"
 #include "string_safety.h"
 #include <string.h>
@@ -145,5 +146,21 @@ bool setPin(const char* key, int16_t gpio, bool skip_save) {
     }
 
     logInfo("[HAL] [OK] Mapped %s -> Virtual Pin %d (%s)", key, gpio, info->silk);
+
+    // Sync Legacy Status Light / Buzzer Keys
+    // This ensures operator_alerts.cpp (which reads config keys) matches the hardware mapping
+    if (isVirtualOutputPin) {
+        int outputIndex = gpio - 115; // Convert 116-131 -> 1-16
+        if (strcmp(key, "output_status_green") == 0) {
+            configSetInt(KEY_STATUS_LIGHT_GREEN, outputIndex);
+        } else if (strcmp(key, "output_status_yellow") == 0) {
+            configSetInt(KEY_STATUS_LIGHT_YELLOW, outputIndex);
+        } else if (strcmp(key, "output_status_red") == 0) {
+            configSetInt(KEY_STATUS_LIGHT_RED, outputIndex);
+        } else if (strcmp(key, "output_buzzer") == 0) {
+            configSetInt(KEY_BUZZER_PIN, outputIndex);
+        }
+    }
+
     return true;
 }

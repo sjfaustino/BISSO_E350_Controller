@@ -66,7 +66,11 @@ static const char *critical_keys[] = {
     KEY_WIFI_AP_SSID,
     KEY_WIFI_AP_PASS,
     KEY_STATUS_LIGHT_EN, // Status Indication
+    KEY_STATUS_LIGHT_GREEN,
+    KEY_STATUS_LIGHT_YELLOW,
+    KEY_STATUS_LIGHT_RED,
     KEY_BUZZER_EN,       // Audible Alarm
+    KEY_BUZZER_PIN,
     KEY_LCD_EN,        // Display Enable
     KEY_YHTC05_ENABLED // Tachometer Enable
 };
