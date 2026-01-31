@@ -113,6 +113,9 @@ window.HardwareModule = window.HardwareModule || {
         };
 
         this.signalData?.forEach(s => {
+            // Skip WJ66 pins as they are handled dynamically below based on interface selection
+            if (s.key === 'wj66_rx' || s.key === 'wj66_tx') return;
+
             const p = s.current_pin !== undefined ? s.current_pin : s.default_pin;
             if (p !== undefined) addUsage(p, s.name || s.key);
         });
