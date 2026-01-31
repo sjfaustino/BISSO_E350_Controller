@@ -206,3 +206,9 @@
         grid-template-columns: 1fr;
     }
 }
+
+@media (min-width: 900px) {
+    .card.wide {
+        grid-column: span 2;
+    }
+}
