@@ -61,7 +61,7 @@
 #define KEY_BUZZER_PIN "buzzer_pin"     // Output pin number (1-16, default 16)
 
 // --- STATUS LIGHT ---
-#define KEY_STATUS_LIGHT_EN "status_light_en"     // Enable status light (1=on, 0=off, default 0)
+#define KEY_STATUS_LIGHT_EN "sl_en"             // Enable status light (1=on, 0=off, default 0)
 #define KEY_STATUS_LIGHT_GREEN "sl_green"         // Green output pin (1-16, default 13)
 #define KEY_STATUS_LIGHT_YELLOW "sl_yellow"       // Yellow output pin (1-16, default 14)
 #define KEY_STATUS_LIGHT_RED "sl_red"             // Red output pin (1-16, default 15)
