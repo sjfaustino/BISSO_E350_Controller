@@ -141,33 +141,20 @@ void lcdInterfaceUpdate() {
       for (int i = 0; i < LCD_ROWS; i++) {
         if (lcd_state.display_dirty[i]) {
           // Acquire mutex for this row only (50ms timeout is plenty for 1 row)
+          bool i2c_ok = false;
           if (taskLockMutex(taskGetLcdMutex(), 50)) {
-            // Check I2C bus health before operation
+            // Check I2C bus health while holding mutex
             Wire.beginTransmission(LCD_I2C_ADDR);
-            if (Wire.endTransmission() != 0) {
-              static uint32_t last_lcd_err = 0;
-              if (millis() - last_lcd_err > 2000) {
-                logWarning("[LCD] I2C write failed - skipping line %d", i);
-                last_lcd_err = millis();
-              }
-              lcd_state.consecutive_i2c_errors++;
-              taskUnlockMutex(taskGetLcdMutex());
-              continue; // Try next row later
+            i2c_ok = (Wire.endTransmission() == 0);
+            
+            if (i2c_ok) {
+              lcd_i2c->setCursor(0, i);
+              char padded_line[LCD_COLS + 1];
+              snprintf(padded_line, sizeof(padded_line), "%-20s", lcd_state.display[i]);
+              lcd_i2c->print(padded_line);
+              lcd_state.display_dirty[i] = false;
             }
-
-            lcd_i2c->setCursor(0, i);
-            char padded_line[LCD_COLS + 1];
-            snprintf(padded_line, sizeof(padded_line), "%-20s", lcd_state.display[i]);
-            lcd_i2c->print(padded_line);
-            lcd_state.display_dirty[i] = false;
-            
             taskUnlockMutex(taskGetLcdMutex());
-            
-            // Success! Clear error counter
-            lcd_state.consecutive_i2c_errors = 0;
-            
-            // Brief yield to allow other I2C tasks (Safety/PLC) to run
-            vTaskDelay(1);
           } else {
             // Mutex timeout for this row
             lcd_state.consecutive_i2c_errors++;
@@ -176,7 +163,24 @@ void lcdInterfaceUpdate() {
               logWarning("[LCD] LCD mutex timeout for row %d", i);
               last_log = millis();
             }
+            continue;
           }
+
+          if (!i2c_ok) {
+              lcd_state.consecutive_i2c_errors++;
+              static uint32_t last_lcd_err = 0;
+              if (millis() - last_lcd_err > 2000) {
+                logWarning("[LCD] I2C write failed - skipping line %d", i);
+                last_lcd_err = millis();
+              }
+              continue; // Try next row later
+          }
+
+          // Success! Clear error counter
+          lcd_state.consecutive_i2c_errors = 0;
+          
+          // Brief yield to allow other I2C tasks (Safety/PLC) to run
+          vTaskDelay(1);
         }
       }
     }

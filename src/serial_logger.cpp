@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
+#include "task_manager.h"
 
 // ESP32-S2/S3 USB CDC Serial - define SerialOut for internal use
 #if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -36,8 +38,19 @@ static void bootLogWrite(const char* message);
 static bool acquireSerialMutex() {
   if (!mutex_initialized || !serial_mutex) return false;
   
-  // Use 50ms timeout to avoid deadlocks
-  return xSemaphoreTakeRecursive(serial_mutex, pdMS_TO_TICKS(50)) == pdTRUE;
+  // PHASE 16 FIX: High-priority tasks (Motion/Safety) must NOT block on logging.
+  // This prevents the "Logging Storm" during stress tests from causing jitter.
+  // Formula: If priority >= 20 (Encoder/Motion/Safety), timeout = 0.
+  // Otherwise, use 50ms timeout to ensure low-priority logs get through.
+  TickType_t timeout = pdMS_TO_TICKS(50);
+  
+  #ifdef TASK_PRIORITY_MOTION
+  if (uxTaskPriorityGet(NULL) >= 20) { // Fast check for real-time tasks
+      timeout = 0;
+  }
+  #endif
+  
+  return xSemaphoreTakeRecursive(serial_mutex, timeout) == pdTRUE;
 }
 
 /**

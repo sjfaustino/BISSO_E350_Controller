@@ -404,7 +404,13 @@ void cmd_debug_main(int argc, char** argv) {
         {"all",      wrap_debugAllHandler,      "Dump all debug info"},
         {"encoders", wrap_debugEncodersHandler, "Encoder statistics"},
         {"config",   wrap_debugConfigHandler,   "Configuration dump"},
-        {"stack",    wrap_debugStack,           "Task stack usage (HWM)"} // Memory Tuning
+        {"stack",    wrap_debugStack,           "Task stack usage (HWM)"},
+        {"sl",       [](int c, char** v){ (void)c; (void)v; statusLightTest(); }, "Status light test"},
+        {"buzzer",   [](int c, char** v){ 
+            int p = (c >= 2) ? atoi(v[1]) : 1;
+            buzzerPlay((buzzer_pattern_t)p);
+            logInfo("[DEBUG] Playing buzzer pattern %d", p);
+        }, "Buzzer test <pattern_id>"}
     };
     
     cliDispatchSubcommand("[DEBUG]", argc, argv, subcmds, 
