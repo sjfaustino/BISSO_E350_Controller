@@ -341,29 +341,23 @@ void runStressTests() {
 }
 
 void cmd_stress_test(int argc, char** argv) {
-    int arg_idx = 1;
-    
-    // Handle "test stress <test>" by checking if argv[1] is "stress"
-    if (argc >= 2 && strcmp(argv[1], "stress") == 0) {
-        arg_idx = 2;
-    }
-
-    if (argc <= arg_idx) {
-        logPrintln("\r\n[STRESS TEST] Usage: test [stress] <test|all>");
-        logPrintln("Available tests:");
-        logPrintln("  concurrent  - Concurrent motion hammers");
-        logPrintln("  faults      - Fault queue/ring-buffer overflow");
-        logPrintln("  mutex       - Motion mutex timeout recovery");
-        logPrintln("  stack       - Stack water-mark monitoring");
-        logPrintln("  watchdog    - Task/Interrupt watchdog resilience");
-        logPrintln("  i2c         - I2C bus recovery & hardware-awareness");
-        logPrintln("  load        - Serial logging vs Load Manager states");
-        logPrintln("  jitter      - Real-time motion loop jitter tracking");
-        logPrintln("  all         - Run complete 8-test suite");
+    if (argc < 1) {
+        logPrintln("\r\n[STRESS TEST] Usage: test stress <test|all>");
+        logPrintln("Available tests: concurrent, faults, mutex, stack, watchdog, i2c, load, jitter, all");
         return;
     }
 
-    const char* test_name = argv[arg_idx];
+    const char* test_name = argv[0];
+    
+    // Handle "test stress <subtest>" where argv[0] is "stress" and argv[1] is the subtest
+    if (strcmp(test_name, "stress") == 0) {
+        if (argc < 2) {
+            logPrintln("\r\n[STRESS TEST] Usage: test stress <test|all>");
+            logPrintln("Available tests: concurrent, faults, mutex, stack, watchdog, i2c, load, jitter, all");
+            return;
+        }
+        test_name = argv[1];
+    }
 
     if (strcmp(test_name, "all") == 0) {
         runStressTests();

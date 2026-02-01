@@ -404,16 +404,32 @@ void cmd_debug_main(int argc, char** argv) {
         {"all",      wrap_debugAllHandler,      "Dump all debug info"},
         {"encoders", wrap_debugEncodersHandler, "Encoder statistics"},
         {"config",   wrap_debugConfigHandler,   "Configuration dump"},
-        {"stack",    wrap_debugStack,           "Task stack usage (HWM)"},
+        {"stack",    wrap_debugStack,           "Task stack usage (HWM)"}
+    };
+    
+    cliDispatchSubcommand("[DEBUG]", argc, argv, subcmds, 
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
+}
+
+// ============================================================================
+// TEST COMMANDS (PHASE 16: Logical grouping)
+// ============================================================================
+extern void cmd_stress_test(int argc, char** argv);
+#include "operator_alerts.h"
+
+void cmd_test_main(int argc, char** argv) {
+    static const cli_subcommand_t subcmds[] = {
         {"sl",       [](int c, char** v){ (void)c; (void)v; statusLightTest(); }, "Status light test"},
         {"buzzer",   [](int c, char** v){ 
             int p = (c >= 2) ? atoi(v[1]) : 1;
             buzzerPlay((buzzer_pattern_t)p);
-            logInfo("[DEBUG] Playing buzzer pattern %d", p);
-        }, "Buzzer test <pattern_id>"}
+            logInfo("[TEST] Playing buzzer pattern %d", p);
+        }, "Buzzer test <pattern_id>"},
+        {"stress",   cmd_stress_test,           "Run system stress tests (all, jitter, etc.)"},
+        {"all",      cmd_stress_test,           "Alias for 'test stress all'"}
     };
     
-    cliDispatchSubcommand("[DEBUG]", argc, argv, subcmds, 
+    cliDispatchSubcommand("[TEST]", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -1807,5 +1823,5 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("ls", "List LittleFS files", cmd_fs_ls);
     cliRegisterCommand("df", "Show LittleFS status", cmd_fs_df);
     cliRegisterCommand("cat", "View LittleFS file content", cmd_fs_cat);
-    cliRegisterCommand("test", "Run system stress tests", cmd_stress_test);
+    cliRegisterCommand("test", "Hardware and stress tests", cmd_test_main);
 }
