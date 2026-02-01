@@ -851,11 +851,11 @@ void cmd_encoder_config_main(int argc, char** argv) {
 }
 
 void cmd_encoder_main(int argc, char** argv) {
-    // Table-driven subcommand dispatch (P1: DRY improvement)
     static const cli_subcommand_t subcmds[] = {
         {"status", cmd_encoder_status,      "Unified dashboard (config + runtime)"},
         {"read",   cmd_encoder_read,        "Display encoder positions N times (default 10) every 0.5s"},
         {"diag",   cmd_encoder_diag,        "Run encoder integration diagnostics"},
+        {"deviation", cmd_encoder_deviation_diag, "Encoder deviation diagnostics"},
         {"test",   cmd_encoder_test,        "Show raw encoder counts and hardware stats"},
         {"baud",   cmd_encoder_baud_detect, "Auto-detect baud rate"},
         {"scan",   cmd_encoder_baud_detect, "Alias for baud (scan for encoder)"},
@@ -1770,7 +1770,7 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("task", "Task monitoring", cmd_diag_scheduler_main);
 
     // PHASE 2: New diagnostic commands
-    cliRegisterCommand("encoder_deviation", "Encoder deviation diagnostics", cmd_encoder_deviation_diag);
+    // encoder_deviation is now a subcommand of 'encoder'
     cliRegisterCommand("fault_recovery", "Fault recovery status", cmd_fault_recovery_diag);
     cliRegisterCommand("task_list", "Detailed task list with stack usage", cmd_task_list_detailed);
 

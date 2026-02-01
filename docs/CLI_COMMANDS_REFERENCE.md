@@ -2825,11 +2825,11 @@ FREERTOS TASK MONITORING:
 
 ---
 
-### `encoder_deviation` - Encoder Deviation Diagnostics
+### `encoder deviation` - Encoder Deviation Diagnostics
 
 **Syntax:**
 ```
-encoder_deviation
+encoder deviation
 ```
 
 **Description:**
