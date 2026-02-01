@@ -656,13 +656,16 @@ void cmd_encoder_status(int argc, char** argv) {
     };
 
     logPrintln("+-----------------+---------------------------------------+");
-    logPrintln("| Axis | Name | Pos (Pulse)| Pos (mm)   | Status | Age (ms)  | Reads | Missed |");
+    logPrintln("| Axis | Name | Pos (Pulse)|  Pos (mm)  | Status | Age (ms)  | Reads | Missed |");
     logPrintln("+------+------+------------+------------+--------+-----------+-------+--------+");
 
     for (int i = 0; i < 4; i++) {
         int32_t pos = wj66GetPosition(i);
         uint32_t age = wj66GetAxisAge(i);
-        const char* status = wj66IsStale(i) ? "STALE" : "OK";
+        
+        // Center-aligned status strings (width 6)
+        const char* status = wj66IsStale(i) ? "STALE " : "  OK  ";
+        
         uint32_t reads = wj66GetReadCount(i);
         uint32_t polls = wj66GetPollCount();
         uint32_t missed = (polls > reads) ? (polls - reads) : 0;
@@ -678,7 +681,8 @@ void cmd_encoder_status(int argc, char** argv) {
 
         char axis_name = "XYZA"[i];
 
-        logPrintf("|  %d   |  %c   | %10ld | %10.3f | %-6s | %9lu | %-5s | %-6s |\r\n", 
+        // Status is %s (pre-padded), Reads/Missed are %5s/%6s (Right Justified)
+        logPrintf("|  %d   |  %c   | %10ld | %10.3f | %s | %9lu | %5s | %6s |\r\n", 
             i, axis_name, (long)pos, pos_mm, status, (unsigned long)age, reads_str, missed_str);
     }
     logPrintln("+------+------+------------+------------+--------+-----------+-------+--------+");
