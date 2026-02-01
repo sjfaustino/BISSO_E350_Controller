@@ -73,6 +73,10 @@ void registerSystemRoutes(PsychicHttpServer& server) {
         apiConfigGet(CONFIG_CATEGORY_MOTION, doc);
         apiConfigGet(CONFIG_CATEGORY_VFD, doc);
         apiConfigGet(CONFIG_CATEGORY_ENCODER, doc);
+        apiConfigGet(CONFIG_CATEGORY_SYSTEM, doc);
+        apiConfigGet(CONFIG_CATEGORY_NETWORK, doc);
+        apiConfigGet(CONFIG_CATEGORY_SERIAL, doc);
+        apiConfigGet(CONFIG_CATEGORY_SPINDLE, doc);
         
         return sendJsonResponse(response, doc);
     });
