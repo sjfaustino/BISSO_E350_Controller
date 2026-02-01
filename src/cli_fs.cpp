@@ -40,8 +40,13 @@ void cmd_fs_df(int argc, char** argv) {
     size_t used = LittleFS.usedBytes();
     logPrintf("LittleFS Partition Status:\n");
     logPrintf("  Total: %8zu bytes\n", total);
-    logPrintf("  Used:  %8zu bytes (%d%%)\n", used, (int)((used * 100) / total));
-    logPrintf("  Free:  %8zu bytes\n", total - used);
+    
+    if (total > 0) {
+        logPrintf("  Used:  %8zu bytes (%d%%)\n", used, (int)((used * 100) / total));
+        logPrintf("  Free:  %8zu bytes\n", total - used);
+    } else {
+        logError("Partition not mounted or empty - check filesystem!");
+    }
 }
 
 void cmd_fs_cat(int argc, char** argv) {
