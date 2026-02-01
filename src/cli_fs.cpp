@@ -8,13 +8,22 @@
 #include "serial_logger.h"
 
 void cmd_fs_ls(int argc, char** argv) {
+    char path_buf[64];
     const char* path = "/";
-    if (argc > 1) path = argv[1];
+    
+    if (argc > 1) {
+        if (argv[1][0] != '/') {
+            snprintf(path_buf, sizeof(path_buf), "/%s", argv[1]);
+            path = path_buf;
+        } else {
+            path = argv[1];
+        }
+    }
 
     logPrintf("Listing directory: %s\n", path);
     File root = LittleFS.open(path);
     if (!root) {
-        logError("Failed to open directory");
+        logError("Failed to open directory (check path?)");
         return;
     }
     if (!root.isDirectory()) {
@@ -55,9 +64,16 @@ void cmd_fs_cat(int argc, char** argv) {
         return;
     }
 
-    File file = LittleFS.open(argv[1], "r");
+    char path_buf[64];
+    const char* path = argv[1];
+    if (argv[1][0] != '/') {
+        snprintf(path_buf, sizeof(path_buf), "/%s", argv[1]);
+        path = path_buf;
+    }
+
+    File file = LittleFS.open(path, "r");
     if (!file) {
-        logError("Failed to open file: %s", argv[1]);
+        logError("Failed to open file: %s", path);
         return;
     }
 
