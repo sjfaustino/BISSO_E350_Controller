@@ -577,6 +577,10 @@ uint32_t wj66GetReadCount(uint8_t axis) {
     return wj66_state.read_count[axis];
 }
 
+uint32_t wj66GetPollCount() {
+    return wj66_device.poll_count;
+}
+
 bool wj66IsStale(uint8_t axis) { 
     return wj66GetAxisAge(axis) > WJ66_TIMEOUT_MS; 
 }

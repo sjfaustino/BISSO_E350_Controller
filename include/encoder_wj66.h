@@ -25,6 +25,7 @@ int32_t wj66GetPosition(uint8_t axis);
 encoder_status_t wj66GetStatus();
 uint32_t wj66GetAxisAge(uint8_t axis);
 uint32_t wj66GetReadCount(uint8_t axis);
+uint32_t wj66GetPollCount();
 bool wj66IsStale(uint8_t axis);
 
 // Commands

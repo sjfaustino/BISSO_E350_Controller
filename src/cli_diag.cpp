@@ -647,17 +647,21 @@ void cmd_encoder_status(int argc, char** argv) {
     logPrintf("| Protocol        | %-37s |\r\n", (proto == 1) ? "Modbus RTU" : "ASCII (#XX\\r)");
     logPrintf("| Address         | %-37d |\r\n", configGetInt(KEY_ENC_ADDR, 0));
     logPrintln("+-----------------+---------------------------------------+");
-    logPrintln("| Axis | Position  | Status | Age (ms)  | Read Count      |");
-    logPrintln("+------+-----------+--------+-----------+-----------------+");
+    logPrintln("| Axis | Pos (Pulse)| Status | Age (ms)  | Reads           | Missed          |");
+    logPrintln("+------+------------+--------+-----------+-----------------+-----------------+");
 
     for (int i = 0; i < 4; i++) {
         int32_t pos = wj66GetPosition(i);
         uint32_t age = wj66GetAxisAge(i);
         const char* status = wj66IsStale(i) ? "STALE" : "OK";
+        uint32_t reads = wj66GetReadCount(i);
+        uint32_t polls = wj66GetPollCount();
+        uint32_t missed = (polls > reads) ? (polls - reads) : 0;
+        
         // Note: Read count isn't directly exposed in header, but we can show status/age
-        logPrintf("|  %d   | %9ld | %-6s | %9lu | %-15lu |\r\n", i, (long)pos, status, (unsigned long)age, (unsigned long)wj66GetReadCount(i));
+        logPrintf("|  %d   | %10ld | %-6s | %9lu | %-15lu | %-15lu |\r\n", i, (long)pos, status, (unsigned long)age, (unsigned long)reads, (unsigned long)missed);
     }
-    logPrintln("+------+-----------+--------+-----------+-----------------+");
+    logPrintln("+------+------------+--------+-----------+-----------------+-----------------+");
 
     encoderMotionDiagnostics();
 }
