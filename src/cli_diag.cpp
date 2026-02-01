@@ -65,6 +65,7 @@ void debugEncodersHandler();
 void debugAllHandler();
 void debugConfigHandler();
 void cmd_diag_scheduler_main(int argc, char** argv);
+void cmd_encoder_deviation_diag(int argc, char** argv);
 void cmd_memory_detailed(int argc, char** argv); // Forward declaration
 
 // CLI wrapper functions (match cli_handler_t signature)
@@ -108,7 +109,7 @@ void cmd_status_dashboard(int argc, char** argv) {
         float progress = job.total_lines > 0 ? (float)job.current_line / job.total_lines * 100.0f : 0.0f;
         snprintf(job_progress_str, sizeof(job_progress_str), "(%.1f%%)", progress);
     } else if (job.state == JOB_PAUSED) job_state_str = "PAUSED";
-    else if (job.state == JOB_COMPLETE) job_state_str = "DONE";
+    else if (job.state == JOB_COMPLETED) job_state_str = "DONE";
     else if (job.state == JOB_ERROR) job_state_str = "ERROR";
 
     logPrintln("\n+============================================================+");
