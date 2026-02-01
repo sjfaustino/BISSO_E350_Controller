@@ -151,7 +151,7 @@ void cliInit() {
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
   cliRegisterWifiCommands(); 
-  cliRegisterCommand("web_setpass", "Set Web UI password", cmd_web_setpass);
+  cliRegisterCommand("passwd", "Set password (web/ota)", cmd_passwd);
   cliRegisterCommand("auth", "Auth diagnostics & testing", cmd_auth);
   cliRegisterCommand("lcd", "LCD Display Control", cmd_lcd_main);
   cliRegisterCommand("jxk10", "JXK-10 Current Sensor", cmd_jxk10_main);

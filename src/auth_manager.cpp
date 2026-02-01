@@ -604,28 +604,55 @@ void authClearRateLimit(const char* ip_address) {
   }
 }
 
-void cmd_web_setpass(int argc, char** argv) {
-  if (argc < 2) {
-    logPrintln("\n[AUTH] === Web Password Management (CLI) ===");
-    CLI_USAGE("web_setpass", "<new_password>");
-    logPrintln("Note: Password must be at least 8 characters");
-    logPrintln("      Requires 3 character types (lower/upper/digit/symbol)");
+// SECURITY: Unified Password Management Command
+// Usage: passwd [web|ota] <new_password>
+void cmd_passwd(int argc, char** argv) {
+  if (argc < 3) {
+    logPrintln("\n[AUTH] === Password Management ===");
+    CLI_USAGE("passwd", "[web|ota] <new_password>");
+    logPrintln("Options:");
+    logPrintln("  web - Set Web UI password");
+    logPrintln("  ota - Set OTA update password");
+    logPrintln("\nRequirements:");
+    logPrintln("  - Minimum 8 characters");
+    logPrintln("  - Mixed case, numbers, symbols recommended");
     return;
   }
 
-  const char* new_pass = argv[1];
+  const char* type = argv[1];
+  const char* new_pass = argv[2];
 
-  // Yield before password update to ensure watchdog is fed
-  yield();
-
-  if (authSetPassword("admin", new_pass)) {
-    yield();  // Feed watchdog after NVS write
-    logPrintln("[AUTH] [OK] Web password updated successfully.");
-    logPrintln("[AUTH] [OK] You can now log in to the Web UI with the new password.");
-  } else {
-    logPrintln("[AUTH] [ERR] Password update failed.");
-    logPrintln("[AUTH] [ERR] Ensure it meets length and complexity requirements.");
+  // Common Length Check
+  if (strlen(new_pass) < 8) {
+    logError("[AUTH] Password must be at least 8 characters");
+    return;
   }
+
+  // Handle "web"
+  if (strcasecmp(type, "web") == 0) {
+    yield(); // Feed watchdog
+    if (authSetPassword("admin", new_pass)) {
+      yield();
+      logPrintln("[AUTH] [OK] Web UI password updated successfully.");
+      logPrintln("[AUTH] [OK] New password active immediately.");
+    } else {
+      logPrintln("[AUTH] [ERR] Update failed (complexity check).");
+    }
+    return;
+  }
+
+  // Handle "ota"
+  if (strcasecmp(type, "ota") == 0) {
+    configSetString(KEY_OTA_PASSWORD, new_pass);
+    configSetInt(KEY_OTA_PW_CHANGED, 1);
+    configUnifiedSave();
+    
+    logInfo("[OTA] [OK] OTA password updated successfully");
+    logWarning("[OTA] Reboot required for changes to take effect");
+    return;
+  }
+
+  logError("[AUTH] Unknown target '%s' (use 'web' or 'ota')", type);
 }
 
 bool authTestPassword(const char* password) {

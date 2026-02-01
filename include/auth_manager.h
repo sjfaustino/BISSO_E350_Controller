@@ -97,11 +97,11 @@ void authRecordFailedAttempt(const char* ip_address);
 void authClearRateLimit(const char* ip_address);
 
 /**
- * @brief CLI Command handler for setting web password
+ * @brief CLI Command handler for setting passwords (web/ota)
  * @param argc Argument count
  * @param argv Argument array
  */
-void cmd_web_setpass(int argc, char** argv);
+void cmd_passwd(int argc, char** argv);
 
 /**
  * @brief CLI Command handler for auth diagnostics and testing

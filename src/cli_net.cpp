@@ -289,41 +289,7 @@ void ethTrackError() {
     eth_error_count++;
 }
 
-// SECURITY: OTA password management command
-void cmd_ota_setpass(int argc, char** argv) {
-    if (argc < 2) {
-        logPrintln("\n[OTA] === OTA Password Management ===");
-        CLI_USAGE("ota_setpass", "<new_password>");
-        logPrintln("Note: Password must be at least 8 characters");
-        logPrintln("      Requires reboot to take effect");
 
-        // Show current status
-        int ota_pw_changed = configGetInt(KEY_OTA_PW_CHANGED, 0);
-        if (ota_pw_changed == 0) {
-            logPrintln("\nCurrent: DEFAULT PASSWORD (insecure!)");
-        } else {
-            logPrintln("\nCurrent: CUSTOM PASSWORD (secure)");
-        }
-        return;
-    }
-
-    const char* new_password = argv[1];
-
-    // Validate password strength
-    if (strlen(new_password) < 8) {
-        logError("[OTA] Password must be at least 8 characters");
-        return;
-    }
-
-    // Save to NVS
-    configSetString(KEY_OTA_PASSWORD, new_password);
-    configSetInt(KEY_OTA_PW_CHANGED, 1);
-    configUnifiedSave();
-
-    logInfo("[OTA] [OK] Password updated successfully");
-    logWarning("[OTA] Reboot required for changes to take effect");
-    logPrintln("[OTA] Use command: reboot");
-}
 
 void cmd_ping(int argc, char** argv) {
     if (argc < 2) {
@@ -375,6 +341,5 @@ void cmd_ping(int argc, char** argv) {
 void cliRegisterWifiCommands() {
     cliRegisterCommand("wifi", "WiFi management", cmd_wifi_main);
     cliRegisterCommand("eth", "Ethernet management (KC868-A16)", cmd_eth_main);
-    cliRegisterCommand("ota_setpass", "Set OTA update password", cmd_ota_setpass);
     cliRegisterCommand("ping", "Ping a host", cmd_ping);
 }
