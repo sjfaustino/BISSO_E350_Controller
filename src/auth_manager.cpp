@@ -7,6 +7,7 @@
 #include "auth_manager.h"
 #include "cli.h"
 #include "config_unified.h"
+#include "config_keys.h"
 #include "serial_logger.h"
 #include "system_constants.h"
 #include <Preferences.h>
