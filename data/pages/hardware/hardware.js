@@ -184,7 +184,7 @@ window.HardwareModule = window.HardwareModule || {
     },
 
     loadConfigValues() {
-        fetch("/api/config").then(res => res.json()).then(data => {
+        fetch(`/api/config?_=${Date.now()}`).then(res => res.json()).then(data => {
             const setChecked = (id, val) => {
                 const el = document.getElementById(id);
                 if (el) el.checked = (val === 1 || val === "1" || val === true);
