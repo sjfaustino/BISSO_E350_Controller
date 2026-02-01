@@ -98,6 +98,7 @@ void test_concurrent_motion_commands() {
         if (success) commands_sent++;
         else commands_rejected++;
 
+        if (i % 50 == 0) watchdogFeed("CLI");
         vTaskDelay(pdMS_TO_TICKS(2));
     }
 
@@ -264,6 +265,7 @@ void test_logging_load_resilience_prod() {
     for (int i = 0; i < 5; i++) {
         logPrintf("[STRESS] Forcing state: %s\r\n", loadManagerGetStateString(states[i]));
         loadManagerForceState(states[i]);
+        watchdogFeed("CLI");
         vTaskDelay(pdMS_TO_TICKS(1000));
         TEST_ASSERT_FALSE(motionIsEmergencyStopped());
     }
@@ -292,7 +294,11 @@ void test_motion_jitter() {
     xTaskCreatePinnedToCore(logging_stress_task, "JitterS0", 2048, (void*)0, 2, NULL, 0);
     xTaskCreatePinnedToCore(logging_stress_task, "JitterS1", 2048, (void*)1, 2, NULL, 1);
     
-    vTaskDelay(pdMS_TO_TICKS(5000)); // Run for 5 seconds
+    // Run for 5 seconds, feeding watchdog every second
+    for (int i = 0; i < 5; i++) {
+        watchdogFeed("CLI");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
     
     g_stress_logging_active = false;
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -323,8 +329,11 @@ void runStressTests() {
     test_mutex_timeout_recovery();
     test_stack_exhaustion_detection();
     test_watchdog_resilience_prod();
+    watchdogFeed("CLI");
     test_i2c_recovery_mechanism_prod();
+    watchdogFeed("CLI");
     test_logging_load_resilience_prod();
+    watchdogFeed("CLI");
     test_motion_jitter();
     
     logPrintln("\r\n[STRESS] === Suite Complete ===");
