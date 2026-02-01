@@ -572,6 +572,11 @@ uint32_t wj66GetAxisAge(uint8_t axis) {
     return now - last;
 }
 
+uint32_t wj66GetReadCount(uint8_t axis) {
+    if (axis >= WJ66_AXES) return 0;
+    return wj66_state.read_count[axis];
+}
+
 bool wj66IsStale(uint8_t axis) { 
     return wj66GetAxisAge(axis) > WJ66_TIMEOUT_MS; 
 }

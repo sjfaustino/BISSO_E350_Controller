@@ -655,7 +655,7 @@ void cmd_encoder_status(int argc, char** argv) {
         uint32_t age = wj66GetAxisAge(i);
         const char* status = wj66IsStale(i) ? "STALE" : "OK";
         // Note: Read count isn't directly exposed in header, but we can show status/age
-        logPrintf("|  %d   | %9ld | %-6s | %9lu |                 |\r\n", i, (long)pos, status, (unsigned long)age);
+        logPrintf("|  %d   | %9ld | %-6s | %9lu | %-15lu |\r\n", i, (long)pos, status, (unsigned long)age, (unsigned long)wj66GetReadCount(i));
     }
     logPrintln("+------+-----------+--------+-----------+-----------------+");
 
