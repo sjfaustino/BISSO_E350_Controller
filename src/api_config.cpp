@@ -557,7 +557,9 @@ bool apiConfigGet(config_category_t category, JsonVariant doc) {
 
   case CONFIG_CATEGORY_SYSTEM: {
       obj["buzzer_en"] = configGetInt(KEY_BUZZER_EN, 1);
-      obj["status_light_en"] = configGetInt(KEY_STATUS_LIGHT_EN, 0);
+      int sl_val = configGetInt(KEY_STATUS_LIGHT_EN, 0);
+      logInfo("[API] System Config: sl_en=%d", sl_val);
+      obj["status_light_en"] = sl_val;
       obj["status_light_green"] = configGetInt(KEY_STATUS_LIGHT_GREEN, 13);
       obj["status_light_yellow"] = configGetInt(KEY_STATUS_LIGHT_YELLOW, 14);
       obj["status_light_red"] = configGetInt(KEY_STATUS_LIGHT_RED, 15);
