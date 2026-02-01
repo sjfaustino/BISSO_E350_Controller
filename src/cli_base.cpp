@@ -449,6 +449,11 @@ void cliPrintHelp() {
   logPrintln("  ~         - Cycle start / resume");
   logPrintln("  Ctrl-X    - Soft reset");
   
+  // Sort commands alphabetically
+  qsort(commands, command_count, sizeof(cli_command_t), [](const void* a, const void* b) -> int {
+      return strcasecmp(((cli_command_t*)a)->command, ((cli_command_t*)b)->command);
+  });
+
   logPrintln("\nSystem Commands:");
   for (int i = 0; i < command_count; i++) {
     logPrintf("  %-12s - %s\r\n", commands[i].command, commands[i].help);

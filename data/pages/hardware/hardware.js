@@ -196,7 +196,10 @@ window.HardwareModule = window.HardwareModule || {
 
             // System-level enable flags (nested under data.system)
             const sys = data.system || {};
-            setChecked("status_light_enabled", sys.status_light_en);
+            // Robust check: handle both full key (API standard) and short key (NVS fallback)
+            const sl_en = (sys.status_light_en !== undefined) ? sys.status_light_en : sys.sl_en;
+            setChecked("status_light_enabled", sl_en);
+
             setChecked("lcd_enabled", sys.lcd_en);
             setChecked("buzzer_enabled", sys.buzzer_en);
 
