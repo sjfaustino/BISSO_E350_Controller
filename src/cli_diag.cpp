@@ -87,23 +87,45 @@ void cmd_status_dashboard(int argc, char** argv) {
     (void)argc; (void)argv;
     watchdogFeed("CLI");
     
+    // System Metrics
     uint32_t uptime_sec = millis() / 1000;
     uint32_t hours = uptime_sec / 3600;
     uint32_t mins = (uptime_sec % 3600) / 60;
     uint32_t secs = uptime_sec % 60;
     
+    uint8_t cpu = taskGetCpuUsage();
+    size_t free_heap = esp_get_free_heap_size();
+    size_t min_heap = esp_get_minimum_free_heap_size();
+
+    // Job Status
+    extern JobManager jobManager;
+    job_status_t job = jobManager.getStatus();
+    const char* job_state_str = "IDLE";
+    char job_progress_str[32] = "";
+    
+    if (job.state == JOB_RUNNING) {
+        job_state_str = "RUNNING";
+        float progress = job.total_lines > 0 ? (float)job.current_line / job.total_lines * 100.0f : 0.0f;
+        snprintf(job_progress_str, sizeof(job_progress_str), "(%.1f%%)", progress);
+    } else if (job.state == JOB_PAUSED) job_state_str = "PAUSED";
+    else if (job.state == JOB_COMPLETE) job_state_str = "DONE";
+    else if (job.state == JOB_ERROR) job_state_str = "ERROR";
+
     logPrintln("\n+============================================================+");
-    logPrintln("|           BISSO E350 QUICK STATUS DASHBOARD               |");
-    logPrintf("|  Uptime: %02u:%02u:%02u                                        |\r\n", (unsigned int)hours, (unsigned int)mins, (unsigned int)secs);
+    logPrintln("|           BISSO E350 MASTER STATUS DASHBOARD              |");
+    logPrintf("|  Uptime: %02u:%02u:%02u   CPU: %-3u%%   Heap: %-4u KB (Min %-3u)  |\r\n", 
+              (unsigned int)hours, (unsigned int)mins, (unsigned int)secs, 
+              cpu, (unsigned)(free_heap/1024), (unsigned)(min_heap/1024));
     logPrintln("+============================================================+");
     
-    logPrintln("| POSITION (mm)                                             |");
-    logPrintf("|   X: %10.3f    Y: %10.3f                        |\r\n",
-                  motionGetPosition(0) / 1000.0f, motionGetPosition(1) / 1000.0f);
-    logPrintf("|   Z: %10.3f    A: %10.3f                        |\r\n",
-                  motionGetPosition(2) / 1000.0f, motionGetPosition(3) / 1000.0f);
+    logPrintln("| MOTION COORDINATES (mm)         | JOB STATUS               |");
+    logPrintf("|   X: %10.3f    Y: %10.3f  | State: %-8s %-9s|\r\n",
+                  motionGetPosition(0) / 1000.0f, motionGetPosition(1) / 1000.0f, job_state_str, job_progress_str);
+    logPrintf("|   Z: %10.3f    A: %10.3f  | Line:  %-6lu / %-6lu   |\r\n",
+                  motionGetPosition(2) / 1000.0f, motionGetPosition(3) / 1000.0f, 
+                  (unsigned long)job.current_line, (unsigned long)job.total_lines);
     
-    logPrintln("+------------------------------------------------------------+");
+    logPrintln("+---------------------------------+--------------------------+");
     logPrintln("| ENCODER FEEDBACK                                          |");
     bool fb_active = encoderMotionIsFeedbackActive();
     logPrintf("|   Status: %s                                         |\r\n",
