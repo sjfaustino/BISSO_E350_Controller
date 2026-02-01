@@ -648,8 +648,16 @@ void cmd_encoder_status(int argc, char** argv) {
     logPrintf("| Protocol        | %-37s |\r\n", (proto == 1) ? "Modbus RTU" : "ASCII (#XX\\r)");
     logPrintf("| Address         | %-37d |\r\n", configGetInt(KEY_ENC_ADDR, 0));
     logPrintln("+-----------------+---------------------------------------+");
-    logPrintln("| Axis | Pos (Pulse)| Pos (mm)   | Status | Age (ms)  | Reads           | Missed          |");
-    logPrintln("+------+------------+------------+--------+-----------+-----------------+-----------------+");
+    // Helper for compact metric formatting (max 4 chars)
+    auto formatMetric = [](uint32_t val, char* buf) {
+        if (val < 1000) snprintf(buf, 6, "%lu", (unsigned long)val);
+        else if (val < 1000000) snprintf(buf, 6, "%luK", (unsigned long)(val / 1000));
+        else snprintf(buf, 6, "%luM", (unsigned long)(val / 1000000));
+    };
+
+    logPrintln("+-----------------+---------------------------------------+");
+    logPrintln("| Axis | Name | Pos (Pulse)| Pos (mm)   | Status | Age (ms)  | Reads | Missed |");
+    logPrintln("+------+------+------------+------------+--------+-----------+-------+--------+");
 
     for (int i = 0; i < 4; i++) {
         int32_t pos = wj66GetPosition(i);
@@ -662,11 +670,18 @@ void cmd_encoder_status(int argc, char** argv) {
         float ppm = machineCal.axes[i].pulses_per_mm;
         float pos_mm = (ppm > 0.001f) ? (float)pos / ppm : 0.0f;
         
-        // Note: Read count isn't directly exposed in header, but we can show status/age
-        logPrintf("|  %d   | %10ld | %10.3f | %-6s | %9lu | %-15lu | %-15lu |\r\n", 
-            i, (long)pos, pos_mm, status, (unsigned long)age, (unsigned long)reads, (unsigned long)missed);
+        // Compact counters
+        char reads_str[8];
+        char missed_str[8];
+        formatMetric(reads, reads_str);
+        formatMetric(missed, missed_str);
+
+        char axis_name = "XYZA"[i];
+
+        logPrintf("|  %d   |  %c   | %10ld | %10.3f | %-6s | %9lu | %-5s | %-6s |\r\n", 
+            i, axis_name, (long)pos, pos_mm, status, (unsigned long)age, reads_str, missed_str);
     }
-    logPrintln("+------+------------+------------+--------+-----------+-----------------+-----------------+");
+    logPrintln("+------+------+------------+------------+--------+-----------+-------+--------+");
 
     encoderMotionDiagnostics();
 }
