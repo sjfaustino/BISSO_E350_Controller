@@ -273,6 +273,62 @@ ECHO CONTROL:
 
 ---
 
+### `passwd` - Password Management
+
+**Syntax:**
+```
+passwd [web|ota] <new_password>
+```
+
+**Description:**
+Sets or updates security credentials for system services. Replaces the legacy `web_setpass` and `ota_setpass` commands with a unified interface.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `web` | Set Web UI (admin) password |
+| `ota` | Set Over-The-Air firmware update password |
+
+**Usage Examples:**
+```
+passwd web MyStrongP@ss!
+passwd ota UpdateMe123!
+```
+
+**Requirements:**
+- Minimum 8 characters
+- Mixed char types (lowercase, uppercase, numbers, symbols) recommended
+
+**Expected Output (Web):**
+```text
+[AUTH] [OK] Web UI password updated successfully.
+[AUTH] [OK] New password active immediately.
+```
+
+**Expected Output (OTA):**
+```text
+[OTA] [OK] OTA password updated successfully
+[OTA] Reboot required for changes to take effect
+```
+
+**How It Works:**
+```text
+PASSWORD MANAGEMENT FLOW:
+┌─────────────────────────────────────────────────────────────┐
+│  passwd [type] [key]                                         │
+│         │                                                    │
+│         ├── web → authSetPassword()                          │
+│         │          ├─ Check complexity (min 8 chars, mixed)  │
+│         │          ├─ SHA-256 Hash + Salt                    │
+│         │          └─ Save to NVS "auth" namespace           │
+│         │                                                    │
+│         └── ota → configSetString("ota_pass")                │
+│                    └─ Save to NVS "config" namespace         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 2. 🕹️ GRBL COMPATIBILITY COMMANDS
 
 These commands provide Grbl-compatible interfaces for CNC software compatibility.
