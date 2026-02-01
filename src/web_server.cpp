@@ -491,7 +491,8 @@ void WebServerManager::broadcastState() {
     system_telemetry_t telemetry = telemetryGetSnapshot();
     
     // PHASE 6.4: String-based serialization (No heap churn)
-    char buffer[2048];
+    // CRITICAL: Moved to static to prevent stack overflow (2KB on stack was crashes)
+    static char buffer[2048];
     size_t len = serializeTelemetryToBuffer(buffer, sizeof(buffer), telemetry, false);
     
     if (len > 0 && len < sizeof(buffer)) {
