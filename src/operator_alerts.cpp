@@ -21,16 +21,16 @@ extern void elboQ73SetRelay(uint8_t relay_bit, bool state);
 
 // Status light state
 static bool status_light_enabled = false;
-static uint8_t status_light_pin_green = 13;   // Output 13 (0-indexed: 12)
-static uint8_t status_light_pin_yellow = 14;  // Output 14
-static uint8_t status_light_pin_red = 15;     // Output 15
+static uint16_t status_light_pin_green = 124;  // Default Y9
+static uint16_t status_light_pin_yellow = 125; // Default Y10
+static uint16_t status_light_pin_red = 126;    // Default Y11
 static system_display_state_t current_state = SYSTEM_STATE_IDLE;
 static uint32_t last_blink_time = 0;
 static bool blink_state = false;
 
 // Buzzer state
 static bool buzzer_enabled = false;
-static uint8_t buzzer_pin = 16;        // Output 16
+static uint16_t buzzer_pin = 127;       // Default Y12
 static buzzer_pattern_t current_pattern = BUZZER_OFF;
 static uint32_t buzzer_start_time = 0;
 static uint8_t buzzer_step = 0;
@@ -45,9 +45,13 @@ static uint8_t buzzer_step = 0;
 // INTERNAL HELPERS
 // =============================================================================
 
-static void setOutput(uint8_t pin, bool state) {
-    // Convert 1-based pin to 0-based relay bit (0-15)
-    if (pin >= 1 && pin <= 16) {
+static void setOutput(uint16_t pin, bool state) {
+    // PHASE 16: Support both virtual pin IDs (116-131) and legacy indices (1-16)
+    if (pin >= 116 && pin <= 131) {
+        // Virtual pins map to Bank 1 (116-123) and Bank 2 (124-131)
+        elboQ73SetRelay(pin - 116, state);
+    } else if (pin >= 1 && pin <= 16) {
+        // Legacy indices 1-16
         elboQ73SetRelay(pin - 1, state);
     }
 }
@@ -65,12 +69,25 @@ static void updateStatusLightOutputs(bool green, bool yellow, bool red) {
 
 void statusLightInit(void) {
     status_light_enabled = configGetInt(KEY_STATUS_LIGHT_EN, 0) != 0;  // Default: disabled
-    status_light_pin_green = configGetInt(KEY_STATUS_LIGHT_GREEN, 13);
-    status_light_pin_yellow = configGetInt(KEY_STATUS_LIGHT_YELLOW, 14);
-    status_light_pin_red = configGetInt(KEY_STATUS_LIGHT_RED, 15);
+    
+    // PHASE 16: Auto-migrate legacy pin indices (1-16) to virtual pin IDs (116-131)
+    auto migratePin = [](const char* key, uint16_t def) -> uint16_t {
+        uint16_t p = configGetInt(key, def);
+        if (p >= 1 && p <= 16) {
+            uint16_t virtualPin = p + 115;
+            logInfo("[STATUS] Migrating legacy pin %d -> Virtual %d for %s", p, virtualPin, key);
+            configSetInt(key, virtualPin);
+            return virtualPin;
+        }
+        return p;
+    };
+
+    status_light_pin_green = migratePin(KEY_STATUS_LIGHT_GREEN, 124);
+    status_light_pin_yellow = migratePin(KEY_STATUS_LIGHT_YELLOW, 125);
+    status_light_pin_red = migratePin(KEY_STATUS_LIGHT_RED, 126);
     
     if (status_light_enabled) {
-        logInfo("[STATUS] Status light ENABLED (G:%d Y:%d R:%d)", 
+        logInfo("[STATUS] Status light ENABLED (Pins: G:%d Y:%d R:%d)", 
                 status_light_pin_green, status_light_pin_yellow, status_light_pin_red);
         // Start in idle state (green)
         statusLightSetState(SYSTEM_STATE_IDLE);
@@ -185,10 +202,19 @@ system_display_state_t statusLightGetState(void) {
 
 void buzzerInit(void) {
     buzzer_enabled = configGetInt(KEY_BUZZER_EN, 1) != 0;  // Default: enabled
-    buzzer_pin = configGetInt(KEY_BUZZER_PIN, 16);
+    
+    // PHASE 16: Auto-migration for buzzer
+    uint16_t p = configGetInt(KEY_BUZZER_PIN, 127);
+    if (p >= 1 && p <= 16) {
+        buzzer_pin = p + 115;
+        logInfo("[BUZZER] Migrating legacy pin %d -> Virtual %d", p, buzzer_pin);
+        configSetInt(KEY_BUZZER_PIN, buzzer_pin);
+    } else {
+        buzzer_pin = p;
+    }
     
     if (buzzer_enabled) {
-        logInfo("[BUZZER] Buzzer ENABLED on output %d", buzzer_pin);
+        logInfo("[BUZZER] Buzzer ENABLED on Virtual Pin %d", buzzer_pin);
         setOutput(buzzer_pin, false);  // Start off
     } else {
         logDebug("[BUZZER] Buzzer disabled");
