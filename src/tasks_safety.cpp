@@ -30,10 +30,7 @@ void taskSafetyFunction(void *parameter) {
   watchdogTaskAdd("Safety");
   watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "Safety");
 
-  // PHASE 5.4: Use dedicated board input mutex for initialization
-  // PHASE 5.4: Use dedicated board input mutex for initialization
-  // NOTE: boardInputsInit() manages its own mutex internally
-  boardInputsInit();
+
 
   while (1) {
     perfMonitorTaskStart(PERF_TASK_ID_SAFETY);
