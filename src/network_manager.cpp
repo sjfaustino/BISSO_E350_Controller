@@ -464,7 +464,7 @@ void NetworkManager::init() {
 
   if (ota_pw_changed == 0) {
     logWarning("[OTA] Default password in use - change recommended!");
-    logWarning("[OTA] Use CLI command: ota_setpass <new_password>");
+    logWarning("[OTA] Use CLI command: passwd ota <new_password>");
   } else {
     logInfo("[OTA] [OK] Custom password loaded from NVS");
   }
