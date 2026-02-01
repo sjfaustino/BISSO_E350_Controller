@@ -283,6 +283,22 @@ passwd [web|ota] <new_password>
 **Description:**
 Sets or updates security credentials for system services. Replaces the legacy `web_setpass` and `ota_setpass` commands with a unified interface.
 
+**How It Works:**
+```text
+PASSWORD MANAGEMENT FLOW:
+┌─────────────────────────────────────────────────────────────┐
+│  passwd [type] [key]                                         │
+│         │                                                    │
+│         ├── web → authSetPassword()                          │
+│         │          ├─ Check complexity (min 8 chars, mixed)  │
+│         │          ├─ SHA-256 Hash + Salt                    │
+│         │          └─ Save to NVS "auth" namespace           │
+│         │                                                    │
+│         └── ota → configSetString("ota_pass")                │
+│                    └─ Save to NVS "config" namespace         │
+└─────────────────────────────────────────────────────────────┘
+```
+
 **Subcommands:**
 | Subcommand | Description |
 |------------|-------------|
@@ -309,22 +325,6 @@ passwd ota UpdateMe123!
 ```text
 [OTA] [OK] OTA password updated successfully
 [OTA] Reboot required for changes to take effect
-```
-
-**How It Works:**
-```text
-PASSWORD MANAGEMENT FLOW:
-┌─────────────────────────────────────────────────────────────┐
-│  passwd [type] [key]                                         │
-│         │                                                    │
-│         ├── web → authSetPassword()                          │
-│         │          ├─ Check complexity (min 8 chars, mixed)  │
-│         │          ├─ SHA-256 Hash + Salt                    │
-│         │          └─ Save to NVS "auth" namespace           │
-│         │                                                    │
-│         └── ota → configSetString("ota_pass")                │
-│                    └─ Save to NVS "config" namespace         │
-└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -3021,6 +3021,111 @@ SPECIFIC CUTTING ENERGY (SCE) CALCULATION:
 │   │  Current   │──→ │  Distance  │──→ │  Analytics │            │
 │   │  Sensor    │    │  Encoders  │    │  Module    │            │
 │   └────────────┘    └────────────┘    └────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 12. 📟 HARDWARE COMMANDS
+
+Direct control and diagnostics for hardware peripherals.
+
+---
+
+### `encoder` - Encoder Management
+
+**Syntax:**
+```
+encoder <subcommand> [args]
+```
+
+**Description:**
+Manages the WJ66 Absolute Encoder interface, providing status monitoring, configuration, and integration diagnostics.
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `status` | Show comprehensive encoder dashboard (positions, health, integration) |
+| `config` | Show current hardware configuration (pins, baud, protocol) |
+| `protocol <0/1>` | Set protocol mode (0=ASCII, 1=Modbus RTU) |
+| `zero <axis>` | Zero specific axis (Warning: Affects machine coordinates) |
+
+---
+
+#### `encoder status` - Dashboard
+
+**Syntax:**
+```
+encoder status
+```
+
+**Description:**
+Displays a real-time table of all 4 axes, showing raw pulse counts, calibrated millimeter positions, and bus health metrics. It also displays the "Encoder Integration" status, which monitors closed-loop performance.
+
+**Expected Output:**
+```text
+[ENCODER] === Configuration & Status Dashboard ===
++-----------------+---------------------------------------+
+| Interface       | RS485                                 |
+| Pins            | RX:16 TX:13                           |
+| Baud Rate       | 9600                                  |
+| Protocol        | ASCII (#XX\r)                         |
+| Address         | 1                                     |
++-----------------+---------------------------------------+
+| Axis | Name | Pos (Pulse)|  Pos (mm)  | Status | Age (ms)  | Reads | Missed |
++------+------+------------+------------+--------+-----------+-------+--------+
+|  0   |  X   |       5432 |     33.950 |  OK    |        50 |   54K |      0 |
+|  1   |  Y   |   12000000 |  12000.000 |  OK    |        51 |   12M |     1K |
+|  2   |  Z   |       -810 |     -0.810 |  OK    |        48 |   54K |      0 |
+|  3   |  A   |          0 |      0.000 | STALE  |      1500 |   54K |      5 |
++------+------+------------+------------+--------+-----------+-------+--------+
+
+=== ENCODER INTEGRATION ===
+Feedback: [ON]
+Threshold: 100.0 mm
+Axis 0: Err=0.0 mm | State=[OK]
+Axis 1: Err=1.2 mm | State=[OK]
+Axis 2: Err=0.0 mm | State=[OK]
+Axis 3: Err=0.0 mm | State=[OK]
+ok
+```
+
+**Column Definitions:**
+- **Axis**: Internal index (0-3).
+- **Name**: Axis label (X, Y, Z, A).
+- **Pos (Pulse)**: Raw signed integer value from the encoder.
+- **Pos (mm)**: Calibrated position (`Pulses / Pulses_per_mm`).
+- **Status**:
+    - `OK`: Fresh data received recently (< timeout).
+    - `STALE`: No data received within timeout (check wiring/power).
+- **Age (ms)**: Time elapsed since last valid packet.
+- **Reads**: Total valid packets received since boot.
+- **Missed**: Total failed poll attempts (`Total Polls - Successful Reads`). High numbers indicate RS485 noise or collision.
+
+**Encoder Integration (Closed-Loop Monitor):**
+The integration section reveals how the system monitors the 3-phase motors:
+- **Feedback**: `[ON]` means the system is actively comparing the Motion Planner's "Target" against the Encoder's "Actual".
+- **Threshold**: The maximum allowed following error (mm) before a fault is triggered.
+- **Axis Err**: The real-time difference (`Actual - Target`).
+    - **Concept**: Since induction motors have slip and no inherent step counting, this acts as a servo-like following error monitor. If the motor jams or stalls, "Actual" falls behind "Target", "Err" spikes, and the system E-Stops to prevent damage.
+
+```
+CLOSED LOOP MONITORING LOGIC:
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│  1. TARGET GENERATOR (Motion Planner)                            │
+│     Calculates where the axis SHOULD be right now (e.g., 100mm)  │
+│             │                                                    │
+│             ▼                                                    │
+│     [ COMPARATOR ] ◄──── Threshold Limit (e.g., 5mm)             │
+│             ▲                                                    │
+│             │                                                    │
+│  2. ACTUAL SENSOR (WJ66 Optical Encoder)                         │
+│     Reads where the motor ACTUALLY is (e.g., 99mm)               │
+│                                                                  │
+│  RESULT: Error = 1mm (OK)                                        │
+│  IF Error > Threshold ──→ TRIGGER ALARM (Stall Detect)           │
+│                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
