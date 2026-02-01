@@ -259,10 +259,13 @@ bool GCodeParser::processCommand(const char* line) {
             case 2:  motionStop(); break;
             case 3:  elboQ73SetRelay(ELBO_Q73_SPEED_1, true); break;
             case 5:  elboQ73SetRelay(ELBO_Q73_SPEED_1, false); break;
-            case 8:  plcSetAuxRelay(4, true); logInfo("[GCODE] Coolant ON (M8)"); break;   // Y13
-            case 9:  plcSetAuxRelay(4, false); plcSetAuxRelay(5, false); logInfo("[GCODE] All Coolant/Aux OFF (M9)"); break;
-            case 10: plcSetAuxRelay(5, true); logInfo("[GCODE] Vacuum ON (M10)"); break;   // Y14
-            case 11: plcSetAuxRelay(5, false); logInfo("[GCODE] Vacuum OFF (M11)"); break;
+            case 8:  plcSetOutput(getPin("output_coolant"), true); logInfo("[GCODE] Coolant ON (M8)"); break;   // Y13
+            case 9:  
+                plcSetOutput(getPin("output_coolant"), false); 
+                plcSetOutput(getPin("output_vacuum"), false); 
+                logInfo("[GCODE] All Coolant/Aux OFF (M9)"); break;
+            case 10: plcSetOutput(getPin("output_vacuum"), true); logInfo("[GCODE] Vacuum ON (M10)"); break;   // Y14
+            case 11: plcSetOutput(getPin("output_vacuum"), false); logInfo("[GCODE] Vacuum OFF (M11)"); break;
             // PHASE 3.2: M117 - Display message on LCD (standard gcode command)
             case 117: handleM117(line); break;
             // PHASE 4.0: M114 - Get current position

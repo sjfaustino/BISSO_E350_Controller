@@ -77,6 +77,7 @@ void plcSetDirection(bool positive);     // true=+, false=-
 void plcSetSpeed(uint8_t speed_profile); // 0=fast, 1=medium, 2=slow
 void plcClearAllOutputs();               // Clear all outputs (stop)
 void plcCommitOutputs();                 // Write shadow register to I2C
+void plcSetOutput(uint16_t pin, bool state); // Dynamic output control (Virtual/Legacy)
 void plcSetAuxRelay(uint8_t bit, bool state); // Control Bank 2 (Y9-Y16)
 
 // Transaction API for batching I2C writes

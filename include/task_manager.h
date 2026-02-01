@@ -33,25 +33,17 @@
 //       - JSON serialization (ArduinoJson allocates on stack for small docs)
 //       - Deep call chains in complex state machines
 
-#define TASK_STACK_SAFETY                                                      \
-  4096 // INCREASED: 3KB->4KB (Fix low stack warning on S3)
-#define TASK_STACK_MOTION                                                      \
-  4096 // Keep 4K for motion planner
-#define TASK_STACK_ENCODER                                                     \
-  3072 // REDUCED: 4KB->3KB
+#define TASK_STACK_SAFETY 3584
+#define TASK_STACK_MOTION 4096
+#define TASK_STACK_ENCODER 3072
 #define TASK_STACK_PLC_COMM 2048
-#define TASK_STACK_I2C_MANAGER                                                 \
-  3072
-#define TASK_STACK_CLI                                                         \
-  6144 // RESTORED: 4KB->6KB (Safe margin for stress tests)
+#define TASK_STACK_I2C_MANAGER 3072
+#define TASK_STACK_CLI 5120
 #define TASK_STACK_FAULT_LOG 3072
-#define TASK_STACK_MONITOR 4096 // TUNED: 6KB->4KB (HWM 732 bytes was too low at 3KB)
-#define TASK_STACK_TELEMETRY                                                   \
-  4096 // TUNED: 6KB->4KB (HWM 3.4KB unused)
-#define TASK_STACK_LCD_FORMAT                                                  \
-  4096 // INCREASED: 3KB->4KB (Fix low stack warning)
-#define TASK_STACK_LCD                                                         \
-  4096 // KEPT: 4KB (HWM 932 bytes was too low at 3KB)
+#define TASK_STACK_MONITOR 3072
+#define TASK_STACK_TELEMETRY 4096
+#define TASK_STACK_LCD_FORMAT 3584
+#define TASK_STACK_LCD 3584
 #define TASK_STACK_BOOT 2048
 
 // WARNING: AsyncWebServer handlers create JsonDocument on stack!
@@ -99,8 +91,8 @@
 // cycles max) Under load, I2C ops complete quickly due to 100kHz bus speed. If
 // timeout needed, indicates I2C bus/device failure → better to fail fast than
 // hang system.
-#define I2C_TIMEOUT_BASE_MS 50
-#define I2C_TIMEOUT_MAX_MS 150
+#define I2C_TIMEOUT_BASE_MS 100
+#define I2C_TIMEOUT_MAX_MS 200
 #define I2C_TIMEOUT_SCALE 0.5f
 
 // ============================================================================
@@ -117,7 +109,7 @@
 // Rationale: Under fault conditions, system can generate 20+ faults/sec.
 // With 50 items, queue fills in 2.5s and critical logs are dropped.
 // With 150 items, provides 7.5s buffer for fault processing.
-#define QUEUE_LEN_FAULT 150
+#define QUEUE_LEN_FAULT 50
 #define QUEUE_LEN_DISPLAY 10
 
 // ============================================================================

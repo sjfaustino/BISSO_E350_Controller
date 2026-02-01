@@ -392,52 +392,75 @@
 
 
 
-        <!-- Tower Light Card -->
+        <!-- Status Feedback Card (Merged Light & Buzzer) -->
         <div class="card device-card">
-            <div class="card-header device-header status-light">
-                <h3 data-i18n="hardware.status_light">🚦 Status Light</h3>
+            <div class="card-header device-header status-feedback">
+                <h3 data-i18n="hardware.status_feedback">📊 Status Feedback</h3>
                 <span class="device-protocol">Digital Outputs</span>
             </div>
             <div class="card-content">
-                <div class="pin-row">
-                    <label for="output_status_green" data-i18n="hardware.green_idle">🟢 Green (Idle):</label>
-                    <select class="pin-select" id="output_status_green" data-signal="output_status_green"></select>
+                <!-- Status Light Section -->
+                <div class="feedback-section">
+                    <h4 data-i18n="hardware.status_light">Status Light</h4>
+                    <div class="pin-row" style="margin-bottom: 10px;">
+                        <label for="status_light_enabled" data-i18n="hardware.enabled">Enabled:</label>
+                        <input type="checkbox" id="status_light_enabled" data-config="status_light_en">
+                    </div>
+                    <div class="pin-row">
+                        <label for="output_status_green" data-i18n="hardware.green_idle">Green (Idle):</label>
+                        <select class="pin-select" id="output_status_green" data-signal="output_status_green"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label for="output_status_yellow" data-i18n="hardware.yellow_run">Yellow (Run):</label>
+                        <select class="pin-select" id="output_status_yellow"
+                            data-signal="output_status_yellow"></select>
+                    </div>
+                    <div class="pin-row">
+                        <label for="output_status_red" data-i18n="hardware.red_fault">Red (Fault):</label>
+                        <select class="pin-select" id="output_status_red" data-signal="output_status_red"></select>
+                    </div>
+                    <div class="device-note" data-i18n="hardware.status_light_note" style="margin-top: 5px;">Visual
+                        status
+                        indicator via KC868-A16 outputs</div>
                 </div>
-                <div class="pin-row">
-                    <label for="output_status_yellow" data-i18n="hardware.yellow_run">🟡 Yellow (Run):</label>
-                    <select class="pin-select" id="output_status_yellow" data-signal="output_status_yellow"></select>
+
+                <hr class="section-divider" style="margin: 20px 0; border: 0; border-top: 1px solid var(--bg-hover);">
+
+                <!-- Buzzer Section -->
+                <div class="feedback-section">
+                    <h4 data-i18n="hardware.audible_alarm">Audible Alarm</h4>
+                    <div class="pin-row" style="margin-bottom: 10px;">
+                        <label for="buzzer_enabled" data-i18n="hardware.enabled">Enabled:</label>
+                        <input type="checkbox" id="buzzer_enabled" data-config="buzzer_en" checked>
+                    </div>
+                    <div class="pin-row">
+                        <label for="output_buzzer" data-i18n="hardware.buzzer_output">Buzzer Output:</label>
+                        <select class="pin-select" id="output_buzzer" data-signal="output_buzzer"></select>
+                    </div>
+                    <div class="device-note" data-i18n="hardware.buzzer_note" style="margin-top: 5px;">Audible alerts
+                        for
+                        job complete, warnings, faults</div>
                 </div>
-                <div class="pin-row">
-                    <label for="output_status_red" data-i18n="hardware.red_fault">🔴 Red (Fault):</label>
-                    <select class="pin-select" id="output_status_red" data-signal="output_status_red"></select>
-                </div>
-                <div class="pin-row" style="margin-top: 10px;">
-                    <label for="status_light_enabled" data-i18n="hardware.enabled">Enabled:</label>
-                    <input type="checkbox" id="status_light_enabled" data-config="status_light_en">
-                </div>
-                <div class="device-note" data-i18n="hardware.status_light_note">Visual status indicator via
-                    KC868-A16
-                    outputs</div>
             </div>
         </div>
 
-        <!-- Buzzer Card -->
+        <!-- Auxiliary Relays Card -->
         <div class="card device-card">
-            <div class="card-header device-header buzzer">
-                <h3 data-i18n="hardware.audible_alarm">🔔 Audible Alarm</h3>
+            <div class="card-header device-header auxiliary">
+                <h3 data-i18n="hardware.aux_relays">🔌 Auxiliary Relays</h3>
                 <span class="device-protocol">Digital Outputs</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="output_buzzer" data-i18n="hardware.buzzer_output">Buzzer Output:</label>
-                    <select class="pin-select" id="output_buzzer" data-signal="output_buzzer"></select>
+                    <label for="output_coolant" data-i18n="hardware.coolant_relay">Coolant Relay:</label>
+                    <select class="pin-select" id="output_coolant" data-signal="output_coolant"></select>
                 </div>
-                <div class="pin-row" style="margin-top: 10px;">
-                    <label for="buzzer_enabled" data-i18n="hardware.enabled">Enabled:</label>
-                    <input type="checkbox" id="buzzer_enabled" data-config="buzzer_en" checked>
+                <div class="pin-row">
+                    <label for="output_vacuum" data-i18n="hardware.vacuum_relay">Vacuum Relay:</label>
+                    <select class="pin-select" id="output_vacuum" data-signal="output_vacuum"></select>
                 </div>
-                <div class="device-note" data-i18n="hardware.buzzer_note">Audible alerts for job complete, warnings,
-                    faults</div>
+                <div class="device-note" data-i18n="hardware.aux_note">Auxiliary output controls for coolant, vacuum,
+                    and other accessories</div>
             </div>
         </div>
     </div>
@@ -505,17 +528,18 @@
     }
 
     /* Device Headers */
-    .hardware-page .device-header {
+    .hardware-page .card-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        color: white;
+        color: white !important;
         border-radius: var(--radius-md) var(--radius-md) 0 0;
     }
 
-    .hardware-page .device-header h3 {
+    .hardware-page .card-header h3 {
         margin: 0;
         font-size: var(--font-size-base);
+        color: white !important;
     }
 
     .hardware-page .device-protocol {
@@ -571,6 +595,14 @@
 
     .hardware-page .device-header.tachometer {
         background: linear-gradient(135deg, #0d9488, #0f766e);
+    }
+
+    .hardware-page .device-header.status-feedback {
+        background: linear-gradient(135deg, #f97316, #ea580c);
+    }
+
+    .hardware-page .device-header.auxiliary {
+        background: linear-gradient(135deg, #4d7c0f, #15803d);
     }
 
     /* Pin Rows */

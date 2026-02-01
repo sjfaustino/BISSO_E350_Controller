@@ -11,9 +11,7 @@
 #include "config_keys.h"
 #include "serial_logger.h"
 #include <Arduino.h>
-
-// Forward declare PLC interface function
-extern void elboQ73SetRelay(uint8_t relay_bit, bool state);
+#include "plc_iface.h"
 
 // =============================================================================
 // STATE VARIABLES
@@ -45,22 +43,16 @@ static uint8_t buzzer_step = 0;
 // INTERNAL HELPERS
 // =============================================================================
 
-static void setOutput(uint16_t pin, bool state) {
-    // PHASE 16: Support both virtual pin IDs (116-131) and legacy indices (1-16)
-    if (pin >= 116 && pin <= 131) {
-        // Virtual pins map to Bank 1 (116-123) and Bank 2 (124-131)
-        elboQ73SetRelay(pin - 116, state);
-    } else if (pin >= 1 && pin <= 16) {
-        // Legacy indices 1-16
-        elboQ73SetRelay(pin - 1, state);
-    }
+static void statusLightSet(uint16_t pin, bool state) {
+    if (pin == 0 || pin == 0xFFFF) return; // Not configured
+    plcSetOutput(pin, state);
 }
 
 static void updateStatusLightOutputs(bool green, bool yellow, bool red) {
     if (!status_light_enabled) return;
-    setOutput(status_light_pin_green, green);
-    setOutput(status_light_pin_yellow, yellow);
-    setOutput(status_light_pin_red, red);
+    statusLightSet(status_light_pin_green, green);
+    statusLightSet(status_light_pin_yellow, yellow);
+    statusLightSet(status_light_pin_red, red);
 }
 
 // =============================================================================
@@ -138,15 +130,15 @@ void statusLightUpdate(void) {
         switch (current_state) {
             case SYSTEM_STATE_PAUSED:
                 // Green solid, Yellow blink
-                setOutput(status_light_pin_yellow, blink_state);
+                statusLightSet(status_light_pin_yellow, blink_state);
                 break;
             case SYSTEM_STATE_FAULT:
                 // Red blink
-                setOutput(status_light_pin_red, blink_state);
+                statusLightSet(status_light_pin_red, blink_state);
                 break;
             case SYSTEM_STATE_HOMING:
                 // Yellow blink
-                setOutput(status_light_pin_yellow, blink_state);
+                statusLightSet(status_light_pin_yellow, blink_state);
                 break;
             default:
                 // No blinking needed
@@ -215,7 +207,7 @@ void buzzerInit(void) {
     
     if (buzzer_enabled) {
         logInfo("[BUZZER] Buzzer ENABLED on Virtual Pin %d", buzzer_pin);
-        setOutput(buzzer_pin, false);  // Start off
+        plcSetOutput(buzzer_pin, false);  // Start off
     } else {
         logDebug("[BUZZER] Buzzer disabled");
     }
@@ -230,13 +222,13 @@ void buzzerPlay(buzzer_pattern_t pattern) {
     
     // Start first beep for most patterns
     if (pattern != BUZZER_OFF) {
-        setOutput(buzzer_pin, true);
+        plcSetOutput(buzzer_pin, true);
     }
 }
 
 void buzzerStop(void) {
     current_pattern = BUZZER_OFF;
-    setOutput(buzzer_pin, false);
+    plcSetOutput(buzzer_pin, false);
 }
 
 void buzzerUpdate(void) {
@@ -259,11 +251,11 @@ void buzzerUpdate(void) {
             
         case BUZZER_BEEP_DOUBLE:
             if (buzzer_step == 0 && elapsed >= BEEP_SHORT_MS) {
-                setOutput(buzzer_pin, false);
+                plcSetOutput(buzzer_pin, false);
                 buzzer_step = 1;
                 buzzer_start_time = millis();
             } else if (buzzer_step == 1 && elapsed >= BEEP_GAP_MS) {
-                setOutput(buzzer_pin, true);
+                plcSetOutput(buzzer_pin, true);
                 buzzer_step = 2;
                 buzzer_start_time = millis();
             } else if (buzzer_step == 2 && elapsed >= BEEP_SHORT_MS) {
@@ -275,14 +267,14 @@ void buzzerUpdate(void) {
             // 3 short beeps with gaps
             if (buzzer_step % 2 == 0) {  // Beep phase
                 if (elapsed >= BEEP_SHORT_MS) {
-                    setOutput(buzzer_pin, false);
+                    plcSetOutput(buzzer_pin, false);
                     buzzer_step++;
                     buzzer_start_time = millis();
                     if (buzzer_step >= 5) buzzerStop();  // Done after 3 beeps
                 }
             } else {  // Gap phase
                 if (elapsed >= BEEP_GAP_MS) {
-                    setOutput(buzzer_pin, true);
+                    plcSetOutput(buzzer_pin, true);
                     buzzer_step++;
                     buzzer_start_time = millis();
                 }
@@ -296,19 +288,19 @@ void buzzerUpdate(void) {
         case BUZZER_JOB_COMPLETE:
             // Distinctive pattern: long-short-short
             if (buzzer_step == 0 && elapsed >= BEEP_LONG_MS) {
-                setOutput(buzzer_pin, false);
+                plcSetOutput(buzzer_pin, false);
                 buzzer_step = 1;
                 buzzer_start_time = millis();
             } else if (buzzer_step == 1 && elapsed >= BEEP_GAP_MS) {
-                setOutput(buzzer_pin, true);
+                plcSetOutput(buzzer_pin, true);
                 buzzer_step = 2;
                 buzzer_start_time = millis();
             } else if (buzzer_step == 2 && elapsed >= BEEP_SHORT_MS) {
-                setOutput(buzzer_pin, false);
+                plcSetOutput(buzzer_pin, false);
                 buzzer_step = 3;
                 buzzer_start_time = millis();
             } else if (buzzer_step == 3 && elapsed >= BEEP_GAP_MS) {
-                setOutput(buzzer_pin, true);
+                plcSetOutput(buzzer_pin, true);
                 buzzer_step = 4;
                 buzzer_start_time = millis();
             } else if (buzzer_step == 4 && elapsed >= BEEP_SHORT_MS) {

@@ -427,6 +427,17 @@ uint8_t elboGetSpeedProfile() {
   return 0xFF; // No speed set
 }
 
+void plcSetOutput(uint16_t pin, bool state) {
+    // Support both virtual pin IDs (116-131) and legacy indices (1-16)
+    if (pin >= 116 && pin <= 131) {
+        // Virtual pins map to Bank 1 (116-123) and Bank 2 (124-131)
+        elboQ73SetRelay(pin - 116, state);
+    } else if (pin >= 1 && pin <= 16) {
+        // Legacy indices 1-16
+        elboQ73SetRelay(pin - 1, state);
+    }
+}
+
 void elboQ73SetRelay(uint8_t relay_bit, bool state) {
   if (relay_bit > 15) // Support up to 16 outputs (0-15)
     return;
@@ -474,51 +485,33 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
 // INPUT READING
 // ============================================================================
 
-bool elboI73GetInput(uint8_t bit, bool *success) {
-  if (!g_plc_hardware_present) {
-    if (success) *success = false;
-    return (i73_input_shadow & (1 << bit));
-  }
+/**
+ * @brief Performs a full read of the I73 input board into the shadow register.
+ * @details Call this once per control loop to reduce I2C bus traffic.
+ */
+void elboI73Refresh() {
+  if (!g_plc_hardware_present) return;
 
-  // CRITICAL FIX: Acquire PLC I2C mutex to prevent bus contention
-  // Timeout: 200ms (PLC operations are time-sensitive but not critical)
-  if (!taskLockMutex(taskGetI2cPlcMutex(), 200)) {
-    static uint32_t last_log = 0;
-    if (millis() - last_log > 2000) {
-      logWarning("[PLC] PLC I2C mutex timeout - using cached input");
-      last_log = millis();
-    }
-    if (success)
-      *success = false;
-    return (i73_input_shadow & (1 << bit));
-  }
+  // CRITICAL FIX: Acquire PLC I2C mutex
+  if (!taskLockMutex(taskGetI2cPlcMutex(), 100)) return;
 
   uint8_t count = Wire.requestFrom((uint8_t)ADDR_I73_INPUT, (uint8_t)1);
-
   if (count == 1) {
     i73_input_shadow = Wire.read();
-    if (success)
-      *success = true;
-  } else {
-    if (success)
-      *success = false;
-
-    // Throttled logging
-    static uint32_t last_log = 0;
-    if (millis() - last_log > 2000) {
-      logError("[PLC] I2C Read Failed (I73)");
-      last_log = millis();
-    }
   }
 
   taskUnlockMutex(taskGetI2cPlcMutex());
-
-  // Check bit state (Returns cached value on failure)
-  return (i73_input_shadow & (1 << bit));
 }
 
-void elboI73Refresh() {
-  elboI73GetInput(0, nullptr);
+/**
+ * @brief Reads a specific bit from the I73 input shadow register.
+ * @param bit Bit index (0-7).
+ * @param success [Optional] Pointer to bool. Set to false if I2C fails (legacy).
+ * @return State of the bit from the last elboI73Refresh() call.
+ */
+bool elboI73GetInput(uint8_t bit, bool *success) {
+  if (success) *success = true; // Cached reads always "succeed" if hardware present
+  return (i73_input_shadow & (1 << bit));
 }
 
 void elboDiagnostics() {

@@ -38,7 +38,8 @@ struct {
   uint32_t error_count;
   uint32_t last_command_time;
   bool waiting_for_response; // Added for flow control
-} wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false};
+  uint32_t last_latency_ms;  // Latency of last successful read
+} wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false, 0};
 
 // RS-485 Registry Device Descriptor
 static bool wj66Poll(void* ctx);
@@ -322,10 +323,9 @@ static bool wj66Poll(void* ctx) { (void)ctx;
     int addr = configGetInt(KEY_ENC_ADDR, 0);
     int proto = configGetInt(KEY_ENC_PROTO, 0); // 0=ASCII, 1=Modbus
 
-    if (proto == 1) {
-        // Modbus RTU Mode: Read 8 registers (4 axes * 32-bit) starting at 0x0010
         uint8_t frame[8];
         modbusReadRegistersRequest((uint8_t)addr, 0x0010, 8, frame);
+        wj66_state.last_command_time = millis();
         return rs485Send(frame, 8);
     }
     
@@ -333,6 +333,7 @@ static bool wj66Poll(void* ctx) { (void)ctx;
     char cmd[8];
     snprintf(cmd, sizeof(cmd), "#%02d2\r", addr); // Use #AA2\r per manual
     
+    wj66_state.last_command_time = millis();
     if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
         logDebug("[WJ66] Sending Poll: %s (Addr %d)", cmd, addr);
         return rs485Send((const uint8_t*)cmd, (uint8_t)strlen(cmd));
@@ -377,9 +378,11 @@ static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void
         
         // Update state
         if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            uint32_t now = millis();
+            wj66_state.last_latency_ms = now - wj66_state.last_command_time;
             for (int i = 0; i < axes_found; i++) {
                 wj66_state.position[i] = values[i];
-                wj66_state.last_read[i] = millis();
+                wj66_state.last_read[i] = now;
                 wj66_state.read_count[i]++;
             }
             wj66_state.status = ENCODER_OK;
@@ -487,6 +490,7 @@ static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void
                 wj66_state.last_read[i] = millis();
                 wj66_state.read_count[i]++;
             }
+            wj66_state.last_latency_ms = millis() - wj66_state.last_command_time;
             wj66_state.status = ENCODER_OK;
             xSemaphoreGive(wj66_mutex);
             // Diagnostic trace enabled for debugging the background issue
@@ -625,7 +629,9 @@ void wj66Diagnostics() {
   logPrintln("\n=== ENCODER STATUS ===");
   logPrintf("Interface: %d (%s)\n", hal->interface, encoderHalGetInterfaceName(hal->interface));
   logPrintf("Baud Rate: %lu\n", (unsigned long)hal->baud_rate);
-  logPrintf("Status: %d\nErrors: %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
+  logPrintf("Protocol:  %s\n", configGetInt(KEY_ENC_PROTO, 0) == 1 ? "Modbus RTU" : "ASCII/CSV");
+  logPrintf("Latency:   %lu ms (Response time)\n", (unsigned long)wj66_state.last_latency_ms);
+  logPrintf("Status:    %d\nErrors:   %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
   logPrintf("Waiting: %s\n", wj66_state.waiting_for_response ? "YES" : "NO");
   
   for (int i = 0; i < WJ66_AXES; i++) {

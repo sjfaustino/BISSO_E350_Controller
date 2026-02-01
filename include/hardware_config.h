@@ -112,7 +112,7 @@ const SignalDef signalDefinitions[] = {
 
     // Auxiliary Peripherals (Y13-Y16, Virtual 128-131)
     {"output_coolant",       "Coolant Relay",     "Flood coolant control", 128, "output", "o_cool"},
-    {"output_vacuum",        "Vacuum Relay",      "Vacuum/Dust control",   129, "output", "o_vac"},
+    {"output_vacuum",        "Vacuum Relay",      "Vacuum/Dust control",    -1, "output", "o_vac"},
 
     // WJ66 Encoder (RS232 -> RS485 Converter)
     {"wj66_rx", "WJ66 RX", "Encoder RX", 16, "input", "wj66_rx"},

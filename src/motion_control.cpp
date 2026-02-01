@@ -274,7 +274,11 @@ void motionUpdate() {
 
   // Read I/O if we have an active axis
   if (current_axis < MOTION_AXES) {
-    // This blocks if I2C is broken, BUT mutex is NOT held!
+    // PHASE 17: I2C Optimization - Read full input byte once per loop
+    // This reduces bus traffic from 2-3 reads to 1 read per 10ms
+    elboI73Refresh();
+    
+    // Uses cached snapshot from elboI73Refresh()
     consensus_active = elboI73GetInput(AXIS_TO_CONSENSO_BIT[current_axis]);
   }
 
