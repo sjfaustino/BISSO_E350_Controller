@@ -1766,7 +1766,6 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("debug", "System diagnostics", cmd_debug_main);
     cliRegisterCommand("selftest", "Run hardware self-test", cmd_selftest);
     cliRegisterCommand("timeouts", "Show timeout diagnostics", cmd_timeout_diag);
-    cliRegisterCommand("config", "Configuration management", cmd_config_main);
     cliRegisterCommand("wdt", "Watchdog management", cmd_diag_scheduler_main);
     cliRegisterCommand("task", "Task monitoring", cmd_diag_scheduler_main);
 
@@ -1784,7 +1783,6 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("nvs", "NVS storage inspector", cmd_nvs_main);
 
     cliRegisterCommand("dio", "Digital I/O status display", cmd_dio_main);
-    cliRegisterCommand("spindle", "Spindle monitor & alarms", cmd_spindle_main);
     cliRegisterCommand("cutting", "Stone cutting analytics", cmd_cutting_main);
     
     // C2: Quick summary command

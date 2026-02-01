@@ -43,11 +43,11 @@
 #define TASK_STACK_I2C_MANAGER                                                 \
   3072
 #define TASK_STACK_CLI                                                         \
-  8192 // RESTORED: 4KB->8KB (ls -R recursion needs stack space)
+  4096 // TUNED: 8KB->4KB (HWM 5.5KB unused)
 #define TASK_STACK_FAULT_LOG 3072
 #define TASK_STACK_MONITOR 4096 // TUNED: 6KB->4KB (HWM 732 bytes was too low at 3KB)
 #define TASK_STACK_TELEMETRY                                                   \
-  6144 // TUNED: 8KB->6KB (HWM 484 bytes was too low at 5KB)
+  4096 // TUNED: 6KB->4KB (HWM 3.4KB unused)
 #define TASK_STACK_LCD_FORMAT                                                  \
   4096 // INCREASED: 3KB->4KB (Fix low stack warning)
 #define TASK_STACK_LCD                                                         \

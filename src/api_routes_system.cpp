@@ -69,16 +69,52 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // GET /api/config
     server.on("/api/config", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        JsonDocument doc;
-        apiConfigGet(CONFIG_CATEGORY_MOTION, doc);
-        apiConfigGet(CONFIG_CATEGORY_VFD, doc);
-        apiConfigGet(CONFIG_CATEGORY_ENCODER, doc);
-        apiConfigGet(CONFIG_CATEGORY_SYSTEM, doc);
-        apiConfigGet(CONFIG_CATEGORY_NETWORK, doc);
-        apiConfigGet(CONFIG_CATEGORY_SERIAL, doc);
-        apiConfigGet(CONFIG_CATEGORY_SPINDLE, doc);
+        response->setContentType("application/json");
         
-        return sendJsonResponse(response, doc);
+        // STREAMING RESPONSE (Reduces Heap usage significantly)
+        // Instead of building one massive JsonDocument (which fragments heap),
+        // we stream each category one by one.
+        
+        uint8_t buffer[1024];
+        ChunkPrinter printer(response, buffer, sizeof(buffer));
+        
+        response->sendChunk((uint8_t*)"{", 1);
+        
+        bool first = true;
+        const config_category_t categories[] = {
+            CONFIG_CATEGORY_MOTION,
+            CONFIG_CATEGORY_VFD,
+            CONFIG_CATEGORY_ENCODER,
+            CONFIG_CATEGORY_SYSTEM,
+            CONFIG_CATEGORY_NETWORK,
+            CONFIG_CATEGORY_SERIAL,
+            CONFIG_CATEGORY_SPINDLE,
+            CONFIG_CATEGORY_HARDWARE,
+            CONFIG_CATEGORY_BEHAVIOR
+        };
+
+        const char* names[] = {
+            "motion", "vfd", "encoder", "system", "network", "serial", "spindle", "hardware", "behavior"
+        };
+        
+        for(size_t i=0; i<sizeof(categories)/sizeof(categories[0]); i++) {
+            if(!first) response->sendChunk((uint8_t*)",", 1);
+            first = false;
+            
+            // Send key e.g. "motion":
+            char keyHeader[32];
+            snprintf(keyHeader, sizeof(keyHeader), "\"%s\":", names[i]);
+            response->sendChunk((uint8_t*)keyHeader, strlen(keyHeader));
+            
+            // Serialize ONLY this category
+            JsonDocument catDoc; // Short-lived, small, stack-friendly if small enough or transient heap
+            apiConfigGet(categories[i], catDoc);
+            serializeJson(catDoc, printer);
+            printer.flush();
+        }
+        
+        response->sendChunk((uint8_t*)"}", 1);
+        return response->finishChunking();
     });
 
     // POST /api/config

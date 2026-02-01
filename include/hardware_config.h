@@ -105,10 +105,10 @@ const SignalDef signalDefinitions[] = {
     {"output_speed_slow", "Speed Slow",        "Slow speed",           123, "output", "o_spd_slo"},
     
     // Status Light (Tower Light)
-    {"output_status_green",  "Status Green",      "Status light green",   124, "output", "o_st_grn"},
-    {"output_status_yellow", "Status Yellow",     "Status light yellow",  125, "output", "o_st_yel"},
-    {"output_status_red",    "Status Red",        "Status light red",     126, "output", "o_st_red"},
-    {"output_buzzer",        "Buzzer",            "Audible alarm",        127, "output", "o_buzz"},
+    {"output_status_green",  "Status Green",      "Status light green",   124, "output", "sl_green"},
+    {"output_status_yellow", "Status Yellow",     "Status light yellow",  125, "output", "sl_yellow"},
+    {"output_status_red",    "Status Red",        "Status light red",     126, "output", "sl_red"},
+    {"output_buzzer",        "Buzzer",            "Audible alarm",        127, "output", "buzzer_pin"},
 
     // Auxiliary Peripherals (Y13-Y16, Virtual 128-131)
     {"output_coolant",       "Coolant Relay",     "Flood coolant control", 128, "output", "o_cool"},
