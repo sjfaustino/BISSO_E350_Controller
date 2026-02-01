@@ -38,6 +38,7 @@
 #include "safety.h"
 #include "firmware_version.h"
 #include "encoder_motion_integration.h"
+#include "calibration.h"
 #include "encoder_calibration.h"
 #include "system_utilities.h"
 #include "input_validation.h"
@@ -647,8 +648,8 @@ void cmd_encoder_status(int argc, char** argv) {
     logPrintf("| Protocol        | %-37s |\r\n", (proto == 1) ? "Modbus RTU" : "ASCII (#XX\\r)");
     logPrintf("| Address         | %-37d |\r\n", configGetInt(KEY_ENC_ADDR, 0));
     logPrintln("+-----------------+---------------------------------------+");
-    logPrintln("| Axis | Pos (Pulse)| Status | Age (ms)  | Reads           | Missed          |");
-    logPrintln("+------+------------+--------+-----------+-----------------+-----------------+");
+    logPrintln("| Axis | Pos (Pulse)| Pos (mm)   | Status | Age (ms)  | Reads           | Missed          |");
+    logPrintln("+------+------------+------------+--------+-----------+-----------------+-----------------+");
 
     for (int i = 0; i < 4; i++) {
         int32_t pos = wj66GetPosition(i);
@@ -658,10 +659,14 @@ void cmd_encoder_status(int argc, char** argv) {
         uint32_t polls = wj66GetPollCount();
         uint32_t missed = (polls > reads) ? (polls - reads) : 0;
         
+        float ppm = machineCal.axes[i].pulses_per_mm;
+        float pos_mm = (ppm > 0.001f) ? (float)pos / ppm : 0.0f;
+        
         // Note: Read count isn't directly exposed in header, but we can show status/age
-        logPrintf("|  %d   | %10ld | %-6s | %9lu | %-15lu | %-15lu |\r\n", i, (long)pos, status, (unsigned long)age, (unsigned long)reads, (unsigned long)missed);
+        logPrintf("|  %d   | %10ld | %10.3f | %-6s | %9lu | %-15lu | %-15lu |\r\n", 
+            i, (long)pos, pos_mm, status, (unsigned long)age, (unsigned long)reads, (unsigned long)missed);
     }
-    logPrintln("+------+------------+--------+-----------+-----------------+-----------------+");
+    logPrintln("+------+------------+------------+--------+-----------+-----------------+-----------------+");
 
     encoderMotionDiagnostics();
 }
