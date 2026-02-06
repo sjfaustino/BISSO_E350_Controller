@@ -62,6 +62,12 @@ float rtcGetTemperature();
 void rtcSyncSystemTime();
 
 /**
+ * @brief Get current Unix epoch from RTC
+ * @return Epoch time in seconds
+ */
+uint32_t rtcGetCurrentEpoch();
+
+/**
  * @brief Check if RTC time is valid (not factory default 2000-01-01)
  * @return true if time appears to be set, false if default
  */

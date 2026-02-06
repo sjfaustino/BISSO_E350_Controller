@@ -1,0 +1,84 @@
+<div class="explorer-container">
+    <div class="explorer-header">
+        <div class="breadcrumb-container">
+            <div id="explorer-breadcrumbs" class="breadcrumbs">
+                <!-- Breadcrumbs populated by JS -->
+            </div>
+        </div>
+        <div class="explorer-actions">
+            <label class="btn btn-primary" title="Upload File">
+                <input type="file" id="explorer-upload-input" hidden>
+                <span>⬆️ <span data-i18n="explorer.upload">Upload</span></span>
+            </label>
+            <button id="explorer-new-folder" class="btn btn-secondary" title="New Folder">
+                <span>📁+ <span data-i18n="explorer.new_folder">New Folder</span></span>
+            </button>
+            <button id="explorer-refresh" class="btn btn-secondary" title="Refresh">
+                <span>🔄</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="explorer-body">
+        <aside class="explorer-sidebar">
+            <div class="sidebar-section">
+                <h4 data-i18n="explorer.storage">Storage</h4>
+                <ul class="drive-list">
+                    <li class="drive-item active" data-drive="flash">
+                        <span class="drive-icon">📟</span>
+                        <div class="drive-info">
+                            <span class="drive-name" data-i18n="explorer.internal_flash">Internal Flash</span>
+                            <div class="progress-small">
+                                <div id="flash-usage-bar" class="progress-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="drive-item" data-drive="sd">
+                        <span class="drive-icon">💾</span>
+                        <div class="drive-info">
+                            <span class="drive-name" data-i18n="explorer.sd_card">SD Card</span>
+                            <div class="progress-small">
+                                <div id="sd-usage-bar" class="progress-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <h4 data-i18n="explorer.quick_access">Quick Access</h4>
+                <ul class="quick-links">
+                    <li data-path="/logs">📋 Logs</li>
+                    <li data-path="/gcode">📝 G-Code</li>
+                    <li data-path="/sd/logs">💾 SD Logs</li>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="explorer-main">
+            <div id="explorer-file-list" class="file-grid">
+                <!-- Files and folders populated by JS -->
+                <div class="loading-overlay">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+            <div id="explorer-drop-zone" class="drop-zone hidden">
+                <div class="drop-zone-content">
+                    <span class="drop-icon">📤</span>
+                    <h3 data-i18n="explorer.drop_to_upload">Drop files to upload</h3>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="explorer-ctx-menu" class="ctx-menu hidden">
+        <ul>
+            <li id="ctx-open">📂 <span data-i18n="explorer.open">Open</span></li>
+            <li id="ctx-run" class="hidden">▶️ <span data-i18n="explorer.run">Run</span></li>
+            <li class="menu-divider"></li>
+            <li id="ctx-download">⬇️ <span data-i18n="explorer.download">Download</span></li>
+            <li id="ctx-rename">✏️ <span data-i18n="explorer.rename">Rename</span></li>
+            <li id="ctx-delete" class="menu-danger">🗑️ <span data-i18n="explorer.delete">Delete</span></li>
+        </ul>
+    </div>
+</div>

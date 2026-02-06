@@ -19,6 +19,8 @@
 #include "i2c_bus_recovery.h"       // ROBUSTNESS FIX: I2C bus recovery before E-STOP
 #include "load_manager.h"           // PHASE 5.3: For loadManagerUpdate()
 #include "rs485_device_registry.h"  // RS485 Watchdog
+#include "oled_dashboard.h"         // Local OLED Dashboard
+#include "sd_telemetry_logger.h"    // Background SD Logging
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -31,6 +33,12 @@ void taskMonitorFunction(void* parameter) {
 
   memoryMonitorInit();
   taskStallDetectionInit();  // PHASE 2.5: Initialize task stall detection
+  
+  // Initialize Local OLED Dashboard for v3.1
+  oledDashboardInit();
+  
+  // Initialize SD Telemetry Logger (Black Box)
+  sdTelemetryLoggerInit();
   
   while (1) {
     // 1. Memory Integrity Check
@@ -138,6 +146,20 @@ void taskMonitorFunction(void* parameter) {
     // 3.9. RS485 Bus Health Check
     if (rs485CheckWatchdog()) {
       // Watchdog alert active - logs within rs485CheckWatchdog() only first time
+    }
+
+    // Update Local OLED Dashboard (DRO and System Info)
+    static uint32_t last_oled_update = 0;
+    if (millis() - last_oled_update > 500) { // 2Hz refresh for OLED
+        oledDashboardUpdate();
+        last_oled_update = millis();
+    }
+
+    // Update SD Telemetry Logger (1Hz Black Box recording)
+    static uint32_t last_sd_log_ms = 0;
+    if (millis() - last_sd_log_ms > 1000) {
+        sdTelemetryLoggerUpdate();
+        last_sd_log_ms = millis();
     }
 
     // 4. Task Health Analysis

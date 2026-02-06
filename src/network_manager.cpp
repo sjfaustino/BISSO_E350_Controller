@@ -246,7 +246,11 @@ String NetworkManager::getEthernetMAC() const {
 
 void NetworkManager::initEthernet() {
 #if ETHERNET_AVAILABLE
-  int eth_enabled = configGetInt(KEY_ETH_ENABLED, 0);  // Default: disabled to save memory
+#if BOARD_KC868_A16_V31
+  int eth_enabled = configGetInt(KEY_ETH_ENABLED, 1);  // Default: enabled for v3.1
+#else
+  int eth_enabled = configGetInt(KEY_ETH_ENABLED, 0);  // Default: disabled to save memory on v1.6
+#endif
   
   if (!eth_enabled) {
     logInfo("[ETH] Ethernet disabled in config");

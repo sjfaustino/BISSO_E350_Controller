@@ -177,6 +177,24 @@ void rtcSyncSystemTime() {
     }
 }
 
+uint32_t rtcGetCurrentEpoch() {
+    if (!rtc_available) return (uint32_t)time(NULL);
+    
+    int y, m, d, h, min, s;
+    if (rtcGetDateTime(&y, &m, &d, &h, &min, &s)) {
+        struct tm tm_time;
+        tm_time.tm_year = y - 1900;
+        tm_time.tm_mon = m - 1;
+        tm_time.tm_mday = d;
+        tm_time.tm_hour = h;
+        tm_time.tm_min = min;
+        tm_time.tm_sec = s;
+        tm_time.tm_isdst = -1;
+        return (uint32_t)mktime(&tm_time);
+    }
+    return (uint32_t)time(NULL);
+}
+
 bool rtcIsTimeSet() {
     int y, m, d, h, min, s;
     if (!rtcGetDateTime(&y, &m, &d, &h, &min, &s)) {

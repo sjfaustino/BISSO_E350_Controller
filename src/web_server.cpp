@@ -36,6 +36,7 @@
 #include "lcd_interface.h"  // Added for LCD mirroring
 #include "lcd_message.h"    // Added for M117 telemetry
 #include "task_manager.h"   // Added for Stack monitoring
+#include "psram_web_cache.h"
 
 // Telemetry History Buffer (last 60 samples, sampled every 5s = 5mins)
 #define HISTORY_BUFFER_SIZE 60
@@ -102,6 +103,9 @@ void WebServerManager::init() {
         }
         logPrintln("[WEB] LittleFS formatted and mounted");
     }
+    
+    // Initialize PSRAM Web Cache (loads assets into RAM for ultra-fast serving)
+    PsramWebCache::getInstance().init();
     
     // PHASE 6.4: Allocate broadcast buffer in PSRAM
     if (broadcast_buffer == nullptr) {
@@ -221,7 +225,17 @@ void WebServerManager::setupRoutes() {
         return streamResponse.send();
     });
 
-    // Main static handler (serves from LittleFS /)
+    // PSRAM Cache Handler: Intercept all other GET requests to serve from RAM
+    server.on("*", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        const cached_file_t* cachedFile = nullptr;
+        if (PsramWebCache::getInstance().get(request->path().c_str(), &cachedFile)) {
+            response->addHeader("Cache-Control", "public, max-age=3600");
+            return response->send(200, cachedFile->content_type.c_str(), cachedFile->data, cachedFile->size);
+        }
+        return (esp_err_t)404; // Fallback to next handler (serveStatic)
+    });
+
+    // Main static handler (serves from LittleFS / as fallback)
     server.serveStatic("/", LittleFS, "/", "public, max-age=3600");
 }
 

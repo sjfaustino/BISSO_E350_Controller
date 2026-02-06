@@ -14,13 +14,16 @@
     #define SerialOut Serial
 #endif
 
-#define LOGGER_BUFFER_SIZE 1024
+#define LOGGER_BUFFER_SIZE 512
 static log_level_t current_log_level = LOG_LEVEL_INFO;
-// shared_log_buffer removed to ensure absolute thread-safety via local stack buffers
 
 // Thread-safety: Mutex for serial output
 static SemaphoreHandle_t serial_mutex = NULL;
 static bool mutex_initialized = false;
+
+// Shared static buffer to prevent stack overflows in system tasks
+// Protected by serial_mutex
+static char shared_formatting_buffer[LOGGER_BUFFER_SIZE];
 
 // Async Queue State
 #define LOG_QUEUE_DEPTH 32
@@ -43,6 +46,7 @@ static bool acquireSerialMutex() {
   if (!mutex_initialized || !serial_mutex) return true;  // Allow if not initialized
   
   // Use consistent timeout for all tasks
+  // For recursive mutexes, if this thread already has it, this returns immediately
   TickType_t timeout = pdMS_TO_TICKS(100);
   return xSemaphoreTakeRecursive(serial_mutex, timeout) == pdTRUE;
 }
@@ -60,32 +64,28 @@ static void releaseSerialMutex() {
 static void vlogPrint(log_level_t level, const char* prefix, const char* format, va_list args) {
   if (level > current_log_level) return;
   
-  // Use local buffer for thread-safety and re-entrancy.
-  // With 8KB stacks, 1KB on stack is safe and provides perfect isolation.
-  char local_buffer[LOGGER_BUFFER_SIZE];
-  int offset = 0;
-  
-  if (prefix != NULL) offset = snprintf(local_buffer, LOGGER_BUFFER_SIZE, "%s", prefix);
-  vsnprintf(local_buffer + offset, LOGGER_BUFFER_SIZE - offset, format, args);
-  
-  // Safe logging starts here - Mutex only protects the output stream/queue
+  // Lock first: The shared_formatting_buffer is NOT thread-safe
   if (!acquireSerialMutex()) return;
+
+  int offset = 0;
+  if (prefix != NULL) offset = snprintf(shared_formatting_buffer, LOGGER_BUFFER_SIZE, "%s", prefix);
+  vsnprintf(shared_formatting_buffer + offset, LOGGER_BUFFER_SIZE - offset, format, args);
   
-  // PHASE 6: Optimized Async Output
+  // Terminal log entries should be atomic
   if (async_enabled && log_queue != NULL) {
     log_msg_t msg;
-    strncpy(msg.text, local_buffer, LOGGER_BUFFER_SIZE - 1);
+    strncpy(msg.text, shared_formatting_buffer, LOGGER_BUFFER_SIZE - 1);
     msg.text[LOGGER_BUFFER_SIZE - 1] = '\0';
     
     if (xQueueSend(log_queue, &msg, 0) != pdTRUE) {
-        SerialOut.println(local_buffer);
+        SerialOut.println(shared_formatting_buffer);
         SerialOut.println("[DEBUG] Log queue overflowed!");
     }
   } else {
-    SerialOut.println(local_buffer);
+    SerialOut.println(shared_formatting_buffer);
   }
   
-  bootLogWrite(local_buffer);
+  bootLogWrite(shared_formatting_buffer);
   releaseSerialMutex();
 }
 
@@ -211,44 +211,42 @@ void logVerbose(const char* format, ...) {
 }
 
 void logPrintf(const char* format, ...) {
-  char local_buffer[LOGGER_BUFFER_SIZE];
-  va_list args; va_start(args, format);
-  vsnprintf(local_buffer, LOGGER_BUFFER_SIZE, format, args); 
-  va_end(args);
-
   if (!acquireSerialMutex()) return;
+
+  va_list args; va_start(args, format);
+  vsnprintf(shared_formatting_buffer, LOGGER_BUFFER_SIZE, format, args); 
+  va_end(args);
   
   if (async_enabled && log_queue != NULL) {
     log_msg_t msg;
-    strncpy(msg.text, local_buffer, LOGGER_BUFFER_SIZE - 1);
+    strncpy(msg.text, shared_formatting_buffer, LOGGER_BUFFER_SIZE - 1);
     msg.text[LOGGER_BUFFER_SIZE - 1] = '\0';
     xQueueSend(log_queue, &msg, 0);
   } else {
-    SerialOut.print(local_buffer);
+    SerialOut.print(shared_formatting_buffer);
   }
   
-  networkManager.telnetPrint(local_buffer);
+  networkManager.telnetPrint(shared_formatting_buffer);
   releaseSerialMutex();
 }
 
 void logPrintln(const char* format, ...) {
-  char local_buffer[LOGGER_BUFFER_SIZE];
-  va_list args; va_start(args, format);
-  vsnprintf(local_buffer, LOGGER_BUFFER_SIZE, format, args); 
-  va_end(args);
-
   if (!acquireSerialMutex()) return;
+
+  va_list args; va_start(args, format);
+  vsnprintf(shared_formatting_buffer, LOGGER_BUFFER_SIZE, format, args); 
+  va_end(args);
   
   if (async_enabled && log_queue != NULL) {
     log_msg_t msg;
-    strncpy(msg.text, local_buffer, LOGGER_BUFFER_SIZE - 1);
+    strncpy(msg.text, shared_formatting_buffer, LOGGER_BUFFER_SIZE - 1);
     msg.text[LOGGER_BUFFER_SIZE - 1] = '\0';
     xQueueSend(log_queue, &msg, 0);
   } else {
-    SerialOut.println(local_buffer);
+    SerialOut.println(shared_formatting_buffer);
   }
   
-  networkManager.telnetPrintln(local_buffer);
+  networkManager.telnetPrintln(shared_formatting_buffer);
   releaseSerialMutex();
 }
 

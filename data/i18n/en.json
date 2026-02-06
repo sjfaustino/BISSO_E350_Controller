@@ -7,6 +7,7 @@
         "dashboard": "Dashboard",
         "motion": "Motion",
         "gcode": "G-Code",
+        "explorer": "Explorer",
         "homing": "Homing",
         "diagnostics": "Diagnostics",
         "network": "Network",
@@ -735,5 +736,19 @@
         "clear_failed": "Failed to clear:",
         "alarm_status": "ALARM",
         "ok_status": "OK"
+    },
+    "explorer": {
+        "upload": "Upload",
+        "new_folder": "New Folder",
+        "drop_to_upload": "Drop files to upload",
+        "storage": "Storage",
+        "internal_flash": "Internal Flash",
+        "sd_card": "SD Card",
+        "quick_access": "Quick Access",
+        "open": "Open",
+        "run": "Run",
+        "download": "Download",
+        "rename": "Rename",
+        "delete": "Delete"
     }
 }
