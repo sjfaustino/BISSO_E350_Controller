@@ -23,6 +23,12 @@ window.SettingsModule = window.SettingsModule || {
         this.loadModules().then(() => this.loadConfiguration());
         window.addEventListener('state-changed', () => this.updateSystemInfo());
 
+        // Check SD card status for storage selectors
+        this.checkSDCardStatus();
+        this.setupStorageSelectors();
+
+
+
         // Hide Undo button initially
         const undoBtn = document.getElementById('undo-settings-btn');
         if (undoBtn) undoBtn.style.display = 'none';
@@ -528,7 +534,105 @@ window.SettingsModule = window.SettingsModule || {
         } catch (e) {
             console.warn('[Settings] OTA settings load failed:', e);
         }
+    },
+
+    // === SD Card Storage Selection ===
+
+    async checkSDCardStatus() {
+        try {
+            const data = await window.API.get('sd/status', null, { silent: true });
+            const badge = document.getElementById('sd-status-badge');
+            const sdOption = document.getElementById('sd-option');
+            const importSdOption = document.getElementById('import-sd-option');
+            const sdInfo = document.getElementById('sd-info');
+            const sdSpaceInfo = document.getElementById('sd-space-info');
+
+            if (data && data.available) {
+                // SD Card available
+                if (badge) {
+                    badge.textContent = '✓ SD Ready';
+                    badge.style.background = 'var(--color-optimal)';
+                }
+                if (sdOption) sdOption.disabled = false;
+                if (importSdOption) importSdOption.disabled = false;
+                if (sdInfo) sdInfo.style.display = 'block';
+                if (sdSpaceInfo && data.freeMB) {
+                    sdSpaceInfo.textContent = `SD: ${data.freeMB} MB free`;
+                }
+                this.sdCardAvailable = true;
+                this.sdCardInfo = data;
+            } else {
+                // SD Card not available
+                if (badge) {
+                    badge.textContent = data?.present ? 'SD Not Mounted' : 'No SD Card';
+                    badge.style.background = 'var(--color-critical)';
+                }
+                if (sdOption) sdOption.disabled = true;
+                if (importSdOption) importSdOption.disabled = true;
+                if (sdInfo) sdInfo.style.display = 'none';
+                this.sdCardAvailable = false;
+            }
+        } catch (e) {
+            console.warn('[Settings] SD card check failed:', e);
+            this.sdCardAvailable = false;
+        }
+    },
+
+    setupStorageSelectors() {
+        const exportSelect = document.getElementById('export-storage-select');
+        const importSelect = document.getElementById('import-storage-select');
+        const filesList = document.getElementById('storage-files-list');
+        const importBtn = document.getElementById('import-config-btn');
+
+        // Update import button text based on selection
+        if (importSelect) {
+            importSelect.addEventListener('change', (e) => {
+                const value = e.target.value;
+                if (filesList) filesList.style.display = (value !== 'upload') ? 'block' : 'none';
+                if (importBtn) {
+                    importBtn.textContent = value === 'upload' ? 'Choose File & Import' : 'Load Selected';
+                }
+                if (value === 'sd' || value === 'flash') {
+                    this.loadStorageBackups(value);
+                }
+            });
+        }
+    },
+
+    async loadStorageBackups(storage) {
+        const filesList = document.getElementById('storage-files-list');
+        if (!filesList) return;
+
+        filesList.innerHTML = '<div style="padding: 12px; color: var(--text-muted); text-align: center;">Loading files...</div>';
+
+        try {
+            const endpoint = storage === 'sd' ? 'sd/backups' : 'config/backups';
+            const data = await window.API.get(endpoint);
+
+            if (data?.files?.length > 0) {
+                filesList.innerHTML = data.files.map(f => `
+                    <div class="backup-file-item" data-file="${f.name}" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between;">
+                        <span>📄 ${f.name}</span>
+                        <span style="color: var(--text-muted); font-size: 0.85em;">${(f.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                `).join('');
+
+                // Add click handlers
+                filesList.querySelectorAll('.backup-file-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        filesList.querySelectorAll('.backup-file-item').forEach(i => i.style.background = '');
+                        item.style.background = 'var(--bg-tertiary)';
+                        this.selectedBackupFile = item.dataset.file;
+                    });
+                });
+            } else {
+                filesList.innerHTML = '<div style="padding: 12px; color: var(--text-muted); text-align: center;">No backup files found</div>';
+            }
+        } catch (e) {
+            filesList.innerHTML = '<div style="padding: 12px; color: var(--color-critical); text-align: center;">Failed to load files</div>';
+        }
     }
 };
 
 window.currentPageModule = SettingsModule;
+

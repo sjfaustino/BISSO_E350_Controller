@@ -11,6 +11,7 @@
 #include "jxk10_modbus.h"         // PHASE 5.0: JXK-10 Spindle Current
 #include "axis_synchronization.h" // PHASE 5.6: Axis validation
 #include "cutting_analytics.h"    // Stone cutting analytics
+#include "spindle_current_monitor.h" // Added for load % telemetry
 #include "dashboard_metrics.h"    // PHASE 5.3: Web UI dashboard metrics
 #include "encoder_diagnostics.h"  // PHASE 5.3: Encoder health monitoring
 #include "encoder_wj66.h"         // Fix: Include for ENCODER_OK
@@ -101,6 +102,7 @@ void taskTelemetryFunction(void *parameter) {
         webServer.setVFDFrequency(isnan(vfd_frequency) || vfd_frequency < 0.0f ? 0.0f : vfd_frequency);
         webServer.setVFDThermalState((vfd_thermal < 0 || vfd_thermal > 200) ? 0 : vfd_thermal);
         webServer.setVFDFaultCode(altivar31GetFaultCode());
+        webServer.setSpindleLoadPercent(spindleMonitorGetLoadPercent());
         webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
         webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
         webServer.setVFDConnected(vfd_alive);

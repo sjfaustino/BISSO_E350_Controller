@@ -57,7 +57,7 @@ The ESP32 controller **replaces a broken ELBO positioning controller**. It inter
 │                                                                         │
 │  ┌─────────────────────┐          ┌─────────────────────┐             │
 │  │   ESP32 Controller  │◄────────►│   Siemens S5 PLC    │             │
-│  │   (KC868-A16 v1.6)  │  PCF8574 │   (Original)        │             │
+│  │   (KC868-A16 v3.1)  │  PCF8574 │   (Original)        │             │
 │  │                     │  I/O     │                     │             │
 │  │  • Position control │          │  • Contactor control│             │
 │  │  • User interface   │          │  • VFD speed ref    │             │
@@ -91,15 +91,16 @@ The ESP32 controller **replaces a broken ELBO positioning controller**. It inter
 
 ### ESP32 Controller Board
 
-| Parameter | v1.6 (Standard) | v3.1 (Upgrade) |
-|-----------|-----------------|----------------|
-| **MCU** | ESP32-WROOM-32E | ESP32-S3-N16R8 |
-| **Flash** | 4 MB | 16 MB |
-| **PSRAM** | None | 8 MB |
-| **Ethernet** | LAN8720A (RMII) | W5500 (SPI) |
-| **Role** | Positioning Controller | Positioning Controller |
-| **Env Flag** | `BOARD_KC868_A16_V16` | `BOARD_KC868_A16_V31` |
-| **Build Target**| `esp32dev` | `esp32s3-kc868-a16-v31` |
+| Parameter | KC868-A16 v3.1 (Standard) | KC868-A16 v1.6 (Legacy) |
+|-----------|---------------------------|-------------------------|
+| **MCU**   | **ESP32-S3-WROOM-1U**     | ESP32-WROOM-32E         |
+| **Flash** | 16 MB                     | 4 MB                    |
+| **PSRAM** | 8 MB                      | None                    |
+| **Ethernet**| W5500 (SPI)              | LAN8720A (RMII)         |
+| **Antenna** | External (v3.1)          | Internal PCB (v1.6)     |
+| **Role**    | Definitive Controller    | Legacy Support          |
+| **Env Flag** | `BOARD_KC868_A16_V31`     | `BOARD_KC868_A16_V16`   |
+| **Build Target**| `esp32s3-kc868-a16-v31` | `esp32dev`              |
 
 ---
 
@@ -243,14 +244,40 @@ The A axis is a **manual rotary axis** for angle adjustment:
 
 ### Current Monitoring Thresholds
 
-Based on the motor specifications, the following protection thresholds are configured:
+Based on the motor specifications and the new Spindle Load logic, the following protection thresholds are configured:
 
-| Threshold | Value | Rationale |
-|-----------|-------|-----------|
-| **Overcurrent** | 30.0 A | 122% of rated (24.5A), allows startup surge |
-| **Stall Detection** | 25.0 A | ~102% of rated current |
-| **Auto-Pause** | 25.0 A | Pause cutting if load exceeds threshold |
-| **Tool Breakage** | 5.0 A drop | Sudden current drop detection |
+| Parameter | Key | Default | Purpose |
+|-----------|-----|---------|---------|
+| **Rated Spindle Amps** | `sp_rated_a` | 24.5 A | Base for Load % calculation ($Amps/Rated \times 100$) |
+| **Overcurrent** | `sp_ovr_a` | 30.0 A | 122% of rated; allows startup surge |
+| **Stall Detection** | `sp_stall_a`| 25.0 A | ~102% of rated current; triggers E-Stop |
+| **Auto-Pause (Thr)** | `sp_pthr`    | 25.0 A | Pause cutting if load exceeds this value |
+| **Auto-Pause (En)**  | `sp_pause`   | 1      | Enable auto-pause functionality (1=ON, 0=OFF) |
+| **Tool Breakage**    | `sp_tbthr`   | 5.0 A  | Sudden current drop detection threshold |
+| **Maintenance Int.** | `maint_m`    | 50000  | Distance in meters before 🔧 alert (50km) |
+
+---
+
+## 💾 NVS Configuration & Persistence
+
+The controller uses the ESP32's **Non-Volatile Storage (NVS)** to persist machine state across power cycles.
+
+### Persistent Machine State
+The following keys are stored in the `nvs` namespace:
+
+| Key | Description | Unit | Update Frequency |
+|-----|-------------|------|------------------|
+| `dist_0_m` | Total X-axis travel | Meters | Every 100m or 1hr idle |
+| `dist_1_m` | Total Y-axis travel | Meters | Every 100m or 1hr idle |
+| `dist_2_m` | Total Z-axis travel | Meters | Every 100m or 1hr idle |
+| `rt_mins`  | Total Up-time | Minutes | Every 60 minutes |
+| `maint_log`| Service entries | JSON | On-demand (status maint log) |
+
+### Flash Protection (SafeSave™)
+To prevent internal flash wear (ESP32 is rated for ~100,000 writes), the controller implements a **Deferred Write Strategy**:
+- **Distance Counters**: Only written to NVS when the machine has moved >100m or has been stationary for >1 hour. This reduces flash wear by 99% compared to real-time saving.
+- **Runtime Counters**: Written every 60 minutes.
+- **Immediate Saves**: Configuration changes (`config set`) and Maintenance Logs are written immediately.
 
 ---
 
@@ -533,6 +560,8 @@ Shared RS-485 bus for Modbus devices:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-03 | 1.3.0 | Set KC868-A16 v3.1 (ESP32-S3-WROOM-1U) as standard definitive target |
+| 2026-02-02 | 1.2.0 | Added Spindle Rated Amps config and NVS 'SafeSave' documentation |
 | 2026-01-26 | 1.1.1 | Corrected standard board version from v1.5 to v1.6 |
-| 2026-01-26 | 1.1.0 | Added support for KC868-A16 v3.1 (ESP32-S3-N16R8) |
+| 2026-01-26 | 1.1.0 | Added initial support for KC868-A16 v3.1 (ESP32-S3-N16R8) |
 | 2026-01-01 | 1.0.0 | Initial documentation |

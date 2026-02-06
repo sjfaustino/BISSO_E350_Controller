@@ -17,7 +17,8 @@ typedef enum {
   SAFETY_PLC_FAULT = 3,
   SAFETY_THERMAL = 4,
   SAFETY_ALARM = 5,
-  SAFETY_ENCODER_ERROR = 6
+  SAFETY_ENCODER_ERROR = 6,
+  SAFETY_RS485_TIMEOUT = 7
 } safety_fault_t;
 
 // FIX: This structure defines the data container for the entire safety module.

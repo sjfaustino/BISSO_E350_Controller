@@ -2,7 +2,7 @@
 #define HAL_INTERFACE_H
 
 #include <Arduino.h>
-#include "../../telemetry_packet.h"
+#include "telemetry_packet.h"
 
 class RemoteDRO_HAL {
 public:

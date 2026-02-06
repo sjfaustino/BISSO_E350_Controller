@@ -101,30 +101,30 @@ status
 
 ---
 
-### `status` - Quick System Status Dashboard
+### `status` - Master Status Dashboard & Diagnostics
 
-**Description:** Displays a high-level summary of system health, positions, network status, and active faults.
+**Description:** Displays a comprehensive real-time summary of machine health, including coordinates, spindle load, network, and active faults.
 
 **Syntax:**
 ```
-status
+status [spindle|maint|runtime|i2c]
 ```
 
-**Example Output:**
-```
+**Master Dashboard Output:**
+```text
 +============================================================+
-|           BISSO E350 QUICK STATUS DASHBOARD               |
-|  Uptime: 00:15:23                                        |
+|           BISSO E350 MASTER STATUS DASHBOARD              |
+|  Uptime: 00:45:12   CPU: 12 %   Heap: 145 KB (Min 128)     |
 +============================================================+
-| POSITION (mm)                                             |
-|   X:      0.000    Y:      0.000                        |
-|   Z:      0.000    A:      0.000                        |
-+------------------------------------------------------------+
+| MOTION COORDINATES (mm)         | JOB STATUS               |
+|   X:   1250.450    Y:    750.120  | State: IDLE              |
+|   Z:     50.000    A:      0.000  | Line:  0      / 0        |
++---------------------------------+--------------------------+
 | ENCODER FEEDBACK                                          |
 |   Status: [ON]                                            |
 +------------------------------------------------------------+
-| SPINDLE CURRENT                                           |
-|   Current:   5.2 A  |  Peak:   8.4 A                    |
+| SPINDLE MONITORING                                        |
+|   Current:   5.2 A  |  Peak:   8.4 A   |  Load:  21.2%    |
 |   Alarm: OK                                               |
 +------------------------------------------------------------+
 | NETWORK                                                   |
@@ -135,6 +135,15 @@ status
 |   [NONE] System healthy                                   |
 +============================================================+
 ```
+
+**Subcommands:**
+- `spindle`: Show real-time Amps, RPM, and **Load %**.
+- `maint`: View axis travel distance and **log maintenance service**.
+- `runtime`: Lifetime machine hours and total distance.
+- `i2c`: Bus health and error counters.
+
+> [!NOTE]
+> For even more detail, use the specialized subcommands or refer to the [CLI COMMAND MASTER REFERENCE](CLI_COMMANDS_REFERENCE.md).
 
 ---
 

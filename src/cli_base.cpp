@@ -151,6 +151,8 @@ void cliInit() {
   cliRegisterDiagCommands();
   cliRegisterCalibCommands();
   cliRegisterWifiCommands(); 
+  cliRegisterSDCommands();
+  cliRegisterRTCCommands();
   cliRegisterCommand("passwd", "Set password (web/ota)", cmd_passwd);
   cliRegisterCommand("auth", "Auth diagnostics & testing", cmd_auth);
   cliRegisterCommand("lcd", "LCD Display Control", cmd_lcd_main);
@@ -186,13 +188,16 @@ void cliUpdate() {
         float wPos[4];
         for(int i=0; i<4; i++) wPos[i] = gcodeParser.getWorkPosition(i, mPos[i]);
 
-        logPrintf("<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f|Bf:%d,127|FS:%.0f,0>\r\n",
-            state_str,
-            mPos[0], mPos[1], mPos[2], mPos[3],
-            wPos[0], wPos[1], wPos[2], wPos[3],
-            plan_slots,
-            motionPlanner.getFeedOverride() * 100.0f 
-        );
+        if (serialLoggerLock()) {
+            logPrintf("<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f|Bf:%d,127|FS:%.0f,0>\r\n",
+                state_str,
+                mPos[0], mPos[1], mPos[2], mPos[3],
+                wPos[0], wPos[1], wPos[2], wPos[3],
+                plan_slots,
+                motionPlanner.getFeedOverride() * 100.0f 
+            );
+            serialLoggerUnlock();
+        }
         return; 
     }
 
@@ -222,7 +227,10 @@ void cliUpdate() {
             if (strlen(history_buffer) > 0) {
                 // Clear current line on terminal
                 if (cli_echo_enabled) {
-                    for (int i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
+                    if (serialLoggerLock()) {
+                        for (int i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
+                        serialLoggerUnlock();
+                    }
                 }
                 
                 // Copy history to current buffer
@@ -230,7 +238,12 @@ void cliUpdate() {
                 cli_pos = strlen(cli_buffer);
                 
                 // Echo the recalled command
-                if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
+                if (cli_echo_enabled) {
+                    if (serialLoggerLock()) {
+                        CLI_SERIAL.print(cli_buffer);
+                        serialLoggerUnlock();
+                    }
+                }
             }
         }
         esc_state = 0;
@@ -249,7 +262,12 @@ void cliUpdate() {
       last_was_eol = true;
       last_eol_char = c;
 
-      if (cli_echo_enabled) CLI_SERIAL.println();
+      if (cli_echo_enabled) {
+        if (serialLoggerLock()) {
+            CLI_SERIAL.println();
+            serialLoggerUnlock();
+        }
+      }
       if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
         
@@ -271,7 +289,12 @@ void cliUpdate() {
       last_was_eol = false;
       if (cli_pos > 0) {
         cli_pos--;
-        if (cli_echo_enabled) CLI_SERIAL.print("\b \b");
+        if (cli_echo_enabled) {
+            if (serialLoggerLock()) {
+                CLI_SERIAL.print("\b \b");
+                serialLoggerUnlock();
+            }
+        }
       }
     } else if (c == '\t') {
       // C4: TAB COMPLETION
@@ -312,7 +335,10 @@ void cliUpdate() {
           
           // Clear current input and replace with match
           if (cli_echo_enabled) {
-            for (uint16_t i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
+            if (serialLoggerLock()) {
+                for (uint16_t i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
+                serialLoggerUnlock();
+            }
           }
           
           strcpy(cli_buffer, cmd);
@@ -320,7 +346,12 @@ void cliUpdate() {
           cli_buffer[cli_pos++] = ' ';  // Add space after command
           cli_buffer[cli_pos] = '\0';
           
-          if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
+          if (cli_echo_enabled) {
+            if (serialLoggerLock()) {
+                CLI_SERIAL.print(cli_buffer);
+                serialLoggerUnlock();
+            }
+          }
         } else if (match_count > 1) {
           // Multiple matches - complete common prefix and show options
           if (common_len > (size_t)cli_pos) {
@@ -334,16 +365,19 @@ void cliUpdate() {
             if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
           } else {
             // Show all matches
-            CLI_SERIAL.println();
-            for (int i = 0; i < command_count; i++) {
-              if (strncasecmp(commands[i].command, cli_buffer, cli_pos) == 0) {
-                CLI_SERIAL.print(commands[i].command);
-                CLI_SERIAL.print("  ");
-              }
+            if (serialLoggerLock()) {
+                CLI_SERIAL.println();
+                for (int i = 0; i < command_count; i++) {
+                  if (strncasecmp(commands[i].command, cli_buffer, cli_pos) == 0) {
+                    CLI_SERIAL.print(commands[i].command);
+                    CLI_SERIAL.print("  ");
+                  }
+                }
+                CLI_SERIAL.println();
+                CLI_SERIAL.print("> ");  // Simple prompt
+                if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
+                serialLoggerUnlock();
             }
-            CLI_SERIAL.println();
-            CLI_SERIAL.print("> ");  // Simple prompt
-            if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
           }
         }
         // No matches - do nothing (beep could be added)
@@ -351,7 +385,12 @@ void cliUpdate() {
     } else if (c >= 32 && c < 127 && cli_pos < CLI_BUFFER_SIZE - 1) {
       last_was_eol = false;
       cli_buffer[cli_pos++] = c;
-      if (cli_echo_enabled) CLI_SERIAL.write(c);
+      if (cli_echo_enabled) {
+        if (serialLoggerLock()) {
+            CLI_SERIAL.write(c);
+            serialLoggerUnlock();
+        }
+      }
     }
   }
 }
@@ -362,10 +401,31 @@ void cliProcessCommand(const char* cmd) {
   // Internal CLI (Check registered commands first)
   char cmd_copy[CLI_BUFFER_SIZE];
   strncpy(cmd_copy, cmd, CLI_BUFFER_SIZE - 1); cmd_copy[CLI_BUFFER_SIZE - 1] = '\0';
+  // Parse arguments with quote support for SSIDs/passwords with spaces
+  // Example: wifi connect "Armor 25T" mypassword
   char* argv[CLI_MAX_ARGS];
   int argc = 0;
-  char* token = strtok(cmd_copy, " ");
-  while (token && argc < CLI_MAX_ARGS) { argv[argc++] = token; token = strtok(NULL, " "); }
+  char* p = cmd_copy;
+
+  while (*p && argc < CLI_MAX_ARGS) {
+    // Skip leading spaces
+    while (*p == ' ') p++;
+    if (!*p) break;
+    
+    if (*p == '"') {
+      // Quoted argument - find closing quote
+      p++;  // Skip opening quote
+      argv[argc++] = p;
+      while (*p && *p != '"') p++;
+      if (*p == '"') *p++ = '\0';  // Terminate at closing quote
+    } else {
+      // Unquoted argument - find next space
+      argv[argc++] = p;
+      while (*p && *p != ' ') p++;
+      if (*p) *p++ = '\0';  // Terminate at space
+    }
+  }
+
   
   if (argc > 0) {
     for (int i = 0; i < command_count; i++) {
@@ -439,6 +499,8 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
 }
 
 void cliPrintHelp() {
+  if (!serialLoggerLock()) return;
+  
   logPrintln("\n=== BISSO E350 CLI Help ===");
   logPrintln("Grbl Commands:");
   logPrintln("  $         - Show Grbl settings");
@@ -459,11 +521,15 @@ void cliPrintHelp() {
     logPrintf("  %-12s - %s\r\n", commands[i].command, commands[i].help);
   }
   logPrintln("==========================\n");
+  
+  serialLoggerUnlock();
 }
 
 // --- COMMANDS ---
 
 void cmd_grbl_settings(int argc, char** argv) {
+    if (!serialLoggerLock()) return;
+    
     logPrintf("$100=%.3f\r\n", configGetFloat(KEY_PPM_X, 100.0));
     logPrintf("$101=%.3f\r\n", configGetFloat(KEY_PPM_Y, 100.0));
     logPrintf("$102=%.3f\r\n", configGetFloat(KEY_PPM_Z, 100.0));
@@ -474,7 +540,8 @@ void cmd_grbl_settings(int argc, char** argv) {
     logPrintf("$113=%.3f\r\n", configGetFloat(KEY_SPEED_CAL_A, 1000.0));
     logPrintf("$120=%.3f\r\n", configGetFloat(KEY_DEFAULT_ACCEL, 100.0));
     logPrintf("$130=%.3f\r\n", (float)configGetInt(KEY_X_LIMIT_MAX, 500000) / configGetFloat(KEY_PPM_X, 1.0));
-    // Note: cliProcessCommand adds "ok" after calling handler
+    
+    serialLoggerUnlock();
 }
 
 void cmd_grbl_home(int argc, char** argv) { motionHome(0); }
@@ -570,4 +637,55 @@ bool cliDispatchSubcommand(const char* prefix, int argc, char** argv,
     // Not found
     logWarning("%s Unknown subcommand: %s", prefix, argv[arg_index]);
     return false;
+}
+
+// ============================================================================
+// TABLE RENDERING HELPERS (P3 KISS Improvement)
+// ============================================================================
+
+void cliPrintTableDivider(int w1, int w2, int w3, int w4, int w5) {
+    // PHASE 16 FIX: Build entire line in buffer, then output atomically
+    char line[256];
+    int pos = 0;
+    
+    auto drawLine = [&](int width) {
+        line[pos++] = '+';
+        for (int i = 0; i < width + 2 && pos < 254; i++) line[pos++] = '-';
+    };
+    
+    drawLine(w1);
+    drawLine(w2);
+    drawLine(w3);
+    if (w4 > 0) drawLine(w4);
+    if (w5 > 0) drawLine(w5);
+    line[pos++] = '+';
+    line[pos] = '\0';
+    
+    logPrintln(line);
+}
+
+void cliPrintTableHeader(int w1, int w2, int w3, int w4, int w5) {
+    cliPrintTableDivider(w1, w2, w3, w4, w5);
+}
+
+void cliPrintTableFooter(int w1, int w2, int w3, int w4, int w5) {
+    cliPrintTableDivider(w1, w2, w3, w4, w5);
+}
+
+void cliPrintTableRow(const char* c1, const char* c2, const char* c3, 
+                      int w1, int w2, int w3,
+                      const char* c4, int w4,
+                      const char* c5, int w5) {
+    // PHASE 16 FIX: Build entire row in buffer, then output atomically
+    char line[256];
+    int pos = 0;
+    
+    pos += snprintf(line + pos, sizeof(line) - pos, "| %-*s ", w1, c1 ? c1 : "");
+    pos += snprintf(line + pos, sizeof(line) - pos, "| %-*s ", w2, c2 ? c2 : "");
+    pos += snprintf(line + pos, sizeof(line) - pos, "| %-*s ", w3, c3 ? c3 : "");
+    if (w4 > 0) pos += snprintf(line + pos, sizeof(line) - pos, "| %-*s ", w4, c4 ? c4 : "");
+    if (w5 > 0) pos += snprintf(line + pos, sizeof(line) - pos, "| %-*s ", w5, c5 ? c5 : "");
+    pos += snprintf(line + pos, sizeof(line) - pos, "|");
+    
+    logPrintln(line);
 }

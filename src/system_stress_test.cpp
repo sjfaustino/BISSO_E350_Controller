@@ -319,6 +319,7 @@ void test_motion_jitter() {
 // ============================================================================
 
 void runStressTests() {
+    if (!serialLoggerLock()) return;
     g_tests_run = 0;
     g_tests_failed_count = 0;
     
@@ -338,6 +339,7 @@ void runStressTests() {
     
     logPrintln("\r\n[STRESS] === Suite Complete ===");
     logPrintf("[STRESS] Tests Run: %d | Failed: %d\r\n", g_tests_run, g_tests_failed_count);
+    serialLoggerUnlock();
 }
 
 void cmd_stress_test(int argc, char** argv) {

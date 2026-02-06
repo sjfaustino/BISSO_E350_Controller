@@ -18,6 +18,7 @@
 #include "serial_logger.h"
 #include "watchdog_manager.h"
 #include <Arduino.h>
+#include "psram_alloc.h"      // PSRAM-preferred allocations
 #include <Wire.h>
 #include <WiFi.h>
 #include <string.h>
@@ -281,8 +282,8 @@ selftest_suite_t selftestRunSuite(uint8_t categories, bool verbose) {
         }
     }
 
-    // Allocate results
-    suite.results = (selftest_result_t*)malloc(count * sizeof(selftest_result_t));
+    // Allocate results - use PSRAM for large buffer on ESP32-S3
+    suite.results = (selftest_result_t*)psramCalloc(count, sizeof(selftest_result_t));
     if (!suite.results) {
         return suite;  // Return empty suite on allocation failure
     }
@@ -396,7 +397,7 @@ void selftestFreeResults(selftest_suite_t* suite) {
     // Ensures results are freed even if called multiple times
     // Guards against double-free by setting pointer to NULL
     if (suite && suite->results) {
-        free(suite->results);
+        psramFree(suite->results);
         suite->results = NULL;
         suite->total_tests = 0;
         suite->passed_tests = 0;

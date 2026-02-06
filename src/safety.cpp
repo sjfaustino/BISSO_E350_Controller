@@ -20,6 +20,7 @@
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include "vfd_current_calibration.h" // PHASE 5.5: VFD current calibration
 #include "system_tuning.h"
+#include "rs485_device_registry.h" // PHASE 4.1: RS485 Watchdog integration
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -280,9 +281,17 @@ void safetyUpdate() {
     }
   }
 
+  // Outside 500ms block
+  if (motionIsMoving() && rs485CheckWatchdog() && !alarm_active) {
+    logError("[SAFETY] [FAIL] RS485 Bus Timeout during active motion!");
+    faultLogEntry(FAULT_ERROR, FAULT_RS485_TIMEOUT, -1, 0, 
+                "RS485 communication lost during motion");
+    safetyTriggerAlarm("RS485 BUS TIMEOUT", SAFETY_RS485_TIMEOUT);
+  }
+
   if (alarm_active) {
     // PHASE 5.1: Wraparound-safe duration calculation
-    safety_state.fault_duration_ms = (uint32_t)(millis() - alarm_trigger_time);
+    safety_state.fault_duration_ms = (uint32_t)(now - alarm_trigger_time);
   }
 }
 
@@ -532,6 +541,9 @@ void safetyDiagnostics() {
     break;
   case SAFETY_ENCODER_ERROR:
     faultStr = "ENCODER_ERROR";
+    break;
+  case SAFETY_RS485_TIMEOUT:
+    faultStr = "RS485_TIMEOUT";
     break;
   }
   logPrintf("Current Fault: %s\n", faultStr);

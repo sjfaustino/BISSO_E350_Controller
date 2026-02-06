@@ -6,12 +6,15 @@
 
 #include "api_routes.h"
 #include "system_telemetry.h"
+#include "telemetry_history.h"
 #include "spindle_current_monitor.h"
 #include "config_unified.h"
 #include "config_keys.h"
 #include "serial_logger.h"
 #include "mcu_info.h"
 #include "firmware_version.h"
+#include "hardware_config.h"
+#include "psram_alloc.h"
 #include <ArduinoJson.h>
 
 // External from web_server.cpp
@@ -43,15 +46,20 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         uint64_t mac = ESP.getEfuseMac();
         snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
 
-        char buffer[2048];
-        snprintf(buffer, sizeof(buffer),
+        char* buffer = (char*)psramMalloc(2048);
+        if (buffer == nullptr) {
+            return response->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+        }
+
+        snprintf(buffer, 2048,
             "{\"system\":{"
             "\"status\":\"READY\",\"health\":\"%s\",\"uptime_sec\":%lu,"
             "\"cpu_percent\":%d,\"free_heap_bytes\":%lu,\"plc_hardware_present\":%s,"
             "\"firmware_version\":\"v%d.%d.%d\",\"build_date\":\"%s\","
-            "\"hw_model\":\"BISSO E350\",\"hw_mcu\":\"%s\",\"hw_revision\":\"%s\","
+            "\"hw_model\":\"%s\",\"hw_mcu\":\"%s\",\"hw_revision\":\"%s\","
             "\"hw_serial\":\"%s\",\"hw_psram_size\":%zu,\"hw_flash_size\":%zu,"
-            "\"hw_has_psram\":%s"
+            "\"hw_has_psram\":%s,\"hw_has_rtc\":%s,\"hw_has_oled\":%s,\"hw_has_sd\":%s,"
+            "\"hw_eth_chip\":\"%s\""
             "},"
             "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
             "\"motion_enabled\":%s,\"motion_moving\":%s,\"estop\":%s,\"alarm\":%s}",
@@ -62,12 +70,17 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             telemetry.plc_hardware_present ? "true" : "false",
             FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH,
             __DATE__,
+            getBoardName(),
             mcuGetModelName(),
             rev_str,
             serial_str,
             mcuGetPsramSize(),
             mcuGetFlashSize(),
             mcuHasPsram() ? "true" : "false",
+            BOARD_HAS_RTC_DS3231 ? "true" : "false",
+            BOARD_HAS_OLED_SSD1306 ? "true" : "false",
+            BOARD_HAS_SDCARD ? "true" : "false",
+            BOARD_HAS_W5500 ? "W5500 (SPI)" : "LAN8720A (RMII)",
             telemetry.axis_x_mm,
             telemetry.axis_y_mm,
             telemetry.axis_z_mm,
@@ -78,7 +91,12 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             telemetry.alarm_active ? "true" : "false"
         );
         
-        return response->send(200, "application/json", buffer);
+        response->setCode(200);
+        response->setContentType("application/json");
+        response->sendHeaders();
+        response->sendChunk((uint8_t*)buffer, strlen(buffer));
+        psramFree(buffer);
+        return response->finishChunking();
     };
 
     // GET /api/status - System status and positions
@@ -155,8 +173,9 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         return response->send(200, "application/json", "{\"success\":true}");
     });
     
-    // GET /api/history/telemetry (FIXED: Overflow-safe consolidated chunked streaming)
+    // GET /api/history/telemetry (legacy 5-min history)
     server.on("/api/history/telemetry", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        // ... (existing logic remains same for backwards compatibility)
         response->setContentType("application/json");
         response->sendHeaders(); 
         
@@ -213,6 +232,69 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         
         return response->finishChunking();
     });
+
+    // NEW: GET /api/telemetry/history - 1-Hour High-Res History (JSON)
+    server.on("/api/telemetry/history", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        uint16_t count = telemetryHistoryGetCount();
+        if (count == 0) {
+            return response->send(200, "application/json", "{\"success\":true,\"samples\":[]}");
+        }
+
+        // Allocate a temporary buffer for history (PSRAM fallback)
+        telemetry_packet_t* samples = (telemetry_packet_t*)psramMalloc(count * sizeof(telemetry_packet_t));
+        if (samples == NULL) {
+            return response->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+        }
+
+        telemetryHistoryGet(samples, &count);
+
+        response->setContentType("application/json");
+        response->sendHeaders();
+        response->sendChunk((uint8_t*)"{\"success\":true,\"samples\":[", 27);
+
+        char buffer[256];
+        for (uint16_t i = 0; i < count; i++) {
+            int n = snprintf(buffer, sizeof(buffer), 
+                "{\"t\":%lu,\"cpu\":%u,\"heap\":%lu,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"spindle\":%.2f}%s",
+                (unsigned long)samples[i].uptime, 
+                samples[i].cpu_usage, 
+                (unsigned long)samples[i].free_heap,
+                samples[i].axis_x, samples[i].axis_y, samples[i].axis_z,
+                samples[i].spindle_amps,
+                (i < count - 1) ? "," : "");
+            response->sendChunk((uint8_t*)buffer, n);
+        }
+
+        response->sendChunk((uint8_t*)"]}", 2);
+        psramFree(samples);
+        return response->finishChunking();
+    });
+
+    // NEW: GET /api/telemetry/history/raw - Binary export for offline analysis
+    server.on("/api/telemetry/history/raw", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        uint16_t count = telemetryHistoryGetCount();
+        size_t total_size = count * sizeof(telemetry_packet_t);
+        
+        if (count == 0 || total_size == 0) {
+            return response->send(404, "text/plain", "No history available");
+        }
+
+        telemetry_packet_t* samples = (telemetry_packet_t*)psramMalloc(total_size);
+        if (samples == NULL) {
+             return response->send(500, "text/plain", "Memory allocation failed");
+        }
+
+        telemetryHistoryGet(samples, &count);
+        
+        response->setContentType("application/octet-stream");
+        response->addHeader("Content-Disposition", "attachment; filename=\"telemetry.bin\"");
+        response->setContent((const uint8_t*)samples, total_size);
+        response->send();
+        
+        psramFree(samples);
+        return ESP_OK;
+    });
+
     
     logDebug("[WEB] Telemetry routes registered");
 }

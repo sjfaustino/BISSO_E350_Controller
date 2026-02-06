@@ -7,11 +7,12 @@
 #include "motion.h"
 #include "motion_state.h"
 #include "serial_logger.h"
+#include "psram_alloc.h"    // PSRAM allocations
 #include <Arduino.h>
 #include <cstring>
 
 // Ring buffer for job history
-static gcode_job_t jobs[GCODE_QUEUE_MAX_JOBS];
+static gcode_job_t* jobs = nullptr; // Pointer for PSRAM allocation
 static uint16_t job_head = 0;        // Next write position
 static uint16_t job_count = 0;       // Total jobs in buffer
 static uint16_t next_job_id = 1;     // Auto-increment ID
@@ -23,8 +24,19 @@ static bool queue_paused = false;    // Paused due to error
 static portMUX_TYPE queueSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
 void gcodeQueueInit() {
+    // CRITICAL: Allocate jobs array in PSRAM for ESP32-S3
+    if (jobs == nullptr) {
+        jobs = (gcode_job_t*)psramCalloc(GCODE_QUEUE_MAX_JOBS, sizeof(gcode_job_t));
+        if (jobs == nullptr) {
+            logError("[QUEUE] CRITICAL: Failed to allocate G-Code queue in PSRAM!");
+            return;
+        }
+        logInfo("[QUEUE] Allocated %d job entries in PSRAM (%u bytes)", 
+                GCODE_QUEUE_MAX_JOBS, (uint32_t)(GCODE_QUEUE_MAX_JOBS * sizeof(gcode_job_t)));
+    }
+
     portENTER_CRITICAL(&queueSpinlock);
-    memset(jobs, 0, sizeof(jobs));
+    memset(jobs, 0, GCODE_QUEUE_MAX_JOBS * sizeof(gcode_job_t));
     job_head = 0;
     job_count = 0;
     next_job_id = 1;
@@ -32,7 +44,7 @@ void gcodeQueueInit() {
     queue_running = false;
     queue_paused = false;
     portEXIT_CRITICAL(&queueSpinlock);
-    logInfo("[QUEUE] Initialized");
+    logInfo("[QUEUE] Initialized with capacity %d", GCODE_QUEUE_MAX_JOBS);
 }
 
 uint16_t gcodeQueueAdd(const char* command) {

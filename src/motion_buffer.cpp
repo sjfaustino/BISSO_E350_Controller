@@ -11,6 +11,7 @@
 #include "system_constants.h" // For MOTION_POSITION_SCALE_FACTOR
 #include "system_events.h"    // PHASE 5.10: Event-driven architecture
 #include "task_manager.h"     // For taskGetMotionMutex()
+#include "psram_alloc.h"     // PSRAM allocations
 #include <string.h>
 
 MotionBuffer motionBuffer;
@@ -19,10 +20,22 @@ MotionBuffer::MotionBuffer() {
   head = 0;
   tail = 0;
   count = 0;
+  buffer = NULL;       // Pointer for PSRAM
   buffer_mutex = NULL; // Will be set by setMutex()
 }
 
 void MotionBuffer::init() {
+  // CRITICAL: Allocate buffer in PSRAM for ESP32-S3
+  if (buffer == NULL) {
+    buffer = (motion_cmd_t*)psramCalloc(MOTION_BUFFER_SIZE, sizeof(motion_cmd_t));
+    if (buffer == NULL) {
+      logError("[BUFFER] CRITICAL: Failed to allocate motion buffer in PSRAM!");
+      return; 
+    }
+    logInfo("[BUFFER] Allocated %d entries in PSRAM (%u bytes)", 
+            MOTION_BUFFER_SIZE, (uint32_t)(MOTION_BUFFER_SIZE * sizeof(motion_cmd_t)));
+  }
+
   // CRITICAL FIX: Initialize mutex early to prevent race condition during
   // emergency stop at boot
   if (buffer_mutex == NULL) {
@@ -39,7 +52,7 @@ void MotionBuffer::init() {
   head = 0;
   tail = 0;
   count = 0;
-  logInfo("[BUFFER] Initialized (Size: %d)", MOTION_BUFFER_SIZE);
+  logInfo("[BUFFER] Initialized (Capacity: %d)", MOTION_BUFFER_SIZE);
 }
 
 void MotionBuffer::setMutex(SemaphoreHandle_t mtx) { buffer_mutex = mtx; }
@@ -103,11 +116,10 @@ bool MotionBuffer::isFull_unsafe() { return count >= MOTION_BUFFER_SIZE; }
 
 bool MotionBuffer::isEmpty_unsafe() { return count == 0; }
 
-// PHASE 5.7: Clarification - Naming Convention
-// NOTE: available() returns COUNT USED (number of items IN buffer)
-// This is OPPOSITE of Arduino convention where available() means "data ready to
-// read" Returns: 0 = empty, MOTION_BUFFER_SIZE = full
-int MotionBuffer::available_unsafe() { return count; }
+// Returns: 0 = empty, MOTION_BUFFER_SIZE = full
+int MotionBuffer::available_unsafe() { 
+  return count; 
+}
 
 // ============================================================================
 // THREAD-SAFE PUBLIC API (protected by mutex)

@@ -129,6 +129,12 @@ float spindleMonitorGetCurrent(void);
 float spindleMonitorGetPeakCurrent(void);
 
 /**
+ * @brief Get spindle load percentage based on rated current
+ * @return Load % (0.0-100.0+)
+ */
+float spindleMonitorGetLoadPercent(void);
+
+/**
  * @brief Check if spindle is in overcurrent condition
  * @return true if current exceeds threshold, false otherwise
  */

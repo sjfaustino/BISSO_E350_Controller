@@ -82,36 +82,7 @@ const char* getOptionValue(int argc, char** argv, const char* option) {
     return NULL;
 }
 
-void printTableSeparator(int col1, int col2, int col3, int col4) {
-    char line[80];
-    int pos = 0;
-    pos += snprintf(line + pos, sizeof(line) - pos, "+");
-    for (int i = 0; i < col1; i++) pos += snprintf(line + pos, sizeof(line) - pos, "-");
-    pos += snprintf(line + pos, sizeof(line) - pos, "+");
-    for (int i = 0; i < col2; i++) pos += snprintf(line + pos, sizeof(line) - pos, "-");
-    pos += snprintf(line + pos, sizeof(line) - pos, "+");
-    for (int i = 0; i < col3; i++) pos += snprintf(line + pos, sizeof(line) - pos, "-");
-    pos += snprintf(line + pos, sizeof(line) - pos, "+");
-    for (int i = 0; i < col4; i++) pos += snprintf(line + pos, sizeof(line) - pos, "-");
-    pos += snprintf(line + pos, sizeof(line) - pos, "+");
-    logPrintln(line);
-}
-
-void printTableRow(const char* col1, const char* col2, const char* col3, const char* col4,
-                   int col1_width, int col2_width, int col3_width, int col4_width) {
-    char line[120];
-    int pos = 0;
-    pos += snprintf(line + pos, sizeof(line) - pos, "| %s", col1);
-    for (int i = strlen(col1); i < col1_width - 1; i++) pos += snprintf(line + pos, sizeof(line) - pos, " ");
-    pos += snprintf(line + pos, sizeof(line) - pos, "| %s", col2);
-    for (int i = strlen(col2); i < col2_width - 1; i++) pos += snprintf(line + pos, sizeof(line) - pos, " ");
-    pos += snprintf(line + pos, sizeof(line) - pos, "| %s", col3);
-    for (int i = strlen(col3); i < col3_width - 1; i++) pos += snprintf(line + pos, sizeof(line) - pos, " ");
-    pos += snprintf(line + pos, sizeof(line) - pos, "| %s", col4);
-    for (int i = strlen(col4); i < col4_width - 1; i++) pos += snprintf(line + pos, sizeof(line) - pos, " ");
-    pos += snprintf(line + pos, sizeof(line) - pos, "|");
-    logPrintln(line);
-}
+// --- TABLE HELPERS REMOVED (Now using global helpers from cli.h) ---
 
 // ============================================================================
 // I2C SCAN COMMAND
@@ -155,9 +126,9 @@ void cmd_i2c_scan(int argc, char** argv) {
 
     if (verbose) {
         logPrintf("[I2C] Scanning range 0x%02X-0x%02X with timing...\n", start_addr, end_addr);
-        printTableSeparator(10, 20, 12, 14);
-        printTableRow("Address", "Device Name", "Status", "Response", 10, 20, 12, 14);
-        printTableSeparator(10, 20, 12, 14);
+        cliPrintTableHeader(10, 20, 12, 14);
+        cliPrintTableRow("Address", "Device Name", "Status", 10, 20, 12, "Response", 14);
+        cliPrintTableDivider(10, 20, 12, 14);
     } else {
         logPrintf("[I2C] Scanning range 0x%02X-0x%02X...\n", start_addr, end_addr);
     }
@@ -186,7 +157,7 @@ void cmd_i2c_scan(int argc, char** argv) {
             if (verbose) {
                 char time_str[16];
                 snprintf(time_str, sizeof(time_str), "%lu us", (unsigned long)elapsed_us);
-                printTableRow(hex_addr, dev_name, "OK", time_str, 10, 20, 12, 14);
+                cliPrintTableRow(hex_addr, dev_name, "OK", 10, 20, 12, time_str, 14);
             } else {
                 logInfo("[I2C] Found 0x%02X: %s", addr, dev_name);
             }
@@ -208,7 +179,7 @@ void cmd_i2c_scan(int argc, char** argv) {
     }
 
     if (verbose) {
-        printTableSeparator(10, 20, 12, 14);
+        cliPrintTableFooter(10, 20, 12, 14);
     }
 
     logInfo("[I2C] Found %d device(s)", found_count);
@@ -279,9 +250,9 @@ void cmd_i2c_test(int argc, char** argv) {
     }
 
     if (!stress && verbose) {
-        printTableSeparator(10, 16, 12, 12);
-        printTableRow("Address", "Read Test", "Write Test", "Stability", 10, 16, 12, 12);
-        printTableSeparator(10, 16, 12, 12);
+        cliPrintTableHeader(10, 16, 12, 12);
+        cliPrintTableRow("Address", "Read Test", "Write Test", 10, 16, 12, "Stability", 12);
+        cliPrintTableDivider(10, 16, 12, 12);
     }
 
     int passed = 0;
@@ -336,12 +307,12 @@ void cmd_i2c_test(int argc, char** argv) {
             }
             logInfo("[I2C]   Success: %d/500 (%.1f%%)", success, (success / 5.0f));
         } else if (verbose) {
-            char addr_str[8], read_result[20], write_result[20], stab[12];
+            char read_result[32], write_result[32], stab[16], addr_str[16];
             snprintf(addr_str, sizeof(addr_str), "0x%02X", addr);
             snprintf(read_result, sizeof(read_result), "%s (%lu ms)", read_res == I2C_RESULT_OK ? "OK" : "FAIL", (unsigned long)read_time);
             snprintf(write_result, sizeof(write_result), "%s (%lu ms)", write_res == I2C_RESULT_OK ? "OK" : "FAIL", (unsigned long)write_time);
             snprintf(stab, sizeof(stab), "%d%%", stability_score);
-            printTableRow(addr_str, read_result, write_result, stab, 10, 16, 12, 12);
+            cliPrintTableRow(addr_str, read_result, write_result, 10, 16, 12, stab, 12);
         } else {
             logInfo("[I2C] 0x%02X: %s", addr, (read_res == I2C_RESULT_OK) ? "PASS" : "FAIL");
         }
@@ -351,7 +322,7 @@ void cmd_i2c_test(int argc, char** argv) {
         if (!taskLockMutex(mutex, 100)) return;
     }
 
-    if (!stress && verbose) printTableSeparator(10, 16, 12, 12);
+    if (!stress && verbose) cliPrintTableFooter(10, 16, 12, 12);
     logInfo("[I2C] Passed: %d/%d", passed, test_count);
     taskUnlockMutex(mutex);
 }

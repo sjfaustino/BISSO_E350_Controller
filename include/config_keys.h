@@ -113,6 +113,7 @@
 #define KEY_SPINDLE_ADDRESS   KEY_JXK10_ADDR
 #define KEY_SPINDLE_THRESHOLD "spindl_thr" // Overcurrent threshold in integer amperes (30 = 30A)
 #define KEY_SPINDLE_POLL_MS   "spindl_poll" // Poll interval in milliseconds (default 1000)
+#define KEY_SPINDLE_RATED_AMPS "sp_rated_a" // Rated Spindle Amps for load % calculation (default 24.5)
 #define KEY_SPINDLE_RATED_RPM                                                  \
   "spindl_rpm"  // Rated Spindle RPM (default 1400)
 #define KEY_BLADE_DIAMETER_MM                                                  \
@@ -144,6 +145,7 @@
 #define KEY_RUNTIME_MINS "rt_mins"       // Total runtime in minutes
 #define KEY_CYCLE_COUNT "cycles"         // Total job cycles completed
 #define KEY_LAST_MAINT_MINS "maint_mins" // Runtime at last maintenance
+#define KEY_MAINT_LAST_RESET "maint_rst" // Last maintenance reset timestamp
 #define KEY_BACKUP_TS "backup_ts"        // Last config backup timestamp (Unix epoch)
 #define KEY_DIST_X_M "dist_x_m"          // Total X axis distance traveled (meters)
 #define KEY_DIST_Y_M "dist_y_m"          // Total Y axis distance traveled (meters)
@@ -178,7 +180,14 @@
 #define KEY_TARGET_MARGIN "tgt_margin"    // Target position margin in mm (default 0.1)
 #define KEY_MOTION_BUFFER_ENABLE "mot_buf_en"
 #define KEY_MOTION_STRICT_LIMITS "mot_strict"
+#define KEY_STRICT_LIMITS        KEY_MOTION_STRICT_LIMITS
 #define KEY_STOP_TIMEOUT "stop_timeout"
+
+// --- MOTION MONITORING ---
+#define KEY_STALL_THRESHOLD "stall_thr_mm" // Deviation threshold for stall (mm)
+#define KEY_DEV_WARN        "dev_warn_mm"  // Warning threshold for deviation (mm)
+#define KEY_DEV_CRIT        "dev_crit_mm"  // Critical threshold for deviation (mm)
+#define KEY_M154_AUTO       "m154_auto_en" // Auto-report enable (1=on, 0=off)
 
 // --- SAFETY ---
 #define KEY_ALARM_PIN "alarm_pin"

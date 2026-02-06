@@ -40,6 +40,25 @@ typedef enum {
 void serialLoggerInit(log_level_t log_level);
 
 /**
+ * @brief Initialize the log queue and logger task
+ * @note Called automatically by serialLoggerInit(), but can be called separately
+ */
+void logQueueInit();
+
+/**
+ * @brief Check if log queue is initialized and ready
+ * @return true if queue and logger task are running
+ */
+bool logQueueIsReady();
+
+/**
+ * @brief Enable async queue mode - call AFTER FreeRTOS tasks have started
+ * Before this is called, all logs use synchronous direct output.
+ * After this is called, logs are enqueued and output by the Logger task.
+ */
+void logQueueEnableAsync();
+
+/**
  * @brief Set current log level at runtime
  * @param log_level New log level
  */

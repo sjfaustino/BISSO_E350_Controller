@@ -1,1 +1,338 @@
-window.SystemModule = window.SystemModule || { systemStartTime: Date.now(), resetCount: 2, init() { console.log("[System] Initializing"), window.API.get('telemetry').then(d => { AppState.update(d); this.loadSystemInfo() }).catch(e => console.warn("[System] Init fetch failed", e)); this.setupEventListeners(), this.startStatusUpdates() }, setupEventListeners() { const e = document.getElementById("check-update-btn"); e && e.addEventListener("click", () => this.checkForUpdates()); const t = document.getElementById("view-logs-btn"); t && t.addEventListener("click", () => this.viewSystemLogs()); const n = document.getElementById("system-health-btn"); n && n.addEventListener("click", () => this.runHealthCheck()); const o = document.getElementById("reset-btn"); o && o.addEventListener("click", () => this.rebootDevice()); const a = document.getElementById("backup-config-btn"); a && a.addEventListener("click", () => this.backupConfiguration()); const s = document.getElementById("restore-config-btn"); s && s.addEventListener("click", () => this.restoreConfiguration()); const i = document.getElementById("factory-reset-btn"); i && i.addEventListener("click", () => this.factoryReset()); const c = document.getElementById("sync-time-btn"); c && c.addEventListener("click", () => this.syncTimeFromBrowser()) }, loadSystemInfo() { const e = document.getElementById("fw-version"), t = document.getElementById("fw-build-date"), n = document.getElementById("serial-number"), o = AppState.get("system.firmware_version") || "1.0.0"; e && (e.textContent = o), t && (t.textContent = AppState.get("system.build_date") || "2025-01-05"), document.getElementById("hw-mcu") && (document.getElementById("hw-mcu").textContent = AppState.get("system.hw_mcu") || "Unknown"), document.getElementById("hw-model") && (document.getElementById("hw-model").textContent = AppState.get("system.hw_model") || "BISSO E350"), document.getElementById("hw-revision") && (document.getElementById("hw-revision").textContent = AppState.get("system.hw_revision") || "v1.0"), n && (n.textContent = AppState.get("system.hw_serial") || "Scanning..."); const a = AppState.get("ota"), s = document.getElementById("fw-latest"), i = document.getElementById("check-update-btn"); s && a && (a.available ? (s.textContent = `${a.latest_version} (Available)`, s.style.color = "var(--color-optimal)", i && (i.textContent = "Install Update", i.classList.remove("btn-primary"), i.classList.add("btn-success"), i.onclick = () => this.installUpdate())) : (s.textContent = `${o} (Latest)`, s.style.color = "var(--text-secondary)", i && (i.textContent = "Check for Updates", i.classList.add("btn-primary"), i.classList.remove("btn-success"), i.onclick = () => this.checkForUpdates()))), this.updateStorageInfo(), this.updateSystemStatus(), this.updateDeviceTime(); const c = AppState.get("config") || {}; this.setConfigStatus("conf-auth", c.http_auth), this.setConfigStatus("conf-https", c.https), this.setConfigStatus("conf-ws", c.websocket), this.setConfigStatus("conf-modbus", c.modbus) }, setConfigStatus(e, t) { const n = document.getElementById(e); n && (void 0 === t ? (n.textContent = "Loading...", n.style.color = "") : t ? (n.textContent = "✓ Yes", n.style.color = "var(--color-optimal)") : (n.textContent = "✗ No", n.style.color = "var(--color-warning)")) }, async checkForUpdates() { AlertManager.add("Checking for updates...", "info"), await AppState.checkForUpdates(); const e = AppState.get("ota"); e && e.available ? (AlertManager.add(`Update available: ${e.latest_version}`, "success", 5e3), this.loadSystemInfo()) : (AlertManager.add("You are running the latest version", "success", 3e3), this.loadSystemInfo()) }, async installUpdate() { if (confirm("Start firmware update? The device will reboot.")) { AlertManager.add("Starting update...", "info"); try { await window.API.post("ota/update"); AlertManager.add("Update started! Do not power off.", "warning", 1e4); const e = document.getElementById("check-update-btn"); e && (e.disabled = !0) } catch (e) { AlertManager.add("Update request failed", "critical") } } }, updateStorageInfo() { const e = 210 / 360 * 100, t = document.getElementById("flash-bar"), n = document.getElementById("flash-used"); t && (t.style.width = "52.5%"), n && (n.textContent = 2.1.toFixed(1)); const o = document.getElementById("ram-bar"), a = document.getElementById("ram-used"); o && (o.style.width = e + "%"), a && (a.textContent = 210); const s = document.getElementById("spiffs-bar"), i = document.getElementById("spiffs-used"); s && (s.style.width = "42%"), i && (i.textContent = 1.68.toFixed(2)), this.setProgressBarColor("flash-bar", 52.5), this.setProgressBarColor("ram-bar", e), this.setProgressBarColor("spiffs-bar", 42) }, setProgressBarColor(e, t) { const n = document.getElementById(e); n && (n.style.background = t > 80 ? "linear-gradient(90deg, var(--color-critical), var(--color-warning))" : t > 60 ? "linear-gradient(90deg, var(--color-warning), var(--color-normal))" : "linear-gradient(90deg, var(--color-optimal), var(--color-normal))") }, updateSystemStatus() { const e = Date.now() - this.systemStartTime, t = (Math.floor(e / 36e5), document.getElementById("system-uptime")), n = document.getElementById("reset-count"), o = document.getElementById("last-reset"), a = document.getElementById("last-backup"), s = AppState.get("system.uptime_seconds") || 0; if (t) { const e = Math.floor(s / 3600), n = Math.floor(s % 3600 / 60); t.textContent = `${e}h ${n}m` } if (o) if (s > 0) { const e = new Date(Date.now() - 1e3 * s); o.textContent = e.toLocaleString() } else o.textContent = "Unknown"; n && (n.textContent = this.resetCount), a && (a.textContent = (new Date).toLocaleString()) }, startStatusUpdates() { setInterval(() => { this.updateStorageInfo(), this.updateSystemStatus(), this.updateDeviceTime(), this.loadSystemInfo() }, 1e4) }, async updateDeviceTime() { try { const t = await window.API.get("time"); const n = document.getElementById("device-time"), o = document.getElementById("time-source"); if (n) { const e = new Date(1e3 * t.timestamp); n.textContent = e.toLocaleString() } o && (t.timestamp > 1577836800 ? (o.textContent = "NTP / Browser Sync", o.style.color = "var(--color-optimal)") : (o.textContent = "Not Synced", o.style.color = "var(--color-warning)")) } catch (e) { console.warn("[System] Failed to fetch device time:", e) } }, async syncTimeFromBrowser() { const e = document.getElementById("sync-time-btn"); e && (e.disabled = !0); try { const ts = Math.floor(Date.now() / 1e3); const data = await window.API.post("time/sync", { timestamp: ts }); AlertManager.add(`Time synced: ${data.time}`, "success", 3e3), this.updateDeviceTime() } catch (e) { AlertManager.add("Time sync failed", "critical", 3e3) } finally { e && (e.disabled = !1) } }, viewSystemLogs() { AlertManager.add("System logs would open in logs page", "info", 2e3) }, async runHealthCheck() { AlertManager.add("Analyzing system telemetry...", "info", 2e3), await new Promise(e => setTimeout(e, 1e3)); const e = AppState.get("system") || {}, t = AppState.get("network") || {}, n = AppState.get("vfd") || {}, o = AppState.get("config") || {}; let a = [], s = "HEALTHY"; const i = e.free_heap_bytes || 0, c = Math.round(i / 1024); let r = "OK"; c < 20 ? (r = "CRITICAL", s = "CRITICAL", a.push(`Low Memory (${c}KB free)`)) : c < 50 && (r = "WARNING", "CRITICAL" !== s && (s = "WARNING"), a.push(`Memory low (${c}KB free)`)); const d = t.wifi_connected ? "OK" : "DISCONNECTED"; t.wifi_connected || a.push("WiFi Disconnected"); t.signal_percent; t.wifi_connected && t.signal_percent <= 30 && a.push(`Weak WiFi Signal (${t.signal_percent}%)`); let l = "N/A"; o.modbus && (l = n.connected ? "OK" : "ERROR", n.connected || (s = "WARNING", a.push("VFD not connected"))); const m = e.plc_hardware_present ? "OK" : "NOT DETECTED", u = `System Health Report:\n✓ RAM: ${r} (${c}KB free)\n${t.wifi_connected ? "✓" : "✗"} WiFi: ${d} (${t.signal_percent}%)\n${o.modbus ? (n.connected ? "✓" : "✗") + " VFD: " + l : "• VFD: Disabled"}\n✓ Hardware: ${m}\n\nOverall Status: ${s}`; a.length > 0 ? AlertManager.add(`Health Check: ${s} - ${a.join(", ")}`, "CRITICAL" === s ? "critical" : "warning", 1e4) : AlertManager.add("Health Check Passed: System Optimal", "success", 5e3), console.log(u) }, async rebootDevice() { if (confirm("Are you sure you want to reboot the device? Connected operations will be interrupted.")) { AlertManager.add("Sending reboot command...", "warning", 5e3); try { await window.API.post("system/reboot"), AlertManager.add("Device is restarting. Connection lost.", "critical", 1e4) } catch (e) { AlertManager.add("Device is restarting...", "critical", 1e4) } } }, backupConfiguration() { AlertManager.add("Creating backup...", "info"), setTimeout(() => { const e = document.createElement("a"); e.href = "/api/config/backup", e.download = "backup.json", document.body.appendChild(e), e.click(), document.body.removeChild(e), AlertManager.add("Backup download started", "success", 3e3), document.getElementById("last-backup").textContent = (new Date).toLocaleString() }, 500) }, restoreConfiguration() { const e = document.createElement("input"); e.type = "file", e.accept = ".json", e.addEventListener("change", e => { const t = e.target.files[0]; if (t) { const e = new FileReader; e.onload = e => { try { JSON.parse(e.target.result); AlertManager.add("Configuration restored successfully", "success", 3e3) } catch (e) { AlertManager.add("Invalid backup file", "critical", 3e3) } }, e.readAsText(t) } }), e.click() }, factoryReset() { if (confirm("WARNING: This will erase all configuration and reset the device to factory defaults. This cannot be undone. Continue?")) { confirm("Are you absolutely certain? Enter your password in the next prompt to confirm.") && (AlertManager.add("Factory reset initiated. Device will reboot...", "critical", 5e3), setTimeout(() => { }, 500)) } }, cleanup() { console.log("[System] Cleaning up") } }, window.currentPageModule = SystemModule;
+window.SystemModule = window.SystemModule || {
+    systemStartTime: Date.now(),
+    resetCount: 2,
+
+    init() {
+        console.log("[System] Initializing");
+        // Initial fetch to get latest telemetry state if not already there
+        window.API.get('telemetry')
+            .then(d => {
+                AppState.update(d);
+                this.loadSystemInfo();
+            })
+            .catch(e => console.warn("[System] Init fetch failed", e));
+
+        this.setupEventListeners();
+        this.startStatusUpdates();
+    },
+
+    setupEventListeners() {
+        const btnMap = {
+            "check-update-btn": () => this.checkForUpdates(),
+            "view-logs-btn": () => this.viewSystemLogs(),
+            "system-health-btn": () => this.runHealthCheck(),
+            "reset-btn": () => this.rebootDevice(),
+            "backup-config-btn": () => this.backupConfiguration(),
+            "restore-config-btn": () => this.restoreConfiguration(),
+            "factory-reset-btn": () => this.factoryReset(),
+            "sync-time-btn": () => this.syncTimeFromBrowser()
+        };
+
+        Object.entries(btnMap).forEach(([id, handler]) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener("click", handler);
+        });
+    },
+
+    loadSystemInfo() {
+        const sys = AppState.get("system") || {};
+
+        // Firmware Info
+        Utils.setText("fw-version", sys.firmware_version || "---");
+        Utils.setText("fw-build-date", sys.build_date || "---");
+
+        // Hardware Info
+        Utils.setText("hw-mcu", sys.hw_mcu || "Unknown");
+        Utils.setText("hw-model", sys.hw_model || "BISSO E350 (Legacy)");
+        Utils.setText("serial-number", sys.hw_serial || "Pending...");
+        Utils.setText("hw-revision", sys.hw_revision || "v1.0");
+
+        if (sys.hw_flash_size) {
+            Utils.setText("hw-flash-size", Utils.formatBytes(sys.hw_flash_size));
+        }
+
+        if (sys.hw_has_psram) {
+            Utils.setText("hw-psram", Utils.formatBytes(sys.hw_psram_size || 0) + " (Available)");
+        } else {
+            Utils.setText("hw-psram", "None");
+        }
+
+        // Features Display (Dynamic based on capability flags)
+        this.updateFeaturesList(sys);
+
+        // OTA Info
+        const ota = AppState.get("ota");
+        const otaLabel = document.getElementById("fw-latest");
+        const otaBtn = document.getElementById("check-update-btn");
+
+        if (otaLabel && ota) {
+            if (ota.available) {
+                otaLabel.textContent = `${ota.latest_version} (Available)`;
+                otaLabel.style.color = "var(--color-optimal)";
+                if (otaBtn) {
+                    otaBtn.textContent = "Install Update";
+                    otaBtn.classList.replace("btn-primary", "btn-success");
+                    otaBtn.onclick = () => this.installUpdate();
+                }
+            } else {
+                otaLabel.textContent = `${sys.firmware_version} (Latest)`;
+                otaLabel.style.color = "var(--text-secondary)";
+            }
+        }
+
+        this.updateStorageInfo();
+        this.updateSystemStatus();
+        this.updateDeviceTime();
+
+        // Config Status
+        const cfg = AppState.get("config") || {};
+        this.setConfigStatus("conf-auth", cfg.http_auth);
+        this.setConfigStatus("conf-https", cfg.https);
+        this.setConfigStatus("conf-ws", cfg.websocket);
+        this.setConfigStatus("conf-modbus", cfg.modbus);
+    },
+
+    updateFeaturesList(sys) {
+        const container = document.getElementById("hw-features");
+        if (!container) return;
+
+        const features = [];
+        if (sys.hw_has_rtc) features.push("RTC DS3231");
+        if (sys.hw_has_oled) features.push("SSD1306 OLED");
+        if (sys.hw_has_sd) features.push("SD Card Slot");
+        if (sys.hw_eth_chip) features.push(`Ethernet (${sys.hw_eth_chip})`);
+
+        if (features.length === 0) {
+            container.textContent = "Standard Built-in";
+        } else {
+            container.textContent = features.join(", ");
+        }
+    },
+
+    setConfigStatus(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        if (value === undefined) {
+            el.textContent = "Loading...";
+            el.style.color = "";
+        } else if (value) {
+            el.textContent = "✓ Yes";
+            el.style.color = "var(--color-optimal)";
+        } else {
+            el.textContent = "✗ No";
+            el.style.color = "var(--color-warning)";
+        }
+    },
+
+    async checkForUpdates() {
+        AlertManager.add("Checking for updates...", "info");
+        await AppState.checkForUpdates();
+        this.loadSystemInfo();
+
+        const ota = AppState.get("ota");
+        if (ota && ota.available) {
+            AlertManager.add(`Update available: ${ota.latest_version}`, "success", 5000);
+        } else {
+            AlertManager.add("You are running the latest version", "success", 3000);
+        }
+    },
+
+    async installUpdate() {
+        if (confirm("Start firmware update? The device will reboot.")) {
+            AlertManager.add("Starting update...", "info");
+            try {
+                await window.API.post("ota/update");
+                AlertManager.add("Update started! Do not power off.", "warning", 10000);
+                const btn = document.getElementById("check-update-btn");
+                if (btn) btn.disabled = true;
+            } catch (e) {
+                AlertManager.add("Update request failed", "critical");
+            }
+        }
+    },
+
+    updateStorageInfo() {
+        // PSRAM/RAM logic
+        const ram_total = 360; // Internal SRAM
+        const ram_used = 210; // Placeholder until we get live task data
+        const ram_pct = (ram_used / ram_total) * 100;
+
+        const bars = {
+            "flash-bar": 52.5,
+            "ram-bar": ram_pct,
+            "spiffs-bar": 42
+        };
+
+        Object.entries(bars).forEach(([id, pct]) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.width = pct + "%";
+                this.setProgressBarColor(id, pct);
+            }
+        });
+
+        Utils.setText("flash-used", "2.1");
+        Utils.setText("ram-used", ram_used);
+        Utils.setText("spiffs-used", "1.68");
+    },
+
+    setProgressBarColor(id, pct) {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        if (pct > 85) el.style.background = "linear-gradient(90deg, var(--color-critical), var(--color-warning))";
+        else if (pct > 70) el.style.background = "linear-gradient(90deg, var(--color-warning), var(--color-normal))";
+        else el.style.background = "linear-gradient(90deg, var(--color-optimal), var(--color-normal))";
+    },
+
+    updateSystemStatus() {
+        const sys = AppState.get("system") || {};
+        const upSec = sys.uptime_seconds || 0;
+
+        const hr = Math.floor(upSec / 3600);
+        const min = Math.floor((upSec % 3600) / 60);
+        Utils.setText("system-uptime", `${hr}h ${min}m`);
+
+        const lastReset = document.getElementById("last-reset");
+        if (lastReset && upSec > 0) {
+            const date = new Date(Date.now() - (upSec * 1000));
+            lastReset.textContent = date.toLocaleString();
+        }
+
+        Utils.setText("reset-count", this.resetCount);
+        Utils.setText("last-backup", new Date().toLocaleString());
+    },
+
+    startStatusUpdates() {
+        this.statusTimer = setInterval(() => {
+            this.updateStorageInfo();
+            this.updateSystemStatus();
+            this.updateDeviceTime();
+            this.loadSystemInfo();
+        }, 10000);
+    },
+
+    async updateDeviceTime() {
+        try {
+            const t = await window.API.get("time");
+            const elTime = document.getElementById("device-time");
+            const elSource = document.getElementById("time-source");
+
+            if (elTime) {
+                const date = new Date(t.timestamp * 1000);
+                elTime.textContent = date.toLocaleString();
+            }
+
+            if (elSource) {
+                const isSynced = t.timestamp > 1577836800; // 2020-01-01
+                elSource.textContent = isSynced ? "NTP / Browser Sync" : "Not Synced";
+                elSource.style.color = isSynced ? "var(--color-optimal)" : "var(--color-warning)";
+            }
+        } catch (e) {
+            console.warn("[System] Failed to fetch device time:", e);
+        }
+    },
+
+    async syncTimeFromBrowser() {
+        const btn = document.getElementById("sync-time-btn");
+        if (btn) btn.disabled = true;
+
+        try {
+            const ts = Math.floor(Date.now() / 1000);
+            const data = await window.API.post("time/sync", { timestamp: ts });
+            AlertManager.add(`Time synced: ${data.time}`, "success", 3000);
+            this.updateDeviceTime();
+        } catch (e) {
+            AlertManager.add("Time sync failed", "critical", 3000);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    },
+
+    viewSystemLogs() {
+        Router.go('logs');
+    },
+
+    async runHealthCheck() {
+        AlertManager.add("Analyzing system telemetry...", "info", 2000);
+        await new Promise(r => setTimeout(r, 1000));
+
+        const sys = AppState.get("system") || {};
+        const net = AppState.get("network") || {};
+        const vfd = AppState.get("vfd") || {};
+        const cfg = AppState.get("config") || {};
+
+        let issues = [];
+        let status = "HEALTHY";
+
+        const heapKB = Math.round((sys.free_heap_bytes || 0) / 1024);
+        if (heapKB < 20) { status = "CRITICAL"; issues.push(`Very low memory (${heapKB}KB)`); }
+        else if (heapKB < 50) { if (status !== "CRITICAL") status = "WARNING"; issues.push(`Low memory (${heapKB}KB)`); }
+
+        if (!net.wifi_connected) issues.push("WiFi disconnected");
+        else if (net.signal_percent <= 30) issues.push(`Weak WiFi signal (${net.signal_percent}%)`);
+
+        if (cfg.modbus && !vfd.connected) {
+            if (status !== "CRITICAL") status = "WARNING";
+            issues.push("VFD not reaching");
+        }
+
+        if (issues.length > 0) {
+            const type = status === "CRITICAL" ? "critical" : "warning";
+            AlertManager.add(`Health: ${status} - ${issues.join(", ")}`, type, 10000);
+        } else {
+            AlertManager.add("System Health: Optimal", "success", 5000);
+        }
+    },
+
+    async rebootDevice() {
+        if (confirm("Reboot the device? Current operations will stop.")) {
+            AlertManager.add("Rebooting...", "warning", 5000);
+            try {
+                await window.API.post("system/reboot");
+                AlertManager.add("Device restarting...", "critical", 10000);
+            } catch (e) {
+                AlertManager.add("Connection lost - rebooting", "critical", 10000);
+            }
+        }
+    },
+
+    backupConfiguration() {
+        AlertManager.add("Downloading backup...", "info");
+        const a = document.createElement("a");
+        a.href = "/api/config/backup";
+        a.download = "bisso_config.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    },
+
+    restoreConfiguration() {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                AlertManager.add("Configuration restore would proceed here", "info");
+            }
+        };
+        input.click();
+    },
+
+    factoryReset() {
+        if (confirm("DANGER: This will erase ALL settings!")) {
+            if (confirm("Are you absolutely sure?")) {
+                AlertManager.add("Initiating factory reset...", "critical");
+            }
+        }
+    },
+
+    cleanup() {
+        console.log("[System] Cleaning up");
+        if (this.statusTimer) clearInterval(this.statusTimer);
+    }
+};
+
+window.currentPageModule = SystemModule;

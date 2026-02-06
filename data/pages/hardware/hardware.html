@@ -157,34 +157,56 @@
             </div>
         </div>
 
-        <!-- Ethernet LAN8270A Card -->
-        <div class="card device-card">
+        <!-- Ethernet W5500 Card (v3.1) -->
+        <div class="card device-card" data-board-variant="v31">
             <div class="card-header device-header ethernet">
-                <h3 data-i18n="hardware.ethernet_lan8270">🌐 Ethernet LAN8270A</h3>
-                <span class="device-protocol">RMII</span>
+                <h3 data-i18n="hardware.ethernet_w5500">🌐 Ethernet W5500</h3>
+                <span class="device-protocol" data-i18n="hardware.protocol_spi">SPI</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-info-grid">
+                    <div class="pin-info-item"><span>SCK:</span> <span class="fixed-pin">42</span></div>
+                    <div class="pin-info-item"><span>MOSI:</span> <span class="fixed-pin">43</span></div>
+                    <div class="pin-info-item"><span>MISO:</span> <span class="fixed-pin">44</span></div>
+                    <div class="pin-info-item"><span>CS:</span> <span class="fixed-pin">15</span></div>
+                </div>
+                <div class="pin-row" style="margin-top: 10px;">
+                    <label for="eth_enabled_v31" data-i18n="hardware.enabled">Enabled:</label>
+                    <input type="checkbox" id="eth_enabled_v31" data-config="eth_en" checked>
+                </div>
+                <div class="device-note" data-i18n="hardware.ethernet_w5500_note">High-performance SPI Ethernet (W5500)
+                </div>
+            </div>
+        </div>
+
+        <!-- Ethernet LAN8270A Card (v1.6) -->
+        <div class="card device-card" data-board-variant="v16">
+            <div class="card-header device-header ethernet">
+                <h3 data-i18n="hardware.ethernet_lan8270a">🌐 Ethernet LAN8720A</h3>
+                <span class="device-protocol" data-i18n="hardware.protocol_rmii">RMII</span>
             </div>
             <div class="card-content">
                 <div class="pin-row">
                     <label for="eth_mdc" data-i18n="hardware.mdc_pin">MDC Pin:</label>
                     <select class="pin-select" id="eth_mdc" disabled>
-                        <option data-i18n="hardware.gpio23_fixed">GPIO 23 (Fixed)</option>
+                        <option value="23">GPIO 23 (Fixed)</option>
                     </select>
                 </div>
                 <div class="pin-row">
                     <label for="eth_mdio" data-i18n="hardware.mdio_pin">MDIO Pin:</label>
                     <select class="pin-select" id="eth_mdio" disabled>
-                        <option data-i18n="hardware.gpio18_fixed">GPIO 18 (Fixed)</option>
+                        <option value="18">GPIO 18 (Fixed)</option>
                     </select>
                 </div>
                 <div class="pin-row">
                     <label for="eth_pwr" data-i18n="hardware.pwr_clk">Power/Clk:</label>
                     <select class="pin-select" id="eth_pwr" disabled>
-                        <option data-i18n="hardware.gpio17_fixed">GPIO 17 (Fixed)</option>
+                        <option value="17">GPIO 17 (Fixed)</option>
                     </select>
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
-                    <label for="eth_enabled" data-i18n="hardware.enabled">Enabled:</label>
-                    <input type="checkbox" id="eth_enabled" data-config="eth_en" checked>
+                    <label for="eth_enabled_v16" data-i18n="hardware.enabled">Enabled:</label>
+                    <input type="checkbox" id="eth_enabled_v16" data-config="eth_en" checked>
                 </div>
                 <div class="device-note" data-i18n="hardware.eth_note">Standard ESP32 RMII Interface (Fixed)</div>
             </div>
@@ -218,6 +240,66 @@
                     <input type="checkbox" id="lcd_enabled" data-config="lcd_en" checked>
                 </div>
                 <div class="device-note" data-i18n="hardware.lcd_note">20x4 character LCD via PCF8574</div>
+            </div>
+        </div>
+
+        <!-- DS3231 RTC Clock (v3.1) -->
+        <div class="card device-card" data-board-variant="v31">
+            <div class="card-header device-header rtc">
+                <h3 data-i18n="hardware.rtc_ds3231">📅 DS3231 RTC Clock</h3>
+                <span class="device-protocol" data-i18n="hardware.protocol_i2c">I2C</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label for="rtc_en" data-i18n="hardware.enabled">Enabled:</label>
+                    <input type="checkbox" id="rtc_en" data-config="rtc_en" checked disabled>
+                </div>
+                <div class="pin-row">
+                    <label data-i18n="hardware.i2c_addr">I2C Address:</label>
+                    <span class="fixed-pin">0x68</span>
+                </div>
+                <div class="device-note" data-i18n="hardware.rtc_note">High-accuracy battery-backed real-time clock
+                </div>
+            </div>
+        </div>
+
+        <!-- SSD1306 OLED Display (v3.1) -->
+        <div class="card device-card" data-board-variant="v31">
+            <div class="card-header device-header oled">
+                <h3 data-i18n="hardware.oled_ssd1306">📺 SSD1306 OLED Display</h3>
+                <span class="device-protocol" data-i18n="hardware.protocol_i2c">I2C</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label for="oled_en" data-i18n="hardware.enabled">Enabled:</label>
+                    <input type="checkbox" id="oled_en" data-config="oled_en">
+                </div>
+                <div class="pin-row">
+                    <label data-i18n="hardware.i2c_addr">I2C Address:</label>
+                    <span class="fixed-pin">0x3C</span>
+                </div>
+                <div class="device-note" data-i18n="hardware.oled_note">On-board local status display (128x64)</div>
+            </div>
+        </div>
+
+        <!-- SD Card Slot (v3.1) -->
+        <div class="card device-card" data-board-variant="v31">
+            <div class="card-header device-header sdcard">
+                <h3 data-i18n="hardware.sd_card">💾 SD Card Slot</h3>
+                <span class="device-protocol" data-i18n="hardware.protocol_spi">SPI</span>
+            </div>
+            <div class="card-content">
+                <div class="pin-row">
+                    <label for="sd_en" data-i18n="hardware.enabled">Enabled:</label>
+                    <input type="checkbox" id="sd_en" data-config="sd_en">
+                </div>
+                <div class="pin-info-grid">
+                    <div class="pin-info-item"><span>MOSI:</span> <span class="fixed-pin">12</span></div>
+                    <div class="pin-info-item"><span>SCK:</span> <span class="fixed-pin">13</span></div>
+                    <div class="pin-info-item"><span>MISO:</span> <span class="fixed-pin">14</span></div>
+                    <div class="pin-info-item"><span>CS:</span> <span class="fixed-pin">11</span></div>
+                </div>
+                <div class="device-note" data-i18n="hardware.sd_note">External storage for G-code jobs and logs</div>
             </div>
         </div>
 

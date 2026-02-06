@@ -22,6 +22,7 @@
 #include "motion_state_machine.h" // PHASE 5.10: Formal state machine
 #include "plc_iface.h"
 #include "safety.h"
+#include "operator_alerts.h"
 #include "serial_logger.h"
 #include "spindle_current_monitor.h" // PHASE 5.0: Spindle current monitoring
 #include "system_constants.h"
@@ -29,6 +30,7 @@
 #include "web_server.h"
 #include "hardware_config.h"
 #include "system_tuning.h"
+#include "system_utilities.h" // PHASE 4.1: Centralized units
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <math.h>
@@ -66,6 +68,29 @@ portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
 // --- JITTER TRACKING STATE ---
 static uint32_t m_max_jitter_us = 0;
+
+// PHASE 4.1: Configuration Cache (KISS/Performance Optimization)
+// Eliminates expensive string-lookup overhead in 100Hz motion loop
+static struct {
+    float target_margin_mm;
+    float stall_threshold_mm;
+    float deviation_warning_mm;
+    float deviation_critical_mm;
+    bool limits_strict;
+    bool auto_report_enabled;
+    uint32_t last_refresh_ms;
+} m_config_cache = {0.1f, 5.0f, 1.0f, 2.5f, true, true, 0};
+
+void motionRefreshConfig() {
+    m_config_cache.target_margin_mm = configGetFloat(KEY_TARGET_MARGIN, 0.1f);
+    m_config_cache.stall_threshold_mm = configGetFloat(KEY_STALL_THRESHOLD, 5.0f);
+    m_config_cache.deviation_warning_mm = configGetFloat(KEY_DEV_WARN, 1.0f);
+    m_config_cache.deviation_critical_mm = configGetFloat(KEY_DEV_CRIT, 2.5f);
+    m_config_cache.limits_strict = (configGetInt(KEY_STRICT_LIMITS, 1) != 0);
+    m_config_cache.auto_report_enabled = (configGetInt(KEY_M154_AUTO, 1) != 0);
+    m_config_cache.last_refresh_ms = millis();
+    logDebug("[MOTION] Configuration cache refreshed");
+}
 
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y,
                                    ELBO_I73_AXIS_Z, ELBO_I73_AXIS_A};
@@ -144,13 +169,13 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
       int32_t delta_pos = current_pos - prev_position;
       // Convert counts/ms to mm/s
       // velocity = (delta_counts / dt_ms) * (1000 ms/s) * (1 mm / ppm counts)
-      float ppm = encoderCalibrationGetPPM(id); // pulses per mm
-      if (ppm > 0.0f) {
+      float scale = getAxisScale(id);
+      if (scale > 0.0f) {
         current_velocity_mm_s =
-            ((float)delta_pos / (float)dt_ms) * 1000.0f / ppm;
+            ((float)delta_pos / (float)dt_ms) * 1000.0f / scale;
         
         // Accumulate distance in units (mm or degrees)
-        accumulated_distance_units += (double)abs(delta_pos) / (double)ppm;
+        accumulated_distance_units += (double)abs(delta_pos) / (double)scale;
       } else {
         current_velocity_mm_s = 0.0f;
       }
@@ -214,26 +239,30 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
 
 void motionInit() {
   logInfo("[MOTION] Init...");
-  m_state.strict_limits = configGetInt(KEY_MOTION_STRICT_LIMITS, 1);
+  
+  // Initial config refresh (caches frequently accessed parameters)
+  motionRefreshConfig();
 
   for (int i = 0; i < MOTION_AXES; i++) {
     axes[i].init(i);
-    axes[i].soft_limit_min = -500000;
-    axes[i].soft_limit_max = 500000;
+    
+    // Load soft limits from configuration
+    char min_key[20], max_key[20];
+    snprintf(min_key, sizeof(min_key), "ax_%d_min", i);
+    snprintf(max_key, sizeof(max_key), "ax_%d_max", i);
+    axes[i].soft_limit_min = configGetInt(min_key, -1000000);
+    axes[i].soft_limit_max = configGetInt(max_key, 1000000);
     
     // Load accumulated distance from NVS
     char d_key[16];
     snprintf(d_key, sizeof(d_key), "dist_%d_m", i);
     axes[i].accumulated_distance_units = (double)configGetFloat(d_key, 0.0f) * 1000.0; // Store as mm internally
+    axes[i].maintenance_alert_logged = false;
   }
   motionPlanner.init();
   MotionStateMachine::init(); // PHASE 5.10: Initialize formal state machine
   autoReportInit(); // PHASE 4.0: Initialize auto-report system
   lcdSleepInit();   // PHASE 4.0: Initialize LCD sleep system
-
-  // PHASE 5.0: Spindle current monitoring
-  // Initialization moved to main.cpp to prevent double-init and key conflation.
-  // motion_control.cpp now only uses the global spindle monitor instance.
 
   motionSetPLCAxisDirection(255, false, false);
 }
@@ -333,12 +362,13 @@ void motionUpdate() {
     backoff_level = 0;
   }
 
-  // PERFORMANCE FIX: I2C Health Check moved to monitor task (tasks_monitor.cpp)
-  // Removed from motion loop to prevent real-time delays (was taking up to 20ms)
-  // Health checks now run at 1Hz in low-priority background task instead
+  // PERFORMANCE FIX: Periodically refresh cache (every 5s) or on manual demand
+  if (millis() - m_config_cache.last_refresh_ms > 5000) {
+      motionRefreshConfig();
+  }
 
-  int strict_mode = m_state.strict_limits;
-  float target_margin_mm = configGetFloat(KEY_TARGET_MARGIN, 0.1f);
+  int strict_mode = m_config_cache.limits_strict;
+  float target_margin_mm = m_config_cache.target_margin_mm;
 
   for (int i = 0; i < MOTION_AXES; i++) {
     int32_t raw_pos = wj66GetPosition(i);
@@ -365,9 +395,9 @@ void motionUpdate() {
         int32_t offset = (int32_t)(axes[i].velocity_counts_ms * (float)dt_since_last_actual);
         
         // Safety: Limit prediction offset to the system's allowed target margin.
-        // Convert mm threshold to axis-specific counts using active PPM.
-        float ppm = encoderCalibrationGetPPM(i);
-        int32_t max_offset = (int32_t)(target_margin_mm * ppm);
+        // Convert mm threshold to axis-specific counts using active scale.
+        float scale = getAxisScale(i);
+        int32_t max_offset = (int32_t)(target_margin_mm * scale);
         
         // Ensure max_offset is at least 1 count to allow any prediction
         if (max_offset < 1) max_offset = 1;
@@ -421,6 +451,24 @@ void motionUpdate() {
 
   uint32_t now = millis();
   bool should_save = (now - last_dist_save_ms > 3600000); // Hourly save fallback
+  
+  // Maintenance check (every 50km = 50,000,000 mm)
+  #define MAINTENANCE_INTERVAL_MM 50000000.0
+  for (int i = 0; i < 3; i++) {
+      if (axes[i].accumulated_distance_units >= MAINTENANCE_INTERVAL_MM) {
+          if (!axes[i].maintenance_alert_logged) {
+              logWarning("[MAINTENANCE] Axis %d reached service interval (%.1f km)!", 
+                         i, axes[i].accumulated_distance_units / 1000000.0);
+              axes[i].maintenance_alert_logged = true;
+              
+              // PHASE 16: Automatically signal maintenance via status light
+              // We use SYSTEM_STATE_PAUSED as it's a visible Yellow blink
+              statusLightSetState(SYSTEM_STATE_PAUSED);
+              
+              faultLogWarning(FAULT_SOFT_LIMIT_EXCEEDED, "Service Interval Reached");
+          }
+      }
+  }
   
   if (!should_save) {
       for (int i = 0; i < 3; i++) {
@@ -1300,4 +1348,12 @@ void motionTrackJitterUS(uint32_t jitter_us) {
   if (jitter_us > m_max_jitter_us) {
     m_max_jitter_us = jitter_us;
   }
+}
+
+void motionResetMaintenance() {
+    for (int i = 0; i < 4; i++) {
+        axes[i].accumulated_distance_units = 0;
+        axes[i].maintenance_alert_logged = false;
+    }
+    logInfo("[MOTION] Axis maintenance distance counters reset");
 }

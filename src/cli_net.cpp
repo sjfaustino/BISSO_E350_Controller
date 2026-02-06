@@ -78,7 +78,9 @@ void cmd_wifi_connect(int argc, char** argv) {
     logPrintf("[WIFI] Connecting to '%s'...\n", argv[2]);
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true); // Re-enable auto-reconnect
+    WiFi.setTxPower(WIFI_POWER_19_5dBm); // Set maximum power for best range
     WiFi.begin(argv[2], argv[3]);
+
 
     // CRITICAL FIX: Non-blocking connection to prevent freezing motion control
     // WiFi connects in background - don't block CLI task with delay() loops

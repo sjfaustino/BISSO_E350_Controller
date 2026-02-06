@@ -82,6 +82,7 @@ public:
 
   // Distance tracking for maintenance
   double accumulated_distance_units; // Total units moved since reset
+  bool maintenance_alert_logged;     // True if maintenance warning has been logged
 
 private:
   bool _error_logged;

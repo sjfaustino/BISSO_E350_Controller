@@ -393,20 +393,64 @@
                     <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Export
                         Configuration</h3>
                     <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
-                        Download current configuration as JSON file for backup or sharing
+                        Download or save configuration to storage
                     </p>
+
+                    <!-- Storage Location Selector -->
+                    <div
+                        style="margin-bottom: 15px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <label style="font-weight: 600; font-size: var(--font-size-sm);">Storage Location</label>
+                            <span id="sd-status-badge"
+                                style="font-size: 0.75em; padding: 2px 8px; border-radius: 4px; background: var(--color-critical); color: white;">No
+                                SD Card</span>
+                        </div>
+                        <select id="export-storage-select" class="form-control" style="margin-bottom: 8px;">
+                            <option value="download">💾 Download to Computer</option>
+                            <option value="flash">📦 Save to Flash (Internal)</option>
+                            <option value="sd" id="sd-option" disabled>💳 Save to SD Card</option>
+                        </select>
+                        <div id="sd-info"
+                            style="font-size: var(--font-size-sm); color: var(--text-muted); display: none;">
+                            <span id="sd-space-info">SD: -- MB free</span>
+                        </div>
+                    </div>
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <button class="btn btn-secondary" id="export-all-btn">Export All Settings</button>
                         <button class="btn btn-ghost" id="export-motion-btn">Export Motion Only</button>
                     </div>
                 </div>
 
+
                 <div style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
                     <h3 style="font-size: var(--font-size-base); font-weight: 600; margin-bottom: 10px;">Import
                         Configuration</h3>
                     <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 10px;">
-                        Upload a previously saved configuration file to restore settings
+                        Load configuration from file or storage
                     </p>
+
+                    <!-- Import Storage Location Selector -->
+                    <div
+                        style="margin-bottom: 15px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+                        <label
+                            style="font-weight: 600; font-size: var(--font-size-sm); display: block; margin-bottom: 8px;">Import
+                            From</label>
+                        <select id="import-storage-select" class="form-control">
+                            <option value="upload">📁 Upload from Computer</option>
+                            <option value="flash">📦 Load from Flash (Internal)</option>
+                            <option value="sd" id="import-sd-option" disabled>💳 Load from SD Card</option>
+                        </select>
+                    </div>
+
+                    <!-- File list for Flash/SD (hidden by default) -->
+                    <div id="storage-files-list"
+                        style="display: none; margin-bottom: 15px; max-height: 150px; overflow-y: auto; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+                        <div style="padding: 12px; color: var(--text-muted); text-align: center;">Select a storage
+                            location...</div>
+                    </div>
+
                     <button class="btn btn-secondary" id="import-config-btn"
                         style="width: 100%; margin-bottom: 10px;">Choose File & Import</button>
                     <div id="import-status"

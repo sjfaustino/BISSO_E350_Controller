@@ -22,6 +22,7 @@
 #include "watchdog_manager.h"
 #include "timeout_manager.h"
 #include "memory_monitor.h"
+#include "psram_alloc.h"       // PSRAM-preferred allocations
 #include "plc_iface.h"        // <-- THIS MUST MATCH THE FILE ABOVE
 #include "motion.h"
 #include "config_unified.h"
@@ -88,6 +89,10 @@ void cmd_status_dashboard(int argc, char** argv) {
     (void)argc; (void)argv;
     watchdogFeed("CLI");
     
+    // PHASE 16 FIX: Build entire output in buffer, then print all at once
+    static char output[2048];
+    int pos = 0;
+    
     // System Metrics
     uint32_t uptime_sec = millis() / 1000;
     uint32_t hours = uptime_sec / 3600;
@@ -112,69 +117,76 @@ void cmd_status_dashboard(int argc, char** argv) {
     else if (job.state == JOB_COMPLETED) job_state_str = "DONE";
     else if (job.state == JOB_ERROR) job_state_str = "ERROR";
 
-    logPrintln("\n+============================================================+");
-    logPrintln("|           BISSO E350 MASTER STATUS DASHBOARD              |");
-    logPrintf("|  Uptime: %02u:%02u:%02u   CPU: %-3u%%   Heap: %-4u KB (Min %-3u)  |\r\n", 
+    pos += snprintf(output + pos, sizeof(output) - pos, "\n+============================================================+\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "|           BISSO E350 MASTER STATUS DASHBOARD              |\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "|  Uptime: %02u:%02u:%02u   CPU: %-3u%%   Heap: %-4u KB (Min %-3u)  |\n", 
               (unsigned int)hours, (unsigned int)mins, (unsigned int)secs, 
               cpu, (unsigned)(free_heap/1024), (unsigned)(min_heap/1024));
-    logPrintln("+============================================================+");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+============================================================+\n");
     
-    logPrintln("| MOTION COORDINATES (mm)         | JOB STATUS               |");
-    logPrintf("|   X: %10.3f    Y: %10.3f  | State: %-8s %-9s|\r\n",
+    pos += snprintf(output + pos, sizeof(output) - pos, "| MOTION COORDINATES (mm)         | JOB STATUS               |\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "|   X: %10.3f    Y: %10.3f  | State: %-8s %-9s|\n",
                   motionGetPosition(0) / 1000.0f, motionGetPosition(1) / 1000.0f, job_state_str, job_progress_str);
-    logPrintf("|   Z: %10.3f    A: %10.3f  | Line:  %-6lu / %-6lu   |\r\n",
+    pos += snprintf(output + pos, sizeof(output) - pos, "|   Z: %10.3f    A: %10.3f  | Line:  %-6lu / %-6lu   |\n",
                   motionGetPosition(2) / 1000.0f, motionGetPosition(3) / 1000.0f, 
                   (unsigned long)job.current_line, (unsigned long)job.total_lines);
     
-    logPrintln("+---------------------------------+--------------------------+");
-    logPrintln("| ENCODER FEEDBACK                                          |");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+---------------------------------+--------------------------+\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "| ENCODER FEEDBACK                                          |\n");
     bool fb_active = encoderMotionIsFeedbackActive();
-    logPrintf("|   Status: %s                                         |\r\n",
+    pos += snprintf(output + pos, sizeof(output) - pos, "|   Status: %s                                         |\n",
                   fb_active ? "[ON] " : "[OFF]");
     
-    logPrintln("+------------------------------------------------------------+");
-    logPrintln("| SPINDLE CURRENT                                           |");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "| SPINDLE MONITORING                                        |\n");
     const spindle_monitor_state_t* spindle = spindleMonitorGetState();
     if (spindle->enabled) {
-        logPrintf("|   Current: %5.1f A  |  Peak: %5.1f A                    |\r\n",
-                      spindle->current_amps, spindle->current_peak_amps);
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   Current: %5.1f A  |  Peak: %5.1f A   |  Load: %5.1f%% |\n",
+                      spindle->current_amps, spindle->current_peak_amps, spindleMonitorGetLoadPercent());
         const char* alarm = "OK";
         if (spindle->alarm_tool_breakage) alarm = "TOOL BREAK";
         else if (spindle->alarm_stall) alarm = "STALL";
         else if (spindle->alarm_overload) alarm = "OVERLOAD";
-        logPrintf("|   Alarm: %-10s                                      |\r\n", alarm);
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   Alarm: %-10s                                      |\n", alarm);
     } else {
-        logPrintln("|   Status: [DISABLED]                                      |");
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   Status: [DISABLED]                                      |\n");
     }
     
-    logPrintln("+------------------------------------------------------------+");
-    logPrintln("| NETWORK                                                   |");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "| NETWORK                                                   |\n");
     if (WiFi.status() == WL_CONNECTED) {
-        logPrintf("|   WiFi: Connected (%d dBm)                              |\r\n", WiFi.RSSI());
-        logPrintf("|   IP: %-15s                                   |\r\n",
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   WiFi: Connected (%d dBm)                              |\n", WiFi.RSSI());
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   IP: %-15s                                   |\n",
                       WiFi.localIP().toString().c_str());
     } else {
-        logPrintln("|   WiFi: [DISCONNECTED]                                    |");
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   WiFi: [DISCONNECTED]                                    |\n");
     }
     
-    logPrintln("+------------------------------------------------------------+");
-    logPrintln("| ACTIVE FAULTS                                             |");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "| ACTIVE FAULTS                                             |\n");
     fault_stats_t faults = faultGetStats();
     if (faults.total_faults == 0) {
-        logPrintln("|   [NONE] System healthy                                   |");
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   [NONE] System healthy                                   |\n");
     } else {
-        logPrintf("|   Total: %lu  |  Last: %lu sec ago                       |\r\n",
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   Total: %lu  |  Last: %lu sec ago                       |\n",
                       (unsigned long)faults.total_faults,
                       (unsigned long)((millis() - faults.last_fault_time_ms) / 1000));
     }
     
     if (emergencyStopIsActive()) {
-        logPrintln("+============================================================+");
-        logPrintln("|  E-STOP ACTIVE - MOTION DISABLED                          |");
+        pos += snprintf(output + pos, sizeof(output) - pos, "+============================================================+\n");
+        pos += snprintf(output + pos, sizeof(output) - pos, "|  E-STOP ACTIVE - MOTION DISABLED                          |\n");
     }
     
-    logPrintln("+============================================================+");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+============================================================+\n");
+    
+    // Acquire mutex and output entire buffer at once
+    serialLoggerLock();
+    Serial.print(output);
+    Serial.flush();
+    serialLoggerUnlock();
 }
+
 
 // ============================================================================
 // RUNTIME / CYCLE COUNTER
@@ -201,7 +213,11 @@ void cmd_runtime(int argc, char** argv) {
             return;
         } else if (strcasecmp(argv[1], "maint") == 0) {
             configSetInt(KEY_LAST_MAINT_MINS, total_mins);
-            logInfo("[RUNTIME] Maintenance recorded");
+            
+            extern void motionResetMaintenance();
+            motionResetMaintenance();
+            
+            logInfo("[RUNTIME] Maintenance recorded and axis counters reset");
             return;
         }
     }
@@ -210,26 +226,31 @@ void cmd_runtime(int argc, char** argv) {
     uint32_t mins = total_mins % 60;
     uint32_t maint_hours = since_maint / 60;
     
+    if (!serialLoggerLock()) return;
+
     logPrintln("\n[RUNTIME] === Machine Usage Statistics ===\n");
-    logPrintln("+-------------------------+--------------------+");
-    logPrintln("| Metric                  | Value              |");
-    logPrintln("+-------------------------+--------------------+");
+    
+    cliPrintTableHeader(23, 18, 0);
+    cliPrintTableRow("Metric", "Value", nullptr, 23, 18, 0);
+    cliPrintTableDivider(23, 18, 0);
     
     char buf[32];
     snprintf(buf, sizeof(buf), "%lu hrs %lu min", (unsigned long)hours, (unsigned long)mins);
-    logPrintf("| %-23s | %-18s |\r\n", "Total Runtime", buf);
+    cliPrintTableRow("Total Runtime", buf, nullptr, 23, 18, 0);
     
     snprintf(buf, sizeof(buf), "%lu", (unsigned long)cycles);
-    logPrintf("| %-23s | %-18s |\r\n", "Job Cycles Completed", buf);
+    cliPrintTableRow("Job Cycles Completed", buf, nullptr, 23, 18, 0);
     
     snprintf(buf, sizeof(buf), "%lu hrs", (unsigned long)maint_hours);
-    logPrintf("| %-23s | %-18s |\r\n", "Since Last Maintenance", buf);
+    cliPrintTableRow("Since Last Maintenance", buf, nullptr, 23, 18, 0);
     
-    logPrintln("+-------------------------+--------------------+");
+    cliPrintTableFooter(23, 18, 0);
     
     if (maint_hours >= 100) {
         logPrintln("\n[!] MAINTENANCE RECOMMENDED (100+ hours since last service)");
     }
+
+    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -237,8 +258,12 @@ void cmd_runtime(int argc, char** argv) {
 // ============================================================================
 void cmd_dio_main(int argc, char** argv) {
     (void)argc; (void)argv;
-    logPrintln("\n[DIO] === Digital I/O Status ===\n");
     watchdogFeed("CLI");
+    
+    // PHASE 16 FIX: Build entire output in buffer, then print all at once
+    // This prevents concurrent task logging from interleaving with CLI output
+    static char output[2048];
+    int pos = 0;
     
     static const char* input1_labels[] = {"Limit-X", "Limit-Y", "Limit-Z", "E-Stop", "Pause", "Resume", "Probe", "Door"};
     static const char* input2_labels[] = {"Home-X", "Home-Y", "Home-Z", "Home-A", "ToolSns", "Coolant", "In-15", "In-16"};
@@ -252,14 +277,16 @@ void cmd_dio_main(int argc, char** argv) {
         {0x25, "OUTPUTS-AUX", output2_labels, true}
     };
     
-    logPrintln("+---------+----------------+------------------------+");
-    logPrintln("| Addr    | Name           | State (MSB..LSB)       |");
-    logPrintln("+---------+----------------+------------------------+");
+    // Build header
+    pos += snprintf(output + pos, sizeof(output) - pos, "\n[DIO] === Digital I/O Status ===\n\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+---------+----------------+------------------------------------------------------------------+\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "| Addr    | Name           | State (MSB..LSB)                                                 |\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+---------+----------------+------------------------------------------------------------------+\n");
     
     for (int b = 0; b < 4; b++) {
         Wire.beginTransmission(banks[b].addr);
         if (Wire.endTransmission() != 0) {
-            logPrintf("| 0x%02X    | %-14s | [NOT CONNECTED]        |\r\n", banks[b].addr, banks[b].name);
+            pos += snprintf(output + pos, sizeof(output) - pos, "| N/A     | %-14s | [NOT CONNECTED]                                                  |\n", banks[b].name);
             continue;
         }
         
@@ -270,27 +297,35 @@ void cmd_dio_main(int argc, char** argv) {
         for (int i = 7; i >= 0; i--) bits[7-i] = (state & (1 << i)) ? '1' : '0';
         bits[8] = '\0';
         
-        logPrintf("| 0x%02X    | %-14s | %s (0x%02X)        |\r\n", banks[b].addr, banks[b].name, bits, state);
+        pos += snprintf(output + pos, sizeof(output) - pos, "| 0x%02X    | %-14s | %s (0x%02X)                                                  |\n", 
+                        banks[b].addr, banks[b].name, bits, state);
         
         // Show active channels
-        char active_buf[64] = "";
-        int pos = 0;
+        char active_buf[128] = "";
+        int apos = 0;
         int count = 0;
         for (int i = 0; i < 8; i++) {
             bool active = banks[b].is_output ? !(state & (1 << i)) : (state & (1 << i));
             if (active) {
-                if (count > 0) pos += snprintf(active_buf + pos, sizeof(active_buf) - pos, ", ");
-                pos += snprintf(active_buf + pos, sizeof(active_buf) - pos, "%s", banks[b].labels[i]);
+                if (count > 0) apos += snprintf(active_buf + apos, sizeof(active_buf) - apos, ", ");
+                apos += snprintf(active_buf + apos, sizeof(active_buf) - apos, "%s", banks[b].labels[i]);
                 count++;
             }
         }
         if (count == 0) snprintf(active_buf, sizeof(active_buf), "(none active)");
-        logPrintf("|         |                | %s\r\n", active_buf);
+        pos += snprintf(output + pos, sizeof(output) - pos, "|         |                | %-64s |\n", active_buf);
     }
     
-    logPrintln("+---------+----------------+------------------------+");
-    logPrintln("Legend: Inputs=HIGH when active, Outputs=LOW when relay ON");
+    pos += snprintf(output + pos, sizeof(output) - pos, "+---------+----------------+------------------------------------------------------------------+\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "Legend: Inputs=HIGH when active, Outputs=LOW when relay ON\n");
+    
+    // Acquire mutex and output entire buffer at once
+    serialLoggerLock();
+    Serial.print(output);
+    Serial.flush();
+    serialLoggerUnlock();
 }
+
 
 // ============================================================================
 // SPINDLE ALARM CLI SUBCOMMANDS
@@ -1090,11 +1125,14 @@ void cmd_fault_recovery_diag(int argc, char** argv) {
 }
 
 void cmd_task_list_detailed(int argc, char** argv) {
+    if (!serialLoggerLock()) return;
+
     logPrintln("\n[TASK] === Detailed Task List ===");
 
     int task_count = taskGetStatsCount();
     if (task_count <= 0) {
         logPrintln("[TASK] No tasks registered");
+        serialLoggerUnlock();
         return;
     }
 
@@ -1119,9 +1157,13 @@ void cmd_task_list_detailed(int argc, char** argv) {
 
     logPrintln("\nNote: Stack HWM = High Water Mark (bytes still available)");
     logPrintln("      Time = Total cumulative time");
+    
+    serialLoggerUnlock();
 }
 
 void cmd_memory_detailed(int argc, char** argv) {
+    if (!serialLoggerLock()) return;
+
     logPrintln("\n[MEMORY] === Detailed Memory Analysis ===");
 
     // Update memory monitor
@@ -1166,6 +1208,8 @@ void cmd_memory_detailed(int argc, char** argv) {
     }
 
     logPrintf("\r\nSamples:      %lu\r\n", (unsigned long)stats->sample_count);
+    
+    serialLoggerUnlock();
 }
 
 // ============================================================================
@@ -1272,7 +1316,7 @@ void cmd_config_backup(int argc, char** argv) {
 
     // Export entire config to JSON
     extern size_t configExportToJSON(char* buffer, size_t buffer_size);
-    char* json_buffer = (char*)malloc(2048);
+    char* json_buffer = (char*)psramMalloc(2048);  // Use PSRAM for large buffer
     if (!json_buffer) {
         logError("[CONFIG] Memory allocation failed");
         return;
@@ -1281,7 +1325,7 @@ void cmd_config_backup(int argc, char** argv) {
     size_t json_size = configExportToJSON(json_buffer, 2048);
     if (json_size == 0) {
         logError("[CONFIG] Failed to export configuration");
-        free(json_buffer);
+        psramFree(json_buffer);
         return;
     }
 
@@ -1292,7 +1336,7 @@ void cmd_config_backup(int argc, char** argv) {
     logInfo("[CONFIG] [OK] Backup saved (%lu bytes)", (unsigned long)json_size);
     logPrintln("[CONFIG] Use 'config restore' to restore from backup");
 
-    free(json_buffer);
+    psramFree(json_buffer);
 }
 
 void cmd_config_restore(int argc, char** argv) {
@@ -1572,6 +1616,8 @@ void cmd_nvs_main(int argc, char** argv) {
 // BOOT LOG VIEWER
 // ============================================================================
 void cmd_log_boot(int argc, char** argv) {
+    if (!serialLoggerLock()) return;
+
     logPrintln("\n[LOG] === Boot Log ===");
     
     size_t log_size = bootLogGetSize();
@@ -1579,14 +1625,16 @@ void cmd_log_boot(int argc, char** argv) {
     
     if (log_size == 0) {
         logPrintln("(No boot log available)");
+        serialLoggerUnlock();
         return;
     }
     
     // Read and print in chunks to avoid large stack allocation
     const size_t chunk_size = 512;
-    char* chunk = (char*)malloc(chunk_size);
+    char* chunk = (char*)psramMalloc(chunk_size);  // Use PSRAM for buffer
     if (!chunk) {
         logError("[LOG] Memory allocation failed");
+        serialLoggerUnlock();
         return;
     }
     
@@ -1601,8 +1649,10 @@ void cmd_log_boot(int argc, char** argv) {
         break;
     }
     
-    free(chunk);
+    psramFree(chunk);
     logPrintln("\n[LOG] === End Boot Log ===");
+    
+    serialLoggerUnlock();
 }
 
 void cmd_log_enable(int argc, char** argv) {

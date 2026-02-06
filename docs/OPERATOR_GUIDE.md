@@ -86,7 +86,7 @@ The BISSO E350 is a **stone bridge saw with multiplexed motion control and indep
   - Do NOT directly control spindle
 - **Web Dashboard**: Real-time monitoring at `http://<controller-ip>/` (default: http://192.168.1.100/)
   - Shows axis motion status and quality
-  - Does NOT show spindle VFD status (it's independent)
+  - **NEW**: Shows Spindle/Saw Load % and Current (Amps) for real-time safety monitoring
 
 #### Key Operating Principle
 ⚠️ **IMPORTANT**: The Altivar 31 VFD controls **AXIS MOTORS ONLY**. The spindle has its own separate VFD and is controlled manually by the operator. These two systems operate completely independently:
@@ -195,9 +195,26 @@ The spindle motor (cutting wheel) is controlled by a **separate VFD** that is **
 - ❌ **NEVER** reach across a spinning cutting wheel
 - ❌ **NEVER** operate spindle without proper eye protection (flying stone debris hazard)
 - ❌ **NEVER** increase spindle speed beyond equipment specifications (check saw documentation)
-- ✅ **ALWAYS** wear proper hearing protection (spindle noise can exceed 95 dB)
+- ✅ **ALWAYS** monitor **Spindle Load %** on the dashboard during heavy cuts
 - ✅ **ALWAYS** ensure stone blank is firmly secured before starting spindle
 - ✅ **ALWAYS** verify axes are in safe position before starting spindle
+
+### 📊 Spindle Load Management (Operator Guide)
+
+The BISSO E350 now provides real-time **Spindle Load %** on the dashboard. This identifies how hard the motor is working relative to its rated capacity.
+
+```text
+SPINDLE LOAD TRAFFIC LIGHT:
+┌──────────┬──────────┬─────────────────────────────────────────────────┐
+│ LOAD %   │ STATUS   │ OPERATOR ACTION                                 │
+├──────────┼──────────┼─────────────────────────────────────────────────┤
+│ < 60%    │ OPTIMAL  │ Normal cutting. Maintain current feed rate.      │
+│ 60-80%   │ WARNING  │ Approaching limit. Monitor temperature.         │
+│ > 80%    │ CRITICAL │ Reduce Axis Feed Rate IMMEDIATELY. Risk of stall.│
+└──────────┴──────────┴─────────────────────────────────────────────────┘
+```
+
+**Pro-Tip**: If the Load % stays in the red (>80%) for more than 30 seconds, the blade is likely dull or the feed rate is too high for the material. Reduce feed rate until load returns to the green/yellow zone.
 
 ### Axis Motion and Spindle Operation Together
 
@@ -1631,32 +1648,44 @@ Complete the [Pre-Startup Checklist](#pre-startup-checklist) every morning.
 
 ### Automated Maintenance Tracking (v3.2)
 
-The system now automatically tracks the accumulated travel distance for each axis to ensure timely greasing and mechanical inspection.
+The system now automatically tracks the accumulated travel distance for each axis and provides a unified command for logging service actions.
 
 #### How it Works:
 1. **Distance Accumulation**: Every millimeter of movement is counted.
-2. **Flash Protection (SafeSave)**: To preserve the longevity of the controller's internal memory (NVS), distance is only saved to permanent storage after **100 meters of movement** or **1 hour of idle time**. This reduces memory wear by over 90%.
+2. **Flash Protection (SafeSave)**: To preserve memory longevity, distance is only saved to permanent storage after **100 meters** of movement or **1 hour** of idle time.
 3. **Thresholds**: The default maintenance interval is **50 km (50,000 meters)**.
 
-#### Visual Indicators:
+#### Monitoring Maintenance:
+Use the `status maint` command to view a detailed report of axis wear and service history.
+
+**Expected Dashboard View:**
+```text
++-------------------+--------------------+--------------------+
+| MAINTENANCE TASK  | LAST SERVICE       | CURRENT DISTANCE   |
++-------------------+--------------------+--------------------+
+| X Axis Lubrication| 2026-01-15         | 42.5 km            |
+| Y Axis Gears      | 2026-01-15         | 18.2 km            |
+| Z Lead Screw      | 2026-01-10         |  2.1 km            |
++-------------------+--------------------+--------------------+
+```
+
+#### Visual Alerts:
 When an axis exceeds its maintenance threshold:
 - A **Pulsing Wrench Icon (🔧)** will appear on the specific axis card in the Web Dashboard.
 - A warning will be logged to the system event log.
 
-```text
-    AXIS STATUS CARD (Dashboard)
-    +------------------------------------------+
-    | [ X Axis Quality ]          [🔧 SERVICE ]|
-    |                                          |
-    |  Score: 98%   [||||||||||||||||||--]     |
-    |  Jitter: 0.002 mm/s                      |
-    +------------------------------------------+
+#### 🔧 How to Reset After Service:
+After performing maintenance (e.g., greasing the rails), use the following command to log the action and reset all counters:
+
+```bash
+# Log a maintenance entry and reset axis counters
+status maint log "Greased all axes and checked belts"
 ```
 
-#### Action Required:
-1. Perform the required lubrication or inspection for that axis.
-2. Clear the distance counter using the CLI: `config set dist_0_m 0` (for X axis).
-3. The wrench icon will disappear immediately.
+**What this does:**
+1. Resets all `axis_dist_x/y/z` counters to **0.00**.
+2. Clears the **🔧 SERVICE** warning from the dashboard.
+3. Records your message in the permanent service log for insurance/auditing.
 
 ---
 
@@ -2046,33 +2075,34 @@ Update Age:      20 ms          <-- Age of the last hardware update
 
 Version 3.2 introduces advanced stone cutting analytics and hardware safety optimizations.
 
-### 14.1. Blade Efficiency Monitoring (Load Meter)
+### 14.1. Spindle Load Monitoring (Load Meter)
 
-Operators can now monitor the "Efficiency" of the cutting process. This metric compares how much electrical current the Spindle VFD is drawing relative to how fast the axis is moving (Feedrate).
+Operators can now monitor the **Spindle Load %** in real-time. This metric calculates exactly how hard the motor is working relative to its rated electrical capacity.
 
-#### The Efficiency Logic:
+#### The Load Logic:
 ```text
-Efficiency = Spindle_Current (Amps) / Feedrate (mm/s)
+Load % = Measured Current (Amps) / Motor Rated Amps (Configurable)
 ```
-- **Low Values (Optimal)**: The blade is sharp and cutting through the material with ease.
-- **High Values (Warning)**: The blade is struggling. This often indicates a dull blade, material that is too hard for the current feedrate, or insufficient coolant flow.
+- **Optimal Zone (Green)**: The blade is cutting efficiently.
+- **Warning Zone (Yellow)**: The motor is working hard; monitor for heat.
+- **Critical Zone (Red)**: Motor is heavily overloaded. Reduce axis speed immediately!
 
-#### Web UI Gauge:
-The "Blade Efficiency" gauge color-codes the load for quick visual status:
+#### Web UI & CLI Dashboard:
+The "Spindle Load" gauge color-codes the load for quick visual status:
 - **Green (Optimal)**: Load < 60%
-- **Yellow (Warning)**: Load 60% - 80% (Consider slowing down)
-- **Red (Critical)**: Load > 80% (Risk of tool breakage or motor stall)
+- **Yellow (Warning)**: Load 60% - 80% 
+- **Red (Critical)**: Load > 80%
 
 ```text
-    SAW BLADE MONITOR
+    SPINDLE LOAD MONITOR
     +------------------------------------------+
     | [ Spindle Status ]              (o) RUN  |
     |                                          |
     |  RPM: 2800 | Speed: 44.5 m/s             |
     |                                          |
-    |  Blade Efficiency (Load Meter)           |
-    |  [###########---------]  1.42            |
-    |  (OPTIMAL)                               |
+    |  Spindle Load %                          |
+    |  [###########---------]  62.0%           |
+    |  (WARNING - MONITOR FEEDRATE)            |
     +------------------------------------------+
 ```
 
@@ -2123,6 +2153,7 @@ Stone materials require specific "Surface Speeds" (the speed at which the blade 
 | 2.0 | 2025-09-15 | Updated for Phase 5.6 per-axis validation |
 | 3.0 | 2025-12-14 | Complete rewrite for multi-file web interface, detailed maintenance procedures |
 | 3.1 | 2026-01-16 | Added Position Prediction, I2C Optimization, and high-performance diagnostics |
+| 3.2 | 2026-02-02 | Added Spindle Load % Monitoring, Intelligent Maintenance Logging, and Table Engine |
 
 ---
 

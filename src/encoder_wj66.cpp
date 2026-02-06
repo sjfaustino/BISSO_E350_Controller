@@ -171,6 +171,7 @@ bool wj66SetBaud(uint32_t baud) {
 }
 
 uint32_t wj66Autodetect() {
+    if (!serialLoggerLock()) return 0;
     logInfo("[WJ66] Starting robust Auto-detect...");
     
     // Suspend RS485 bus activity during scan
@@ -180,6 +181,7 @@ uint32_t wj66Autodetect() {
     if (!rs485TakeBus(1000)) {
         logError("[WJ66] Failed to acquire bus mutex for scan");
         rs485SetBusPaused(false);
+        serialLoggerUnlock();
         return 0;
     }
 
@@ -314,6 +316,7 @@ uint32_t wj66Autodetect() {
     
     rs485ReleaseBus();
     rs485SetBusPaused(false);
+    serialLoggerUnlock();
     return found_rate;
 }
 
@@ -323,6 +326,7 @@ static bool wj66Poll(void* ctx) { (void)ctx;
     int addr = configGetInt(KEY_ENC_ADDR, 0);
     int proto = configGetInt(KEY_ENC_PROTO, 0); // 0=ASCII, 1=Modbus
 
+    if (proto == 1) {
         uint8_t frame[8];
         modbusReadRegistersRequest((uint8_t)addr, 0x0010, 8, frame);
         wj66_state.last_command_time = millis();
@@ -625,6 +629,7 @@ void wj66SetZero(uint8_t axis) {
 }
 
 void wj66Diagnostics() {
+  if (!serialLoggerLock()) return;
   const encoder_hal_config_t* hal = encoderHalGetConfig();
   logPrintln("\n=== ENCODER STATUS ===");
   logPrintf("Interface: %d (%s)\n", hal->interface, encoderHalGetInterfaceName(hal->interface));
@@ -644,4 +649,5 @@ void wj66Diagnostics() {
         (unsigned long)age
     );
   }
+  serialLoggerUnlock();
 }

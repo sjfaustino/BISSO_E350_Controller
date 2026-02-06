@@ -1,0 +1,40 @@
+﻿e 0
+[INFO]  [WDT] Registered task: CLI
+[INFO]  [WDT] Subscribed task: CLI
+[INFO]  [FAULT_TASK] [OK] Started on core 0
+[INFO]  [WDT] Registered task: Fault_Log
+[INFO]  [WDT] Subscribed task: Fault_Log
+[INFO]  [MONITOR_TASK] [OK] Started on core 1
+[INFO]  [WDT] Registered task: Monitor
+[INFO]  [WDT] Subscribed task: Monitor
+[WARN]  [RTC] Time not set (factory default 2000-01-01)
+[INFO]  [MEM] Initializing...
+[INFO]  [MEM] [OK] Internal: 312100 bytes, PSRAM: 8388607 bytes
+[INFO]  [STALL] Task stall detection initialized
+[WARN]  [RTC] Cannot sync - no internet. Use 'rtc set YYYY-MM-DD HH:MM:SS'
+[INFO]  [LCD_MSG] Message system initialized
+[INFO]  [LCD_MSG] Message set: 'RTC TIME NOT SET!' (duration: 5000 ms)
+[INFO]  [BOOT] OTA GitHub check disabled (saves 16KB SSL memory)
+[INFO]  [BOOT] [OK] Complete in 3614 ms
+[INFO]  [TELEMETRY_TASK] [OK] Started on core 0 - Background collection
+[INFO]  [WDT] Registered task: Telemetry
+[INFO]  [WDT] Subscribed task: Telemetry
+[INFO]  [CUTTING] Analytics initialized (V=230, ??=85%, blade=3.0mm)
+[INFO]  [LCD_FORMATTER_TASK] [OK] Started on core 0 - Background formatting
+[INFO]  [WDT] Registered task: LCD_Formatter
+[INFO]  [WDT] Subscribed task: LCD_Formatter
+[INFO]  [LCD_FORMATTER] [OK] Initialized on Core 0
+[INFO]  [LCD_TASK] [OK] Started on core 0
+[INFO]  [WDT] Registered task: LCD
+[INFO]  [WDT] Subscribed task: LCD
+[WARN]  [RS485] Timeout: YH-TC05 (Addr 3, after 500ms)
+[WARN]  [RS485] Timeout: Altivar31 (Addr 2, after 500ms)
+[WARN]  [RS485] Timeout: YH-TC05 (Addr 3, after 500ms)
+[WARN]  [RS485] Timeout: YH-TC05 (Addr 3, after 500ms)
+[ERROR] [WIFI] Auth Failed (Reason: 15). Stopping auto-reconnect to protect encoder bus.
+[INFO]  [LCD_MSG] Reverted to automatic display (expired)
+[ERROR] [WIFI] Auth Failed (Reason: 15). Stopping auto-reconnect to protect encoder bus.
+[WARN]  [RS485] Timeout: Altivar31 (Addr 2, after 500ms)
+[WARN]  [RS485] Timeout: Altivar31 (Addr 2, after 500ms)
+[INFO]  [RS485] Altivar31 timeout logging silenced until success.
+

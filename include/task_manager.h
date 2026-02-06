@@ -33,18 +33,18 @@
 //       - JSON serialization (ArduinoJson allocates on stack for small docs)
 //       - Deep call chains in complex state machines
 
-#define TASK_STACK_SAFETY 3584
-#define TASK_STACK_MOTION 4096
-#define TASK_STACK_ENCODER 3072
-#define TASK_STACK_PLC_COMM 2048
-#define TASK_STACK_I2C_MANAGER 3072
-#define TASK_STACK_CLI 5120
-#define TASK_STACK_FAULT_LOG 3072
-#define TASK_STACK_MONITOR 3072
-#define TASK_STACK_TELEMETRY 4096
-#define TASK_STACK_LCD_FORMAT 3584
-#define TASK_STACK_LCD 3584
-#define TASK_STACK_BOOT 2048
+#define TASK_STACK_SAFETY 8192
+#define TASK_STACK_MOTION 8192
+#define TASK_STACK_ENCODER 8192
+#define TASK_STACK_PLC_COMM 4096
+#define TASK_STACK_I2C_MANAGER 8192
+#define TASK_STACK_CLI 8192
+#define TASK_STACK_FAULT_LOG 8192
+#define TASK_STACK_MONITOR 8192
+#define TASK_STACK_TELEMETRY 8192
+#define TASK_STACK_LCD_FORMAT 8192
+#define TASK_STACK_LCD 8192
+#define TASK_STACK_BOOT 4096
 
 // WARNING: AsyncWebServer handlers create JsonDocument on stack!
 // If web API returns become complex, increase CONFIG_ASYNC_TCP_TASK_STACK_SIZE

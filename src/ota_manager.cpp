@@ -5,6 +5,8 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <Update.h>
+#include "system_utils.h"       // Safe reboot helper
+
 
 static int ota_progress = 0;
 static bool ota_active = false;
@@ -174,8 +176,9 @@ static void ota_task(void* pvParameters) {
                         if (Update.isFinished()) {
                             logInfo("[OTA] Update fully finished. Rebooting...");
                             vTaskDelay(2000 / portTICK_PERIOD_MS);
-                            ESP.restart();
+                            systemSafeReboot("OTA update complete");
                         }
+
                     } else {
                         logError("[OTA] Update failed! Error: %s", Update.errorString());
                     }

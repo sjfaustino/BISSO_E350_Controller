@@ -17,8 +17,23 @@
 const BoardType BOARD = detectBoard();
 
 BoardType detectBoard() {
-    // Strictly enforce KC868-A16 for PosiPro
-    return BoardType::A16;
+#if defined(BOARD_KC868_A16_V31)
+    return BoardType::A16_V31;
+#elif defined(BOARD_KC868_A16_V16)
+    return BoardType::A16_V16;
+#else
+    return BoardType::UNKNOWN;
+#endif
+}
+
+const char* getBoardName() {
+#if defined(BOARD_KC868_A16_V31)
+    return "KC868-A16 v3.1 (S3-WROOM-1U)";
+#elif defined(BOARD_KC868_A16_V16)
+    return "KC868-A16 v1.6 (WROOM-32E)";
+#else
+    return "Generic ESP32";
+#endif
 }
 
 const PinInfo* getPinInfo(int16_t gpio) {

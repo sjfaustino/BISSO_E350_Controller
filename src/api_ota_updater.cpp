@@ -10,6 +10,8 @@
 #include <esp_partition.h>
 #include <string.h>
 #include <stdio.h>
+#include "system_utils.h"       // Safe reboot helper
+
 
 // OTA state tracking
 static struct {
@@ -201,7 +203,8 @@ bool otaUpdaterFinalize() {
 
     // Schedule reboot (give time for response to be sent)
     vTaskDelay(pdMS_TO_TICKS(2000));
-    ESP.restart();
+    systemSafeReboot("Firmware validated and installed");
+
 
     return true;
 }

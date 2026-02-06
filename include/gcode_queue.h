@@ -13,7 +13,7 @@
 #include <stdbool.h>
 
 // Maximum number of jobs to track in history
-#define GCODE_QUEUE_MAX_JOBS 20
+#define GCODE_QUEUE_MAX_JOBS 200 // Increased from 20 using PSRAM on ESP32-S3
 #define GCODE_CMD_MAX_LEN 64
 #define GCODE_ERR_MAX_LEN 32
 

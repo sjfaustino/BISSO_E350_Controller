@@ -9,9 +9,17 @@
     <!-- CSS - Bundled -->
     <link rel="stylesheet" href="css/bundle.css">
 
-    <!-- Favicon -->
+    <!-- Favicon & PWA Icons -->
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="shortcut icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="pwa-icon.png">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- PWA & Mobile Optimization -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
 </head>
 
 <body>
@@ -138,6 +146,16 @@
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
     </style>
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('[PWA] Service Worker registered'))
+                    .catch(err => console.error('[PWA] Service Worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
 
 </html>

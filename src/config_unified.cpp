@@ -6,6 +6,7 @@
  */
 
 #include "config_unified.h"
+#include "cli.h" // PHASE 4.1: Support table-driven dump
 #include "config_keys.h"
 #include "serial_logger.h"
 #include "system_constants.h"
@@ -15,6 +16,8 @@
 #include <math.h>
 #include <string.h>
 #include <nvs_flash.h>
+#include "system_utils.h"       // Safe reboot helper
+
 
 // NVS Persistence Object
 static Preferences prefs;
@@ -805,21 +808,22 @@ void configUnifiedPrintAll() {
     if (!config_table[i].is_set)
       continue;
 
-    // Pad key for alignment
-    logPrintf("%-30s | ", config_table[i].key);
-
+    char val_buf[128];
     switch (config_table[i].type) {
     case CONFIG_INT32:
-      logPrintf("%ld", (long)config_table[i].value.int_val);
+      snprintf(val_buf, sizeof(val_buf), "%ld", (long)config_table[i].value.int_val);
       break;
     case CONFIG_FLOAT:
-      logPrintf("%.3f", config_table[i].value.float_val);
+      snprintf(val_buf, sizeof(val_buf), "%.3f", config_table[i].value.float_val);
       break;
     case CONFIG_STRING:
-      logPrintf("\"%s\"", config_table[i].value.str_val);
+      snprintf(val_buf, sizeof(val_buf), "\"%s\"", config_table[i].value.str_val);
       break;
+    default:
+      strncpy(val_buf, "???", sizeof(val_buf));
     }
-    logPrintln("");
+    
+    cliPrintTableRow(config_table[i].key, val_buf, nullptr, 30, 20, 0);
   }
   serialLoggerUnlock();
 }
@@ -993,7 +997,8 @@ bool configEraseNvs() {
   if (err == ESP_OK) {
     logInfo("[NVS] Erase complete. Rebooting in 2 seconds...");
     delay(2000);
-    ESP.restart();
+    systemSafeReboot("NVS erase complete");
+
     return true;
   } else {
     logError("[NVS] Erase failed: %d", err);

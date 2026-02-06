@@ -5,9 +5,27 @@ window.HardwareModule = window.HardwareModule || {
 
     init() {
         console.log("[Hardware] Initializing");
+        this.updateVariantVisibility();
         this.loadHandlers().then(() => {
             this.loadPinConfiguration();
             this.setupEventListeners();
+        });
+    },
+
+    isV31() {
+        const sys = window.AppState?.data?.system;
+        return sys && (sys.hw_model?.includes("v3.1") || sys.hw_has_sd === true);
+    },
+
+    updateVariantVisibility() {
+        const isV31 = this.isV31();
+        document.querySelectorAll("[data-board-variant]").forEach(el => {
+            const variant = el.dataset.boardVariant;
+            if (variant === "v31") {
+                el.style.display = isV31 ? "block" : "none";
+            } else if (variant === "v16") {
+                el.style.display = isV31 ? "none" : "block";
+            }
         });
     },
 
@@ -87,7 +105,24 @@ window.HardwareModule = window.HardwareModule || {
         const el = document.getElementById("pin-summary-table");
         if (!el) return;
 
-        const staticMap = [
+        const isV31 = this.isV31();
+        const staticMap = isV31 ? [
+            ...Array.from({ length: 16 }, (_, i) => ({ label: `X${i + 1}`, type: "Digital Input", pin: 100 + i })),
+            ...Array.from({ length: 16 }, (_, i) => ({ label: `Y${i + 1}`, type: "Digital Output", pin: 116 + i })),
+            { label: "CH1", type: "0-5V Input", pin: 4 },
+            { label: "CH2", type: "0-5V Input", pin: 6 },
+            { label: "CH3", type: "0-5V Input", pin: 7 },
+            { label: "CH4", type: "0-5V Input", pin: 5 },
+            { label: "HT1", type: "1-Wire/GPIO", pin: 47 },
+            { label: "HT2", type: "1-Wire/GPIO", pin: 48 },
+            { label: "HT3", type: "1-Wire/GPIO", pin: 38 },
+            { label: "RS485_A", type: "RS485", pin: 17 },
+            { label: "RS485_B", type: "RS485", pin: 16 },
+            { label: "I2C_SDA", type: "I2C", pin: 9 },
+            { label: "I2C_SCL", type: "I2C", pin: 10 },
+            { label: "RF433_RX", type: "RF Input", pin: 8 },
+            { label: "RF433_TX", type: "RF Output", pin: 18 }
+        ] : [
             ...Array.from({ length: 16 }, (_, i) => ({ label: `X${i + 1}`, type: "Digital Input", pin: 100 + i })),
             ...Array.from({ length: 16 }, (_, i) => ({ label: `Y${i + 1}`, type: "Digital Output", pin: 116 + i })),
             { label: "CH1", type: "4/20mA Input", pin: 36 },
@@ -101,8 +136,8 @@ window.HardwareModule = window.HardwareModule || {
             { label: "RS485_B", type: "RS485", pin: 13 },
             { label: "I2C_SDA", type: "I2C", pin: 4 },
             { label: "I2C_SCL", type: "I2C", pin: 5 },
-            { label: "433MHz_RX", type: "RF Input", pin: -1 },
-            { label: "433MHz_TX", type: "RF Output", pin: -1 }
+            { label: "433MHz_RX", type: "RF Input", pin: 2 },
+            { label: "433MHz_TX", type: "RF Output", pin: 15 }
         ];
 
         const pinUsage = new Map();
@@ -120,24 +155,37 @@ window.HardwareModule = window.HardwareModule || {
             if (p !== undefined) addUsage(p, s.name || s.key);
         });
 
-        // Hardcoded generic usages
-        addUsage(23, "Ethernet MDC"); addUsage(18, "Ethernet MDIO");
-        addUsage(17, "Ethernet CLK/Pwr"); addUsage(19, "Ethernet TXD0");
-        addUsage(21, "Ethernet TX_EN"); addUsage(22, "Ethernet TXD1");
-        addUsage(25, "Ethernet RXD0"); addUsage(26, "Ethernet RXD1");
-        addUsage(27, "Ethernet CRS_DV");
-        addUsage(4, "LCD Display (SDA)"); addUsage(5, "LCD Display (SCL)");
+        // Hardware revision specific fixed usages
+        if (isV31) {
+            addUsage(17, "RS485 (MAX13487 RX)"); addUsage(16, "RS485 (MAX13487 TX)");
+            addUsage(9, "I2C (SDA)"); addUsage(10, "I2C (SCL)");
+            addUsage(42, "Ethernet (CLK)"); addUsage(43, "Ethernet (MOSI)");
+            addUsage(44, "Ethernet (MISO)"); addUsage(15, "Ethernet (CS)");
+            addUsage(12, "SD Card (MOSI)"); addUsage(13, "SD Card (SCK)");
+            addUsage(14, "SD Card (MISO)"); addUsage(11, "SD Card (CS)");
+        } else {
+            addUsage(23, "Ethernet MDC"); addUsage(18, "Ethernet MDIO");
+            addUsage(17, "Ethernet CLK/Pwr"); addUsage(19, "Ethernet TXD0");
+            addUsage(21, "Ethernet TX_EN"); addUsage(22, "Ethernet TXD1");
+            addUsage(25, "Ethernet RXD0"); addUsage(26, "Ethernet RXD1");
+            addUsage(27, "Ethernet CRS_DV");
+            addUsage(4, "LCD Display (SDA)"); addUsage(5, "LCD Display (SCL)");
+        }
 
         // WJ66 Encoder pins based on interface selection
         const wj66Iface = document.getElementById("wj66_interface")?.value;
         if (wj66Iface == "1") {  // Use == to handle both "1" and 1
-            // RS485 mode - GPIO16/GPIO13
-            addUsage(16, "WJ66 Encoder (RX)");
-            addUsage(13, "WJ66 Encoder (TX)");
+            if (isV31) {
+                addUsage(17, "WJ66 Encoder (RX)"); addUsage(16, "WJ66 Encoder (TX)");
+            } else {
+                addUsage(16, "WJ66 Encoder (RX)"); addUsage(13, "WJ66 Encoder (TX)");
+            }
         } else {
-            // HT1/HT2 mode - GPIO14/GPIO33
-            addUsage(14, "WJ66 Encoder (RX)");
-            addUsage(33, "WJ66 Encoder (TX)");
+            if (isV31) {
+                addUsage(47, "WJ66 Encoder (RX)"); addUsage(48, "WJ66 Encoder (TX)");
+            } else {
+                addUsage(14, "WJ66 Encoder (RX)"); addUsage(33, "WJ66 Encoder (TX)");
+            }
         }
 
         let html = `

@@ -9,8 +9,9 @@
 typedef void (*cli_handler_t)(int argc, char** argv);
 typedef struct cli_command_t cli_command_t; 
 
-enum class BoardType : uint8_t { UNKNOWN = 0, A16, A32 };
+enum class BoardType : uint8_t { UNKNOWN = 0, A16_V16, A16_V31 };
 BoardType detectBoard();
+const char* getBoardName();
 extern const BoardType BOARD;
 
 struct PinInfo {
@@ -115,8 +116,8 @@ const SignalDef signalDefinitions[] = {
     {"output_vacuum",        "Vacuum Relay",      "Vacuum/Dust control",    -1, "output", "o_vac"},
 
     // WJ66 Encoder (RS232 -> RS485 Converter)
-    {"wj66_rx", "WJ66 RX", "Encoder RX", 16, "input", "wj66_rx"},
-    {"wj66_tx", "WJ66 TX", "Encoder TX", 13, "output", "wj66_tx"}
+    {"wj66_rx", "WJ66 RX", "Encoder RX", PIN_RS485_RX, "input", "wj66_rx"},
+    {"wj66_tx", "WJ66 TX", "Encoder TX", PIN_RS485_TX, "output", "wj66_tx"}
 };
 
 constexpr size_t SIGNAL_COUNT = sizeof(signalDefinitions)/sizeof(signalDefinitions[0]);

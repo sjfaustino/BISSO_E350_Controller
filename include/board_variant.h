@@ -15,7 +15,7 @@
 // KC868-A16 v3.1 (ESP32-S3-WROOM-1U N16R8)
 // =============================================================================
 #define BOARD_NAME           "KC868-A16 v3.1"
-#define BOARD_MCU            "ESP32-S3-N16R8"
+#define BOARD_MCU            "ESP32-S3-WROOM-1U"
 #define BOARD_HAS_PSRAM      1
 #define BOARD_HAS_W5500      1   // W5500 SPI Ethernet (not currently implemented)
 #define BOARD_HAS_RTC_DS3231 1   // On-board RTC
@@ -59,6 +59,11 @@
 // RF433MHz
 #define PIN_RF433_RX         8
 #define PIN_RF433_TX         18
+
+// Free GPIOs (without pull-up resistance on PCB)
+#define PIN_FREE_GPIO1       39
+#define PIN_FREE_GPIO2       40
+#define PIN_FREE_GPIO3       41
 
 // I2C Device Addresses (v3.1 specific)
 #define I2C_ADDR_RTC_DS3231  0x68

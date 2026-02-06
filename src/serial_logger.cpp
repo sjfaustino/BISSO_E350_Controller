@@ -1,97 +1,108 @@
 #include "serial_logger.h"
 #include "firmware_version.h" 
-#include "network_manager.h" // <-- NEW: Link to Network Manager
+#include "network_manager.h"
 #include <stdio.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 #include "task_manager.h"
 
-// ESP32-S2/S3 USB CDC Serial - define SerialOut for internal use
+// ESP32-S2/S3 USB CDC Serial
 #if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
-    // For S2/S3, Serial is redirected to USB CDC via platformio build_flags
     #define SerialOut Serial
 #else
     #define SerialOut Serial
 #endif
 
-#define LOGGER_BUFFER_SIZE 512
+#define LOGGER_BUFFER_SIZE 1024
 static log_level_t current_log_level = LOG_LEVEL_INFO;
-static char log_buffer[LOGGER_BUFFER_SIZE];
+// shared_log_buffer removed to ensure absolute thread-safety via local stack buffers
 
 // Thread-safety: Mutex for serial output
 static SemaphoreHandle_t serial_mutex = NULL;
 static bool mutex_initialized = false;
 
-// Forward declaration for boot log writing
+// Async Queue State
+#define LOG_QUEUE_DEPTH 32
+struct log_msg_t {
+    char text[LOGGER_BUFFER_SIZE];
+};
+static QueueHandle_t log_queue = NULL;
+static bool async_enabled = false;
+static TaskHandle_t logger_task_handle = NULL;
+
+// Forward declarations
 static void bootLogWrite(const char* message);
+static void loggerTask(void* parameter);
 
-/**
- * @brief Initialize the serial mutex (called lazily)
- */
+// ============================================================================
+// MUTEX HELPERS
+// ============================================================================
 
-
-/**
- * @brief Acquire serial mutex with timeout
- * @return true if acquired, false if timeout
- */
 static bool acquireSerialMutex() {
-  if (!mutex_initialized || !serial_mutex) return false;
+  if (!mutex_initialized || !serial_mutex) return true;  // Allow if not initialized
   
-  // PHASE 16 FIX: High-priority tasks (Motion/Safety) must NOT block on logging.
-  // This prevents the "Logging Storm" during stress tests from causing jitter.
-  // Formula: If priority >= 20 (Encoder/Motion/Safety), timeout = 0.
-  // Otherwise, use 50ms timeout to ensure low-priority logs get through.
-  TickType_t timeout = pdMS_TO_TICKS(50);
-  
-  #ifdef TASK_PRIORITY_MOTION
-  if (uxTaskPriorityGet(NULL) >= 20) { // Fast check for real-time tasks
-      timeout = 0;
-  }
-  #endif
-  
+  // Use consistent timeout for all tasks
+  TickType_t timeout = pdMS_TO_TICKS(100);
   return xSemaphoreTakeRecursive(serial_mutex, timeout) == pdTRUE;
 }
 
-/**
- * @brief Release serial mutex
- */
 static void releaseSerialMutex() {
-  if (serial_mutex) {
+  if (serial_mutex && mutex_initialized) {
     xSemaphoreGiveRecursive(serial_mutex);
   }
 }
 
+// ============================================================================
+// CORE LOGGING
+// ============================================================================
+
 static void vlogPrint(log_level_t level, const char* prefix, const char* format, va_list args) {
   if (level > current_log_level) return;
   
-  // Acquire mutex for thread-safe output
-  // CRITICAL FIX: If we can't get the lock, we MUST NOT touch the static buffer
-  if (!acquireSerialMutex()) {
-      // Optional: Print a minimal marker using ROM functions to indicate drop, 
-      // or just silently drop to prevent corruption.
-      // ets_printf("!"); 
-      return; 
+  // Use local buffer for thread-safety and re-entrancy.
+  // With 8KB stacks, 1KB on stack is safe and provides perfect isolation.
+  char local_buffer[LOGGER_BUFFER_SIZE];
+  int offset = 0;
+  
+  if (prefix != NULL) offset = snprintf(local_buffer, LOGGER_BUFFER_SIZE, "%s", prefix);
+  vsnprintf(local_buffer + offset, LOGGER_BUFFER_SIZE - offset, format, args);
+  
+  // Safe logging starts here - Mutex only protects the output stream/queue
+  if (!acquireSerialMutex()) return;
+  
+  // PHASE 6: Optimized Async Output
+  if (async_enabled && log_queue != NULL) {
+    log_msg_t msg;
+    strncpy(msg.text, local_buffer, LOGGER_BUFFER_SIZE - 1);
+    msg.text[LOGGER_BUFFER_SIZE - 1] = '\0';
+    
+    if (xQueueSend(log_queue, &msg, 0) != pdTRUE) {
+        SerialOut.println(local_buffer);
+        SerialOut.println("[DEBUG] Log queue overflowed!");
+    }
+  } else {
+    SerialOut.println(local_buffer);
   }
   
-  int offset = 0;
-  if (prefix != NULL) offset = snprintf(log_buffer, LOGGER_BUFFER_SIZE, "%s", prefix);
-  vsnprintf(log_buffer + offset, LOGGER_BUFFER_SIZE - offset, format, args);
-  
-  // Output to Serial (UART) only
-  SerialOut.println(log_buffer);
-  
-  // Also write to boot log file if active
-  bootLogWrite(log_buffer);
-  
+  bootLogWrite(local_buffer);
   releaseSerialMutex();
 }
 
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
 void serialLoggerInit(log_level_t log_level) {
-  // Initialize mutex explicitly
+  // Initialize hardware buffer for USB CDC (ESP32-S3)
+  #if defined(CONFIG_IDF_TARGET_ESP32S3)
+  SerialOut.setTxBufferSize(2048);
+  #endif
+
+  // Initialize mutex
   if (!mutex_initialized) {
     serial_mutex = xSemaphoreCreateRecursiveMutex();
-    mutex_initialized = true;
+    mutex_initialized = (serial_mutex != NULL);
   }
   
   current_log_level = log_level;
@@ -102,8 +113,60 @@ void serialLoggerInit(log_level_t log_level) {
   SerialOut.println("\n------------------------------------------");
   SerialOut.printf("     %s Serial Logger Init     \n", ver_str);
   SerialOut.println("------------------------------------------\n");
+  SerialOut.flush();
   
   SerialOut.printf("Log Level: %d\n\n", log_level);
+}
+
+// Implementation of log queue for background processing
+void logQueueInit() {
+  if (log_queue != NULL) return;
+
+  // Use PSRAM for the queue storage if available
+  log_queue = xQueueCreate(LOG_QUEUE_DEPTH, sizeof(log_msg_t));
+  if (log_queue == NULL) {
+    SerialOut.println("[ERROR] Failed to create log queue!");
+    return;
+  }
+
+  // Create logger task on Core 0 (Higher Priority for UI Responsiveness)
+  // Priority 5 ensures it runs above background tasks but below motion control
+  xTaskCreatePinnedToCore(
+      loggerTask,
+      "LoggerTask",
+      4096,
+      NULL,
+      5, // Priority 5
+      &logger_task_handle,
+      0 // Core 0
+  );
+
+  logInfo("[LOGGER] Async queue initialized (depth: %d)", LOG_QUEUE_DEPTH);
+}
+
+void logQueueEnableAsync() {
+  if (log_queue != NULL && logger_task_handle != NULL) {
+    async_enabled = true;
+    logInfo("[LOGGER] Async logging enabled");
+  }
+}
+
+bool logQueueIsReady() {
+  return (log_queue != NULL && logger_task_handle != NULL);
+}
+
+static void loggerTask(void* parameter) {
+    log_msg_t msg;
+    while (true) {
+        if (xQueueReceive(log_queue, &msg, portMAX_DELAY) == pdTRUE) {
+            // No mutex needed for SerialOut here as it's the only consumer
+            // but we use logPrintf-style lock for consistency if others use SerialOut directly
+            if (acquireSerialMutex()) {
+                SerialOut.println(msg.text);
+                releaseSerialMutex();
+            }
+        }
+    }
 }
 
 void serialLoggerSetLevel(log_level_t log_level) {
@@ -113,64 +176,88 @@ void serialLoggerSetLevel(log_level_t log_level) {
 
 log_level_t serialLoggerGetLevel() { return current_log_level; }
 
+// ============================================================================
+// LOG FUNCTIONS
+// ============================================================================
+
 void logError(const char* format, ...) {
   va_list args; va_start(args, format);
-  vlogPrint(LOG_LEVEL_ERROR, "[ERROR] ", format, args); va_end(args);
+  vlogPrint(LOG_LEVEL_ERROR, "[ERROR] ", format, args); 
+  va_end(args);
 }
 
 void logWarning(const char* format, ...) {
   va_list args; va_start(args, format);
-  vlogPrint(LOG_LEVEL_WARNING, "[WARN]  ", format, args); va_end(args);
+  vlogPrint(LOG_LEVEL_WARNING, "[WARN]  ", format, args); 
+  va_end(args);
 }
 
 void logInfo(const char* format, ...) {
   va_list args; va_start(args, format);
-  vlogPrint(LOG_LEVEL_INFO, "[INFO]  ", format, args); va_end(args);
+  vlogPrint(LOG_LEVEL_INFO, "[INFO]  ", format, args); 
+  va_end(args);
 }
 
 void logDebug(const char* format, ...) {
   va_list args; va_start(args, format);
-  vlogPrint(LOG_LEVEL_DEBUG, "[DEBUG] ", format, args); va_end(args);
+  vlogPrint(LOG_LEVEL_DEBUG, "[DEBUG] ", format, args); 
+  va_end(args);
 }
 
 void logVerbose(const char* format, ...) {
   va_list args; va_start(args, format);
-  vlogPrint(LOG_LEVEL_VERBOSE, "[VERB]  ", format, args); va_end(args);
+  vlogPrint(LOG_LEVEL_VERBOSE, "[VERB]  ", format, args); 
+  va_end(args);
 }
 
 void logPrintf(const char* format, ...) {
-  // CRITICAL FIX: If we can't get the lock, we MUST NOT touch the static buffer
-  if (!acquireSerialMutex()) {
-      return; 
+  char local_buffer[LOGGER_BUFFER_SIZE];
+  va_list args; va_start(args, format);
+  vsnprintf(local_buffer, LOGGER_BUFFER_SIZE, format, args); 
+  va_end(args);
+
+  if (!acquireSerialMutex()) return;
+  
+  if (async_enabled && log_queue != NULL) {
+    log_msg_t msg;
+    strncpy(msg.text, local_buffer, LOGGER_BUFFER_SIZE - 1);
+    msg.text[LOGGER_BUFFER_SIZE - 1] = '\0';
+    xQueueSend(log_queue, &msg, 0);
+  } else {
+    SerialOut.print(local_buffer);
   }
   
-  va_list args; va_start(args, format);
-  vsnprintf(log_buffer, LOGGER_BUFFER_SIZE, format, args); va_end(args);
-  SerialOut.print(log_buffer);
-  
-  // Note: Telnet mirroring might be unsafe if networkManager locks too.
-  // Ideally, use a queue for telnet. For now, this is kept but protected by serial_mutex.
-  networkManager.telnetPrint(log_buffer); 
-  
+  networkManager.telnetPrint(local_buffer);
   releaseSerialMutex();
 }
 
 void logPrintln(const char* format, ...) {
-  // CRITICAL FIX: If we can't get the lock, we MUST NOT touch the static buffer
-  if (!acquireSerialMutex()) {
-      return; 
+  char local_buffer[LOGGER_BUFFER_SIZE];
+  va_list args; va_start(args, format);
+  vsnprintf(local_buffer, LOGGER_BUFFER_SIZE, format, args); 
+  va_end(args);
+
+  if (!acquireSerialMutex()) return;
+  
+  if (async_enabled && log_queue != NULL) {
+    log_msg_t msg;
+    strncpy(msg.text, local_buffer, LOGGER_BUFFER_SIZE - 1);
+    msg.text[LOGGER_BUFFER_SIZE - 1] = '\0';
+    xQueueSend(log_queue, &msg, 0);
+  } else {
+    SerialOut.println(local_buffer);
   }
   
-  va_list args; va_start(args, format);
-  vsnprintf(log_buffer, LOGGER_BUFFER_SIZE, format, args); va_end(args);
-  SerialOut.println(log_buffer);
-  networkManager.telnetPrintln(log_buffer); // Mirror raw prints
-  
+  networkManager.telnetPrintln(local_buffer);
   releaseSerialMutex();
 }
 
-char* serialLoggerGetBuffer() { return log_buffer; }
-size_t serialLoggerGetBufferSize() { return LOGGER_BUFFER_SIZE; }
+// ============================================================================
+// BUFFER ACCESS
+// ============================================================================
+
+char* serialLoggerGetBuffer() { return nullptr; }
+size_t serialLoggerGetBufferSize() { return 0; }
 
 bool serialLoggerLock() {
   return acquireSerialMutex();
@@ -196,13 +283,11 @@ static size_t boot_log_max_size = 32768;
 static size_t boot_log_current_size = 0;
 
 bool bootLogInit(size_t max_size_bytes) {
-    // Check if boot logging is enabled in config (default: disabled for debugging)
     if (configGetInt(KEY_BOOTLOG_EN, 0) == 0) {
         SerialOut.println("[BOOTLOG] Disabled by configuration");
         return false;
     }
     
-    // Mount LittleFS if not already mounted
     if (!LittleFS.begin(false)) {
         SerialOut.println("[BOOTLOG] LittleFS mount failed");
         return false;
@@ -210,12 +295,10 @@ bool bootLogInit(size_t max_size_bytes) {
     
     boot_log_max_size = max_size_bytes;
     
-    // Remove old log file (overwrite on each boot)
     if (LittleFS.exists(BOOT_LOG_PATH)) {
         LittleFS.remove(BOOT_LOG_PATH);
     }
     
-    // Open new log file for writing
     boot_log_file = LittleFS.open(BOOT_LOG_PATH, "w");
     if (!boot_log_file) {
         SerialOut.println("[BOOTLOG] Failed to create log file");
@@ -225,7 +308,6 @@ bool bootLogInit(size_t max_size_bytes) {
     boot_logging_active = true;
     boot_log_current_size = 0;
     
-    // Write header
     const char* header = "=== BOOT LOG START ===\n";
     boot_log_file.print(header);
     boot_log_current_size += strlen(header);
@@ -256,8 +338,6 @@ bool bootLogIsActive() {
 
 size_t bootLogGetSize() {
     if (!LittleFS.begin(false)) return 0;
-    
-    // Check existence first to prevent VFS noise/errors in certain core versions
     if (!LittleFS.exists(BOOT_LOG_PATH)) return 0;
     
     File f = LittleFS.open(BOOT_LOG_PATH, "r");
@@ -272,7 +352,6 @@ size_t bootLogRead(char* buffer, size_t max_len) {
     if (!buffer || max_len == 0) return 0;
     if (!LittleFS.begin(false)) return 0;
     
-    // Check existence first to prevent VFS noise
     if (!LittleFS.exists(BOOT_LOG_PATH)) {
         strncpy(buffer, "(No boot log available)", max_len - 1);
         buffer[max_len - 1] = '\0';
@@ -293,17 +372,12 @@ size_t bootLogRead(char* buffer, size_t max_len) {
     return bytes_read;
 }
 
-/**
- * @brief Internal helper to write to boot log file (called from vlogPrint)
- */
 static void bootLogWrite(const char* message) {
     if (!boot_logging_active || !boot_log_file) return;
     
     size_t msg_len = strlen(message);
     
-    // Check size limit (leave room for footer)
     if (boot_log_current_size + msg_len + 50 > boot_log_max_size) {
-        // Stop logging to prevent overflow
         boot_log_file.print("\n[BOOTLOG] Size limit reached, stopping capture\n");
         boot_log_file.flush();
         boot_logging_active = false;
@@ -315,7 +389,6 @@ static void bootLogWrite(const char* message) {
     boot_log_file.print("\n");
     boot_log_current_size += msg_len + 1;
     
-    // Flush periodically (every 1KB)
     if (boot_log_current_size % 1024 < msg_len) {
         boot_log_file.flush();
     }

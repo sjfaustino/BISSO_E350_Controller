@@ -6,6 +6,7 @@
 
 #include "encoder_hal.h"
 #include "serial_logger.h"
+#include "system_constants.h"
 #include <Arduino.h>
 
 // ============================================================================
@@ -58,14 +59,14 @@ static const encoder_interface_config_t INTERFACE_TABLE[] = {
     {
         ENCODER_INTERFACE_RS232_HT,
         "RS232-HT",
-        "GPIO14/33 (HT1/HT2) - RS232 3.3V - Standard",
-        14, 33, 1
+        "HT1/HT2 (RS232 3.3V) - Standard",
+        PIN_1WIRE_HT1, PIN_1WIRE_HT2, 1
     },
     {
         ENCODER_INTERFACE_RS485_RXD2,
         "RS485",
-        "GPIO16/13 (RS485 RXD/TXD) - RS485 Differential - KC868-A16",
-        16, 13, 2
+        "RS485 (Differential) - KC868-A16",
+        PIN_RS485_RX, PIN_RS485_TX, 2
     },
     {
         ENCODER_INTERFACE_CUSTOM,

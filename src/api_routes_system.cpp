@@ -13,8 +13,14 @@
 #include "rs485_autodetect.h"
 #include "firmware_version.h"
 #include "serial_logger.h"
+#include "board_variant.h"
+#include "sd_card_manager.h"
+#include "system_utils.h"        // Safe reboot helper
 #include <ArduinoJson.h>
+
 #include <time.h>
+#include <SD.h>
+
 
 void registerSystemRoutes(PsychicHttpServer& server) {
     
@@ -385,8 +391,70 @@ void registerSystemRoutes(PsychicHttpServer& server) {
     server.on("/api/system/reboot", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         esp_err_t err = response->send(200, "application/json", "{\"success\":true,\"message\":\"Rebooting...\"}");
         delay(100);
-        ESP.restart();
+        systemSafeReboot("Web API request");  // Safe: unmounts SD first
         return err;
+    });
+    
+    // ==== SD CARD API ROUTES ====
+    
+    // GET /api/sd/status - Get SD card status for Web UI storage selection
+    server.on("/api/sd/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        JsonDocument doc;
+        
+        #if BOARD_HAS_SDCARD
+        doc["available"] = sdCardIsPresent() && sdCardIsMounted();
+        doc["present"] = sdCardIsPresent();
+        doc["mounted"] = sdCardIsMounted();
+        
+        if (sdCardIsMounted()) {
+            SDCardInfo info;
+            if (sdCardGetInfo(&info)) {
+                doc["totalMB"] = (uint32_t)(info.totalBytes / (1024 * 1024));
+                doc["freeMB"] = (uint32_t)(info.freeBytes / (1024 * 1024));
+                doc["usedMB"] = (uint32_t)(info.usedBytes / (1024 * 1024));
+            }
+        }
+
+        #else
+        doc["available"] = false;
+        doc["present"] = false;
+        doc["mounted"] = false;
+        #endif
+        
+        return sendJsonResponse(response, doc);
+    });
+
+    // GET /api/sd/backups - List backup files on SD card
+    server.on("/api/sd/backups", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        JsonDocument doc;
+        JsonArray files = doc["files"].to<JsonArray>();
+        
+        #if BOARD_HAS_SDCARD
+        if (sdCardIsMounted()) {
+            File root = SD.open("/backups");
+            if (root && root.isDirectory()) {
+                File file = root.openNextFile();
+                while (file) {
+                    if (!file.isDirectory()) {
+                        JsonObject f = files.add<JsonObject>();
+                        f["name"] = String(file.name());
+                        f["size"] = file.size();
+                    }
+                    file = root.openNextFile();
+                }
+                root.close();
+            }
+            doc["success"] = true;
+        } else {
+            doc["success"] = false;
+            doc["error"] = "SD card not mounted";
+        }
+        #else
+        doc["success"] = false;
+        doc["error"] = "No SD card support";
+        #endif
+        
+        return sendJsonResponse(response, doc);
     });
     
     logDebug("[WEB] System routes registered");

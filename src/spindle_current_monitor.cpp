@@ -13,6 +13,7 @@
 #include "config_unified.h"
 #include "config_keys.h"
 #include "system_tuning.h"
+#include "cli.h" // Added for table diagnostics
 #include <Arduino.h>
 #include <string.h>
 
@@ -174,22 +175,24 @@ bool spindleMonitorUpdate(void) {
 
   // Check for critical overcurrent condition (E-Stop threshold)
   if (current > monitor_state.overcurrent_threshold_amps) {
-      monitor_state.overload_count++;
-      spindleMonitorTriggerShutdown();
+    monitor_state.overload_count++;
+    spindleMonitorTriggerShutdown();
   }
 
   return true;
 }
 
-float spindleMonitorGetCurrent(void) { return monitor_state.current_amps; }
+float spindleMonitorGetCurrent(void) {
+  return monitor_state.current_amps;
+}
 
 float spindleMonitorGetPeakCurrent(void) {
   return monitor_state.current_peak_amps;
 }
 
 bool spindleMonitorIsOvercurrent(void) {
-  return (monitor_state.current_amps >
-          monitor_state.overcurrent_threshold_amps);
+  if (!monitor_state.enabled) return false;
+  return monitor_state.current_amps > monitor_state.overcurrent_threshold_amps;
 }
 
 // NOTE: Status register not documented in JXK-10 PDF, these always return false
@@ -218,6 +221,13 @@ const spindle_monitor_state_t *spindleMonitorGetState(void) {
   return &monitor_state;
 }
 
+float spindleMonitorGetLoadPercent(void) {
+    if (!monitor_state.enabled) return 0.0f;
+    float rated = (float)configGetInt(KEY_SPINDLE_RATED_AMPS, 25);
+    if (rated < 0.1f) return 0.0f;
+    return (monitor_state.current_amps / rated) * 100.0f;
+}
+
 void spindleMonitorResetStats(void) {
   monitor_state.read_count = 0;
   monitor_state.error_count = 0;
@@ -230,45 +240,46 @@ void spindleMonitorResetStats(void) {
 
 void spindleMonitorPrintDiagnostics(void) {
   serialLoggerLock();
-  logPrintln("\n[SPINDLE] === Current Monitor Diagnostics ===");
-  logPrintf("Status:              %s\n",
-                monitor_state.enabled ? "ENABLED" : "DISABLED");
-  logPrintf("Current:             %.2f A\n", monitor_state.current_amps);
-  logPrintf("Peak Current:        %.2f A\n",
-                monitor_state.current_peak_amps);
-  logPrintf("Average Current:     %.2f A\n",
-                monitor_state.current_average_amps);
-  logPrintf("Overcurrent Threshold: %.1f A\n",
-                monitor_state.overcurrent_threshold_amps);
-  logPrintf("Poll Interval:       %lu ms\n",
-                (unsigned long)monitor_state.poll_interval_ms);
-  logPrintf("Read Count:          %lu\n",
-                (unsigned long)monitor_state.read_count);
-  logPrintf("Error Count:         %lu\n",
-                (unsigned long)monitor_state.error_count);
-  logPrintf("Overload Events:     %lu\n",
-                (unsigned long)monitor_state.overload_count);
-  logPrintf("Shutdown Events:     %lu\n",
-                (unsigned long)monitor_state.shutdown_count);
-  if (monitor_state.shutdown_count > 0) {
-    logPrintf(
-        "Last Shutdown:       %lu ms ago @ %.1f A\n",
-        (unsigned long)(millis() - monitor_state.last_shutdown_time_ms),
-        monitor_state.last_shutdown_current_amps);
-  }
+  logPrintln("\n[SPINDLE] === Current Monitor Diagnostics ===\n");
   
-  // Alarm status
-  logPrintf("Tool Breakage Alarm: %s (count: %lu)\n",
-                monitor_state.alarm_tool_breakage ? "ACTIVE" : "OK",
-                (unsigned long)monitor_state.tool_breakage_count);
-  logPrintf("Stall Alarm:         %s (count: %lu)\n",
-                monitor_state.alarm_stall ? "ACTIVE" : "OK",
-                (unsigned long)monitor_state.stall_count);
-  logPrintf("Tool Breakage Threshold: %.1f A drop\n",
-                monitor_state.tool_breakage_drop_amps);
-  logPrintf("Stall Threshold:     %.1f A for %lu ms\n",
-                monitor_state.stall_threshold_amps,
-                (unsigned long)monitor_state.stall_timeout_ms);
+  cliPrintTableHeader(25, 18, 0);
+  cliPrintTableRow("Metric", "Value", nullptr, 25, 18, 0);
+  cliPrintTableDivider(25, 18, 0);
+  
+  cliPrintTableRow("Status", monitor_state.enabled ? "ENABLED" : "DISABLED", nullptr, 25, 18, 0);
+  
+  char buf[32];
+  snprintf(buf, sizeof(buf), "%.2f A (%.1f%%)", monitor_state.current_amps, spindleMonitorGetLoadPercent());
+  cliPrintTableRow("Current Load", buf, nullptr, 25, 18, 0);
+  
+  snprintf(buf, sizeof(buf), "%.2f A", monitor_state.current_peak_amps);
+  cliPrintTableRow("Peak Current", buf, nullptr, 25, 18, 0);
+  
+  snprintf(buf, sizeof(buf), "%.1f A", monitor_state.overcurrent_threshold_amps);
+  cliPrintTableRow("Shutdown Threshold", buf, nullptr, 25, 18, 0);
+  
+  snprintf(buf, sizeof(buf), "%lu", (unsigned long)monitor_state.overload_count);
+  cliPrintTableRow("Overload Events", buf, nullptr, 25, 18, 0);
+  
+  snprintf(buf, sizeof(buf), "%lu", (unsigned long)monitor_state.shutdown_count);
+  cliPrintTableRow("Shutdown Events", buf, nullptr, 25, 18, 0);
+  
+  cliPrintTableFooter(25, 18, 0);
+  
+  // Alarm Status Table
+  logPrintln("\n[SPINDLE] === Alarm Configuration ===\n");
+  cliPrintTableHeader(25, 18, 0);
+  cliPrintTableRow("Alarm Type", "Status/Threshold", nullptr, 25, 18, 0);
+  cliPrintTableDivider(25, 18, 0);
+  
+  snprintf(buf, sizeof(buf), "%s (%.1f A drop)", monitor_state.alarm_tool_breakage ? "ACTIVE" : "OK", monitor_state.tool_breakage_drop_amps);
+  cliPrintTableRow("Tool Breakage", buf, nullptr, 25, 18, 0);
+  
+  snprintf(buf, sizeof(buf), "%s (%.1f A)", monitor_state.alarm_stall ? "ACTIVE" : "OK", monitor_state.stall_threshold_amps);
+  cliPrintTableRow("Stall", buf, nullptr, 25, 18, 0);
+  
+  cliPrintTableFooter(25, 18, 0);
+  
   serialLoggerUnlock();
 }
 

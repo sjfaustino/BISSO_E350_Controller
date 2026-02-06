@@ -46,6 +46,7 @@ public:
     void setSpindleRPM(float rpm);
     void setSpindleSpeed(float speed_m_s);
     void setSpindleEfficiency(float load_ratio);
+    void setSpindleLoadPercent(float load_pct);
 
     // Axis Metrics (PHASE 5.6: Per-axis motion validation)
     void setAxisQualityScore(uint8_t axis, uint32_t quality_score);
@@ -88,6 +89,7 @@ private:
         float spindle_rpm;
         float spindle_speed_m_s;
         float spindle_efficiency;
+        float spindle_load_pct;
 
         // Axis metrics (PHASE 5.6) - per-axis
         struct {

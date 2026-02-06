@@ -1,4 +1,4 @@
-# 💻 BISSO E350 - CLI COMMAND MASTER REFERENCE (V2.0) 💻
+# 💻 BISSO E350 - CLI COMMAND MASTER REFERENCE (V2.3) 💻
 
 ```text
    ____ _     ___    ____ ___  __  __ __  __    _    _   _ ____  ____  
@@ -142,18 +142,34 @@ INFO DATA SOURCES:
 
 ---
 
-### `status` - Quick System Dashboard
+### `status` - Multi-System Dashboard & Diagnostics
 
 **Syntax:**
 ```
-status
+status [subcommand] [args...]
 ```
+
+**Description:**
+The `status` command is a multi-purpose entry point for monitoring the machine. When called without arguments, it provides a high-level health report. Subcommands provide deep-dive analytics for specific hardware or maintenance tracking.
+
+**Subcommands:**
+| Subcommand | Description | Detailed View |
+|------------|-------------|---------------|
+| (none)     | Quick System Dashboard | High-level health summary |
+| `spindle`  | Spindle/Saw Monitor   | Amps, RPM, and Load % |
+| `maint`    | Maintenance Tracker   | Log service & reset counters |
+| `runtime`  | System Usage Stats    | Total hours & total distance |
+| `i2c`      | I2C Bus Status        | Errors and frequency |
+
+---
+
+#### `status` (General) - System Health Snapshot
 
 **Description:**
 Displays a real-time summary of machine health including network, position, memory, and safety status.
 
 **How It Works:**
-The status command aggregates data from multiple subsystems in a single atomic snapshot. Each subsystem provides a status accessor function that the CLI calls sequentially. This is designed as a quick health check—for detailed diagnostics, use specialized commands like `memory stats` or `estop status`.
+The status command aggregates data from multiple subsystems in a single atomic snapshot. Each subsystem provides a status accessor function that the CLI calls sequentially. 
 
 ```text
 STATUS DATA AGGREGATION:
@@ -170,18 +186,155 @@ STATUS DATA AGGREGATION:
 
 **Expected Output:**
 ```text
-=== BISSO E350 System Dashboard ===
-┌───────────────────────────┬────────────────────────────┐
-│ SYSTEM                    │ VALUES                     │
-├───────────────────────────┼────────────────────────────┤
-│ Uptime                    │ 04:32:15                   │
-│ Motion State              │ IDLE                       │
-│ Position X/Y/Z/A          │ 1234.5 / 567.8 / 50.0 / 0  │
-│ Free Heap                 │ 145,432 bytes              │
-│ WiFi RSSI                 │ -67 dBm                    │
-│ E-Stop                    │ [OK] CLEAR                 │
-│ Safety                    │ [OK] No Alarms             │
-└───────────────────────────┴────────────────────────────┘
++============================================================+
+|           BISSO E350 MASTER STATUS DASHBOARD              |
+|  Uptime: 00:45:12   CPU: 12 %   Heap: 145 KB (Min 128)     |
++============================================================+
+| MOTION COORDINATES (mm)         | JOB STATUS               |
+|   X:   1250.450    Y:    750.120  | State: IDLE              |
+|   Z:     50.000    A:      0.000  | Line:  0      / 0        |
++---------------------------------+--------------------------+
+| ENCODER FEEDBACK                                          |
+|   Status: [ON]                                            |
++------------------------------------------------------------+
+| SPINDLE MONITORING                                        |
+|   Current:   5.2 A  |  Peak:   8.4 A   |  Load:  21.2%    |
+|   Alarm: OK                                               |
++------------------------------------------------------------+
+| NETWORK                                                   |
+|   WiFi: Connected (-45 dBm)                               |
+|   IP: 192.168.1.50                                        |
++------------------------------------------------------------+
+| ACTIVE FAULTS                                             |
+|   [NONE] System healthy                                   |
++============================================================+
+```
+
+---
+
+#### `status spindle` - Spindle Load Diagnostics
+
+**Syntax:**
+```
+status spindle
+```
+
+**Description:**
+Provides real-time electrical and mechanical metrics for the 22kW Main Spindle motor.
+
+**Key Feature - Spindle Load %**:
+Unlike raw Amps, **Load %** provides an immediate intuitive understanding of how hard the tool is working. It is calculated using the configured `sp_rated_a` (Rated Amps) value.
+
+$Load \% = (Measured Amps / Rated Amps) \times 100$
+
+**How It Works:**
+The command queries the RS485 current monitor and the VFD encoder simultaneously. The CLI Table Engine then formats this data into a professional dashboard.
+
+```text
+SPINDLE LOAD FLOW:
+┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
+│  Current Sensor  │───→──│ Telemetry Task   │───→──│ CLI Table Engine │
+│  (JX-K10)        │      │ (Calculates %)   │      │ (Formats Report) │
+└──────────────────┘      └──────────────────┘      └──────────────────┘
+                                   ↑
+                          ┌──────────────────┐
+                          │ NVS Config       │
+                          │ (sp_rated_a)     │
+                          └──────────────────┘
+```
+
+**Expected Output:**
+```text
++----------------+------------+---------+----------------+
+| SPINDLE STATUS | SETPOINT   | ACTUAL  | CURRENT LOAD   |
++----------------+------------+---------+----------------+
+| RUNNING        | 2400 RPM   | 2398 RPM| 15.2 A (62.0%) |
++----------------+------------+---------+----------------+
+```
+
+---
+
+#### `status maint` - Maintenance & Service Logging
+
+**Syntax:**
+```
+status maint [log "message"]
+```
+
+**Description:**
+Tracks mechanical wear and logs maintenance history. Logging a message automatically resets the axis travel counters.
+
+**Mechanism - Counter Zeroing**:
+When you log maintenance (e.g., `status maint log "Greased X manual"`), the system:
+1. Records the event with a timestamp in the service history.
+2. Resets `axis_dist_x/y/z` counters to zero.
+3. Clears any active maintenance alerts on the Dashboard.
+
+```text
+MAINTENANCE RESET LOGIC:
+┌─────────────────────────────────────────────────────────────┐
+│  'status maint log' Command received                        │
+│         │                                                    │
+│         ▼                                                    │
+│  1. motionResetAxisDistanceCounters()                        │
+│  2. safetyClearMaintAlerts()                                 │
+│  3. nvsWriteLog(timestamp, message)                          │
+│  4. Update 'last_maint_reset' timestamp                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Usage Examples:**
+```bash
+status maint             # View current distance and last service
+status maint log "Lubed" # Reset counters after maintenance
+```
+
+**Expected Output:**
+```text
++-------------------+--------------------+--------------------+
+| MAINTENANCE TASK  | LAST SERVICE       | CURRENT DISTANCE   |
++-------------------+--------------------+--------------------+
+| X Axis Lubrication| 2026-01-15         | 42.5 km            |
+| Y Axis Gears      | 2026-01-15         | 18.2 km            |
+| Z Lead Screw      | 2026-01-10         |  2.1 km            |
++-------------------+--------------------+--------------------+
+```
+
+---
+
+#### `status runtime` - Global Usage Statistics
+
+**Syntax:**
+```
+status runtime
+```
+
+**Description:**
+Reports total machine lifetime metrics. These values are persistent and cannot be reset by operators.
+
+**Metrics Tracked:**
+- **Total Power-On Time**: cumulative minutes the controller has been energized.
+- **Total Cutting Time**: cumulative minutes the spindle has been active (>100 RPM).
+- **Total Axis Travel**: cumulative distance (km) traveled by all axes combined.
+
+---
+
+### 🏛️ TECHNICAL ARCHITECTURE: CLI Table Engine
+
+The BISSO E350 utilizes a custom, **zero-allocation Table Engine** for all diagnostic reports. This ensures consistent formatting while minimizing RAM fragmentation on the ESP32.
+
+**Key Technical Details:**
+- **Static Buffers**: Uses pre-allocated character buffers to avoid `std::string` heap allocations.
+- **Dynamic Sizing**: Headers and dividers automatically scale to fit the longest content.
+- **Performance**: Capable of rendering 100+ row reports in under 5ms.
+
+```text
+TABLE RENDERING PIPELINE:
+┌─────────────────────┐      ┌──────────────────────────┐      ┌────────────┐
+│ cliPrintTableHeader │───→──│ cliPrintTableRow(vals..) │───→──│ cliPrint.. │
+└─────────────────────┘      └──────────────────────────┘      └────────────┘
+         │                             │                             │
+   Draw top border              Format columns                 Draw footer
 ```
 
 ---
@@ -3131,7 +3284,904 @@ CLOSED LOOP MONITORING LOGIC:
 
 ---
 
+## 🕰️ REAL-TIME CLOCK (RTC) MANAGEMENT
+
+The KC868-A16 v3.1 board includes an on-board **DS3231 high-precision RTC** with battery backup. This enables time-aware features such as timestamped fault logs, scheduled operations, and accurate time tracking even during power outages.
+
+```text
+RTC SYSTEM OVERVIEW (KC868-A16 v3.1 ONLY):
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│    ┌──────────────┐        ┌──────────────────────────────────────┐    │
+│    │   DS3231     │        │          ESP32-S3 MCU                │    │
+│    │   RTC Chip   │◄──I2C──┤  rtc_manager.cpp                     │    │
+│    │              │        │  (0x68 address)                      │    │
+│    │  ┌────────┐  │        │                                      │    │
+│    │  │Battery │  │        │  Functions:                          │    │
+│    │  │ CR2032 │  │        │  • rtcGetDateTime()                  │    │
+│    │  │ Backup │  │        │  • rtcSetDateTime()                  │    │
+│    │  └────────┘  │        │  • rtcSyncFromNTP()                  │    │
+│    │              │        │  • rtcGetTemperature()               │    │
+│    │  Accuracy:   │        │                                      │    │
+│    │  ±2ppm       │        │                                      │    │
+│    └──────────────┘        └──────────────────────────────────────┘    │
+│                                                                          │
+│    FEATURES:                                                            │
+│    ✓ Battery backup (maintains time during power loss)                  │
+│    ✓ NTP auto-sync when WiFi connected (if time unset)                  │
+│    ✓ Built-in temperature sensor (±3°C accuracy)                        │
+│    ✓ Timestamped fault logging                                          │
+│    ✓ LCD warning if time not set and no internet                        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### `rtc` - Real-Time Clock Management
+
+**Syntax:**
+```
+rtc <subcommand> [args...]
+```
+
+**Description:**
+The `rtc` command provides comprehensive management of the on-board DS3231 real-time clock. It allows you to view status, get/set date and time, sync from NTP, and read the built-in temperature sensor.
+
+**How It Works:**
+The RTC communicates with the ESP32 over the I2C bus at address 0x68. Time is stored in BCD (Binary-Coded Decimal) format in the DS3231's registers. The rtc_manager module handles the conversion between BCD and standard integers. At boot, the system checks if the RTC time is valid (year > 2000). If not set, it attempts NTP synchronization when WiFi connects.
+
+```text
+RTC INITIALIZATION FLOW (Boot Sequence):
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│  elboInit() (plc_iface.cpp)                                             │
+│       │                                                                  │
+│       ├── Wire.begin(SDA=9, SCL=10) ──→ I2C Bus Initialize              │
+│       │                                                                  │
+│       ├── [I2C Recovery if needed]                                       │
+│       │                                                                  │
+│       ├── Q73 Output Board Detection                                     │
+│       │                                                                  │
+│       └── rtcInit() ◄───────────────────────────────────────────────┐   │
+│               │                                                      │   │
+│               ├── Retry detection up to 3 times with 50ms delays    │   │
+│               │                                                      │   │
+│               ├── Wire.beginTransmission(0x68) ──→ Check presence   │   │
+│               │                                                      │   │
+│               ├── If detected:                                       │   │
+│               │      • Set rtc_available = true                     │   │
+│               │      • Log current date/time                        │   │
+│               │                                                      │   │
+│               └── If not detected:                                   │   │
+│                      • Set rtc_available = false                    │   │
+│                      • Log warning                                  │   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+```text
+AUTO-SYNC FLOW (After Boot):
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│  rtcCheckAndSync() called after taskManagerStart()                       │
+│       │                                                                  │
+│       ├── Is RTC time set? (year > 2000)                                │
+│       │       │                                                          │
+│       │       ├── YES ──→ rtcSyncSystemTime()                           │
+│       │       │           (Sync ESP32 system time FROM RTC)              │
+│       │       │           └── settimeofday() updates system clock       │
+│       │       │                                                          │
+│       │       └── NO ──→ Time is factory default (2000-01-01)           │
+│       │               │                                                  │
+│       │               ├── Is WiFi connected?                            │
+│       │               │       │                                          │
+│       │               │       ├── YES ──→ rtcSyncFromNTP()              │
+│       │               │       │           │                              │
+│       │               │       │           ├── configTime() with NTP     │
+│       │               │       │           │   servers                    │
+│       │               │       │           │                              │
+│       │               │       │           ├── Wait up to 10s for sync   │
+│       │               │       │           │                              │
+│       │               │       │           ├── Call rtcSetDateTime()     │
+│       │               │       │           │   to SET the RTC            │
+│       │               │       │           │                              │
+│       │               │       │           └── Log: "Synced from NTP"    │
+│       │               │       │                                          │
+│       │               │       └── NO ──→ No internet available          │
+│       │               │               │                                  │
+│       │               │               ├── Log warning                   │
+│       │               │               │                                  │
+│       │               │               └── lcdMessageSet()               │
+│       │               │                   "RTC TIME NOT SET!"           │
+│       │               │                   (Display for 5 seconds)       │
+│       │               │                                                  │
+│       │               └── User must set manually:                        │
+│       │                   rtc set YYYY-MM-DD HH:MM:SS                   │
+│       │                                                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Subcommands:**
+| Subcommand | Syntax | Description |
+|------------|--------|-------------|
+| `status` | `rtc status` | Show complete RTC status with date, time, and temperature |
+| `get` | `rtc get` | Get current date/time in compact format |
+| `date` | `rtc date YYYY-MM-DD` | Set date only (keeps current time) |
+| `time` | `rtc time HH:MM:SS` | Set time only (keeps current date) |
+| `set` | `rtc set YYYY-MM-DD HH:MM:SS` | Set both date and time |
+| `sync` | `rtc sync` | Sync ESP32 system time from RTC |
+| `temp` | `rtc temp` | Read RTC's built-in temperature sensor |
+
+---
+
+#### `rtc status` - Full RTC Status Dashboard
+
+**Syntax:**
+```
+rtc status
+```
+
+**Description:**
+Displays a comprehensive status report of the RTC including availability, current date and time, and the built-in temperature sensor reading.
+
+**How It Works:**
+This command reads from multiple DS3231 registers sequentially. The time registers are at addresses 0x00-0x06 (seconds through year in BCD format). The temperature is read from registers 0x11-0x12 (MSB and LSB, where LSB bits 7-6 contain fractional degrees in 0.25°C increments).
+
+```text
+DS3231 REGISTER MAP (accessed by rtc status):
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Address │ Register    │ Format     │ Example                          │
+│──────────┼─────────────┼────────────┼──────────────────────────────────│
+│   0x00   │ Seconds     │ BCD 00-59  │ 0x30 = 30 seconds                │
+│   0x01   │ Minutes     │ BCD 00-59  │ 0x45 = 45 minutes                │
+│   0x02   │ Hours       │ BCD 00-23  │ 0x14 = 14 (2 PM in 24h mode)     │
+│   0x03   │ Day of Week │ 1-7        │ (not used by rtc_manager)        │
+│   0x04   │ Date        │ BCD 01-31  │ 0x05 = 5th day of month          │
+│   0x05   │ Month/Cent  │ BCD 01-12  │ 0x02 = February                  │
+│   0x06   │ Year        │ BCD 00-99  │ 0x26 = 2026 (add 2000)           │
+│   0x11   │ Temp MSB    │ Signed int │ 0x19 = 25°C                      │
+│   0x12   │ Temp LSB    │ Bits 7-6   │ 0x40 = +0.25°C fractional        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Expected Output (RTC Available):**
+```text
+[RTC] === DS3231 RTC Status ===
+  Status:      Available
+  Date:        2026-02-05
+  Time:        19:35:42
+  Temperature: 24.5 C
+```
+
+**Expected Output (RTC Not Available):**
+```text
+[RTC] === DS3231 RTC Status ===
+  Status: NOT AVAILABLE
+```
+
+---
+
+#### `rtc get` - Get Current Date/Time
+
+**Syntax:**
+```
+rtc get
+```
+
+**Description:**
+Returns the current date and time from the RTC in a compact single-line format.
+
+**Expected Output:**
+```text
+[RTC] 2026-02-05 19:36:15
+```
+
+**Possible Errors:**
+```text
+[ERROR] [RTC] RTC not available
+```
+*Cause: DS3231 chip not detected on I2C bus. Check hardware connection.*
+
+```text
+[ERROR] [RTC] Failed to read time
+```
+*Cause: I2C communication error. Try `i2c recovery` command.*
+
+---
+
+#### `rtc date` - Set Date Only
+
+**Syntax:**
+```
+rtc date YYYY-MM-DD
+```
+
+**Description:**
+Sets only the date portion of the RTC, preserving the current time. Useful when the time is correct but the date was never set.
+
+**Parameters:**
+| Parameter | Format | Valid Range | Example |
+|-----------|--------|-------------|---------|
+| Year | YYYY | 2000-2099 | 2026 |
+| Month | MM | 01-12 | 02 |
+| Day | DD | 01-31 | 05 |
+
+**Usage Example:**
+```
+rtc date 2026-02-05
+```
+
+**Expected Output:**
+```text
+[INFO] [RTC] [OK] Date set to: 2026-02-05
+```
+
+**Possible Errors:**
+```text
+[ERROR] [RTC] Usage: rtc date YYYY-MM-DD
+[INFO] [RTC] Example: rtc date 2026-02-05
+```
+*Cause: Missing or malformed date parameter.*
+
+```text
+[ERROR] [RTC] Invalid format. Use: YYYY-MM-DD
+```
+*Cause: Date string doesn't match expected format (check for dashes).*
+
+---
+
+#### `rtc time` - Set Time Only
+
+**Syntax:**
+```
+rtc time HH:MM:SS
+rtc time HH:MM
+```
+
+**Description:**
+Sets only the time portion of the RTC, preserving the current date. Both HH:MM:SS and HH:MM formats are accepted (seconds default to 00 if omitted).
+
+**Parameters:**
+| Parameter | Format | Valid Range | Example |
+|-----------|--------|-------------|---------|
+| Hour | HH | 00-23 | 19 (7 PM) |
+| Minute | MM | 00-59 | 37 |
+| Second | SS | 00-59 | 00 (optional) |
+
+**Usage Examples:**
+```
+rtc time 19:37:00
+rtc time 14:30
+```
+
+**Expected Output:**
+```text
+[INFO] [RTC] [OK] Time set to: 19:37:00
+```
+
+---
+
+#### `rtc set` - Set Both Date and Time
+
+**Syntax:**
+```
+rtc set YYYY-MM-DD HH:MM:SS
+rtc set YYYY-MM-DD HH:MM
+```
+
+**Description:**
+Sets both the date and time in a single command. This is the most common way to initialize the RTC.
+
+**Usage Example:**
+```
+rtc set 2026-02-05 19:40:00
+```
+
+**Expected Output:**
+```text
+[INFO] [RTC] [OK] DateTime set to: 2026-02-05 19:40:00
+```
+
+```text
+SET DATETIME I2C TRANSACTION:
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│  rtcSetDateTime(2026, 02, 05, 19, 40, 00)                               │
+│       │                                                                  │
+│       ├── Validate ranges:                                              │
+│       │      • year: 2000-2099  ✓                                       │
+│       │      • month: 1-12      ✓                                       │
+│       │      • day: 1-31        ✓                                       │
+│       │      • hour: 0-23       ✓                                       │
+│       │      • minute: 0-59     ✓                                       │
+│       │      • second: 0-59     ✓                                       │
+│       │                                                                  │
+│       ├── Convert to BCD:                                               │
+│       │      • 40 seconds → 0x40                                        │
+│       │      • 40 minutes → 0x40                                        │
+│       │      • 19 hours   → 0x19                                        │
+│       │      • 05 day     → 0x05                                        │
+│       │      • 02 month   → 0x02                                        │
+│       │      • 26 year    → 0x26 (year - 2000)                          │
+│       │                                                                  │
+│       └── I2C Write Transaction:                                        │
+│              Wire.beginTransmission(0x68)                               │
+│              Wire.write(0x00)   // Start at register 0                  │
+│              Wire.write(0x40)   // Seconds                              │
+│              Wire.write(0x40)   // Minutes                              │
+│              Wire.write(0x19)   // Hours                                │
+│              Wire.write(0x01)   // Day of week (unused)                 │
+│              Wire.write(0x05)   // Date                                 │
+│              Wire.write(0x02)   // Month                                │
+│              Wire.write(0x26)   // Year                                 │
+│              Wire.endTransmission()                                     │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### `rtc sync` - Sync System Time from RTC
+
+**Syntax:**
+```
+rtc sync
+```
+
+**Description:**
+Synchronizes the ESP32's internal system clock with the RTC. This is useful after manually setting the RTC to update the system time without rebooting.
+
+**How It Works:**
+Reads the current time from the DS3231, converts it to a Unix timestamp, and calls the ESP32's `settimeofday()` function to update the internal clock.
+
+**Expected Output:**
+```text
+[INFO] [RTC] [OK] System time synced from RTC
+```
+
+---
+
+#### `rtc temp` - Read RTC Temperature Sensor
+
+**Syntax:**
+```
+rtc temp
+```
+
+**Description:**
+The DS3231 has a built-in temperature sensor used for its internal temperature compensation. This command reads and displays that temperature.
+
+**How It Works:**
+The temperature is stored in registers 0x11 (MSB, signed integer part) and 0x12 (LSB, where bits 7-6 are the fractional part in 0.25°C increments).
+
+```text
+TEMPERATURE CALCULATION:
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│   Register 0x11 (MSB): Signed 8-bit integer = °C integer part           │
+│   Register 0x12 (LSB): Bits 7-6 = fractional part                       │
+│                                                                          │
+│   Example: MSB = 0x19 (25), LSB = 0x80 (bits 7-6 = 0b10 = 2)            │
+│   Temp = 25 + (2 × 0.25) = 25.50°C                                      │
+│                                                                          │
+│   Formula: Temp = MSB + ((LSB >> 6) × 0.25)                             │
+│                                                                          │
+│   Accuracy: ±3°C (not meant for precision thermometry, just for         │
+│             the DS3231's internal temperature compensation)             │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Expected Output:**
+```text
+[RTC] Temperature: 24.5 C
+```
+
+---
+
+### 🏛️ RTC ARCHITECTURE DETAILS
+
+**Hardware Requirements:**
+- KC868-A16 v3.1 board (ESP32-S3 with on-board DS3231)
+- DS3231 RTC at I2C address 0x68
+- CR2032 battery for backup power
+
+**Board Variant Conditional Compilation:**
+The RTC functionality is only compiled when `BOARD_HAS_RTC_DS3231` is defined:
+```c
+#if BOARD_HAS_RTC_DS3231
+  // RTC code here
+#endif
+```
+
+For KC868-A16 v1.6 (without RTC), the `rtc` command will show:
+```text
+[RTC] RTC not available on this board variant
+```
+
+**NTP Servers Used:**
+When auto-syncing, the system uses these NTP servers (in order of preference):
+1. `pool.ntp.org` (global pool)
+2. `time.nist.gov` (US NIST)
+3. `time.google.com` (Google)
+
+**Timeout Behavior:**
+- NTP sync timeout: 10 seconds (20 retries × 500ms)
+- If timeout occurs, LCD displays "RTC TIME NOT SET!" for 5 seconds
+
+---
+
+## 💾 SD CARD MANAGEMENT
+
+The KC868-A16 v3.1 board includes an on-board **MicroSD card slot** connected via dedicated SPI bus. This enables storage of G-code files, job logs, configuration backups, and historical data beyond what LittleFS can provide.
+
+```text
+SD CARD SYSTEM OVERVIEW (KC868-A16 v3.1 ONLY):
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│    ┌──────────────┐        ┌──────────────────────────────────────┐    │
+│    │  MicroSD     │        │          ESP32-S3 MCU                │    │
+│    │  Card Slot   │◄─SPI──┤  sd_card_manager.cpp                  │    │
+│    │              │  HSPI  │                                      │    │
+│    │  ┌────────┐  │        │  Functions:                          │    │
+│    │  │ FAT32  │  │        │  • sdCardInit() - Initialize & mount │    │
+│    │  │ Format │  │        │  • sdCardUnmount() - Safe unmount    │    │
+│    │  └────────┘  │        │  • sdCardFormat() - Delete all data  │    │
+│    │              │        │  • sdCardHealthCheck() - Test I/O    │    │
+│    │  Card Detect │        │                                      │    │
+│    │  Pin: GPIO38 │        │                                      │    │
+│    └──────────────┘        └──────────────────────────────────────┘    │
+│                                                                          │
+│    FEATURES:                                                            │
+│    ✓ Supports SDSC, SDHC, and SDXC cards (FAT32 formatted)              │
+│    ✓ Card detect pin for hot-plug detection                            │
+│    ✓ Health check at mount (write/read/verify test)                    │
+│    ✓ Safe unmount before reboot (via systemSafeReboot)                 │
+│    ✓ Default directories: /gcode, /logs, /backups, /jobs               │
+│                                                                          │
+│    SPI PIN MAPPING:                                                     │
+│    ┌────────────────────────────────────────┐                           │
+│    │ Function │ GPIO Pin │ Description      │                           │
+│    │──────────┼──────────┼──────────────────│                           │
+│    │ SD_CS    │ GPIO41   │ Chip Select      │                           │
+│    │ SD_SCK   │ GPIO42   │ SPI Clock        │                           │
+│    │ SD_MOSI  │ GPIO2    │ Master Out       │                           │
+│    │ SD_MISO  │ GPIO1    │ Master In        │                           │
+│    │ SD_CD    │ GPIO38   │ Card Detect      │                           │
+│    └────────────────────────────────────────┘                           │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### `sd` - SD Card Management
+
+**Syntax:**
+```
+sd <subcommand> [args...]
+```
+
+**Description:**
+The `sd` command provides comprehensive management of the on-board MicroSD card slot. It allows you to view card status, browse files, manage directories, and perform maintenance operations like health checks and formatting.
+
+**How It Works:**
+The SD card uses a dedicated HSPI bus separate from the main I2C bus. At boot, `sdCardInit()` checks the card detect pin, initializes SPI at 4MHz, mounts the FAT32 filesystem, creates default directories, and runs a health check. The system uses the Arduino SD library backed by ESP-IDF's FATFS for reliable file operations.
+
+```text
+SD CARD INITIALIZATION FLOW (Boot Sequence):
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│  sdCardInit() called from plcIfaceInit()                                │
+│       │                                                                  │
+│       ├── Check Card Detect Pin (GPIO38)                                │
+│       │       │                                                          │
+│       │       └── Pin HIGH? ──→ No card inserted, skip init            │
+│       │                                                                  │
+│       ├── Initialize HSPI Bus                                           │
+│       │      sd_spi.begin(SCK=42, MISO=1, MOSI=2, CS=41)               │
+│       │                                                                  │
+│       ├── Mount FAT32 Filesystem                                        │
+│       │      SD.begin(CS, sd_spi, 4000000) // 4MHz SPI                 │
+│       │       │                                                          │
+│       │       └── Mount failed? ──→ Log error, abort                   │
+│       │                                                                  │
+│       ├── Detect Card Type                                              │
+│       │      • CARD_NONE = No card                                      │
+│       │      • CARD_MMC = MMC card                                      │
+│       │      • CARD_SD = Standard SD (SDSC)                             │
+│       │      • CARD_SDHC = High Capacity (SDHC/SDXC)                    │
+│       │                                                                  │
+│       ├── Log Card Info                                                 │
+│       │      • Type, Size, Used/Free space                              │
+│       │                                                                  │
+│       ├── Create Default Directories                                    │
+│       │      /gcode, /logs, /backups, /jobs                             │
+│       │                                                                  │
+│       └── Run Health Check ◄────────────────────────────────────────┐   │
+│               │                                                      │   │
+│               ├── Write test pattern to /.sd_health_check           │   │
+│               ├── Read back and verify with memcmp()                 │   │
+│               ├── Delete test file                                   │   │
+│               │                                                      │   │
+│               └── If failed ──→ Log warning (but continue)          │   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Subcommands:**
+| Subcommand | Syntax | Description |
+|------------|--------|-------------|
+| `status` | `sd status` | Show card type, size, and usage |
+| `ls` | `sd ls [path]` | List directory contents |
+| `cat` | `sd cat <file>` | Display file contents |
+| `rm` | `sd rm <file>` | Delete a file |
+| `rmdir` | `sd rmdir <dir>` | Delete an empty directory |
+| `mkdir` | `sd mkdir <dir>` | Create a directory |
+| `eject` | `sd eject` | Safely unmount card |
+| `health` | `sd health` | Run health check |
+| `format` | `sd format [-y]` | Format card (delete all data) |
+
+---
+
+#### `sd status` - Card Status Dashboard
+
+**Syntax:**
+```
+sd status
+```
+
+**Description:**
+Displays comprehensive information about the SD card including detection status, card type, capacity, and usage statistics.
+
+**Expected Output (Card Mounted):**
+```text
+[SD] === SD Card Status ===
+  Detected:    YES
+  Status:      Mounted and ready
+  Type:        SDHC/SDXC
+  Capacity:    29584 MB
+  Used:        1247 MB (4%)
+  Free:        28337 MB
+```
+
+**Expected Output (No Card):**
+```text
+[SD] === SD Card Status ===
+  Detected:    NO
+  Status:      No card detected
+```
+
+---
+
+#### `sd ls` - List Directory Contents
+
+**Syntax:**
+```
+sd ls [path]
+```
+
+**Description:**
+Lists files and subdirectories in the specified path. If no path is given, lists the root directory.
+
+**Parameters:**
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| path | No | `/` | Directory path to list |
+
+**Usage Examples:**
+```
+sd ls                 # List root directory
+sd ls /gcode          # List G-code files
+sd ls /logs           # List log files
+```
+
+**Expected Output:**
+```text
+[SD] Contents of: /gcode
+-------------------------------------------------------------
+Type       Size        Name
+-------------------------------------------------------------
+[FILE]     15234       job001.gcode
+[FILE]     8721        test_cut.nc
+[DIR]      -           archive
+-------------------------------------------------------------
+Total: 3 items
+```
+
+---
+
+#### `sd cat` - View File Contents
+
+**Syntax:**
+```
+sd cat <filename>
+```
+
+**Description:**
+Displays the contents of a text file to the serial console. Useful for inspecting G-code files, logs, or configuration backups.
+
+**Parameters:**
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| filename | Yes | Full path to the file |
+
+**Usage Example:**
+```
+sd cat /gcode/test.gcode
+```
+
+**Expected Output:**
+```text
+[SD] Contents of: /gcode/test.gcode (1523 bytes)
+-------------------------------------------------------------
+G21 ; Metric mode
+G90 ; Absolute positioning
+G0 X0 Y0 Z5 ; Rapid to home
+G1 X100 F500 ; Move X to 100mm
+...
+-------------------------------------------------------------
+```
+
+---
+
+#### `sd rm` - Delete File
+
+**Syntax:**
+```
+sd rm <filename>
+```
+
+**Description:**
+Deletes a single file from the SD card. Does not work on directories.
+
+**Expected Output:**
+```text
+[SD] [OK] File deleted: /gcode/old_job.gcode
+```
+
+**Possible Errors:**
+```text
+[SD] Not found: /gcode/nonexistent.gcode
+[SD] '/gcode' is a directory - use 'sd rmdir' instead
+```
+
+---
+
+#### `sd rmdir` - Delete Directory
+
+**Syntax:**
+```
+sd rmdir <directory>
+```
+
+**Description:**
+Deletes an empty directory. The directory must be empty (no files or subdirectories).
+
+**Expected Output:**
+```text
+[SD] [OK] Directory deleted: /gcode/archive
+```
+
+**Possible Errors:**
+```text
+[SD] Failed to delete directory (may not be empty): /gcode
+[SD] TIP: Delete all files inside first
+```
+
+---
+
+#### `sd mkdir` - Create Directory
+
+**Syntax:**
+```
+sd mkdir <directory>
+```
+
+**Description:**
+Creates a new directory at the specified path.
+
+**Expected Output:**
+```text
+[SD] [OK] Directory created: /gcode/new_project
+```
+
+---
+
+#### `sd eject` - Safely Unmount
+
+**Syntax:**
+```
+sd eject
+```
+
+**Description:**
+Safely unmounts the SD card by flushing all pending writes and closing the filesystem. **Always run this before physically removing the card** to prevent filesystem corruption.
+
+**How It Works:**
+Calls `SD.end()` which flushes cached data and releases the SPI bus. The card detect pin will still function to detect card removal.
+
+**Expected Output:**
+```text
+[SD] [OK] SD card safely unmounted
+[SD] You can now remove the card
+```
+
+---
+
+#### `sd health` - Health Check
+
+**Syntax:**
+```
+sd health
+```
+
+**Description:**
+Performs a quick health check to verify the SD card is functioning correctly. This test runs automatically at boot but can be run manually to diagnose card issues.
+
+**How It Works:**
+```text
+HEALTH CHECK PROCESS:
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│  1. CREATE TEST FILE                                                    │
+│     SD.open("/.sd_health_check", FILE_WRITE)                            │
+│                                                                          │
+│  2. WRITE TEST PATTERN (16 bytes)                                       │
+│     ┌──────────────────────────────────────────────────────────┐        │
+│     │ 0x55 0xAA 0x00 0xFF │ Alternating bit patterns          │        │
+│     │ 0x12 0x34 0x56 0x78 │ Sequential values                 │        │
+│     │ 0xDE 0xAD 0xBE 0xEF │ Magic pattern                     │        │
+│     │ 0x42 0x49 0x53 0x53 │ "BISS" signature                  │        │
+│     └──────────────────────────────────────────────────────────┘        │
+│                                                                          │
+│  3. READ BACK DATA                                                      │
+│     SD.open("/.sd_health_check", FILE_READ)                             │
+│     Read 16 bytes into buffer                                           │
+│                                                                          │
+│  4. VERIFY DATA INTEGRITY                                               │
+│     memcmp(written, read, 16) == 0 ?                                    │
+│                                                                          │
+│  5. DELETE TEST FILE                                                    │
+│     SD.remove("/.sd_health_check")                                      │
+│                                                                          │
+│  RESULT CODES:                                                          │
+│  ├── SD_HEALTH_OK ────────────── All steps passed                       │
+│  ├── SD_HEALTH_WRITE_FAILED ─── File create or write failed            │
+│  ├── SD_HEALTH_READ_FAILED ──── File open or read failed               │
+│  ├── SD_HEALTH_VERIFY_FAILED ── Data corruption detected               │
+│  └── SD_HEALTH_DELETE_FAILED ── Could not clean up test file           │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Expected Output (Pass):**
+```text
+[SD] Performing health check...
+[SD] [OK] Health check PASSED
+```
+
+**Expected Output (Fail):**
+```text
+[SD] Performing health check...
+[SD] Health check FAILED: Data verification failed (corruption)
+```
+
+---
+
+#### `sd format` - Format SD Card
+
+**Syntax:**
+```
+sd format          # Shows warning, requires confirmation
+sd format -y       # Skip confirmation (destructive!)
+sd format --yes    # Same as -y
+```
+
+**Description:**
+Formats the SD card by recursively deleting all files and directories, then recreating the default directory structure. This is a "quick format" style operation - it deletes the filesystem contents rather than performing a low-level format.
+
+> [!CAUTION]
+> This operation **permanently deletes ALL data** on the SD card! There is no undo.
+
+**How It Works:**
+```text
+FORMAT OPERATION FLOW:
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│  sd format -y                                                           │
+│       │                                                                  │
+│       ├── Check -y flag present?                                        │
+│       │       │                                                          │
+│       │       ├── NO ──→ Print warning and exit                         │
+│       │       │          "To confirm, run: sd format -y"                │
+│       │       │                                                          │
+│       │       └── YES ──→ Proceed with format                           │
+│       │                                                                  │
+│       ├── Collect all root-level items (max 64)                         │
+│       │                                                                  │
+│       ├── For each item:                                                │
+│       │       │                                                          │
+│       │       ├── If file ──→ SD.remove(path)                           │
+│       │       │                                                          │
+│       │       └── If directory ──→ deleteRecursive(path)                │
+│       │               │                                                  │
+│       │               ├── Open directory                                │
+│       │               ├── Recursively delete contents                   │
+│       │               └── SD.rmdir(path)                                │
+│       │                                                                  │
+│       ├── Log deletion count                                            │
+│       │                                                                  │
+│       └── Recreate default directories                                  │
+│              /gcode, /logs, /backups, /jobs                             │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Expected Output (Without Confirmation):**
+```text
+[SD] *** WARNING: This will DELETE ALL DATA on the SD card! ***
+[SD] To confirm, run: sd format -y
+```
+
+**Expected Output (With Confirmation):**
+```text
+[SD] Formatting SD card (deleting all data)...
+[SD] Deleted 7/7 items
+[SD] [OK] SD card formatted successfully
+[SD] Default directories recreated: /gcode, /logs, /backups, /jobs
+```
+
+---
+
+### 🏛️ SD CARD ARCHITECTURE DETAILS
+
+**Hardware Requirements:**
+- KC868-A16 v3.1 board (ESP32-S3-WROOM-1U with SD slot)
+- MicroSD card formatted as FAT32
+- Cards up to 32GB officially supported (larger cards may work)
+
+**Board Variant Conditional Compilation:**
+SD card functionality is only compiled when `BOARD_HAS_SDCARD` is defined:
+```c
+#if BOARD_HAS_SDCARD
+  // SD code here
+#endif
+```
+
+For KC868-A16 v1.6 (without SD slot), the `sd` command will show:
+```text
+[SD] SD card not supported on this board variant
+```
+
+**Safe Reboot Integration:**
+All system reboots (`systemSafeReboot()`) automatically unmount the SD card first to prevent filesystem corruption:
+```c
+void systemSafeReboot(const char* reason) {
+    #if BOARD_HAS_SDCARD
+    if (sdCardIsMounted()) {
+        sdCardUnmount();  // Flush and close
+    }
+    #endif
+    ESP.restart();
+}
+```
+
+**Default Directory Structure:**
+```
+/sd
+├── gcode/       # G-code files (.gcode, .nc)
+├── logs/        # System and job logs
+├── backups/     # Configuration backups
+└── jobs/        # Job metadata and history
+```
+
+---
+
 ## 📊 COMPLETE COMMAND QUICK REFERENCE
+
+
 
 ### System Commands
 | Command | Description |
@@ -3216,6 +4266,8 @@ CLOSED LOOP MONITORING LOGIC:
 | `lcd` | LCD control |
 | `dio` | Digital I/O |
 | `rs485` | RS-485 registry |
+| `rtc` | Real-time clock (v3.1 boards) |
+| `sd` | SD card management (v3.1 boards) |
 
 ### Filesystem
 | Command | Description |
@@ -3241,10 +4293,11 @@ CLOSED LOOP MONITORING LOGIC:
 
 ---
 
-**Document Version:** 2.1 Ultimate Master  
-**Last Updated:** 2026-01-28  
+**Document Version:** 2.2 Ultimate Master  
+**Last Updated:** 2026-02-05  
 **Firmware Compatibility:** v3.5.x+  
-**Total Commands Documented:** 81+  
+**Total Commands Documented:** 83+  
+
 **Author:** Antigravity (DeepMind Advanced Agentic Coding)  
 **Machine:** BISSO E350 PosiPro 4-Axis CNC Bridge Saw
 

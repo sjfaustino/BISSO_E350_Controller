@@ -5,6 +5,7 @@
 
 #include "system_telemetry.h"
 #include "lcd_interface.h" // Added for lcdInterfaceGetContent
+#include "telemetry_history.h" // PSRAM history
 #include "firmware_version.h"
 #include "serial_logger.h"
 #include "altivar31_modbus.h"  // VFD run status
@@ -72,6 +73,7 @@ static system_health_t calculateHealthStatus() {
 
 void telemetryInit() {
     memset(&telemetry_cache, 0, sizeof(telemetry_cache));
+    telemetryHistoryInit(); // Initialize PSRAM buffer
     logInfo("[TELEMETRY] Initialized");
 }
 
@@ -232,6 +234,15 @@ void telemetryUpdate() {
     lcdInterfaceGetContent(telemetry_cache.lcd_lines);
 
     portEXIT_CRITICAL(&telemetrySpinlock);
+
+    // PHASE 6: Add to PSRAM History (1Hz)
+    static uint32_t last_history_ms = 0;
+    if (now - last_history_ms >= 1000) {
+        last_history_ms = now;
+        telemetry_packet_t packet;
+        telemetryExportBinary(&packet);
+        telemetryHistoryAdd(&packet);
+    }
 
     // =========================================================================
     // PHASE 3: Signal events OUTSIDE critical section (may log/allocate)

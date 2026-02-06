@@ -38,7 +38,8 @@ typedef enum {
   FAULT_SPINDLE_OVERCURRENT = 0x15,  // PHASE 5.1: Spindle overcurrent detection
   FAULT_SPINDLE_STALL = 0x16,  // Spindle stall (prolonged overload)
   FAULT_SPINDLE_TOOLBREAK = 0x17,  // Tool breakage (sudden current drop)
-  FAULT_CODE_MAX = 0x18  // Maximum fault code value (for array sizing)
+  FAULT_RS485_TIMEOUT = 0x18,   // PHASE 4.1: RS-485 Bus communication failure
+  FAULT_CODE_MAX = 0x19  // Maximum fault code value (for array sizing)
 } fault_code_t;
 
 // Fault Statistics Structure (Must match usage in cli_diag.cpp)

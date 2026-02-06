@@ -11,6 +11,7 @@
 #include <WiFi.h>
 #include "motion_buffer.h"  // For buffer telemetry
 #include "motion_state.h" // Added for execution tracking
+#include "psram_alloc.h"
 #include "api_config.h"
 #include "serial_logger.h"
 #include "hardware_config.h"
@@ -64,6 +65,9 @@ void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
 // Instantiate the global webServer object declared extern in web_server.h
 WebServerManager webServer;
 
+// PHASE 6.4: Transmit buffer in PSRAM
+static char* broadcast_buffer = nullptr;
+
 // Constructor
 WebServerManager::WebServerManager(uint16_t port) : server(port), port(port) {
     // server(port) initializes the PsychicHttpServer with the port
@@ -97,6 +101,11 @@ void WebServerManager::init() {
             return;
         }
         logPrintln("[WEB] LittleFS formatted and mounted");
+    }
+    
+    // PHASE 6.4: Allocate broadcast buffer in PSRAM
+    if (broadcast_buffer == nullptr) {
+        broadcast_buffer = (char*)psramMalloc(2048);
     }
     
     // Register all API routes (extracted for maintainability)
@@ -318,6 +327,12 @@ void WebServerManager::setSpindleEfficiency(float load_ratio) {
     portEXIT_CRITICAL(&statusSpinlock);
 }
 
+void WebServerManager::setSpindleLoadPercent(float load_pct) {
+    portENTER_CRITICAL(&statusSpinlock);
+    current_status.spindle_load_pct = load_pct;
+    portEXIT_CRITICAL(&statusSpinlock);
+}
+
 void WebServerManager::setAxisQualityScore(uint8_t axis, uint32_t quality_score) {
     if (axis < 3) {
         portENTER_CRITICAL(&statusSpinlock);
@@ -395,7 +410,7 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
         "\"motion_active\":%s,\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},"
         "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
-        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f},"
+        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f,\"load_pct\":%.1f},"
         "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
         "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
         "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s}},"
@@ -425,7 +440,7 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         current_status.dro_connected ? "true" : "false",
         current_status.vfd_current_amps, current_status.vfd_frequency_hz, current_status.vfd_thermal_percent, current_status.vfd_fault_code,
         current_status.vfd_threshold_amps, current_status.vfd_calibration_valid ? "true" : "false", current_status.vfd_connected ? "true" : "false",
-        current_status.spindle_rpm, current_status.spindle_speed_m_s, current_status.spindle_efficiency,
+        current_status.spindle_rpm, current_status.spindle_speed_m_s, current_status.spindle_efficiency, current_status.spindle_load_pct,
         current_status.axis_metrics[0].quality_score, current_status.axis_metrics[0].jitter_mms, current_status.axis_metrics[0].vfd_error_percent, current_status.axis_metrics[0].quality_score < 10 ? "true" : "false", current_status.axis_metrics[0].maintenance_warning ? "true" : "false",
         current_status.axis_metrics[1].quality_score, current_status.axis_metrics[1].jitter_mms, current_status.axis_metrics[1].vfd_error_percent, current_status.axis_metrics[1].quality_score < 10 ? "true" : "false", current_status.axis_metrics[1].maintenance_warning ? "true" : "false",
         current_status.axis_metrics[2].quality_score, current_status.axis_metrics[2].jitter_mms, current_status.axis_metrics[2].vfd_error_percent, current_status.axis_metrics[2].quality_score < 10 ? "true" : "false", current_status.axis_metrics[2].maintenance_warning ? "true" : "false",
@@ -491,18 +506,19 @@ void WebServerManager::broadcastState() {
     system_telemetry_t telemetry = telemetryGetSnapshot();
     
     // PHASE 6.4: String-based serialization (No heap churn)
-    // CRITICAL: Moved to static to prevent stack overflow (2KB on stack was crashes)
-    static char buffer[2048];
-    size_t len = serializeTelemetryToBuffer(buffer, sizeof(buffer), telemetry, false);
+    // CRITICAL: Using PSRAM buffer to prevent stack overflow
+    if (broadcast_buffer == nullptr) return;
     
-    if (len > 0 && len < sizeof(buffer)) {
+    size_t len = serializeTelemetryToBuffer(broadcast_buffer, 2048, telemetry, false);
+    
+    if (len > 0 && len < 2048) {
         // Wrap in try-catch to prevent crash if clients disconnect during broadcast
         try {
-            wsHandler.sendAll(buffer);
+            wsHandler.sendAll(broadcast_buffer);
         } catch (...) {
             logWarning("[WS] Broadcast failed - client disconnected");
         }
-    } else if (len >= sizeof(buffer)) {
+    } else if (len >= 2048) {
         logError("[WS] Broadcast failed - Buffer overflow (%u bytes)", (uint32_t)len);
     }
 

@@ -91,6 +91,9 @@ void cliRegisterDiagCommands();
 void cliRegisterI2CCommands();
 void cliRegisterCalibCommands();
 void cliRegisterWifiCommands(); 
+void cliRegisterSDCommands();
+void cliRegisterRTCCommands();
+
 
 // ============================================================================
 // COMMAND HANDLER PROTOTYPES

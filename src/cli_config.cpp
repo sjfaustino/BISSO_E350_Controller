@@ -144,14 +144,15 @@ void cmd_config_get(int argc, char **argv) {
 
 void cmd_config_dump(int argc, char **argv) {
   logPrintln("\n[CONFIG] === FULL CONFIGURATION DUMP ===");
-  logPrintln("KEY                            | VALUE");
-  logPrintln("--------------------------------+----------------");
+  
+  cliPrintTableHeader(30, 20, 0);
+  cliPrintTableRow("KEY", "VALUE", nullptr, 30, 20, 0);
+  cliPrintTableDivider(30, 20, 0);
 
-  extern void
-  configUnifiedPrintAll();
+  extern void configUnifiedPrintAll();
   configUnifiedPrintAll();
 
-  logPrintln("--------------------------------+----------------");
+  cliPrintTableFooter(30, 20, 0);
 }
 
 void cmd_config_set(int argc, char **argv) {

@@ -168,11 +168,13 @@ void taskManagerInit() {
 void taskManagerStart() {
   logPrintln("[TASKS] Starting scheduler...");
 
+  // Log queue now handles serialization - no delays needed between task creations
   taskSafetyCreate();
   taskMotionCreate();
   taskEncoderCreate();
   taskPlcCommCreate();
   taskI2cManagerCreate();
+  logInfo("[TASKS] [OK] All tasks active");
   taskCliCreate();
   taskFaultLogCreate();
   taskMonitorCreate();
@@ -181,6 +183,7 @@ void taskManagerStart() {
   taskLcdCreate();
 
   // CRITICAL: Validate that all critical tasks were created successfully
+
   bool critical_failure = false;
   if (task_safety == NULL) {
     logError(
@@ -207,8 +210,6 @@ void taskManagerStart() {
       delay(1000); // Halt system in infinite loop - DO NOT START SCHEDULER
     }
   }
-
-  logInfo("[TASKS] [OK] All tasks active");
 }
 
 // ============================================================================

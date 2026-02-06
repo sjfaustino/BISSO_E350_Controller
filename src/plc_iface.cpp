@@ -28,6 +28,8 @@
 #include "task_manager.h"
 #include <Wire.h>
 #include <freertos/FreeRTOS.h>
+#include "rtc_manager.h"
+
 
 // Shadow Registers
 static uint8_t i73_input_shadow = 0x00; // Default 0 (Inactive) to prevent phantom inputs on vanilla ESP32
@@ -169,6 +171,7 @@ void elboInit() {
   logInfo("[PLC] I2C initialized at %lu Hz", (unsigned long)i2c_speed);
   delay(10);            // Allow bus to settle
 
+
   // Reset Outputs (Safe State: All OFF)
   // KC868-A16 uses active-low relay outputs: 0xFF = all OFF, 0x00 = all ON
   q73_shadow_register = 0xFF;
@@ -199,6 +202,11 @@ void elboInit() {
     logError("[PLC] [CRITICAL] Q73 Output Board Missing!");
     g_plc_hardware_present = false;  // Mark hardware as not present
   }
+
+  // Initialize DS3231 RTC AFTER I2C recovery (v3.1 boards only)
+  #if BOARD_HAS_RTC_DS3231
+  rtcInit();
+  #endif
 }
 
 // ============================================================================

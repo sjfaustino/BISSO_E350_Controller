@@ -31,6 +31,9 @@
 #include "operator_alerts.h"  // Buzzer and tower light
 #include "spindle_current_monitor.h" // PHASE 5.0
 #include "job_manager.h" // G-Code Job Manager
+#include "sd_card_manager.h"  // SD Card support
+#include "rtc_manager.h"       // RTC auto-sync
+#include "system_utils.h"      // Safe reboot helper
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -45,7 +48,7 @@ extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskNa
   logError("[CRITICAL] STACK OVERFLOW in task: %s", pcTaskName);
   faultLogCritical(FAULT_CRITICAL_SYSTEM_ERROR, "Stack Overflow");
   delay(1000);
-  ESP.restart();
+  systemEmergencyReboot();  // Critical error - minimal cleanup
 }
 
 #include "api_config.h"
@@ -98,6 +101,13 @@ bool init_network_wrapper() {
     return true;
 }
 
+bool init_sd_card_wrapper() {
+    // SD card is optional - system works without it
+    sdCardInit();  // Returns false if no card, but that's OK
+    return true;   // Always succeed - boot continues without SD card
+}
+
+
 // PHASE 5.3: Initialize advanced diagnostics and load management
 bool init_encoder_diag_wrapper() { encoderDiagnosticsInit(); return true; }
 bool init_load_mgr_wrapper() { loadManagerInit(); return true; }
@@ -137,7 +147,17 @@ bool init_yhtc05_wrapper() {
 
 void setup() {
   Serial.begin(115200);
-  delay(2000);  // Allow USB CDC or UART to initialize
+  
+  // PHASE 16 FIX: On ESP32-S3 with USB CDC, wait for Serial to connect 
+  // so we don't miss the initial boot text. Timeout after 5 seconds.
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && defined(ARDUINO_USB_CDC_ON_BOOT)
+  uint32_t start_wait = millis();
+  while (!Serial && (millis() - start_wait < 5000)) {
+    delay(10);
+  }
+#endif
+  
+  delay(2000);  // Robust buffer for USB CDC / UART stability
   
   serialLoggerInit(LOG_LEVEL);
   
@@ -167,6 +187,7 @@ void setup() {
   BOOT_INIT("Motion", init_motion_wrapper, BOOT_ERROR_MOTION);
   BOOT_INIT("CLI", init_cli_wrapper, BOOT_ERROR_CLI);
   BOOT_INIT("Network", init_network_wrapper, (boot_status_code_t)13);
+  BOOT_INIT("SD Card", init_sd_card_wrapper, (boot_status_code_t)23);
   BOOT_INIT("Encoder Diag", init_encoder_diag_wrapper, (boot_status_code_t)15);
   BOOT_INIT("Load Manager", init_load_mgr_wrapper, (boot_status_code_t)16);
   BOOT_INIT("Dashboard", init_dashboard_wrapper, (boot_status_code_t)17);
@@ -204,6 +225,11 @@ void setup() {
   // bootLogStop();
   
   taskManagerStart();
+
+  // RTC auto-sync: Check if time needs sync from NTP (v3.1 boards only)
+  #if BOARD_HAS_RTC_DS3231
+  rtcCheckAndSync();
+  #endif
   
   // PHASE 6.2: OTA check is now OPTIONAL and disabled by default
   // The SSL buffer allocation (~16KB) causes heap fragmentation

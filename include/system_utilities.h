@@ -18,8 +18,21 @@ char axisIndexToChar(uint8_t index);
  * @param arg Pointer to the axis string (e.g., "X").
  * @return Axis index (0-3) or 255 if invalid.
  */
-uint8_t axisCharToIndex(char* arg); // Renamed from parse_axis_arg for clarity
-
 // --- Add other system utilities here as needed ---
+
+/**
+ * @brief Convert encoder counts to millimeters based on axis calibration.
+ */
+float countsToMM(uint8_t axis, int32_t counts);
+
+/**
+ * @brief Convert distance in mm to encoder counts.
+ */
+int32_t mmToCounts(uint8_t axis, float mm);
+
+/**
+ * @brief Get the active scale (PPM/PPD) for an axis.
+ */
+float getAxisScale(uint8_t axis);
 
 #endif // SYSTEM_UTILITIES_H

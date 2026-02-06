@@ -12,7 +12,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
-#define MOTION_BUFFER_SIZE 32 // Power of 2 for efficiency
+#define MOTION_BUFFER_SIZE 1024 // Increased from 32 using PSRAM on ESP32-S3
 
 // CRITICAL FIX: Store positions as integer counts to prevent float drift
 // Float arithmetic accumulates rounding errors over long jobs (hours/days)
@@ -43,13 +43,13 @@ public:
 
     // Status Queries (THREAD-SAFE with mutex)
     int available();     // Returns number of items currently in buffer
-    int getCapacity();   // Returns total size (32)
+    int getCapacity();   // Returns total size (1024)
 
 private:
-    motion_cmd_t buffer[MOTION_BUFFER_SIZE];
-    volatile uint8_t head;
-    volatile uint8_t tail;
-    volatile int count;
+    motion_cmd_t* buffer; // Pointer for PSRAM allocation
+    volatile uint16_t head;
+    volatile uint16_t tail;
+    volatile uint16_t count;
     SemaphoreHandle_t buffer_mutex;  // Protects head, tail, count modifications
 
     // Internal unsafe versions (called within critical section)
@@ -58,7 +58,7 @@ private:
     bool peek_unsafe(motion_cmd_t* cmd);
     bool isFull_unsafe();
     bool isEmpty_unsafe();
-    int available_unsafe();
+    int available_unsafe(); 
 };
 
 extern MotionBuffer motionBuffer;

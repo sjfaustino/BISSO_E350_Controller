@@ -6,8 +6,8 @@
  */
 
 #include "rs485_device_registry.h"
-#include "rs485_device_registry.h"
 #include "serial_logger.h"
+#include "system_constants.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -55,10 +55,10 @@ bool rs485RegistryInit(uint32_t baud_rate) {
     registry.watchdog_alert_active = false;
     
     // Initialize RS485 UART
-    bus_serial->begin(baud_rate, SERIAL_8N1, 16, 13);
+    bus_serial->begin(baud_rate, SERIAL_8N1, PIN_RS485_RX, PIN_RS485_TX);
     
-    logInfo("[RS485] Registry initialized on Serial2 (baud: %lu, RX:16 TX:13)",
-            (unsigned long)baud_rate);
+    logInfo("[RS485] Registry initialized on Serial2 (baud: %lu, RX:%d TX:%d)",
+            (unsigned long)baud_rate, PIN_RS485_RX, PIN_RS485_TX);
     return true;
 }
 
