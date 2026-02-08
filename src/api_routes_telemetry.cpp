@@ -59,7 +59,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
 
         snprintf(buffer, API_STATUS_BUFFER_SIZE,
             "{\"system\":{"
-            "\"status\":\"READY\",\"health\":\"%s\",\"uptime_sec\":%lu,"
+            "\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,"
             "\"cpu_percent\":%d,\"free_heap_bytes\":%lu,\"plc_hardware_present\":%s,"
             "\"firmware_version\":\"v%d.%d.%d\",\"build_date\":\"%s\","
             "\"hw_model\":\"%s\",\"hw_mcu\":\"%s\",\"hw_revision\":\"%s\","
@@ -69,6 +69,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             "},"
             "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
             "\"motion_enabled\":%s,\"motion_moving\":%s,\"estop\":%s,\"alarm\":%s}",
+            telemetry.estop_active ? "E-STOP" : (telemetry.alarm_active ? "ALARMED" : (telemetry.motion_moving ? "MOVING" : "READY")),
             telemetryGetHealthStatusString(telemetry.health_status),
             (unsigned long)telemetry.uptime_seconds,
             telemetry.cpu_usage_percent,

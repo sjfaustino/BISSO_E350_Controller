@@ -70,6 +70,23 @@ typedef struct {
     uint16_t spindle_rpm;
     bool rpm_stall_detected;
 
+    // VFD & Spindle Detail (PHASE 8 DRY)
+    bool vfd_connected;
+    float vfd_frequency_hz;
+    int16_t vfd_thermal_state;
+    uint32_t vfd_fault_code;
+    float spindle_load_percent;
+    float spindle_efficiency;
+    
+    // Axis Quality & Synchronization (PHASE 8 DRY)
+    float axis_quality_score[3];
+    float axis_jitter_mms[3];
+    bool axis_stalled[3];
+    float axis_vfd_error_percent[3];
+
+    // Connectivity
+    bool dro_connected;
+
     // Safety System
     bool estop_active;
     bool alarm_active;

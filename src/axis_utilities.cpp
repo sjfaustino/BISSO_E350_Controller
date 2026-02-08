@@ -1,4 +1,10 @@
-#include "system_utilities.h"
+/**
+ * @file axis_utilities.cpp
+ * @brief Axis-related utility functions implementation
+ * @project BISSO E350 Controller
+ */
+
+#include "axis_utilities.h"
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>

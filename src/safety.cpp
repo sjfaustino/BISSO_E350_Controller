@@ -464,48 +464,51 @@ void safetyResetAlarm() {
       (unsigned long)safety_state.fault_duration_ms);
 }
 
+// PHASE 8: Unified fault reporting
+void safetyReportFault(fault_severity_t sev, fault_code_t code, int32_t axis, const char* reason, safety_fault_t safety_type) {
+  // 1. Log to system fault logger
+  faultLogEntry(sev, code, axis, 0, reason);
+  
+  // 2. Log to serial
+  if (sev >= FAULT_ERROR) {
+    logError("[SAFETY] [FAULT] %s (Axis: %d, Code: 0x%02X)", reason, axis, code);
+  } else {
+    logWarning("[SAFETY] [WARN] %s (Axis: %d, Code: 0x%02X)", reason, axis, code);
+  }
+
+  // 3. Trigger hardware alarm if necessary
+  if (sev >= FAULT_ERROR) {
+    safetyTriggerAlarm(reason, safety_type);
+  }
+}
+
 void safetyReportStall(uint8_t axis) {
   if (axis < MOTION_AXES) {
-    // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
     char msg[64];
     snprintf(msg, sizeof(msg), "STALL Axis %d", axis);
-    faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
-                  "Motion stall detected");
-    safetyTriggerAlarm(msg, SAFETY_STALLED);
+    safetyReportFault(FAULT_ERROR, FAULT_MOTION_STALL, axis, msg, SAFETY_STALLED);
   }
 }
 
 void safetyReportSoftLimit(uint8_t axis) {
   if (axis < MOTION_AXES) {
-    // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
     char msg[64];
     snprintf(msg, sizeof(msg), "LIMIT Axis %d", axis);
-    faultLogEntry(FAULT_ERROR, FAULT_SOFT_LIMIT_EXCEEDED, axis, 0,
-                  "Soft limit reached");
-
-    // PHASE 5.10: Signal soft limit violation event
     systemEventsSafetySet(EVENT_SAFETY_SOFT_LIMIT_HIT);
-
-    safetyTriggerAlarm(msg, SAFETY_SOFT_LIMIT);
+    safetyReportFault(FAULT_ERROR, FAULT_SOFT_LIMIT_EXCEEDED, axis, msg, SAFETY_SOFT_LIMIT);
   }
 }
 
 void safetyReportEncoderError(uint8_t axis) {
   if (axis < MOTION_AXES) {
-    // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
     char msg[64];
     snprintf(msg, sizeof(msg), "ENC_ERR Axis %d", axis);
-    faultLogEntry(FAULT_ERROR, FAULT_ENCODER_TIMEOUT, axis, 0,
-                  "Encoder comm failure");
-    safetyTriggerAlarm(msg, SAFETY_ENCODER_ERROR);
+    safetyReportFault(FAULT_ERROR, FAULT_ENCODER_TIMEOUT, axis, msg, SAFETY_ENCODER_ERROR);
   }
 }
 
 void safetyReportPLCFault() {
-  // PHASE 5.10: Removed unsafe current_fault assignment (now done in safetyTriggerAlarm)
-  safetyTriggerAlarm("PLC_FAULT", SAFETY_PLC_FAULT);
-  faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, -1, 0,
-                "PLC Consensus Failure");
+  safetyReportFault(FAULT_ERROR, FAULT_PLC_COMM_LOSS, -1, "PLC_FAULT", SAFETY_PLC_FAULT);
 }
 
 safety_fault_t safetyGetCurrentFault() { return safety_state.current_fault; }

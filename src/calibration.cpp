@@ -7,7 +7,7 @@
 #include "fault_logging.h"
 #include <Preferences.h>
 #include "serial_logger.h"
-#include "system_utilities.h" // <-- NEW: Centralized Axis Utilities
+#include "axis_utilities.h" // <-- NEW: Centralized Axis Utilities
 #include <string.h>
 #include <stdio.h> // For snprintf
 #include <ctype.h> // Required for tolower()

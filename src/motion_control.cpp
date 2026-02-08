@@ -31,7 +31,7 @@
 #include "web_server.h"
 #include "hardware_config.h"
 #include "system_tuning.h"
-#include "system_utilities.h" // PHASE 4.1: Centralized units
+#include "axis_utilities.h" // PHASE 4.1: Centralized units
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <math.h>

@@ -64,93 +64,34 @@ void taskTelemetryFunction(void *parameter) {
     bool runHeavy = (millis() - last_heavy_telemetry >= 1000);
 
     if (runHeavy) {
-        // 1. Update System Telemetry (PHASE 5.1)
-        telemetryUpdate();
+        // 1. Get snapshot (centralized sampling)
+        system_telemetry_t snapshot = telemetryGetSnapshot();
 
-        // 2. Update Phase 5.3 Modules
-        encoderDiagnosticsUpdate();
-        dashboardMetricsUpdate();
-        
-        // 2.5. Update Stone Cutting Analytics
-        cuttingAnalyticsUpdate();
+        // 2. Update status and broadcast to WebUI
+        webServer.setSpindleRPM(snapshot.spindle_rpm);
+        webServer.setVFDCurrent(snapshot.spindle_current_amps);
+        webServer.setVFDFrequency(snapshot.vfd_frequency_hz);
+        webServer.setVFDThermalState(snapshot.vfd_thermal_state);
+        webServer.setVFDFaultCode(snapshot.vfd_fault_code);
+        webServer.setSpindleLoadPercent(snapshot.spindle_load_percent);
+        webServer.setVFDConnected(snapshot.vfd_connected);
+        webServer.setDROConnected(snapshot.dro_connected);
+        webServer.setSpindleEfficiency(snapshot.spindle_efficiency);
+        webServer.setSystemUptime(snapshot.uptime_seconds);
 
-        // 3. Telemetry Processing (Registry Integrated)
-        float current_amps = altivar31GetCurrentAmps();
-        if (!isnan(current_amps) && current_amps > 0.0f && current_amps <= 100.0f) {
-            vfdCalibrationSampleCurrent(current_amps);
+        for (int i = 0; i < 3; i++) {
+            webServer.setAxisQualityScore(i, snapshot.axis_quality_score[i]);
+            webServer.setAxisJitterAmplitude(i, snapshot.axis_jitter_mms[i]);
+            webServer.setAxisStalled(i, snapshot.axis_stalled[i]);
+            webServer.setAxisVFDError(i, snapshot.axis_vfd_error_percent[i]);
         }
-
-        float vfd_current = jxk10GetCurrentAmps();
-        float vfd_frequency = altivar31GetFrequencyHz();
-        int16_t vfd_thermal = altivar31GetThermalState();
-
-        const jxk10_state_t* jxk_state = jxk10GetState();
-        bool vfd_alive = jxk_state 
-                         && jxk_state->enabled 
-                         && (jxk_state->read_count > 5)
-                         && (jxk_state->consecutive_errors < 5)
-                         && (millis() - jxk_state->last_read_time_ms < 5000);
-
-        int rated_rpm = configGetInt(KEY_SPINDLE_RATED_RPM, 1400);
-        int blade_dia = configGetInt(KEY_BLADE_DIAMETER_MM, 350);
-        float current_rpm = (vfd_alive && vfd_current > 1.0f) ? (float)rated_rpm : 0.0f;
-        float current_speed = (current_rpm * 3.14159f * (float)blade_dia) / 60000.0f;
-        
-        webServer.setSpindleRPM(current_rpm);
-        webServer.setSpindleSpeed(current_speed);
-        webServer.setVFDCurrent(isnan(vfd_current) || vfd_current < 0.0f ? 0.0f : vfd_current);
-        webServer.setVFDFrequency(isnan(vfd_frequency) || vfd_frequency < 0.0f ? 0.0f : vfd_frequency);
-        webServer.setVFDThermalState((vfd_thermal < 0 || vfd_thermal > 200) ? 0 : vfd_thermal);
-        webServer.setVFDFaultCode(altivar31GetFaultCode());
-        webServer.setSpindleLoadPercent(spindleMonitorGetLoadPercent());
-        webServer.setVFDCalibrationThreshold(vfdCalibrationGetThreshold());
-        webServer.setVFDCalibrationValid(vfdCalibrationIsValid());
-        webServer.setVFDConnected(vfd_alive);
-
-        float actual_feedrate_mm_s = 0.0f;
-        uint8_t active_axis = motionGetActiveAxis();
-        if (active_axis < 3) actual_feedrate_mm_s = abs(motionGetVelocity(active_axis));
-        
-        float efficiency = (actual_feedrate_mm_s > 0.1f && vfd_current > 1.0f) ? vfd_current / actual_feedrate_mm_s : 0.0f;
-        webServer.setSpindleEfficiency(efficiency);
-
-        bool dro_alive = !wj66IsStale(0);
-        webServer.setDROConnected(dro_alive);
-
-        active_axis = motionGetActiveAxis();
-        float x_vel = motionGetVelocity(0);
-        float y_vel = motionGetVelocity(1);
-        float z_vel = motionGetVelocity(2);
-        float feedrate = motionGetFeedOverride();
-        float vfd_freq_safe = (isnan(vfd_frequency) || vfd_frequency < 0.0f) ? 0.0f : vfd_frequency;
-
-        axisSynchronizationUpdate(active_axis, x_vel, y_vel, z_vel, vfd_freq_safe, feedrate);
-
-        axisSynchronizationLock();
-        const all_axes_metrics_t *all_metrics = axisSynchronizationGetAllMetrics();
-        if (all_metrics) {
-            for (int axis = 0; axis < 3; axis++) {
-                const axis_metrics_t *metrics = axisSynchronizationGetAxisMetrics(axis);
-                if (metrics) {
-                    webServer.setAxisQualityScore(axis, metrics->quality_score);
-                    webServer.setAxisJitterAmplitude(axis, metrics->velocity_jitter_mms);
-                    webServer.setAxisStalled(axis, metrics->stalled);
-                    webServer.setAxisVFDError(axis, metrics->vfd_encoder_error_percent);
-                }
-            }
-        }
-        axisSynchronizationUnlock();
-
-        webServer.setSystemUptime(taskGetUptime());
 
         const char *status_str = "READY";
-        if (motionIsEmergencyStopped()) status_str = "E-STOP";
-        else if (safetyIsAlarmed()) status_str = "ALARMED";
-        else if (motionIsMoving()) status_str = "MOVING";
-
+        if (snapshot.estop_active) status_str = "E-STOP";
+        else if (snapshot.alarm_active) status_str = "ALARMED";
+        else if (snapshot.motion_moving) status_str = "MOVING";
         webServer.setSystemStatus(status_str);
 
-        // Broadcast to WebUI clients (1Hz is sufficient for browser)
         webServer.broadcastState();
         last_heavy_telemetry = millis();
     }

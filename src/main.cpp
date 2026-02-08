@@ -145,8 +145,8 @@ bool init_yhtc05_wrapper() {
 }
 
 #define BOOT_INIT(name, func, code) \
-  do { if (func()) { logInfo("[BOOT] Init %s [OK]", name); bootMarkInitialized(name); } \
-       else { logError("[BOOT] Init %s [FAIL]", name); bootMarkFailed(name, "Init failed", code); } } while (0)
+  do { if (func()) { logModuleInitOK(name); bootMarkInitialized(name); } \
+       else { logModuleInitFail(name); bootMarkFailed(name, "Init failed", code); } } while (0)
 
 void setup() {
   Serial.begin(115200);

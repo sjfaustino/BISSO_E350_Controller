@@ -9,6 +9,11 @@
 #include "firmware_version.h"
 #include "serial_logger.h"
 #include "altivar31_modbus.h"  // VFD run status
+#include "axis_synchronization.h"
+#include "dashboard_metrics.h"
+#include "vfd_current_calibration.h"
+#include "encoder_wj66.h"
+#include "jxk10_modbus.h"
 #include "motion.h"
 #include "motion_state.h"
 #include "safety.h"
@@ -196,6 +201,45 @@ void telemetryUpdate() {
     // uint32_t cfg_ver = configGetInt("schema_version", 1); // Unused
     bool cfg_default = (configGetInt(KEY_WEB_PW_CHANGED, 0) == 0);
 
+    // VFD & Spindle Load (DRY Phase 8)
+    const jxk10_state_t* jxk_state = jxk10GetState();
+    bool vfd_alive = jxk_state 
+                     && jxk_state->enabled 
+                     && (jxk_state->read_count > 5)
+                     && (jxk_state->consecutive_errors < 5)
+                     && (now - jxk_state->last_read_time_ms < 5000);
+
+    float vfd_freq = altivar31GetFrequencyHz();
+    float vfd_current = jxk10GetCurrentAmps();
+    int16_t vfd_thermal = altivar31GetThermalState();
+    uint32_t vfd_fault = altivar31GetFaultCode();
+    float spindle_load = spindleMonitorGetLoadPercent();
+    
+    float actual_feedrate_mm_s = 0.0f;
+    uint8_t active_axis = motionGetActiveAxis();
+    if (active_axis < 3) actual_feedrate_mm_s = abs(motionGetVelocity(active_axis));
+    float efficiency = (actual_feedrate_mm_s > 0.1f && vfd_current > 1.0f) ? vfd_current / actual_feedrate_mm_s : 0.0f;
+
+    // Axis Quality (DRY Phase 8)
+    float q_scores[3] = {0};
+    float j_amps[3] = {0};
+    bool a_stalled[3] = {false};
+    float v_errs[3] = {0};
+    
+    axisSynchronizationLock();
+    for (int i = 0; i < 3; i++) {
+        const axis_metrics_t *metrics = axisSynchronizationGetAxisMetrics(i);
+        if (metrics) {
+            q_scores[i] = metrics->quality_score;
+            j_amps[i] = metrics->velocity_jitter_mms;
+            a_stalled[i] = metrics->stalled;
+            v_errs[i] = metrics->vfd_encoder_error_percent;
+        }
+    }
+    axisSynchronizationUnlock();
+
+    bool dro_alive = !wj66IsStale(0);
+
     // SD Card Status (PHASE 6.6)
     bool sd_mount = sdCardIsMounted();
     uint8_t sd_health = (uint8_t)sdCardGetLastHealth();
@@ -260,6 +304,20 @@ void telemetryUpdate() {
     telemetry_cache.sd_total_bytes = last_sd_total;
     telemetry_cache.sd_used_bytes = last_sd_used;
     
+    // DRY Phase 8 Fields
+    telemetry_cache.vfd_connected = vfd_alive;
+    telemetry_cache.vfd_frequency_hz = (isnan(vfd_freq) || vfd_freq < 0.0f) ? 0.0f : vfd_freq;
+    telemetry_cache.vfd_thermal_state = (vfd_thermal < 0 || vfd_thermal > 200) ? 0 : vfd_thermal;
+    telemetry_cache.vfd_fault_code = vfd_fault;
+    telemetry_cache.spindle_load_percent = spindle_load;
+    telemetry_cache.spindle_efficiency = efficiency;
+    telemetry_cache.dro_connected = dro_alive;
+    
+    memcpy(telemetry_cache.axis_quality_score, q_scores, sizeof(q_scores));
+    memcpy(telemetry_cache.axis_jitter_mms, j_amps, sizeof(j_amps));
+    memcpy(telemetry_cache.axis_stalled, a_stalled, sizeof(a_stalled));
+    memcpy(telemetry_cache.axis_vfd_error_percent, v_errs, sizeof(v_errs));
+
     // LCD Mirror
     lcdInterfaceGetContent(telemetry_cache.lcd_lines);
 

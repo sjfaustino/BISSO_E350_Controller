@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "safety_state_machine.h" // Includes the safety_fsm_state_t enum definition
+#include "fault_logging.h"        // Includes fault_severity_t and fault_code_t
 
 #define SAFETY_ALARM_PIN 2
 #define SAFETY_MAX_STALL_TIME_MS 2000
@@ -40,6 +41,13 @@ bool safetyCheckMotionAllowed(uint8_t axis);
 // PHASE 5.10: Added fault_type parameter for thread-safe fault assignment
 void safetyTriggerAlarm(const char* reason, safety_fault_t fault_type);
 void safetyResetAlarm();
+/**
+ * @brief Unified fault reporting (DRY Phase 8)
+ * Handles fault logging, serial output, and alarm triggering in one place.
+ */
+void safetyReportFault(fault_severity_t sev, fault_code_t code, int32_t axis, const char* reason, safety_fault_t safety_type);
+
+// Backward compatibility wrappers (Refactored to use safetyReportFault)
 void safetyReportStall(uint8_t axis);
 void safetyReportSoftLimit(uint8_t axis);
 void safetyReportEncoderError(uint8_t axis);

@@ -1,9 +1,13 @@
-#ifndef SYSTEM_UTILITIES_H
-#define SYSTEM_UTILITIES_H
+/**
+ * @file axis_utilities.h
+ * @brief Axis-related utility functions (PPM, indexing, conversion)
+ * @project BISSO E350 Controller
+ */
+
+#ifndef AXIS_UTILITIES_H
+#define AXIS_UTILITIES_H
 
 #include <stdint.h>
-
-// --- Axis Mapping Definitions (Centralized) ---
 
 /**
  * @brief Converts a 0-indexed axis number to its corresponding character label.
@@ -18,7 +22,7 @@ char axisIndexToChar(uint8_t index);
  * @param arg Pointer to the axis string (e.g., "X").
  * @return Axis index (0-3) or 255 if invalid.
  */
-// --- Add other system utilities here as needed ---
+uint8_t axisCharToIndex(char* arg);
 
 /**
  * @brief Convert encoder counts to millimeters based on axis calibration.
@@ -35,4 +39,4 @@ int32_t mmToCounts(uint8_t axis, float mm);
  */
 float getAxisScale(uint8_t axis);
 
-#endif // SYSTEM_UTILITIES_H
+#endif // AXIS_UTILITIES_H

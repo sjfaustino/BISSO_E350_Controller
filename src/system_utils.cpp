@@ -61,3 +61,21 @@ void systemEmergencyReboot() {
     
     while(1) { delay(100); }
 }
+/**
+ * @brief Module initialization logging helpers (DRY Phase 8)
+ */
+void logModuleInit(const char* name) {
+    logInfo("[%s] Initializing...", name);
+}
+
+void logModuleInitOK(const char* name) {
+    logInfo("[%s] [OK] Initialized successfully", name);
+}
+
+void logModuleInitFail(const char* name, const char* reason) {
+    if (reason) {
+        logError("[%s] [FAIL] Initialization failed: %s", name, reason);
+    } else {
+        logError("[%s] [FAIL] Initialization failed", name);
+    }
+}

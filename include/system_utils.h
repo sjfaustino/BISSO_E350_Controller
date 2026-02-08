@@ -30,3 +30,10 @@ void systemSafeReboot(const char* reason = nullptr);
  * may cause issues (e.g., stack overflow handler)
  */
 void systemEmergencyReboot();
+
+/**
+ * @brief Module initialization logging helpers
+ */
+void logModuleInit(const char* name);
+void logModuleInitOK(const char* name);
+void logModuleInitFail(const char* name, const char* reason = nullptr);
