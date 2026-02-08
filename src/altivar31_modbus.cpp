@@ -61,80 +61,71 @@ void Altivar31Driver::queueRequest(uint16_t register_addr) {
 }
 
 bool Altivar31Driver::poll() {
-    // If pending register set (by queueRequest), use it. Else cycle.
+    // If pending register set (by queueRequest), use it for one-off transactions (e.g. fault code)
     if (_pending_register != 0) {
-        // Use the pending one
-        // (Note: pending register logic in original code was: set pending, call rs485RequestImmediatePoll.
-        // The poll callback just used pending_register.
-        // But here, poll() is called by registry.
-        // If it was immediate poll, registry calls poll().
-        // If it was scheduled poll, registry calls poll().
-        // So we need to know if this is an immediate request or scheduled.
-        // Simplified: Always use pending if set, else use step.
-        // But we must clear pending after use? 
-        // Or cleaner: queueRequest sets pending. poll() uses valid pending. 
-        // If pending is 0, use scheduling.)
-    } else {
-        _pending_register = poll_registers[_poll_step];
-        _poll_step = (_poll_step + 1) % POLL_STEP_COUNT; 
-    }
-    
+        uint16_t tx_len = modbusReadRegistersRequest(getSlaveAddress(),
+                                                      _pending_register, 1, _tx_buffer);
+        return send(_tx_buffer, tx_len);
+    } 
+
+    // BATCH OPTIMIZATION: Read contiguous block 3201-3204
+    // 3201: Status (ETA)
+    // 3202: Output Frequency (rFr)
+    // 3204: Motor Current (LCr)
+    // Note: We read 4 registers to get 3201, 3202, 3203 (not used), 3204.
     uint16_t tx_len = modbusReadRegistersRequest(getSlaveAddress(),
-                                                  _pending_register, 1, _tx_buffer);
-    
-    // Clear pending if it was a one-off?
-    // Wait, if we set it for immediate, we want it used once.
-    // If we set it from schedule, we want it used once.
-    // So we don't clear it yet, we need it in onResponse to know what we read!
+                                                  ALTIVAR31_REG_DRIVE_STATUS, 4, _tx_buffer);
     
     bool sent = send(_tx_buffer, tx_len);
     return sent;
 }
 
 bool Altivar31Driver::onResponse(const uint8_t* data, uint16_t len) {
-    uint16_t regs[1];
-    uint8_t err = modbusParseReadResponse(data, len, 1, regs);
+    // Determine how many registers we expected
+    uint16_t expected_count = (_pending_register != 0) ? 1 : 4;
+    uint16_t regs[4];
+    uint8_t err = modbusParseReadResponse(data, len, expected_count, regs);
     
     if (err != MODBUS_ERR_NONE) {
         _state.last_error_time_ms = millis();
+        _pending_register = 0; // Clear on error too
         return false;
     }
 
-    uint16_t raw_value = regs[0];
-
-    switch (_pending_register) {
-        case ALTIVAR31_REG_DRIVE_CURRENT:
-            _state.current_raw = (int16_t)raw_value;
-            _state.current_amps = _state.current_raw * 0.1f;
-            break;
-
-        case ALTIVAR31_REG_OUTPUT_FREQ:
-            _state.frequency_raw = (int16_t)raw_value;
-            _state.frequency_hz = _state.frequency_raw * 0.1f;
-            break;
-
-        case ALTIVAR31_REG_DRIVE_STATUS:
-            _state.status_word = raw_value;
-            break;
-
-        case ALTIVAR31_REG_FAULT_CODE:
-            _state.fault_code = raw_value;
-            break;
-
-        case ALTIVAR31_REG_THERMAL_STATE:
-            _state.thermal_state = (int16_t)raw_value;
-            break;
+    if (_pending_register != 0) {
+        // Handle single register response
+        uint16_t raw_value = regs[0];
+        switch (_pending_register) {
+            case ALTIVAR31_REG_FAULT_CODE:
+                _state.fault_code = raw_value;
+                break;
+            case ALTIVAR31_REG_THERMAL_STATE:
+                _state.thermal_state = (int16_t)raw_value;
+                break;
+            case ALTIVAR31_REG_DRIVE_CURRENT:
+                _state.current_raw = (int16_t)raw_value;
+                _state.current_amps = _state.current_raw * 0.1f;
+                break;
+            case ALTIVAR31_REG_OUTPUT_FREQ:
+                _state.frequency_raw = (int16_t)raw_value;
+                _state.frequency_hz = _state.frequency_raw * 0.1f;
+                break;
+            case ALTIVAR31_REG_DRIVE_STATUS:
+                _state.status_word = raw_value;
+                break;
+        }
+        _pending_register = 0;
+    } else {
+        // Handle batch response (3201-3204)
+        _state.status_word = regs[0];               // 3201
+        _state.frequency_raw = (int16_t)regs[1];    // 3202
+        _state.frequency_hz = _state.frequency_raw * 0.1f;
+        // regs[2] is 3203 (not used)
+        _state.current_raw = (int16_t)regs[3];      // 3204
+        _state.current_amps = _state.current_raw * 0.1f;
     }
 
     _state.last_read_time_ms = millis();
-    
-    // Reset pending register (consumed)
-    // Actually, if we are in scheduling mode, _pending_register is set every poll.
-    // If explicit mode, it was set.
-    // Safe to clear?
-    // If we clear it to 0, poll() logic works (0 -> schedule).
-    _pending_register = 0; 
-    
     return true;
 }
 

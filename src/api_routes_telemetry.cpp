@@ -263,9 +263,15 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         response->sendHeaders();
         response->sendChunk((uint8_t*)"{\"success\":true,\"samples\":[", 27);
 
-        char buffer[256];
+        // OPTIMIZATION: Use status buffer as a 2KB staging area to batch multiple samples
+        // before calling sendChunk(). This reduces overhead significantly.
+        char* staging = memoryGetStatusBuffer(); 
+        bool staging_locked = memoryLockStatusBuffer(100);
+        
+        size_t offset = 0;
         for (uint16_t i = 0; i < count; i++) {
-            int n = snprintf(buffer, sizeof(buffer), 
+            char sample_buf[128];
+            int n = snprintf(sample_buf, sizeof(sample_buf), 
                 "{\"t\":%lu,\"cpu\":%u,\"heap\":%lu,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"spindle\":%.2f}%s",
                 (unsigned long)samples[i].uptime, 
                 samples[i].cpu_usage, 
@@ -273,8 +279,24 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
                 samples[i].axis_x, samples[i].axis_y, samples[i].axis_z,
                 samples[i].spindle_amps,
                 (i < count - 1) ? "," : "");
-            response->sendChunk((uint8_t*)buffer, n);
+
+            if (staging_locked && staging) {
+                if (offset + n >= API_STATUS_BUFFER_SIZE - 1) {
+                    response->sendChunk((uint8_t*)staging, offset);
+                    offset = 0;
+                }
+                memcpy(staging + offset, sample_buf, n);
+                offset += n;
+            } else {
+                // Fallback to single chunk if staging buffer busy
+                response->sendChunk((uint8_t*)sample_buf, n);
+            }
         }
+
+        if (staging_locked && staging && offset > 0) {
+            response->sendChunk((uint8_t*)staging, offset);
+        }
+        if (staging_locked) memoryUnlockStatusBuffer();
 
         response->sendChunk((uint8_t*)"]}", 2);
         memoryUnlockHistoryBuffer();
