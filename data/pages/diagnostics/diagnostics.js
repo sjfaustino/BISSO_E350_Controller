@@ -1,5 +1,30 @@
 window.DiagnosticsModule = window.DiagnosticsModule || {
-    updateInterval: null, trendInterval: null, spindleInterval: null, spindleData: [], spindlePaused: !1, spindleMaxPoints: 120, tachometerInterval: null, rs485Interval: null, setNA(t, e = "") { t && (t.innerHTML = '<span class="value-na">n/a</span>' + e) }, updateHeaderNA(t, e, n) { const a = document.getElementById(t); a && (a.innerHTML = n ? e : `${e} <span class="value-na" style="font-size: 0.8em; margin-left: 8px;">(N/A)</span>`) }, init() { console.log("[Diagnostics] Initializing"), window.addEventListener("state-changed", () => this.onStateChanged()), this.setupEventListeners(), this.loadInitialData(), this.updateInterval = setInterval(() => this.loadIOStatus(), 2e3), this.loadTrendData(), this.trendInterval = setInterval(() => this.loadTrendData(), 5e3), this.loadSpindleData(), this.spindleInterval = setInterval(() => this.loadSpindleData(), 500), this.loadIODiagnostics(), this.ioDiagInterval = setInterval(() => this.loadIODiagnostics(), 2e3), this.startTachometerPolling(), this.loadBootLog(), this.updateRS485Status(), this.rs485Interval = setInterval(() => this.updateRS485Status(), 3e3) }, setupEventListeners() {
+    updateInterval: null, trendInterval: null, spindleInterval: null, spindleData: [], spindlePaused: !1, spindleMaxPoints: 120, tachometerInterval: null, rs485Interval: null,
+    setNA(t, e = "") {
+        if (!t) return;
+        t.innerText = "";
+        const span = document.createElement("span");
+        span.className = "value-na";
+        span.textContent = "n/a";
+        t.appendChild(span);
+        if (e) t.appendChild(document.createTextNode(e));
+    },
+    updateHeaderNA(t, e, n) {
+        const a = document.getElementById(t);
+        if (!a) return;
+        if (n) {
+            a.textContent = e;
+        } else {
+            a.textContent = e + " ";
+            const span = document.createElement("span");
+            span.className = "value-na";
+            span.style.fontSize = "0.8em";
+            span.style.marginLeft = "8px";
+            span.textContent = "(N/A)";
+            a.appendChild(span);
+        }
+    },
+    init() { console.log("[Diagnostics] Initializing"), window.addEventListener("state-changed", () => this.onStateChanged()), this.setupEventListeners(), this.loadInitialData(), this.updateInterval = setInterval(() => this.loadIOStatus(), 2e3), this.loadTrendData(), this.trendInterval = setInterval(() => this.loadTrendData(), 5e3), this.loadSpindleData(), this.spindleInterval = setInterval(() => this.loadSpindleData(), 500), this.loadIODiagnostics(), this.ioDiagInterval = setInterval(() => this.loadIODiagnostics(), 2e3), this.startTachometerPolling(), this.loadBootLog(), this.updateRS485Status(), this.rs485Interval = setInterval(() => this.updateRS485Status(), 3e3) }, setupEventListeners() {
         const bind = (id, fn) => document.getElementById(id)?.addEventListener("click", fn);
         bind("refresh-io-btn", () => this.loadIOStatus());
         bind("clear-faults-btn", () => this.clearFaults());

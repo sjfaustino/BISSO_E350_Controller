@@ -20,7 +20,7 @@ void taskEncoderFunction(void* parameter) {
   rs485RegistryInit(g_config.rs485_baud);
 
   // Diagnostic: Measure stack high water mark
-  UBaseType_t stack_hwm_initial = uxTaskGetStackHighWaterMark(NULL);
+  UBaseType_t stack_hwm_initial = uxTaskGetStackHighWaterMark(nullptr);
   logInfo("[ENCODER_TASK] Initial stack HWM: %u bytes", (unsigned int)stack_hwm_initial * 4);
 
   watchdogTaskAdd("Encoder");
@@ -43,7 +43,7 @@ void taskEncoderFunction(void* parameter) {
     // Periodic stack monitoring (every 100 cycles = 2 seconds)
     loop_count++;
     if (loop_count % 100 == 0) {
-      UBaseType_t stack_hwm = uxTaskGetStackHighWaterMark(NULL);
+      UBaseType_t stack_hwm = uxTaskGetStackHighWaterMark(nullptr);
       uint32_t stack_hwm_bytes = stack_hwm * sizeof(StackType_t);
       uint32_t stack_used = TASK_STACK_ENCODER - stack_hwm_bytes;
       // Only warn if less than 512 bytes free

@@ -12,9 +12,9 @@
 // PRIVATE STATE
 // ============================================================================
 
-static EventGroupHandle_t safety_events = NULL;
-static EventGroupHandle_t motion_events = NULL;
-static EventGroupHandle_t system_events = NULL;
+static EventGroupHandle_t safety_events = nullptr;
+static EventGroupHandle_t motion_events = nullptr;
+static EventGroupHandle_t system_events = nullptr;
 
 static bool initialized = false;
 
@@ -52,15 +52,15 @@ bool systemEventsInit(void) {
 void systemEventsCleanup(void) {
     if (safety_events) {
         vEventGroupDelete(safety_events);
-        safety_events = NULL;
+        safety_events = nullptr;
     }
     if (motion_events) {
         vEventGroupDelete(motion_events);
-        motion_events = NULL;
+        motion_events = nullptr;
     }
     if (system_events) {
         vEventGroupDelete(system_events);
-        system_events = NULL;
+        system_events = nullptr;
     }
     initialized = false;
     logInfo("[EVENTS] Event groups cleaned up");

@@ -731,6 +731,9 @@ result_t configUnifiedSave() {
       break;
     }
     if (result == 0) success = false;
+    
+    // Prevent task starvation during long save operations
+    if (i % 10 == 0) taskYIELD();
   }
   config_dirty = false;
   

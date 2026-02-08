@@ -12,7 +12,7 @@
 
 static spinlock_timing_stats_t spinlock_stats[MAX_SPINLOCK_LOCATIONS];
 static uint8_t spinlock_stats_count = 0;
-static SemaphoreHandle_t spinlock_stats_mutex = NULL;
+static SemaphoreHandle_t spinlock_stats_mutex = nullptr;
 
 spinlock_timing_stats_t* spinlockTimingGetStats(const char* location) {
   if (!spinlock_stats_mutex) {
@@ -42,7 +42,7 @@ spinlock_timing_stats_t* spinlockTimingGetStats(const char* location) {
   }
 
   xSemaphoreGive(spinlock_stats_mutex);
-  return NULL;
+  return nullptr;
 }
 
 void spinlockTimingPrintStats() {

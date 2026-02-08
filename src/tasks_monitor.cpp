@@ -181,7 +181,7 @@ void taskMonitorFunction(void* parameter) {
 
         // SECURITY FIX: Stack monitoring is now handled globally by taskUpdateStackUsage()
         // and reported via telemetry. The Monitor task still logs critical alerts.
-        if (stats_array[i].handle != NULL) {
+        if (stats_array[i].handle != nullptr) {
             uint16_t high_water = stats_array[i].stack_high_water;
 
             if (high_water < STACK_CRITICAL_THRESHOLD_WORDS * 4) {  // Convert words to bytes

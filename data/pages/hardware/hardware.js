@@ -58,7 +58,11 @@ window.HardwareModule = window.HardwareModule || {
         document.querySelectorAll(".pin-select").forEach(el => {
             if (el.disabled || el.dataset.keepOptions === "true") return;
             const t = el.dataset.signal;
-            el.innerHTML = '<option value="">' + window.i18n.t('hardware.select_pin') + '</option>';
+            el.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = "";
+            defaultOpt.textContent = window.i18n.t('hardware.select_pin');
+            el.appendChild(defaultOpt);
 
             if (t && t.startsWith("output_")) {
                 for (let i = 1; i <= 16; i++) {
