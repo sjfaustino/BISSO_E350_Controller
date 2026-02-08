@@ -13,16 +13,16 @@ static SPIClass sd_spi(HSPI);
 /**
  * @brief Initialize SD card with custom SPI pins
  */
-bool sdCardInit() {
+result_t sdCardInit() {
     // Only initialize if board has SD card support
     #if !BOARD_HAS_SDCARD
         logWarning("[SD] SD card not supported on this board variant");
-        return false;
+        return RESULT_ERROR_HARDWARE;
     #endif
     
     if (sd_initialized) {
         logDebug("[SD] Already initialized");
-        return sd_mounted;
+        return sd_mounted ? RESULT_OK : RESULT_ERROR;
     }
     
     logInfo("[SD] Initializing SD card...");
@@ -35,7 +35,7 @@ bool sdCardInit() {
         logInfo("[SD] No card detected (card detect pin is HIGH)");
         sd_initialized = true;
         sd_mounted = false;
-        return false;
+        return RESULT_ERROR;
     }
     
     logInfo("[SD] Card detected, initializing SPI...");
@@ -48,7 +48,7 @@ bool sdCardInit() {
         logError("[SD] Failed to mount SD card");
         sd_initialized = true;
         sd_mounted = false;
-        return false;
+        return RESULT_ERROR_HARDWARE;
     }
     
     // Get card type
@@ -105,7 +105,7 @@ bool sdCardInit() {
     }
     
     sd_initialized = true;
-    return sd_mounted;
+    return sd_mounted ? RESULT_OK : RESULT_ERROR;
 }
 
 
@@ -142,8 +142,9 @@ void sdCardUnmount() {
 /**
  * @brief Get SD card information
  */
-bool sdCardGetInfo(SDCardInfo* info) {
-    if (!info || !sd_mounted) return false;
+result_t sdCardGetInfo(SDCardInfo* info) {
+    if (!info) return RESULT_INVALID_PARAM;
+    if (!sd_mounted) return RESULT_NOT_READY;
     
     info->totalBytes = SD.totalBytes();
     info->usedBytes = SD.usedBytes();
@@ -158,7 +159,7 @@ bool sdCardGetInfo(SDCardInfo* info) {
         default: info->cardTypeName = "UNKNOWN"; break;
     }
     
-    return true;
+    return RESULT_OK;
 }
 
 /**
@@ -186,41 +187,43 @@ size_t sdCardGetFileSize(const char* path) {
 /**
  * @brief Delete file
  */
-bool sdCardDeleteFile(const char* path) {
-    if (!sd_mounted || !path) return false;
+result_t sdCardDeleteFile(const char* path) {
+    if (!path) return RESULT_INVALID_PARAM;
+    if (!sd_mounted) return RESULT_NOT_READY;
     
     if (!SD.exists(path)) {
         logError("[SD] File not found: %s", path);
-        return false;
+        return RESULT_ERROR;
     }
     
     if (SD.remove(path)) {
         logInfo("[SD] Deleted: %s", path);
-        return true;
+        return RESULT_OK;
     }
     
     logError("[SD] Failed to delete: %s", path);
-    return false;
+    return RESULT_ERROR;
 }
 
 /**
  * @brief Create directory
  */
-bool sdCardCreateDir(const char* path) {
-    if (!sd_mounted || !path) return false;
+result_t sdCardCreateDir(const char* path) {
+    if (!path) return RESULT_INVALID_PARAM;
+    if (!sd_mounted) return RESULT_NOT_READY;
     
     if (SD.exists(path)) {
         logDebug("[SD] Directory already exists: %s", path);
-        return true;
+        return RESULT_OK;
     }
     
     if (SD.mkdir(path)) {
         logInfo("[SD] Created directory: %s", path);
-        return true;
+        return RESULT_OK;
     }
     
     logError("[SD] Failed to create directory: %s", path);
-    return false;
+    return RESULT_ERROR;
 }
 
 /**
@@ -439,10 +442,10 @@ static bool deleteRecursive(const char* path) {
  * Recursively deletes all files and directories on the SD card,
  * then recreates the default directory structure.
  */
-bool sdCardFormat() {
+result_t sdCardFormat() {
     if (!sd_mounted) {
         logError("[SD] SD card not mounted");
-        return false;
+        return RESULT_NOT_READY;
     }
     
     logWarning("[SD] Formatting SD card (deleting all data)...");
@@ -451,7 +454,7 @@ bool sdCardFormat() {
     File root = SD.open("/");
     if (!root) {
         logError("[SD] Failed to open root directory");
-        return false;
+        return RESULT_ERROR;
     }
     
     // Collect all root-level items first (can't delete while iterating safely)
@@ -488,5 +491,5 @@ bool sdCardFormat() {
     logInfo("[SD] [OK] SD card formatted successfully");
     logInfo("[SD] Default directories recreated: /gcode, /logs, /backups, /jobs");
     
-    return true;
+    return RESULT_OK;
 }

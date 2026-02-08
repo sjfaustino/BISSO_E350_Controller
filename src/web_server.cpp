@@ -41,6 +41,7 @@
 
 // Telemetry History Buffer (last 60 samples, sampled every 5s = 5mins)
 #define HISTORY_BUFFER_SIZE 60
+#define TELEMETRY_HISTORY_INTERVAL_MS 5000
 struct history_sample_t {
     uint8_t cpu;
     uint32_t heap;
@@ -56,7 +57,7 @@ bool webAuthenticate(PsychicRequest *request);
 
 void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
     uint32_t now = millis();
-    if (now - last_history_sample_ms < 5000) return; // Sample every 5s
+    if (now - last_history_sample_ms < TELEMETRY_HISTORY_INTERVAL_MS) return; // Sample history periodically
     last_history_sample_ms = now;
 
     telemetry_history[history_head] = {cpu, heap, spindle};

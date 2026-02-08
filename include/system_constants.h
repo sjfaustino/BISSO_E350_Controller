@@ -125,7 +125,10 @@ typedef enum {
   RESULT_INVALID_PARAM = 5,                       
   RESULT_NOT_READY = 6,                           
   RESULT_BUSY = 7,                                
-  RESULT_UNKNOWN = 8                              
+  RESULT_ERROR_HARDWARE = 8,                      
+  RESULT_ERROR_MEMORY = 9,                        
+  RESULT_ERROR_STORAGE = 10,                      
+  RESULT_UNKNOWN = 11                             
 } result_t;
 
 const char* resultToString(result_t result);

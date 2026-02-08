@@ -21,6 +21,7 @@
 #include "task_performance_monitor.h"
 #include "config_unified.h"
 #include "config_keys.h"
+#include "config_schema_versioning.h"
 #include "gcode_parser.h"
 #include "system_constants.h"
 #include "rtc_manager.h"
@@ -356,7 +357,7 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         t.sd_health,
         t.sd_total_bytes,
         t.sd_used_bytes,
-        (unsigned long)configGetInt(KEY_SCHEMA_VERSION, 1),
+        (unsigned long)configGetStoredSchemaVersion(),
         t.config_is_default ? "true" : "false",
         t.lcd_lines[0], t.lcd_lines[1], t.lcd_lines[2], t.lcd_lines[3]);
 

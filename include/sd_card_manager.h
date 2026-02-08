@@ -11,8 +11,10 @@
 
 #include <Arduino.h>
 
+#include "system_constants.h"
+
 // SD card initialization and status
-bool sdCardInit();
+result_t sdCardInit();
 bool sdCardIsPresent();
 bool sdCardIsMounted();
 void sdCardUnmount();
@@ -26,13 +28,13 @@ struct SDCardInfo {
     const char* cardTypeName;
 };
 
-bool sdCardGetInfo(SDCardInfo* info);
+result_t sdCardGetInfo(SDCardInfo* info);
 
 // File operations helpers
 bool sdCardFileExists(const char* path);
 size_t sdCardGetFileSize(const char* path);
-bool sdCardDeleteFile(const char* path);
-bool sdCardCreateDir(const char* path);
+result_t sdCardDeleteFile(const char* path);
+result_t sdCardCreateDir(const char* path);
 bool sdCardListDir(const char* path);
 
 // Mount status string for CLI/logging
@@ -80,4 +82,4 @@ SDCardHealth sdCardGetLastHealth();
  * 
  * @return true if successful, false on error
  */
-bool sdCardFormat();
+result_t sdCardFormat();

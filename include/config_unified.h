@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "system_constants.h"
 
 // Configuration Constants
 // Increased to 128 to hold G54-G59 offsets (24 keys) + defaults
@@ -35,7 +36,7 @@ typedef struct {
     bool is_set;
 } config_entry_t;
 
-void configUnifiedInit();
+result_t configUnifiedInit();
 void configUnifiedCleanup();  // PHASE 5.10: Resource cleanup
 void configSetDefaults();
 
@@ -43,13 +44,13 @@ int32_t configGetInt(const char* key, int32_t default_val);
 float configGetFloat(const char* key, float default_val);
 const char* configGetString(const char* key, const char* default_val);
 
-void configSetInt(const char* key, int32_t value);
-void configSetFloat(const char* key, float value);
-void configSetString(const char* key, const char* value);
+result_t configSetInt(const char* key, int32_t value);
+result_t configSetFloat(const char* key, float value);
+result_t configSetString(const char* key, const char* value);
 
 void configUnifiedFlush();
-void configUnifiedSave();
-void configUnifiedReset();
+result_t configUnifiedSave();
+result_t configUnifiedReset();
 void configUnifiedClear();
 int configGetKeyCount();
 

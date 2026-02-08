@@ -17,11 +17,18 @@ static UpdateCheckResult cached_result = {false, "", "", ""};
 // The GitHub repository info
 static const char* GITHUB_API_URL = "https://api.github.com/repos/sjfaustino/BISSO_E350_Controller/releases/latest";
 
-void otaInit(void) {
+// OTA Operation Constants
+#define OTA_HANDSHAKE_TIMEOUT_S 30
+#define OTA_MAX_RETRIES 3
+#define OTA_RETRY_DELAY_MS 1000
+#define OTA_HTTP_TIMEOUT_MS 10000
+
+result_t otaInit(void) {
     ota_progress = 0;
     ota_active = false;
     ota_check_complete = false;
     memset(&cached_result, 0, sizeof(cached_result));
+    return RESULT_OK;
 }
 
 UpdateCheckResult otaCheckForUpdate(void) {
@@ -31,7 +38,7 @@ UpdateCheckResult otaCheckForUpdate(void) {
     WiFiClientSecure client;
     client.setInsecure(); // GitHub uses common CA
     client.setInsecure(); // GitHub uses common CA
-    client.setHandshakeTimeout(30); // Allow more time for handshake
+    client.setHandshakeTimeout(OTA_HANDSHAKE_TIMEOUT_S); // Allow more time for handshake
 
     HTTPClient http;
     logInfo("[OTA] Checking GitHub for updates: %s", GITHUB_API_URL);
@@ -39,15 +46,15 @@ UpdateCheckResult otaCheckForUpdate(void) {
     int retry_count = 0;
     bool success = false;
     
-    while (retry_count < 3 && !success) {
+    while (retry_count < OTA_MAX_RETRIES && !success) {
         if (retry_count > 0) {
-            logWarning("[OTA] Retry %d/3...", retry_count + 1);
-            delay(1000);
+            logWarning("[OTA] Retry %d/%d...", retry_count + 1, OTA_MAX_RETRIES);
+            delay(OTA_RETRY_DELAY_MS);
         }
         
         if (http.begin(client, GITHUB_API_URL)) {
             http.addHeader("User-Agent", "ESP32-OTA-Client");
-            http.setTimeout(10000); // 10s request timeout
+            http.setTimeout(OTA_HTTP_TIMEOUT_MS); // request timeout
 
             int httpCode = http.GET();
             
@@ -200,15 +207,20 @@ static void ota_task(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-bool otaPerformUpdate(const char* download_url) {
-    if (ota_active) return false;
+result_t otaPerformUpdate(const char* download_url) {
+    if (ota_active) return RESULT_BUSY;
     
     char* url_copy = strdup(download_url);
-    if (!url_copy) return false;
+    if (!url_copy) return RESULT_ERROR_MEMORY;
     
     // Create background task for update so we don't block the web server
-    xTaskCreate(ota_task, "ota_task", 8192, url_copy, 5, NULL);
-    return true;
+    BaseType_t res = xTaskCreate(ota_task, "ota_task", 8192, url_copy, 5, NULL);
+    if (res != pdPASS) {
+        logError("[OTA] Failed to create ota_task");
+        free(url_copy);
+        return RESULT_ERROR;
+    }
+    return RESULT_OK;
 }
 
 int otaGetProgress(void) {
@@ -242,11 +254,16 @@ static void ota_check_task(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-void otaStartBackgroundCheck(void) {
-    if (ota_check_complete) return; // Already checked
+result_t otaStartBackgroundCheck(void) {
+    if (ota_check_complete) return RESULT_OK; // Already checked
     
     // Reduced stack from 8192 to 5120 to save heap
-    xTaskCreate(ota_check_task, "ota_check", 5120, NULL, 3, NULL);
+    BaseType_t res = xTaskCreate(ota_check_task, "ota_check", 5120, NULL, 3, NULL);
+    if (res != pdPASS) {
+        logError("[OTA] Failed to create ota_check task");
+        return RESULT_ERROR;
+    }
+    return RESULT_OK;
 }
 
 bool otaCheckComplete(void) {

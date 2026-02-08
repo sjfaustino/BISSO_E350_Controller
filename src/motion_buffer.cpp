@@ -7,6 +7,7 @@
 
 #include "motion_buffer.h"
 #include "encoder_calibration.h" // For machine calibration data
+#include "motion.h"
 #include "serial_logger.h"
 #include "system_constants.h" // For MOTION_POSITION_SCALE_FACTOR
 #include "system_events.h"    // PHASE 5.10: Event-driven architecture

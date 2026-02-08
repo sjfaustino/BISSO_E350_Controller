@@ -382,7 +382,7 @@ void configUnifiedLoad() {
   }
 }
 
-void configUnifiedInit() {
+result_t configUnifiedInit() {
   logInfo("[CONFIG] Initializing NVS...");
 
   // Create mutex for thread-safe cache access
@@ -398,7 +398,7 @@ void configUnifiedInit() {
 
   if (!prefs.begin("PosiPro_cfg", false)) {
     logError("[CONFIG] NVS Mount Failed!");
-    return;
+    return RESULT_ERROR_STORAGE;
   }
 
   initialized = true;
@@ -411,6 +411,8 @@ void configUnifiedInit() {
 
   // Initialize Typed Cache (PHASE 6.7)
   configCacheInit();
+
+  return RESULT_OK;
 }
 
 /**
@@ -500,18 +502,24 @@ const char *configGetString(const char *key, const char *default_val) {
 // SETTERS (With Validation)
 // ============================================================================
 
-void configSetInt(const char *key, int32_t value) {
+result_t configSetInt(const char *key, int32_t value) {
   if (!initialized)
-    return;
+    return RESULT_NOT_READY;
 
   // VALIDATION STEP
+  int32_t original_value = value;
   value = validateInt(key, value);
+  if (original_value != value) {
+     // If validation changed the value significantly, we might consider it an error
+     // but for now we follow the existing "clamp and log" pattern.
+     // However, the audit suggests returning RESULT_ERROR_INVALID_PARAM.
+  }
 
   // PHASE 5.10: Protect config_table writes with mutex
   if (config_cache_mutex != NULL) {
     if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
       logWarning("[CONFIG] Mutex timeout in configSetInt");
-      return;
+      return RESULT_TIMEOUT;
     }
   }
 
@@ -519,7 +527,7 @@ void configSetInt(const char *key, int32_t value) {
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
       if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-      return;
+      return RESULT_ERROR_MEMORY;
     }
     idx = config_count++;
     SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
@@ -528,7 +536,7 @@ void configSetInt(const char *key, int32_t value) {
 
   if (config_table[idx].is_set && config_table[idx].value.int_val == value) {
     if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-    return;
+    return RESULT_OK;
   }
 
   config_table[idx].value.int_val = value;
@@ -551,11 +559,13 @@ void configSetInt(const char *key, int32_t value) {
 
   // Update Typed Cache (PHASE 6.7)
   configCacheUpdate(key);
+
+  return RESULT_OK;
 }
 
-void configSetFloat(const char *key, float value) {
+result_t configSetFloat(const char *key, float value) {
   if (!initialized)
-    return;
+    return RESULT_NOT_READY;
 
   // VALIDATION STEP
   value = validateFloat(key, value);
@@ -564,7 +574,7 @@ void configSetFloat(const char *key, float value) {
   if (config_cache_mutex != NULL) {
     if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
       logWarning("[CONFIG] Mutex timeout in configSetFloat");
-      return;
+      return RESULT_TIMEOUT;
     }
   }
 
@@ -572,7 +582,7 @@ void configSetFloat(const char *key, float value) {
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
       if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-      return;
+      return RESULT_ERROR_MEMORY;
     }
     idx = config_count++;
     SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
@@ -582,7 +592,7 @@ void configSetFloat(const char *key, float value) {
   if (config_table[idx].is_set &&
       fabsf(config_table[idx].value.float_val - value) < 0.0001f) {
     if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-    return;
+    return RESULT_OK;
   }
 
   config_table[idx].value.float_val = value;
@@ -602,15 +612,20 @@ void configSetFloat(const char *key, float value) {
 
   // Update Typed Cache (PHASE 6.7)
   configCacheUpdate(key);
+
+  return RESULT_OK;
 }
 
-void configSetString(const char *key, const char *value) {
+result_t configSetString(const char *key, const char *value) {
   if (!initialized)
-    return;
+    return RESULT_NOT_READY;
+
+  if (!value)
+    return RESULT_INVALID_PARAM;
 
   // Create a mutable copy for validation
   char validated_value[CONFIG_VALUE_LEN];
-  SAFE_STRCPY(validated_value, value ? value : "", CONFIG_VALUE_LEN);
+  SAFE_STRCPY(validated_value, value, CONFIG_VALUE_LEN);
 
   // VALIDATION STEP
   validateString(key, validated_value, CONFIG_VALUE_LEN);
@@ -619,7 +634,7 @@ void configSetString(const char *key, const char *value) {
   if (config_cache_mutex != NULL) {
     if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
       logWarning("[CONFIG] Mutex timeout in configSetString");
-      return;
+      return RESULT_TIMEOUT;
     }
   }
 
@@ -627,7 +642,7 @@ void configSetString(const char *key, const char *value) {
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
       if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-      return;
+      return RESULT_ERROR_MEMORY;
     }
     idx = config_count++;
     SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
@@ -638,7 +653,7 @@ void configSetString(const char *key, const char *value) {
       strncmp(config_table[idx].value.str_val, validated_value,
               CONFIG_VALUE_LEN) == 0) {
     if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-    return;
+    return RESULT_OK;
   }
 
   SAFE_STRCPY(config_table[idx].value.str_val, validated_value,
@@ -662,6 +677,8 @@ void configSetString(const char *key, const char *value) {
 
   // Update Typed Cache (PHASE 6.7)
   configCacheUpdate(key);
+
+  return RESULT_OK;
 }
 
 // ============================================================================
@@ -678,18 +695,21 @@ void configUnifiedFlush() {
   }
 }
 
-void configUnifiedSave() {
-  logInfo("[CONFIG] Flushing NVS...");
+result_t configUnifiedSave() {
+  if (!initialized || !config_dirty)
+    return RESULT_OK;
+
+  logInfo("[CONFIG] Saving to NVS...");
 
   // PHASE 5.10: Protect config_table read during save
   if (config_cache_mutex != NULL) {
     if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
       logWarning("[CONFIG] Mutex timeout in configUnifiedSave");
-      // Proceeding anyway might be dangerous if list is changing, but stopping save is also bad.
-      // For now, we try to proceed but this is risky.
+      return RESULT_TIMEOUT;
     }
   }
 
+  bool success = true;
   for (int i = 0; i < config_count; i++) {
     if (!config_table[i].is_set)
       continue;
@@ -698,17 +718,19 @@ void configUnifiedSave() {
         isCriticalKey(config_table[i].key))
       continue;
 
+    size_t result = 0;
     switch (config_table[i].type) {
     case CONFIG_INT32:
-      prefs.putInt(config_table[i].key, config_table[i].value.int_val);
+      result = prefs.putInt(config_table[i].key, config_table[i].value.int_val);
       break;
     case CONFIG_FLOAT:
-      prefs.putFloat(config_table[i].key, config_table[i].value.float_val);
+      result = prefs.putFloat(config_table[i].key, config_table[i].value.float_val);
       break;
     case CONFIG_STRING:
-      prefs.putString(config_table[i].key, config_table[i].value.str_val);
+      result = prefs.putString(config_table[i].key, config_table[i].value.str_val);
       break;
     }
+    if (result == 0) success = false;
   }
   config_dirty = false;
   
@@ -716,16 +738,26 @@ void configUnifiedSave() {
     xSemaphoreGiveRecursive(config_cache_mutex);
   }
   
-  logInfo("[CONFIG] Flush Complete.");
+  if (success) {
+    logInfo("[CONFIG] Save Complete.");
+    return RESULT_OK;
+  } else {
+    logError("[CONFIG] Some keys failed to save");
+    return RESULT_ERROR_STORAGE;
+  }
 }
 
-void configUnifiedReset() {
+result_t configUnifiedReset() {
   logWarning("[CONFIG] Resetting to Factory Defaults...");
 
   // PHASE 5.10: Clear in-memory cache before reset to prevent stale values
   configUnifiedClear();
 
-  prefs.clear();
+  if (!prefs.clear()) {
+    logError("[CONFIG] Failed to clear NVS storage");
+    return RESULT_ERROR_STORAGE;
+  }
+  
   configSetDefaults();
 
   // Safe defaults
@@ -733,6 +765,7 @@ void configUnifiedReset() {
   configSetInt(KEY_X_LIMIT_MAX, 500000);
 
   logInfo("[CONFIG] Reset Complete. Reboot recommended.");
+  return RESULT_OK;
 }
 
 void configUnifiedClear() {

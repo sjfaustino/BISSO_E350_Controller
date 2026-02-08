@@ -48,6 +48,7 @@
 #include "axis_synchronization.h"  // PHASE 5.6: Per-axis motion quality diagnostics
 #include "cutting_analytics.h"      // Stone cutting analytics
 #include "job_manager.h"            // C2: For diag summary job status
+#include "rtc_manager.h"
 #include <LittleFS.h>               // Boot log file operations
 #include <stdlib.h>
 #include <string.h>

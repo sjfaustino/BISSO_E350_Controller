@@ -2,6 +2,7 @@
 #define OTA_MANAGER_H
 
 #include <Arduino.h>
+#include "system_constants.h"
 
 /**
  * @brief Result of an update check
@@ -16,7 +17,7 @@ struct UpdateCheckResult {
 /**
  * @brief Initializes the OTA manager
  */
-void otaInit(void);
+result_t otaInit(void);
 
 /**
  * @brief Checks GitHub for a newer firmware version
@@ -35,7 +36,7 @@ const UpdateCheckResult* otaGetCachedResult(void);
  * @param download_url The URL of the binary file on GitHub
  * @return True if update started successfully
  */
-bool otaPerformUpdate(const char* download_url);
+result_t otaPerformUpdate(const char* download_url);
 
 /**
  * @brief Get the progress of the current update (0-100)
@@ -51,7 +52,7 @@ bool otaIsUpdating(void);
  * @brief Start background update check (call after WiFi connects)
  * Non-blocking - spawns a FreeRTOS task
  */
-void otaStartBackgroundCheck(void);
+result_t otaStartBackgroundCheck(void);
 
 /**
  * @brief Get the cached update check result

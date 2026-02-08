@@ -7,6 +7,7 @@
 #include "safety.h"
 #include "altivar31_modbus.h" // PHASE 5.5: VFD current-based stall detection
 #include "axis_synchronization.h" // PHASE 5.6: Per-axis motion validation
+#include "config_unified.h"
 #include "config_cache.h"
 #include "config_keys.h"
 #include "encoder_motion_integration.h"

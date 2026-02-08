@@ -10,6 +10,7 @@
 #include "altivar31_modbus.h"
 #include "motion.h"
 #include "serial_logger.h"
+#include "config_unified.h"
 #include "config_cache.h"
 #include "config_keys.h"
 #include "system_tuning.h"
@@ -57,6 +58,7 @@ static spindle_monitor_state_t monitor_state = {
 
 static uint32_t last_check_time_ms = 0;
 
+bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
   // Load global RS485 baud for all Modbus devices (PHASE 6.7 Typed Cache)
   uint32_t rs485_baud = g_config.rs485_baud;
   
