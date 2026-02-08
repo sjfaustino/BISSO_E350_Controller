@@ -24,6 +24,8 @@ extern void run_rs485_registry_tests(void);
 extern void run_hardware_optimization_tests(void);
 extern void run_api_routes_tests(void);
 extern void run_string_safety_tests(void);
+extern void run_config_validation_tests(void);
+extern void run_error_handling_paths_tests(void);
 
 // Unity setup/teardown hooks
 void setUp(void) {
@@ -54,6 +56,8 @@ void run_all_tests(void) {
     run_hardware_optimization_tests();
     run_api_routes_tests();
     run_string_safety_tests();
+    run_config_validation_tests();
+    run_error_handling_paths_tests();
     
     UNITY_END();
 }
