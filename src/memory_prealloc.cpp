@@ -9,6 +9,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <string.h>
+#include "system_utils.h" // PHASE 8.1
 
 // Static buffers
 static char* api_status_buffer = nullptr;
@@ -19,7 +20,7 @@ static SemaphoreHandle_t status_mutex = nullptr;
 static SemaphoreHandle_t history_mutex = nullptr;
 
 bool memoryPreallocInit() {
-    logInfo("[PREALLOC] Initializing PSRAM buffers...");
+    logModuleInit("PREALLOC");
 
     // 1. Initialize mutexes
     status_mutex = xSemaphoreCreateMutex();

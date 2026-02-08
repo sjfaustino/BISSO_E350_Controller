@@ -21,6 +21,7 @@
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 #include <string.h>
+#include "system_utils.h" // PHASE 8.1
 
 // ============================================================================
 // RTOS HANDLES
@@ -73,7 +74,7 @@ static uint32_t boot_time_ms = 0;
 // ============================================================================
 
 void taskManagerInit() {
-  logPrintln("[TASKS] Initializing FreeRTOS manager...");
+  logModuleInit("TASKS");
   boot_time_ms = millis();
 
   // Create Queues with individual error checking
@@ -162,7 +163,7 @@ void taskManagerInit() {
     }
   }
 
-  logInfo("[TASKS] [OK] Primitives created");
+  logModuleInitOK("TASKS");
 }
 
 void taskManagerStart() {

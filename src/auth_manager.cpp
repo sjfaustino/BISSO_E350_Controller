@@ -15,6 +15,7 @@
 #include <esp_random.h>
 #include <string.h>
 #include "string_safety.h"
+#include "system_utils.h" // PHASE 8.1
 
 // Internal state
 static char current_username[32] = "admin";
@@ -262,7 +263,7 @@ bool authValidatePasswordStrength(const char* password) {
 }
 
 void authInit() {
-  logInfo("[AUTH] Initializing secure authentication...");
+  logModuleInit("AUTH");
 
   Preferences prefs;
   prefs.begin("auth", true);  // Read-only

@@ -32,6 +32,7 @@
 #include "hardware_config.h"
 #include "system_tuning.h"
 #include "axis_utilities.h" // PHASE 4.1: Centralized units
+#include "system_utils.h" // PHASE 8.1
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <math.h>
@@ -218,7 +219,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
 // ============================================================================
 
 void motionInit() {
-  logInfo("[MOTION] Init...");
+  logModuleInit("MOTION");
 
   for (int i = 0; i < MOTION_AXES; i++) {
     axes[i].init(i);

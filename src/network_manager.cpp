@@ -1,4 +1,5 @@
 #include "network_manager.h"
+#include "system_utils.h" // PHASE 8.1
 #include "cli.h"
 #include "config_keys.h"    // For KEY_OTA_PASSWORD, KEY_ETH_ENABLED
 #include "config_unified.h" // For OTA password from NVS
@@ -258,7 +259,8 @@ void NetworkManager::initEthernet() {
     return;
   }
   
-  logInfo("[ETH] Initializing %s Ethernet PHY...", BOARD_HAS_W5500 ? "W5500" : "LAN8720");
+  logModuleInit("ETH");
+  logInfo("[ETH] PHY Type: %s", BOARD_HAS_W5500 ? "W5500" : "LAN8720");
   
   // Register Ethernet event handler before starting interface
   WiFi.onEvent(onEthernetEvent);
@@ -278,7 +280,7 @@ void NetworkManager::initEthernet() {
   return;
 #endif
 
-  logInfo("[ETH] Initializing W5500 SPI Ethernet...");
+  logModuleInit("ETH_SPI");
   
   // 1. SPI Bus initialization
   spi_bus_config_t buscfg = {}; 
@@ -353,7 +355,7 @@ void NetworkManager::initEthernet() {
 #endif
 
   if (success) {
-    logInfo("[ETH] [OK] Ethernet initialization queued");
+    logModuleInitOK("ETH");
     
     // Configure static IP if DHCP disabled
     int use_dhcp = configGetInt(KEY_ETH_DHCP, 1);  // Default: DHCP
@@ -377,7 +379,7 @@ void NetworkManager::initEthernet() {
       }
     }
   } else {
-    logError("[ETH] Failed to initialize Ethernet");
+    logModuleInitFail("ETH", "Initialization Failed");
   }
 #else
   logInfo("[ETH] Ethernet not configured for this board");
@@ -385,7 +387,7 @@ void NetworkManager::initEthernet() {
 }
 
 void NetworkManager::init() {
-  logPrintln("[NET] Initializing Network Stack...");
+  logModuleInit("NET");
 
   // Register WiFi event handler (always needed)
   WiFi.onEvent(onWiFiEvent);

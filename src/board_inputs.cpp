@@ -7,6 +7,7 @@
 #include "serial_logger.h"
 #include "task_manager.h" // THREAD SAFETY FIX: For I2C board mutex
 #include <Wire.h>
+#include "system_utils.h" // PHASE 8.1
 
 static uint8_t input_cache = 0x00; // Default 0 (Inactive)
 static bool device_present = false; // Track if device was detected at init
@@ -30,7 +31,7 @@ static uint8_t mask_pause = 0;
 static uint8_t mask_resume = 0;
 
 void boardInputsInit() {
-  logInfo("[INPUTS] Initializing...");
+  logModuleInit("INPUTS");
 
   // Check if buttons are enabled in config (default: DISABLED for testing)
   buttons_enabled = configGetInt(KEY_BUTTONS_ENABLED, 0) != 0;

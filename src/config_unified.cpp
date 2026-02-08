@@ -383,7 +383,7 @@ void configUnifiedLoad() {
 }
 
 result_t configUnifiedInit() {
-  logInfo("[CONFIG] Initializing NVS...");
+  logModuleInit("CONFIG");
 
   // Create mutex for thread-safe cache access
   if (config_cache_mutex == NULL) {

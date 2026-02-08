@@ -5,6 +5,7 @@
 #include <Preferences.h>
 #include <string.h>
 #include <Arduino.h>
+#include "system_utils.h" // PHASE 8.1
 
 #define BOOT_NVS_NAMESPACE "bisso_boot"
 
@@ -22,7 +23,7 @@ static bool shutting_down = false;
 static Preferences boot_prefs;
 
 void bootValidationInit() {
-  logInfo("[BOOT_VAL] Initializing...");
+  logModuleInit("BOOT");
   
   // Clear subsystems array safely
   memset(subsystems, 0, sizeof(subsystems));

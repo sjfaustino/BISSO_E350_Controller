@@ -14,6 +14,7 @@
 #include "config_keys.h"
 #include "cutting_analytics.h"  // ITEM 3: Session summary at job end
 #include "operator_alerts.h"    // ITEM 3: Job complete alert
+#include "system_utils.h" // PHASE 8.1
 #include <LittleFS.h>
 
 JobManager jobManager;
@@ -24,7 +25,7 @@ JobManager::JobManager() : file_open(false), buffer_low_water_mark(4) {
 }
 
 void JobManager::init() {
-    logInfo("[JOB] Initializing Job Engine...");
+    logModuleInit("JOB");
     if(!LittleFS.begin(true)) {
         logError("[JOB] LittleFS Mount Fail");
     }

@@ -17,6 +17,7 @@
 #include "config_unified.h"
 #include "config_keys.h"
 #include "modbus_rtu.h"
+#include "system_utils.h" // PHASE 8.1
 
 // Safety Constants
 // BUFFER SIZE VERIFICATION (Code Audit):
@@ -71,7 +72,7 @@ static SemaphoreHandle_t wj66_mutex = NULL;
 
 
 void wj66Init() {
-  logInfo("[WJ66] Initializing...");
+  logModuleInit("WJ66");
 
   // PHASE 5.10: Create mutex for thread-safe position access
   if (wj66_mutex == NULL) {

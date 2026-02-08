@@ -5,6 +5,7 @@
 #include <Preferences.h>
 #include <esp_task_wdt.h>
 #include <string.h>
+#include "system_utils.h" // PHASE 8.1
 
 // ============================================================================
 // WATCHDOG STATE
@@ -76,7 +77,7 @@ void watchdogInit() {
   if (wdt_initialized) return;
   
   // Use logInfo for system startup messages
-  logInfo("[WDT] Initializing...");
+  logModuleInit("WDT");
   
   last_reset_reason = getResetReason();
   logInfo("[WDT] Last reset reason: %s", resetReasonString(last_reset_reason));
@@ -114,7 +115,7 @@ void watchdogInit() {
   
   wdt_enabled = true;
   wdt_initialized = true;
-  logInfo("[WDT] System initialized");
+  logModuleInitOK("WDT");
 }
 
 // ============================================================================

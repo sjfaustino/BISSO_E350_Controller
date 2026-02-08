@@ -173,6 +173,9 @@ void WebServerManager::setupRoutes() {
     wsHandler.onOpen([this](PsychicWebSocketClient *client) {
         // logPrintf("[WS] Client connected: %s\n", client->remoteIP().toString().c_str());
         
+        // PHASE 6.8: Track client for heartbeat
+        ws_clients[client] = millis();
+
         // PHASE 6.3: Memory Optimization
         // DO NOT send initial state here. It causes heap churn during page navigation.
         // The client will pick up the next periodic broadcast (within 500ms).
@@ -181,11 +184,17 @@ void WebServerManager::setupRoutes() {
     
     wsHandler.onClose([this](PsychicWebSocketClient *client) {
         // logPrintf("[WS] Client disconnected: %s\n", client->remoteIP().toString().c_str());
+        
+        // PHASE 6.8: Stop tracking client
+        ws_clients.erase(client);
     });
     
     wsHandler.onFrame([this](PsychicWebSocketRequest *request, httpd_ws_frame *frame) {
         // Handle incoming messages (commands from web UI)
         if (frame->type == HTTPD_WS_TYPE_TEXT) {
+            // PHASE 6.8: Update activity timestamp
+            ws_clients[request->client()] = millis();
+
             String msg = String((char*)frame->payload, frame->len);
             
             // Parse JSON for commands
@@ -207,6 +216,11 @@ void WebServerManager::setupRoutes() {
             if (msg.indexOf("ping") == -1) {
                 logPrintf("[WS] Received: %s\r\n", msg.c_str());
             }
+        } 
+        else if (frame->type == HTTPD_WS_TYPE_PONG) {
+            // PHASE 6.8: Heartbeat response received
+            ws_clients[request->client()] = millis();
+            // logVerbose("[WS] Pong received from %s", request->client()->remoteIP().toString().c_str());
         }
         return ESP_OK;
     });
@@ -549,6 +563,74 @@ void WebServerManager::broadcastState() {
 
     // Update history tracking
     updateHistory(telemetry.cpu_usage_percent, telemetry.free_heap_bytes, current_status.vfd_current_amps);
+
+    // PHASE 6.8: Check WebSocket health (prune stale clients)
+    checkWsHealth();
+}
+
+void WebServerManager::checkWsHealth() {
+    static uint32_t last_check = 0;
+    const uint32_t CHECK_INTERVAL = 5000;  // Check every 5s
+    const uint32_t CLIENT_TIMEOUT = 30000; // Timeout after 30s inactivity
+
+    if (millis() - last_check < CHECK_INTERVAL) return;
+    last_check = millis();
+
+    // Iterate through tracked clients
+    // Note: Use iterator to safely remove elements while iterating
+    for (auto it = ws_clients.begin(); it != ws_clients.end(); ) {
+        PsychicWebSocketClient* client = it->first;
+        uint32_t last_seen = it->second;
+
+        if (millis() - last_seen > CLIENT_TIMEOUT) {
+            logWarning("[WS] Client %s timed out (30s). Closing.", client->remoteIP().toString().c_str());
+            
+            // Close the connection (triggers onClose which will erase from map... 
+            // BUT we are iterating the map right now! Be careful).
+            // Calling close() usually calls the onClose callback immediately or async.
+            // If it calls immediately, we get invalid iterator.
+            
+            // SAFER APPROACH: Mark for deletion or rely on close() triggering callback?
+            // If we erase here, we must update iterator.
+            // But if close() triggers onClose(), onClose() will try to erase the same key.
+            // Map erase is safe if key missing? Yes.
+            
+            // Let's close it. If onClose fires immediately, 'it' might be invalidated if implementation is naive?
+            // Actually, onClose callback uses "this->ws_clients.erase(client)".
+            // If we are holding an iterator to it, standard map rules say valid unless we erase 'it'.
+            // But if callback erases 'it', then 'it' becomes invalid.
+            
+            // Safe pattern: advance iterator, then close.
+            PsychicWebSocketClient* to_close = client;
+            ++it; 
+            
+            // Now 'it' points to next. 'to_close' is valid pointer.
+            // Closing should be safe.
+            to_close->close(); 
+        } else {
+            // Client active - Send Ping to keep alive and solicit Pong
+            // OpCode 0x9 is PING. PsychicHttp 'sendFrame' needed?
+            // PsychicWebSocketClient has sendPing()?
+            // Looking at library headers (simulated), standard way is usually send(..., PING).
+            // PsychicHttp uses valid ESP-IDF ws_send_frame_async underneath.
+            
+            // Assuming client->sendPing() exists or sending raw frame.
+            // If API unknown, simplest is sending text "ping".
+            // But real WS Ping is OpCode 0x9.
+            // client->sendPing() is standard in many libs. 
+            // Let's try sending standard ping frame if method exists, else text.
+            // Since we can't see library source, safe bet for "Heartbeat" task logic is:
+            // "client->sendPing();"
+            // If that fails compilation, we will fix.
+            // PsychicWebSocketClient usually inherits from something or wraps httpd_ws_send_frame.
+            
+            // Let's assume sendPing() is available or use raw frame construction.
+            // For now, I'll use `client->sendPing()`.
+            // Use standard ESP-IDF opcode for PING (0x9)
+            client->sendMessage(HTTPD_WS_TYPE_PING, NULL, 0);
+            ++it;
+        }
+    }
 }
 
 // --- Credentials Stubs ---

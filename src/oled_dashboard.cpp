@@ -12,6 +12,7 @@
 #include "network_manager.h"
 #include "motion.h"
 #include "serial_logger.h"
+#include "system_utils.h" // PHASE 8.1
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -26,11 +27,11 @@ bool oledDashboardInit() {
     return false;
 #endif
 
-    logInfo("[OLED] Initializing SSD1306 Dashboard...");
+    logModuleInit("OLED");
     
     // Wire instance should already be initialized by board_inputs or main.cpp
     if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-        logError("[OLED] SSD1306 allocation failed");
+        logModuleInitFail("OLED", "Allocation failed");
         return false;
     }
 
@@ -43,6 +44,7 @@ bool oledDashboardInit() {
     display.display();
     
     oled_ready = true;
+    logModuleInitOK("OLED");
     return true;
 }
 

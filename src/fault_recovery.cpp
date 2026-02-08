@@ -8,6 +8,7 @@
 #include "i2c_bus_recovery.h"
 #include "encoder_wj66.h"
 #include <string.h>
+#include "system_utils.h" // PHASE 8.1
 
 // ============================================================================
 // STATE TRACKING
@@ -54,7 +55,7 @@ const char* recoveryStrategyToString(recovery_strategy_t strategy) {
 // ============================================================================
 
 void faultRecoveryInit() {
-    logInfo("[FAULT_RECOVERY] Initializing recovery system");
+    logModuleInit("FAULT_REC");
     faultRecoveryResetAll();
 }
 

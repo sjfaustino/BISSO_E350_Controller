@@ -8,12 +8,13 @@
 #include "config_keys.h"
 #include "serial_logger.h"
 #include <string.h>
+#include "system_utils.h" // PHASE 8.1
 
 // Global instance
 config_cache_t g_config;
 
 void configCacheInit() {
-    logInfo("[CONFIG] Initializing Typed Cache...");
+    logModuleInit("CONFIG_CACHE");
     memset(&g_config, 0, sizeof(config_cache_t));
     configCacheRefresh();
 }

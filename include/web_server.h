@@ -15,6 +15,7 @@
 #include "config_unified.h"
 #include "system_constants.h" 
 #include "system_telemetry.h"
+#include <map> // PHASE 6.8: For WebSocket client tracking
 
 class WebServerManager {
 public:
@@ -123,6 +124,10 @@ private:
 
     // JSON Builder Helpers (Code Audit Refactor)
     size_t serializeTelemetryToBuffer(char* buffer, size_t buffer_size, const system_telemetry_t& telemetry, bool full = true);
+
+    // PHASE 6.8: WebSocket Heartbeat
+    std::map<PsychicWebSocketClient*, uint32_t> ws_clients;
+    void checkWsHealth();
 };
 
 extern WebServerManager webServer;

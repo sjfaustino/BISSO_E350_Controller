@@ -29,6 +29,7 @@
 #include <Wire.h>
 #include <freertos/FreeRTOS.h>
 #include "rtc_manager.h"
+#include "system_utils.h" // PHASE 8.1
 
 
 // Shadow Registers
@@ -149,7 +150,7 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char *context) {
 // ============================================================================
 
 void elboInit() {
-  logInfo("[PLC] Initializing I2C Bus...");
+  logModuleInit("PLC");
 
   // Create mutex for shadow register protection
   plc_shadow_mutex = xSemaphoreCreateMutex();

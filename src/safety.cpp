@@ -22,6 +22,8 @@
 #include "vfd_current_calibration.h" // PHASE 5.5: VFD current calibration
 #include "system_tuning.h"
 #include "rs485_device_registry.h" // PHASE 4.1: RS485 Watchdog integration
+#include "rs485_device_registry.h" // PHASE 4.1: RS485 Watchdog integration
+#include "system_utils.h" // PHASE 8.1
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -53,7 +55,7 @@ static uint32_t last_stall_check = 0;
 static SemaphoreHandle_t safety_state_mutex = NULL;
 
 void safetyInit() {
-  logPrintln("[SAFETY] Initializing...");
+  logModuleInit("SAFETY");
 
   // PHASE 5.7: Cursor AI Fix - Create mutex for thread-safe safety state
   safety_state_mutex = xSemaphoreCreateMutex();

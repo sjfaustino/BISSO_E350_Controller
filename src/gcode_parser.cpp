@@ -22,6 +22,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
+#include "system_utils.h" // PHASE 8.1
 
 GCodeParser gcodeParser;
 
@@ -30,7 +31,7 @@ GCodeParser::GCodeParser() : distanceMode(G_MODE_ABSOLUTE), currentFeedRate(50.0
 }
 
 void GCodeParser::init() {
-    logInfo("[GCODE] Initializing...");
+    logModuleInit("GCODE");
     distanceMode = G_MODE_ABSOLUTE;
     currentFeedRate = 50.0f; 
     currentWCS = WCS_G54;

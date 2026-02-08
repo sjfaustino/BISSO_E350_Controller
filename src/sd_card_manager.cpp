@@ -1,6 +1,7 @@
 #include "sd_card_manager.h"
 #include "serial_logger.h"
 #include "board_variant.h"
+#include "system_utils.h" // PHASE 8.1: Standardized Logging
 #include <SD.h>
 #include <SPI.h>
 
@@ -25,7 +26,7 @@ result_t sdCardInit() {
         return sd_mounted ? RESULT_OK : RESULT_ERROR;
     }
     
-    logInfo("[SD] Initializing SD card...");
+    logModuleInit("SD");
     
     // Check card detect pin first
     pinMode(PIN_SD_CD, INPUT_PULLUP);
@@ -45,7 +46,7 @@ result_t sdCardInit() {
     
     // Try to mount SD card
     if (!SD.begin(PIN_SD_CS, sd_spi, 4000000)) {  // 4MHz SPI speed
-        logError("[SD] Failed to mount SD card");
+        logModuleInitFail("SD", "Mount failed");
         sd_initialized = true;
         sd_mounted = false;
         return RESULT_ERROR_HARDWARE;
@@ -88,7 +89,7 @@ result_t sdCardInit() {
         logInfo("[SD] Card Size: %llu MB", cardSize);
         logInfo("[SD] Total Space: %llu MB", totalBytes);
         logInfo("[SD] Used Space: %llu MB", usedBytes);
-        logInfo("[SD] [OK] SD card mounted successfully");
+        logModuleInitOK("SD");
         
         // Create default directories if they don't exist
         SD.mkdir("/gcode");

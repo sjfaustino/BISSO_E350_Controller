@@ -22,6 +22,7 @@
 
 #include "serial_logger.h"
 #include "system_tuning.h"
+#include "system_utils.h" // PHASE 8.1
 
 // Global I2C LCD instance (will be initialized in lcdInterfaceInit)
 static LiquidCrystal_I2C *lcd_i2c = nullptr;
@@ -39,7 +40,7 @@ struct {
                {true, true, true, true}, false, 0};
 
 void lcdInterfaceInit() {
-  logPrintln("[LCD] Initializing...");
+  logModuleInit("LCD");
 
   for (int i = 0; i < LCD_ROWS; i++) {
     memset(lcd_state.display[i], 0, LCD_COLS + 1);
@@ -88,7 +89,8 @@ void lcdInterfaceInit() {
       lcd_i2c->print("LCD Init OK");
 
       lcd_state.mode = LCD_MODE_I2C;
-      logInfo("[LCD] [OK] I2C LCD Initialized at 0x%02X (20x4)", found_addr);
+      logModuleInitOK("LCD");
+      logInfo("[LCD] I2C Address: 0x%02X (20x4)", found_addr);
     } else {
       lcd_state.mode = LCD_MODE_SERIAL;
       logError("[LCD] Failed to allocate LiquidCrystal_I2C, using Serial");
@@ -111,7 +113,7 @@ void lcdInterfaceInit() {
     lcdInterfaceSetMode(LCD_MODE_NONE);
     lcdInterfaceBacklight(false);
   } else {
-    logInfo("[LCD] [OK] Ready");
+    logModuleInitOK("LCD");
   }
 }
 

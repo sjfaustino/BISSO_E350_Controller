@@ -3,6 +3,7 @@
 #include "system_events.h"
 #include "load_manager.h" // PHASE 14
 #include <esp_heap_caps.h>
+#include "system_utils.h" // PHASE 8.1
 
 // FIX: Fully initialize struct to suppress warnings
 static memory_stats_t mem_stats = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -13,7 +14,7 @@ static uint32_t total_heap_size = 0;
 static bool low_memory_event_active = false;
 
 void memoryMonitorInit() {
-  logInfo("[MEM] Initializing...");
+  logModuleInit("MEM");
   total_heap_size = heap_caps_get_total_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   mem_stats.current_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   mem_stats.minimum_free = mem_stats.current_free;

@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include "system_utils.h" // PHASE 8.1
 
 
 #pragma GCC diagnostic push
@@ -77,7 +78,8 @@ static void faultAddToRingBuffer(const fault_entry_t *entry) {
 }
 
 void faultLoggingInit() {
-  logInfo("[FAULT] Initializing v%d...", FAULT_LOG_VERSION);
+  logModuleInit("FAULT");
+  logInfo("[FAULT] Version: %d", FAULT_LOG_VERSION);
 
   if (!fault_prefs.begin(FAULT_LOG_NAMESPACE, false)) {
     logError("[FAULT] [FAIL] NVS init failed! Attempting recovery...");

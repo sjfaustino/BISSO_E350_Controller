@@ -73,6 +73,7 @@ const FileExplorer = {
         };
 
         // Bulk Actions
+        document.getElementById('bulk-restore').onclick = () => this.bulkRestore();
         document.getElementById('bulk-delete').onclick = () => this.bulkDelete();
         document.getElementById('bulk-cancel').onclick = () => this.selectAll(false);
 
@@ -365,6 +366,11 @@ const FileExplorer = {
         if (this.selectedFiles.size > 0) {
             countEl.textContent = this.selectedFiles.size;
             bar.classList.remove('hidden');
+
+            const inTrash = this.currentPath.includes('.trash');
+            const restoreBtn = document.getElementById('bulk-restore');
+            if (inTrash) restoreBtn.classList.remove('hidden');
+            else restoreBtn.classList.add('hidden');
         } else {
             bar.classList.add('hidden');
         }
@@ -395,6 +401,59 @@ const FileExplorer = {
             }
         } catch (err) {
             alert('Bulk delete failed: ' + err.message);
+        }
+    },
+
+    async bulkRestore() {
+        if (!confirm(`Restore ${this.selectedFiles.size} selected items?`)) return;
+
+        let restored = 0;
+        let failed = 0;
+        const paths = Array.from(this.selectedFiles);
+
+        for (const path of paths) {
+            try {
+                // Determine the name component from the full path
+                // "path" here is the full path from the file object, e.g. /sd/.trash/file.txt.123
+                // The restoreItem logic uses the name relative to currentPath if calling from context menu,
+                // but here we have full paths. 
+                // However, the restore API expects "path" to be the full path.
+                // NOTE: this.selectedFiles stores fullSync paths?
+                // init() -> this.files map -> fullPath is constructed.
+
+                // Let's check restoreItem usage:
+                // restoreItem(name) -> constructs apiPath using currentDrive/Path/Name.
+                // The API needs the full path including /sd if applicable.
+
+                // selectedFiles set contains 'fullPath'.
+                // If drive is SD, fullPath starts with /sd
+                // So we can pass path directly to the API?
+                // Let's verify handleTrashRestore in api_file_manager.cpp
+                // It takes "path" from JSON.
+                // It checks for /sd prefix.
+
+                const resp = await fetch('/api/trash/restore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path })
+                });
+
+                if (resp.ok) restored++;
+                else failed++;
+            } catch (e) {
+                failed++;
+            }
+        }
+
+        this.selectedFiles.clear();
+        this.loadFiles();
+        this.updateUsage();
+
+        if (failed > 0) {
+            alert(`Restored ${restored} items. ${failed} items failed.`);
+        } else {
+            // Optional: simple toast or log
+            console.log(`Restored ${restored} items.`);
         }
     },
 
@@ -589,9 +648,10 @@ const FileExplorer = {
         const restoreBtn = document.getElementById('ctx-restore');
         const inTrash = this.currentPath.includes('.trash');
 
-        if (file && !file.dir) {
-            const isGcode = name.endsWith('.gcode') || name.endsWith('.nc');
-            const isText = isGcode || name.endsWith('.txt') || name.endsWith('.log') || name.endsWith('.json') || name.endsWith('.csv');
+        if (file) {
+            const isDir = file.dir;
+            const isGcode = !isDir && (name.endsWith('.gcode') || name.endsWith('.nc'));
+            const isText = !isDir && (isGcode || name.endsWith('.txt') || name.endsWith('.log') || name.endsWith('.json') || name.endsWith('.csv'));
 
             if (isGcode && !inTrash) runBtn.classList.remove('hidden');
             else runBtn.classList.add('hidden');
@@ -601,6 +661,8 @@ const FileExplorer = {
 
             if (inTrash) restoreBtn.classList.remove('hidden');
             else restoreBtn.classList.add('hidden');
+
+            // Delete is always available
         } else {
             runBtn.classList.add('hidden');
             editBtn.classList.add('hidden');
