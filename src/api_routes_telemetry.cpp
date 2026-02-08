@@ -15,6 +15,7 @@
 #include "firmware_version.h"
 #include "hardware_config.h"
 #include "psram_alloc.h"
+#include "memory_prealloc.h"
 #include <ArduinoJson.h>
 
 // External from web_server.cpp
@@ -46,12 +47,17 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         uint64_t mac = ESP.getEfuseMac();
         snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
 
-        char* buffer = (char*)psramMalloc(2048);
-        if (buffer == nullptr) {
-            return response->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+        if (!memoryLockStatusBuffer(100)) {
+            return response->send(503, "application/json", "{\"error\":\"Resource busy\"}");
         }
 
-        snprintf(buffer, 2048,
+        char* buffer = memoryGetStatusBuffer();
+        if (buffer == nullptr) {
+            memoryUnlockStatusBuffer();
+            return response->send(500, "application/json", "{\"error\":\"Buffer not allocated\"}");
+        }
+
+        snprintf(buffer, API_STATUS_BUFFER_SIZE,
             "{\"system\":{"
             "\"status\":\"READY\",\"health\":\"%s\",\"uptime_sec\":%lu,"
             "\"cpu_percent\":%d,\"free_heap_bytes\":%lu,\"plc_hardware_present\":%s,"
@@ -95,7 +101,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         response->setContentType("application/json");
         response->sendHeaders();
         response->sendChunk((uint8_t*)buffer, strlen(buffer));
-        psramFree(buffer);
+        memoryUnlockStatusBuffer();
         return response->finishChunking();
     };
 
@@ -240,10 +246,15 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             return response->send(200, "application/json", "{\"success\":true,\"samples\":[]}");
         }
 
-        // Allocate a temporary buffer for history (PSRAM fallback)
-        telemetry_packet_t* samples = (telemetry_packet_t*)psramMalloc(count * sizeof(telemetry_packet_t));
+        // Use pre-allocated buffer for history (fragmentation fix)
+        if (!memoryLockHistoryBuffer(500)) {
+            return response->send(503, "application/json", "{\"error\":\"Resource busy\"}");
+        }
+
+        telemetry_packet_t* samples = (telemetry_packet_t*)memoryGetHistoryExportBuffer();
         if (samples == NULL) {
-            return response->send(500, "application/json", "{\"error\":\"Memory allocation failed\"}");
+            memoryUnlockHistoryBuffer();
+            return response->send(500, "application/json", "{\"error\":\"Buffer not allocated\"}");
         }
 
         telemetryHistoryGet(samples, &count);
@@ -266,7 +277,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
         }
 
         response->sendChunk((uint8_t*)"]}", 2);
-        psramFree(samples);
+        memoryUnlockHistoryBuffer();
         return response->finishChunking();
     });
 
@@ -279,19 +290,24 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             return response->send(404, "text/plain", "No history available");
         }
 
-        telemetry_packet_t* samples = (telemetry_packet_t*)psramMalloc(total_size);
+        if (!memoryLockHistoryBuffer(500)) {
+            return response->send(503, "text/plain", "Resource busy");
+        }
+
+        telemetry_packet_t* samples = (telemetry_packet_t*)memoryGetHistoryExportBuffer();
         if (samples == NULL) {
-             return response->send(500, "text/plain", "Memory allocation failed");
+             memoryUnlockHistoryBuffer();
+             return response->send(500, "text/plain", "Buffer not allocated");
         }
 
         telemetryHistoryGet(samples, &count);
         
         response->setContentType("application/octet-stream");
         response->addHeader("Content-Disposition", "attachment; filename=\"telemetry.bin\"");
-        response->setContent((const uint8_t*)samples, total_size);
+        response->setContent((const uint8_t*)samples, count * sizeof(telemetry_packet_t));
         response->send();
         
-        psramFree(samples);
+        memoryUnlockHistoryBuffer();
         return ESP_OK;
     });
 

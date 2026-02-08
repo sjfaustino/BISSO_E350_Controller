@@ -35,6 +35,7 @@
 #include "rtc_manager.h"       // RTC auto-sync
 #include "system_utils.h"      // Safe reboot helper
 #include "trash_bin_manager.h" // Trash bin with auto-delete
+#include "memory_prealloc.h"  // PHASE 6.12: Memory pre-allocation
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -65,6 +66,7 @@ bool init_config_wrapper() {
 }
 bool init_schema_wrapper() { configSchemaVersioningInit(); configSchemaInit(); return !configIsMigrationNeeded(); }
 bool init_auth_wrapper() { authInit(); return true; }  // PHASE 5.10: SHA-256 authentication
+bool init_prealloc_wrapper() { return memoryPreallocInit(); } // PHASE 6.12
 
 // PHASE 5.7: Cursor AI Fix - Proper error checking for calibration initialization
 bool init_calib_wrapper() {
@@ -175,6 +177,7 @@ void setup() {
   BOOT_INIT("Config", init_config_wrapper, BOOT_ERROR_CONFIG);
   BOOT_INIT("Schema", init_schema_wrapper, BOOT_ERROR_SCHEMA);
   BOOT_INIT("Auth", init_auth_wrapper, (boot_status_code_t)20);
+  BOOT_INIT("Prealloc", init_prealloc_wrapper, (boot_status_code_t)25);
 
   // CRITICAL: Initialize task manager BEFORE Motion to create mutexes/queues
   taskManagerInit();
