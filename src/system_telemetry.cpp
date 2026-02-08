@@ -23,9 +23,12 @@
 #include "config_keys.h"
 #include "gcode_parser.h"
 #include "system_constants.h"
-#include "system_events.h" // PHASE 5.10: Event-driven architecture
+#include "rtc_manager.h"
+#include "sd_card_manager.h"
+#include "system_events.h"
 #include <string.h>
 #include <stdio.h>
+#include "string_safety.h"
 #include <cmath>
 #include <Arduino.h>
 #include <WiFi.h>
@@ -185,9 +188,28 @@ void telemetryUpdate() {
         else wifi_signal = (uint8_t)signal_raw;
     }
 
+    // RTC Battery Status
+    bool rtc_low = rtcHasBatteryWarning();
+
     // Configuration
     // uint32_t cfg_ver = configGetInt("schema_version", 1); // Unused
     bool cfg_default = (configGetInt(KEY_WEB_PW_CHANGED, 0) == 0);
+
+    // SD Card Status (PHASE 6.6)
+    bool sd_mount = sdCardIsMounted();
+    uint8_t sd_health = (uint8_t)sdCardGetLastHealth();
+    static uint64_t last_sd_total = 0;
+    static uint64_t last_sd_used = 0;
+    static uint32_t last_sd_space_update = 0;
+
+    if (sd_mount && (now - last_sd_space_update >= 10000 || last_sd_space_update == 0)) {
+        last_sd_space_update = now;
+        SDCardInfo info;
+        if (sdCardGetInfo(&info)) {
+            last_sd_total = info.totalBytes;
+            last_sd_used = info.usedBytes;
+        }
+    }
 
     // =========================================================================
     // PHASE 2: Write to cache under spinlock (fast, no function calls)
@@ -229,6 +251,13 @@ void telemetryUpdate() {
     telemetry_cache.wifi_signal_strength = wifi_signal;
     telemetry_cache.config_is_default = cfg_default;
     telemetry_cache.plc_hardware_present = plcIsHardwarePresent();
+    telemetry_cache.rtc_battery_low = rtc_low;
+    
+    // SD Card (PHASE 6.6)
+    telemetry_cache.sd_mounted = sd_mount;
+    telemetry_cache.sd_health = sd_health;
+    telemetry_cache.sd_total_bytes = last_sd_total;
+    telemetry_cache.sd_used_bytes = last_sd_used;
     
     // LCD Mirror
     lcdInterfaceGetContent(telemetry_cache.lcd_lines);
@@ -279,8 +308,8 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
     
     // OPTIMIZATION: Use lighter-weight formatting to reduce stack usage
     // and improve speed. Avoid single massive snprintf.
-    int n = snprintf(buffer, buffer_size,
-        "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"plc_hardware_present\":%s,\"firmware_version\":\"v%d.%d.%d\"},"
+    int n = SAFE_SNPRINTF(buffer, buffer_size,
+        "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"plc_hardware_present\":%s,\"rtc_battery_low\":%s,\"firmware_version\":\"v%d.%d.%d\"},"
         "\"memory\":{\"free_bytes\":%lu,\"stack_used\":%lu},"
         "\"motion\":{\"enabled\":%s,\"moving\":%s,\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,\"wco\":[%.3f,%.3f,%.3f,%.3f],\"active_wcs\":%u},"
         "\"spindle\":{\"enabled\":%s,\"running\":%s,\"current_amps\":%.2f,\"peak_amps\":%.2f,\"errors\":%lu,"
@@ -289,12 +318,14 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         "\"rpm_sensor\":{\"enabled\":%s,\"rpm\":%u,\"stall_detected\":%s},"
         "\"tasks\":{\"slowest_id\":%u,\"slowest_us\":%lu},"
         "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},"
+        "\"sd\":{\"mounted\":%s,\"health\":%u,\"total_bytes\":%llu,\"used_bytes\":%llu},"
         "\"config\":{\"version\":%lu,\"is_default\":%s},"
         "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}}",
         telemetryGetHealthStatusString(t.health_status),
         (unsigned long)t.uptime_seconds,
         t.cpu_usage_percent,
         t.plc_hardware_present ? "true" : "false",
+        t.rtc_battery_low ? "true" : "false",
         FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH,
         (unsigned long)t.free_heap_bytes,
         (unsigned long)t.stack_used_bytes,
@@ -321,7 +352,11 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
         (unsigned long)t.slowest_task_time_us,
         t.wifi_connected ? "true" : "false",
         t.wifi_signal_strength,
-        (unsigned long)t.config_version,
+        t.sd_mounted ? "true" : "false",
+        t.sd_health,
+        t.sd_total_bytes,
+        t.sd_used_bytes,
+        (unsigned long)configGetInt(KEY_SCHEMA_VERSION, 1),
         t.config_is_default ? "true" : "false",
         t.lcd_lines[0], t.lcd_lines[1], t.lcd_lines[2], t.lcd_lines[3]);
 

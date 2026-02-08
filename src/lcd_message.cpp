@@ -1,6 +1,6 @@
 /**
  * @file lcd_message.cpp
- * @brief PHASE 3.2 LCD Message System
+ * @brief LCD Message System
  *
  * Manages custom LCD messages from G-code M117 command.
  * Allows temporary display override while still showing motion info.
@@ -10,6 +10,7 @@
 #include "serial_logger.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include "string_safety.h"
 
 // ============================================================================
 // MESSAGE STATE
@@ -60,8 +61,7 @@ void lcdMessageSet(const char* message, uint32_t duration_ms) {
 
   LOCK_MESSAGE();
   // Copy message and truncate to LCD width
-  strncpy(current_message.text, message, LCD_MESSAGE_MAX_LEN);
-  current_message.text[LCD_MESSAGE_MAX_LEN] = '\0';
+  SAFE_STRCPY(current_message.text, message, sizeof(current_message.text));
 
   current_message.type = LCD_MSG_CUSTOM;
   current_message.timestamp_ms = millis();

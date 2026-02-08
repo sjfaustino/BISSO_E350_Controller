@@ -34,6 +34,7 @@
 #include "sd_card_manager.h"  // SD Card support
 #include "rtc_manager.h"       // RTC auto-sync
 #include "system_utils.h"      // Safe reboot helper
+#include "trash_bin_manager.h" // Trash bin with auto-delete
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -230,6 +231,10 @@ void setup() {
   #if BOARD_HAS_RTC_DS3231
   rtcCheckAndSync();
   #endif
+  
+  // Initialize Trash Bin
+  trashBinInit();
+  trashBinStartBackgroundHandler();
   
   // PHASE 6.2: OTA check is now OPTIONAL and disabled by default
   // The SSL buffer allocation (~16KB) causes heap fragmentation

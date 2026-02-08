@@ -12,6 +12,7 @@
 #include <LittleFS.h>
 #include <SD.h>
 #include "sd_card_manager.h"
+#include "trash_bin_manager.h"
 #include <functional>  // For std::function in recursive listing
 
 // PHASE 5.10: Local auth helper with rate limiting for PsychicHttp
@@ -107,10 +108,11 @@ static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *respon
     
     char entry[512];
     snprintf(entry, sizeof(entry), 
-      "{\"name\":\"%s\",\"dir\":%s,\"size\":%u}", 
+      "{\"name\":\"%s\",\"dir\":%s,\"size\":%u,\"time\":%u}", 
       file.name(), 
       file.isDirectory() ? "true" : "false", 
-      (uint32_t)file.size()
+      (uint32_t)file.size(),
+      (uint32_t)file.getLastWrite()
     );
     response->sendChunk((uint8_t*)entry, strlen(entry));
     file = root.openNextFile();
@@ -178,14 +180,60 @@ static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *resp
     bool is_dir = f.isDirectory();
     f.close();
 
-    bool success = is_dir ? fs->rmdir(path) : fs->remove(path);
+    bool success = trashBinMoveToTrash(fs, path.c_str());
     if (success) {
-        return response->send(200, "text/plain", "Deleted");
+        return response->send(200, "text/plain", "Moved to Trash");
     }
-    return response->send(500, "text/plain", "Delete failed");
+    return response->send(500, "text/plain", "Failed to move to Trash");
   } else {
     return response->send(404, "text/plain", "File not found");
   }
+}
+
+static esp_err_t handleFileBulkDelete(PsychicRequest *request, PsychicResponse *response) {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    
+    String body = request->body();
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, body);
+    
+    if (error || !doc.is<JsonArray>()) {
+        return response->send(400, "text/plain", "Invalid JSON array");
+    }
+
+    JsonArray paths = doc.as<JsonArray>();
+    int deleted = 0;
+    int failed = 0;
+
+    for (JsonVariant pathVar : paths) {
+        String path = pathVar.as<String>();
+        if (!isValidFilename(path.c_str())) {
+            failed++;
+            continue;
+        }
+
+        bool use_sd = path.startsWith("/sd");
+        FS *fs;
+        if (use_sd) {
+            if (!sdCardIsMounted()) { failed++; continue; }
+            fs = &SD;
+            path = path.substring(3);
+        } else {
+            fs = &LittleFS;
+        }
+
+        if (fs->exists(path)) {
+            bool success = trashBinMoveToTrash(fs, path.c_str());
+            if (success) deleted++;
+            else failed++;
+        } else {
+            failed++;
+        }
+    }
+
+    char result[128];
+    snprintf(result, sizeof(result), "{\"deleted\":%d,\"failed\":%d}", deleted, failed);
+    return response->send(200, "application/json", result);
 }
 
 // --- Registration ---
@@ -262,12 +310,104 @@ static esp_err_t handleFileUpload(PsychicRequest *request, const String& filenam
     return ESP_OK;
 }
 
+static esp_err_t handleFileRead(PsychicRequest *request, PsychicResponse *response) {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    if (!request->hasParam("path")) return response->send(400, "text/plain", "Missing path");
+    String path = request->getParam("path")->value();
+
+    bool use_sd = path.startsWith("/sd");
+    FS *fs;
+    if (use_sd) {
+        if (!sdCardIsMounted()) return response->send(503, "text/plain", "SD not mounted");
+        fs = &SD;
+        path = path.substring(3);
+    } else {
+        fs = &LittleFS;
+    }
+
+    if (!fs->exists(path)) return response->send(404, "text/plain", "File not found");
+
+    // Check size - limit to 512KB for editing stability
+    File f = fs->open(path, FILE_READ);
+    if (f.size() > 512 * 1024) {
+        f.close();
+        return response->send(413, "text/plain", "File too large to edit (>512KB)");
+    }
+    f.close();
+
+    PsychicFileResponse streamResponse(response, *fs, path);
+    return streamResponse.send();
+}
+
+static esp_err_t handleFileSave(PsychicRequest *request, PsychicResponse *response) {
+    if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+    if (!request->hasParam("path")) return response->send(400, "text/plain", "Missing path");
+    String path = request->getParam("path")->value();
+    String content = request->body();
+
+    bool use_sd = path.startsWith("/sd");
+    FS *fs;
+    if (use_sd) {
+        if (!sdCardIsMounted()) return response->send(503, "text/plain", "SD not mounted");
+        fs = &SD;
+        path = path.substring(3);
+    } else {
+        fs = &LittleFS;
+    }
+
+    File f = fs->open(path, FILE_WRITE);
+    if (!f) return response->send(500, "text/plain", "Could not open file for writing");
+
+    f.print(content);
+    f.close();
+
+    logInfo("[FILE_API] Saved: %s", path.c_str());
+    return response->send(200, "text/plain", "Saved");
+}
+
+static esp_err_t handleTrashRestore(PsychicRequest *request, PsychicResponse *response) {
+  if (requireAuth(request, response) != ESP_OK) return ESP_OK;
+
+  String body = request->body();
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, body);
+
+  if (error || !doc.is<JsonObject>() || !doc.containsKey("path")) {
+    return response->send(400, "text/plain", "Invalid JSON: missing path");
+  }
+
+  String fullPath = doc["path"].as<String>();
+  if (!isValidFilename(fullPath.c_str())) {
+      return response->send(400, "text/plain", "Invalid filename");
+  }
+
+  bool use_sd = fullPath.startsWith("/sd");
+  FS *fs;
+  String internalPath = fullPath;
+  if (use_sd) {
+      if (!sdCardIsMounted()) return response->send(503, "text/plain", "SD not mounted");
+      fs = &SD;
+      internalPath = fullPath.substring(3); // Remove "/sd"
+      if (internalPath == "") internalPath = "/";
+  } else {
+      fs = &LittleFS;
+  }
+
+  if (trashBinRestore(fs, internalPath.c_str())) {
+      return response->send(200, "text/plain", "Restored");
+  }
+  return response->send(500, "text/plain", "Restore failed (target may exist)");
+}
+
 void apiRegisterFileRoutes(PsychicHttpServer& server) {
   // API: List Files (Protected)
   server.on("/api/files", HTTP_GET, handleFileList);
 
   // API: Delete File (Protected)  
   server.on("/api/files", HTTP_DELETE, handleFileDelete);
+
+  // API: Bulk Delete (Protected)
+  server.on("/api/files/bulk-delete", HTTP_POST, handleFileBulkDelete);
 
   // API: Make Directory (Protected)
   server.on("/api/files/mkdir", HTTP_POST, handleMakeDir);
@@ -281,5 +421,14 @@ void apiRegisterFileRoutes(PsychicHttpServer& server) {
   upHandler->onRequest(handleUploadRequest);
   server.on("/api/files/upload", HTTP_POST, upHandler);
 
-  logInfo("[FILE_API] File routes updated for SD, Folders, and Uploads");
+  // API: Read File (Protected)
+  server.on("/api/files/read", HTTP_GET, handleFileRead);
+
+  // API: Save File (Protected)
+  server.on("/api/files/save", HTTP_POST, handleFileSave);
+
+  // API: Restore from Trash (Protected)
+  server.on("/api/trash/restore", HTTP_POST, handleTrashRestore);
+
+  logInfo("[FILE_API] File routes updated for SD, Folders, Uploads, and Trash Restore");
 }

@@ -7,7 +7,8 @@
 // SD Card state
 static bool sd_initialized = false;
 static bool sd_mounted = false;
-static SPIClass sd_spi(HSPI);  // Use HSPI for SD card
+static SDCardHealth last_health = SD_HEALTH_NOT_MOUNTED;
+static SPIClass sd_spi(HSPI);
 
 /**
  * @brief Initialize SD card with custom SPI pins
@@ -96,9 +97,9 @@ bool sdCardInit() {
         SD.mkdir("/jobs");
         
         // Perform health check to detect card issues early
-        SDCardHealth health = sdCardHealthCheck();
-        if (health != SD_HEALTH_OK) {
-            logWarning("[SD] Health check FAILED: %s", sdCardHealthString(health));
+        last_health = sdCardHealthCheck();
+        if (last_health != SD_HEALTH_OK) {
+            logWarning("[SD] Health check FAILED: %s", sdCardHealthString(last_health));
             // Continue anyway - card may still be usable for reads
         }
     }
@@ -293,7 +294,8 @@ const char* sdCardGetStatusString() {
  */
 SDCardHealth sdCardHealthCheck() {
     if (!sd_mounted) {
-        return SD_HEALTH_NOT_MOUNTED;
+        last_health = SD_HEALTH_NOT_MOUNTED;
+        return last_health;
     }
     
     const char* testPath = "/.sd_health_check";
@@ -355,7 +357,15 @@ SDCardHealth sdCardHealthCheck() {
     }
     
     logDebug("[SD] Health check passed");
-    return SD_HEALTH_OK;
+    last_health = SD_HEALTH_OK;
+    return last_health;
+}
+
+/**
+ * @brief Get the last health check result
+ */
+SDCardHealth sdCardGetLastHealth() {
+    return last_health;
 }
 
 /**

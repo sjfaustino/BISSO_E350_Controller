@@ -86,10 +86,16 @@ static void wrap_memory_reset(int argc, char** argv) { (void)argc; (void)argv; m
 // QUICK STATUS DASHBOARD
 // ============================================================================
 void cmd_status_dashboard(int argc, char** argv) {
-    (void)argc; (void)argv;
     watchdogFeed("CLI");
     
-    // PHASE 16 FIX: Build entire output in buffer, then print all at once
+    bool verbose = false;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-v") == 0) {
+            verbose = true;
+            break;
+        }
+    }
+
     static char output[2048];
     int pos = 0;
     
@@ -118,7 +124,7 @@ void cmd_status_dashboard(int argc, char** argv) {
     else if (job.state == JOB_ERROR) job_state_str = "ERROR";
 
     pos += snprintf(output + pos, sizeof(output) - pos, "\n+============================================================+\n");
-    pos += snprintf(output + pos, sizeof(output) - pos, "|           BISSO E350 MASTER STATUS DASHBOARD              |\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "|           BISSO E350 %-11s DASHBOARD              |\n", verbose ? "VERBOSE" : "MASTER");
     pos += snprintf(output + pos, sizeof(output) - pos, "|  Uptime: %02u:%02u:%02u   CPU: %-3u%%   Heap: %-4u KB (Min %-3u)  |\n", 
               (unsigned int)hours, (unsigned int)mins, (unsigned int)secs, 
               cpu, (unsigned)(free_heap/1024), (unsigned)(min_heap/1024));
@@ -126,59 +132,67 @@ void cmd_status_dashboard(int argc, char** argv) {
     
     pos += snprintf(output + pos, sizeof(output) - pos, "| MOTION COORDINATES (mm)         | JOB STATUS               |\n");
     pos += snprintf(output + pos, sizeof(output) - pos, "|   X: %10.3f    Y: %10.3f  | State: %-8s %-9s|\n",
-                  motionGetPosition(0) / 1000.0f, motionGetPosition(1) / 1000.0f, job_state_str, job_progress_str);
+                  motionGetPositionMM(0), motionGetPositionMM(1), job_state_str, job_progress_str);
     pos += snprintf(output + pos, sizeof(output) - pos, "|   Z: %10.3f    A: %10.3f  | Line:  %-6lu / %-6lu   |\n",
-                  motionGetPosition(2) / 1000.0f, motionGetPosition(3) / 1000.0f, 
+                  motionGetPositionMM(2), motionGetPositionMM(3), 
                   (unsigned long)job.current_line, (unsigned long)job.total_lines);
     
-    pos += snprintf(output + pos, sizeof(output) - pos, "+---------------------------------+--------------------------+\n");
-    pos += snprintf(output + pos, sizeof(output) - pos, "| ENCODER FEEDBACK                                          |\n");
-    bool fb_active = encoderMotionIsFeedbackActive();
-    pos += snprintf(output + pos, sizeof(output) - pos, "|   Status: %s                                         |\n",
-                  fb_active ? "[ON] " : "[OFF]");
-    
-    pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
-    pos += snprintf(output + pos, sizeof(output) - pos, "| SPINDLE MONITORING                                        |\n");
-    const spindle_monitor_state_t* spindle = spindleMonitorGetState();
-    if (spindle->enabled) {
-        pos += snprintf(output + pos, sizeof(output) - pos, "|   Current: %5.1f A  |  Peak: %5.1f A   |  Load: %5.1f%% |\n",
-                      spindle->current_amps, spindle->current_peak_amps, spindleMonitorGetLoadPercent());
-        const char* alarm = "OK";
-        if (spindle->alarm_tool_breakage) alarm = "TOOL BREAK";
-        else if (spindle->alarm_stall) alarm = "STALL";
-        else if (spindle->alarm_overload) alarm = "OVERLOAD";
-        pos += snprintf(output + pos, sizeof(output) - pos, "|   Alarm: %-10s                                      |\n", alarm);
-    } else {
-        pos += snprintf(output + pos, sizeof(output) - pos, "|   Status: [DISABLED]                                      |\n");
-    }
-    
-    pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
-    pos += snprintf(output + pos, sizeof(output) - pos, "| NETWORK                                                   |\n");
-    if (WiFi.status() == WL_CONNECTED) {
-        pos += snprintf(output + pos, sizeof(output) - pos, "|   WiFi: Connected (%d dBm)                              |\n", WiFi.RSSI());
-        pos += snprintf(output + pos, sizeof(output) - pos, "|   IP: %-15s                                   |\n",
-                      WiFi.localIP().toString().c_str());
-    } else {
-        pos += snprintf(output + pos, sizeof(output) - pos, "|   WiFi: [DISCONNECTED]                                    |\n");
-    }
-    
-    pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
-    pos += snprintf(output + pos, sizeof(output) - pos, "| ACTIVE FAULTS                                             |\n");
-    fault_stats_t faults = faultGetStats();
-    if (faults.total_faults == 0) {
-        pos += snprintf(output + pos, sizeof(output) - pos, "|   [NONE] System healthy                                   |\n");
-    } else {
-        pos += snprintf(output + pos, sizeof(output) - pos, "|   Total: %lu  |  Last: %lu sec ago                       |\n",
-                      (unsigned long)faults.total_faults,
-                      (unsigned long)((millis() - faults.last_fault_time_ms) / 1000));
+    if (verbose) {
+        pos += snprintf(output + pos, sizeof(output) - pos, "+---------------------------------+--------------------------+\n");
+        pos += snprintf(output + pos, sizeof(output) - pos, "| ENCODER FEEDBACK                                          |\n");
+        bool fb_active = encoderMotionIsFeedbackActive();
+        pos += snprintf(output + pos, sizeof(output) - pos, "|   Status: %-48s|\n",
+                      fb_active ? "[ACTIVE]" : "[DISABLED]");
+        
+        pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
+        pos += snprintf(output + pos, sizeof(output) - pos, "| SPINDLE MONITORING                                        |\n");
+        const spindle_monitor_state_t* spindle = spindleMonitorGetState();
+        if (spindle->enabled) {
+            pos += snprintf(output + pos, sizeof(output) - pos, "|   Current: %5.1f A  |  Peak: %5.1f A   |  Load: %5.1f%% |\n",
+                          spindle->current_amps, spindle->current_peak_amps, spindleMonitorGetLoadPercent());
+            const char* alarm = "OK";
+            if (spindle->alarm_tool_breakage) alarm = "TOOL BREAK";
+            else if (spindle->alarm_stall) alarm = "STALL";
+            else if (spindle->alarm_overload) alarm = "OVERLOAD";
+            pos += snprintf(output + pos, sizeof(output) - pos, "|   Alarm: %-10s                                      |\n", alarm);
+        } else {
+            pos += snprintf(output + pos, sizeof(output) - pos, "|   Status: [DISABLED]                                      |\n");
+        }
+        
+        pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
+        pos += snprintf(output + pos, sizeof(output) - pos, "| NETWORK                                                   |\n");
+        if (WiFi.status() == WL_CONNECTED) {
+            pos += snprintf(output + pos, sizeof(output) - pos, "|   WiFi: Connected (%d dBm)  | IP: %-25s|\n", WiFi.RSSI(), WiFi.localIP().toString().c_str());
+        } else {
+            pos += snprintf(output + pos, sizeof(output) - pos, "|   WiFi: [DISCONNECTED]                                    |\n");
+        }
+        
+        pos += snprintf(output + pos, sizeof(output) - pos, "+------------------------------------------------------------+\n");
+        pos += snprintf(output + pos, sizeof(output) - pos, "| ACTIVE FAULTS                                             |\n");
+        fault_stats_t faults = faultGetStats();
+        if (faults.total_faults == 0) {
+            pos += snprintf(output + pos, sizeof(output) - pos, "|   [NONE] System healthy                                   |\n");
+        } else {
+            pos += snprintf(output + pos, sizeof(output) - pos, "|   Total: %-8lu  |  Last Wait: %-10lu sec ago        |\n",
+                          (unsigned long)faults.total_faults,
+                          (unsigned long)((millis() - faults.last_fault_time_ms) / 1000));
+        }
     }
     
     if (emergencyStopIsActive()) {
         pos += snprintf(output + pos, sizeof(output) - pos, "+============================================================+\n");
         pos += snprintf(output + pos, sizeof(output) - pos, "|  E-STOP ACTIVE - MOTION DISABLED                          |\n");
     }
+
+    if (rtcHasBatteryWarning()) {
+        pos += snprintf(output + pos, sizeof(output) - pos, "+============================================================+\n");
+        pos += snprintf(output + pos, sizeof(output) - pos, "|  WARNING: RTC BATTERY LOW - CLOCK WILL RESET ON POWER OFF |\n");
+    }
     
     pos += snprintf(output + pos, sizeof(output) - pos, "+============================================================+\n");
+    if (!verbose) {
+        pos += snprintf(output + pos, sizeof(output) - pos, " (Use 'status -v' for full diagnostics)\n");
+    }
     
     // Acquire mutex and output entire buffer at once
     serialLoggerLock();

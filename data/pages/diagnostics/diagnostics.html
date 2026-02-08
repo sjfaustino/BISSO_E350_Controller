@@ -165,335 +165,369 @@
             </div>
         </div>
 
-        <!-- RS485 Bus Health Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2 data-i18n="diagnostics.rs485_health">RS485 Bus Health</h2>
-                <span class="io-indicator off" id="rs485-status-indicator" style="width: 12px; height: 12px;"></span>
-            </div>
-            <div class="card-content">
-                <div class="metric-card">
-                    <div class="metric-label">Bus Status</div>
-                    <div class="metric-value" id="rs485-bus-status">--</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Devices Online</div>
-                    <div class="metric-value" id="rs485-device-count">--</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Transactions</div>
-                    <div class="metric-value" id="rs485-tx-count">--</div>
-                </div>
-                <div class="metric-card warning">
-                    <div class="metric-label">Error Rate</div>
-                    <div class="metric-value" id="rs485-error-rate">--%</div>
-                </div>
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                    <div class="metric-label" style="margin-bottom: 8px;">Device Status</div>
-                    <div id="rs485-device-list" style="font-size: 12px; color: var(--text-secondary);">
-                        No devices registered
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Fault Log Viewer Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2 data-i18n="diagnostics.fault_log">Fault Log</h2>
-                <button class="btn btn-small btn-secondary" id="clear-faults-btn"
-                    data-i18n="diagnostics.clear">Clear</button>
-            </div>
-            <div class="card-content">
-                <div class="fault-summary" style="margin-bottom: 15px;">
-                    <span class="fault-count" id="fault-count">0</span>
-                    <span class="fault-label">Active Faults</span>
-                </div>
-                <div class="fault-list" id="fault-list">
-                    <div class="fault-empty">No faults recorded</div>
-                </div>
-            </div>
-        </div>
     </div>
+</div>
 
-    <div class="card-grid">
-        <div class="card">
-            <div class="card-header">
-                <h2 id="diag-header-vfd" data-i18n="diagnostics.vfd_diagnostics">VFD Diagnostics</h2>
-            </div>
-            <div class="card-content">
-                <div class="metric-card">
-                    <div class="metric-label">Current Draw</div>
-                    <div class="metric-value" id="diag-vfd-current">-- A</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Frequency</div>
-                    <div class="metric-value" id="diag-vfd-freq">-- Hz</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Thermal State</div>
-                    <div class="metric-value" id="diag-vfd-thermal">--%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Fault Code</div>
-                    <div class="metric-value" id="diag-vfd-fault">0x0000</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- YH-TC05 Tachometer Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2 id="diag-header-tach" data-i18n="diagnostics.tachometer">YH-TC05 Tachometer</h2>
-            </div>
-            <div class="card-content">
-                <div class="metric-card">
-                    <div class="metric-label">Current Speed</div>
-                    <div class="metric-value">
-                        <span id="tach_rpm">--</span> <span style="font-size: 0.5em; vertical-align: middle;">RPM</span>
-                    </div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Peak Speed</div>
-                    <div class="metric-value">
-                        <span id="tach_peak">--</span> <span
-                            style="font-size: 0.5em; vertical-align: middle;">RPM</span>
-                    </div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Status</div>
-                    <div class="metric-value">
-                        <span id="tach_status" class="status-badge status-unknown"
-                            style="font-size: 0.5em; padding: 2px 8px; vertical-align: middle;">Unknown</span>
-                    </div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Errors</div>
-                    <div class="metric-value" id="tach_errors" style="color: var(--text-secondary);">0</div>
-                </div>
-            </div>
-            <div style="padding: 0 15px 15px 15px; font-size: 11px; color: var(--text-secondary); text-align: right;">
-                Total Pulses: <span id="tach_pulses" style="font-family: monospace;">--</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Real-time Saw Blade Current Graph -->
-    <div class="card" style="margin-top: 20px;">
+<!-- SD Card and RS485 Bus Health Section -->
+<div class="card-grid">
+    <!-- SD Card Health Card (PHASE 6.6) -->
+    <div class="card">
         <div class="card-header">
-            <h2 id="diag-header-spindle-rt">🪚 Saw Blade Current (Real-time)</h2>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <span id="spindle-status-badge" class="badge badge-success">OK</span>
-                <button class="btn btn-small btn-secondary" id="spindle-graph-pause"
-                    data-i18n="diagnostics.pause">Pause</button>
-            </div>
+            <h2 data-i18n="diagnostics.sd_health">SD Card Health</h2>
+            <span id="sd-status-indicator" class="io-indicator off" style="width: 12px; height: 12px;"></span>
         </div>
         <div class="card-content">
-            <div class="spindle-graph-container">
-                <div class="spindle-graph-main">
-                    <canvas id="spindle-current-chart" width="600" height="200"></canvas>
+            <div class="metric-card">
+                <div class="metric-label">Status</div>
+                <div class="metric-value" id="sd-status-val">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Health</div>
+                <div class="metric-value" id="sd-health-val">--</div>
+            </div>
+            <div style="margin-top: 15px;">
+                <div class="metric-label" style="display: flex; justify-content: space-between;">
+                    <span>Storage Usage</span>
+                    <span id="sd-usage-text">-- / -- MB</span>
                 </div>
-                <div class="spindle-graph-stats">
-                    <div class="spindle-stat">
-                        <span class="spindle-stat-label">Current</span>
-                        <span class="spindle-stat-value" id="spindle-current-now">0.0 A</span>
-                    </div>
-                    <div class="spindle-stat">
-                        <span class="spindle-stat-label">Peak</span>
-                        <span class="spindle-stat-value" id="spindle-current-peak">0.0 A</span>
-                    </div>
-                    <div class="spindle-stat">
-                        <span class="spindle-stat-label">Pause Threshold</span>
-                        <span class="spindle-stat-value warning" id="spindle-threshold-pause">25 A</span>
-                    </div>
-                    <div class="spindle-stat">
-                        <span class="spindle-stat-label">E-Stop Threshold</span>
-                        <span class="spindle-stat-value danger" id="spindle-threshold-estop">30 A</span>
-                    </div>
-                    <div class="spindle-stat">
-                        <span class="spindle-stat-label">Auto-Pauses</span>
-                        <span class="spindle-stat-value" id="spindle-pause-count">0</span>
+                <div class="progress-bar"
+                    style="margin-top: 8px; height: 10px; background: var(--bg-tertiary); border-radius: 5px; overflow: hidden;">
+                    <div id="sd-usage-bar" class="progress-fill"
+                        style="width: 0%; height: 100%; background: var(--color-optimal); transition: width 0.3s ease;">
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- I/O Expander Diagnostics Card -->
-    <div class="card" style="margin-top: 20px;">
+    <!-- RS485 Bus Health Card -->
+    <div class="card">
         <div class="card-header">
-            <h3 data-i18n="diagnostics.io_expander">🔌 I/O Expander Diagnostics</h3>
-            <button class="btn btn-small btn-secondary" id="refresh-io-diag-btn"
+            <h2 data-i18n="diagnostics.rs485_health">RS485 Bus Health</h2>
+            <span class="io-indicator off" id="rs485-status-indicator" style="width: 12px; height: 12px;"></span>
+        </div>
+        <div class="card-content">
+            <div class="metric-card">
+                <div class="metric-label">Bus Status</div>
+                <div class="metric-value" id="rs485-bus-status">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Devices Online</div>
+                <div class="metric-value" id="rs485-device-count">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Transactions</div>
+                <div class="metric-value" id="rs485-tx-count">--</div>
+            </div>
+            <div class="metric-card warning">
+                <div class="metric-label">Error Rate</div>
+                <div class="metric-value" id="rs485-error-rate">--%</div>
+            </div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                <div class="metric-label" style="margin-bottom: 8px;">Device Status</div>
+                <div id="rs485-device-list" style="font-size: 12px; color: var(--text-secondary);">
+                    No devices registered
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fault Log Viewer Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 data-i18n="diagnostics.fault_log">Fault Log</h2>
+            <button class="btn btn-small btn-secondary" id="clear-faults-btn"
+                data-i18n="diagnostics.clear">Clear</button>
+        </div>
+        <div class="card-content">
+            <div class="fault-summary" style="margin-bottom: 15px;">
+                <span class="fault-count" id="fault-count">0</span>
+                <span class="fault-label">Active Faults</span>
+            </div>
+            <div class="fault-list" id="fault-list">
+                <div class="fault-empty">No faults recorded</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2 id="diag-header-vfd" data-i18n="diagnostics.vfd_diagnostics">VFD Diagnostics</h2>
+        </div>
+        <div class="card-content">
+            <div class="metric-card">
+                <div class="metric-label">Current Draw</div>
+                <div class="metric-value" id="diag-vfd-current">-- A</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Frequency</div>
+                <div class="metric-value" id="diag-vfd-freq">-- Hz</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Thermal State</div>
+                <div class="metric-value" id="diag-vfd-thermal">--%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Fault Code</div>
+                <div class="metric-value" id="diag-vfd-fault">0x0000</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- YH-TC05 Tachometer Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 id="diag-header-tach" data-i18n="diagnostics.tachometer">YH-TC05 Tachometer</h2>
+        </div>
+        <div class="card-content">
+            <div class="metric-card">
+                <div class="metric-label">Current Speed</div>
+                <div class="metric-value">
+                    <span id="tach_rpm">--</span> <span style="font-size: 0.5em; vertical-align: middle;">RPM</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Peak Speed</div>
+                <div class="metric-value">
+                    <span id="tach_peak">--</span> <span style="font-size: 0.5em; vertical-align: middle;">RPM</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Status</div>
+                <div class="metric-value">
+                    <span id="tach_status" class="status-badge status-unknown"
+                        style="font-size: 0.5em; padding: 2px 8px; vertical-align: middle;">Unknown</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Errors</div>
+                <div class="metric-value" id="tach_errors" style="color: var(--text-secondary);">0</div>
+            </div>
+        </div>
+        <div style="padding: 0 15px 15px 15px; font-size: 11px; color: var(--text-secondary); text-align: right;">
+            Total Pulses: <span id="tach_pulses" style="font-family: monospace;">--</span>
+        </div>
+    </div>
+</div>
+
+<!-- Real-time Saw Blade Current Graph -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h2 id="diag-header-spindle-rt">🪚 Saw Blade Current (Real-time)</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span id="spindle-status-badge" class="badge badge-success">OK</span>
+            <button class="btn btn-small btn-secondary" id="spindle-graph-pause"
+                data-i18n="diagnostics.pause">Pause</button>
+        </div>
+    </div>
+    <div class="card-content">
+        <div class="spindle-graph-container">
+            <div class="spindle-graph-main">
+                <canvas id="spindle-current-chart" width="600" height="200"></canvas>
+            </div>
+            <div class="spindle-graph-stats">
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">Current</span>
+                    <span class="spindle-stat-value" id="spindle-current-now">0.0 A</span>
+                </div>
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">Peak</span>
+                    <span class="spindle-stat-value" id="spindle-current-peak">0.0 A</span>
+                </div>
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">Pause Threshold</span>
+                    <span class="spindle-stat-value warning" id="spindle-threshold-pause">25 A</span>
+                </div>
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">E-Stop Threshold</span>
+                    <span class="spindle-stat-value danger" id="spindle-threshold-estop">30 A</span>
+                </div>
+                <div class="spindle-stat">
+                    <span class="spindle-stat-label">Auto-Pauses</span>
+                    <span class="spindle-stat-value" id="spindle-pause-count">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- I/O Expander Diagnostics Card -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 data-i18n="diagnostics.io_expander">🔌 I/O Expander Diagnostics</h3>
+        <button class="btn btn-small btn-secondary" id="refresh-io-diag-btn"
+            data-i18n="diagnostics.refresh">Refresh</button>
+    </div>
+    <div class="card-content">
+        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
+            Live status of PCF8574 I/O expander registers (2 input + 2 output banks)
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Input Bank -->
+            <div>
+                <h4 style="margin-bottom: 10px; font-size: 14px;">Inputs (Read-Only)</h4>
+                <div id="io-input-grid" class="io-diag-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Output Bank -->
+            <div>
+                <h4 style="margin-bottom: 10px; font-size: 14px;">Outputs (Active)</h4>
+                <div id="io-output-grid" class="io-diag-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
+            <span style="font-size: 12px; color: var(--text-secondary);">
+                E-Stop: <strong id="hw-estop-state">--</strong> |
+                Last Update: <strong id="io-last-update">--</strong>
+            </span>
+        </div>
+    </div>
+</div>
+
+<style>
+    .spindle-graph-container {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .spindle-graph-main {
+        flex: 1;
+        min-width: 300px;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    .spindle-graph-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 150px;
+    }
+
+    .spindle-stat {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: var(--bg-secondary);
+        border-radius: 6px;
+    }
+
+    .spindle-stat-label {
+        color: var(--text-secondary);
+        font-size: 12px;
+    }
+
+    .spindle-stat-value {
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .spindle-stat-value.warning {
+        color: var(--warning);
+    }
+
+    .spindle-stat-value.danger {
+        color: var(--danger);
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-success {
+        background: var(--success);
+        color: white;
+    }
+
+    .badge-warning {
+        background: var(--warning);
+        color: black;
+    }
+
+    .badge-danger {
+        background: var(--danger);
+        color: white;
+    }
+</style>
+
+<!-- Trend Charts Card -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h2 data-i18n="diagnostics.trend_charts">📈 Trend Charts (Last 60 Seconds)</h2>
+        <button class="btn btn-small btn-secondary" id="refresh-trends-btn"
+            data-i18n="diagnostics.refresh">Refresh</button>
+    </div>
+    <div class="card-content">
+        <div class="trend-charts-grid">
+            <div class="trend-chart-container">
+                <h4>CPU Usage (%)</h4>
+                <canvas id="chart-cpu" width="300" height="100"></canvas>
+                <div class="chart-stats">
+                    <span>Current: <strong id="diag-cpu-current">--</strong>%</span>
+                    <span>Avg: <strong id="diag-cpu-avg">--</strong>%</span>
+                    <span>Max: <strong id="diag-cpu-max">--</strong>%</span>
+                </div>
+            </div>
+            <div class="trend-chart-container">
+                <h4>Free Memory (KB)</h4>
+                <canvas id="chart-memory" width="300" height="100"></canvas>
+                <div class="chart-stats">
+                    <span>Current: <strong id="diag-mem-current">--</strong> KB</span>
+                    <span>Min: <strong id="diag-mem-min">--</strong> KB</span>
+                </div>
+            </div>
+            <div class="trend-chart-container">
+                <h4 id="diag-header-spindle-trend">Spindle Current (A)</h4>
+                <canvas id="chart-spindle" width="300" height="100"></canvas>
+                <div class="chart-stats">
+                    <span>Current: <strong id="diag-spindle-current">--</strong> A</span>
+                    <span>Avg: <strong id="diag-spindle-avg">--</strong> A</span>
+                    <span>Max: <strong id="diag-spindle-max">--</strong> A</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Boot Log Viewer Card -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h2 data-i18n="diagnostics.boot_log">📋 Boot Log</h2>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn btn-small btn-secondary" id="refresh-bootlog-btn"
                 data-i18n="diagnostics.refresh">Refresh</button>
-        </div>
-        <div class="card-content">
-            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
-                Live status of PCF8574 I/O expander registers (2 input + 2 output banks)
-            </p>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <!-- Input Bank -->
-                <div>
-                    <h4 style="margin-bottom: 10px; font-size: 14px;">Inputs (Read-Only)</h4>
-                    <div id="io-input-grid" class="io-diag-grid">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-                <!-- Output Bank -->
-                <div>
-                    <h4 style="margin-bottom: 10px; font-size: 14px;">Outputs (Active)</h4>
-                    <div id="io-output-grid" class="io-diag-grid">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-            </div>
-
-            <div style="margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
-                <span style="font-size: 12px; color: var(--text-secondary);">
-                    E-Stop: <strong id="hw-estop-state">--</strong> |
-                    Last Update: <strong id="io-last-update">--</strong>
-                </span>
-            </div>
+            <button class="btn btn-small btn-danger" id="delete-bootlog-btn"
+                data-i18n="diagnostics.delete">Delete</button>
         </div>
     </div>
-
-    <style>
-        .spindle-graph-container {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .spindle-graph-main {
-            flex: 1;
-            min-width: 300px;
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            padding: 10px;
-        }
-
-        .spindle-graph-stats {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            min-width: 150px;
-        }
-
-        .spindle-stat {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 12px;
-            background: var(--bg-secondary);
-            border-radius: 6px;
-        }
-
-        .spindle-stat-label {
-            color: var(--text-secondary);
-            font-size: 12px;
-        }
-
-        .spindle-stat-value {
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .spindle-stat-value.warning {
-            color: var(--warning);
-        }
-
-        .spindle-stat-value.danger {
-            color: var(--danger);
-        }
-
-        .badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .badge-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .badge-warning {
-            background: var(--warning);
-            color: black;
-        }
-
-        .badge-danger {
-            background: var(--danger);
-            color: white;
-        }
-    </style>
-
-    <!-- Trend Charts Card -->
-    <div class="card" style="margin-top: 20px;">
-        <div class="card-header">
-            <h2 data-i18n="diagnostics.trend_charts">📈 Trend Charts (Last 60 Seconds)</h2>
-            <button class="btn btn-small btn-secondary" id="refresh-trends-btn"
-                data-i18n="diagnostics.refresh">Refresh</button>
-        </div>
-        <div class="card-content">
-            <div class="trend-charts-grid">
-                <div class="trend-chart-container">
-                    <h4>CPU Usage (%)</h4>
-                    <canvas id="chart-cpu" width="300" height="100"></canvas>
-                    <div class="chart-stats">
-                        <span>Current: <strong id="diag-cpu-current">--</strong>%</span>
-                        <span>Avg: <strong id="diag-cpu-avg">--</strong>%</span>
-                        <span>Max: <strong id="diag-cpu-max">--</strong>%</span>
-                    </div>
-                </div>
-                <div class="trend-chart-container">
-                    <h4>Free Memory (KB)</h4>
-                    <canvas id="chart-memory" width="300" height="100"></canvas>
-                    <div class="chart-stats">
-                        <span>Current: <strong id="diag-mem-current">--</strong> KB</span>
-                        <span>Min: <strong id="diag-mem-min">--</strong> KB</span>
-                    </div>
-                </div>
-                <div class="trend-chart-container">
-                    <h4 id="diag-header-spindle-trend">Spindle Current (A)</h4>
-                    <canvas id="chart-spindle" width="300" height="100"></canvas>
-                    <div class="chart-stats">
-                        <span>Current: <strong id="diag-spindle-current">--</strong> A</span>
-                        <span>Avg: <strong id="diag-spindle-avg">--</strong> A</span>
-                        <span>Max: <strong id="diag-spindle-max">--</strong> A</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Boot Log Viewer Card -->
-    <div class="card" style="margin-top: 20px;">
-        <div class="card-header">
-            <h2 data-i18n="diagnostics.boot_log">📋 Boot Log</h2>
-            <div style="display: flex; gap: 8px;">
-                <button class="btn btn-small btn-secondary" id="refresh-bootlog-btn"
-                    data-i18n="diagnostics.refresh">Refresh</button>
-                <button class="btn btn-small btn-danger" id="delete-bootlog-btn"
-                    data-i18n="diagnostics.delete">Delete</button>
-            </div>
-        </div>
-        <div class="card-content">
-            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-                Captured serial output from last device boot (useful for debugging startup issues)
-            </p>
-            <textarea id="bootlog-content" readonly
-                style="width: 100%; height: 250px; font-family: monospace; font-size: 11px; 
+    <div class="card-content">
+        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+            Captured serial output from last device boot (useful for debugging startup issues)
+        </p>
+        <textarea id="bootlog-content" readonly
+            style="width: 100%; height: 250px; font-family: monospace; font-size: 11px; 
                        background: var(--bg-tertiary); color: var(--text-primary); 
                        border: 1px solid var(--border-color); border-radius: 6px; 
                        padding: 10px; resize: vertical; white-space: pre; overflow-x: auto;">(Loading boot log...)</textarea>
-            <div style="margin-top: 10px; font-size: 11px; color: var(--text-secondary);">
-                Log size: <span id="bootlog-size">--</span> bytes
-            </div>
+        <div style="margin-top: 10px; font-size: 11px; color: var(--text-secondary);">
+            Log size: <span id="bootlog-size">--</span> bytes
         </div>
     </div>
+</div>
 </div>
 
 <style>

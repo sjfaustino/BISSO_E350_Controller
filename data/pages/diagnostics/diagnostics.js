@@ -30,7 +30,45 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
             }
         }); this.updateEncoderStatus(t); if (t.vfd) {
             this.updateHeaderNA("diag-header-vfd", "VFD Diagnostics", t.vfd.connected), this.updateHeaderNA("diag-header-spindle-rt", "🪚 Saw Blade Current (Real-time)", t.vfd.connected), this.updateHeaderNA("diag-header-spindle-trend", "Spindle Current (A)", t.vfd.connected); const e = document.getElementById("diag-vfd-current"), n = document.getElementById("diag-vfd-freq"), a = document.getElementById("diag-vfd-thermal"), s = document.getElementById("diag-vfd-fault"); t.vfd.connected ? (e && (e.textContent = (t.vfd.current_amps || 0).toFixed(1) + " A"), n && (n.textContent = (t.vfd.frequency_hz || 0).toFixed(1) + " Hz"), a && (a.textContent = (t.vfd.thermal_percent || 0) + "%"), s && (s.textContent = "0x" + (t.vfd.fault_code || 0).toString(16).padStart(4, "0").toUpperCase())) : (e && (e.textContent = "N/A"), n && (n.textContent = "N/A"), a && (a.textContent = "N/A"), s && (s.textContent = "N/A"))
-        } t.safety && this.setIOIndicator("io-estop", t.safety.estop, !0)
+        } t.safety && this.setIOIndicator("io-estop", t.safety.estop, !0);
+
+        // SD Card Status (PHASE 6.6)
+        this.updateSDStatus(t.sd);
+    }, updateSDStatus(sd) {
+        if (!sd) return;
+        const indicator = document.getElementById("sd-status-indicator");
+        const statusVal = document.getElementById("sd-status-val");
+        const healthVal = document.getElementById("sd-health-val");
+        const usageText = document.getElementById("sd-usage-text");
+        const usageBar = document.getElementById("sd-usage-bar");
+
+        if (indicator) {
+            indicator.classList.remove("on", "off", "alarm");
+            indicator.classList.add(sd.mounted ? (sd.health === 0 ? "on" : "alarm") : "off");
+        }
+
+        if (statusVal) {
+            statusVal.textContent = sd.mounted ? "Mounted" : "Not Mounted";
+            statusVal.style.color = sd.mounted ? "var(--color-optimal)" : "var(--text-secondary)";
+        }
+
+        if (healthVal) {
+            const healthMap = ["OK", "Read-Only", "Write Failed", "Read Failed", "Corruption", "Delete Failed", "Not Mounted"];
+            healthVal.textContent = healthMap[sd.health] || "Unknown";
+            healthVal.style.color = sd.health === 0 ? "var(--color-optimal)" : "var(--color-critical)";
+        }
+
+        if (usageText && sd.mounted) {
+            const totalMB = (sd.total_bytes / (1024 * 1024)).toFixed(0);
+            const usedMB = (sd.used_bytes / (1024 * 1024)).toFixed(0);
+            usageText.textContent = `${usedMB} / ${totalMB} MB`;
+
+            if (usageBar) {
+                const pct = sd.total_bytes > 0 ? (sd.used_bytes / sd.total_bytes * 100) : 0;
+                usageBar.style.width = pct + "%";
+                usageBar.style.background = pct > 90 ? "var(--color-critical)" : pct > 75 ? "var(--color-warning)" : "var(--color-optimal)";
+            }
+        }
     }, updateEncoderStatus(t) {
         const connected = t.motion?.dro_connected ?? false;
         ["x", "y", "z", "a"].forEach(e => {

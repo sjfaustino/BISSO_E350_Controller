@@ -10,7 +10,7 @@
 #include "altivar31_modbus.h"
 #include "motion.h"
 #include "serial_logger.h"
-#include "config_unified.h"
+#include "config_cache.h"
 #include "config_keys.h"
 #include "system_tuning.h"
 #include "cli.h" // Added for table diagnostics
@@ -57,9 +57,8 @@ static spindle_monitor_state_t monitor_state = {
 
 static uint32_t last_check_time_ms = 0;
 
-bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
-  // Load global RS485 baud for all Modbus devices
-  uint32_t rs485_baud = configGetInt(KEY_RS485_BAUD, 9600);
+  // Load global RS485 baud for all Modbus devices (PHASE 6.7 Typed Cache)
+  uint32_t rs485_baud = g_config.rs485_baud;
   
   // Initialize JXK-10 driver (registry registration happens here)
   if (!jxk10ModbusInit(jxk10_address, rs485_baud)) {
@@ -79,9 +78,10 @@ bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
   monitor_state.poll_interval_ms = SPINDLE_MONITOR_POLL_DEFAULT_MS;
   monitor_state.last_poll_time_ms = millis();
   
-  // Load auto-pause config
-  monitor_state.auto_pause_enabled = (configGetInt(KEY_SPINDL_PAUSE_EN, 1) != 0);
-  monitor_state.auto_pause_threshold_amps = (float)configGetInt(KEY_SPINDL_PAUSE_THR, 25);
+  // Load auto-pause config from typed cache (PHASE 6.7)
+  monitor_state.auto_pause_enabled = g_config.strict_limits; // Fallback to strict_limits for safety
+  monitor_state.auto_pause_enabled = (configGetInt(KEY_SPINDL_PAUSE_EN, 1) != 0); // Still use specific key if possible
+  monitor_state.auto_pause_threshold_amps = (float)g_config.spindle_pause_threshold;
   monitor_state.auto_paused = false;
 
   logInfo("[SPINDLE] Initialized (JXK-10 ID: %u, Threshold: %.1f A)",
@@ -223,7 +223,7 @@ const spindle_monitor_state_t *spindleMonitorGetState(void) {
 
 float spindleMonitorGetLoadPercent(void) {
     if (!monitor_state.enabled) return 0.0f;
-    float rated = (float)configGetInt(KEY_SPINDLE_RATED_AMPS, 25);
+    float rated = g_config.spindle_rated_amps;
     if (rated < 0.1f) return 0.0f;
     return (monitor_state.current_amps / rated) * 100.0f;
 }

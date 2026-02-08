@@ -8,6 +8,7 @@
 #include "config_unified.h"
 #include "cli.h" // PHASE 4.1: Support table-driven dump
 #include "config_keys.h"
+#include "config_cache.h"
 #include "serial_logger.h"
 #include "system_constants.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
@@ -17,6 +18,7 @@
 #include <string.h>
 #include <nvs_flash.h>
 #include "system_utils.h"       // Safe reboot helper
+#include "string_safety.h"
 
 
 // NVS Persistence Object
@@ -191,8 +193,7 @@ static void addToCacheInt(const char *key, int32_t val) {
   }
 
   int idx = config_count++;
-  strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
-  config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
+  SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
   config_table[idx].type = CONFIG_INT32;
   config_table[idx].value.int_val = val;
   config_table[idx].is_set = true;
@@ -214,8 +215,7 @@ static void addToCacheFloat(const char *key, float val) {
   }
 
   int idx = config_count++;
-  strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
-  config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
+  SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
   config_table[idx].type = CONFIG_FLOAT;
   config_table[idx].value.float_val = val;
   config_table[idx].is_set = true;
@@ -408,6 +408,9 @@ void configUnifiedInit() {
   
   // Log NVS space usage on boot
   configLogNvsStats();
+
+  // Initialize Typed Cache (PHASE 6.7)
+  configCacheInit();
 }
 
 /**
@@ -519,8 +522,7 @@ void configSetInt(const char *key, int32_t value) {
       return;
     }
     idx = config_count++;
-    strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
-    config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
+    SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
     config_table[idx].type = CONFIG_INT32;
   }
 
@@ -546,6 +548,9 @@ void configSetInt(const char *key, int32_t value) {
 
   // PHASE 5.10: Signal configuration change event
   systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
+
+  // Update Typed Cache (PHASE 6.7)
+  configCacheUpdate(key);
 }
 
 void configSetFloat(const char *key, float value) {
@@ -570,8 +575,7 @@ void configSetFloat(const char *key, float value) {
       return;
     }
     idx = config_count++;
-    strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
-    config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
+    SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
     config_table[idx].type = CONFIG_FLOAT;
   }
 
@@ -595,6 +599,9 @@ void configSetFloat(const char *key, float value) {
 
   // PHASE 5.10: Signal configuration change event
   systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
+
+  // Update Typed Cache (PHASE 6.7)
+  configCacheUpdate(key);
 }
 
 void configSetString(const char *key, const char *value) {
@@ -603,8 +610,7 @@ void configSetString(const char *key, const char *value) {
 
   // Create a mutable copy for validation
   char validated_value[CONFIG_VALUE_LEN];
-  strncpy(validated_value, value ? value : "", CONFIG_VALUE_LEN - 1);
-  validated_value[CONFIG_VALUE_LEN - 1] = '\0';
+  SAFE_STRCPY(validated_value, value ? value : "", CONFIG_VALUE_LEN);
 
   // VALIDATION STEP
   validateString(key, validated_value, CONFIG_VALUE_LEN);
@@ -624,8 +630,7 @@ void configSetString(const char *key, const char *value) {
       return;
     }
     idx = config_count++;
-    strncpy(config_table[idx].key, key, CONFIG_KEY_LEN - 1);
-    config_table[idx].key[CONFIG_KEY_LEN - 1] = '\0';
+    SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
     config_table[idx].type = CONFIG_STRING;
   }
 
@@ -636,9 +641,8 @@ void configSetString(const char *key, const char *value) {
     return;
   }
 
-  strncpy(config_table[idx].value.str_val, validated_value,
-          CONFIG_VALUE_LEN - 1);
-  config_table[idx].value.str_val[CONFIG_VALUE_LEN - 1] = '\0';
+  SAFE_STRCPY(config_table[idx].value.str_val, validated_value,
+              CONFIG_VALUE_LEN);
   config_table[idx].is_set = true;
   config_dirty = true;
   last_nvs_save = millis();
@@ -655,6 +659,9 @@ void configSetString(const char *key, const char *value) {
 
   // PHASE 5.10: Signal configuration change event
   systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
+
+  // Update Typed Cache (PHASE 6.7)
+  configCacheUpdate(key);
 }
 
 // ============================================================================
@@ -811,16 +818,16 @@ void configUnifiedPrintAll() {
     char val_buf[128];
     switch (config_table[i].type) {
     case CONFIG_INT32:
-      snprintf(val_buf, sizeof(val_buf), "%ld", (long)config_table[i].value.int_val);
+      SAFE_SNPRINTF(val_buf, sizeof(val_buf), "%ld", (long)config_table[i].value.int_val);
       break;
     case CONFIG_FLOAT:
-      snprintf(val_buf, sizeof(val_buf), "%.3f", config_table[i].value.float_val);
+      SAFE_SNPRINTF(val_buf, sizeof(val_buf), "%.3f", config_table[i].value.float_val);
       break;
     case CONFIG_STRING:
-      snprintf(val_buf, sizeof(val_buf), "\"%s\"", config_table[i].value.str_val);
+      SAFE_SNPRINTF(val_buf, sizeof(val_buf), "\"%s\"", config_table[i].value.str_val);
       break;
     default:
-      strncpy(val_buf, "???", sizeof(val_buf));
+      SAFE_STRCPY(val_buf, "???", sizeof(val_buf));
     }
     
     cliPrintTableRow(config_table[i].key, val_buf, nullptr, 30, 20, 0);

@@ -69,26 +69,10 @@ bool MotionPlanner::checkBufferDrain(uint8_t &active_axis) {
   motion_cmd_t cmd;
   // Check if next move is valid before popping (Peek logic could be added here)
   if (motionBuffer.pop(&cmd)) {
-    // CRITICAL FIX: Convert counts back to MM only when calling motion control
-    // Motion control API still uses MM, but buffer stores counts to prevent
-    // drift
-    float x_scale = (machineCal.axes[0].pulses_per_mm > 0)
-                        ? machineCal.axes[0].pulses_per_mm
-                        : MOTION_POSITION_SCALE_FACTOR;
-    float y_scale = (machineCal.axes[1].pulses_per_mm > 0)
-                        ? machineCal.axes[1].pulses_per_mm
-                        : MOTION_POSITION_SCALE_FACTOR;
-    float z_scale = (machineCal.axes[2].pulses_per_mm > 0)
-                        ? machineCal.axes[2].pulses_per_mm
-                        : MOTION_POSITION_SCALE_FACTOR;
-    float a_scale = (machineCal.axes[3].pulses_per_degree > 0)
-                        ? machineCal.axes[3].pulses_per_degree
-                        : MOTION_POSITION_SCALE_FACTOR_DEG;
-
-    float x_mm = (float)cmd.x_counts / x_scale;
-    float y_mm = (float)cmd.y_counts / y_scale;
-    float z_mm = (float)cmd.z_counts / z_scale;
-    float a_mm = (float)cmd.a_counts / a_scale;
+    float x_mm = (float)cmd.x_counts / motionGetAxisScale(0);
+    float y_mm = (float)cmd.y_counts / motionGetAxisScale(1);
+    float z_mm = (float)cmd.z_counts / motionGetAxisScale(2);
+    float a_mm = (float)cmd.a_counts / motionGetAxisScale(3);
 
     if (!motionStartInternalMove(x_mm, y_mm, z_mm, a_mm, cmd.speed_mm_s)) {
       logError("[PLANNER] Buffered move failed to start!");

@@ -66,25 +66,10 @@ bool MotionBuffer::push_unsafe(float x, float y, float z, float a,
   if (count >= MOTION_BUFFER_SIZE)
     return false;
 
-  // CRITICAL FIX: Convert from MM to encoder counts to prevent float drift
-  // All motion planning uses integer math; only convert to MM for display
-  float x_scale = (machineCal.axes[0].pulses_per_mm > 0)
-                      ? machineCal.axes[0].pulses_per_mm
-                      : MOTION_POSITION_SCALE_FACTOR;
-  float y_scale = (machineCal.axes[1].pulses_per_mm > 0)
-                      ? machineCal.axes[1].pulses_per_mm
-                      : MOTION_POSITION_SCALE_FACTOR;
-  float z_scale = (machineCal.axes[2].pulses_per_mm > 0)
-                      ? machineCal.axes[2].pulses_per_mm
-                      : MOTION_POSITION_SCALE_FACTOR;
-  float a_scale = (machineCal.axes[3].pulses_per_degree > 0)
-                      ? machineCal.axes[3].pulses_per_degree
-                      : MOTION_POSITION_SCALE_FACTOR_DEG;
-
-  buffer[head].x_counts = (int32_t)(x * x_scale);
-  buffer[head].y_counts = (int32_t)(y * y_scale);
-  buffer[head].z_counts = (int32_t)(z * z_scale);
-  buffer[head].a_counts = (int32_t)(a * a_scale);
+  buffer[head].x_counts = (int32_t)(x * motionGetAxisScale(0));
+  buffer[head].y_counts = (int32_t)(y * motionGetAxisScale(1));
+  buffer[head].z_counts = (int32_t)(z * motionGetAxisScale(2));
+  buffer[head].a_counts = (int32_t)(a * motionGetAxisScale(3));
   buffer[head].speed_mm_s = speed;
 
   head = (head + 1) % MOTION_BUFFER_SIZE;

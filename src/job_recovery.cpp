@@ -11,6 +11,7 @@
 #include <Preferences.h>
 #include <string.h>
 #include <time.h>
+#include "string_safety.h"
 
 // NVS namespace for recovery data
 static Preferences recoveryPrefs;
@@ -131,8 +132,7 @@ void recoverySaveState(const char* filename, uint32_t line_number,
     
     job_recovery_t state;
     state.magic = RECOVERY_MAGIC;
-    strncpy(state.filename, filename, sizeof(state.filename) - 1);
-    state.filename[sizeof(state.filename) - 1] = '\0';
+    SAFE_STRCPY(state.filename, filename, sizeof(state.filename));
     state.line_number = line_number;
     state.pos_x = x;
     state.pos_y = y;

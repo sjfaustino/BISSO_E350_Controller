@@ -15,6 +15,7 @@
 #if BOARD_HAS_RTC_DS3231
 
 static bool rtc_available = false;
+static bool rtc_battery_warning = false;
 
 // DS3231 Register addresses
 #define DS3231_ADDR       I2C_ADDR_RTC_DS3231  // 0x68
@@ -25,6 +26,7 @@ static bool rtc_available = false;
 #define DS3231_REG_DATE   0x04
 #define DS3231_REG_MONTH  0x05
 #define DS3231_REG_YEAR   0x06
+#define DS3231_REG_STATUS 0x0F
 #define DS3231_REG_TEMP   0x11
 
 // BCD conversion helpers
@@ -48,6 +50,20 @@ bool rtcInit() {
             rtc_available = true;
             logInfo("[RTC] DS3231 detected at 0x%02X", DS3231_ADDR);
             
+            // Check Oscillator Stop Flag (Battery/Power failure)
+            Wire.beginTransmission(DS3231_ADDR);
+            Wire.write(DS3231_REG_STATUS);
+            if (Wire.endTransmission() == 0) {
+                Wire.requestFrom(DS3231_ADDR, 1);
+                if (Wire.available()) {
+                    uint8_t status = Wire.read();
+                    if (status & 0x80) { // OSF bit
+                        rtc_battery_warning = true;
+                        logWarning("[RTC] OSCILLATOR STOPPED - Battery may be dead or was removed!");
+                    }
+                }
+            }
+
             // Read and log current time
             char dateStr[16], timeStr[16];
             rtcGetDateString(dateStr, sizeof(dateStr));
@@ -70,6 +86,10 @@ bool rtcInit() {
 
 bool rtcIsAvailable() {
     return rtc_available;
+}
+
+bool rtcHasBatteryWarning() {
+    return rtc_battery_warning;
 }
 
 bool rtcGetDateTime(int* year, int* month, int* day, int* hour, int* minute, int* second) {

@@ -28,6 +28,9 @@ void cmd_rtc_status(int argc, char** argv) {
     }
     
     logPrintln("  Status:      Available");
+    if (rtcHasBatteryWarning()) {
+        logPrintln("  WARNING:     BATTERY LOW/FAILED (Oscillator Stopped)");
+    }
     
     char dateStr[16], timeStr[16];
     rtcGetDateString(dateStr, sizeof(dateStr));

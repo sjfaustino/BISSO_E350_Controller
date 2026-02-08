@@ -1250,7 +1250,9 @@ class SharedWebSocket {
     static dataReceivedBytes = 0;
     static latency = 0;
     static lastPingTime = 0;
+    static lastMessageTime = Date.now();
     static pingInterval = null;
+    static watchdogInterval = null;
 
     static connect() {
         // Clear any pending reconnect timer
@@ -1288,12 +1290,15 @@ class SharedWebSocket {
                     AlertManager.add('WebSocket reconnected', 'success', 2000);
                 }
 
-                // Start pinging for latency
+                // Start pinging for latency and watchdog
+                this.lastMessageTime = Date.now();
                 this.startLatencyTracking();
+                this.startWatchdog();
             };
 
             this.ws.onmessage = (event) => {
                 this.packetsReceived++;
+                this.lastMessageTime = Date.now();
                 if (event.data) this.dataReceivedBytes += event.data.length;
                 try {
                     const data = JSON.parse(event.data);
@@ -1320,6 +1325,7 @@ class SharedWebSocket {
             this.ws.onclose = (event) => {
                 this.isConnected = false;
                 console.log('[WS] Disconnected (code:', event.code, ')');
+                this.stopWatchdog();
                 this.broadcast('ws-disconnected');
                 this.scheduleReconnect();
             };
@@ -1424,6 +1430,7 @@ class SharedWebSocket {
         }
         this.isConnected = false;
         this.stopLatencyTracking();
+        this.stopWatchdog();
     }
 
     static startLatencyTracking() {
@@ -1446,6 +1453,26 @@ class SharedWebSocket {
         if (this.pingInterval) {
             clearInterval(this.pingInterval);
             this.pingInterval = null;
+        }
+    }
+
+    static startWatchdog() {
+        this.stopWatchdog();
+        this.watchdogInterval = setInterval(() => {
+            if (this.isConnected) {
+                const timeSinceLastMessage = Date.now() - this.lastMessageTime;
+                if (timeSinceLastMessage > 15000) { // 15 seconds timeout
+                    console.warn('[WS] Heartbeat timeout. Forcing reconnect...');
+                    this.forceReconnect();
+                }
+            }
+        }, 5000);
+    }
+
+    static stopWatchdog() {
+        if (this.watchdogInterval) {
+            clearInterval(this.watchdogInterval);
+            this.watchdogInterval = null;
         }
     }
 

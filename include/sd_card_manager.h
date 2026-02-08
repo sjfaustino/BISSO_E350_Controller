@@ -68,6 +68,11 @@ SDCardHealth sdCardHealthCheck();
 const char* sdCardHealthString(SDCardHealth result);
 
 /**
+ * @brief Get the last health check result
+ */
+SDCardHealth sdCardGetLastHealth();
+
+/**
  * @brief Format/wipe SD card (delete all files and directories)
  * 
  * Recursively deletes all files and directories on the SD card.

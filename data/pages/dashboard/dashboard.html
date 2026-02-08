@@ -2,6 +2,15 @@
   dashboard.html - Main dashboard view with DRO, system status, and real-time graphs
 -->
 <div class="dashboard">
+    <!-- System Warnings Banner -->
+    <div id="status-warnings" class="status-warnings hidden">
+        <div class="warning-item critical" id="warning-rtc-battery">
+            <span class="warning-icon">⚠️</span>
+            <span class="warning-text" data-i18n="dashboard.rtc_battery_low">RTC Battery Low! Clock will reset on power
+                loss.</span>
+        </div>
+    </div>
+
     <!-- Live Position Display (DRO) -->
     <div class="dro-container">
         <div class="card dro-card">

@@ -36,6 +36,7 @@ typedef struct {
     uint32_t uptime_seconds;
     uint32_t boot_failures;  // Number of boot attempts before success
     bool plc_hardware_present; // PHASE 5.11: Detected at boot
+    bool rtc_battery_low;      // NEW: RTC Battery failure detection
 
     // CPU & Memory
     uint8_t cpu_usage_percent;
@@ -97,6 +98,12 @@ typedef struct {
     uint32_t loop_cycle_count;
     uint32_t watchdog_resets;
     float temperature;
+
+    // SD Card Metrics (PHASE 6.6)
+    bool sd_mounted;
+    uint8_t sd_health;         // Maps to SDCardHealth enum
+    uint64_t sd_total_bytes;
+    uint64_t sd_used_bytes;
 
     // LCD Mirror
     char lcd_lines[4][21];

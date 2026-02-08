@@ -18,6 +18,12 @@
 bool rtcInit();
 
 /**
+ * @brief Check if RTC battery is low or has failed (Oscillator Stop Flag)
+ * @return true if battery warning detected
+ */
+bool rtcHasBatteryWarning();
+
+/**
  * @brief Check if RTC is available
  */
 bool rtcIsAvailable();

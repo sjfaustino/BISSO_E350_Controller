@@ -8,9 +8,15 @@ const FileExplorer = {
     currentPath: '/',
     files: [],
     selectedFile: null,
+    selectedFiles: new Set(),
+    sortField: 'name',
+    sortAsc: true,
+    searchQuery: '',
+    viewMode: localStorage.getItem('explorerViewMode') || 'grid', // 'grid' or 'list'
 
     init() {
         console.log('[Explorer] Initializing...');
+        this.applyViewMode();
         this.bindEvents();
         this.bindDragEvents();
         this.loadFiles();
@@ -43,6 +49,33 @@ const FileExplorer = {
         // Upload
         document.getElementById('explorer-upload-input').onchange = (e) => this.handleUpload(e);
 
+        // Search
+        document.getElementById('explorer-search').oninput = (e) => {
+            this.searchQuery = e.target.value.toLowerCase();
+            this.renderFiles();
+        };
+
+        // Sort
+        document.getElementById('explorer-sort-by').onchange = (e) => {
+            this.sortField = e.target.value;
+            this.renderFiles();
+        };
+
+        document.getElementById('explorer-sort-order').onclick = (e) => {
+            this.sortAsc = !this.sortAsc;
+            e.target.textContent = this.sortAsc ? '🔼' : '🔽';
+            this.renderFiles();
+        };
+
+        // Select All
+        document.getElementById('explorer-select-all').onchange = (e) => {
+            this.selectAll(e.target.checked);
+        };
+
+        // Bulk Actions
+        document.getElementById('bulk-delete').onclick = () => this.bulkDelete();
+        document.getElementById('bulk-cancel').onclick = () => this.selectAll(false);
+
         // Global click to close context menu
         document.addEventListener('click', () => {
             document.getElementById('explorer-ctx-menu').classList.add('hidden');
@@ -59,9 +92,19 @@ const FileExplorer = {
 
         // Context menu actions
         document.getElementById('ctx-open').onclick = () => this.openItem(this.selectedFile);
+        document.getElementById('ctx-edit').onclick = () => this.openEditor(this.selectedFile);
         document.getElementById('ctx-download').onclick = () => this.downloadFile(this.selectedFile);
         document.getElementById('ctx-rename').onclick = () => this.renameItem(this.selectedFile);
+        document.getElementById('ctx-restore').onclick = () => this.restoreItem(this.selectedFile);
         document.getElementById('ctx-delete').onclick = () => this.deleteItem(this.selectedFile);
+
+        // Editor actions
+        document.getElementById('editor-save').onclick = () => this.saveFile();
+        document.getElementById('editor-close').onclick = () => this.closeEditor();
+
+        // View Mode
+        document.getElementById('view-grid').onclick = () => this.setViewMode('grid');
+        document.getElementById('view-list').onclick = () => this.setViewMode('list');
     },
 
     bindDragEvents() {
@@ -104,6 +147,9 @@ const FileExplorer = {
             if (!response.ok) throw new Error(await response.text());
 
             this.files = await response.json();
+            this.files = this.files.map(f => ({ ...f, fullPath: this.currentDrive === 'sd' ? `/sd${this.currentPath === '/' ? '' : this.currentPath}/${f.name}` : `${this.currentPath === '/' ? '' : this.currentPath}/${f.name}` }));
+            this.selectedFiles.clear();
+            this.updateBulkBar();
             this.renderFiles();
             this.renderBreadcrumbs();
         } catch (err) {
@@ -115,24 +161,59 @@ const FileExplorer = {
     renderFiles() {
         const listEl = document.getElementById('explorer-file-list');
         listEl.innerHTML = '';
+        listEl.className = this.viewMode === 'list' ? 'file-grid list-view' : 'file-grid';
 
-        // Sort: Folders first, then alphabetically
-        this.files.sort((a, b) => {
-            if (a.dir !== b.dir) return b.dir ? 1 : -1;
-            return a.name.localeCompare(b.name);
+        // Filter
+        let filteredFiles = this.files.filter(f => {
+            const matchesSearch = f.name.toLowerCase().includes(this.searchQuery);
+            const isHidden = f.name.startsWith('.');
+            const inTrash = this.currentPath.includes('.trash');
+
+            // Hide dotfiles unless we are explicitly in a hidden folder (like .trash)
+            if (isHidden && !inTrash) return false;
+
+            return matchesSearch;
         });
 
-        this.files.forEach(file => {
+        // Sort
+        filteredFiles.sort((a, b) => {
+            // Folders always first
+            if (a.dir !== b.dir) return b.dir ? 1 : -1;
+
+            let res = 0;
+            if (this.sortField === 'size') res = a.size - b.size;
+            else if (this.sortField === 'time') res = a.time - b.time;
+            else res = a.name.localeCompare(b.name);
+
+            return this.sortAsc ? res : -res;
+        });
+
+        filteredFiles.forEach(file => {
             const item = document.createElement('div');
             item.className = 'file-item';
+            if (this.selectedFiles.has(file.fullPath)) item.classList.add('selected');
+            item.dataset.path = file.fullPath;
             item.dataset.name = file.name;
 
             const icon = file.dir ? '📁' : this.getFileIcon(file.name);
+            const size = file.dir ? '--' : this.formatSize(file.size);
+            const date = file.time ? new Date(file.time * 1000).toLocaleDateString() : '--';
 
             item.innerHTML = `
+                <div class="selection-box">
+                    <input type="checkbox" ${this.selectedFiles.has(file.fullPath) ? 'checked' : ''}>
+                </div>
                 <div class="icon">${icon}</div>
                 <div class="name" title="${file.name}">${file.name}</div>
+                <div class="meta-size">${size}</div>
+                <div class="meta-date">${date}</div>
             `;
+
+            const checkbox = item.querySelector('input');
+            checkbox.onclick = (e) => {
+                e.stopPropagation();
+                this.toggleSelection(file.fullPath, checkbox.checked);
+            };
 
             item.onclick = (e) => {
                 if (e.detail === 2) { // Double click
@@ -144,6 +225,13 @@ const FileExplorer = {
 
             listEl.appendChild(item);
         });
+
+        // Trigger staggered animation
+        setTimeout(() => {
+            document.querySelectorAll('.file-item').forEach((el, i) => {
+                setTimeout(() => el.classList.add('appearing'), i * 20);
+            });
+        }, 50);
     },
 
     renderBreadcrumbs() {
@@ -217,11 +305,97 @@ const FileExplorer = {
 
         // Keep path format consistent
         if (this.currentPath === '') this.currentPath = '/';
+        if (!this.currentPath.startsWith('/')) this.currentPath = '/' + this.currentPath;
+
+        // Selection reset on navigation
+        this.selectedFiles.clear();
+        this.updateBulkBar();
 
         document.querySelectorAll('.drive-item').forEach(el => el.classList.remove('active'));
         document.querySelector(`.drive-item[data-drive="${this.currentDrive}"]`).classList.add('active');
 
         this.loadFiles();
+    },
+
+    setViewMode(mode) {
+        if (this.viewMode === mode) return;
+        this.viewMode = mode;
+        localStorage.setItem('explorerViewMode', mode);
+        this.applyViewMode();
+        this.renderFiles();
+    },
+
+    applyViewMode() {
+        document.getElementById('view-grid').classList.toggle('active', this.viewMode === 'grid');
+        document.getElementById('view-list').classList.toggle('active', this.viewMode === 'list');
+    },
+
+    formatSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    },
+
+    toggleSelection(path, isSelected) {
+        if (isSelected) this.selectedFiles.add(path);
+        else this.selectedFiles.delete(path);
+
+        this.updateBulkBar();
+        this.renderFiles();
+    },
+
+    selectAll(checked) {
+        if (checked) {
+            this.files.filter(f => f.name.toLowerCase().includes(this.searchQuery))
+                .forEach(f => this.selectedFiles.add(f.fullPath));
+        } else {
+            this.selectedFiles.clear();
+            document.getElementById('explorer-select-all').checked = false;
+        }
+        this.updateBulkBar();
+        this.renderFiles();
+    },
+
+    updateBulkBar() {
+        const bar = document.getElementById('explorer-bulk-bar');
+        const countEl = document.getElementById('bulk-count');
+
+        if (this.selectedFiles.size > 0) {
+            countEl.textContent = this.selectedFiles.size;
+            bar.classList.remove('hidden');
+        } else {
+            bar.classList.add('hidden');
+        }
+    },
+
+    async bulkDelete() {
+        if (!confirm(`Delete ${this.selectedFiles.size} selected items?`)) return;
+
+        try {
+            const paths = Array.from(this.selectedFiles);
+            const resp = await fetch('/api/files/bulk-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(paths)
+            });
+
+            if (!resp.ok) throw new Error(await resp.text());
+
+            const result = await resp.json();
+            console.log('[Explorer] Bulk delete result:', result);
+
+            this.selectedFiles.clear();
+            this.loadFiles();
+            this.updateUsage();
+
+            if (result.failed > 0) {
+                alert(`Deleted ${result.deleted} items. ${result.failed} items failed.`);
+            }
+        } catch (err) {
+            alert('Bulk delete failed: ' + err.message);
+        }
     },
 
     getFileIcon(name) {
@@ -266,6 +440,26 @@ const FileExplorer = {
         }
     },
 
+    async restoreItem(name) {
+        const apiPath = this.currentDrive === 'sd' ? `/sd${this.currentPath}/${name}` : `${this.currentPath}/${name}`;
+
+        try {
+            const resp = await fetch('/api/trash/restore', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: apiPath })
+            });
+
+            if (!resp.ok) throw new Error(await resp.text());
+
+            console.log('[Explorer] Restored:', name);
+            this.loadFiles();
+            this.updateUsage();
+        } catch (err) {
+            alert('Restore failed: ' + err.message);
+        }
+    },
+
     async handleUpload(target) {
         let file;
         if (target instanceof File) {
@@ -278,21 +472,101 @@ const FileExplorer = {
 
         const formData = new FormData();
         formData.append('file', file);
-
         const path = this.currentDrive === 'sd' ? `/sd${this.currentPath}` : this.currentPath;
         formData.append('path', path);
 
+        const progressContainer = document.getElementById('upload-progress-container');
+        const progressBar = document.getElementById('upload-progress-bar');
+        const progressText = document.getElementById('upload-progress-text');
+
+        progressContainer.classList.remove('hidden');
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/files/upload', true);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressText.textContent = percent + '%';
+                }
+            };
+
+            xhr.onload = () => {
+                progressContainer.classList.add('hidden');
+                if (xhr.status === 200) {
+                    this.loadFiles();
+                    this.updateUsage();
+                    resolve();
+                } else {
+                    alert('Upload failed: ' + xhr.responseText);
+                    reject();
+                }
+            };
+
+            xhr.onerror = () => {
+                progressContainer.classList.add('hidden');
+                alert('Upload error');
+                reject();
+            };
+
+            xhr.send(formData);
+        });
+    },
+
+    async openEditor(name) {
+        if (!name) return;
+        const file = this.files.find(f => f.name === name);
+        if (file && file.dir) return;
+
+        const apiPath = this.currentDrive === 'sd' ? `/sd${this.currentPath}/${name}` : `${this.currentPath}/${name}`;
+
         try {
-            const resp = await fetch('/api/files/upload', {
+            const resp = await fetch(`/api/files/read?path=${encodeURIComponent(apiPath)}`);
+            if (!resp.ok) throw new Error(await resp.text());
+
+            const content = await resp.text();
+            document.getElementById('editor-filename').textContent = name;
+            document.getElementById('editor-textarea').value = content;
+            document.getElementById('explorer-editor').classList.remove('hidden');
+        } catch (err) {
+            alert('Could not open file: ' + err.message);
+        }
+    },
+
+    async saveFile() {
+        const name = document.getElementById('editor-filename').textContent;
+        const content = document.getElementById('editor-textarea').value;
+        const apiPath = this.currentDrive === 'sd' ? `/sd${this.currentPath}/${name}` : `${this.currentPath}/${name}`;
+
+        const saveBtn = document.getElementById('editor-save');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        try {
+            const resp = await fetch(`/api/files/save?path=${encodeURIComponent(apiPath)}`, {
                 method: 'POST',
-                body: formData
+                body: content
             });
             if (!resp.ok) throw new Error(await resp.text());
+
+            this.closeEditor();
             this.loadFiles();
-            this.updateUsage();
         } catch (err) {
-            alert('Upload failed: ' + err.message);
+            alert('Save failed: ' + err.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
         }
+    },
+
+    closeEditor() {
+        document.getElementById('explorer-editor').classList.add('hidden');
+        document.getElementById('editor-textarea').value = '';
     },
 
     downloadFile(name) {
@@ -308,13 +582,29 @@ const FileExplorer = {
         menu.style.top = e.pageY + 'px';
         menu.classList.remove('hidden');
 
-        // Context-aware run button
+        // Context-aware run/edit/restore buttons
         const file = this.files.find(f => f.name === name);
         const runBtn = document.getElementById('ctx-run');
-        if (file && !file.dir && (name.endsWith('.gcode') || name.endsWith('.nc'))) {
-            runBtn.classList.remove('hidden');
+        const editBtn = document.getElementById('ctx-edit');
+        const restoreBtn = document.getElementById('ctx-restore');
+        const inTrash = this.currentPath.includes('.trash');
+
+        if (file && !file.dir) {
+            const isGcode = name.endsWith('.gcode') || name.endsWith('.nc');
+            const isText = isGcode || name.endsWith('.txt') || name.endsWith('.log') || name.endsWith('.json') || name.endsWith('.csv');
+
+            if (isGcode && !inTrash) runBtn.classList.remove('hidden');
+            else runBtn.classList.add('hidden');
+
+            if (isText && !inTrash) editBtn.classList.remove('hidden');
+            else editBtn.classList.add('hidden');
+
+            if (inTrash) restoreBtn.classList.remove('hidden');
+            else restoreBtn.classList.add('hidden');
         } else {
             runBtn.classList.add('hidden');
+            editBtn.classList.add('hidden');
+            restoreBtn.classList.add('hidden');
         }
     },
 

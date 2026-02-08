@@ -8,7 +8,7 @@
 #include "auto_report.h"  // PHASE 4.0: M154 auto-report support
 #include "board_inputs.h" // PHASE 4.0: M226 board input reading
 #include "config_keys.h"
-#include "config_unified.h"
+#include "config_cache.h"
 #include "encoder_calibration.h"
 #include "encoder_motion_integration.h"
 #include "encoder_wj66.h"
@@ -18,6 +18,7 @@
 #include "motion.h"
 #include "motion_planner.h"
 #include "motion_state.h"
+#include "string_safety.h"
 #include "motion_buffer.h"       // PHASE 5.11: Check buffer state in motionIsMoving
 #include "motion_state_machine.h" // PHASE 5.10: Formal state machine
 #include "plc_iface.h"
@@ -69,28 +70,7 @@ portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
 // --- JITTER TRACKING STATE ---
 static uint32_t m_max_jitter_us = 0;
 
-// PHASE 4.1: Configuration Cache (KISS/Performance Optimization)
-// Eliminates expensive string-lookup overhead in 100Hz motion loop
-static struct {
-    float target_margin_mm;
-    float stall_threshold_mm;
-    float deviation_warning_mm;
-    float deviation_critical_mm;
-    bool limits_strict;
-    bool auto_report_enabled;
-    uint32_t last_refresh_ms;
-} m_config_cache = {0.1f, 5.0f, 1.0f, 2.5f, true, true, 0};
-
-void motionRefreshConfig() {
-    m_config_cache.target_margin_mm = configGetFloat(KEY_TARGET_MARGIN, 0.1f);
-    m_config_cache.stall_threshold_mm = configGetFloat(KEY_STALL_THRESHOLD, 5.0f);
-    m_config_cache.deviation_warning_mm = configGetFloat(KEY_DEV_WARN, 1.0f);
-    m_config_cache.deviation_critical_mm = configGetFloat(KEY_DEV_CRIT, 2.5f);
-    m_config_cache.limits_strict = (configGetInt(KEY_STRICT_LIMITS, 1) != 0);
-    m_config_cache.auto_report_enabled = (configGetInt(KEY_M154_AUTO, 1) != 0);
-    m_config_cache.last_refresh_ms = millis();
-    logDebug("[MOTION] Configuration cache refreshed");
-}
+// PHASE 6.7: Uses Global Typed Cache (g_config) instead of local cache
 
 const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y,
                                    ELBO_I73_AXIS_Z, ELBO_I73_AXIS_A};
@@ -239,9 +219,6 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
 
 void motionInit() {
   logInfo("[MOTION] Init...");
-  
-  // Initial config refresh (caches frequently accessed parameters)
-  motionRefreshConfig();
 
   for (int i = 0; i < MOTION_AXES; i++) {
     axes[i].init(i);
@@ -362,13 +339,9 @@ void motionUpdate() {
     backoff_level = 0;
   }
 
-  // PERFORMANCE FIX: Periodically refresh cache (every 5s) or on manual demand
-  if (millis() - m_config_cache.last_refresh_ms > 5000) {
-      motionRefreshConfig();
-  }
-
-  int strict_mode = m_config_cache.limits_strict;
-  float target_margin_mm = m_config_cache.target_margin_mm;
+  // PHASE 6.7: Multi-key lookups replaced by atomic struct access
+  int strict_mode = g_config.strict_limits;
+  float target_margin_mm = g_config.target_margin_mm;
 
   for (int i = 0; i < MOTION_AXES; i++) {
     int32_t raw_pos = wj66GetPosition(i);
@@ -679,8 +652,7 @@ float motionGetEstimatedTimeRemaining() {
 void motionSetCurrentCommand(const char* cmd) {
     if(!cmd) return;
     portENTER_CRITICAL(&motionSpinlock);
-    strncpy(m_state.current_command, cmd, sizeof(m_state.current_command) - 1);
-    m_state.current_command[sizeof(m_state.current_command) - 1] = '\0';
+    SAFE_STRCPY(m_state.current_command, cmd, sizeof(m_state.current_command));
     portEXIT_CRITICAL(&motionSpinlock);
 }
 

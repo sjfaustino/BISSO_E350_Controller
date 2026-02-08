@@ -16,6 +16,7 @@
 #include <esp_now.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
+#include "string_safety.h"
 
 // Ethernet support: LAN8720 for v1.6, W5500 for v3.1
 #include <ETH.h>
@@ -236,7 +237,7 @@ String NetworkManager::getEthernetMAC() const {
     uint8_t mac_addr[6];
     if (esp_read_mac(mac_addr, ESP_MAC_ETH) == ESP_OK) {
         char mac_str[18];
-        snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+        SAFE_SNPRINTF(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
                  mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
         return String(mac_str);
     }
@@ -601,9 +602,7 @@ void NetworkManager::update() {
 
     switch (telnet_auth_state) {
     case TELNET_AUTH_WAIT_USERNAME:
-      strncpy(telnet_username_attempt, input.c_str(),
-              sizeof(telnet_username_attempt) - 1);
-      telnet_username_attempt[sizeof(telnet_username_attempt) - 1] = '\0';
+      SAFE_STRCPY(telnet_username_attempt, input.c_str(), sizeof(telnet_username_attempt));
       telnetSuppressEcho(telnetClient);  // Hide password as user types
       telnetClient.print("Password: ");
       telnet_auth_state = TELNET_AUTH_WAIT_PASSWORD;
@@ -665,7 +664,7 @@ void NetworkManager::update() {
         for (int i = 0; i < 4; i++) wPos[i] = gcodeParser.getWorkPosition(i, mPos[i]);
         
         char buf[160];
-        snprintf(buf, sizeof(buf), "<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f>",
+        SAFE_SNPRINTF(buf, sizeof(buf), "<%s|MPos:%.3f,%.3f,%.3f,%.3f|WPos:%.3f,%.3f,%.3f,%.3f>",
             state, mPos[0], mPos[1], mPos[2], mPos[3], wPos[0], wPos[1], wPos[2], wPos[3]);
         telnetClient.println(buf);
         telnetClient.print("> ");

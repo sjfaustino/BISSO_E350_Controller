@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include <Update.h>
 #include "system_utils.h"       // Safe reboot helper
+#include "string_safety.h"
 
 
 static int ota_progress = 0;
@@ -63,7 +64,7 @@ UpdateCheckResult otaCheckForUpdate(void) {
                 if (!error) {
                     const char* tag_name = doc["tag_name"]; // e.g., "v1.0.1"
                     if (tag_name) {
-                        strncpy(result.latest_version, tag_name, sizeof(result.latest_version));
+                        SAFE_STRCPY(result.latest_version, tag_name, sizeof(result.latest_version));
                         
                         // Parse GitHub version (format: "vX.Y.Z" or "X.Y.Z")
                         int gh_major = 0, gh_minor = 0, gh_patch = 0;
@@ -98,14 +99,14 @@ UpdateCheckResult otaCheckForUpdate(void) {
                             for (JsonObject asset : assets) {
                                 const char* name = asset["name"];
                                 if (name && strstr(name, ".bin") != NULL) {
-                                    strncpy(result.download_url, asset["browser_download_url"], sizeof(result.download_url));
+                                    SAFE_STRCPY(result.download_url, asset["browser_download_url"], sizeof(result.download_url));
                                     break;
                                 }
                             }
                             
                             const char* body = doc["body"];
                             if (body) {
-                                strncpy(result.release_notes, body, sizeof(result.release_notes));
+                                SAFE_STRCPY(result.release_notes, body, sizeof(result.release_notes));
                             }
                         }
                     }

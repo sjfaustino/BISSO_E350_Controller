@@ -37,6 +37,7 @@
 #include "lcd_message.h"    // Added for M117 telemetry
 #include "task_manager.h"   // Added for Stack monitoring
 #include "psram_web_cache.h"
+#include "string_safety.h"
 
 // Telemetry History Buffer (last 60 samples, sampled every 5s = 5mins)
 #define HISTORY_BUFFER_SIZE 60
@@ -117,7 +118,7 @@ void WebServerManager::init() {
     
     // Initialize status cache
     memset(&current_status, 0, sizeof(current_status));
-    strncpy(current_status.status, "IDLE", sizeof(current_status.status));
+    SAFE_STRCPY(current_status.status, "IDLE", sizeof(current_status.status));
 }
 
 // ============================================================================
@@ -254,7 +255,7 @@ void WebServerManager::begin() {
 
 void WebServerManager::setSystemStatus(const char* status) {
     portENTER_CRITICAL(&statusSpinlock);
-    strncpy(current_status.status, status, sizeof(current_status.status) - 1);
+    SAFE_STRCPY(current_status.status, status, sizeof(current_status.status));
     portEXIT_CRITICAL(&statusSpinlock);
 }
 
@@ -420,7 +421,7 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
 
     int n = snprintf(buffer, buffer_size,
         "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
-        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu%s%s%s%s%s%s%s%s%s%s%s},"
+        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu,\"rtc_battery_low\":%s%s%s%s%s%s%s%s%s%s%s},"
         "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
         "\"motion_active\":%s,\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},"
         "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
@@ -429,6 +430,7 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
         "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s}},"
         "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},"
+        "\"sd\":{\"mounted\":%s,\"health\":%d,\"total_bytes\":%llu,\"used_bytes\":%llu},"
         "\"parser\":{\"absolute_mode\":%s,\"feedrate\":%.1f,\"actual_feedrate\":%.1f},"
         "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}",
         current_status.status,
@@ -460,6 +462,10 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         current_status.axis_metrics[2].quality_score, current_status.axis_metrics[2].jitter_mms, current_status.axis_metrics[2].vfd_error_percent, current_status.axis_metrics[2].quality_score < 10 ? "true" : "false", current_status.axis_metrics[2].maintenance_warning ? "true" : "false",
         telemetry.wifi_connected ? "true" : "false",
         telemetry.wifi_signal_strength,
+        telemetry.sd_mounted ? "true" : "false",
+        (int)telemetry.sd_health,
+        telemetry.sd_total_bytes,
+        telemetry.sd_used_bytes,
         (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE) ? "true" : "false",
         req_feedrate,
         actual_feedrate,
@@ -532,8 +538,12 @@ void WebServerManager::broadcastState() {
         } catch (...) {
             logWarning("[WS] Broadcast failed - client disconnected");
         }
-    } else if (len >= 2048) {
-        logError("[WS] Broadcast failed - Buffer overflow (%u bytes)", (uint32_t)len);
+    } else {
+        // PHASE 6.4: Fallback heartbeat when telemetry is skipped to keep watchdog happy
+        wsHandler.sendAll("{\"type\":\"hb\"}");
+        if (len >= 2048) {
+            logError("[WS] Broadcast failed - Buffer overflow (%u bytes)", (uint32_t)len);
+        }
     }
 
     // Update history tracking

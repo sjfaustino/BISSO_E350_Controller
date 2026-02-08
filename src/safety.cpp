@@ -7,8 +7,8 @@
 #include "safety.h"
 #include "altivar31_modbus.h" // PHASE 5.5: VFD current-based stall detection
 #include "axis_synchronization.h" // PHASE 5.6: Per-axis motion validation
+#include "config_cache.h"
 #include "config_keys.h"
-#include "config_unified.h"
 #include "encoder_motion_integration.h"
 #include "encoder_wj66.h" // For wj66GetStatus() and wj66IsStale()
 #include "fault_logging.h"
@@ -83,8 +83,7 @@ void safetyUpdate() {
   if ((uint32_t)(now - last_stall_check) > SAFETY_STALL_CHECK_INTERVAL_MS) {
     last_stall_check = now;
 
-    uint32_t stall_limit_ms =
-        (uint32_t)configGetInt(KEY_STALL_TIMEOUT, SAFETY_MAX_STALL_TIME_MS);
+    uint32_t stall_limit_ms = g_config.stall_timeout_ms;
 
     if (motionIsMoving()) {
       for (uint8_t axis = 0; axis < MOTION_AXES; axis++) {

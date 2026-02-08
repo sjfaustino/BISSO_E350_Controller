@@ -64,4 +64,22 @@ bool safe_strcat(char* dest, size_t dest_size, const char* src);
  */
 bool safe_is_valid_string(const char* buffer, size_t max_size);
 
+// ============================================================================
+// CONVENIENCE MACROS
+// ============================================================================
+
+/**
+ * SAFE_STRCPY(dest, src, size)
+ * Recommended macro for fixed-size buffer copies.
+ * Ensures null-termination and logs warnings on truncation.
+ */
+#define SAFE_STRCPY(dest, src, size) safe_strcpy(dest, size, src)
+
+/**
+ * SAFE_SNPRINTF(dest, size, format, ...)
+ * Recommended macro for formatted string creation.
+ * Ensures null-termination and logs warnings on truncation.
+ */
+#define SAFE_SNPRINTF(dest, size, format, ...) safe_snprintf(dest, size, format, ##__VA_ARGS__)
+
 #endif // STRING_SAFETY_H

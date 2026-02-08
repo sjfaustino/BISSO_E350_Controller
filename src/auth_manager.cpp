@@ -14,6 +14,7 @@
 #include <mbedtls/sha256.h>
 #include <esp_random.h>
 #include <string.h>
+#include "string_safety.h"
 
 // Internal state
 static char current_username[32] = "admin";
@@ -21,7 +22,7 @@ static char stored_password_hash[AUTH_MAX_STORED_PW_LEN] = "";
 static bool password_change_required = false;
 static bool credentials_loaded = false;
 
-// PHASE 5.10: Rate limiting for brute force protection
+// Rate limiting for brute force protection
 #define AUTH_RATE_LIMIT_MAX_IPS 16
 #define AUTH_RATE_LIMIT_MAX_ATTEMPTS 5
 #define AUTH_RATE_LIMIT_WINDOW_MS 60000  // 1 minute
@@ -159,8 +160,7 @@ static bool verifyPassword(const char* password, const char* stored_hash) {
   }
 
   char salt_hex_str[AUTH_SALT_BYTES * 2 + 1];
-  strncpy(salt_hex_str, salt_hex, AUTH_SALT_BYTES * 2);
-  salt_hex_str[AUTH_SALT_BYTES * 2] = '\0';
+  SAFE_STRCPY(salt_hex_str, salt_hex, sizeof(salt_hex_str));
 
   uint8_t salt[AUTH_SALT_BYTES];
   if (hexToBin(salt_hex_str, salt, sizeof(salt)) != AUTH_SALT_BYTES) {
@@ -270,8 +270,7 @@ void authInit() {
   // Load username
   String user = prefs.getString("username", "");
   if (user.length() > 0) {
-    strncpy(current_username, user.c_str(), sizeof(current_username) - 1);
-    current_username[sizeof(current_username) - 1] = '\0';
+    SAFE_STRCPY(current_username, user.c_str(), sizeof(current_username));
   }
 
   // Load password hash
@@ -316,8 +315,7 @@ void authInit() {
     credentials_loaded = true;
   } else {
     // Load existing credentials
-    strncpy(stored_password_hash, pw_hash.c_str(), sizeof(stored_password_hash) - 1);
-    stored_password_hash[sizeof(stored_password_hash) - 1] = '\0';
+    SAFE_STRCPY(stored_password_hash, pw_hash.c_str(), sizeof(stored_password_hash));
 
     // Check if legacy plain text
     if (strncmp(stored_password_hash, "$sha256$", 8) != 0) {
@@ -431,8 +429,7 @@ bool authIsPasswordChangeRequired() {
 
 void authGetUsername(char* output, size_t length) {
   if (output && length > 0) {
-    strncpy(output, current_username, length - 1);
-    output[length - 1] = '\0';
+    SAFE_STRCPY(output, current_username, length);
   }
 }
 
@@ -557,8 +554,7 @@ void authRecordFailedAttempt(const char* ip_address) {
 
   // Not found - add new entry
   if (rate_limit_entries < AUTH_RATE_LIMIT_MAX_IPS) {
-    strncpy(rate_limit_table[rate_limit_entries].ip_address, ip_address, 15);
-    rate_limit_table[rate_limit_entries].ip_address[15] = '\0';
+    SAFE_STRCPY(rate_limit_table[rate_limit_entries].ip_address, ip_address, 16);
     rate_limit_table[rate_limit_entries].attempt_count = 1;
     rate_limit_table[rate_limit_entries].first_attempt_time = now;
     rate_limit_table[rate_limit_entries].last_attempt_time = now;
@@ -678,8 +674,7 @@ bool authTestPassword(const char* password) {
   
   // Extract salt
   char salt_hex_str[AUTH_SALT_BYTES * 2 + 1];
-  strncpy(salt_hex_str, salt_hex, AUTH_SALT_BYTES * 2);
-  salt_hex_str[AUTH_SALT_BYTES * 2] = '\0';
+  SAFE_STRCPY(salt_hex_str, salt_hex, sizeof(salt_hex_str));
   
   uint8_t salt[AUTH_SALT_BYTES];
   hexToBin(salt_hex_str, salt, sizeof(salt));
@@ -755,8 +750,7 @@ void cmd_auth(int argc, char** argv) {
     prefs.end();
     
     if (pw_hash.length() > 0) {
-      strncpy(stored_password_hash, pw_hash.c_str(), sizeof(stored_password_hash) - 1);
-      stored_password_hash[sizeof(stored_password_hash) - 1] = '\0';
+      SAFE_STRCPY(stored_password_hash, pw_hash.c_str(), sizeof(stored_password_hash));
       logInfo("[AUTH] Credentials reloaded successfully");
       authPrintDiagnostics();
     } else {
