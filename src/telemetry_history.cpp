@@ -5,21 +5,21 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
-static telemetry_packet_t* history_buffer = NULL;
+static telemetry_packet_t* history_buffer = nullptr;
 static uint16_t history_head = 0;
 static uint16_t history_count = 0;
-static SemaphoreHandle_t history_mutex = NULL;
+static SemaphoreHandle_t history_mutex = nullptr;
 
 void telemetryHistoryInit() {
-    if (history_buffer != NULL) return;
+    if (history_buffer != nullptr) return;
 
     history_mutex = xSemaphoreCreateMutex();
     
     // Allocate buffer in PSRAM
     // 3600 * ~40 bytes = ~144KB
     history_buffer = (telemetry_packet_t*)psramCalloc(TELEMETRY_HISTORY_DEPTH, sizeof(telemetry_packet_t));
-    
-    if (history_buffer == NULL) {
+    // Check allocation
+    if (history_buffer == nullptr) {
         logError("[HISTORY] Failed to allocate telemetry history in PSRAM!");
         return;
     }
@@ -29,7 +29,7 @@ void telemetryHistoryInit() {
 }
 
 void telemetryHistoryAdd(const telemetry_packet_t* packet) {
-    if (history_buffer == NULL || history_mutex == NULL || packet == NULL) return;
+    if (history_buffer == nullptr || history_mutex == nullptr || packet == nullptr) return;
 
     if (xSemaphoreTake(history_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
         memcpy(&history_buffer[history_head], packet, sizeof(telemetry_packet_t));
@@ -43,10 +43,10 @@ void telemetryHistoryAdd(const telemetry_packet_t* packet) {
     }
 }
 
-void telemetryHistoryGet(telemetry_packet_t* buffer, uint16_t* count) {
-    if (history_buffer == NULL || history_mutex == NULL || buffer == NULL || count == NULL) {
+bool telemetryHistoryGet(telemetry_packet_t* buffer, size_t* count) {
+    if (history_buffer == nullptr || history_mutex == nullptr || buffer == nullptr || count == nullptr) {
         if (count) *count = 0;
-        return;
+        return false; // Added return value for vbool
     }
 
     if (xSemaphoreTake(history_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
@@ -61,8 +61,10 @@ void telemetryHistoryGet(telemetry_packet_t* buffer, uint16_t* count) {
         }
         
         xSemaphoreGive(history_mutex);
+        return true;
     } else {
         *count = 0;
+        return false;
     }
 }
 

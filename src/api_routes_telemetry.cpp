@@ -242,7 +242,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
 
     // NEW: GET /api/telemetry/history - 1-Hour High-Res History (JSON)
     server.on("/api/telemetry/history", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        uint16_t count = telemetryHistoryGetCount();
+        size_t count = telemetryHistoryGetCount();
         if (count == 0) {
             return response->send(200, "application/json", "{\"success\":true,\"samples\":[]}");
         }
@@ -306,7 +306,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
 
     // NEW: GET /api/telemetry/history/raw - Binary export for offline analysis
     server.on("/api/telemetry/history/raw", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
-        uint16_t count = telemetryHistoryGetCount();
+        size_t count = telemetryHistoryGetCount();
         size_t total_size = count * sizeof(telemetry_packet_t);
         
         if (count == 0 || total_size == 0) {

@@ -27,43 +27,43 @@
 // RTOS HANDLES
 // ============================================================================
 
-static TaskHandle_t task_safety = NULL;
-static TaskHandle_t task_motion = NULL;
-static TaskHandle_t task_encoder = NULL;
-static TaskHandle_t task_plc_comm = NULL;
-static TaskHandle_t task_i2c_manager = NULL;
-static TaskHandle_t task_cli = NULL;
-static TaskHandle_t task_fault_log = NULL;
-static TaskHandle_t task_monitor = NULL;
-static TaskHandle_t task_telemetry = NULL; // PHASE 5.4: Background telemetry
-static TaskHandle_t task_lcd_formatter = NULL; // PHASE 5.4: LCD formatting
-static TaskHandle_t task_lcd = NULL;
+static TaskHandle_t task_safety = nullptr;
+static TaskHandle_t task_motion = nullptr;
+static TaskHandle_t task_encoder = nullptr;
+static TaskHandle_t task_plc_comm = nullptr;
+static TaskHandle_t task_i2c_manager = nullptr;
+static TaskHandle_t task_cli = nullptr;
+static TaskHandle_t task_fault_log = nullptr;
+static TaskHandle_t task_monitor = nullptr;
+static TaskHandle_t task_telemetry = nullptr; // PHASE 5.4: Background telemetry
+static TaskHandle_t task_lcd_formatter = nullptr; // PHASE 5.4: LCD formatting
+static TaskHandle_t task_lcd = nullptr;
 
-static QueueHandle_t queue_motion = NULL;
-static QueueHandle_t queue_safety = NULL;
-static QueueHandle_t queue_encoder = NULL;
-static QueueHandle_t queue_plc = NULL;
-static QueueHandle_t queue_fault = NULL;
-static QueueHandle_t queue_display = NULL;
+static QueueHandle_t queue_motion = nullptr;
+static QueueHandle_t queue_safety = nullptr;
+static QueueHandle_t queue_encoder = nullptr;
+static QueueHandle_t queue_plc = nullptr;
+static QueueHandle_t queue_fault = nullptr;
+static QueueHandle_t queue_display = nullptr;
 
-static SemaphoreHandle_t mutex_i2c = NULL; // Shared Bus Mutex
+static SemaphoreHandle_t mutex_i2c = nullptr; // Shared Bus Mutex
 // mutex_i2c_board, mutex_i2c_plc, mutex_lcd are aliased to mutex_i2c
-static SemaphoreHandle_t mutex_motion = NULL;
-static SemaphoreHandle_t mutex_buffer = NULL; // NEW: Separate buffer mutex
+static SemaphoreHandle_t mutex_motion = nullptr;
+static SemaphoreHandle_t mutex_buffer = nullptr; // NEW: Separate buffer mutex
 
 task_stats_t task_stats[] = {
-    {NULL, "Safety", TASK_PRIORITY_SAFETY, 0, 0, 0, 0, 0},
-    {NULL, "Motion", TASK_PRIORITY_MOTION, 0, 0, 0, 0, 0},
-    {NULL, "Encoder", TASK_PRIORITY_ENCODER, 0, 0, 0, 0, 0},
-    {NULL, "PLC_Comm", TASK_PRIORITY_PLC_COMM, 0, 0, 0, 0, 0},
-    {NULL, "I2C_Manager", TASK_PRIORITY_I2C_MANAGER, 0, 0, 0, 0, 0},
-    {NULL, "CLI", TASK_PRIORITY_CLI, 0, 0, 0, 0, 0},
-    {NULL, "Fault_Log", TASK_PRIORITY_FAULT_LOG, 0, 0, 0, 0, 0},
-    {NULL, "Monitor", TASK_PRIORITY_MONITOR, 0, 0, 0, 0, 0},
-    {NULL, "Telemetry", TASK_PRIORITY_TELEMETRY, 0, 0, 0, 0, 0}, // PHASE 5.4
-    {NULL, "LCD_Formatter", TASK_PRIORITY_LCD_FORMAT, 0, 0, 0, 0,
+    {nullptr, "Safety", TASK_PRIORITY_SAFETY, 0, 0, 0, 0, 0},
+    {nullptr, "Motion", TASK_PRIORITY_MOTION, 0, 0, 0, 0, 0},
+    {nullptr, "Encoder", TASK_PRIORITY_ENCODER, 0, 0, 0, 0, 0},
+    {nullptr, "PLC_Comm", TASK_PRIORITY_PLC_COMM, 0, 0, 0, 0, 0},
+    {nullptr, "I2C_Manager", TASK_PRIORITY_I2C_MANAGER, 0, 0, 0, 0, 0},
+    {nullptr, "CLI", TASK_PRIORITY_CLI, 0, 0, 0, 0, 0},
+    {nullptr, "Fault_Log", TASK_PRIORITY_FAULT_LOG, 0, 0, 0, 0, 0},
+    {nullptr, "Monitor", TASK_PRIORITY_MONITOR, 0, 0, 0, 0, 0},
+    {nullptr, "Telemetry", TASK_PRIORITY_TELEMETRY, 0, 0, 0, 0, 0}, // PHASE 5.4
+    {nullptr, "LCD_Formatter", TASK_PRIORITY_LCD_FORMAT, 0, 0, 0, 0,
      0}, // PHASE 5.4
-    {NULL, "LCD", TASK_PRIORITY_LCD, 0, 0, 0, 0, 0},
+    {nullptr, "LCD", TASK_PRIORITY_LCD, 0, 0, 0, 0, 0},
 };
 
 static int stats_count = sizeof(task_stats) / sizeof(task_stats_t);

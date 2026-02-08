@@ -41,7 +41,7 @@ timeout_handle_t* timeoutStartCustom(timeout_type_t type, uint32_t custom_ms) {
     }
   }
   logError("[TIMEOUT] No free handles");
-  return NULL;
+  return nullptr;
 }
 
 timeout_handle_t* timeoutStart(timeout_type_t type) {

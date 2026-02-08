@@ -81,8 +81,7 @@ bool spindleMonitorInit(uint8_t jxk10_address, float threshold_amps) {
   monitor_state.last_poll_time_ms = millis();
   
   // Load auto-pause config from typed cache (PHASE 6.7)
-  monitor_state.auto_pause_enabled = g_config.strict_limits; // Fallback to strict_limits for safety
-  monitor_state.auto_pause_enabled = (configGetInt(KEY_SPINDL_PAUSE_EN, 1) != 0); // Still use specific key if possible
+  monitor_state.auto_pause_enabled = g_config.spindle_pause_enabled;
   monitor_state.auto_pause_threshold_amps = (float)g_config.spindle_pause_threshold;
   monitor_state.auto_paused = false;
 

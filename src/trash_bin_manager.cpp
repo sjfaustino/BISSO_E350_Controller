@@ -153,5 +153,6 @@ static void trashBinTask(void* pvParameters) {
 }
 
 void trashBinStartBackgroundHandler() {
-    xTaskCreate(trashBinTask, "TrashBinTask", 4096, NULL, 1, NULL);
+    // Start background task
+    xTaskCreate(trashBinTask, "TrashBinTask", 4096, nullptr, 1, nullptr);
 }

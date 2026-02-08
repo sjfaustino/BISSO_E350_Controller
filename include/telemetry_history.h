@@ -30,8 +30,9 @@ void telemetryHistoryAdd(const telemetry_packet_t* packet);
  * @brief Get all available history samples
  * @param buffer Output buffer (must be at least TELEMETRY_HISTORY_DEPTH * sizeof(telemetry_packet_t))
  * @param count Pointer to store actual number of samples returned
+ * @return true if successful, false on error
  */
-void telemetryHistoryGet(telemetry_packet_t* buffer, uint16_t* count);
+bool telemetryHistoryGet(telemetry_packet_t* buffer, size_t* count);
 
 /**
  * @brief Get the number of samples currently in history

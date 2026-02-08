@@ -28,6 +28,7 @@ void configCacheRefresh() {
     g_config.jxk10_addr = (uint32_t)configGetInt(KEY_JXK10_ADDR, 1);
     g_config.spindle_threshold = (uint32_t)configGetInt(KEY_SPINDLE_THRESHOLD, 30);
     g_config.spindle_pause_threshold = (uint32_t)configGetInt(KEY_SPINDL_PAUSE_THR, 25);
+    g_config.spindle_pause_enabled = (configGetInt(KEY_SPINDL_PAUSE_EN, 1) != 0);
     g_config.spindle_rated_amps = configGetFloat(KEY_SPINDLE_RATED_AMPS, 24.5f);
     
     // Motion Safety
@@ -63,6 +64,8 @@ void configCacheUpdate(const char* key) {
         g_config.spindle_threshold = (uint32_t)configGetInt(key, 30);
     } else if (strcmp(key, KEY_SPINDL_PAUSE_THR) == 0) {
         g_config.spindle_pause_threshold = (uint32_t)configGetInt(key, 25);
+    } else if (strcmp(key, KEY_SPINDL_PAUSE_EN) == 0) {
+        g_config.spindle_pause_enabled = (configGetInt(key, 1) != 0);
     } else if (strcmp(key, KEY_SPINDLE_RATED_AMPS) == 0) {
         g_config.spindle_rated_amps = configGetFloat(key, 24.5f);
     } else if (strcmp(key, KEY_MOTION_STRICT_LIMITS) == 0) {

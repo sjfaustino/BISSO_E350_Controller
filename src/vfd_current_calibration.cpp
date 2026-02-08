@@ -171,7 +171,7 @@ bool vfdCalibrationIsMeasureComplete(void) {
 }
 
 bool vfdCalibrationGetMeasurement(float* out_rms_amps, float* out_peak_amps) {
-    if (out_rms_amps == NULL || out_peak_amps == NULL) {
+    if (out_rms_amps == nullptr || out_peak_amps == nullptr) {
         return false;
     }
 

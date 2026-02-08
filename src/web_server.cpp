@@ -627,7 +627,7 @@ void WebServerManager::checkWsHealth() {
             // Let's assume sendPing() is available or use raw frame construction.
             // For now, I'll use `client->sendPing()`.
             // Use standard ESP-IDF opcode for PING (0x9)
-            client->sendMessage(HTTPD_WS_TYPE_PING, NULL, 0);
+            client->sendMessage(HTTPD_WS_TYPE_PING, nullptr, 0);
             ++it;
         }
     }

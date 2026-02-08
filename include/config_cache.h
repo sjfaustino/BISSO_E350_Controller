@@ -23,6 +23,7 @@ typedef struct {
     uint32_t jxk10_addr;
     uint32_t spindle_threshold;
     uint32_t spindle_pause_threshold;
+    bool spindle_pause_enabled;
     float spindle_rated_amps;
     
     // Motion Safety

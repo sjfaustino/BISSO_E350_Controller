@@ -21,6 +21,8 @@
 #define ENABLE_INTERRUPT_WDT        1    // Interrupt watchdog (CPU core)
 #define PANIC_ON_TIMEOUT            1    // Force restart on timeout (safer)
 
+#define WDT_MAX_TASKS               15   // Max number of monitored tasks
+
 // ============================================================================
 // WATCHDOG STATUS CODES
 // ============================================================================

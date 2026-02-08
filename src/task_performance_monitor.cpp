@@ -60,7 +60,7 @@ static const char* task_names[] = {
 static task_performance_t* getOrCreateMetrics(uint32_t task_id) {
     // Check if this task is enabled for tracking
     if (task_id >= MAX_TRACKED_TASKS || !task_tracking_enabled[task_id]) {
-        return NULL;  // Skip tracking for disabled tasks
+        return nullptr;  // Skip tracking for disabled tasks
     }
 
     // Search for existing
@@ -81,7 +81,7 @@ static task_performance_t* getOrCreateMetrics(uint32_t task_id) {
         return metrics;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 // Get microsecond timestamp
@@ -165,7 +165,7 @@ const task_performance_t* perfMonitorGetTaskMetrics(uint32_t task_id) {
             return &task_metrics[i];
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 const task_performance_t* perfMonitorGetAllMetrics(int* count) {
