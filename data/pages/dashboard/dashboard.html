@@ -514,6 +514,83 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tool Path Preview -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin: 0;" data-i18n="dashboard.toolpath_preview">🎯 Tool Path Preview</h3>
+                    <button class="card-toggle" data-toggle="toolpath">−</button>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <div class="toolpath-controls" style="padding: 15px; border-bottom: 1px solid var(--border-color);">
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <button class="btn btn-small btn-secondary" id="toolpath-load" data-i18n="dashboard.load_gcode">Load G-Code</button>
+                            <button class="btn btn-small btn-secondary" id="toolpath-fit" data-i18n="dashboard.fit_view">Fit View</button>
+                            <button class="btn btn-small btn-secondary" id="toolpath-play" data-i18n="dashboard.play">▶️ Play</button>
+                            <button class="btn btn-small btn-secondary" id="toolpath-reset" data-i18n="dashboard.reset">Reset</button>
+                            <div style="display: flex; gap: 5px; align-items: center;">
+                                <label style="font-size: 12px;" data-i18n="dashboard.show_rapid">Rapid:</label>
+                                <input type="checkbox" id="toolpath-show-rapid" checked style="margin: 0;">
+                            </div>
+                            <div style="display: flex; gap: 5px; align-items: center;">
+                                <label style="font-size: 12px;" data-i18n="dashboard.show_feed">Feed:</label>
+                                <input type="checkbox" id="toolpath-show-feed" checked style="margin: 0;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; font-size: 12px;">
+                            <span data-i18n="dashboard.color_scheme">Color:</span>
+                            <select id="toolpath-color-scheme" style="padding: 2px 6px; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                                <option value="default" data-i18n="dashboard.color_default">Default</option>
+                                <option value="depth" data-i18n="dashboard.color_depth">By Depth</option>
+                                <option value="speed" data-i18n="dashboard.color_speed">By Speed</option>
+                                <option value="tool" data-i18n="dashboard.color_tool">By Tool</option>
+                            </select>
+                            <span style="margin-left: 10px;" data-i18n="dashboard.current_file">File:</span>
+                            <span id="toolpath-filename" style="font-weight: 600; color: var(--accent-color);">None loaded</span>
+                        </div>
+                    </div>
+                    <div style="position: relative; height: 300px; background: var(--bg-tertiary);">
+                        <canvas id="toolpath-canvas" style="width: 100%; height: 100%; display: block; cursor: crosshair;"></canvas>
+                        
+                        <!-- Coordinate Overlay -->
+                        <div id="toolpath-coords" style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: #00ff00; padding: 8px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 11px; pointer-events: none;">
+                            <div>X: <span id="toolpath-x">0.000</span></div>
+                            <div>Y: <span id="toolpath-y">0.000</span></div>
+                            <div>Z: <span id="toolpath-z">0.000</span></div>
+                        </div>
+                        
+                        <!-- Status Indicators -->
+                        <div id="toolpath-status" style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 5px; pointer-events: none;">
+                            <div id="toolpath-collision-status" style="background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 3px; font-size: 11px;">
+                                <span style="color: #4CAF50;">●</span> <span data-i18n="dashboard.no_collisions">No Collisions</span>
+                            </div>
+                            <div id="toolpath-bounds-status" style="background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 3px; font-size: 11px;">
+                                <span style="color: #4CAF50;">●</span> <span data-i18n="dashboard.within_bounds">Within Bounds</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Progress Timeline -->
+                        <div id="toolpath-timeline" style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); padding: 8px 15px; border-radius: 4px 4px 0 0; pointer-events: auto;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                <span style="color: white; font-size: 11px;" data-i18n="dashboard.simulation">Simulation</span>
+                                <div style="display: flex; gap: 5px;">
+                                    <button id="toolpath-step-back" style="background: transparent; border: 1px solid var(--border-color); color: white; padding: 2px 6px; border-radius: 2px; font-size: 10px;">⏮</button>
+                                    <button id="toolpath-step-forward" style="background: transparent; border: 1px solid var(--border-color); color: white; padding: 2px 6px; border-radius: 2px; font-size: 10px;">⏭</button>
+                                </div>
+                            </div>
+                            <input type="range" id="toolpath-progress" min="0" max="100" value="0" style="width: 100%; height: 4px; -webkit-appearance: none; appearance: none; background: var(--bg-secondary); border-radius: 2px; outline: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 3px;">
+                                <span style="color: white; font-size: 10px;">
+                                    <span data-i18n="dashboard.line">Line</span>: <span id="toolpath-line">0</span> / <span id="toolpath-total-lines">0</span>
+                                </span>
+                                <span style="color: white; font-size: 10px;">
+                                    <span id="toolpath-time">0:00</span> / <span id="toolpath-total-time">0:00</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

@@ -263,7 +263,533 @@ window.DashboardModule = window.DashboardModule || {
         } const e = this.lastTelemetry?.vfd?.connected; if (this.history.spindle.length > 0 && e) { const e = this.history.spindle[this.history.spindle.length - 1]; if (t ? this.graphs.spindle?.addDataPoint(e) : this.graphs.spindle?.addDataPoint("Current", e), !t) { const t = this.graphs.spindle?.getStats("Current"); if (t) { const i = document.getElementById("spindle-current"); i && (i.textContent = e.toFixed(2) + " A"); const s = document.getElementById("spindle-bar"), n = document.getElementById("spindle-freq"), a = document.getElementById("spindle-thermal"); if (s) { const t = 30, i = Math.min(e / t * 100, 100); s.style.width = i + "%", s.style.background = i > 80 ? "var(--color-critical)" : i > 60 ? "var(--color-warning)" : "var(--color-optimal)" } this.lastTelemetry && this.lastTelemetry.vfd && (n && (n.textContent = this.lastTelemetry.vfd.frequency_hz.toFixed(1) + " Hz"), a && (a.textContent = (this.lastTelemetry.vfd.thermal_percent || 0) + "%")); const o = document.getElementById("spindle-stat-current"), r = document.getElementById("spindle-stat-avg"), d = document.getElementById("spindle-stat-max"); o && (o.textContent = e.toFixed(2) + " A"), r && (r.textContent = t.avg.toFixed(2) + " A"), d && (d.textContent = t.max.toFixed(2) + " A") } } } else e || (this.setNA(document.getElementById("spindle-stat-current"), " A"), this.setNA(document.getElementById("spindle-stat-avg"), " A"), this.setNA(document.getElementById("spindle-stat-max"), " A")); if (this.history.temperature.length > 0) { const e = this.history.temperature[this.history.temperature.length - 1]; if (t ? this.graphs.temperature?.addDataPoint(e) : this.graphs.temperature?.addDataPoint("Temp", e), !t) { const t = this.graphs.temperature?.getStats("Temp"); if (t) { const i = document.getElementById("temp-current"), s = document.getElementById("temp-stat-avg"), n = document.getElementById("temp-stat-max"); i && (i.textContent = e.toFixed(1) + " °C"), s && (s.textContent = t.avg.toFixed(1) + " °C"), n && (n.textContent = t.max.toFixed(1) + " °C") } } } if (this.history.latency.length > 0 && !t) { const t = this.history.latency[this.history.latency.length - 1]; this.graphs.latency?.addDataPoint("Latency", t); const e = this.graphs.latency?.getStats("Latency"); if (e) { const i = document.getElementById("latency-current"), s = document.getElementById("latency-stat-avg"), n = document.getElementById("latency-stat-max"); i && (i.textContent = t.toFixed(0) + " ms"), s && (s.textContent = e.avg.toFixed(0) + " ms"), n && (n.textContent = e.max.toFixed(0) + " ms") } } if (this.history.motion.length > 0 && !t) { const t = this.history.motion[this.history.motion.length - 1], e = AppState.data.motion?.dro_connected ?? !1; this.updateHeaderNA("header-motion-load", window.i18n.t('dashboard.motion_system_load'), e); const i = e && t.quality || 0, s = e && t.jitter || 0; this.graphs.motion?.addDataPoint("Quality", i), this.graphs.motion?.addDataPoint("Jitter", s); const n = document.getElementById("motion-quality"), a = document.getElementById("motion-jitter"); e ? (this.setValue(n, i.toFixed(0) + "%"), this.setValue(a, s.toFixed(2) + " mm/s")) : (this.setNA(n), this.setNA(a)) } if (this.history.wifi.length > 0 && !t) { const t = this.history.wifi[this.history.wifi.length - 1]; this.graphs.wifi?.addDataPoint("Signal", t); const e = this.graphs.wifi?.getStats("Signal"); if (e) { const i = document.getElementById("wifi-current"), s = document.getElementById("wifi-stat-avg"), n = document.getElementById("wifi-stat-max"); i && (i.textContent = t.toFixed(0) + "%"), s && (s.textContent = e.avg.toFixed(0) + "%"), n && (n.textContent = e.max.toFixed(0) + "%") } }
     }, exportGraphsData() { let t = window.i18n.t('dashboard.graph_export_header') + (new Date).toLocaleString() + "\n\n"; Object.entries(this.graphs).forEach(([e, i]) => { i && "function" == typeof i.exportData && (t += `\n=== ${e.toUpperCase()} ===\n`, t += i.exportData()) }); const e = new Blob([t], { type: "text/csv" }), i = window.URL.createObjectURL(e), s = document.createElement("a"); s.href = i, s.download = `graphs-export-${Date.now()}.csv`, s.click(), window.URL.revokeObjectURL(i), AlertManager.add(window.i18n.t('dashboard.graph_exported_alert'), "success", 2e3) }, cleanup() { console.log(window.i18n.t('dashboard.cleaning_up')), this.stateChangeHandler && (window.removeEventListener("state-changed", this.stateChangeHandler), this.stateChangeHandler = null), this.updateInterval && (clearInterval(this.updateInterval), this.updateInterval = null), Object.values(this.graphs).forEach(t => { t && "function" == typeof t.destroy && t.destroy() }), this.graphs = {} }
 };
-// Stack Monitor Extension (Idempotent)
+// Tool Path Preview Module
+    initToolPathPreview() {
+        this.toolpath = {
+            canvas: null,
+            ctx: null,
+            gcodeData: [],
+            currentLine: 0,
+            isPlaying: false,
+            viewTransform: {
+                scale: 1,
+                offsetX: 0,
+                offsetY: 0
+            },
+            filename: 'None loaded',
+            totalTime: '0:00',
+            collisions: [],
+            bounds: { minX: 0, maxX: 3000, minY: 0, maxY: 2000, minZ: 0, maxZ: 200 }
+        };
+
+        this.setupToolPathCanvas();
+        this.setupToolPathEventListeners();
+    },
+
+    setupToolPathCanvas() {
+        this.toolpath.canvas = document.getElementById('toolpath-canvas');
+        if (this.toolpath.canvas) {
+            this.toolpath.ctx = this.toolpath.canvas.getContext('2d');
+            this.resizeToolPathCanvas();
+            window.addEventListener('resize', () => this.resizeToolPathCanvas());
+        }
+    },
+
+    resizeToolPathCanvas() {
+        const container = this.toolpath.canvas.parentElement;
+        this.toolpath.canvas.width = container.clientWidth;
+        this.toolpath.canvas.height = container.clientHeight;
+        this.renderToolPath();
+    },
+
+    setupToolPathEventListeners() {
+        // Canvas interactions
+        if (this.toolpath.canvas) {
+            this.toolpath.canvas.addEventListener('mousemove', (e) => this.onToolPathMouseMove(e));
+            this.toolpath.canvas.addEventListener('wheel', (e) => this.onToolPathWheel(e));
+            this.toolpath.canvas.addEventListener('mousedown', (e) => this.onToolPathMouseDown(e));
+        }
+
+        // Control buttons
+        document.getElementById('toolpath-load')?.addEventListener('click', () => this.loadGCode());
+        document.getElementById('toolpath-fit')?.addEventListener('click', () => this.fitToolPathView());
+        document.getElementById('toolpath-play')?.addEventListener('click', () => this.toggleToolPathPlay());
+        document.getElementById('toolpath-reset')?.addEventListener('click', () => this.resetToolPath());
+
+        // View options
+        document.getElementById('toolpath-show-rapid')?.addEventListener('change', () => this.renderToolPath());
+        document.getElementById('toolpath-show-feed')?.addEventListener('change', () => this.renderToolPath());
+        document.getElementById('toolpath-color-scheme')?.addEventListener('change', () => this.renderToolPath());
+
+        // Timeline controls
+        document.getElementById('toolpath-progress')?.addEventListener('input', (e) => this.seekToolPathTo(e.target.value));
+        document.getElementById('toolpath-step-forward')?.addEventListener('click', () => this.stepToolPathForward());
+        document.getElementById('toolpath-step-back')?.addEventListener('click', () => this.stepToolPathBack());
+    },
+
+    async loadGCode() {
+        try {
+            const response = await window.API.get('/gcode/current');
+            if (response && response.content) {
+                this.toolpath.gcodeData = this.parseGCode(response.content);
+                this.toolpath.filename = response.filename || 'current_job.nc';
+                this.updateToolPathStats();
+                this.fitToolPathView();
+                this.renderToolPath();
+                this.updateToolPathUI();
+                AlertManager.add('G-Code loaded successfully', 'success', 2000);
+            }
+        } catch (error) {
+            AlertManager.add('Failed to load G-Code', 'error');
+        }
+    },
+
+    parseGCode(gcode) {
+        const lines = gcode.split('\n');
+        const parsed = [];
+        let currentPos = { x: 0, y: 0, z: 0 };
+        let currentTool = 1;
+        let totalDistance = 0;
+        
+        lines.forEach((line, index) => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(';')) return;
+            
+            const command = this.parseGCodeLine(trimmed, currentPos);
+            if (command) {
+                command.lineNumber = index;
+                command.tool = currentTool;
+                
+                if (command.type === 'tool-change') {
+                    currentTool = command.toolNumber;
+                }
+                
+                if (command.type === 'move' && command.end) {
+                    const distance = Math.sqrt(
+                        Math.pow(command.end.x - currentPos.x, 2) + 
+                        Math.pow(command.end.y - currentPos.y, 2) + 
+                        Math.pow(command.end.z - currentPos.z, 2)
+                    );
+                    totalDistance += distance;
+                    currentPos = { ...command.end };
+                }
+                
+                parsed.push(command);
+            }
+        });
+        
+        // Estimate time (rough calculation)
+        const estimatedMinutes = Math.round(totalDistance / 1000); // Assuming 1000mm/min
+        this.toolpath.totalTime = `${Math.floor(estimatedMinutes / 60)}:${(estimatedMinutes % 60).toString().padStart(2, '0')}`;
+        
+        return parsed;
+    },
+
+    parseGCodeLine(line, currentPos) {
+        const parts = line.split(/\s+/);
+        const cmd = parts[0].toUpperCase();
+        
+        if (cmd === 'G0' || cmd === 'G1') {
+            const move = {
+                type: 'move',
+                rapid: cmd === 'G0',
+                start: { ...currentPos },
+                end: { ...currentPos }
+            };
+            
+            parts.forEach(part => {
+                if (part.startsWith('X')) move.end.x = parseFloat(part.substring(1));
+                if (part.startsWith('Y')) move.end.y = parseFloat(part.substring(1));
+                if (part.startsWith('Z')) move.end.z = parseFloat(part.substring(1));
+                if (part.startsWith('F')) move.feedrate = parseFloat(part.substring(1));
+            });
+            
+            return move;
+        }
+        
+        if (cmd === 'G2' || cmd === 'G3') {
+            return {
+                type: 'arc',
+                clockwise: cmd === 'G2',
+                start: { ...currentPos },
+                end: { ...currentPos },
+                center: { x: 0, y: 0 },
+                feedrate: 0
+            };
+        }
+        
+        if (cmd === 'M6') {
+            return {
+                type: 'tool-change',
+                toolNumber: parseInt(parts[1]) || 1
+            };
+        }
+        
+        return null;
+    },
+
+    renderToolPath() {
+        if (!this.toolpath.ctx) return;
+        
+        const ctx = this.toolpath.ctx;
+        const width = this.toolpath.canvas.width;
+        const height = this.toolpath.canvas.height;
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+        
+        // Apply transformations
+        ctx.save();
+        ctx.translate(width/2 + this.toolpath.viewTransform.offsetX, height/2 + this.toolpath.viewTransform.offsetY);
+        ctx.scale(this.toolpath.viewTransform.scale, -this.toolpath.viewTransform.scale); // Flip Y axis
+        
+        // Draw grid
+        this.drawToolPathGrid();
+        
+        // Draw machine bounds
+        this.drawToolPathBounds();
+        
+        // Draw toolpath
+        this.drawToolPathData();
+        
+        // Draw current position
+        if (this.toolpath.currentLine < this.toolpath.gcodeData.length) {
+            this.drawToolPathCurrentPosition();
+        }
+        
+        ctx.restore();
+    },
+
+    drawToolPathGrid() {
+        const ctx = this.toolpath.ctx;
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 0.5;
+        
+        const gridSize = 100 * this.toolpath.viewTransform.scale;
+        const gridCount = 20;
+        
+        for (let i = -gridCount; i <= gridCount; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * gridSize, -gridCount * gridSize);
+            ctx.lineTo(i * gridSize, gridCount * gridSize);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(-gridCount * gridSize, i * gridSize);
+            ctx.lineTo(gridCount * gridSize, i * gridSize);
+            ctx.stroke();
+        }
+    },
+
+    drawToolPathBounds() {
+        const ctx = this.toolpath.ctx;
+        ctx.strokeStyle = '#f44336';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        
+        // Machine limits (3000x2000x200)
+        ctx.strokeRect(0, 0, 3000, 2000);
+        
+        ctx.setLineDash([]);
+    },
+
+    drawToolPathData() {
+        const ctx = this.toolpath.ctx;
+        const showRapid = document.getElementById('toolpath-show-rapid')?.checked;
+        const showFeed = document.getElementById('toolpath-show-feed')?.checked;
+        const colorScheme = document.getElementById('toolpath-color-scheme')?.value || 'default';
+        
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.8;
+        
+        this.toolpath.gcodeData.forEach((command, index) => {
+            if (index > this.toolpath.currentLine) return; // Don't draw future moves
+            
+            let color = this.getToolPathColor(command, colorScheme);
+            
+            if (command.type === 'move') {
+                if (command.rapid && !showRapid) return;
+                if (!command.rapid && !showFeed) return;
+                
+                ctx.strokeStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(command.start.x, command.start.y);
+                ctx.lineTo(command.end.x, command.end.y);
+                ctx.stroke();
+            }
+            
+            if (command.type === 'arc' && showFeed) {
+                this.drawToolPathArc(command, color);
+            }
+            
+            if (command.type === 'tool-change') {
+                this.drawToolPathToolChange(command);
+            }
+        });
+    },
+
+    getToolPathColor(command, scheme) {
+        switch (scheme) {
+            case 'depth':
+                const depth = (command.end?.z || 0) / 200; // Normalize to 0-1
+                return `hsl(${240 - depth * 60}, 70%, 50%)`;
+            
+            case 'speed':
+                const speed = (command.feedrate || 1000) / 3000;
+                return `hsl(${120 - speed * 120}, 70%, 50%)`;
+            
+            case 'tool':
+                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57'];
+                return colors[command.tool % colors.length];
+            
+            default:
+                return command.rapid ? '#ff9800' : '#2196f3';
+        }
+    },
+
+    drawToolPathArc(command, color) {
+        // Simplified arc drawing - would need proper implementation
+        const ctx = this.toolpath.ctx;
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(command.start.x, command.start.y);
+        ctx.lineTo(command.end.x, command.end.y);
+        ctx.stroke();
+    },
+
+    drawToolPathToolChange(command) {
+        const ctx = this.toolpath.ctx;
+        ctx.fillStyle = '#ff9800';
+        ctx.beginPath();
+        ctx.arc(command.start.x, command.start.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'white';
+        ctx.font = '12px Arial';
+        ctx.fillText(`T${command.tool}`, command.start.x + 20, command.start.y + 5);
+    },
+
+    drawToolPathCurrentPosition() {
+        const command = this.toolpath.gcodeData[this.toolpath.currentLine];
+        if (!command || !command.end) return;
+        
+        const ctx = this.toolpath.ctx;
+        const pos = command.end;
+        
+        // Draw position indicator
+        ctx.fillStyle = '#4CAF50';
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw tool indicator
+        ctx.fillStyle = '#2196f3';
+        ctx.font = '12px Arial';
+        ctx.fillText(`T${command.tool}`, pos.x + 15, pos.y + 5);
+    },
+
+    onToolPathMouseMove(e) {
+        const rect = this.toolpath.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Convert to machine coordinates
+        const machineCoords = this.screenToMachine(x, y);
+        
+        document.getElementById('toolpath-x').textContent = machineCoords.x.toFixed(3);
+        document.getElementById('toolpath-y').textContent = machineCoords.y.toFixed(3);
+        document.getElementById('toolpath-z').textContent = '0.000';
+    },
+
+    onToolPathWheel(e) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        this.toolpath.viewTransform.scale *= delta;
+        this.toolpath.viewTransform.scale = Math.max(0.01, Math.min(10, this.toolpath.viewTransform.scale));
+        this.renderToolPath();
+    },
+
+    onToolPathMouseDown(e) {
+        // Implement pan functionality
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startOffsetX = this.toolpath.viewTransform.offsetX;
+        const startOffsetY = this.toolpath.viewTransform.offsetY;
+
+        const onMouseMove = (e) => {
+            this.toolpath.viewTransform.offsetX = startOffsetX + (e.clientX - startX);
+            this.toolpath.viewTransform.offsetY = startOffsetY + (e.clientY - startY);
+            this.renderToolPath();
+        };
+
+        const onMouseUp = () => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    },
+
+    screenToMachine(screenX, screenY) {
+        const width = this.toolpath.canvas.width;
+        const height = this.toolpath.canvas.height;
+        
+        const x = (screenX - width/2 - this.toolpath.viewTransform.offsetX) / this.toolpath.viewTransform.scale;
+        const y = -(screenY - height/2 - this.toolpath.viewTransform.offsetY) / this.toolpath.viewTransform.scale;
+        
+        return { x, y };
+    },
+
+    fitToolPathView() {
+        if (this.toolpath.gcodeData.length === 0) return;
+        
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        
+        this.toolpath.gcodeData.forEach(command => {
+            if (command.end) {
+                minX = Math.min(minX, command.end.x);
+                maxX = Math.max(maxX, command.end.x);
+                minY = Math.min(minY, command.end.y);
+                maxY = Math.max(maxY, command.end.y);
+            }
+        });
+        
+        const width = this.toolpath.canvas.width;
+        const height = this.toolpath.canvas.height;
+        const padding = 50;
+        
+        const scaleX = (width - 2 * padding) / (maxX - minX);
+        const scaleY = (height - 2 * padding) / (maxY - minY);
+        
+        this.toolpath.viewTransform.scale = Math.min(scaleX, scaleY);
+        this.toolpath.viewTransform.offsetX = -(minX + maxX) / 2 * this.toolpath.viewTransform.scale;
+        this.toolpath.viewTransform.offsetY = (minY + maxY) / 2 * this.toolpath.viewTransform.scale;
+        
+        this.renderToolPath();
+    },
+
+    toggleToolPathPlay() {
+        this.toolpath.isPlaying = !this.toolpath.isPlaying;
+        const btn = document.getElementById('toolpath-play');
+        btn.textContent = this.toolpath.isPlaying ? '⏸️ Pause' : '▶️ Play';
+        
+        if (this.toolpath.isPlaying) {
+            this.animateToolPath();
+        }
+    },
+
+    animateToolPath() {
+        if (!this.toolpath.isPlaying) return;
+        
+        this.toolpath.currentLine = Math.min(this.toolpath.currentLine + 1, this.toolpath.gcodeData.length - 1);
+        document.getElementById('toolpath-progress').value = (this.toolpath.currentLine / this.toolpath.gcodeData.length) * 100;
+        
+        this.updateToolPathTimeline();
+        this.renderToolPath();
+        
+        if (this.toolpath.currentLine < this.toolpath.gcodeData.length - 1) {
+            requestAnimationFrame(() => this.animateToolPath());
+        } else {
+            this.toolpath.isPlaying = false;
+            document.getElementById('toolpath-play').textContent = '▶️ Play';
+        }
+    },
+
+    seekToolPathTo(value) {
+        this.toolpath.currentLine = Math.floor((value / 100) * this.toolpath.gcodeData.length);
+        this.updateToolPathTimeline();
+        this.renderToolPath();
+    },
+
+    stepToolPathForward() {
+        this.toolpath.currentLine = Math.min(this.toolpath.currentLine + 1, this.toolpath.gcodeData.length - 1);
+        this.updateToolPathTimeline();
+        this.renderToolPath();
+    },
+
+    stepToolPathBack() {
+        this.toolpath.currentLine = Math.max(this.toolpath.currentLine - 1, 0);
+        this.updateToolPathTimeline();
+        this.renderToolPath();
+    },
+
+    resetToolPath() {
+        this.toolpath.currentLine = 0;
+        this.toolpath.isPlaying = false;
+        document.getElementById('toolpath-play').textContent = '▶️ Play';
+        document.getElementById('toolpath-progress').value = 0;
+        this.updateToolPathTimeline();
+        this.renderToolPath();
+    },
+
+    updateToolPathTimeline() {
+        const command = this.toolpath.gcodeData[this.toolpath.currentLine];
+        if (command) {
+            document.getElementById('toolpath-line').textContent = command.lineNumber || 0;
+            
+            const progress = (this.toolpath.currentLine / this.toolpath.gcodeData.length) * 100;
+            const currentTime = (progress / 100) * this.parseTimeToSeconds(this.toolpath.totalTime);
+            const minutes = Math.floor(currentTime / 60);
+            const seconds = Math.floor(currentTime % 60);
+            document.getElementById('toolpath-time').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        document.getElementById('toolpath-total-lines').textContent = this.toolpath.gcodeData.length;
+        document.getElementById('toolpath-total-time').textContent = this.toolpath.totalTime;
+    },
+
+    parseTimeToSeconds(timeStr) {
+        const [minutes, seconds] = timeStr.split(':').map(Number);
+        return minutes * 60 + seconds;
+    },
+
+    updateToolPathStats() {
+        this.checkToolPathCollisions();
+        this.updateToolPathUI();
+    },
+
+    checkToolPathCollisions() {
+        this.toolpath.collisions = [];
+        
+        // Check toolpath against machine bounds
+        this.toolpath.gcodeData.forEach((command, index) => {
+            if (command.end) {
+                if (command.end.x < 0 || command.end.x > 3000 ||
+                    command.end.y < 0 || command.end.y > 2000 ||
+                    command.end.z < 0 || command.end.z > 200) {
+                    this.toolpath.collisions.push({
+                        line: command.lineNumber,
+                        type: 'boundary',
+                        message: 'Position exceeds machine limits'
+                    });
+                }
+            }
+        });
+        
+        // Update UI
+        const collisionStatus = document.getElementById('toolpath-collision-status');
+        const boundsStatus = document.getElementById('toolpath-bounds-status');
+        
+        if (this.toolpath.collisions.length > 0) {
+            collisionStatus.innerHTML = '<span style="color: #f44336;">●</span> <span data-i18n="dashboard.collisions_found">Collisions Found</span>';
+            AlertManager.add(`Found ${this.toolpath.collisions.length} potential collisions`, 'warning');
+        } else {
+            collisionStatus.innerHTML = '<span style="color: #4CAF50;">●</span> <span data-i18n="dashboard.no_collisions">No Collisions</span>';
+        }
+        
+        boundsStatus.innerHTML = '<span style="color: #4CAF50;">●</span> <span data-i18n="dashboard.within_bounds">Within Bounds</span>';
+    },
+
+    updateToolPathUI() {
+        document.getElementById('toolpath-filename').textContent = this.toolpath.filename;
+        document.getElementById('toolpath-total-lines').textContent = this.toolpath.gcodeData.length;
+        document.getElementById('toolpath-total-time').textContent = this.toolpath.totalTime;
+    },
+
+    // Stack Monitor Extension (Idempotent)
 if (!DashboardModule._isPatched) {
     DashboardModule.initStackGraph = function () {
         if (document.getElementById("stackChart")) {
@@ -294,6 +820,7 @@ if (!DashboardModule._isPatched) {
     DashboardModule.initializeGraphs = function () {
         _oInit.call(this);
         this.initStackGraph();
+        this.initToolPathPreview();
     };
 
     // Hook update

@@ -23,9 +23,12 @@
 </head>
 
 <body>
+    <!-- Mobile hamburger toggle (outside flex container) -->
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle navigation">&#9776;</button>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <div class="app-container">
         <!-- Navigation Sidebar -->
-        <nav class="sidebar">
+        <nav class="sidebar" id="sidebar">
             <div class="logo">
                 <svg class="logo-svg" viewBox="260 340 500 350" xmlns="http://www.w3.org/2000/svg">
                     <path fill="currentColor"
@@ -147,6 +150,27 @@
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
     </style>
+    <!-- Mobile nav toggle -->
+    <script>
+        (function () {
+            var btn = document.getElementById('hamburger-btn');
+            var sidebar = document.getElementById('sidebar');
+            var backdrop = document.getElementById('sidebar-backdrop');
+            function toggle() {
+                sidebar.classList.toggle('open');
+                backdrop.classList.toggle('open');
+            }
+            function close() {
+                sidebar.classList.remove('open');
+                backdrop.classList.remove('open');
+            }
+            btn.addEventListener('click', toggle);
+            backdrop.addEventListener('click', close);
+            sidebar.querySelectorAll('.nav-item').forEach(function (item) {
+                item.addEventListener('click', close);
+            });
+        })();
+    </script>
     <!-- PWA Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {

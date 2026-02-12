@@ -195,7 +195,10 @@ void telemetryUpdate() {
     }
 
     // RTC Battery Status
-    bool rtc_low = rtcHasBatteryWarning();
+    bool rtc_low = false;
+    #if BOARD_HAS_RTC_DS3231
+        rtc_low = rtcHasBatteryWarning();
+    #endif
 
     // Configuration
     // uint32_t cfg_ver = configGetInt("schema_version", 1); // Unused

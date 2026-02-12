@@ -6,6 +6,7 @@
 
 #include "cli.h"
 #include "serial_logger.h"
+#include "psram_alloc.h"
 #include "boot_validation.h"
 #include "memory_monitor.h"
 #include "task_manager.h"
@@ -330,39 +331,40 @@ void cliUpdate() {
         }
         
         if (match_count == 1) {
-          // Single match - complete it
+          // Single match - complete it by printing the suffix only
+          // (backspace chars don't work reliably on USB CDC serial)
           const char* cmd = commands[last_match].command;
+          size_t cmd_len = strlen(cmd);
           
-          // Clear current input and replace with match
           if (cli_echo_enabled) {
             if (serialLoggerLock()) {
-                for (uint16_t i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
+                // Print only the remaining characters after what's typed
+                CLI_SERIAL.print(cmd + cli_pos);
+                CLI_SERIAL.print(' ');
                 serialLoggerUnlock();
             }
           }
           
           strcpy(cli_buffer, cmd);
-          cli_pos = strlen(cmd);
-          cli_buffer[cli_pos++] = ' ';  // Add space after command
+          cli_pos = cmd_len;
+          cli_buffer[cli_pos++] = ' ';
           cli_buffer[cli_pos] = '\0';
-          
-          if (cli_echo_enabled) {
-            if (serialLoggerLock()) {
-                CLI_SERIAL.print(cli_buffer);
-                serialLoggerUnlock();
-            }
-          }
         } else if (match_count > 1) {
           // Multiple matches - complete common prefix and show options
           if (common_len > (size_t)cli_pos) {
-            // Extend to common prefix
+            // Extend to common prefix — print suffix only
             if (cli_echo_enabled) {
-              for (uint16_t i = 0; i < cli_pos; i++) CLI_SERIAL.print("\b \b");
+              if (serialLoggerLock()) {
+                // Print only the new characters beyond what's typed
+                for (size_t i = cli_pos; i < common_len; i++) {
+                  CLI_SERIAL.print(common_prefix[i]);
+                }
+                serialLoggerUnlock();
+              }
             }
             strncpy(cli_buffer, common_prefix, common_len);
             cli_buffer[common_len] = '\0';
             cli_pos = common_len;
-            if (cli_echo_enabled) CLI_SERIAL.print(cli_buffer);
           } else {
             // Show all matches
             if (serialLoggerLock()) {
@@ -499,30 +501,42 @@ bool cliRegisterCommand(const char* name, const char* help, cli_handler_t handle
 }
 
 void cliPrintHelp() {
-  if (!serialLoggerLock()) return;
+  // Build entire help output into one buffer, print once — no interleaving possible
+  // Allocate from PSRAM (help output can be ~2KB with 50+ commands)
+  const size_t BUF_SIZE = 3072;
+  char* buf = (char*)psramMalloc(BUF_SIZE);
+  if (!buf) return;
+  int pos = 0;
   
-  logPrintln("\n=== BISSO E350 CLI Help ===");
-  logPrintln("Grbl Commands:");
-  logPrintln("  $         - Show Grbl settings");
-  logPrintln("  $H        - Run homing cycle");
-  logPrintln("  $G        - Show parser state");
-  logPrintln("  ?         - Real-time status report");
-  logPrintln("  !         - Feed hold");
-  logPrintln("  ~         - Cycle start / resume");
-  logPrintln("  Ctrl-X    - Soft reset");
+  pos += snprintf(buf + pos, BUF_SIZE - pos,
+    "\r\n=== BISSO E350 CLI Help ===\r\n"
+    "Grbl Commands:\r\n"
+    "  $         - Show Grbl settings\r\n"
+    "  $H        - Run homing cycle\r\n"
+    "  $G        - Show parser state\r\n"
+    "  ?         - Real-time status report\r\n"
+    "  !         - Feed hold\r\n"
+    "  ~         - Cycle start / resume\r\n"
+    "  Ctrl-X    - Soft reset\r\n");
   
   // Sort commands alphabetically
   qsort(commands, command_count, sizeof(cli_command_t), [](const void* a, const void* b) -> int {
       return strcasecmp(((cli_command_t*)a)->command, ((cli_command_t*)b)->command);
   });
 
-  logPrintln("\nSystem Commands:");
-  for (int i = 0; i < command_count; i++) {
-    logPrintf("  %-12s - %s\r\n", commands[i].command, commands[i].help);
+  pos += snprintf(buf + pos, BUF_SIZE - pos, "\r\nSystem Commands:\r\n");
+  for (int i = 0; i < command_count && pos < (int)(BUF_SIZE - 80); i++) {
+    pos += snprintf(buf + pos, BUF_SIZE - pos, "  %-12s - %s\r\n", commands[i].command, commands[i].help);
   }
-  logPrintln("==========================\n");
-  
-  serialLoggerUnlock();
+  pos += snprintf(buf + pos, BUF_SIZE - pos, "==========================\r\n");
+
+  // Single atomic print — acquire mutex, output, flush, release
+  if (serialLoggerLock()) {
+    Serial.print(buf);
+    Serial.flush();
+    serialLoggerUnlock();
+  }
+  psramFree(buf);
 }
 
 // --- COMMANDS ---
@@ -661,7 +675,7 @@ void cliPrintTableDivider(int w1, int w2, int w3, int w4, int w5) {
     line[pos++] = '+';
     line[pos] = '\0';
     
-    logPrintln(line);
+    logDirectPrintln(line);
 }
 
 void cliPrintTableHeader(int w1, int w2, int w3, int w4, int w5) {
@@ -687,5 +701,5 @@ void cliPrintTableRow(const char* c1, const char* c2, const char* c3,
     if (w5 > 0) pos += snprintf(line + pos, sizeof(line) - pos, "| %-*s ", w5, c5 ? c5 : "");
     pos += snprintf(line + pos, sizeof(line) - pos, "|");
     
-    logPrintln(line);
+    logDirectPrintln(line);
 }

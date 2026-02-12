@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Isometric Tool Path Animation Mockup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        
+        .mockup-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #4CAF50;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: rgba(42, 42, 42, 0.9);
+            border-radius: 12px;
+            border: 1px solid #444;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #333 0%, #444 100%);
+            padding: 15px 20px;
+            border-bottom: 1px solid #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #4CAF50;
+        }
+        
+        .card-content {
+            padding: 20px;
+        }
+        
+        /* Isometric View Container */
+        .isometric-container {
+            position: relative;
+            height: 500px;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #333;
+        }
+        
+        .isometric-scene {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+        
+        .machine-bed {
+            position: absolute;
+            width: 400px;
+            height: 300px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) rotateX(60deg) rotateZ(45deg);
+            background: linear-gradient(45deg, #2a2a2a 25%, transparent 25%, transparent 75%, #2a2a2a 75%, #2a2a2a),
+                        linear-gradient(45deg, #2a2a2a 25%, #333 25%, #333 75%, #2a2a2a 75%, #2a2a2a);
+            background-size: 30px 30px;
+            background-position: 0 0, 15px 15px;
+            border: 2px solid #555;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        
+        .grid-lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .grid-line {
+            position: absolute;
+            background: rgba(76, 175, 80, 0.2);
+            transform-origin: left center;
+        }
+        
+        .toolpath-line {
+            position: absolute;
+            height: 3px;
+            background: linear-gradient(90deg, #2196f3, #64b5f6);
+            border-radius: 2px;
+            transform-origin: left center;
+            box-shadow: 0 0 10px rgba(33, 150, 243, 0.5);
+            pointer-events: none;
+        }
+        
+        .toolpath-line.rapid {
+            background: linear-gradient(90deg, #ff9800, #ffb74d);
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+        }
+        
+        .toolpath-line.completed {
+            opacity: 0.3;
+        }
+        
+        /* Saw/Tool Representation */
+        .saw-assembly {
+            position: absolute;
+            width: 40px;
+            height: 60px;
+            transform-style: preserve-3d;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        
+        .saw-blade {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #888 0%, #666 50%, #444 100%);
+            border-radius: 50%;
+            top: 10px;
+            left: 0;
+            border: 3px solid #333;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            animation: spin 2s linear infinite;
+        }
+        
+        .saw-spindle {
+            position: absolute;
+            width: 8px;
+            height: 50px;
+            background: linear-gradient(180deg, #666 0%, #444 100%);
+            left: 16px;
+            top: 5px;
+            border-radius: 2px;
+        }
+        
+        .saw-guard {
+            position: absolute;
+            width: 50px;
+            height: 20px;
+            background: linear-gradient(180deg, #ff6b6b 0%, #ee5a24 100%);
+            border-radius: 25px 25px 0 0;
+            top: 0;
+            left: -5px;
+            border: 2px solid #333;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Tool Path Animation */
+        .path-point {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        .cutting-particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: #ffa726;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particle-fall 1s ease-out forwards;
+        }
+        
+        @keyframes particle-fall {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--dx), var(--dy)) scale(0);
+                opacity: 0;
+            }
+        }
+        
+        /* Control Panel */
+        .control-panel {
+            background: rgba(42, 42, 42, 0.9);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #444;
+        }
+        
+        .control-section {
+            margin-bottom: 25px;
+        }
+        
+        .control-section h4 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 5px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #555 0%, #666 100%);
+            box-shadow: 0 4px 15px rgba(85, 85, 85, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 6px 20px rgba(85, 85, 85, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        .btn-danger:hover {
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+        }
+        
+        .status-display {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #333;
+        }
+        
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .status-label {
+            color: #888;
+        }
+        
+        .status-value {
+            color: #4CAF50;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .speed-slider {
+            flex: 1;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .speed-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .speed-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .view-controls {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .view-btn {
+            flex: 1;
+            padding: 8px;
+            background: #444;
+            border: 1px solid #666;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .view-btn:hover {
+            background: #555;
+        }
+        
+        .view-btn.active {
+            background: #4CAF50;
+            border-color: #4CAF50;
+        }
+        
+        /* Coordinate Display */
+        .coord-display {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border: 1px solid #333;
+            z-index: 20;
+        }
+        
+        .coord-line {
+            margin: 3px 0;
+        }
+        
+        /* Info Panel */
+        .info-panel {
+            background: rgba(42, 42, 42, 0.9);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #444;
+            margin-top: 20px;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .feature-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .feature-title {
+            color: #4CAF50;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .feature-desc {
+            font-size: 13px;
+            color: #ccc;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="mockup-container">
+        <h1 class="title">🔧 Isometric Tool Path Animation</h1>
+        <p class="subtitle">Watch the saw move along the cutting path in real-time 3D visualization</p>
+        
+        <div class="main-content">
+            <!-- Isometric View -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🎯 3D Tool Path Visualization</h3>
+                    <button class="card-toggle">−</button>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <div class="isometric-container">
+                        <div class="isometric-scene" id="isometricScene">
+                            <!-- Machine Bed -->
+                            <div class="machine-bed">
+                                <div class="grid-lines" id="gridLines"></div>
+                            </div>
+                            
+                            <!-- Tool Path Lines -->
+                            <div id="toolpathLines"></div>
+                            
+                            <!-- Saw Assembly -->
+                            <div class="saw-assembly" id="sawAssembly">
+                                <div class="saw-guard"></div>
+                                <div class="saw-spindle"></div>
+                                <div class="saw-blade"></div>
+                            </div>
+                            
+                            <!-- Coordinate Display -->
+                            <div class="coord-display">
+                                <div class="coord-line">X: <span id="coordX">0.000</span></div>
+                                <div class="coord-line">Y: <span id="coordY">0.000</span></div>
+                                <div class="coord-line">Z: <span id="coordZ">0.000</span></div>
+                                <div class="coord-line">Tool: <span id="coordTool">T1</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Control Panel -->
+            <div>
+                <div class="control-panel">
+                    <div class="control-section">
+                        <h4>🎮 Animation Controls</h4>
+                        <button class="btn" id="playBtn">▶️ Play</button>
+                        <button class="btn btn-secondary" id="pauseBtn">⏸️ Pause</button>
+                        <button class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
+                        <button class="btn btn-danger" id="stopBtn">⏹️ Stop</button>
+                    </div>
+                    
+                    <div class="control-section">
+                        <h4>⚡ Animation Speed</h4>
+                        <div class="speed-control">
+                            <span>🐢</span>
+                            <input type="range" class="speed-slider" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+                            <span>🚀</span>
+                        </div>
+                        <div style="text-align: center; font-size: 12px; color: #888;">
+                            Speed: <span id="speedValue">1.0</span>x
+                        </div>
+                    </div>
+                    
+                    <div class="control-section">
+                        <h4>📊 Status</h4>
+                        <div class="status-display">
+                            <div class="status-row">
+                                <span class="status-label">Position:</span>
+                                <span class="status-value" id="statusPosition">0, 0, 0</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label">Progress:</span>
+                                <span class="status-value" id="statusProgress">0%</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label">Current Line:</span>
+                                <span class="status-value" id="statusLine">0 / 0</span>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label">Status:</span>
+                                <span class="status-value" id="statusStatus">Ready</span>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressBar"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-section">
+                        <h4>👁️ View Options</h4>
+                        <div class="view-controls">
+                            <button class="view-btn active" data-view="isometric">Isometric</button>
+                            <button class="view-btn" data-view="top">Top</button>
+                            <button class="view-btn" data-view="side">Side</button>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                <input type="checkbox" id="showParticles" checked>
+                                Show cutting particles
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 5px;">
+                                <input type="checkbox" id="showPath" checked>
+                                Show tool path
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Panel -->
+        <div class="info-panel">
+            <h3 style="color: #4CAF50; margin-bottom: 10px;">✨ Animation Features</h3>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">🔧</div>
+                    <div class="feature-title">Realistic Saw Model</div>
+                    <div class="feature-desc">3D saw assembly with spinning blade, spindle, and guard</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">Precise Path Following</div>
+                    <div class="feature-desc">Saw follows exact G-code coordinates with smooth interpolation</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">✨</div>
+                    <div class="feature-title">Cutting Particles</div>
+                    <div class="feature-desc">Animated particles simulate material removal during cutting</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📐</div>
+                    <div class="feature-title">Multiple Views</div>
+                    <div class="feature-desc">Switch between isometric, top, and side perspectives</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-title">Variable Speed</div>
+                    <div class="feature-desc">Adjust animation speed from 0.1x to 3x normal speed</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🎮</div>
+                    <div class="feature-title">Full Controls</div>
+                    <div class="feature-desc">Play, pause, reset, and stop with real-time status updates</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        class IsometricToolPathAnimation {
+            constructor() {
+                this.scene = document.getElementById('isometricScene');
+                this.sawAssembly = document.getElementById('sawAssembly');
+                this.toolpathLines = document.getElementById('toolpathLines');
+                this.isPlaying = false;
+                this.isPaused = false;
+                this.currentPathIndex = 0;
+                this.animationSpeed = 1.0;
+                this.showParticles = true;
+                this.showPath = true;
+                this.currentView = 'isometric';
+                
+                // Define tool path (sample cutting pattern)
+                this.toolPath = [
+                    { x: 0, y: 0, z: 50, type: 'rapid', tool: 1 },
+                    { x: 100, y: 0, z: 50, type: 'rapid', tool: 1 },
+                    { x: 100, y: 100, z: 50, type: 'rapid', tool: 1 },
+                    { x: 0, y: 100, z: 50, type: 'rapid', tool: 1 },
+                    { x: 0, y: 0, z: 50, type: 'rapid', tool: 1 },
+                    { x: 50, y: 50, z: 10, type: 'cut', tool: 1 },
+                    { x: 150, y: 50, z: 10, type: 'cut', tool: 1 },
+                    { x: 150, y: 150, z: 10, type: 'cut', tool: 1 },
+                    { x: 50, y: 150, z: 10, type: 'cut', tool: 1 },
+                    { x: 50, y: 50, z: 10, type: 'cut', tool: 1 },
+                    { x: 50, y: 50, z: 50, type: 'rapid', tool: 1 },
+                    { x: 200, y: 100, z: 50, type: 'rapid', tool: 2 },
+                    { x: 200, y: 100, z: 10, type: 'cut', tool: 2 },
+                    { x: 250, y: 100, z: 10, type: 'cut', tool: 2 },
+                    { x: 250, y: 200, z: 10, type: 'cut', tool: 2 },
+                    { x: 200, y: 200, z: 10, type: 'cut', tool: 2 },
+                    { x: 200, y: 100, z: 10, type: 'cut', tool: 2 },
+                    { x: 200, y: 100, z: 50, type: 'rapid', tool: 2 }
+                ];
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.createToolPathVisualization();
+                this.createGridLines();
+                this.updateSawPosition(0);
+            }
+            
+            setupEventListeners() {
+                document.getElementById('playBtn').addEventListener('click', () => this.play());
+                document.getElementById('pauseBtn').addEventListener('click', () => this.pause());
+                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+                document.getElementById('stopBtn').addEventListener('click', () => this.stop());
+                
+                const speedSlider = document.getElementById('speedSlider');
+                speedSlider.addEventListener('input', (e) => {
+                    this.animationSpeed = parseFloat(e.target.value);
+                    document.getElementById('speedValue').textContent = this.animationSpeed.toFixed(1);
+                });
+                
+                document.getElementById('showParticles').addEventListener('change', (e) => {
+                    this.showParticles = e.target.checked;
+                });
+                
+                document.getElementById('showPath').addEventListener('change', (e) => {
+                    this.showPath = e.target.checked;
+                    this.toolpathLines.style.display = this.showPath ? 'block' : 'none';
+                });
+                
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.changeView(e.target.dataset.view);
+                    });
+                });
+            }
+            
+            createToolPathVisualization() {
+                this.toolpathLines.innerHTML = '';
+                
+                for (let i = 0; i < this.toolPath.length - 1; i++) {
+                    const start = this.toolPath[i];
+                    const end = this.toolPath[i + 1];
+                    
+                    const line = document.createElement('div');
+                    line.className = `toolpath-line ${start.type === 'rapid' ? 'rapid' : ''}`;
+                    line.dataset.index = i;
+                    
+                    const startPos = this.worldToScreen(start.x, start.y, start.z);
+                    const endPos = this.worldToScreen(end.x, end.y, end.z);
+                    
+                    const dx = endPos.x - startPos.x;
+                    const dy = endPos.y - startPos.y;
+                    const length = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    
+                    line.style.left = startPos.x + 'px';
+                    line.style.top = startPos.y + 'px';
+                    line.style.width = length + 'px';
+                    line.style.transform = `rotate(${angle}deg)`;
+                    
+                    this.toolpathLines.appendChild(line);
+                }
+            }
+            
+            createGridLines() {
+                const gridLines = document.getElementById('gridLines');
+                gridLines.innerHTML = '';
+                
+                // Create grid lines on the machine bed
+                for (let i = 0; i <= 10; i++) {
+                    for (let j = 0; j <= 10; j++) {
+                        const dot = document.createElement('div');
+                        dot.className = 'grid-line';
+                        dot.style.left = (i * 40) + 'px';
+                        dot.style.top = (j * 30) + 'px';
+                        dot.style.width = '2px';
+                        dot.style.height = '2px';
+                        dot.style.borderRadius = '50%';
+                        gridLines.appendChild(dot);
+                    }
+                }
+            }
+            
+            worldToScreen(x, y, z) {
+                // Convert world coordinates to screen coordinates
+                const scale = 1.5;
+                const offsetX = this.scene.offsetWidth / 2;
+                const offsetY = this.scene.offsetHeight / 2;
+                
+                // Isometric projection
+                const screenX = offsetX + (x - y) * scale * Math.cos(Math.PI / 6);
+                const screenY = offsetY + (x + y) * scale * Math.sin(Math.PI / 6) - z * scale;
+                
+                return { x: screenX, y: screenY };
+            }
+            
+            updateSawPosition(pathIndex) {
+                if (pathIndex >= this.toolPath.length) return;
+                
+                const position = this.toolPath[pathIndex];
+                const screenPos = this.worldToScreen(position.x, position.y, position.z);
+                
+                // Update saw position
+                this.sawAssembly.style.left = screenPos.x + 'px';
+                this.sawAssembly.style.top = screenPos.y + 'px';
+                
+                // Update coordinate display
+                document.getElementById('coordX').textContent = position.x.toFixed(3);
+                document.getElementById('coordY').textContent = position.y.toFixed(3);
+                document.getElementById('coordZ').textContent = position.z.toFixed(3);
+                document.getElementById('coordTool').textContent = 'T' + position.tool;
+                
+                // Update status
+                document.getElementById('statusPosition').textContent = 
+                    `${position.x.toFixed(0)}, ${position.y.toFixed(0)}, ${position.z.toFixed(0)}`;
+                document.getElementById('statusLine').textContent = 
+                    `${pathIndex + 1} / ${this.toolPath.length}`;
+                
+                const progress = ((pathIndex + 1) / this.toolPath.length) * 100;
+                document.getElementById('statusProgress').textContent = progress.toFixed(1) + '%';
+                document.getElementById('progressBar').style.width = progress + '%';
+                
+                // Update tool path completion
+                this.updateToolPathCompletion(pathIndex);
+                
+                // Create cutting particles
+                if (this.showParticles && position.type === 'cut') {
+                    this.createCuttingParticles(screenPos.x, screenPos.y);
+                }
+            }
+            
+            updateToolPathCompletion(currentIndex) {
+                const lines = this.toolpathLines.querySelectorAll('.toolpath-line');
+                lines.forEach((line, index) => {
+                    if (index <= currentIndex - 1) {
+                        line.classList.add('completed');
+                    } else {
+                        line.classList.remove('completed');
+                    }
+                });
+            }
+            
+            createCuttingParticles(x, y) {
+                for (let i = 0; i < 3; i++) {
+                    setTimeout(() => {
+                        const particle = document.createElement('div');
+                        particle.className = 'cutting-particle';
+                        particle.style.left = x + 'px';
+                        particle.style.top = y + 'px';
+                        
+                        const dx = (Math.random() - 0.5) * 50;
+                        const dy = Math.random() * 30 + 10;
+                        particle.style.setProperty('--dx', dx + 'px');
+                        particle.style.setProperty('--dy', dy + 'px');
+                        
+                        this.scene.appendChild(particle);
+                        
+                        setTimeout(() => particle.remove(), 1000);
+                    }, i * 100);
+                }
+            }
+            
+            changeView(viewType) {
+                this.currentView = viewType;
+                const machineBed = document.querySelector('.machine-bed');
+                
+                switch(viewType) {
+                    case 'isometric':
+                        machineBed.style.transform = 'translate(-50%, -50%) rotateX(60deg) rotateZ(45deg)';
+                        break;
+                    case 'top':
+                        machineBed.style.transform = 'translate(-50%, -50%) rotateX(0deg) rotateZ(0deg)';
+                        break;
+                    case 'side':
+                        machineBed.style.transform = 'translate(-50%, -50%) rotateX(0deg) rotateZ(90deg)';
+                        break;
+                }
+            }
+            
+            play() {
+                if (this.isPlaying && !this.isPaused) return;
+                
+                this.isPlaying = true;
+                this.isPaused = false;
+                document.getElementById('statusStatus').textContent = 'Running';
+                this.animate();
+            }
+            
+            pause() {
+                this.isPaused = true;
+                document.getElementById('statusStatus').textContent = 'Paused';
+            }
+            
+            reset() {
+                this.stop();
+                this.currentPathIndex = 0;
+                this.updateSawPosition(0);
+                document.getElementById('statusStatus').textContent = 'Ready';
+            }
+            
+            stop() {
+                this.isPlaying = false;
+                this.isPaused = false;
+                document.getElementById('statusStatus').textContent = 'Stopped';
+            }
+            
+            animate() {
+                if (!this.isPlaying || this.isPaused) return;
+                
+                this.updateSawPosition(this.currentPathIndex);
+                
+                this.currentPathIndex++;
+                if (this.currentPathIndex >= this.toolPath.length) {
+                    this.currentPathIndex = 0; // Loop animation
+                }
+                
+                const delay = 500 / this.animationSpeed; // Base delay of 500ms
+                setTimeout(() => this.animate(), delay);
+            }
+        }
+        
+        // Initialize animation when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new IsometricToolPathAnimation();
+        });
+    </script>
+</body>
+</html>

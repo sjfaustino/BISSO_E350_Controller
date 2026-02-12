@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Path Preview Mockup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .mockup-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #4CAF50;
+        }
+        
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: #2a2a2a;
+            border-radius: 8px;
+            border: 1px solid #444;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background: #333;
+            padding: 15px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .card-toggle {
+            background: #444;
+            border: none;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .card-content {
+            padding: 15px;
+        }
+        
+        /* Tool Path Preview Specific Styles */
+        .toolpath-controls {
+            padding: 15px;
+            border-bottom: 1px solid #444;
+            background: #333;
+        }
+        
+        .control-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .btn {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: #555;
+        }
+        
+        .btn-secondary:hover {
+            background: #666;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 11px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .checkbox-group label {
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        select {
+            background: #444;
+            border: 1px solid #666;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .canvas-container {
+            position: relative;
+            height: 300px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+        }
+        
+        .toolpath-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #222;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            position: relative;
+        }
+        
+        /* Mock toolpath visualization */
+        .toolpath-visualization {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .toolpath-line {
+            position: absolute;
+            background: #2196f3;
+            height: 2px;
+            transform-origin: left center;
+        }
+        
+        .toolpath-line.rapid {
+            background: #ff9800;
+        }
+        
+        .toolpath-position {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #4CAF50;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
+        .tool-marker {
+            position: absolute;
+            background: #ff9800;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        /* Coordinate Overlay */
+        .coordinate-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #00ff00;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            pointer-events: none;
+        }
+        
+        .coordinate-line {
+            margin: 2px 0;
+        }
+        
+        /* Status Indicators */
+        .status-indicators {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            pointer-events: none;
+        }
+        
+        .status-item {
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .status-dot.success {
+            background: #4CAF50;
+        }
+        
+        .status-dot.warning {
+            background: #ff9800;
+        }
+        
+        .status-dot.error {
+            background: #f44336;
+        }
+        
+        /* Timeline */
+        .timeline {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            padding: 8px 15px;
+            border-radius: 4px 4px 0 0;
+            pointer-events: auto;
+        }
+        
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .timeline-title {
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .timeline-controls {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .timeline-btn {
+            background: transparent;
+            border: 1px solid #666;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        
+        .timeline-btn:hover {
+            background: #444;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            margin-bottom: 5px;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 2px;
+            width: 35%;
+        }
+        
+        .timeline-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .timeline-stat {
+            color: white;
+            font-size: 10px;
+        }
+        
+        /* File info */
+        .file-info {
+            color: #4CAF50;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mockup-container">
+        <h1 class="title">🎯 Tool Path Preview - Graphical Mockup</h1>
+        
+        <div class="card-grid">
+            <!-- Tool Path Preview Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🎯 Tool Path Preview</h3>
+                    <button class="card-toggle">−</button>
+                </div>
+                <div class="card-content" style="padding: 0;">
+                    <!-- Controls -->
+                    <div class="toolpath-controls">
+                        <div class="control-row">
+                            <button class="btn btn-small btn-secondary">Load G-Code</button>
+                            <button class="btn btn-small btn-secondary">Fit View</button>
+                            <button class="btn btn-small btn-secondary">▶️ Play</button>
+                            <button class="btn btn-small btn-secondary">Reset</button>
+                            <div class="checkbox-group">
+                                <label>Rapid:</label>
+                                <input type="checkbox" checked>
+                            </div>
+                            <div class="checkbox-group">
+                                <label>Feed:</label>
+                                <input type="checkbox" checked>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <span>Color:</span>
+                            <select>
+                                <option>Default</option>
+                                <option>By Depth</option>
+                                <option>By Speed</option>
+                                <option>By Tool</option>
+                            </select>
+                            <span style="margin-left: 10px;">File:</span>
+                            <span class="file-info">part_001.nc</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Canvas Area -->
+                    <div class="canvas-container">
+                        <div class="toolpath-canvas">
+                            <!-- Mock Toolpath Visualization -->
+                            <div class="toolpath-visualization">
+                                <!-- Rapid moves (orange) -->
+                                <div class="toolpath-line rapid" style="left: 20%; top: 30%; width: 60px; transform: rotate(45deg);"></div>
+                                <div class="toolpath-line rapid" style="left: 50%; top: 20%; width: 80px; transform: rotate(-30deg);"></div>
+                                
+                                <!-- Feed moves (blue) -->
+                                <div class="toolpath-line" style="left: 30%; top: 40%; width: 100px; transform: rotate(0deg);"></div>
+                                <div class="toolpath-line" style="left: 40%; top: 60%; width: 120px; transform: rotate(90deg);"></div>
+                                <div class="toolpath-line" style="left: 60%; top: 50%; width: 80px; transform: rotate(45deg);"></div>
+                                
+                                <!-- Current position indicator -->
+                                <div class="toolpath-position" style="left: 65%; top: 55%;"></div>
+                                
+                                <!-- Tool change markers -->
+                                <div class="tool-marker" style="left: 25%; top: 35%;">T1</div>
+                                <div class="tool-marker" style="left: 55%; top: 25%;">T2</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Coordinate Overlay -->
+                        <div class="coordinate-overlay">
+                            <div class="coordinate-line">X: <span>125.450</span></div>
+                            <div class="coordinate-line">Y: <span>87.320</span></div>
+                            <div class="coordinate-line">Z: <span>-12.500</span></div>
+                        </div>
+                        
+                        <!-- Status Indicators -->
+                        <div class="status-indicators">
+                            <div class="status-item">
+                                <span class="status-dot success"></span>
+                                <span>No Collisions</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-dot success"></span>
+                                <span>Within Bounds</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Timeline -->
+                        <div class="timeline">
+                            <div class="timeline-header">
+                                <span class="timeline-title">Simulation</span>
+                                <div class="timeline-controls">
+                                    <button class="timeline-btn">⏮</button>
+                                    <button class="timeline-btn">⏭</button>
+                                </div>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+                            <div class="timeline-info">
+                                <span class="timeline-stat">Line: 350 / 1000</span>
+                                <span class="timeline-stat">5:25 / 15:30</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Context Cards -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>📊 Simulation Features</h3>
+                </div>
+                <div class="card-content">
+                    <h4 style="color: #4CAF50; margin-bottom: 10px;">✨ Key Capabilities</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin: 8px 0;">🎯 <strong>Real-time Position Tracking</strong> - Live X,Y,Z coordinates</li>
+                        <li style="margin: 8px 0;">🔄 <strong>Interactive Playback</strong> - Play, pause, step, scrub</li>
+                        <li style="margin: 8px 0;">🎨 <strong>Color-Coded Moves</strong> - Orange (rapid), Blue (feed)</li>
+                        <li style="margin: 8px 0;">🔧 <strong>Tool Change Markers</strong> - Visual T1, T2 indicators</li>
+                        <li style="margin: 8px 0;">⚡ <strong>Collision Detection</strong> - Real-time boundary checking</li>
+                        <li style="margin: 8px 0;">🔍 <strong>Zoom & Pan</strong> - Mouse wheel zoom, click-drag pan</li>
+                    </ul>
+                    
+                    <h4 style="color: #ff9800; margin: 15px 0 10px;">🎮 Interactive Controls</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin: 8px 0;">🖱️ <strong>Mouse Wheel</strong> - Zoom in/out</li>
+                        <li style="margin: 8px 0;">👆 <strong>Click & Drag</strong> - Pan view</li>
+                        <li style="margin: 8px 0;">📊 <strong>Timeline Scrub</strong> - Jump to any position</li>
+                        <li style="margin: 8px 0;">⏯️ <strong>Space Bar</strong> - Play/pause (planned)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Full Width Context -->
+        <div class="card">
+            <div class="card-header">
+                <h3>🚀 Integration with BISSO E350 Dashboard</h3>
+            </div>
+            <div class="card-content">
+                <p style="margin-bottom: 15px;">The Tool Path Preview seamlessly integrates into your existing dashboard architecture:</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    <div>
+                        <h4 style="color: #2196f3; margin-bottom: 8px;">🔗 System Integration</h4>
+                        <ul style="list-style: none; padding: 0; font-size: 14px;">
+                            <li style="margin: 5px 0;">• Uses existing API client</li>
+                            <li style="margin: 5px 0;">• Follows card design patterns</li>
+                            <li style="margin: 5px 0;">• WebSocket ready for live data</li>
+                            <li style="margin: 5px 0;">• i18n internationalization</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h4 style="color: #4CAF50; margin-bottom: 8px;">🛡️ Safety Features</h4>
+                        <ul style="list-style: none; padding: 0; font-size: 14px;">
+                            <li style="margin: 5px 0;">• Machine boundary checking</li>
+                            <li style="margin: 5px 0;">• Collision detection</li>
+                            <li style="margin: 5px 0;">• Real-time validation</li>
+                            <li style="margin: 5px 0;">• Visual warnings</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h4 style="color: #ff9800; margin-bottom: 8px;">⚡ Performance</h4>
+                        <ul style="list-style: none; padding: 0; font-size: 14px;">
+                            <li style="margin: 5px 0;">• Optimized canvas rendering</li>
+                            <li style="margin: 5px 0;">• Efficient G-code parsing</li>
+                            <li style="margin: 5px 0;">• Smooth animations</li>
+                            <li style="margin: 5px 0;">• Memory conscious</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Add some interactive behavior to the mockup
+        document.addEventListener('DOMContentLoaded', function() {
+            const playBtn = document.querySelector('.btn:has("▶️")');
+            const progressFill = document.querySelector('.progress-fill');
+            const positionIndicator = document.querySelector('.toolpath-position');
+            
+            let isPlaying = false;
+            let progress = 35;
+            
+            if (playBtn) {
+                playBtn.addEventListener('click', function() {
+                    isPlaying = !isPlaying;
+                    this.textContent = isPlaying ? '⏸️ Pause' : '▶️ Play';
+                    
+                    if (isPlaying) {
+                        animateProgress();
+                    }
+                });
+            }
+            
+            function animateProgress() {
+                if (!isPlaying || progress >= 100) {
+                    isPlaying = false;
+                    if (playBtn) playBtn.textContent = '▶️ Play';
+                    return;
+                }
+                
+                progress += 0.5;
+                if (progressFill) progressFill.style.width = progress + '%';
+                
+                // Move position indicator along path
+                if (positionIndicator) {
+                    const angle = (progress / 100) * Math.PI * 2;
+                    const x = 50 + Math.cos(angle) * 30;
+                    const y = 50 + Math.sin(angle) * 20;
+                    positionIndicator.style.left = x + '%';
+                    positionIndicator.style.top = y + '%';
+                }
+                
+                requestAnimationFrame(animateProgress);
+            }
+            
+            // Add hover effects
+            const canvas = document.querySelector('.toolpath-canvas');
+            const coords = document.querySelector('.coordinate-overlay span');
+            
+            if (canvas) {
+                canvas.addEventListener('mousemove', function(e) {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width * 3000).toFixed(1);
+                    const y = ((rect.height - (e.clientY - rect.top)) / rect.height * 2000).toFixed(1);
+                    
+                    const coordLines = document.querySelectorAll('.coordinate-line span');
+                    if (coordLines[0]) coordLines[0].textContent = x;
+                    if (coordLines[1]) coordLines[1].textContent = y;
+                });
+            }
+        });
+    </script>
+</body>
+</html>

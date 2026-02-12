@@ -343,22 +343,26 @@ void runStressTests() {
 }
 
 void cmd_stress_test(int argc, char** argv) {
-    if (argc < 1) {
+    // argv[0] = "test", argv[1] = subcommand (e.g. "stress", "all")
+    // For "test stress <name>": argv[2] = test name
+    // For "test all": argv[1] = "all" (dispatched directly)
+    
+    if (argc < 2) {
         logPrintln("\r\n[STRESS TEST] Usage: test stress <test|all>");
         logPrintln("Available tests: concurrent, faults, mutex, stack, watchdog, i2c, load, jitter, all");
         return;
     }
 
-    const char* test_name = argv[0];
+    const char* test_name = argv[1];
     
-    // Handle "test stress <subtest>" where argv[0] is "stress" and argv[1] is the subtest
+    // Handle "test stress <subtest>" — argv[1]="stress", argv[2]=subtest
     if (strcmp(test_name, "stress") == 0) {
-        if (argc < 2) {
+        if (argc < 3) {
             logPrintln("\r\n[STRESS TEST] Usage: test stress <test|all>");
             logPrintln("Available tests: concurrent, faults, mutex, stack, watchdog, i2c, load, jitter, all");
             return;
         }
-        test_name = argv[1];
+        test_name = argv[2];
     }
 
     if (strcmp(test_name, "all") == 0) {

@@ -120,6 +120,13 @@ void logPrintf(const char* format, ...);
 void logPrintln(const char* format, ...);
 
 /**
+ * @brief Direct print to Serial — NO mutex acquire (caller must hold serialLoggerLock)
+ * @note Use inside serialLoggerLock()/serialLoggerUnlock() blocks for atomic multi-line output
+ */
+void logDirectPrintf(const char* format, ...);
+void logDirectPrintln(const char* format, ...);
+
+/**
  * @brief Get internal buffer pointer (for direct manipulation if needed)
  * @return Pointer to internal buffer
  */

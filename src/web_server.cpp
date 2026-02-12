@@ -86,8 +86,8 @@ void WebServerManager::init() {
     otaInit();
     
     // TUNE: Increase parallel sockets to 6 for Dashboard stability (many assets + WS)
-    server.config.stack_size = 8192;
-    server.config.max_open_sockets = 6; // Allow 6 parallel (browser standard)
+    server.config.stack_size = 6144; // PHASE 6.9: Reduced to 6KB to save heap (was 8KB)
+    // server.config.max_open_sockets is configured in begin()
     server.config.lru_purge_enable = true;
     server.config.send_wait_timeout = 15; // More headroom for chunked deliveries
     server.config.recv_wait_timeout = 15;
@@ -259,8 +259,8 @@ void WebServerManager::begin() {
     logPrintln("[WEB] Starting Server");
     
     // PHASE 6.2: Memory-safe configuration (Optimized for standard browser parallelism)
-    // 4 sockets provide a good balance between concurrency and heap usage.
-    server.config.max_open_sockets = 4;
+    // 3 sockets provide a good balance between concurrency and heap usage.
+    server.config.max_open_sockets = 3; // PHASE 6.9: Reduced from 4->3 to save ~6KB heap
     server.config.max_uri_handlers = 40;
     
     server.start(); 
@@ -436,7 +436,7 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
 
     int n = snprintf(buffer, buffer_size,
         "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
-        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu,\"rtc_battery_low\":%s%s%s%s%s%s%s%s%s%s%s},"
+        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu,\"rtc_battery_low\":%s%s%s%s%s%s%s%s%s%s%s%s},"
         "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
         "\"motion_active\":%s,\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},"
         "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
@@ -458,6 +458,7 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         __DATE__,
         has_lcd_msg ? (const char*)custom_msg.text : "",
         has_lcd_msg ? (unsigned long long)custom_msg.timestamp_ms : 0ULL,
+        telemetry.rtc_battery_low ? "true" : "false",
         full ? (telemetry.plc_hardware_present ? ",\"plc_hardware_present\":true" : ",\"plc_hardware_present\":false") : "",
         full ? ",\"hw_model\":\"BISSO E350\"" : "",
         full ? ",\"hw_mcu\":\"" : "", full ? mcuGetModelName() : "", full ? "\"" : "",
@@ -529,11 +530,15 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
 
 // --- Broadcast state to all connected WebSocket clients ---
 void WebServerManager::broadcastState() {
-    // PHASE 6.2: Skip broadcast if heap is critically fragmented
-    // This gives the heap time to recover during file serving
-    size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-    if (largest_block < 10240) { // Increased to 10KB to prevent fragmentation issues
-        // Heap is too fragmented - skip this broadcast cycle
+    // PHASE 6.9: Skip if no WebSocket clients connected
+    // Use PsychicHttp's own client count — NOT our ws_clients map (which may be stale)
+    if (wsHandler.count() == 0) return;
+    
+    // Skip broadcast if internal DRAM heap is critically low
+    // PsychicHttp's httpd_ws_send_frame_async allocates from internal DRAM only.
+    // CRITICAL: Must use MALLOC_CAP_INTERNAL, NOT MALLOC_CAP_8BIT (which includes PSRAM on S3).
+    size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (largest_block < 40960) { // 40KB internal DRAM threshold
         return;
     }
     
@@ -547,19 +552,11 @@ void WebServerManager::broadcastState() {
     size_t len = serializeTelemetryToBuffer(broadcast_buffer, 2048, telemetry, false);
     
     if (len > 0 && len < 2048) {
-        // Wrap in try-catch to prevent crash if clients disconnect during broadcast
-        try {
-            wsHandler.sendAll(broadcast_buffer);
-        } catch (...) {
-            logWarning("[WS] Broadcast failed - client disconnected");
-        }
-    } else {
-        // PHASE 6.4: Fallback heartbeat when telemetry is skipped to keep watchdog happy
-        wsHandler.sendAll("{\"type\":\"hb\"}");
-        if (len >= 2048) {
-            logError("[WS] Broadcast failed - Buffer overflow (%u bytes)", (uint32_t)len);
-        }
+        wsHandler.sendAll(broadcast_buffer);
+    } else if (len >= 2048) {
+        logError("[WS] Broadcast skipped - Buffer overflow (%u bytes)", (uint32_t)len);
     }
+    // Note: If len == 0, skip silently (no heartbeat needed - clients have their own timeout)
 
     // Update history tracking
     updateHistory(telemetry.cpu_usage_percent, telemetry.free_heap_bytes, current_status.vfd_current_amps);

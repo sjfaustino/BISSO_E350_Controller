@@ -185,10 +185,12 @@ void cmd_status_dashboard(int argc, char** argv) {
         pos += snprintf(output + pos, sizeof(output) - pos, "|  E-STOP ACTIVE - MOTION DISABLED                          |\n");
     }
 
+#if BOARD_HAS_RTC_DS3231
     if (rtcHasBatteryWarning()) {
         pos += snprintf(output + pos, sizeof(output) - pos, "+============================================================+\n");
         pos += snprintf(output + pos, sizeof(output) - pos, "|  WARNING: RTC BATTERY LOW - CLOCK WILL RESET ON POWER OFF |\n");
     }
+#endif
     
     pos += snprintf(output + pos, sizeof(output) - pos, "+============================================================+\n");
     if (!verbose) {
@@ -243,7 +245,7 @@ void cmd_runtime(int argc, char** argv) {
     
     if (!serialLoggerLock()) return;
 
-    logPrintln("\n[RUNTIME] === Machine Usage Statistics ===\n");
+    logDirectPrintln("\n[RUNTIME] === Machine Usage Statistics ===\n");
     
     cliPrintTableHeader(23, 18, 0);
     cliPrintTableRow("Metric", "Value", nullptr, 23, 18, 0);
@@ -262,9 +264,10 @@ void cmd_runtime(int argc, char** argv) {
     cliPrintTableFooter(23, 18, 0);
     
     if (maint_hours >= 100) {
-        logPrintln("\n[!] MAINTENANCE RECOMMENDED (100+ hours since last service)");
+        logDirectPrintln("\n[!] MAINTENANCE RECOMMENDED (100+ hours since last service)");
     }
 
+    Serial.flush();
     serialLoggerUnlock();
 }
 
@@ -1177,11 +1180,11 @@ void cmd_task_list_detailed(int argc, char** argv) {
 }
 
 void cmd_memory_detailed(int argc, char** argv) {
-    if (!serialLoggerLock()) return;
+    // Build entire output into a local buffer to prevent interleaved corruption
+    // (logPrintf acquires/releases mutex on each call, allowing other tasks to interleave)
+    char buf[768];
+    int pos = 0;
 
-    logPrintln("\n[MEMORY] === Detailed Memory Analysis ===");
-
-    // Update memory monitor
     extern void memoryMonitorUpdate();
     memoryMonitorUpdate();
     
@@ -1192,39 +1195,53 @@ void cmd_memory_detailed(int argc, char** argv) {
     uint32_t internal_used = internal_total - internal_free;
     uint32_t internal_largest = memoryMonitorGetLargestFreeBlock();
 
-    logPrintf("\r\nInternal Heap (DRAM):\r\n");
-    logPrintf("  Total:      %lu bytes\r\n", (unsigned long)internal_total);
-    logPrintf("  Used:       %lu bytes (%.1f%%)\r\n", (unsigned long)internal_used, (internal_used * 100.0f) / internal_total);
-    logPrintf("  Free:       %lu bytes (%.1f%%)\r\n", (unsigned long)internal_free, (internal_free * 100.0f) / internal_total);
-    logPrintf("  Largest:    %lu bytes (max contiguous)\r\n", (unsigned long)internal_largest);
-    logPrintf("  Min Free:   %lu bytes (lowest ever)\r\n", (unsigned long)stats->minimum_free);
+    pos += snprintf(buf + pos, sizeof(buf) - pos,
+        "\r\nInternal Heap (DRAM):\r\n"
+        "  Total:      %lu bytes\r\n"
+        "  Used:       %lu bytes (%.1f%%)\r\n"
+        "  Free:       %lu bytes (%.1f%%)\r\n"
+        "  Largest:    %lu bytes (max contiguous)\r\n"
+        "  Min Free:   %lu bytes (lowest ever)\r\n",
+        (unsigned long)internal_total,
+        (unsigned long)internal_used, (internal_used * 100.0f) / internal_total,
+        (unsigned long)internal_free, (internal_free * 100.0f) / internal_total,
+        (unsigned long)internal_largest,
+        (unsigned long)stats->minimum_free);
 
-    // Internal Fragmentation
     if (internal_largest > 0 && internal_free > 0) {
         float frag = 100.0f * (1.0f - ((float)internal_largest / internal_free));
-        logPrintf("  Frag:       %.1f%%\r\n", frag);
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "  Frag:       %.1f%%\r\n", frag);
     }
 
     if (stats->psram_total > 0) {
         uint32_t psram_used = stats->psram_total - stats->psram_current_free;
-        logPrintf("\r\nExternal Heap (PSRAM):\r\n");
-        logPrintf("  Total:      %lu bytes\r\n", (unsigned long)stats->psram_total);
-        logPrintf("  Used:       %lu bytes (%.1f%%)\r\n", (unsigned long)psram_used, (psram_used * 100.0f) / stats->psram_total);
-        logPrintf("  Free:       %lu bytes (%.1f%%)\r\n", (unsigned long)stats->psram_current_free, (stats->psram_current_free * 100.0f) / stats->psram_total);
-        logPrintf("  Largest:    %lu bytes (max contiguous)\r\n", (unsigned long)stats->psram_largest_block);
+        pos += snprintf(buf + pos, sizeof(buf) - pos,
+            "\r\nExternal Heap (PSRAM):\r\n"
+            "  Total:      %lu bytes\r\n"
+            "  Used:       %lu bytes (%.1f%%)\r\n"
+            "  Free:       %lu bytes (%.1f%%)\r\n"
+            "  Largest:    %lu bytes (max contiguous)\r\n",
+            (unsigned long)stats->psram_total,
+            (unsigned long)psram_used, (psram_used * 100.0f) / stats->psram_total,
+            (unsigned long)stats->psram_current_free, (stats->psram_current_free * 100.0f) / stats->psram_total,
+            (unsigned long)stats->psram_largest_block);
         
-        // PSRAM Fragmentation
         if (stats->psram_largest_block > 0 && stats->psram_current_free > 0) {
             float pfrag = 100.0f * (1.0f - ((float)stats->psram_largest_block / stats->psram_current_free));
-            logPrintf("  Frag:       %.1f%%\r\n", pfrag);
+            pos += snprintf(buf + pos, sizeof(buf) - pos, "  Frag:       %.1f%%\r\n", pfrag);
         }
     } else {
-        logPrintf("\r\nExternal Heap (PSRAM): NOT FOUND\r\n");
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "\r\nExternal Heap (PSRAM): NOT FOUND\r\n");
     }
 
-    logPrintf("\r\nSamples:      %lu\r\n", (unsigned long)stats->sample_count);
-    
-    serialLoggerUnlock();
+    pos += snprintf(buf + pos, sizeof(buf) - pos, "\r\nSamples:      %lu\r\n", (unsigned long)stats->sample_count);
+
+    // Single atomic print — direct to Serial under mutex
+    if (serialLoggerLock()) {
+        Serial.print(buf);
+        Serial.flush();
+        serialLoggerUnlock();
+    }
 }
 
 // ============================================================================

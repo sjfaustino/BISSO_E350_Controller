@@ -336,10 +336,27 @@ void NetworkManager::initEthernet() {
   }
   
   // 5. Netif integration (LwIP)
+  // Ensure LwIP is initialized (idempotent)
+  esp_netif_init();
+  esp_event_loop_create_default();
+  
   // Note: We use the Arduino ESP32 context, so we might need to check if netif is already init
   esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
   esp_netif_t *eth_netif = esp_netif_new(&netif_cfg);
-  esp_netif_attach(eth_netif, esp_eth_new_netif_glue(eth_handle));
+  
+  if (eth_netif == NULL) {
+      logError("[ETH] Failed to create netif");
+      return;
+  }
+
+  void* glue = esp_eth_new_netif_glue(eth_handle);
+  if (glue == NULL) {
+      logError("[ETH] Failed to create netif glue");
+      esp_netif_destroy(eth_netif);
+      return;
+  }
+
+  esp_netif_attach(eth_netif, glue);
   
   success = (esp_eth_start(eth_handle) == ESP_OK);
   

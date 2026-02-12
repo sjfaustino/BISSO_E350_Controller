@@ -5,7 +5,20 @@ window.HardwareModule = window.HardwareModule || {
 
     init() {
         console.log("[Hardware] Initializing");
-        this.updateVariantVisibility();
+        // Hide all variant-specific cards initially (prevent flash of wrong card)
+        document.querySelectorAll("[data-board-variant]").forEach(el => {
+            el.style.display = "none";
+        });
+        // Fetch system info first, then show correct cards
+        window.API.get("status", null, { silent: true }).then(data => {
+            if (data && data.system) {
+                if (typeof AppState !== 'undefined') AppState.update(data);
+            }
+            this.updateVariantVisibility();
+        }).catch(() => {
+            // Fallback: use whatever AppState has (may be empty)
+            this.updateVariantVisibility();
+        });
         this.loadHandlers().then(() => {
             this.loadPinConfiguration();
             this.setupEventListeners();

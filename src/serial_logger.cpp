@@ -213,41 +213,49 @@ void logVerbose(const char* format, ...) {
 void logPrintf(const char* format, ...) {
   if (!acquireSerialMutex()) return;
 
+  // Stack-local buffer — safe from shared buffer contention
+  // Always synchronous — CLI output must not go through async queue
+  char buf[256];
   va_list args; va_start(args, format);
-  vsnprintf(shared_formatting_buffer, LOGGER_BUFFER_SIZE, format, args); 
+  vsnprintf(buf, sizeof(buf), format, args); 
   va_end(args);
   
-  if (async_enabled && log_queue != NULL) {
-    log_msg_t msg;
-    strncpy(msg.text, shared_formatting_buffer, LOGGER_BUFFER_SIZE - 1);
-    msg.text[LOGGER_BUFFER_SIZE - 1] = '\0';
-    xQueueSend(log_queue, &msg, 0);
-  } else {
-    SerialOut.print(shared_formatting_buffer);
-  }
-  
-  networkManager.telnetPrint(shared_formatting_buffer);
+  SerialOut.print(buf);
+  networkManager.telnetPrint(buf);
   releaseSerialMutex();
 }
 
 void logPrintln(const char* format, ...) {
   if (!acquireSerialMutex()) return;
 
+  char buf[256];
   va_list args; va_start(args, format);
-  vsnprintf(shared_formatting_buffer, LOGGER_BUFFER_SIZE, format, args); 
+  vsnprintf(buf, sizeof(buf), format, args); 
   va_end(args);
   
-  if (async_enabled && log_queue != NULL) {
-    log_msg_t msg;
-    strncpy(msg.text, shared_formatting_buffer, LOGGER_BUFFER_SIZE - 1);
-    msg.text[LOGGER_BUFFER_SIZE - 1] = '\0';
-    xQueueSend(log_queue, &msg, 0);
-  } else {
-    SerialOut.println(shared_formatting_buffer);
-  }
-  
-  networkManager.telnetPrintln(shared_formatting_buffer);
+  SerialOut.println(buf);
+  networkManager.telnetPrintln(buf);
   releaseSerialMutex();
+}
+
+// ============================================================================
+// DIRECT PRINT (NO MUTEX - caller must hold serialLoggerLock)
+// ============================================================================
+
+void logDirectPrintf(const char* format, ...) {
+  char buf[256];
+  va_list args; va_start(args, format);
+  vsnprintf(buf, sizeof(buf), format, args);
+  va_end(args);
+  SerialOut.print(buf);
+}
+
+void logDirectPrintln(const char* format, ...) {
+  char buf[256];
+  va_list args; va_start(args, format);
+  vsnprintf(buf, sizeof(buf), format, args);
+  va_end(args);
+  SerialOut.println(buf);
 }
 
 // ============================================================================

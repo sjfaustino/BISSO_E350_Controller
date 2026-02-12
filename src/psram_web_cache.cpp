@@ -29,9 +29,19 @@ bool PsramWebCache::init(const char* root) {
         std::string path = entry.path();
         
         if (entry.isDirectory()) {
-            init(path.c_str());
+            // Skip hidden directories (.trash, etc.) - they contain non-web content
+            const char* name = entry.name();
+            if (name[0] != '.') {
+                init(path.c_str());
+            }
         } else {
             size_t fileSize = entry.size();
+            // Skip large binary files (e.g. pwa-icon.png 495KB) — served from flash on demand
+            if (fileSize > 102400) {
+                logPrintf("[CACHE] Skipped %s (%u bytes, too large)\r\n", path.c_str(), (uint32_t)fileSize);
+                entry = dir.openNextFile();
+                continue;
+            }
             // Allocate in PSRAM
             uint8_t* buffer = (uint8_t*)psramMalloc(fileSize);
             

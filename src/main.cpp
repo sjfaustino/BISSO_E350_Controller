@@ -39,6 +39,7 @@
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <driver/gpio.h> // Fixed: Required for gpio_install_isr_service
 
 static uint32_t boot_time_ms = 0;
 extern WebServerManager webServer;
@@ -149,6 +150,14 @@ bool init_yhtc05_wrapper() {
        else { logModuleInitFail(name); bootMarkFailed(name, "Init failed", code); } } while (0)
 
 void setup() {
+  // 0. Initialize GPIO ISR Service (Create global ISR handler)
+  // This MUST be called before any driver (Ethernet, Inputs) attaches an interrupt
+  // ESP_ERROR_CHECK_WITHOUT_ABORT(gpio_install_isr_service(0));
+  if (gpio_install_isr_service(0) != ESP_OK) {
+      // Driver might be already installed by Arduino framework (unlikely at this stage but safe to check)
+      // logError("ISR Service install failed"); // logging not ready yet
+  }
+  
   Serial.begin(115200);
   
   // PHASE 16 FIX: On ESP32-S3 with USB CDC, wait for Serial to connect 

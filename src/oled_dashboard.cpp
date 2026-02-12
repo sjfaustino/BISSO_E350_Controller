@@ -4,15 +4,17 @@
  */
 
 #include "oled_dashboard.h"
-#include <Adafruit_SSD1306.h>
-#include <Adafruit_GFX.h>
-#include <Wire.h>
 #include "board_variant.h"
 #include "system_telemetry.h"
 #include "network_manager.h"
 #include "motion.h"
 #include "serial_logger.h"
 #include "system_utils.h" // PHASE 8.1
+#include <Wire.h>
+
+#if BOARD_HAS_OLED_SSD1306
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -20,13 +22,14 @@
 #define SCREEN_ADDRESS 0x3C
 
 static Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#endif
+
 static bool oled_ready = false;
 
 bool oledDashboardInit() {
 #if !BOARD_HAS_OLED_SSD1306
     return false;
-#endif
-
+#else
     logModuleInit("OLED");
     
     // Wire instance should already be initialized by board_inputs or main.cpp
@@ -46,11 +49,13 @@ bool oledDashboardInit() {
     oled_ready = true;
     logModuleInitOK("OLED");
     return true;
+#endif
 }
 
 void oledDashboardUpdate() {
     if (!oled_ready) return;
 
+#if BOARD_HAS_OLED_SSD1306
     system_telemetry_t t = telemetryGetSnapshot();
     
     display.clearDisplay();
@@ -90,4 +95,5 @@ void oledDashboardUpdate() {
     display.print("H:"); display.print(t.free_heap_bytes / 1024); display.print("KB");
 
     display.display();
+#endif
 }

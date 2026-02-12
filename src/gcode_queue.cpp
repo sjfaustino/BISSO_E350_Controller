@@ -251,7 +251,7 @@ bool gcodeQueueSkip() {
 
 void gcodeQueueClear() {
     portENTER_CRITICAL(&queueSpinlock);
-    memset(jobs, 0, sizeof(jobs));
+    memset(jobs, 0, GCODE_QUEUE_MAX_JOBS * sizeof(gcode_job_t));
     job_head = 0;
     job_count = 0;
     current_job_idx = UINT16_MAX;

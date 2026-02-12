@@ -18,9 +18,9 @@ static void purgeDirectory(FS* fs, const char* dirPath, uint32_t currentEpoch);
 void trashBinInit() {
     logInfo("[TRASH] Initializing trash bins...");
     
-    if (!LittleFS.exists(TRASH_DIR)) {
-        if (LittleFS.mkdir(TRASH_DIR)) logInfo("[TRASH] Created LittleFS trash bin");
-        else logError("[TRASH] Failed to create LittleFS trash bin");
+    // mkdir() is a no-op if directory already exists; avoids VFS error log from exists() -> open()
+    if (LittleFS.mkdir(TRASH_DIR)) {
+        logInfo("[TRASH] Created LittleFS trash bin");
     }
 
     if (sdCardIsMounted()) {
@@ -40,7 +40,10 @@ bool trashBinMoveToTrash(FS* fs, const char* path) {
     }
 
     // Generate unique trash name: filename.ext.epoch
-    uint32_t epoch = rtcGetCurrentEpoch();
+    uint32_t epoch = 0;
+    #if BOARD_HAS_RTC_DS3231
+        epoch = rtcGetCurrentEpoch();
+    #endif
     String fileName = String(path);
     int lastSlash = fileName.lastIndexOf('/');
     if (lastSlash != -1) {
@@ -92,7 +95,16 @@ bool trashBinRestore(FS* fs, const char* trashPath) {
 }
 
 void trashBinAutoPurge() {
-    uint32_t currentEpoch = rtcGetCurrentEpoch();
+    uint32_t currentEpoch = 0;
+    #if BOARD_HAS_RTC_DS3231
+        currentEpoch = rtcGetCurrentEpoch();
+    #endif
+
+    if (currentEpoch == 0) {
+        logWarning("[TRASH] Skipping auto-purge: RTC not available/set");
+        return;
+    }
+
     logInfo("[TRASH] Starting auto-purge (Threshold: 30 days ago)...");
 
     purgeDirectory(&LittleFS, TRASH_DIR, currentEpoch);

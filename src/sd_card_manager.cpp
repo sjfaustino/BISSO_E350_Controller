@@ -19,7 +19,7 @@ result_t sdCardInit() {
     #if !BOARD_HAS_SDCARD
         logWarning("[SD] SD card not supported on this board variant");
         return RESULT_ERROR_HARDWARE;
-    #endif
+    #else
     
     if (sd_initialized) {
         logDebug("[SD] Already initialized");
@@ -107,6 +107,7 @@ result_t sdCardInit() {
     
     sd_initialized = true;
     return sd_mounted ? RESULT_OK : RESULT_ERROR;
+    #endif
 }
 
 
@@ -116,10 +117,10 @@ result_t sdCardInit() {
 bool sdCardIsPresent() {
     #if !BOARD_HAS_SDCARD
         return false;
-    #endif
-    
+    #else
     // Card detect pin is LOW when card is inserted
     return digitalRead(PIN_SD_CD) == LOW;
+    #endif
 }
 
 /**

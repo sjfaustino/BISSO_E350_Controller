@@ -27,7 +27,11 @@ bool sdTelemetryLoggerInit() {
     }
 
     // Generate filename based on timestamp or sequential ID
-    uint32_t timestamp = rtcGetCurrentEpoch();
+    uint32_t timestamp = 0;
+    #if BOARD_HAS_RTC_DS3231
+        timestamp = rtcGetCurrentEpoch();
+    #endif
+
     if (timestamp > 1700000000) { // Valid RTC time
         snprintf(log_filename, sizeof(log_filename), "/logs/diag_%lu.csv", (unsigned long)timestamp);
     } else {
