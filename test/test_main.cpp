@@ -26,6 +26,9 @@ extern void run_api_routes_tests(void);
 extern void run_string_safety_tests(void);
 extern void run_config_validation_tests(void);
 extern void run_error_handling_paths_tests(void);
+extern void run_telemetry_json_tests(void);
+extern void run_cli_dispatch_tests(void);
+extern void run_cli_tab_completion_tests(void);
 
 // Unity setup/teardown hooks
 void setUp(void) {
@@ -58,6 +61,9 @@ void run_all_tests(void) {
     run_string_safety_tests();
     run_config_validation_tests();
     run_error_handling_paths_tests();
+    run_telemetry_json_tests();
+    run_cli_dispatch_tests();
+    run_cli_tab_completion_tests();
     
     UNITY_END();
 }
