@@ -259,8 +259,8 @@ void WebServerManager::begin() {
     logPrintln("[WEB] Starting Server");
     
     // PHASE 6.2: Memory-safe configuration (Optimized for standard browser parallelism)
-    // 3 sockets provide a good balance between concurrency and heap usage.
-    server.config.max_open_sockets = 3; // PHASE 6.9: Reduced from 4->3 to save ~6KB heap
+    // 6 sockets provide a good balance between concurrency and heap usage on S3.
+    server.config.max_open_sockets = 6; 
     server.config.max_uri_handlers = 40;
     
     server.start(); 
@@ -592,7 +592,7 @@ void WebServerManager::broadcastState() {
 void WebServerManager::checkWsHealth() {
     static uint32_t last_check = 0;
     const uint32_t CHECK_INTERVAL = 5000;  // Check every 5s
-    const uint32_t CLIENT_TIMEOUT = 30000; // Timeout after 30s inactivity
+    const uint32_t CLIENT_TIMEOUT = 60000; // Timeout after 60s inactivity (more lenient for WiFi)
 
     if (millis() - last_check < CHECK_INTERVAL) return;
     last_check = millis();

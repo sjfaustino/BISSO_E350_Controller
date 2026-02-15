@@ -73,7 +73,7 @@ window.HardwareModule = window.HardwareModule || {
             const t = el.dataset.signal;
             el.innerHTML = '';
             const defaultOpt = document.createElement('option');
-            defaultOpt.value = "";
+            defaultOpt.value = "-1";
             defaultOpt.textContent = window.i18n.t('hardware.select_pin');
             el.appendChild(defaultOpt);
 
@@ -341,13 +341,15 @@ window.HardwareModule = window.HardwareModule || {
         if (isRS485) {
             if (badge) badge.textContent = "RS485 Modbus/ASCII";
             if (note) note.style.display = "block";
-            if (rxEl) { rxEl.value = "16"; rxEl.disabled = true; }
-            if (txEl) { txEl.value = "13"; txEl.disabled = true; }
+            const isV31 = this.isV31();
+            if (rxEl) { rxEl.value = isV31 ? "17" : "16"; rxEl.disabled = true; }
+            if (txEl) { txEl.value = isV31 ? "16" : "13"; txEl.disabled = true; }
         } else {
             if (badge) badge.textContent = "RS232 TTL";
             if (note) note.style.display = "none";
-            if (rxEl) { rxEl.disabled = false; if (rxEl.value == "16") rxEl.value = "14"; }
-            if (txEl) { txEl.disabled = false; if (txEl.value == "13") txEl.value = "33"; }
+            const isV31 = this.isV31();
+            if (rxEl) { rxEl.disabled = false; if (rxEl.value == "16" || rxEl.value == "17") rxEl.value = isV31 ? "47" : "14"; }
+            if (txEl) { txEl.disabled = false; if (txEl.value == "13" || txEl.value == "16") txEl.value = isV31 ? "48" : "33"; }
         }
 
         // Update pin summary to reflect the new interface
