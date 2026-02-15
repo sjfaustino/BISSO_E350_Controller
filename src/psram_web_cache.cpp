@@ -9,8 +9,8 @@
 #include "serial_logger.h"
 
 PsramWebCache::~PsramWebCache() {
-    for (auto const& [path, file] : cache) {
-        psramFree(file.data);
+    for (auto const& pair : cache) {
+        psramFree(pair.second.data);
     }
     cache.clear();
 }
@@ -19,8 +19,8 @@ bool PsramWebCache::init(const char* root) {
     logPrintf("[CACHE] Initializing PSRAM Web Cache from %s...\r\n", root);
     
     // Clear and reset before start
-    for (auto const& [path, file] : cache) {
-        psramFree(file.data);
+    for (auto const& pair : cache) {
+        psramFree(pair.second.data);
     }
     cache.clear();
     total_size = 0;
