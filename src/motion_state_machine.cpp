@@ -288,7 +288,10 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
     // PHASE 5.20: Position Hunting Logic
     // If we've settled for at least 600ms (typical mechanical bounce time)
     // and we are still outside margin, we check if we should "hunt" back.
-    // SAFETY: Restrict hunting to X (0) and Z (2) axes to avoid reversing Y during a cut.
+    // SAFETY: Restrict hunting to X (0) and Z (2) axes. 
+    // Hunting is intentionally disabled for the Y-axis (Cutting) because an automatic 
+    // position correction (reversing) while the blade is inside the material could 
+    // cause immediate blade breakage or severe damage to the workpiece/machine.
     uint32_t settle_time = (uint32_t)(millis() - axis->state_entry_ms);
     if ((axis->id == 0 || axis->id == 2) && settle_time > 600) {
         logInfo("[AXIS %d] Position hunt: error=%ld counts. Reversing...", 
