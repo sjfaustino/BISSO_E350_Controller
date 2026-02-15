@@ -665,7 +665,7 @@ void cmd_vfd_config(int argc, char** argv) {
         configUnifiedSave();
         logInfo("[VFDCFG] VFD stall detection %s", enable ? "ENABLED" : "DISABLED");
 
-    } else if (strcmp(argv[1], "show") == 0) {
+    } else if (strcmp(argv[2], "show") == 0) {
         logPrintln("\n[VFDCFG] === Current VFD Configuration ===");
 
         float margin = configGetFloat(KEY_VFD_STALL_MARGIN, 20.0f);
