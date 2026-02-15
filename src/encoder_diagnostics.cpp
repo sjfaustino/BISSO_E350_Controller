@@ -180,7 +180,7 @@ bool encoderDiagnosticsVerifyCalibration(uint8_t axis_id, float distance_mm) {
     // Wait for motion to complete
     uint32_t timeout = millis() + 30000;  // 30 second timeout
     while (motionIsMoving() && millis() < timeout) {
-        delay(100);
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 
     // Check end position
@@ -214,7 +214,7 @@ uint8_t encoderDiagnosticsAnalyzeSignal(uint8_t axis_id, uint32_t duration_ms) {
             error_count++;
         }
         read_count++;
-        delay(100);
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 
     uint8_t quality = (uint8_t)((1.0f - ((float)error_count / read_count)) * 100.0f);

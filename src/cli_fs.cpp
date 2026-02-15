@@ -36,7 +36,7 @@ void ls_recursive(const char* path) {
     File file = root.openNextFile();
     while (file) {
         if (file.isDirectory()) {
-            logPrintf("  [DIR]  %s\n", file.name());
+            logPrintf("%-10s %-11s %s\n", "[DIR]", "-", file.name());
              // Construct full path for recursion
             char subpath[128];
             if (strcmp(path, "/") == 0) snprintf(subpath, sizeof(subpath), "/%s", file.name());
@@ -50,7 +50,7 @@ void ls_recursive(const char* path) {
             // Actually, we can't easily recurse *while* iterating unless we close/reopen or store paths.
             // Storing paths is safer.
         } else {
-            logPrintf("  [FILE] %-32s %8zu bytes\n", file.name(), file.size());
+            logPrintf("%-10s %-11zu %s\n", "[FILE]", file.size(), file.name());
         }
         file = root.openNextFile();
     }
@@ -106,7 +106,11 @@ void cmd_fs_ls(int argc, char** argv) {
     if (flag_R) {
         ls_recursive(path);
     } else {
-        logPrintf("Listing directory: %s\n", path);
+        logPrintf("\nListing [LittleFS]: %s\n", path);
+        logPrintln("-------------------------------------------------------------");
+        logPrintln("Type       Size        Name");
+        logPrintln("-------------------------------------------------------------");
+
         File root = LittleFS.open(path);
         if (!root) {
             logError("Failed to open directory (check path?)");
@@ -118,16 +122,21 @@ void cmd_fs_ls(int argc, char** argv) {
             return;
         }
 
+        int count = 0;
         File file = root.openNextFile();
         while (file) {
             if (file.isDirectory()) {
-                logPrintf("  [DIR]  %s\n", file.name());
+                logPrintf("%-10s %-11s %s\n", "[DIR]", "-", file.name());
             } else {
-                logPrintf("  [FILE] %-32s %8zu bytes\n", file.name(), file.size());
+                logPrintf("%-10s %-11zu %s\n", "[FILE]", file.size(), file.name());
             }
+            count++;
             file = root.openNextFile();
         }
         root.close();
+
+        logPrintln("-------------------------------------------------------------");
+        logPrintf("Total: %d items\n\n", count);
     }
 }
 
@@ -164,11 +173,11 @@ void cmd_fs_cat(int argc, char** argv) {
         return;
     }
 
-    logPrintf("--- %s START ---\n", argv[1]);
+    logPrintf("--- Reading [LittleFS]: %s (%lu bytes) ---\n", path, (unsigned long)file.size());
     while (file.available()) {
         CLI_SERIAL.write(file.read());
     }
-    logPrintf("\n--- %s END ---\n", argv[1]);
+    logPrintf("\n--- END ---\n");
     file.close();
 }
 

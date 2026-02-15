@@ -293,7 +293,7 @@ bool sdCardListDir(const char* path) {
     }
     
     logPrintln("");
-    logPrintf("[SD] Contents of: %s\n", path);
+    logPrintf("Listing [SD]: %s\n", path);
     logPrintln("-------------------------------------------------------------");
     logPrintln("Type       Size        Name");
     logPrintln("-------------------------------------------------------------");
@@ -302,12 +302,11 @@ bool sdCardListDir(const char* path) {
     int count = 0;
     
     while (file) {
-        const char* type = file.isDirectory() ? "[DIR]" : "[FILE]";
         
         if (file.isDirectory()) {
-            logPrintf("%-10s %-11s %s\n", type, "-", file.name());
+            logPrintf("%-10s %-11s %s\n", "[DIR]", "-", file.name());
         } else {
-            logPrintf("%-10s %-11lu %s\n", type, (unsigned long)file.size(), file.name());
+            logPrintf("%-10s %-11lu %s\n", "[FILE]", (unsigned long)file.size(), file.name());
         }
         
         count++;

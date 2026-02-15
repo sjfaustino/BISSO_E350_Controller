@@ -92,7 +92,7 @@ bool Jxk10Driver::setInternalSlaveAddress(uint8_t new_address) {
     if (!send(_tx_buffer, tx_len)) return false;
 
     // Wait for response (blocking since this is a config change)
-    delay(100); 
+    vTaskDelay(pdMS_TO_TICKS(100)); 
     // We cannot easily read response here because Registry owns the serial port RX.
     // However, if we assume registry is running in background, it might consume the response.
     // Making this work perfectly requires Registry support for "One-off transaction".

@@ -71,8 +71,7 @@ void cmd_sd_cat(int argc, char** argv) {
         return;
     }
     
-    logPrintf("\n[SD] Contents of: %s (%lu bytes)\n", filename, (unsigned long)file.size());
-    logPrintln("-------------------------------------------------------------");
+    logPrintf("--- Reading [SD]: %s (%lu bytes) ---\n", filename, (unsigned long)file.size());
     
     while (file.available()) {
         char c = file.read();
@@ -80,7 +79,7 @@ void cmd_sd_cat(int argc, char** argv) {
         watchdogFeed("CLI");
     }
     
-    logPrintln("\n-------------------------------------------------------------\n");
+    logPrintf("\n--- END ---\n");
     file.close();
 }
 

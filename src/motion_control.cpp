@@ -350,7 +350,10 @@ void motionUpdate() {
     
     // Extrapolate position based on last known velocity and time since last RS485 update
     if (axes[i].last_actual_update_ms > 0) {
-        uint32_t dt_since_last_actual = (uint32_t)(millis() - axes[i].last_actual_update_ms);
+        uint32_t now = millis();
+        uint32_t dt_since_last_actual = (now >= axes[i].last_actual_update_ms) 
+            ? (now - axes[i].last_actual_update_ms) 
+            : (UINT32_MAX - axes[i].last_actual_update_ms + now + 1);
         
         // Clamp extrapolation time to 200ms to prevent runaway if bus is lost
         if (dt_since_last_actual > 200) dt_since_last_actual = 200;

@@ -69,7 +69,7 @@ bool encoderReadFrameWithStats(uint8_t* data, uint8_t max_len, uint32_t timeout_
           }
           if (pos >= 64) pos = 0; 
       }
-      delay(1);
+      vTaskDelay(pdMS_TO_TICKS(1));
   }
   
   stats.frames_failed++;
