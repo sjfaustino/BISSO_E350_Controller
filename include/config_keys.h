@@ -99,6 +99,7 @@
 #define KEY_PPM_Z "ppm_z"
 #define KEY_PPM_A "ppm_a"
 #define KEY_ENC_ERR_THRESHOLD "enc_thresh"
+#define KEY_ENC_DEV_TIMEOUT   "enc_dev_timo" // Encoder deviation alarm timeout (ms)
 #define KEY_ENC_FEEDBACK "enc_fb_en"  // Encoder feedback enable (1=on, 0=off)
 #define KEY_ENC_INTERFACE                                                      \
   "enc_iface" // WJ66 interface type (0=RS232_HT, 1=RS485_RXD2, 255=CUSTOM)

@@ -10,6 +10,7 @@
 #include "config_keys.h"
 #include "config_cache.h"
 #include "serial_logger.h"
+#include "system_tuning.h"
 #include "system_constants.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include <Arduino.h>
@@ -242,6 +243,11 @@ static int32_t validateInt(const char *key, int32_t value) {
     return (value < 100) ? 100 : (value > 60000 ? 60000 : value);
   }
 
+  // 4. Encoder Deviation Alarm Timeout (100ms to 10s)
+  if (strcmp(key, KEY_ENC_DEV_TIMEOUT) == 0) {
+    return (value < 100) ? 100 : (value > 10000 ? 10000 : value);
+  }
+
   // 3. Profiles (0-2)
   if (strstr(key, "home_prof_") != NULL) {
     return (value < 0) ? 0 : (value > 2 ? 2 : value);
@@ -340,6 +346,8 @@ void configSetDefaults() {
     prefs.putInt(KEY_JXK10_ADDR, 1);
   if (!prefs.isKey(KEY_JXK10_ENABLED))
     prefs.putInt(KEY_JXK10_ENABLED, 1);
+  if (!prefs.isKey(KEY_ENC_DEV_TIMEOUT))
+    prefs.putInt(KEY_ENC_DEV_TIMEOUT, ENCODER_DEVIATION_TIMEOUT_DEFAULT_MS);
   if (!prefs.isKey(KEY_SPINDLE_THRESHOLD))
     prefs.putInt(KEY_SPINDLE_THRESHOLD, 30);
 

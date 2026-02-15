@@ -10,6 +10,8 @@
 #include "system_constants.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
 #include "motion.h"
+#include "config_unified.h"
+#include "config_keys.h"
 #include <math.h>
 
 // ============================================================================
@@ -69,7 +71,8 @@ void encoderDeviationUpdate(uint8_t axis, int32_t expected_pos, int32_t actual_p
     // STATE MACHINE: Determine deviation status
     // ============================================================================
 
-    bool is_moving = (velocity_mm_s > ENCODER_MIN_ACTIVE_VELOCITY_MM_S);
+    uint32_t timeout_ms = configGetInt(KEY_ENC_DEV_TIMEOUT, ENCODER_DEVIATION_TIMEOUT_DEFAULT_MS);
+    bool is_moving = (velocity_mm_s > ENCODER_DEVIATION_MIN_ACTIVE_VEL_MM_S);
     bool exceeds_tolerance = (abs_deviation > ENCODER_DEVIATION_TOLERANCE_COUNTS);
 
     switch (dev->status) {
@@ -90,7 +93,7 @@ void encoderDeviationUpdate(uint8_t axis, int32_t expected_pos, int32_t actual_p
                 logInfo("[ENCODER_DEV] Axis %d recovered (was %.1f%% off)",
                     axis, (abs_deviation / (float)ENCODER_DEVIATION_TOLERANCE_COUNTS) * 100.0f);
             }
-            else if (now - dev->deviation_start_ms > ENCODER_DEVIATION_TIMEOUT_MS) {
+            else if (now - dev->deviation_start_ms > timeout_ms) {
                 // Sustained deviation - escalate to error
                 dev->status = AXIS_DEVIATION_ERROR;
                 dev->alarm_count++;
@@ -108,7 +111,7 @@ void encoderDeviationUpdate(uint8_t axis, int32_t expected_pos, int32_t actual_p
             break;
 
         case AXIS_DEVIATION_ERROR:
-            if (!exceeds_tolerance && now - dev->deviation_start_ms > 2000) {
+            if (!exceeds_tolerance && now - dev->deviation_start_ms > ENCODER_DEVIATION_RECOVERY_MS) {
                 // Deviation cleared for 2 seconds
                 dev->status = AXIS_OK;
                 logInfo("[ENCODER_DEV] Axis %d deviation cleared", axis);

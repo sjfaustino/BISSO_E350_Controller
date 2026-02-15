@@ -138,7 +138,11 @@
 #define ENCODER_BAUD_RATE_DEFAULT 9600          // Default baud rate
 
 // Deviation thresholds
-#define ENCODER_MAX_DEVIATION_COUNTS 100        // Maximum acceptable deviation
+// Deviation thresholds (PHASE 6.10: Hardening)
+#define ENCODER_DEVIATION_TOLERANCE_COUNTS 50   // Tolerance in counts before flagging
+#define ENCODER_DEVIATION_TIMEOUT_DEFAULT_MS 1000 // Default timeout before alarm
+#define ENCODER_DEVIATION_RECOVERY_MS 2000      // Time deviation must stay corrected before clearing error
+#define ENCODER_DEVIATION_MIN_ACTIVE_VEL_MM_S 5.0f // Min velocity to check deviation (avoid creep noise)
 
 // ============================================================================
 // VFD PARAMETERS

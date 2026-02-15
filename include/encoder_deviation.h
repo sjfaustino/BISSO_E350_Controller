@@ -10,20 +10,16 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "system_tuning.h"
 
 // ============================================================================
-// DEVIATION DETECTION CONFIGURATION
+// DEVIATION DETECTION CONSTANTS
 // ============================================================================
-
-// Tolerance in counts before flagging as deviation
-#define ENCODER_DEVIATION_TOLERANCE_COUNTS 50
-
-// Maximum time (ms) a deviation can be tolerated before alarming
-#define ENCODER_DEVIATION_TIMEOUT_MS 1000
-
-// Minimum velocity (mm/s) to consider motion as "active"
-// Below this, we don't check for deviation (prevents false alarms during creep)
-#define ENCODER_MIN_ACTIVE_VELOCITY_MM_S 5.0f
+// Thresholds and timeouts are now centralized in system_tuning.h
+// ENCODER_DEVIATION_TOLERANCE_COUNTS 
+// ENCODER_DEVIATION_TIMEOUT_MS (Configurable via KEY_ENC_DEV_TIMEOUT)
+// ENCODER_DEVIATION_RECOVERY_MS
+// ENCODER_DEVIATION_MIN_ACTIVE_VEL_MM_S
 
 // ============================================================================
 // DEVIATION STATUS CODES
