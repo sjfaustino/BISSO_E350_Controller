@@ -54,7 +54,7 @@ bool PsramWebCache::loadFromDir(const char* dirPath) {
             size_t fileSize = entry.size();
             // Skip large binary files (e.g. pwa-icon.png 495KB) — served from flash on demand
             if (fileSize > 102400) {
-                logPrintf("[CACHE] Skipped %s (%u bytes, too large)\r\n", path.c_str(), (uint32_t)fileSize);
+                // logPrintf("[CACHE] Skipped %s (%u bytes, too large)\r\n", path.c_str(), (uint32_t)fileSize); // Quiet
                 entry = dir.openNextFile();
                 continue;
             }
@@ -71,7 +71,7 @@ bool PsramWebCache::loadFromDir(const char* dirPath) {
                     
                     cache[path] = file;
                     total_size += fileSize;
-                    logPrintf("[CACHE] Loaded %s (%u bytes)\r\n", path.c_str(), (uint32_t)fileSize);
+                    // logPrintf("[CACHE] Loaded %s (%u bytes)\r\n", path.c_str(), (uint32_t)fileSize); // Quiet
                 } else {
                     logError("[CACHE] Failed to read %s", path.c_str());
                     psramFree(buffer);
@@ -83,6 +83,15 @@ bool PsramWebCache::loadFromDir(const char* dirPath) {
         entry = dir.openNextFile();
     }
     return true;
+}
+
+void PsramWebCache::dumpCacheInfo() const {
+    logPrintf("\nPSRAM Web Cache Contents (%u assets, %u bytes):\n", (uint32_t)cache.size(), (uint32_t)total_size);
+    logPrintf("----------------------------------------------------------------\n");
+    for (auto const& pair : cache) {
+        logPrintf("  %-40s %8u bytes [%s]\n", pair.first.c_str(), (uint32_t)pair.second.size, pair.second.content_type.c_str());
+    }
+    logPrintf("----------------------------------------------------------------\n");
 }
 
 bool PsramWebCache::get(const char* path, const cached_file_t** file) const {

@@ -48,6 +48,11 @@ public:
      */
     size_t getFileCount() const { return cache.size(); }
 
+    /**
+     * @brief Dump all cached files and their sizes to the serial console
+     */
+    void dumpCacheInfo() const;
+
 private:
     PsramWebCache() : total_size(0) {}
     ~PsramWebCache();

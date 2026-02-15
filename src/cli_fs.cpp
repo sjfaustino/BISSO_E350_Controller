@@ -6,6 +6,7 @@
 #include "cli.h"
 #include <LittleFS.h>
 #include "serial_logger.h"
+#include "psram_web_cache.h"
 
 // Helper for directory stats (-d)
 void get_dir_stats(const char* path, size_t& file_count, size_t& dir_count, size_t& total_size) {
@@ -167,4 +168,8 @@ void cmd_fs_cat(int argc, char** argv) {
     }
     logPrintf("\n--- %s END ---\n", argv[1]);
     file.close();
+}
+
+void cmd_fs_cache(int argc, char** argv) {
+    PsramWebCache::getInstance().dumpCacheInfo();
 }
