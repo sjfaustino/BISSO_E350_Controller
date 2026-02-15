@@ -41,6 +41,7 @@ static int command_count = 0;
 extern void cmd_lcd_main(int argc, char** argv);
 extern void cmd_jxk10_main(int argc, char** argv);
 extern void cmd_fs_cache(int argc, char** argv);
+extern void cmd_fs_dmesg(int argc, char** argv);
 void cmd_help(int argc, char** argv);
 void cmd_system_info(int argc, char** argv);
 void cmd_system_reset(int argc, char** argv);
@@ -156,6 +157,7 @@ void cliInit() {
   cliRegisterSDCommands();
   cliRegisterRTCCommands();
   cliRegisterCommand("cache", "Show PSRAM Web Cache details", cmd_fs_cache);
+  cliRegisterCommand("dmesg", "Show system boot log (from SD)", cmd_fs_dmesg);
   cliRegisterCommand("passwd", "Set password (web/ota)", cmd_passwd);
   cliRegisterCommand("auth", "Auth diagnostics & testing", cmd_auth);
   cliRegisterCommand("lcd", "LCD Display Control", cmd_lcd_main);

@@ -35,6 +35,7 @@ bool sdCardFileExists(const char* path);
 size_t sdCardGetFileSize(const char* path);
 result_t sdCardDeleteFile(const char* path);
 result_t sdCardCreateDir(const char* path);
+result_t sdCardMkdirRecursive(const char* path);
 bool sdCardListDir(const char* path);
 
 // Mount status string for CLI/logging

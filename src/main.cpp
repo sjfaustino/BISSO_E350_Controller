@@ -201,6 +201,12 @@ void setup() {
   BOOT_INIT("CLI", init_cli_wrapper, BOOT_ERROR_CLI);
   BOOT_INIT("Network", init_network_wrapper, (boot_status_code_t)13);
   BOOT_INIT("SD Card", init_sd_card_wrapper, (boot_status_code_t)23);
+  
+  // PHASE 8.2: Initialize persistent system logging to SD after mount
+  if (sdCardIsMounted()) {
+      systemLogInit("/var/log/boot.log");
+  }
+
   BOOT_INIT("Encoder Diag", init_encoder_diag_wrapper, (boot_status_code_t)15);
   BOOT_INIT("Load Manager", init_load_mgr_wrapper, (boot_status_code_t)16);
   BOOT_INIT("Dashboard", init_dashboard_wrapper, (boot_status_code_t)17);

@@ -186,4 +186,26 @@ size_t bootLogGetSize();
  */
 size_t bootLogRead(char* buffer, size_t max_len);
 
+// ============================================================================
+// PERSISTENT SYSTEM LOGGING (SD Card)
+// ============================================================================
+
+/**
+ * @brief Initialize persistent system logging to SD card
+ * @param path The file path on SD card (e.g., "/var/log/boot.log")
+ * @return true if initialized successfully
+ */
+bool systemLogInit(const char* path = "/var/log/boot.log");
+
+/**
+ * @brief Stop persistent system logging
+ */
+void systemLogStop();
+
+/**
+ * @brief Write a message directly to the persistent system log
+ * @param message The message to write
+ */
+void systemLogWrite(const char* message);
+
 #endif

@@ -5,6 +5,8 @@
 
 #include "cli.h"
 #include <LittleFS.h>
+#include <SD.h>
+#include "sd_card_manager.h"
 #include "serial_logger.h"
 #include "psram_web_cache.h"
 
@@ -172,4 +174,25 @@ void cmd_fs_cat(int argc, char** argv) {
 
 void cmd_fs_cache(int argc, char** argv) {
     PsramWebCache::getInstance().dumpCacheInfo();
+}
+
+void cmd_fs_dmesg(int argc, char** argv) {
+    const char* path = "/var/log/boot.log";
+    if (!sdCardIsMounted()) {
+        logError("SD card not mounted. Persistent logs unavailable.");
+        return;
+    }
+
+    File file = SD.open(path, FILE_READ);
+    if (!file) {
+        logError("Log file not found: %s", path);
+        return;
+    }
+
+    logPrintf("--- DMESG: %s START ---\n", path);
+    while (file.available()) {
+        CLI_SERIAL.write(file.read());
+    }
+    logPrintf("\n--- DMESG: %s END ---\n", path);
+    file.close();
 }

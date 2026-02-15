@@ -229,6 +229,52 @@ result_t sdCardCreateDir(const char* path) {
 }
 
 /**
+ * @brief Create directory recursively (e.g., /var/log/boot.log -> creates /var and /var/log)
+ */
+result_t sdCardMkdirRecursive(const char* path) {
+    if (!path || !sd_mounted) return RESULT_ERROR;
+
+    String fullPath = String(path);
+    if (fullPath.length() == 0) return RESULT_OK;
+
+    // Split path and create directories one by one
+    String currentPath = "";
+    int start = 0;
+    
+    // Skip leading slash
+    if (fullPath.startsWith("/")) {
+        start = 1;
+        currentPath = "/";
+    }
+
+    while (start < (int)fullPath.length()) {
+        int nextSlash = fullPath.indexOf('/', start);
+        String folder;
+        
+        if (nextSlash == -1) {
+            folder = fullPath.substring(start);
+            start = fullPath.length();
+        } else {
+            folder = fullPath.substring(start, nextSlash);
+            start = nextSlash + 1;
+        }
+
+        if (folder.length() > 0) {
+            currentPath += folder;
+            if (!SD.exists(currentPath.c_str())) {
+                if (!SD.mkdir(currentPath.c_str())) {
+                    logError("[SD] Failed to create intermediate dir: %s", currentPath.c_str());
+                    return RESULT_ERROR;
+                }
+            }
+            currentPath += "/";
+        }
+    }
+
+    return RESULT_OK;
+}
+
+/**
  * @brief List directory contents
  */
 bool sdCardListDir(const char* path) {

@@ -14,6 +14,9 @@
     #define SerialOut Serial
 #endif
 
+#include <SD.h>
+#include "sd_card_manager.h"
+
 #define LOGGER_BUFFER_SIZE 512
 static log_level_t current_log_level = LOG_LEVEL_INFO;
 
@@ -86,6 +89,7 @@ static void vlogPrint(log_level_t level, const char* prefix, const char* format,
   }
   
   bootLogWrite(shared_formatting_buffer);
+  systemLogWrite(shared_formatting_buffer);
   releaseSerialMutex();
 }
 
@@ -222,6 +226,7 @@ void logPrintf(const char* format, ...) {
   
   SerialOut.print(buf);
   networkManager.telnetPrint(buf);
+  systemLogWrite(buf);
   releaseSerialMutex();
 }
 
@@ -235,6 +240,7 @@ void logPrintln(const char* format, ...) {
   
   SerialOut.println(buf);
   networkManager.telnetPrintln(buf);
+  systemLogWrite(buf);
   releaseSerialMutex();
 }
 
@@ -397,5 +403,79 @@ static void bootLogWrite(const char* message) {
     
     if (boot_log_current_size % 1024 < msg_len) {
         boot_log_file.flush();
+    }
+}
+
+// ============================================================================
+// PERSISTENT SYSTEM LOGGING (SD Card)
+// ============================================================================
+
+static File system_log_file;
+static bool system_logging_active = false;
+static std::string system_log_path = "";
+
+bool systemLogInit(const char* path) {
+    if (!sdCardIsMounted()) {
+        SerialOut.println("[SYSTEMLOG] SD card not mounted, persistent logging disabled");
+        return false;
+    }
+
+    // Ensure directory exists recursively
+    std::string path_str = path;
+    size_t last_slash = path_str.find_last_of('/');
+    if (last_slash != std::string::npos && last_slash > 0) {
+        std::string dir = path_str.substr(0, last_slash);
+        sdCardMkdirRecursive(dir.c_str());
+    }
+
+    system_log_path = path;
+    
+    // Open in append mode (Linux style)
+    system_log_file = SD.open(path, FILE_APPEND);
+    if (!system_log_file) {
+        // Try creating if append fails (might not exist)
+        system_log_file = SD.open(path, FILE_WRITE);
+    }
+
+    if (!system_log_file) {
+        SerialOut.printf("[SYSTEMLOG] Failed to open path: %s\n", path);
+        return false;
+    }
+
+    system_logging_active = true;
+    
+    // Write session header
+    system_log_file.printf("\n--- SESSION START: %lu ---\n", (unsigned long)millis());
+    system_log_file.flush();
+    
+    SerialOut.printf("[SYSTEMLOG] Persistent logging active at %s\n", path);
+    return true;
+}
+
+void systemLogStop() {
+    if (system_logging_active) {
+        system_log_file.println("--- SESSION END ---");
+        system_log_file.flush();
+        system_log_file.close();
+        system_logging_active = false;
+    }
+}
+
+void systemLogWrite(const char* message) {
+    if (!system_logging_active || !system_log_file) return;
+    
+    // Write and flush periodically
+    system_log_file.println(message);
+    
+    // Safety: check if card is still mounted before flush
+    if (sdCardIsMounted()) {
+        static uint32_t last_flush = 0;
+        if (millis() - last_flush > 5000) {
+            system_log_file.flush();
+            last_flush = millis();
+        }
+    } else {
+        system_logging_active = false;
+        system_log_file.close();
     }
 }
