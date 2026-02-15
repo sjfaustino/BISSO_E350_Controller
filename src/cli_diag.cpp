@@ -604,11 +604,20 @@ static String formatTimestamp(uint32_t timestamp_ms) {
 
 void cmd_faults_stats(int argc, char** argv) {
     fault_stats_t stats = faultGetStats();
+    if (!serialLoggerLock()) return;
+    
     logPrintln("\n[FAULT] === Statistics ===");
     logPrintf("Total: %lu\r\n", (unsigned long)stats.total_faults);
     if (stats.total_faults > 0) {
         logPrintf("Last: %s\r\n", formatTimestamp(stats.last_fault_time_ms).c_str());
     }
+    
+    logPrintf("Categories: ENC:%lu, MOT:%lu, SAF:%lu, CFG:%lu, PLC:%lu, SYS:%lu\r\n",
+              (unsigned long)stats.encoder_faults, (unsigned long)stats.motion_faults,
+              (unsigned long)stats.safety_faults, (unsigned long)stats.config_faults,
+              (unsigned long)stats.plc_faults, (unsigned long)stats.system_faults);
+              
+    serialLoggerUnlock();
 }
 
 void cmd_faults_main(int argc, char** argv) {
@@ -718,7 +727,7 @@ void cmd_encoder_read(int argc, char** argv) {
         if (n_reads <= 0) n_reads = 1;
     }
 
-    logPrintf("[ENCODER] Reading %d times (0.5s interval)...\r\n", n_reads);
+    logPrintf("Reading %d times (0.5s interval)...\r\n", n_reads);
     logPrintln("| Axis 0    | Axis 1    | Axis 2    | Axis 3    |");
     logPrintln("+-----------+-----------+-----------+-----------+");
 
@@ -736,8 +745,10 @@ void cmd_encoder_status(int argc, char** argv) {
     (void)argc; (void)argv;
     const encoder_hal_config_t* config = encoderHalGetConfig();
     if (!config) return;
+    
+    if (!serialLoggerLock()) return;
 
-    logPrintln("\n[ENCODER] === Configuration & Status Dashboard ===");
+    logPrintln("\n=== Encoder Configuration & Status Dashboard ===");
     logPrintln("+-----------------+---------------------------------------+");
     logPrintf("| Interface       | %-37s |\r\n", encoderHalGetInterfaceName(config->interface));
     logPrintf("| Pins            | RX:%-2d TX:%-2d                             |\r\n", config->rx_pin, config->tx_pin);
@@ -746,6 +757,7 @@ void cmd_encoder_status(int argc, char** argv) {
     logPrintf("| Protocol        | %-37s |\r\n", (proto == 1) ? "Modbus RTU" : "ASCII (#XX\\r)");
     logPrintf("| Address         | %-37d |\r\n", configGetInt(KEY_ENC_ADDR, 0));
     logPrintln("+-----------------+---------------------------------------+");
+
     // Helper for compact metric formatting (max 4 chars)
     auto formatMetric = [](uint32_t val, char* buf) {
         if (val < 1000) snprintf(buf, 6, "%lu", (unsigned long)val);
@@ -785,13 +797,15 @@ void cmd_encoder_status(int argc, char** argv) {
     }
     logPrintln("+------+------+------------+------------+--------+-----------+-------+--------+");
 
-    encoderMotionDiagnostics();
+    // Integration diagnostics
+    serialLoggerUnlock(); // Unlock before calling sub-function that might lock again (though it's recursive)
+    encoderMotionDiagnostics(); // This function handles its own locking correctly
 }
 
 void cmd_encoder_protocol(int argc, char** argv) {
     if (argc < 3) {
         int current = configGetInt(KEY_ENC_PROTO, 0);
-        logPrintf("[ENCODER] Current Protocol: %s (%d)\r\n", (current == 1) ? "Modbus RTU" : "ASCII (#XX\\r)", current);
+        logPrintf("Current Protocol: %s (%d)\r\n", (current == 1) ? "Modbus RTU" : "ASCII (#XX\\r)", current);
         CLI_USAGE("encoder", "protocol <0|1>");
         logPrintln("  0: ASCII mode (Default, eg: #01\\r -> !+0000.00,...)");
         logPrintln("  1: Modbus RTU mode (Read Holding Registers FC03)");
@@ -800,13 +814,13 @@ void cmd_encoder_protocol(int argc, char** argv) {
 
     int proto = atoi(argv[2]);
     if (proto != 0 && proto != 1) {
-        logError("[ENCODER] Invalid protocol: %d (use 0 or 1)", proto);
+        logError("Invalid protocol: %d (use 0 or 1)", proto);
         return;
     }
 
     configSetInt(KEY_ENC_PROTO, proto);
     configUnifiedSave();
-    logInfo("[ENCODER] Protocol set to %s. Changes will take effect on next poll.", 
+    logInfo("Protocol set to %s. Changes will take effect on next poll.", 
             (proto == 1) ? "Modbus RTU" : "ASCII");
 }
 
@@ -815,11 +829,11 @@ void cmd_encoder_protocol(int argc, char** argv) {
 // ============================================================================
 
 void cmd_encoder_config_show(int argc, char** argv) {
-    logPrintln("\n[ENCODER CONFIG] === WJ66 Configuration ===");
+    logPrintln("\n=== WJ66 Encoder Configuration ===");
 
     const encoder_hal_config_t* config = encoderHalGetConfig();
     if (!config) {
-        logError("[ENCODER CONFIG] Unable to get HAL configuration");
+        logError("Unable to get HAL configuration");
         return;
     }
 
@@ -869,13 +883,13 @@ void cmd_encoder_config_interface(int argc, char** argv) {
 
     // Switch interface
     if (encoderHalSwitchInterface(interface_type, baud_rate)) {
-        logInfo("[ENCODER CONFIG] Switched to %s", encoderHalGetInterfaceName(interface_type));
+        logInfo("Switched to %s", encoderHalGetInterfaceName(interface_type));
 
         // Save to NVS
         configSetInt(KEY_ENC_INTERFACE, (int)interface_type);
-        logInfo("[ENCODER CONFIG] Configuration saved to NVS");
+        logInfo("Configuration saved to NVS");
     } else {
-        logError("[ENCODER CONFIG] Failed to switch interface");
+        logError("Failed to switch interface");
     }
 }
 
@@ -892,7 +906,7 @@ void cmd_encoder_config_baud(int argc, char** argv) {
 
     int32_t new_baud_i32 = 0;
     if (!parseAndValidateInt(argv[2], &new_baud_i32, 1200, 115200)) {
-        logError("[ENCODER CONFIG] Invalid baud rate (must be 1200-115200)");
+        logError("Invalid baud rate (must be 1200-115200)");
         return;
     }
 
@@ -904,13 +918,13 @@ void cmd_encoder_config_baud(int argc, char** argv) {
 
     // Re-initialize with new baud rate
     if (encoderHalInit(interface, new_baud)) {
-        logInfo("[ENCODER CONFIG] Baud rate set to %lu", (unsigned long)new_baud);
+        logInfo("Baud rate set to %lu", (unsigned long)new_baud);
 
         // Save to NVS
         configSetInt(KEY_ENC_BAUD, (int)new_baud);
-        logInfo("[ENCODER CONFIG] Configuration saved to NVS");
+        logInfo("Configuration saved to NVS");
     } else {
-        logError("[ENCODER CONFIG] Failed to set baud rate");
+        logError("Failed to set baud rate");
     }
 }
 
@@ -922,7 +936,7 @@ void cmd_encoder_config_main(int argc, char** argv) {
         {"baud",      cmd_encoder_config_baud,      "Set baud rate"}
     };
     
-    cliDispatchSubcommand("[ENCODER CONFIG]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 2);
 }
 
@@ -940,7 +954,7 @@ void cmd_encoder_main(int argc, char** argv) {
         {"protocol", cmd_encoder_protocol,    "Set protocol: 0=ASCII (#XX\\r), 1=Modbus RTU"}
     };
     
-    cliDispatchSubcommand("[ENCODER]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 

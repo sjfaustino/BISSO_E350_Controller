@@ -434,20 +434,10 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
 
     portENTER_CRITICAL(&statusSpinlock);
 
+    // 1. System Info and Dashboard basics
     int n = snprintf(buffer, buffer_size,
         "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
-        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu,\"rtc_battery_low\":%s%s%s%s%s%s%s%s%s%s%s%s},"
-        "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
-        "\"motion_active\":%s,\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},"
-        "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
-        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f,\"load_pct\":%.1f},"
-        "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
-        "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
-        "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s}},"
-        "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},"
-        "\"sd\":{\"mounted\":%s,\"health\":%d,\"total_bytes\":%llu,\"used_bytes\":%llu},"
-        "\"parser\":{\"absolute_mode\":%s,\"feedrate\":%.1f,\"actual_feedrate\":%.1f},"
-        "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}",
+        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu,\"rtc_battery_low\":%s",
         current_status.status,
         telemetryGetHealthStatusString(telemetry.health_status),
         (unsigned long)current_status.uptime_sec,
@@ -457,42 +447,76 @@ size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_
         ver_str,
         __DATE__,
         has_lcd_msg ? (const char*)custom_msg.text : "",
-        has_lcd_msg ? (unsigned long long)custom_msg.timestamp_ms : 0ULL,
-        telemetry.rtc_battery_low ? "true" : "false",
-        full ? (telemetry.plc_hardware_present ? ",\"plc_hardware_present\":true" : ",\"plc_hardware_present\":false") : "",
-        full ? ",\"hw_model\":\"BISSO E350\"" : "",
-        full ? ",\"hw_mcu\":\"" : "", full ? mcuGetModelName() : "", full ? "\"" : "",
-        full ? ",\"hw_revision\":\"" : "", full ? rev_str : "", full ? "\"" : "",
-        full ? ",\"hw_serial\":\"" : "", full ? serial_str : "", full ? "\"" : "",
+        (unsigned long long)(has_lcd_msg ? custom_msg.timestamp_ms : 0),
+        telemetry.rtc_battery_low ? "true" : "false"
+    );
+
+    if (n < 0 || (size_t)n >= buffer_size) {
+        portEXIT_CRITICAL(&statusSpinlock);
+        return (size_t)n;
+    }
+    size_t offset = (size_t)n;
+
+    // 2. Identification (Full mode only)
+    if (full) {
+        n = snprintf(buffer + offset, buffer_size - offset,
+            ",\"plc_hardware_present\":%s,\"hw_model\":\"BISSO E350\",\"hw_mcu\":\"%s\",\"hw_revision\":\"%s\",\"hw_serial\":\"%s\"",
+            telemetry.plc_hardware_present ? "true" : "false",
+            mcuGetModelName(),
+            rev_str,
+            serial_str);
+        if (n > 0 && (offset + n) < buffer_size) offset += n;
+    }
+
+    // 3. Motion state and raw coordinates
+    n = snprintf(buffer + offset, buffer_size - offset,
+        "},\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,\"motion_active\":%s,"
+        "\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},",
         telemetry.axis_x_mm, telemetry.axis_y_mm, telemetry.axis_z_mm, telemetry.axis_a_mm,
         moving ? "true" : "false",
         moving ? "true" : "false",
         motionBuffer.available(),
         motionBuffer.getCapacity(),
-        current_status.dro_connected ? "true" : "false",
+        current_status.dro_connected ? "true" : "false");
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
+
+    // 4. VFD telemetry
+    n = snprintf(buffer + offset, buffer_size - offset,
+        "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
+        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f,\"load_pct\":%.1f},",
         current_status.vfd_current_amps, current_status.vfd_frequency_hz, current_status.vfd_thermal_percent, current_status.vfd_fault_code,
         current_status.vfd_threshold_amps, current_status.vfd_calibration_valid ? "true" : "false", current_status.vfd_connected ? "true" : "false",
-        current_status.spindle_rpm, current_status.spindle_speed_m_s, current_status.spindle_efficiency, current_status.spindle_load_pct,
-        current_status.axis_metrics[0].quality_score, current_status.axis_metrics[0].jitter_mms, current_status.axis_metrics[0].vfd_error_percent, current_status.axis_metrics[0].quality_score < 10 ? "true" : "false", current_status.axis_metrics[0].maintenance_warning ? "true" : "false",
-        current_status.axis_metrics[1].quality_score, current_status.axis_metrics[1].jitter_mms, current_status.axis_metrics[1].vfd_error_percent, current_status.axis_metrics[1].quality_score < 10 ? "true" : "false", current_status.axis_metrics[1].maintenance_warning ? "true" : "false",
-        current_status.axis_metrics[2].quality_score, current_status.axis_metrics[2].jitter_mms, current_status.axis_metrics[2].vfd_error_percent, current_status.axis_metrics[2].quality_score < 10 ? "true" : "false", current_status.axis_metrics[2].maintenance_warning ? "true" : "false",
-        telemetry.wifi_connected ? "true" : "false",
-        telemetry.wifi_signal_strength,
-        telemetry.sd_mounted ? "true" : "false",
-        (int)telemetry.sd_health,
-        telemetry.sd_total_bytes,
-        telemetry.sd_used_bytes,
-        (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE) ? "true" : "false",
-        req_feedrate,
-        actual_feedrate,
-        lcd_lines[0], lcd_lines[1], lcd_lines[2], lcd_lines[3]
-    );
+        current_status.spindle_rpm, current_status.spindle_speed_m_s, current_status.spindle_efficiency, current_status.spindle_load_pct);
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
+
+    // 5. Axis metrics and Network
+    n = snprintf(buffer + offset, buffer_size - offset,
+        "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
+        "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
+        "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s}},"
+        "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},",
+        current_status.axis_metrics[0].quality_score, current_status.axis_metrics[0].jitter_mms, current_status.axis_metrics[0].vfd_error_percent, 
+        current_status.axis_metrics[0].quality_score < 10 ? "true" : "false", current_status.axis_metrics[0].maintenance_warning ? "true" : "false",
+        current_status.axis_metrics[1].quality_score, current_status.axis_metrics[1].jitter_mms, current_status.axis_metrics[1].vfd_error_percent, 
+        current_status.axis_metrics[1].quality_score < 10 ? "true" : "false", current_status.axis_metrics[1].maintenance_warning ? "true" : "false",
+        current_status.axis_metrics[2].quality_score, current_status.axis_metrics[2].jitter_mms, current_status.axis_metrics[2].vfd_error_percent, 
+        current_status.axis_metrics[2].quality_score < 10 ? "true" : "false", current_status.axis_metrics[2].maintenance_warning ? "true" : "false",
+        telemetry.wifi_connected ? "true" : "false", telemetry.wifi_signal_strength);
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
+
+    // 6. SD, Parser and LCD
+    n = snprintf(buffer + offset, buffer_size - offset,
+        "\"sd\":{\"mounted\":%s,\"health\":%d,\"total_bytes\":%llu,\"used_bytes\":%llu},"
+        "\"parser\":{\"absolute_mode\":%s,\"feedrate\":%.1f,\"actual_feedrate\":%.1f},"
+        "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}",
+        telemetry.sd_mounted ? "true" : "false", (int)telemetry.sd_health, telemetry.sd_total_bytes, telemetry.sd_used_bytes,
+        (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE) ? "true" : "false", req_feedrate, actual_feedrate,
+        lcd_lines[0], lcd_lines[1], lcd_lines[2], lcd_lines[3]);
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
 
     portEXIT_CRITICAL(&statusSpinlock);
 
     if (n < 0 || (size_t)n >= buffer_size) return (size_t)n;
-
-    size_t offset = (size_t)n;
 
     // Execution status if moving
     if (moving) {

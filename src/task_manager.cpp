@@ -417,6 +417,7 @@ void taskLcdCreate() {
 // ============================================================================
 
 void taskShowStats() {
+  if (!serialLoggerLock()) return;
   logPrintln("\r\n=== TASK STATISTICS ===");
   logPrintln("Task               Runs      Avg(ms)   Max(ms)   CPU%%");
   logPrintln("------------------------------------------------------");
@@ -440,9 +441,11 @@ void taskShowStats() {
                   (unsigned long)task_stats[i].max_run_time_ms, cpu_percent);
   }
   logPrintln("");
+  serialLoggerUnlock();
 }
 
 void taskShowAllTasks() {
+  if (!serialLoggerLock()) return;
   logPrintln("\r\n=== TASK LIST ===");
   logPrintln("Task                  Priority  Stack(bytes)  Core");
   logPrintln("--------------------------------------------------");
@@ -459,6 +462,7 @@ void taskShowAllTasks() {
                   (unsigned long)stack_high_water, (long)core_id);
   }
   logPrintln("");
+  serialLoggerUnlock();
 }
 
 extern volatile uint32_t accumulated_loop_count;

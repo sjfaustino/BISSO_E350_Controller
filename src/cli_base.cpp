@@ -625,9 +625,15 @@ void cmd_echo(int argc, char** argv) {
 bool cliDispatchSubcommand(const char* prefix, int argc, char** argv,
                            const cli_subcommand_t* table, size_t table_size,
                            int arg_index) {
+    bool has_prefix = (prefix && strlen(prefix) > 0);
+
     // Check if argument exists
     if (argc <= arg_index) {
-        logPrintf("%s Usage: %s [", prefix, argv[0]);
+        if (has_prefix) {
+            logPrintf("%s Usage: %s [", prefix, argv[0]);
+        } else {
+            logPrintf("Usage: %s [", argv[0]);
+        }
         for (size_t i = 0; i < table_size; i++) {
             logPrintf("%s%s", table[i].name, (i < table_size - 1) ? " | " : "");
         }
@@ -649,7 +655,11 @@ bool cliDispatchSubcommand(const char* prefix, int argc, char** argv,
     }
     
     // Not found
-    logWarning("%s Unknown subcommand: %s", prefix, argv[arg_index]);
+    if (has_prefix) {
+        logWarning("%s Unknown subcommand: %s", prefix, argv[arg_index]);
+    } else {
+        logWarning("Unknown subcommand: %s", argv[arg_index]);
+    }
     return false;
 }
 

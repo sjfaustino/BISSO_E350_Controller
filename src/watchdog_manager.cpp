@@ -369,4 +369,10 @@ void watchdogLogStats() {
   wdt_prefs.putUInt("recoveries", wdt_stats.automatic_recoveries);
 }
 watchdog_stats_t* watchdogGetStats() { return &wdt_stats; }
-void watchdogPrintDetailedReport() { watchdogShowStatus(); watchdogShowTasks(); watchdogShowStats(); }
+void watchdogPrintDetailedReport() {
+    if (!serialLoggerLock()) return;
+    watchdogShowStatus(); 
+    watchdogShowTasks(); 
+    watchdogShowStats(); 
+    serialLoggerUnlock();
+}

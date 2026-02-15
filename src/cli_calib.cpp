@@ -471,6 +471,7 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         altivar31PrintDiagnostics();
 
     } else if (strcmp(argv[2], "thermal") == 0) {
+        if (!serialLoggerLock()) return;
         logPrintln("\n[VFDDIAG] === Thermal Monitoring ===");
         int16_t thermal = altivar31GetThermalState();
         int32_t warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
@@ -488,8 +489,10 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
             logPrintln("Status:              NORMAL");
         }
         logPrintln("");
+        serialLoggerUnlock();
 
     } else if (strcmp(argv[2], "current") == 0) {
+        if (!serialLoggerLock()) return;
         logPrintln("\n[VFDDIAG] === Motor Current Measurements ===");
         float current = altivar31GetCurrentAmps();
         int16_t raw = altivar31GetCurrentRaw();
@@ -505,7 +508,7 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
                           calib->standard_cut_rms_amps, calib->standard_cut_peak_amps);
             if (calib->heavy_cut_rms_amps > 0.0f) {
                 logPrintf("  Heavy Load:          %.2f A (RMS) / %.2f A (peak)\r\n",
-                               calib->heavy_cut_rms_amps, calib->heavy_cut_peak_amps);
+                                calib->heavy_cut_rms_amps, calib->heavy_cut_peak_amps);
             }
             logPrintln("\r\nStall Detection:");
             logPrintf("  Threshold:           %.2f A\r\n", calib->stall_threshold_amps);
@@ -522,6 +525,7 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
             logPrintln("  Calibration Status:  NOT CALIBRATED");
         }
         logPrintln("");
+        serialLoggerUnlock();
 
     } else if (strcmp(argv[2], "frequency") == 0) {
         logPrintln("\n[VFDDIAG] === Output Frequency ===");
@@ -536,6 +540,7 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         vfdCalibrationPrintSummary();
 
     } else if (strcmp(argv[2], "full") == 0) {
+        if (!serialLoggerLock()) return;
         logPrintln("\n[VFDDIAG] === Comprehensive VFD Report ===");
         logPrintln("\n--- Status ---");
         altivar31PrintDiagnostics();
@@ -564,6 +569,7 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         int32_t timeout = configGetInt(KEY_STALL_TIMEOUT, 2000);
         logPrintf("Stall Margin:        %.0f%%\n", margin);
         logPrintf("Stall Timeout:       %ld ms\n", (long)timeout);
+        serialLoggerUnlock();
 
     } else {
         logWarning("[VFDDIAG] Unknown subcommand. Use 'help' for usage.");

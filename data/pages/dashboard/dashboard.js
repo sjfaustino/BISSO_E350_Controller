@@ -241,29 +241,148 @@ window.DashboardModule = window.DashboardModule || {
         i && (e ? (i.textContent = window.i18n.t('dashboard.live'), i.classList.remove("offline")) : (i.textContent = window.i18n.t('dashboard.offline'), i.classList.add("offline")))
     },
     drawChart() { const t = document.getElementById("trendsChart"); if (!t) return; const e = t.getContext("2d"), i = t.getBoundingClientRect(); t.width = i.width, t.height = i.height; const s = 35, n = t.width - s - 10, a = t.height - 10 - 20; e.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg-primary").trim() || "#fff", e.fillRect(0, 0, t.width, t.height), e.strokeStyle = "#e5e7eb", e.lineWidth = 1, e.fillStyle = "#6b7280", e.font = "10px sans-serif", e.textAlign = "right", e.textBaseline = "middle"; for (let i = 0; i <= 4; i++) { const n = i / 4, o = 10 + a - n * a; e.beginPath(), e.moveTo(s, o), e.lineTo(t.width - 10, o), e.stroke(); const r = 100 * n; e.fillText(r.toFixed(0), 30, o) } e.textAlign = "center", e.textBaseline = "top"; const o = this.currentTimeRange / 1e3 >= 60 ? this.currentTimeRange / 6e4 + "m" : this.currentTimeRange / 1e3 + "s"; e.fillText("-" + o, s, t.height - 20 + 5), e.fillText(window.i18n.t('dashboard.now'), t.width - 10, t.height - 20 + 5); const r = Math.min(this.history.cpu.length, 60 * this.currentTimeRange), d = this.history.cpu.slice(-r), h = this.history.memory.slice(-r), l = this.history.spindle.slice(-r), c = (t, i, o, r = "#888") => { if (t && !(t.length < 2)) { e.strokeStyle = i || r, e.lineWidth = 2, e.beginPath(); for (let i = 0; i < t.length; i++) { const r = Math.max(0, Math.min(100, t[i] / o * 100)), d = s + i / Math.max(1, t.length - 1) * n, h = 10 + a - r / 100 * a; 0 === i ? e.moveTo(d, h) : e.lineTo(d, h) } e.stroke() } }, m = getComputedStyle(document.documentElement).getPropertyValue("--chart-cpu").trim() || "#10b981", p = getComputedStyle(document.documentElement).getPropertyValue("--chart-mem").trim() || "#3b82f6", u = getComputedStyle(document.documentElement).getPropertyValue("--chart-spindle").trim() || "#f59e0b"; c(d, m, 100), c(h, p, 320), c(l, u, 30), e.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-primary").trim(), e.lineWidth = 1, e.beginPath(), e.moveTo(s, 10), e.lineTo(s, t.height - 20), e.lineTo(t.width - 10, t.height - 20), e.stroke() }, updateGraphs() {
-        const t = this.graphs.cpu && "MiniChart" === this.graphs.cpu.constructor.name; if (!this.historicalDataLoaded && this.history.cpu.length > 1) {
-            console.log(window.i18n.t('dashboard.bulk_loading_charts', { count: this.history.cpu.length }), this.history.cpu.length, window.i18n.t('dashboard.points_to_charts')); for (let e = 0; e < this.history.cpu.length; e++)void 0 !== this.history.cpu[e] && (t ? this.graphs.cpu?.addDataPoint(this.history.cpu[e]) : this.graphs.cpu?.addDataPoint("CPU", this.history.cpu[e])), void 0 !== this.history.memory[e] && (t ? this.graphs.memory?.addDataPoint(this.history.memory[e]) : this.graphs.memory?.addDataPoint("Memory", this.history.memory[e])), void 0 !== this.history.spindle[e] && (t ? this.graphs.spindle?.addDataPoint(this.history.spindle[e]) : this.graphs.spindle?.addDataPoint("Spindle", this.history.spindle[e])), void 0 !== this.history.temperature[e] && (t ? this.graphs.temperature?.addDataPoint(this.history.temperature[e]) : this.graphs.temperature?.addDataPoint("Temp", this.history.temperature[e]));
-            return this.historicalDataLoaded = !0, void console.log(window.i18n.t('dashboard.bulk_load_complete'))
-        } if (this.history.cpu.length > 0) { const e = this.history.cpu[this.history.cpu.length - 1]; t ? this.graphs.cpu?.addDataPoint(e) : this.graphs.cpu?.addDataPoint("CPU", e); { let t = this.graphs.cpu?.getStats("CPU"); if (!t && this.history.cpu.length > 0) { const i = this.history.cpu; t = { avg: i.reduce((t, e) => t + e, 0) / i.length, max: Math.max(...i), current: e } } if (t) { const i = document.getElementById("cpu-value"), s = document.getElementById("cpu-avg"), n = document.getElementById("cpu-max"); i && (i.textContent = e.toFixed(1) + "%"), s && (s.textContent = t.avg.toFixed(1)), n && (n.textContent = t.max.toFixed(1)); const a = document.getElementById("cpu-current"), o = document.getElementById("cpu-stat-avg"), r = document.getElementById("cpu-stat-max"); a && (a.textContent = e.toFixed(1) + "%"), o && (o.textContent = t.avg.toFixed(1) + "%"), r && (r.textContent = t.max.toFixed(1) + "%") } } } if (this.history.memory.length > 0) {
-            const e = this.history.memory[this.history.memory.length - 1]; if (t ? this.graphs.memory?.addDataPoint(e) : this.graphs.memory?.addDataPoint("Memory", e), !t) {
-                const t = this.graphs.memory?.getStats("Memory"); if (t) {
-                    const i = document.getElementById("mem-value"),
-                        s = document.getElementById("mem-min"),
-                        avg = document.getElementById("mem-avg"),
-                        max = document.getElementById("mem-max");
-                    i && (i.textContent = e.toFixed(0) + " KB");
-                    s && (s.textContent = t.min.toFixed(0));
-                    avg && (avg.textContent = t.avg.toFixed(0));
-                    max && (max.textContent = t.max.toFixed(0));
-
-                    const n = document.getElementById("mem-current"), a = document.getElementById("mem-stat-avg"), o = document.getElementById("mem-stat-max");
-                    n && (n.textContent = e.toFixed(0) + " KB"), a && (a.textContent = t.avg.toFixed(0) + " KB"), o && (o.textContent = t.max.toFixed(0) + " KB")
-                }
+        const isMini = this.graphs.cpu && "MiniChart" === this.graphs.cpu.constructor.name;
+        if (!this.historicalDataLoaded && this.history.cpu.length > 1) {
+            console.log(window.i18n.t('dashboard.bulk_loading_charts', { count: this.history.cpu.length }), this.history.cpu.length, window.i18n.t('dashboard.points_to_charts'));
+            for (let i = 0; i < this.history.cpu.length; i++) {
+                if (this.history.cpu[i] !== undefined) isMini ? this.graphs.cpu?.addDataPoint(this.history.cpu[i]) : this.graphs.cpu?.addDataPoint("CPU", this.history.cpu[i]);
+                if (this.history.memory[i] !== undefined) isMini ? this.graphs.memory?.addDataPoint(this.history.memory[i]) : this.graphs.memory?.addDataPoint("Memory", this.history.memory[i]);
+                if (this.history.spindle[i] !== undefined) isMini ? this.graphs.spindle?.addDataPoint(this.history.spindle[i]) : this.graphs.spindle?.addDataPoint("Spindle", this.history.spindle[i]);
+                if (this.history.temperature[i] !== undefined) isMini ? this.graphs.temperature?.addDataPoint(this.history.temperature[i]) : this.graphs.temperature?.addDataPoint("Temp", this.history.temperature[i]);
             }
-        } const e = this.lastTelemetry?.vfd?.connected; if (this.history.spindle.length > 0 && e) { const e = this.history.spindle[this.history.spindle.length - 1]; if (t ? this.graphs.spindle?.addDataPoint(e) : this.graphs.spindle?.addDataPoint("Current", e), !t) { const t = this.graphs.spindle?.getStats("Current"); if (t) { const i = document.getElementById("spindle-current"); i && (i.textContent = e.toFixed(2) + " A"); const s = document.getElementById("spindle-bar"), n = document.getElementById("spindle-freq"), a = document.getElementById("spindle-thermal"); if (s) { const t = 30, i = Math.min(e / t * 100, 100); s.style.width = i + "%", s.style.background = i > 80 ? "var(--color-critical)" : i > 60 ? "var(--color-warning)" : "var(--color-optimal)" } this.lastTelemetry && this.lastTelemetry.vfd && (n && (n.textContent = this.lastTelemetry.vfd.frequency_hz.toFixed(1) + " Hz"), a && (a.textContent = (this.lastTelemetry.vfd.thermal_percent || 0) + "%")); const o = document.getElementById("spindle-stat-current"), r = document.getElementById("spindle-stat-avg"), d = document.getElementById("spindle-stat-max"); o && (o.textContent = e.toFixed(2) + " A"), r && (r.textContent = t.avg.toFixed(2) + " A"), d && (d.textContent = t.max.toFixed(2) + " A") } } } else e || (this.setNA(document.getElementById("spindle-stat-current"), " A"), this.setNA(document.getElementById("spindle-stat-avg"), " A"), this.setNA(document.getElementById("spindle-stat-max"), " A")); if (this.history.temperature.length > 0) { const e = this.history.temperature[this.history.temperature.length - 1]; if (t ? this.graphs.temperature?.addDataPoint(e) : this.graphs.temperature?.addDataPoint("Temp", e), !t) { const t = this.graphs.temperature?.getStats("Temp"); if (t) { const i = document.getElementById("temp-current"), s = document.getElementById("temp-stat-avg"), n = document.getElementById("temp-stat-max"); i && (i.textContent = e.toFixed(1) + " °C"), s && (s.textContent = t.avg.toFixed(1) + " °C"), n && (n.textContent = t.max.toFixed(1) + " °C") } } } if (this.history.latency.length > 0 && !t) { const t = this.history.latency[this.history.latency.length - 1]; this.graphs.latency?.addDataPoint("Latency", t); const e = this.graphs.latency?.getStats("Latency"); if (e) { const i = document.getElementById("latency-current"), s = document.getElementById("latency-stat-avg"), n = document.getElementById("latency-stat-max"); i && (i.textContent = t.toFixed(0) + " ms"), s && (s.textContent = e.avg.toFixed(0) + " ms"), n && (n.textContent = e.max.toFixed(0) + " ms") } } if (this.history.motion.length > 0 && !t) { const t = this.history.motion[this.history.motion.length - 1], e = AppState.data.motion?.dro_connected ?? !1; this.updateHeaderNA("header-motion-load", window.i18n.t('dashboard.motion_system_load'), e); const i = e && t.quality || 0, s = e && t.jitter || 0; this.graphs.motion?.addDataPoint("Quality", i), this.graphs.motion?.addDataPoint("Jitter", s); const n = document.getElementById("motion-quality"), a = document.getElementById("motion-jitter"); e ? (this.setValue(n, i.toFixed(0) + "%"), this.setValue(a, s.toFixed(2) + " mm/s")) : (this.setNA(n), this.setNA(a)) } if (this.history.wifi.length > 0 && !t) { const t = this.history.wifi[this.history.wifi.length - 1]; this.graphs.wifi?.addDataPoint("Signal", t); const e = this.graphs.wifi?.getStats("Signal"); if (e) { const i = document.getElementById("wifi-current"), s = document.getElementById("wifi-stat-avg"), n = document.getElementById("wifi-stat-max"); i && (i.textContent = t.toFixed(0) + "%"), s && (s.textContent = e.avg.toFixed(0) + "%"), n && (n.textContent = e.max.toFixed(0) + "%") } }
-    }, exportGraphsData() { let t = window.i18n.t('dashboard.graph_export_header') + (new Date).toLocaleString() + "\n\n"; Object.entries(this.graphs).forEach(([e, i]) => { i && "function" == typeof i.exportData && (t += `\n=== ${e.toUpperCase()} ===\n`, t += i.exportData()) }); const e = new Blob([t], { type: "text/csv" }), i = window.URL.createObjectURL(e), s = document.createElement("a"); s.href = i, s.download = `graphs-export-${Date.now()}.csv`, s.click(), window.URL.revokeObjectURL(i), AlertManager.add(window.i18n.t('dashboard.graph_exported_alert'), "success", 2e3) }, cleanup() { console.log(window.i18n.t('dashboard.cleaning_up')), this.stateChangeHandler && (window.removeEventListener("state-changed", this.stateChangeHandler), this.stateChangeHandler = null), this.updateInterval && (clearInterval(this.updateInterval), this.updateInterval = null), Object.values(this.graphs).forEach(t => { t && "function" == typeof t.destroy && t.destroy() }), this.graphs = {} }
-};
-// Tool Path Preview Module
+            this.historicalDataLoaded = true;
+            console.log(window.i18n.t('dashboard.bulk_load_complete'));
+            return;
+        }
+
+        if (this.history.cpu.length > 0) {
+            const cpuVal = this.history.cpu[this.history.cpu.length - 1];
+            isMini ? this.graphs.cpu?.addDataPoint(cpuVal) : this.graphs.cpu?.addDataPoint("CPU", cpuVal);
+            let stats = this.graphs.cpu?.getStats("CPU");
+            if (!stats && this.history.cpu.length > 0) {
+                const hist = this.history.cpu;
+                stats = { avg: hist.reduce((a, b) => a + b, 0) / hist.length, max: Math.max(...hist), current: cpuVal };
+            }
+            if (stats) {
+                const curEl = document.getElementById("cpu-value"), avgEl = document.getElementById("cpu-avg"), maxEl = document.getElementById("cpu-max");
+                curEl && (curEl.textContent = cpuVal.toFixed(1) + "%");
+                avgEl && (avgEl.textContent = stats.avg.toFixed(1));
+                maxEl && (maxEl.textContent = stats.max.toFixed(1));
+                const sCur = document.getElementById("cpu-current"), sAvg = document.getElementById("cpu-stat-avg"), sMax = document.getElementById("cpu-stat-max");
+                sCur && (sCur.textContent = cpuVal.toFixed(1) + "%"), sAvg && (sAvg.textContent = stats.avg.toFixed(1) + "%"), sMax && (sMax.textContent = stats.max.toFixed(1) + "%");
+            }
+        }
+
+        if (this.history.memory.length > 0) {
+            const memVal = this.history.memory[this.history.memory.length - 1];
+            isMini ? this.graphs.memory?.addDataPoint(memVal) : this.graphs.memory?.addDataPoint("Heap", memVal);
+            const mStats = this.graphs.memory?.getStats("Heap");
+            if (mStats) {
+                const curEl = document.getElementById("mem-value"), minEl = document.getElementById("mem-min"), avgEl = document.getElementById("mem-avg"), maxEl = document.getElementById("mem-max");
+                curEl && (curEl.textContent = memVal.toFixed(0) + " KB");
+                minEl && (minEl.textContent = mStats.min.toFixed(0));
+                avgEl && (avgEl.textContent = mStats.avg.toFixed(0));
+                maxEl && (maxEl.textContent = mStats.max.toFixed(0));
+                const sCur = document.getElementById("mem-current"), sAvg = document.getElementById("mem-stat-avg"), sMax = document.getElementById("mem-stat-max");
+                sCur && (sCur.textContent = memVal.toFixed(0) + " KB"), sAvg && (sAvg.textContent = mStats.avg.toFixed(0) + " KB"), sMax && (sMax.textContent = mStats.max.toFixed(0) + " KB");
+            }
+        }
+
+        const vfdOn = this.lastTelemetry?.vfd?.connected;
+        if (this.history.spindle.length > 0 && vfdOn) {
+            const spinVal = this.history.spindle[this.history.spindle.length - 1];
+            isMini ? this.graphs.spindle?.addDataPoint(spinVal) : this.graphs.spindle?.addDataPoint("Current", spinVal);
+            const sStats = this.graphs.spindle?.getStats("Current");
+            if (sStats) {
+                const curEl = document.getElementById("spindle-current");
+                curEl && (curEl.textContent = spinVal.toFixed(2) + " A");
+                const barEl = document.getElementById("spindle-bar"), freqEl = document.getElementById("spindle-freq"), thermEl = document.getElementById("spindle-thermal");
+                if (barEl) {
+                    const pct = Math.min(spinVal / 30 * 100, 100);
+                    barEl.style.width = pct + "%", barEl.style.background = pct > 80 ? "var(--color-critical)" : pct > 60 ? "var(--color-warning)" : "var(--color-optimal)";
+                }
+                if (this.lastTelemetry?.vfd) {
+                    freqEl && (freqEl.textContent = this.lastTelemetry.vfd.frequency_hz.toFixed(1) + " Hz");
+                    thermEl && (thermEl.textContent = (this.lastTelemetry.vfd.thermal_percent || 0) + "%");
+                }
+                const sCur = document.getElementById("spindle-stat-current"), sAvg = document.getElementById("spindle-stat-avg"), sMax = document.getElementById("spindle-stat-max");
+                sCur && (sCur.textContent = spinVal.toFixed(2) + " A"), sAvg && (sAvg.textContent = sStats.avg.toFixed(2) + " A"), sMax && (sMax.textContent = sStats.max.toFixed(2) + " A");
+            }
+        } else if (!vfdOn) {
+            this.setNA(document.getElementById("spindle-stat-current"), " A");
+            this.setNA(document.getElementById("spindle-stat-avg"), " A");
+            this.setNA(document.getElementById("spindle-stat-max"), " A");
+        }
+
+        if (this.history.temperature.length > 0) {
+            const tVal = this.history.temperature[this.history.temperature.length - 1];
+            isMini ? this.graphs.temperature?.addDataPoint(tVal) : this.graphs.temperature?.addDataPoint("Temp", tVal);
+            const tStats = this.graphs.temperature?.getStats("Temp");
+            if (tStats) {
+                const curEl = document.getElementById("temp-current"), avgEl = document.getElementById("temp-stat-avg"), maxEl = document.getElementById("temp-stat-max");
+                curEl && (curEl.textContent = tVal.toFixed(1) + " °C");
+                avgEl && (avgEl.textContent = tStats.avg.toFixed(1) + " °C");
+                maxEl && (maxEl.textContent = tStats.max.toFixed(1) + " °C");
+            }
+        }
+
+        if (this.history.latency.length > 0) {
+            const lVal = this.history.latency[this.history.latency.length - 1];
+            this.graphs.latency?.addDataPoint("Latency", lVal);
+            const lStats = this.graphs.latency?.getStats("Latency");
+            if (lStats) {
+                const curEl = document.getElementById("latency-current"), avgEl = document.getElementById("latency-stat-avg"), maxEl = document.getElementById("latency-stat-max");
+                curEl && (curEl.textContent = lVal.toFixed(0) + " ms");
+                avgEl && (avgEl.textContent = lStats.avg.toFixed(0) + " ms");
+                maxEl && (maxEl.textContent = lStats.max.toFixed(0) + " ms");
+            }
+        }
+
+        if (this.history.motion.length > 0) {
+            const mVal = this.history.motion[this.history.motion.length - 1], droVal = AppState.data.motion?.dro_connected ?? false;
+            this.updateHeaderNA("header-motion-load", window.i18n.t('dashboard.motion_system_load'), droVal);
+            const qual = droVal ? mVal.quality : 0, jitt = droVal ? mVal.jitter : 0;
+            this.graphs.motion?.addDataPoint("Quality", qual);
+            this.graphs.motion?.addDataPoint("Jitter", jitt);
+            const qEl = document.getElementById("motion-quality"), jEl = document.getElementById("motion-jitter");
+            droVal ? (this.setValue(qEl, qual.toFixed(0) + "%"), this.setValue(jEl, jitt.toFixed(2) + " mm/s")) : (this.setNA(qEl), this.setNA(jEl));
+        }
+
+        if (this.history.wifi.length > 0) {
+            const wVal = this.history.wifi[this.history.wifi.length - 1];
+            this.graphs.wifi?.addDataPoint("Signal", wVal);
+            const wStats = this.graphs.wifi?.getStats("Signal");
+            if (wStats) {
+                const curEl = document.getElementById("wifi-current"), avgEl = document.getElementById("wifi-stat-avg"), maxEl = document.getElementById("wifi-stat-max");
+                curEl && (curEl.textContent = wVal.toFixed(0) + "%");
+                avgEl && (avgEl.textContent = wStats.avg.toFixed(0) + "%");
+                maxEl && (maxEl.textContent = wStats.max.toFixed(0) + "%");
+            }
+        }
+    },
+
+    exportGraphsData() {
+        let t = window.i18n.t('dashboard.graph_export_header') + (new Date).toLocaleString() + "\n\n";
+        Object.entries(this.graphs).forEach(([e, i]) => { i && "function" == typeof i.exportData && (t += `\n=== ${e.toUpperCase()} ===\n`, t += i.exportData()) });
+        const e = new Blob([t], { type: "text/csv" }), i = window.URL.createObjectURL(e), s = document.createElement("a");
+        s.href = i, s.download = `graphs-export-${Date.now()}.csv`, s.click(), window.URL.revokeObjectURL(i), AlertManager.add(window.i18n.t('dashboard.graph_exported_alert'), "success", 2e3)
+    },
+
+    cleanup() {
+        console.log(window.i18n.t('dashboard.cleaning_up'));
+        if (this.stateChangeHandler) {
+            window.removeEventListener("state-changed", this.stateChangeHandler);
+            this.stateChangeHandler = null;
+        }
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+        Object.values(this.graphs).forEach(t => { t && "function" == typeof t.destroy && t.destroy() });
+        this.graphs = {};
+    },
+
+    // Tool Path Preview Module
     initToolPathPreview() {
         this.toolpath = {
             canvas: null,
@@ -350,45 +469,45 @@ window.DashboardModule = window.DashboardModule || {
         let currentPos = { x: 0, y: 0, z: 0 };
         let currentTool = 1;
         let totalDistance = 0;
-        
+
         lines.forEach((line, index) => {
             const trimmed = line.trim();
             if (!trimmed || trimmed.startsWith(';')) return;
-            
+
             const command = this.parseGCodeLine(trimmed, currentPos);
             if (command) {
                 command.lineNumber = index;
                 command.tool = currentTool;
-                
+
                 if (command.type === 'tool-change') {
                     currentTool = command.toolNumber;
                 }
-                
+
                 if (command.type === 'move' && command.end) {
                     const distance = Math.sqrt(
-                        Math.pow(command.end.x - currentPos.x, 2) + 
-                        Math.pow(command.end.y - currentPos.y, 2) + 
+                        Math.pow(command.end.x - currentPos.x, 2) +
+                        Math.pow(command.end.y - currentPos.y, 2) +
                         Math.pow(command.end.z - currentPos.z, 2)
                     );
                     totalDistance += distance;
                     currentPos = { ...command.end };
                 }
-                
+
                 parsed.push(command);
             }
         });
-        
+
         // Estimate time (rough calculation)
         const estimatedMinutes = Math.round(totalDistance / 1000); // Assuming 1000mm/min
         this.toolpath.totalTime = `${Math.floor(estimatedMinutes / 60)}:${(estimatedMinutes % 60).toString().padStart(2, '0')}`;
-        
+
         return parsed;
     },
 
     parseGCodeLine(line, currentPos) {
         const parts = line.split(/\s+/);
         const cmd = parts[0].toUpperCase();
-        
+
         if (cmd === 'G0' || cmd === 'G1') {
             const move = {
                 type: 'move',
@@ -396,17 +515,17 @@ window.DashboardModule = window.DashboardModule || {
                 start: { ...currentPos },
                 end: { ...currentPos }
             };
-            
+
             parts.forEach(part => {
                 if (part.startsWith('X')) move.end.x = parseFloat(part.substring(1));
                 if (part.startsWith('Y')) move.end.y = parseFloat(part.substring(1));
                 if (part.startsWith('Z')) move.end.z = parseFloat(part.substring(1));
                 if (part.startsWith('F')) move.feedrate = parseFloat(part.substring(1));
             });
-            
+
             return move;
         }
-        
+
         if (cmd === 'G2' || cmd === 'G3') {
             return {
                 type: 'arc',
@@ -417,46 +536,46 @@ window.DashboardModule = window.DashboardModule || {
                 feedrate: 0
             };
         }
-        
+
         if (cmd === 'M6') {
             return {
                 type: 'tool-change',
                 toolNumber: parseInt(parts[1]) || 1
             };
         }
-        
+
         return null;
     },
 
     renderToolPath() {
         if (!this.toolpath.ctx) return;
-        
+
         const ctx = this.toolpath.ctx;
         const width = this.toolpath.canvas.width;
         const height = this.toolpath.canvas.height;
-        
+
         // Clear canvas
         ctx.clearRect(0, 0, width, height);
-        
+
         // Apply transformations
         ctx.save();
-        ctx.translate(width/2 + this.toolpath.viewTransform.offsetX, height/2 + this.toolpath.viewTransform.offsetY);
+        ctx.translate(width / 2 + this.toolpath.viewTransform.offsetX, height / 2 + this.toolpath.viewTransform.offsetY);
         ctx.scale(this.toolpath.viewTransform.scale, -this.toolpath.viewTransform.scale); // Flip Y axis
-        
+
         // Draw grid
         this.drawToolPathGrid();
-        
+
         // Draw machine bounds
         this.drawToolPathBounds();
-        
+
         // Draw toolpath
         this.drawToolPathData();
-        
+
         // Draw current position
         if (this.toolpath.currentLine < this.toolpath.gcodeData.length) {
             this.drawToolPathCurrentPosition();
         }
-        
+
         ctx.restore();
     },
 
@@ -464,16 +583,16 @@ window.DashboardModule = window.DashboardModule || {
         const ctx = this.toolpath.ctx;
         ctx.strokeStyle = '#e0e0e0';
         ctx.lineWidth = 0.5;
-        
+
         const gridSize = 100 * this.toolpath.viewTransform.scale;
         const gridCount = 20;
-        
+
         for (let i = -gridCount; i <= gridCount; i++) {
             ctx.beginPath();
             ctx.moveTo(i * gridSize, -gridCount * gridSize);
             ctx.lineTo(i * gridSize, gridCount * gridSize);
             ctx.stroke();
-            
+
             ctx.beginPath();
             ctx.moveTo(-gridCount * gridSize, i * gridSize);
             ctx.lineTo(gridCount * gridSize, i * gridSize);
@@ -486,10 +605,10 @@ window.DashboardModule = window.DashboardModule || {
         ctx.strokeStyle = '#f44336';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
-        
+
         // Machine limits (3000x2000x200)
         ctx.strokeRect(0, 0, 3000, 2000);
-        
+
         ctx.setLineDash([]);
     },
 
@@ -498,30 +617,30 @@ window.DashboardModule = window.DashboardModule || {
         const showRapid = document.getElementById('toolpath-show-rapid')?.checked;
         const showFeed = document.getElementById('toolpath-show-feed')?.checked;
         const colorScheme = document.getElementById('toolpath-color-scheme')?.value || 'default';
-        
+
         ctx.lineWidth = 2;
         ctx.globalAlpha = 0.8;
-        
+
         this.toolpath.gcodeData.forEach((command, index) => {
             if (index > this.toolpath.currentLine) return; // Don't draw future moves
-            
+
             let color = this.getToolPathColor(command, colorScheme);
-            
+
             if (command.type === 'move') {
                 if (command.rapid && !showRapid) return;
                 if (!command.rapid && !showFeed) return;
-                
+
                 ctx.strokeStyle = color;
                 ctx.beginPath();
                 ctx.moveTo(command.start.x, command.start.y);
                 ctx.lineTo(command.end.x, command.end.y);
                 ctx.stroke();
             }
-            
+
             if (command.type === 'arc' && showFeed) {
                 this.drawToolPathArc(command, color);
             }
-            
+
             if (command.type === 'tool-change') {
                 this.drawToolPathToolChange(command);
             }
@@ -533,15 +652,15 @@ window.DashboardModule = window.DashboardModule || {
             case 'depth':
                 const depth = (command.end?.z || 0) / 200; // Normalize to 0-1
                 return `hsl(${240 - depth * 60}, 70%, 50%)`;
-            
+
             case 'speed':
                 const speed = (command.feedrate || 1000) / 3000;
                 return `hsl(${120 - speed * 120}, 70%, 50%)`;
-            
+
             case 'tool':
                 const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57'];
                 return colors[command.tool % colors.length];
-            
+
             default:
                 return command.rapid ? '#ff9800' : '#2196f3';
         }
@@ -563,7 +682,7 @@ window.DashboardModule = window.DashboardModule || {
         ctx.beginPath();
         ctx.arc(command.start.x, command.start.y, 15, 0, Math.PI * 2);
         ctx.fill();
-        
+
         ctx.fillStyle = 'white';
         ctx.font = '12px Arial';
         ctx.fillText(`T${command.tool}`, command.start.x + 20, command.start.y + 5);
@@ -572,16 +691,16 @@ window.DashboardModule = window.DashboardModule || {
     drawToolPathCurrentPosition() {
         const command = this.toolpath.gcodeData[this.toolpath.currentLine];
         if (!command || !command.end) return;
-        
+
         const ctx = this.toolpath.ctx;
         const pos = command.end;
-        
+
         // Draw position indicator
         ctx.fillStyle = '#4CAF50';
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
         ctx.fill();
-        
+
         // Draw tool indicator
         ctx.fillStyle = '#2196f3';
         ctx.font = '12px Arial';
@@ -592,10 +711,10 @@ window.DashboardModule = window.DashboardModule || {
         const rect = this.toolpath.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
+
         // Convert to machine coordinates
         const machineCoords = this.screenToMachine(x, y);
-        
+
         document.getElementById('toolpath-x').textContent = machineCoords.x.toFixed(3);
         document.getElementById('toolpath-y').textContent = machineCoords.y.toFixed(3);
         document.getElementById('toolpath-z').textContent = '0.000';
@@ -634,19 +753,19 @@ window.DashboardModule = window.DashboardModule || {
     screenToMachine(screenX, screenY) {
         const width = this.toolpath.canvas.width;
         const height = this.toolpath.canvas.height;
-        
-        const x = (screenX - width/2 - this.toolpath.viewTransform.offsetX) / this.toolpath.viewTransform.scale;
-        const y = -(screenY - height/2 - this.toolpath.viewTransform.offsetY) / this.toolpath.viewTransform.scale;
-        
+
+        const x = (screenX - width / 2 - this.toolpath.viewTransform.offsetX) / this.toolpath.viewTransform.scale;
+        const y = -(screenY - height / 2 - this.toolpath.viewTransform.offsetY) / this.toolpath.viewTransform.scale;
+
         return { x, y };
     },
 
     fitToolPathView() {
         if (this.toolpath.gcodeData.length === 0) return;
-        
+
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
-        
+
         this.toolpath.gcodeData.forEach(command => {
             if (command.end) {
                 minX = Math.min(minX, command.end.x);
@@ -655,18 +774,18 @@ window.DashboardModule = window.DashboardModule || {
                 maxY = Math.max(maxY, command.end.y);
             }
         });
-        
+
         const width = this.toolpath.canvas.width;
         const height = this.toolpath.canvas.height;
         const padding = 50;
-        
+
         const scaleX = (width - 2 * padding) / (maxX - minX);
         const scaleY = (height - 2 * padding) / (maxY - minY);
-        
+
         this.toolpath.viewTransform.scale = Math.min(scaleX, scaleY);
         this.toolpath.viewTransform.offsetX = -(minX + maxX) / 2 * this.toolpath.viewTransform.scale;
         this.toolpath.viewTransform.offsetY = (minY + maxY) / 2 * this.toolpath.viewTransform.scale;
-        
+
         this.renderToolPath();
     },
 
@@ -674,7 +793,7 @@ window.DashboardModule = window.DashboardModule || {
         this.toolpath.isPlaying = !this.toolpath.isPlaying;
         const btn = document.getElementById('toolpath-play');
         btn.textContent = this.toolpath.isPlaying ? '⏸️ Pause' : '▶️ Play';
-        
+
         if (this.toolpath.isPlaying) {
             this.animateToolPath();
         }
@@ -682,13 +801,13 @@ window.DashboardModule = window.DashboardModule || {
 
     animateToolPath() {
         if (!this.toolpath.isPlaying) return;
-        
+
         this.toolpath.currentLine = Math.min(this.toolpath.currentLine + 1, this.toolpath.gcodeData.length - 1);
         document.getElementById('toolpath-progress').value = (this.toolpath.currentLine / this.toolpath.gcodeData.length) * 100;
-        
+
         this.updateToolPathTimeline();
         this.renderToolPath();
-        
+
         if (this.toolpath.currentLine < this.toolpath.gcodeData.length - 1) {
             requestAnimationFrame(() => this.animateToolPath());
         } else {
@@ -728,15 +847,15 @@ window.DashboardModule = window.DashboardModule || {
         const command = this.toolpath.gcodeData[this.toolpath.currentLine];
         if (command) {
             document.getElementById('toolpath-line').textContent = command.lineNumber || 0;
-            
+
             const progress = (this.toolpath.currentLine / this.toolpath.gcodeData.length) * 100;
             const currentTime = (progress / 100) * this.parseTimeToSeconds(this.toolpath.totalTime);
             const minutes = Math.floor(currentTime / 60);
             const seconds = Math.floor(currentTime % 60);
-            document.getElementById('toolpath-time').textContent = 
+            document.getElementById('toolpath-time').textContent =
                 `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
-        
+
         document.getElementById('toolpath-total-lines').textContent = this.toolpath.gcodeData.length;
         document.getElementById('toolpath-total-time').textContent = this.toolpath.totalTime;
     },
@@ -753,7 +872,7 @@ window.DashboardModule = window.DashboardModule || {
 
     checkToolPathCollisions() {
         this.toolpath.collisions = [];
-        
+
         // Check toolpath against machine bounds
         this.toolpath.gcodeData.forEach((command, index) => {
             if (command.end) {
@@ -768,18 +887,18 @@ window.DashboardModule = window.DashboardModule || {
                 }
             }
         });
-        
+
         // Update UI
         const collisionStatus = document.getElementById('toolpath-collision-status');
         const boundsStatus = document.getElementById('toolpath-bounds-status');
-        
+
         if (this.toolpath.collisions.length > 0) {
             collisionStatus.innerHTML = '<span style="color: #f44336;">●</span> <span data-i18n="dashboard.collisions_found">Collisions Found</span>';
             AlertManager.add(`Found ${this.toolpath.collisions.length} potential collisions`, 'warning');
         } else {
             collisionStatus.innerHTML = '<span style="color: #4CAF50;">●</span> <span data-i18n="dashboard.no_collisions">No Collisions</span>';
         }
-        
+
         boundsStatus.innerHTML = '<span style="color: #4CAF50;">●</span> <span data-i18n="dashboard.within_bounds">Within Bounds</span>';
     },
 
@@ -787,9 +906,10 @@ window.DashboardModule = window.DashboardModule || {
         document.getElementById('toolpath-filename').textContent = this.toolpath.filename;
         document.getElementById('toolpath-total-lines').textContent = this.toolpath.gcodeData.length;
         document.getElementById('toolpath-total-time').textContent = this.toolpath.totalTime;
-    },
+    }
+};
 
-    // Stack Monitor Extension (Idempotent)
+// Stack Monitor Extension (Idempotent)
 if (!DashboardModule._isPatched) {
     DashboardModule.initStackGraph = function () {
         if (document.getElementById("stackChart")) {

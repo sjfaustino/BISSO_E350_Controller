@@ -175,11 +175,6 @@ static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *resp
   }
 
   if (fs->exists(path)) {
-    // Check if it's a file or directory
-    File f = fs->open(path);
-    bool is_dir = f.isDirectory();
-    f.close();
-
     bool success = trashBinMoveToTrash(fs, path.c_str());
     if (success) {
         return response->send(200, "text/plain", "Moved to Trash");
@@ -372,7 +367,7 @@ static esp_err_t handleTrashRestore(PsychicRequest *request, PsychicResponse *re
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, body);
 
-  if (error || !doc.is<JsonObject>() || !doc.containsKey("path")) {
+  if (error || !doc.is<JsonObject>() || !doc["path"].is<const char*>()) {
     return response->send(400, "text/plain", "Invalid JSON: missing path");
   }
 

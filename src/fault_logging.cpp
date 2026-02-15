@@ -392,7 +392,38 @@ fault_stats_t faultGetStats() {
 }
 
 void faultShowHistory() {
-  logPrintln("[FAULT] Full history dump via CLI only.");
+  if (!serialLoggerLock()) return;
+  
+  uint8_t count = faultGetHistoryCount();
+  logPrintln("\n[FAULT] === Persistent History (%u entries) ===", count);
+  logPrintln("+-----+----------+----------+------------------------------------------+");
+  logPrintln("| ID  | Severity | Code     | Message                                  |");
+  logPrintln("+-----+----------+----------+------------------------------------------+");
+  
+  for (uint8_t i = 0; i < count; i++) {
+    fault_entry_t entry;
+    // We get history from oldest to newest (Reverse of how they are shown on web usually)
+    // but consistent for CLI logging.
+    if (faultGetHistoryEntry(i, &entry)) {
+      logPrintf("| %2u  | %-8s | %02X       | %-40s |\r\n", 
+                i, faultSeverityToString(entry.severity), (int)entry.code, entry.message);
+    }
+  }
+  logPrintln("+-----+----------+----------+------------------------------------------+");
+  
+  // Also show ring buffer if active
+  uint8_t rb_count = faultGetRingBufferEntryCount();
+  if (rb_count > 0) {
+      logPrintln("\n[FAULT] === Volatile Ring Buffer (Queue Fallback) ===");
+      for (uint8_t i = 0; i < rb_count; i++) {
+          const fault_entry_t* entry = faultGetRingBufferEntry(i);
+          if (entry) {
+              logPrintf("  [%2u] %s: %s\r\n", i, faultSeverityToString(entry->severity), entry->message);
+          }
+      }
+  }
+  
+  serialLoggerUnlock();
 }
 
 void faultClearHistory() {
