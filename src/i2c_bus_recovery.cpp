@@ -95,6 +95,9 @@ void i2cRecoverBus() {
   pinMode(PIN_I2C_SDA, INPUT_PULLUP);
   pinMode(PIN_I2C_SCL, INPUT_PULLUP);
 
+  // Perform 9 clock pulses to clear stuck SDA
+  // NOTE: delayMicroseconds() is used for precise I2C bit-banging. 
+  // Blocking for ~150us is intentional and acceptable for this rare recovery event.
   for (int i = 0; i < 9; i++) {
     pinMode(PIN_I2C_SCL, OUTPUT);
     digitalWrite(PIN_I2C_SCL, LOW);
