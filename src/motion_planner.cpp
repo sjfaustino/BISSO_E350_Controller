@@ -124,11 +124,21 @@ bool MotionPlanner::checkLookAhead(Axis *axis, uint8_t active_axis,
 
 void MotionPlanner::applyDynamicApproach(Axis *axis, uint8_t active_axis,
                                          int32_t current_pos) {
-  // SAFETY: Dynamic approach deceleration applies ONLY to X-axis
-  // - X-axis: Positions material between cuts (blade is OUTSIDE stone) - safe to decelerate
-  // - Y-axis: Cutting axis (blade moves INTO stone) - must maintain constant speed through cut
-  // - Z-axis: Drill/blade plunge - fast descent into stone would damage drill bit
-  // - A-axis: Rotation - not applicable
+  // SAFETY: Dynamic approach deceleration applies ONLY to the X-axis (Material Positioning).
+  // 
+  // RATIONALE:
+  // - X-AXIS: Used for positioning the slab between cuts when the blade is retracted. 
+  //   Deceleration is safe and improves positioning precision.
+  // 
+  // - Y-AXIS (Cutting): Decelerating mid-cut would cause an uneven surface finish, 
+  //   increased heat buildup in a single spot, and potential blade stalling.
+  //   Uniform feed speed is required for consistent cutting quality.
+  // 
+  // - Z-AXIS (Plunge): Decelerating while plunging a diamond tool into stone can cause 
+  //   bit binding or thermal shock. The descent must remain at the programmed plunge rate.
+  // 
+  // - A-AXIS (Rotation): Dynamic approach is not implemented for rotational movements.
+  // 
   if (active_axis != 0) return;
   
   int32_t dist = abs(axis->target_position - current_pos);
