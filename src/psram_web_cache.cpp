@@ -18,9 +18,25 @@ PsramWebCache::~PsramWebCache() {
 bool PsramWebCache::init(const char* root) {
     logPrintf("[CACHE] Initializing PSRAM Web Cache from %s...\r\n", root);
     
-    File dir = LittleFS.open(root);
+    // Clear and reset before start
+    for (auto const& [path, file] : cache) {
+        psramFree(file.data);
+    }
+    cache.clear();
+    total_size = 0;
+
+    // Start recursive loading
+    bool success = loadFromDir(root);
+    
+    // Final summary - only once!
+    logPrintf("[CACHE] Total Assets: %u | Total Size: %u bytes\r\n", (uint32_t)cache.size(), (uint32_t)total_size);
+    return success;
+}
+
+bool PsramWebCache::loadFromDir(const char* dirPath) {
+    File dir = LittleFS.open(dirPath);
     if (!dir || !dir.isDirectory()) {
-        logError("[CACHE] Failed to open root directory %s", root);
+        logError("[CACHE] Failed to open directory %s", dirPath);
         return false;
     }
 
@@ -32,7 +48,7 @@ bool PsramWebCache::init(const char* root) {
             // Skip hidden directories (.trash, etc.) - they contain non-web content
             const char* name = entry.name();
             if (name[0] != '.') {
-                init(path.c_str());
+                loadFromDir(path.c_str());
             }
         } else {
             size_t fileSize = entry.size();
@@ -66,8 +82,6 @@ bool PsramWebCache::init(const char* root) {
         }
         entry = dir.openNextFile();
     }
-    
-    logPrintf("[CACHE] Total Assets: %u | Total Size: %u bytes\r\n", (uint32_t)cache.size(), (uint32_t)total_size);
     return true;
 }
 

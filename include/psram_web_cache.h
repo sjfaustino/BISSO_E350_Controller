@@ -55,6 +55,7 @@ private:
     std::map<std::string, cached_file_t> cache;
     size_t total_size;
 
+    bool loadFromDir(const char* dirPath);
     std::string getContentType(const std::string& filename);
 };
 
