@@ -103,42 +103,42 @@ bool setPin(const char* key, int16_t gpio, bool skip_save) {
         return false;
     }
 
-    // 2. Validate Virtual Pin (0-31 are Virtual I2C Pins on A16)
-    const PinInfo* info = getPinInfo(gpio);
-    if (!info) {
+    // 2. Validate Virtual Pin
+    const PinInfo* info = (gpio == -1) ? nullptr : getPinInfo(gpio);
+    if (gpio != -1 && !info) {
         logError("[HAL] Invalid Virtual Pin ID %d", gpio);
         return false;
     }
 
     // 3. I/O Type Check (Input vs Output)
-    // Virtual Pin Scheme for KC868-A16:
-    // Pins 100-115 (X1-X16) are PHYSICAL INPUTS (Opto via I2C)
-    // Pins 116-131 (Y1-Y16) are PHYSICAL OUTPUTS (Relay via I2C)
-    // CH1-CH4 are analog inputs using GPIO 34-39
-    // Direct GPIO (13, 14, 16, 32, 33) for RS485/WJ66
-    bool isVirtualInputPin = (gpio >= 100 && gpio <= 115);
-    bool isVirtualOutputPin = (gpio >= 116 && gpio <= 131);
-    // bool isAnalogPin = (gpio == 34 || gpio == 35 || gpio == 36 || gpio == 39); // Unused
-    // bool isDirectGpio = (gpio < 100 && !isAnalogPin);  // Unused
-    
-    bool isInputSignal = (strcmp(signalType, "input") == 0);
-    bool isOutputSignal = (strcmp(signalType, "output") == 0);
+    if (gpio != -1) {
+        // Virtual Pin Scheme for KC868-A16:
+        // Pins 100-115 (X1-X16) are PHYSICAL INPUTS (Opto via I2C)
+        // Pins 116-131 (Y1-Y16) are PHYSICAL OUTPUTS (Relay via I2C)
+        // CH1-CH4 are analog inputs using GPIO 34-39
+        // Direct GPIO (13, 14, 16, 32, 33) for RS485/WJ66
+        bool isVirtualInputPin = (gpio >= 100 && gpio <= 115);
+        bool isVirtualOutputPin = (gpio >= 116 && gpio <= 131);
+        
+        bool isInputSignal = (strcmp(signalType, "input") == 0);
+        bool isOutputSignal = (strcmp(signalType, "output") == 0);
 
-    // Only validate I2C virtual pins for I/O mismatch
-    if (isVirtualInputPin && isOutputSignal) {
-        logError("[HAL] Hardware Mismatch: Virtual Pin %d (X%d) is PHYSICALLY AN INPUT", gpio, gpio - 99);
-        return false;
-    }
-    if (isVirtualOutputPin && isInputSignal) {
-        logError("[HAL] Hardware Mismatch: Virtual Pin %d (Y%d) is PHYSICALLY AN OUTPUT", gpio, gpio - 115);
-        return false;
-    }
+        // Only validate I2C virtual pins for I/O mismatch
+        if (isVirtualInputPin && isOutputSignal) {
+            logError("[HAL] Hardware Mismatch: Virtual Pin %d (X%d) is PHYSICALLY AN INPUT", gpio, gpio - 99);
+            return false;
+        }
+        if (isVirtualOutputPin && isInputSignal) {
+            logError("[HAL] Hardware Mismatch: Virtual Pin %d (Y%d) is PHYSICALLY AN OUTPUT", gpio, gpio - 115);
+            return false;
+        }
 
-    // 4. Check Logical Conflicts
-    const char* conflict = checkPinConflict(gpio, key);
-    if (conflict) {
-        logError("[HAL] Conflict: Pin %d used by %s", gpio, conflict);
-        return false;
+        // 4. Check Logical Conflicts
+        const char* conflict = checkPinConflict(gpio, key);
+        if (conflict) {
+            logError("[HAL] Conflict: Pin %d used by %s", gpio, conflict);
+            return false;
+        }
     }
 
     // 5. Save Mapping using short NVS key
@@ -160,7 +160,11 @@ bool setPin(const char* key, int16_t gpio, bool skip_save) {
         return false;
     }
 
-    logInfo("[HAL] [OK] Mapped %s -> Virtual Pin %d (%s)", key, gpio, info->silk);
+    if (gpio == -1) {
+        logInfo("[HAL] [OK] Unmapped %s", key);
+    } else {
+        logInfo("[HAL] [OK] Mapped %s -> Virtual Pin %d (%s)", key, gpio, info->silk);
+    }
 
     return true;
 }

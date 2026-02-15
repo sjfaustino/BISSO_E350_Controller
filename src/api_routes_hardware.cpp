@@ -161,7 +161,14 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         bool all_ok = true;
         int count = 0;
         for (JsonPair kv : assignments) {
-            if (!setPin(kv.key().c_str(), kv.value().as<int16_t>(), true)) {
+            JsonVariant val = kv.value();
+            int16_t pin = val.as<int16_t>();
+
+            // If value is null or invalid conversion to number (yielding 0), skip it.
+            // Pin 0 is not a valid mappable pin for any of our signals.
+            if (pin == 0 && val.isNull()) continue;
+
+            if (!setPin(kv.key().c_str(), pin, true)) {
                 all_ok = false;
             }
             count++;
@@ -179,9 +186,8 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
     // POST /api/hardware/pins/reset
     server.on("/api/hardware/pins/reset", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         for (size_t i = 0; i < SIGNAL_COUNT; i++) {
-            char nvs_key[40];
-            snprintf(nvs_key, sizeof(nvs_key), "pin_%s", signalDefinitions[i].key);
-            configSetInt(nvs_key, -1);
+            // Use setPin to ensure consistent NVS key usage and logging
+            setPin(signalDefinitions[i].key, -1, true);
         }
         configUnifiedSave();
         return response->send(200, "application/json", "{\"success\":true}");
