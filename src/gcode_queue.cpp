@@ -8,6 +8,7 @@
 #include "motion_state.h"
 #include "serial_logger.h"
 #include "psram_alloc.h"    // PSRAM allocations
+#include "fault_logging.h"
 #include <Arduino.h>
 #include <cstring>
 
@@ -28,8 +29,10 @@ void gcodeQueueInit() {
     if (jobs == nullptr) {
         jobs = (gcode_job_t*)psramCalloc(GCODE_QUEUE_MAX_JOBS, sizeof(gcode_job_t));
         if (jobs == nullptr) {
-            logError("[QUEUE] CRITICAL: Failed to allocate G-Code queue in PSRAM!");
-            return;
+            logError("[QUEUE] CRITICAL: Failed to allocate G-Code queue in PSRAM! HALTING.");
+            faultLogEntry(FAULT_CRITICAL, FAULT_CRITICAL_SYSTEM_ERROR, -1, 0, 
+                          "G-Code queue allocation failed");
+            while(1) { delay(1000); } // Halt system - cannot recover without queue
         }
         logInfo("[QUEUE] Allocated %d job entries in PSRAM (%u bytes)", 
                 GCODE_QUEUE_MAX_JOBS, (uint32_t)(GCODE_QUEUE_MAX_JOBS * sizeof(gcode_job_t)));

@@ -86,7 +86,11 @@ void WebServerManager::init() {
     otaInit();
     
     // TUNE: Increase parallel sockets to 6 for Dashboard stability (many assets + WS)
-    server.config.stack_size = 6144; // PHASE 6.9: Reduced to 6KB to save heap (was 8KB)
+    // server.config.stack_size = 6144; // PHASE 6.9: Reduced to 6KB to save heap (was 8KB)
+    // RATIONALE: Reducing PsychicHttp task stack to 6KB frees ~12KB of internal DRAM 
+    // across 6 sockets, which is critical for supporting large WebSocket broadcasts.
+    // MONITOR: High-water marks should be checked if new API handlers use large stack arrays.
+    server.config.stack_size = 6144; 
     // server.config.max_open_sockets is configured in begin()
     server.config.lru_purge_enable = true;
     server.config.send_wait_timeout = 15; // More headroom for chunked deliveries
