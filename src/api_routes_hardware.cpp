@@ -161,7 +161,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
         bool all_ok = true;
         int count = 0;
         for (JsonPair kv : assignments) {
-            if (!setPin(kv.key().c_str(), kv.value().as<int8_t>(), true)) {
+            if (!setPin(kv.key().c_str(), kv.value().as<int16_t>(), true)) {
                 all_ok = false;
             }
             count++;
