@@ -57,6 +57,19 @@ typedef bool (*rs485_poll_fn)(void* ctx);
 typedef bool (*rs485_response_fn)(void* ctx, const uint8_t* data, uint16_t len);
 
 // ============================================================================
+// LATENCY HISTOGRAM
+// ============================================================================
+
+typedef struct {
+    uint32_t bucket_lt10ms;     // < 10ms
+    uint32_t bucket_10to25ms;   // 10-25ms
+    uint32_t bucket_25to50ms;   // 25-50ms
+    uint32_t bucket_50to100ms;  // 50-100ms
+    uint32_t bucket_100to250ms; // 100-250ms
+    uint32_t bucket_gt250ms;    // > 250ms (usually a timeout)
+} rs485_latency_histogram_t;
+
+// ============================================================================
 // DEVICE DESCRIPTOR
 // ============================================================================
 
@@ -79,6 +92,18 @@ typedef struct {
     uint32_t error_count;           // Failed polls
     uint32_t consecutive_errors;    // Consecutive failures
     bool pending_response;          // Waiting for response
+
+    // Latency Tracking (NEW)
+    uint32_t last_tx_end_us;        // micros() end of last transmission
+    uint32_t first_rx_byte_us;      // micros() start of reception
+    rs485_latency_histogram_t latency_hist;
+    
+    // Jitter Analysis
+    uint32_t min_latency_us;
+    uint32_t max_latency_us;
+    uint64_t total_latency_us;
+    uint64_t total_latency_sq_us;
+    uint32_t latency_samples;
 } rs485_device_t;
 
 // ============================================================================
@@ -167,6 +192,12 @@ bool rs485Update(void);
  * @details Call this from a dedicated higher-frequency task (e.g. Encoder task)
  */
 void rs485HandleBus(void);
+
+/**
+ * @brief Force-reset of the RS-485 bus hardware (Panic Recovery)
+ * @details Re-initializes UART and clears physical bus state
+ */
+void rs485PerformPanicRecovery(void);
 
 // ============================================================================
 // BUS I/O API (Abstraction for registered devices)

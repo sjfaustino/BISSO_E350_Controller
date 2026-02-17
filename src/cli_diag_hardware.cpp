@@ -176,6 +176,52 @@ void cmd_rs485_hex(int argc, char** argv) {
 }
 
 void cmd_rs485_diag(int argc, char** argv) { (void)argc; (void)argv; rs485PrintDiagnostics(); }
+
+void cmd_rs485_latency(int argc, char** argv) {
+    (void)argc; (void)argv;
+    uint8_t count = 0;
+    rs485_device_t** devices = rs485GetDevices(&count);
+    
+    serialLoggerLock();
+    logPrintln("\n[RS485] === Device Latency Histograms ===");
+    logPrintln("Measurements from End-of-TX to Start-of-RX (micros)\n");
+    
+    logPrintln("Device          | Addr | MinUs | MaxUs | AvgUs | ±Dev  | <10ms | 10-25 | 25-50 | 50-100|100-250| >250ms");
+    logPrintln("----------------|------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------");
+    
+    for (uint8_t i = 0; i < count; i++) {
+        rs485_device_t* dev = devices[i];
+        if (!dev) continue;
+        
+        uint32_t avg = 0;
+        uint32_t std_dev = 0;
+        if (dev->latency_samples > 0) {
+            avg = (uint32_t)(dev->total_latency_us / dev->latency_samples);
+            uint64_t mean_sq = dev->total_latency_sq_us / dev->latency_samples;
+            uint64_t avg_sq = (uint64_t)avg * avg;
+            if (mean_sq > avg_sq) std_dev = (uint32_t)sqrt(mean_sq - avg_sq);
+        }
+        
+        uint32_t min_val = (dev->min_latency_us == UINT32_MAX) ? 0 : dev->min_latency_us;
+
+        logPrintf("%-15s | %4u | %5lu | %5lu | %5lu | %5lu | %5lu | %5lu | %5lu | %5lu | %5lu | %5lu\n",
+                      dev->name,
+                      dev->slave_address,
+                      (unsigned long)min_val,
+                      (unsigned long)dev->max_latency_us,
+                      (unsigned long)avg,
+                      (unsigned long)std_dev,
+                      (unsigned long)dev->latency_hist.bucket_lt10ms,
+                      (unsigned long)dev->latency_hist.bucket_10to25ms,
+                      (unsigned long)dev->latency_hist.bucket_25to50ms,
+                      (unsigned long)dev->latency_hist.bucket_50to100ms,
+                      (unsigned long)dev->latency_hist.bucket_100to250ms,
+                      (unsigned long)dev->latency_hist.bucket_gt250ms);
+    }
+    logPrintln("");
+    serialLoggerUnlock();
+}
+
 void cmd_rs485_reset(int argc, char** argv) { (void)argc; (void)argv; rs485ResetErrorCounters(); }
 
 // ============================================================================
@@ -234,6 +280,7 @@ void cmd_rs485_main(int argc, char** argv) {
         {"hex",     cmd_rs485_hex,      "<hex...> - Send raw hex bytes"},
         {"sniff",   cmd_rs485_sniff,    "[duration_sec] - Monitor bus traffic"},
         {"diag",    cmd_rs485_diag,     "Show detailed registry diagnostics"},
+        {"latency", cmd_rs485_latency,  "Show response time distribution"},
         {"reset",   cmd_rs485_reset,    "Reset error counters"}
     };
     

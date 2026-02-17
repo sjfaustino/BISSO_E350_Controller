@@ -322,10 +322,52 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
             d["error_count"] = dev->error_count;
             d["consecutive_errors"] = dev->consecutive_errors;
             d["healthy"] = dev->consecutive_errors < 3;
+
+            // Calculate Effective Interval
+            uint32_t effective = dev->poll_interval_ms;
+            if (dev->consecutive_errors > 0) {
+                uint8_t shift = (dev->consecutive_errors > 10) ? 10 : dev->consecutive_errors;
+                effective <<= shift;
+            }
+            d["effective_interval_ms"] = effective;
+
+            // Latency Histogram
+            JsonArray hist = d["latency_hist"].to<JsonArray>();
+            hist.add(dev->latency_hist.bucket_lt10ms);
+            hist.add(dev->latency_hist.bucket_10to25ms);
+            hist.add(dev->latency_hist.bucket_25to50ms);
+            hist.add(dev->latency_hist.bucket_50to100ms);
+            hist.add(dev->latency_hist.bucket_100to250ms);
+            hist.add(dev->latency_hist.bucket_gt250ms);
+
+            // Jitter Analysis & StdDev
+            JsonObject jitter = d["jitter"].to<JsonObject>();
+            jitter["min"] = (dev->min_latency_us == UINT32_MAX) ? 0 : dev->min_latency_us;
+            jitter["max"] = dev->max_latency_us;
+            
+            uint32_t avg = 0;
+            uint32_t std_dev = 0;
+            if (dev->latency_samples > 0) {
+                avg = (uint32_t)(dev->total_latency_us / dev->latency_samples);
+                // StdDev = sqrt((sum_sq / N) - (avg * avg))
+                uint64_t mean_sq = dev->total_latency_sq_us / dev->latency_samples;
+                uint64_t avg_sq = (uint64_t)avg * avg;
+                if (mean_sq > avg_sq) {
+                    std_dev = (uint32_t)sqrt(mean_sq - avg_sq);
+                }
+            }
+            jitter["avg"] = avg;
+            jitter["std_dev"] = std_dev;
         }
         
         return sendJsonResponse(response, doc);
     });
     
     logDebug("[WEB] Hardware routes registered");
+
+    // POST /api/hardware/rs485/reset - Reset bus statistics
+    server.on("/api/hardware/rs485/reset", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        rs485ResetErrorCounters();
+        return response->send(200, "application/json", "{\"success\":true}");
+    });
 }

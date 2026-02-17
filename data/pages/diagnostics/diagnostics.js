@@ -37,6 +37,16 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
             const t = document.getElementById("spindle-graph-pause");
             t && (t.textContent = this.spindlePaused ? "Resume" : "Pause");
         });
+        bind("btn-rs485-reset", () => {
+            if (confirm("Reset RS485 statistics and latency histograms?")) {
+                window.API.post("hardware/rs485/reset", null, "btn-rs485-reset").then(data => {
+                    if (data.success) {
+                        AlertManager.add("RS485 statistics reset", "success", 2000);
+                        this.updateRS485Status();
+                    }
+                }).catch(err => console.error("[Diagnostics] Reset failed:", err));
+            }
+        });
     },
     loadBootLog() { const textarea = document.getElementById("bootlog-content"); const sizeEl = document.getElementById("bootlog-size"); if (!textarea) return; if ("file:" === window.location.protocol) { textarea.value = "(Mock mode - boot log not available)"; if (sizeEl) sizeEl.textContent = "0"; return } window.API.get("logs/boot", null, { silent: true }).then(text => { textarea.value = text || "(Empty)"; if (sizeEl) sizeEl.textContent = text.length.toString() }).catch(err => { console.warn("[Diagnostics] Boot log fetch failed:", err); textarea.value = "(Failed to load boot log)"; if (sizeEl) sizeEl.textContent = "--" }) }, deleteBootLog() { if ("file:" === window.location.protocol) { AlertManager.add("Cannot delete in mock mode", "warning", 2e3); return } if (!confirm("Delete boot log?")) return; window.API.delete("logs/boot", "delete-bootlog-btn").then(data => { if (data.success) { AlertManager.add("Boot log deleted", "success", 2e3); this.loadBootLog() } else { AlertManager.add("Failed to delete boot log", "error", 3e3) } }).catch(err => { console.error("[Diagnostics] Delete boot log failed:", err); AlertManager.add("Failed to delete boot log", "error", 3e3) }) }, loadInitialData() { if ("file:" === window.location.protocol) return console.log("[Diagnostics] Mock mode - using simulated data"), void this.simulateDiagnosticData(); this.loadIOStatus(), this.loadFaultLog() }, onStateChanged() {
         const t = AppState.data;["x", "y", "z"].forEach(e => {
@@ -186,11 +196,55 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
                     deviceListEl.innerHTML = data.devices.map(d => {
                         const icon = d.healthy ? "✅" : "❌";
                         const errInfo = d.error_count > 0 ? ` (${d.error_count} errors)` : "";
-                        return `<div style="margin-bottom: 4px;">${icon} ${d.name} @ ${d.address}${errInfo}</div>`;
+                        const intervalInfo = d.effective_interval_ms !== d.poll_interval_ms ? ` <span style="color: var(--color-warning); font-size: 0.85em;">[Rate: ${d.effective_interval_ms}ms]</span>` : "";
+                        return `<div style="margin-bottom: 4px;">${icon} ${d.name} @ ${d.address}${errInfo}${intervalInfo}</div>`;
                     }).join("");
                 }
             }
+            this.renderLatencyStats(data.devices || []);
         }).catch(e => console.warn("[Diagnostics] RS485 status fetch failed:", e));
+    },
+    renderLatencyStats(devices) {
+        const container = document.getElementById("rs485-latency-container");
+        if (!container) return;
+        if (!devices || devices.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">No latency data available</p>';
+            return;
+        }
+
+        const bucketLabels = ["<10ms", "10-25", "25-50", "50-100", "100-250", ">250"];
+        const bucketColors = ["#22c55e", "#84cc16", "#eab308", "#f97316", "#ef4444", "#7f1d1d"];
+
+        container.innerHTML = devices.map(dev => {
+            const hist = dev.latency_hist || [0, 0, 0, 0, 0, 0];
+            const jitter = dev.jitter || { min: 0, max: 0, avg: 0 };
+            const total = hist.reduce((a, b) => a + b, 0);
+
+            return `
+                <div class="latency-device-row" style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <strong style="font-size: 14px; color: var(--color-normal);">${dev.name} (Addr ${dev.address})</strong>
+                        <div style="font-size: 12px; color: var(--text-secondary);">
+                            Min: <strong>${(jitter.min / 1000).toFixed(2)}ms</strong> | 
+                            Max: <strong>${(jitter.max / 1000).toFixed(2)}ms</strong> | 
+                            Avg: <strong>${(jitter.avg / 1000).toFixed(2)}ms</strong>
+                            ${jitter.std_dev > 0 ? ` (±${(jitter.std_dev / 1000).toFixed(2)})` : ""}
+                        </div>
+                    </div>
+                    <div class="latency-bars" style="display: flex; height: 12px; background: #222; border-radius: 6px; overflow: hidden; margin-bottom: 4px;">
+                        ${hist.map((val, i) => {
+                const pct = total > 0 ? (val / total * 100).toFixed(1) : 0;
+                return val > 0 ? `
+                                <div class="latency-bar" style="width: ${pct}%; background: ${bucketColors[i]}; transition: width 0.3s ease;" title="${bucketLabels[i]}: ${val} samples (${pct}%)"></div>
+                            ` : "";
+            }).join("")}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 0 4px; font-size: 9px; color: var(--text-tertiary); text-transform: uppercase;">
+                        ${bucketLabels.map((lbl, i) => `<span>${lbl}</span>`).join("")}
+                    </div>
+                </div>
+            `;
+        }).join("");
     },
     formatNumber(n) { if (n >= 1e6) return (n / 1e6).toFixed(1) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(1) + "K"; return n.toString(); }
 }, window.currentPageModule = DiagnosticsModule;

@@ -2373,6 +2373,7 @@ rs485 <subcommand>
 | `raw` | Send raw hex data or ASCII string |
 | `reset` | Reset device registry |
 | `sniff` | Real-time bus monitor |
+| `latency` | Show response time distribution |
 
 #### `rs485 sniff` - Real-Time Bus Monitor
 
@@ -2404,6 +2405,49 @@ Sniffing RS485 for 10 seconds... (Press any key to stop)
 [   45280] [RS485] TX: 02 03 00 01 00 01 D5 FA 
 [   45295] [RS485] RX: 02 03 02 05 DC BA 8D 
 Sniffer stopped.
+```
+
+---
+
+#### `rs485 latency` - Response Time Histograms
+
+**Syntax:**
+```
+rs485 latency
+```
+
+**Description:**
+Displays a high-precision statistical distribution of response times for all registered RS-485 slave devices. 
+
+**Measured Metric:**
+The system measures the **Slave Response Time** from the microsecond the last byte of a request is transmitted (TX) to the microsecond the first byte of the response is received (RX).
+
+**Latency Buckets:**
+1.  **<10ms**: Excellent (Typical for high-speed encoders/VFDs)
+2.  **10-25ms**: Good (Standard industrial response)
+3.  **25-50ms**: Acceptable (Slower PLCs or high-traffic segments)
+4.  **50-100ms**: Slow (Investigate for bus congestion)
+5.  **100-250ms**: Poor (Likely heavy processing or noise issues)
+6.  **>250ms**: Critical (Near timeout threshold)
+
+**How It Works:**
+The low-level RS-485 bus driver captures hardware-level timestamps using `micros()` immediately after serial writes and reads. These delta values are then categorized into buckets for each device in the registry.
+
+**Usage Example:**
+```bash
+rs485 latency
+```
+
+**Expected Output:**
+```text
+[RS485] === Device Latency Histograms ===
+Measurements from End-of-TX to Start-of-RX (micros)
+
+Device          | Addr | MinUs | MaxUs | AvgUs | ±Dev  | <10ms | 10-25 | 25-50 | 50-100|100-250| >250ms
+----------------|------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------
+WJ66-Encoder    |    1 |   840 |  1250 |   910 |    45 |  1245 |     2 |     0 |     0 |     0 |     0
+Altivar31       |    2 | 12500 | 28000 | 18500 |  1200 |     0 |   450 |    12 |     3 |     0 |     0
+JXK-10-Amps     |    3 | 45000 | 78000 | 62000 |  3500 |     0 |     0 |   210 |    15 |     1 |     0
 ```
 
 ---

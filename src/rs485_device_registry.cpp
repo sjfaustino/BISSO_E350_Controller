@@ -8,6 +8,7 @@
 #include "rs485_device_registry.h"
 #include "serial_logger.h"
 #include "system_constants.h"
+#include "fault_logging.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -88,6 +89,16 @@ bool rs485RegisterDevice(rs485_device_t* device) {
     device->error_count = 0;
     device->consecutive_errors = 0;
     device->pending_response = false;
+
+    // Initialize latency stats
+    device->last_tx_end_us = 0;
+    device->first_rx_byte_us = 0;
+    memset(&device->latency_hist, 0, sizeof(device->latency_hist));
+    device->min_latency_us = UINT32_MAX;
+    device->max_latency_us = 0;
+    device->total_latency_us = 0;
+    device->total_latency_sq_us = 0;
+    device->latency_samples = 0;
     
     // Add to registry (sorted by priority, highest first)
     uint8_t insert_idx = registry.device_count;
@@ -222,8 +233,26 @@ bool rs485Update(void) {
                 registry.last_switch_time_ms = now; // Enforce gap after timeout
                 registry.total_errors++;
                 
+                // Panic Recovery Trigger: If all devices failing for > 15s
+                if (now - registry.last_successful_response_ms > 15000) {
+                    logError("[RS485] TOTAL BUS FAILURE > 15s. Triggering panic recovery...");
+                    rs485PerformPanicRecovery();
+                }
+
+                // Critical Path: WJ66 Encoder Watchdog
+                if (current->type == RS485_DEVICE_TYPE_ENCODER && motionIsMoving()) {
+                    logCritical("[RS485] CRITICAL: Encoder timeout during motion!");
+                    faultLogEntry(FAULT_CRITICAL, FAULT_ENCODER_TIMEOUT, 0, 0, "Encoder timeout during motion");
+                    emergencyStopSetActive(true);
+                }
+
                 // PHASE 16: Reduced spam for bare board/bench debugging.
-                // Log the first 3 errors to notify the user, then stay silent.
+                if (current->consecutive_errors == 10) {
+                    // Log to persistent fault history on persistent failure
+                    faultLogEntry(FAULT_WARNING, FAULT_RS485_TIMEOUT, 0, current->slave_address, 
+                                 "Comm loss with device %s", current->name);
+                }
+
                 if (current->consecutive_errors <= 3) {
                     logWarning("[RS485] Timeout: %s (Addr %d, after 250ms)", 
                                current->name, current->slave_address);
@@ -252,6 +281,7 @@ bool rs485Update(void) {
     if (next->poll && next->poll(next->user_data)) {
         next->last_poll_time_ms = now;
         next->pending_response = true;
+        next->first_rx_byte_us = 0; // Reset for new txn
         registry.bus_busy = true;
         registry.last_switch_time_ms = now;
         registry.total_transactions++;
@@ -285,6 +315,26 @@ bool rs485ProcessResponse(const uint8_t* data, uint16_t len) {
         current->consecutive_errors = 0;
         registry.last_successful_response_ms = millis();  // Reset watchdog
         registry.watchdog_alert_active = false;           // Clear alert on success
+
+        // Update Latency Histogram
+        if (current->first_rx_byte_us > 0 && current->last_tx_end_us > 0) {
+            uint32_t latency_us = current->first_rx_byte_us - current->last_tx_end_us;
+            uint32_t latency_ms = latency_us / 1000;
+
+            if (latency_ms < 10)         current->latency_hist.bucket_lt10ms++;
+            else if (latency_ms < 25)    current->latency_hist.bucket_10to25ms++;
+            else if (latency_ms < 50)    current->latency_hist.bucket_25to50ms++;
+            else if (latency_ms < 100)   current->latency_hist.bucket_50to100ms++;
+            else if (latency_ms < 250)   current->latency_hist.bucket_100to250ms++;
+            else                         current->latency_hist.bucket_gt250ms++;
+
+            // Update Jitter Analysis
+            if (latency_us < current->min_latency_us) current->min_latency_us = latency_us;
+            if (latency_us > current->max_latency_us) current->max_latency_us = latency_us;
+            current->total_latency_us += latency_us;
+            current->total_latency_sq_us += (uint64_t)latency_us * latency_us;
+            current->latency_samples++;
+        }
     } else {
         current->error_count++;
         current->consecutive_errors++;
@@ -316,12 +366,14 @@ void rs485HandleBus(void) {
         uint8_t b;
         while (bus_serial->available()) {
             b = bus_serial->read();
-            if (bus_rx_idx < sizeof(bus_rx_buffer)) {
+                if (bus_rx_idx == 0) {
+                    rs485_device_t* current = registry.devices[registry.current_device_index];
+                    if (current) current->first_rx_byte_us = micros();
+                }
                 bus_rx_buffer[bus_rx_idx++] = b;
                 last_byte_time_ms = now;
                 // logDebug("R: %02X '%c'", b, (b >= 32) ? b : '.');
             }
-        }
         
         // Check for frame completion (5ms silence or buffer full)
         if (bus_rx_idx > 0) {
@@ -406,6 +458,11 @@ bool rs485Send(const uint8_t* data, uint8_t len) {
         }
         
         ok = (bus_serial->write(data, len) == len);
+        
+        // Record end of TX for latency tracking
+        rs485_device_t* current = registry.devices[registry.current_device_index];
+        if (current) current->last_tx_end_us = micros();
+
         xSemaphoreGiveRecursive((SemaphoreHandle_t)registry.bus_mutex);
     }
     return ok;
@@ -476,6 +533,12 @@ void rs485ResetErrorCounters(void) {
         dev->poll_count = 0;
         dev->error_count = 0;
         dev->consecutive_errors = 0;
+        memset(&dev->latency_hist, 0, sizeof(dev->latency_hist));
+        dev->min_latency_us = UINT32_MAX;
+        dev->max_latency_us = 0;
+        dev->total_latency_us = 0;
+        dev->total_latency_sq_us = 0;
+        dev->latency_samples = 0;
     }
     registry.total_transactions = 0;
     registry.total_errors = 0;
@@ -575,6 +638,27 @@ void rs485SetBusPaused(bool paused) {
 
 bool rs485IsBusPaused(void) {
     return registry.bus_paused;
+}
+
+void rs485PerformPanicRecovery(void) {
+    if (!bus_serial) return;
+    
+    logWarning("[RS485] Performing panic recovery: Re-initializing UART...");
+    
+    // Lock bus to prevent concurrent access during reset
+    if (xSemaphoreTakeRecursive((SemaphoreHandle_t)registry.bus_mutex, pdMS_TO_TICKS(500)) == pdTRUE) {
+        bus_serial->end();
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+        bus_serial->begin(registry.baud_rate, SERIAL_8N1, PIN_RS485_RX, PIN_RS485_TX);
+        
+        registry.bus_busy = false;
+        registry.last_successful_response_ms = millis(); // Reset timer to allow recovery
+        
+        xSemaphoreGiveRecursive((SemaphoreHandle_t)registry.bus_mutex);
+        logInfo("[RS485] Recovery complete.");
+    } else {
+        logError("[RS485] Recovery failed: Bus mutex timeout");
+    }
 }
 
 void rs485SetSniffer(void (*cb)(bool is_tx, const uint8_t* data, uint16_t len)) {

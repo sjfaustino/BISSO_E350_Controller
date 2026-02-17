@@ -232,6 +232,22 @@
         </div>
     </div>
 
+    <!-- RS485 Latency & Jitter Card -->
+    <div class="card full-width">
+        <div class="card-header">
+            <h2 data-i18n="diagnostics.rs485_latency">RS485 Latency & Jitter</h2>
+            <button class="btn btn-sm btn-outline" id="btn-rs485-reset" style="margin-left: auto;">Reset Stats</button>
+        </div>
+        <div class="card-content">
+            <div id="rs485-latency-container">
+                <!-- Device latency stats populated by JS -->
+                <p style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                    No latency data available
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- Fault Log Viewer Card -->
     <div class="card">
         <div class="card-header">
