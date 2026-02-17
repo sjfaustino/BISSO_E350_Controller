@@ -100,6 +100,9 @@ typedef struct {
     bool watchdog_alert_active;                 // True if alert has been raised
     bool bus_paused;                            // True to suspend all registry activity
     void* bus_mutex;                            // Mutex for bus access
+    
+    // Sniffer support
+    void (*sniffer_cb)(bool is_tx, const uint8_t* data, uint16_t len);
 } rs485_registry_state_t;
 
 // Watchdog timeout (ms) - alert if no response in this time
@@ -303,6 +306,12 @@ bool rs485TakeBus(uint32_t timeout_ms);
  * @brief Release manual control of the RS-485 bus
  */
 void rs485ReleaseBus(void);
+
+/**
+ * @brief Set global sniffer callback
+ * @param cb Callback function or NULL to disable
+ */
+void rs485SetSniffer(void (*cb)(bool is_tx, const uint8_t* data, uint16_t len));
 
 #ifdef __cplusplus
 }

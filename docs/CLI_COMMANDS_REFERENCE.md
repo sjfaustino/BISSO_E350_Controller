@@ -2327,7 +2327,40 @@ rs485 <subcommand>
 | `raw` | Send raw hex data or ASCII string |
 | `reset` | Reset device registry |
 
+#### `rs485 sniff` - Real-Time Bus Monitor
+
+**Syntax:**
+```
+rs485 sniff [duration_sec]
+```
+
+**Description:**
+Captures and displays all Modbus RTU traffic on the RS-485 bus in real-time. Displays both outgoing requests (TX) and incoming responses (RX) in hex format.
+
+**Parameters:**
+- `duration_sec`: (Optional) Capture duration in seconds (1-600). Default is 10s.
+
+**How It Works:**
+The command registers a global sniffer callback in the RS-485 driver. Every byte transmitted or received by any Modbus driver is mirrored to the console. The listener automatically detaches after the timeout or when any key is pressed.
+
+**Usage Examples:**
+```bash
+rs485 sniff       # Monitor for 10 seconds
+rs485 sniff 60    # Monitor for 1 minute
+```
+
+**Expected Output:**
+```text
+Sniffing RS485 for 10 seconds... (Press any key to stop)
+[   45230] [RS485] TX: 01 03 00 00 00 02 C4 0B 
+[   45242] [RS485] RX: 01 03 04 00 00 00 00 FB 4E 
+[   45280] [RS485] TX: 02 03 00 01 00 01 D5 FA 
+[   45295] [RS485] RX: 02 03 02 05 DC BA 8D 
+Sniffer stopped.
+```
+
 ---
+
 
 #### `rs485 raw` - Send Custom Command
 

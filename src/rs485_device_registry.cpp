@@ -37,7 +37,8 @@ static rs485_registry_state_t registry = {
     .last_successful_response_ms = 0,
     .watchdog_alert_active = false,
     .bus_paused = false,
-    .bus_mutex = NULL
+    .bus_mutex = NULL,
+    .sniffer_cb = NULL
 };
 
 // ============================================================================
@@ -337,6 +338,12 @@ void rs485HandleBus(void) {
             
             if (frame_complete) {
                 logDebug("[RS485] RX Frame (%d bytes)", bus_rx_idx);
+                
+                // Trigger sniffer if active
+                if (registry.sniffer_cb) {
+                    registry.sniffer_cb(false, bus_rx_buffer, bus_rx_idx);
+                }
+                
                 rs485ProcessResponse(bus_rx_buffer, bus_rx_idx);
                 bus_rx_idx = 0;
             }
@@ -393,6 +400,11 @@ bool rs485Send(const uint8_t* data, uint8_t len) {
     
     bool ok = false;
     if (xSemaphoreTakeRecursive((SemaphoreHandle_t)registry.bus_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // Trigger sniffer if active
+        if (registry.sniffer_cb) {
+            registry.sniffer_cb(true, data, len);
+        }
+        
         ok = (bus_serial->write(data, len) == len);
         xSemaphoreGiveRecursive((SemaphoreHandle_t)registry.bus_mutex);
     }
@@ -563,4 +575,8 @@ void rs485SetBusPaused(bool paused) {
 
 bool rs485IsBusPaused(void) {
     return registry.bus_paused;
+}
+
+void rs485SetSniffer(void (*cb)(bool is_tx, const uint8_t* data, uint16_t len)) {
+    registry.sniffer_cb = cb;
 }

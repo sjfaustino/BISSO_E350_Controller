@@ -116,6 +116,7 @@ void cmd_faults_main(int argc, char** argv);        // 'faults' command
 void cmd_encoder_main(int argc, char** argv);       // 'encoder' command
 void cmd_debug_main(int argc, char** argv);         // 'debug' command
 void cmd_diag_scheduler_main(int argc, char** argv);// 'wdt' and 'task' dispatcher
+void cmd_rs485_main(int argc, char** argv);          // 'rs485' dispatcher
 
 // --- I2C Management (cli_i2c.cpp) ---
 void cmd_i2c_main(int argc, char** argv);           // 'i2c' command

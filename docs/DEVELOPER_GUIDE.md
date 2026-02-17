@@ -600,6 +600,9 @@ The RS-485 bus uses a **Priority-Based Dispatcher** with an exponential backoff 
 - Subsequent requests for that device are skipped until the backoff expires.
 - This ensures that a single disconnected or noisy device doesn't cause G-code execution delays.
 
+**RS-485 Sniffer Hook**:
+The registry supports a global sniffer callback (`rs485SetSniffer`). When active, the bus manager mirrors all transmitted and received frames to this callback, enabling non-intrusive bus monitoring via the CLI or other diagnostic tasks.
+
 ---
 
 ## 10. Security Implementation
@@ -959,6 +962,7 @@ Located at `.github/workflows/release.yml`. Triggered by tags matching `v*`.
 
 | Date | Changes |
 |------|---------|
+| 2026-02-17 | Implementation: Added Modbus Sniffer diagnostic tool and global RS-485 hook |
 | 2026-02-15 | Audit: Updated MachineCalibration refactor, RS-485 backoff, and CLI hardening details |
 | 2026-01-25 | Initial guide structure |
 ---

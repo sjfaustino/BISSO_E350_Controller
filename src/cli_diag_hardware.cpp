@@ -178,4 +178,70 @@ void cmd_rs485_hex(int argc, char** argv) {
 void cmd_rs485_diag(int argc, char** argv) { (void)argc; (void)argv; rs485PrintDiagnostics(); }
 void cmd_rs485_reset(int argc, char** argv) { (void)argc; (void)argv; rs485ResetErrorCounters(); }
 
+// ============================================================================
+// MODBUS SNIFFER
+// ============================================================================
+
+static uint32_t sniff_end_time = 0;
+
+static void rs485_sniff_cb(bool is_tx, const uint8_t* data, uint16_t len) {
+    if (millis() > sniff_end_time) {
+        return;
+    }
+    
+    // Format to hex
+    char hex[512] = "";
+    int hpos = 0;
+    for (uint16_t i = 0; i < len && hpos < (int)sizeof(hex)-4; i++) {
+        hpos += snprintf(hex + hpos, sizeof(hex) - hpos, "%02X ", data[i]);
+    }
+    
+    // Print packet (logPrintf is thread-safe)
+    logPrintf("[%8lu] [RS485] %s: %s\n", (unsigned long)millis(), is_tx ? "TX" : "RX", hex);
+}
+
+void cmd_rs485_sniff(int argc, char** argv) {
+    uint32_t duration_sec = 10;
+    if (argc >= 3) duration_sec = atoi(argv[2]);
+    if (duration_sec == 0) duration_sec = 10;
+    if (duration_sec > 600) duration_sec = 600; // Cap at 10 mins
+    
+    logPrintf("Sniffing RS485 for %lu seconds... (Press any key to stop)\n", (unsigned long)duration_sec);
+    sniff_end_time = millis() + (duration_sec * 1000);
+    
+    rs485SetSniffer(rs485_sniff_cb);
+    
+    while (millis() < sniff_end_time) {
+        if (Serial.available()) {
+            while (Serial.available()) Serial.read(); // Clear input
+            break;
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        watchdogFeed("CLI");
+    }
+    
+    rs485SetSniffer(NULL);
+    logPrintln("Sniffer stopped.");
+}
+
+// ============================================================================
+// MAIN RS485 DISPATCHER
+// ============================================================================
+
+void cmd_rs485_main(int argc, char** argv) {
+    static const cli_subcommand_t subcmds[] = {
+        {"raw",     cmd_rs485_raw,      "<string> - Send raw ASCII string"},
+        {"hex",     cmd_rs485_hex,      "<hex...> - Send raw hex bytes"},
+        {"sniff",   cmd_rs485_sniff,    "[duration_sec] - Monitor bus traffic"},
+        {"diag",    cmd_rs485_diag,     "Show detailed registry diagnostics"},
+        {"reset",   cmd_rs485_reset,    "Reset error counters"}
+    };
+    
+    if (argc < 2) {
+        logPrintln("\n=== RS-485 Bus Management ===");
+    }
+    
+    cliDispatchSubcommand("[RS485]", argc, argv, subcmds, sizeof(subcmds)/sizeof(subcmds[0]), 1);
+}
+
 

@@ -237,7 +237,7 @@ void cliRegisterDiagCommands() {
     // Delegated to cli_diag_hardware.cpp
     cliRegisterCommand("dio", "Digital I/O status", cmd_dio_main);
     cliRegisterCommand("spindle", "Spindle monitor", cmd_spindle_diag);
-    cliRegisterCommand("rs485", "RS-485 bus diag", cmd_rs485_raw);
+    cliRegisterCommand("rs485", "RS-485 bus diag", cmd_rs485_main);
     
     // Delegated to cli_diag_network.cpp
     cliRegisterCommand("net", "Network diagnostics", cmd_net_diag);
