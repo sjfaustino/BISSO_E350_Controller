@@ -779,9 +779,8 @@ The `EngineeringMenu` class inherits from `BaseMenu` and implements a hierarchic
 
 #### Real-time I/O View
 The `STATE_IO_VIEW` provides a live bitmask display of the I2C input and output expanders:
-- **IN (X)**: Shows the 8-bit state of the ADDR_I73_INPUT board.
-- **OUT (Y1)**: Shows the 8-bit state of the ADDR_Q73_OUTPUT board.
-- **OUT (Y2)**: Shows the 8-bit state of the ADDR_Q73_AUX board.
+- **IX (X1-X16)**: Shows the 16-bit state of the digital inputs (0x21 and 0x22).
+- **QY (Y1-Y16)**: Shows the 16-bit state of the relay outputs (0x24 and 0x25).
 
 #### LCD Menu Layout (v2.4)
 ```text
@@ -795,7 +794,7 @@ ENGINEER MENU (3x BOOT Click)
 │   ├── 1. View Alarms (Fault Ring Buffer)
 │   ├── 2. LogLvl: [DEBUG/INFO]
 │   ├── 3. Modbus Health (Slave Poll Stats)
-│   ├── 4. Live I/O View (I2C Bitmasks)
+│   ├── 4. Live I/O View (16-bit IX/QY)
 │   ├── 5. Diag Dump (Serial Trigger)
 │   └── 6. BACK
 ├── 3. System Utils

@@ -8,6 +8,7 @@
 #include "lcd_interface.h"
 #include "operator_alerts.h"
 #include "altivar31_modbus.h"
+#include "board_inputs.h"
 #include <string.h>
 
 // External diagnostic helper
@@ -373,21 +374,23 @@ void EngineeringMenu::refreshMenuLines() {
         setLine(0, "== LIVE I/O VIEW ==");
         
         // Bits: 7 6 5 4 3 2 1 0
-        char in_bits[10], out1_bits[10], out2_bits[10];
-        uint8_t in = elboI73GetRawState();
+        char in1_bits[10], in2_bits[10], out1_bits[10], out2_bits[10];
+        uint8_t in1 = elboI73GetRawState();
+        uint8_t in2 = boardInputsGetRawState();
         uint8_t out1 = elboQ73GetRawState();
         uint8_t out2 = elboQ73GetAuxRawState();
         
         for(int i=7; i>=0; i--) {
-            in_bits[7-i] = (in & (1<<i)) ? '1' : '0';
+            in1_bits[7-i] = (in1 & (1<<i)) ? '1' : '0';
+            in2_bits[7-i] = (in2 & (1<<i)) ? '1' : '0';
             out1_bits[7-i] = (out1 & (1<<i)) ? '1' : '0';
             out2_bits[7-i] = (out2 & (1<<i)) ? '1' : '0';
         }
-        in_bits[8] = out1_bits[8] = out2_bits[8] = '\0';
+        in1_bits[8] = in2_bits[8] = out1_bits[8] = out2_bits[8] = '\0';
         
-        setLine(1, "IN (X):  %s", in_bits);
-        setLine(2, "OUT(Y1): %s", out1_bits);
-        setLine(3, "OUT(Y2): %s %cBACK", out2_bits, '>');
+        setLine(1, "IX:%s|%s", in1_bits, in2_bits);
+        setLine(2, "QY:%s|%s", out1_bits, out2_bits);
+        setLine(3, "[BACK] - Hold select");
     } else if (m_state == STATE_MODBUS_HEALTH) {
         uint8_t count = 0;
         rs485_device_t** devices = rs485GetDevices(&count);
