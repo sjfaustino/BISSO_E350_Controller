@@ -9,6 +9,7 @@
 #include "encoder_wj66.h"
 #include "altivar31_modbus.h"
 #include "motion.h"
+#include "plc_iface.h"
 
 void systemDumpDiagnostics() {
     serialLoggerLock();
@@ -31,6 +32,9 @@ void systemDumpDiagnostics() {
     const altivar31_state_t* v = altivar31GetState();
     logPrintf("VFD     : Freq:%.1fHz Curr:%.1fA (Errors:%u)\n", 
         v->frequency_hz, v->current_amps, v->error_count);
+        
+    // 5. PLC/Hardware IO
+    plcPrintDiagnostics();
         
     // 5. Config Dump
     logPrintln("\n[DIAG] NVS Config:");

@@ -75,20 +75,31 @@ void elboI73Refresh();   // Public periodic refresh
 void plcSetAxisSelect(uint8_t axis);     // 0=X, 1=Y, 2=Z, 255=none
 void plcSetDirection(bool positive);     // true=+, false=-
 void plcSetSpeed(uint8_t speed_profile); // 0=fast, 1=medium, 2=slow
+uint8_t plcGetSpeedProfile();            // NEW
 void plcClearAllOutputs();               // Clear all outputs (stop)
 void plcCommitOutputs();                 // Write shadow register to I2C
 void plcSetOutput(uint16_t pin, bool state); // Dynamic output control (Virtual/Legacy)
 void plcSetAuxRelay(uint8_t bit, bool state); // Control Bank 2 (Y9-Y16)
+void plcPrintDiagnostics();               // NEW - detailed IO diagnostics
 
 // Transaction API for batching I2C writes
 void plcBeginTransaction();              // Delay I2C writes until EndTransaction
 void plcEndTransaction();                // Commit changes and resume immediate writes
 
-// Legacy API (redirects to new API internally)
-void elboQ73SetRelay(uint8_t bit, bool state);
-void elboSetSpeedProfile(uint8_t profile_idx);
-uint8_t elboGetSpeedProfile();
+// --- LEGACY API (DEPRECATED) ---
+[[deprecated("Use plcSetDirection")]]
 void elboSetDirection(uint8_t axis, bool forward);
+
+[[deprecated("Use plcSetSpeed")]]
+void elboSetSpeedProfile(uint8_t profile_idx);
+
+[[deprecated("Use plcGetSpeedProfile")]]
+uint8_t elboGetSpeedProfile();
+
+[[deprecated("Use plcSetOutput or plcSetAuxRelay")]]
+void elboQ73SetRelay(uint8_t bit, bool state);
+
+[[deprecated("Use systemDumpDiagnostics")]]
 void elboDiagnostics();
 
 // Health monitoring

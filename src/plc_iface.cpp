@@ -414,7 +414,7 @@ void elboSetSpeedProfile(uint8_t profile_index) {
 
 // PHASE 3.1: Added getter to read current speed profile
 // Allows LCD and diagnostics to display active speed profile
-uint8_t elboGetSpeedProfile() {
+uint8_t plcGetSpeedProfile() {
   // Read speed profile bits (5, 6, 7) from shadow register
   if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
     logWarning("[PLC] Failed to acquire shadow mutex for GetSpeedProfile");
@@ -434,6 +434,10 @@ uint8_t elboGetSpeedProfile() {
     return 2; // Slow
 
   return 0xFF; // No speed set
+}
+
+uint8_t elboGetSpeedProfile() {
+  return plcGetSpeedProfile();
 }
 
 void plcSetOutput(uint16_t pin, bool state) {
@@ -523,7 +527,7 @@ bool elboI73GetInput(uint8_t bit, bool *success) {
   return (i73_input_shadow & (1 << bit));
 }
 
-void elboDiagnostics() {
+void plcPrintDiagnostics() {
   logPrintln("\n[PLC] === IO Diagnostics ===");
 
   // Read shadow register safely with mutex protection
@@ -560,6 +564,10 @@ void elboDiagnostics() {
   } else {
     logWarning("[PLC] Q73: Could not acquire I2C mutex for diagnostics");
   }
+}
+
+void elboDiagnostics() {
+  plcPrintDiagnostics();
 }
 
 // PHASE 5.7: Fix - Shadow Register Health Monitoring

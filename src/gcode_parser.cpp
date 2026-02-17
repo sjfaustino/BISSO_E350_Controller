@@ -258,8 +258,8 @@ bool GCodeParser::processCommand(const char* line) {
             case 0:
             case 1:  handleM0_M1(line); break; // PHASE 5.1: M0/M1 Program stop/pause
             case 2:  motionStop(); break;
-            case 3:  elboQ73SetRelay(ELBO_Q73_SPEED_1, true); break;
-            case 5:  elboQ73SetRelay(ELBO_Q73_SPEED_1, false); break;
+            case 3:  plcSetSpeed(2); break; // Fast (Legacy Spindle ON)
+            case 5:  plcSetSpeed(255); break; // All OFF (Legacy Spindle OFF)
             case 8:  plcSetOutput(getPin("output_coolant"), true); logInfo("[GCODE] Coolant ON (M8)"); break;   // Y13
             case 9:  
                 plcSetOutput(getPin("output_coolant"), false); 

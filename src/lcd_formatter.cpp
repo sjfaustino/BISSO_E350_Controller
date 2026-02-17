@@ -53,7 +53,7 @@ void lcdFormatterUpdate() {
     safety_fault_t current_fault_code = safetyGetCurrentFault();
 
     // Get speed profile and encoder health
-    uint8_t speed_profile = elboGetSpeedProfile();
+    uint8_t speed_profile = plcGetSpeedProfile();
     char speed_char = (speed_profile <= 2) ? ('1' + speed_profile) : '?';
 
     // Check encoder health
