@@ -144,6 +144,52 @@ INFO DATA SOURCES:
 
 ---
 
+### `diag` - Full System Diagnostic Dump
+
+**Syntax:**
+```
+diag
+```
+
+**Description:**
+Performs an exhaustive "snapshot" dump of all major machine subsystems. This command is designed for remote support and deep-dive troubleshooting, consolidating information from five different hardware and software modules into a single report.
+
+**How It Works:**
+The `diag` command calls `systemDumpDiagnostics()`, which acquires a log lock to ensure the multi-line output is not interleaved with other system logs. It aggregates data from:
+1.  **Firmware Core**: Version, build date, and millisecond uptime.
+2.  **Motion Engine**: Current operational state (IDLE/MOVING).
+3.  **WJ66 Encoder**: Raw bus position and communication health statistics (polls vs. successful reads).
+4.  **Altivar 31 VFD**: Real-time frequency (Hz), motor current (Amps), and Modbus error counters.
+5.  **PLC Interface**: Complete state dump of all 16 shadow registers (Inputs, Main Outputs, Aux Outputs) using the modernized `plcPrintDiagnostics()` API.
+6.  **NVS Configuration**: Full printout of all persistent settings stored in the unified configuration system.
+
+**Usage Example:**
+```bash
+diag
+```
+
+**Expected Output:**
+```text
+[DIAG] === SYSTEM SNAPSHOT ===
+Firmware: BISSO E350 v1.2 (Compiled: Feb 17 2026 12:00:00)
+Uptime  : 3600000 ms
+Motion  : IDLE
+Encoder : Raw:1250450 (Polls:4520 Reads:4518)
+VFD     : Freq:50.0Hz Curr:4.2A (Errors:0)
+
+[PLC] === IO Diagnostics ===
+X1-X16  : 11111111|11111111 (0xFFFF)
+Y1-Y8   : 00000111|00000000 (0xE0)  <- Speed:FAST, Axis:X
+Y9-Y16  : 11111111|11111111 (0xFFFF)
+
+[DIAG] NVS Config:
+wifi_ssid: "Factory_Internal"
+...
+[DIAG] === END SNAPSHOT ===
+```
+
+---
+
 ### `status` - Multi-System Dashboard & Diagnostics
 
 **Syntax:**

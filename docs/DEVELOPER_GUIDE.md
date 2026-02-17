@@ -409,7 +409,34 @@ bool motionBufferIsFull();
 bool motionBufferIsEmpty();
 ```
 
-### 6.4 Adding New Motion Commands
+### 6.4 PLC Hardware Abstraction
+
+The device uses a custom semantic API to control the PLC contactors via I2C expanders. This layer abstracts direct bit manipulation into hardware-independent calls.
+
+#### Semantic API (Modern)
+Preferred for all new development:
+
+```cpp
+// In plc_iface.h
+void plcSetAxisSelect(uint8_t axis);     // Select axis (0=X, 1=Y, 2=Z, 255=none)
+void plcSetDirection(bool positive);     // Set movement direction
+void plcSetSpeed(uint8_t speed_profile); // Set speed (0=Fast, 1=Med, 2=Slow)
+uint8_t plcGetSpeedProfile();            // Get active speed profile
+void plcClearAllOutputs();               // Stop all signals immediately
+void plcCommitOutputs();                 // Manual shadow register commit
+void plcPrintDiagnostics();              // Detailed IO diagnostics dump
+```
+
+#### Legacy API (Deprecated)
+The following functions are maintained for backward compatibility but marked with `[[deprecated]]`:
+
+- `elboSetDirection()`: Use `plcSetDirection()` instead.
+- `elboSetSpeedProfile()`: Use `plcSetSpeed()` instead.
+- `elboGetSpeedProfile()`: Use `plcGetSpeedProfile()` instead.
+- `elboQ73SetRelay()`: Use `plcSetOutput()` or `plcSetAuxRelay()` instead.
+- `elboDiagnostics()`: Use `plcPrintDiagnostics()` or `systemDumpDiagnostics()` instead.
+
+### 6.5 Adding New Motion Commands
 
 1. Declare in `include/motion.h`
 2. Implement in `src/motion_control.cpp`
@@ -996,6 +1023,7 @@ Located at `.github/workflows/release.yml`. Triggered by tags matching `v*`.
 | Date | Changes |
 |------|---------|
 | 2026-02-17 | Implementation: Added Modbus Sniffer diagnostic tool and global RS-485 hook |
+| 2026-02-17 | Refactor: Deprecated legacy PLC API; added semantic `plcSet*` / `plcGet*` API documentation |
 | 2026-02-15 | Audit: Updated MachineCalibration refactor, RS-485 backoff, and CLI hardening details |
 | 2026-01-25 | Initial guide structure |
 ---
@@ -1045,5 +1073,14 @@ graph TD
     B -->|1| D[Hardware Serial1 GPIO 40/39]
     E[Engineering Menu] -- Update --> B
 ```
+
+### RS485 DMA Technical Note
+
+As of February 2026, the RS485 bus explicitly uses the interrupt-driven `HardwareSerial` (FIFO) rather than DMA. 
+
+**Rationale for avoiding DMA:**
+- **Industrial Reliability**: The standard interrupt-driven approach is simpler and less prone to edge-case failures in high-EMI environments.
+- **Modbus RTU Timing**: DMA struggles with Modbus's requirement for a 3.5-character "silent gap" to identify frame ends, requiring complex IDLE-line interrupt handling that adds more failure points than it resolves.
+- **Buffer Locality**: DMA requires internal SRAM buffers, which would increase pressure on the controller's limited internal memory compared to the current implementation.
 
 ---

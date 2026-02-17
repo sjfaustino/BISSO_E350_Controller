@@ -149,7 +149,7 @@ void cmd_status_dashboard(int argc, char** argv) {
     logDirectPrintln("+============================================================+");
     
     cliPrintTableHeader(15, 14, 15, 14, 0);
-    char buf1[32], buf2[32], buf3[32], buf4[32];
+    char buf1[32], buf2[32];
     
     // Row 1: Uptime & CPU
     snprintf(buf1, sizeof(buf1), "%02lu:%02lu:%02lu", (unsigned long)hours, (unsigned long)mins, (unsigned long)secs);
@@ -215,6 +215,12 @@ void cmd_task_main(int argc, char** argv) {
 
 void cmd_timeout_diag(int argc, char** argv) { (void)argc; (void)argv; timeoutShowDiagnostics(); }
 
+extern void systemDumpDiagnostics();
+void cmd_diag_dump(int argc, char** argv) {
+    (void)argc; (void)argv;
+    systemDumpDiagnostics();
+}
+
 // --- Registration ---
 void cliRegisterDiagCommands() {
     runtimeInit();
@@ -222,6 +228,7 @@ void cliRegisterDiagCommands() {
     
     // System
     cliRegisterCommand("status", "System dashboard", cmd_status_dashboard);
+    cliRegisterCommand("diag", "Full system diagnostic dump", cmd_diag_dump);
     cliRegisterCommand("runtime", "Uptime & cycle count", cmd_runtime);
     cliRegisterCommand("memory", "Heap diagnostics", cmd_memory_main);
     cliRegisterCommand("memleak", "Leak analysis", cmd_memory_leak_check);
