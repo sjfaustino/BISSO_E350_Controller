@@ -938,17 +938,22 @@ The RS485 autodetect feature scans common baud rates (4800-115200) to find conne
 
 ## Appendix E: Custom Partition Layout
 
-The device uses a custom `partitions.csv` for the 4MB flash:
+The device uses specific partition layouts depending on the hardware revision:
+
+### v1.6 Hardware (4MB Flash)
+Uses a **Single-App layout** to maximize space for firmware and Web UI assets. OTA is not supported on this revision due to 4MB flash constraints combined with a large LittleFS partition.
 
 | Partition | Size | Purpose |
 |:---|:---|:---|
-| `nvs` | 64 KB | Configuration storage |
-| `otadata` | 8 KB | OTA boot selection |
-| `ota_0` | 1,408 KB | Firmware Slot A (active) |
-| `ota_1` | 1,408 KB | Firmware Slot B (for updates) |
-| `spiffs` | 1,152 KB | LittleFS for web UI assets |
+| `nvs` | 20 KB | Configuration storage |
+| `phy_init` | 4 KB | Radio configuration |
+| `factory` | 2,048 KB | Primary application binary |
+| `spiffs` | 1,984 KB | LittleFS for web UI assets |
 
-To modify, edit `partitions.csv` in the project root. Note that changing the partition table will erase all data.
+### v3.1 Hardware (16MB Flash)
+Uses a **Standard 16MB OTA Layout** (`default_16MB.csv`). This takes advantage of the larger flash to provide full A/B OTA updates and a much larger LittleFS storage area (typically ~10MB).
+
+To modify, edit the appropriate `.csv` file in the project root or platformio configuration. Note that changing the partition table will erase all data.
 
 ---
 
