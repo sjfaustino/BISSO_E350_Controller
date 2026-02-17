@@ -19,6 +19,7 @@ public:
         STATE_SYSTEM,       // Sub-menu for Reboot/Reset
         STATE_MODBUS_HEALTH, // RS485 Device Diagnostics
         STATE_VIEW_ALARMS,   // Show recent faults
+        STATE_IO_VIEW,       // Real-time DIO status
         STATE_CONFIRM_SAVE,
         STATE_CONFIRM_RESET
     };

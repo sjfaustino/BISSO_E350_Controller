@@ -98,7 +98,7 @@ void EngineeringMenu::update() {
 
     // 3. Inactivity Timeout Logic
     if (m_state != STATE_INACTIVE && (now - m_last_interaction_time > 10000) && (m_debounced_state == HIGH)) {
-        if (m_state == STATE_MAIN || m_state == STATE_HARDWARE || m_state == STATE_DIAGS || m_state == STATE_SYSTEM || m_state == STATE_MODBUS_HEALTH || m_state == STATE_VIEW_ALARMS) {
+        if (m_state == STATE_MAIN || m_state == STATE_HARDWARE || m_state == STATE_DIAGS || m_state == STATE_SYSTEM || m_state == STATE_MODBUS_HEALTH || m_state == STATE_VIEW_ALARMS || m_state == STATE_IO_VIEW) {
             bool changed = (m_pending_serial_dest != configGetInt(KEY_SERIAL_DEST, 0)) ||
                           (m_pending_lights_en != configGetInt(KEY_STATUS_LIGHT_EN, 0)) ||
                           (m_pending_vfd_en != configGetInt(KEY_VFD_EN, 1));
@@ -155,10 +155,10 @@ void EngineeringMenu::nextOption() {
     } else if (m_state == STATE_HARDWARE) {
         m_selection = (m_selection + 1) % 4;
     } else if (m_state == STATE_DIAGS) {
-        m_selection = (m_selection + 1) % 5;
+        m_selection = (m_selection + 1) % 6;
     } else if (m_state == STATE_SYSTEM) {
         m_selection = (m_selection + 1) % 3;
-    } else if (m_state == STATE_MODBUS_HEALTH || m_state == STATE_VIEW_ALARMS) {
+    } else if (m_state == STATE_MODBUS_HEALTH || m_state == STATE_VIEW_ALARMS || m_state == STATE_IO_VIEW) {
         m_selection = 0; // Toggle only one button (BACK)
     } else if (m_state == STATE_CONFIRM_SAVE || m_state == STATE_CONFIRM_RESET) {
         m_selection = (m_selection == 0) ? 1 : 0;
@@ -230,12 +230,16 @@ void EngineeringMenu::selectOption() {
             m_state = STATE_MODBUS_HEALTH;
             m_selection = 0;
         }
-        else if (m_selection == 3) dumpDiagnostics();
-        else if (m_selection == 4) {
+        else if (m_selection == 3) {
+            m_state = STATE_IO_VIEW;
+            m_selection = 0;
+        }
+        else if (m_selection == 4) dumpDiagnostics();
+        else if (m_selection == 5) {
             m_state = STATE_MAIN;
             m_selection = 1;
         }
-    } else if (m_state == STATE_VIEW_ALARMS) {
+    } else if (m_state == STATE_VIEW_ALARMS || m_state == STATE_IO_VIEW) {
         m_state = STATE_DIAGS;
         m_selection = 0;
     } else if (m_state == STATE_MODBUS_HEALTH) {
@@ -341,10 +345,13 @@ void EngineeringMenu::refreshMenuLines() {
             setLine(3, "%c3.Modbus Health >>", (m_selection == 2 ? '>' : ' '));
         } else if (m_selection == 3) {
             setLine(2, " 3.Modbus Health >>");
-            setLine(3, "%c4.Diag Dump (Ser)", '>');
+            setLine(3, "%c4.Live I/O View >>", '>');
+        } else if (m_selection == 4) {
+            setLine(2, " 4.Live I/O View >>");
+            setLine(3, "%c5.Diag Dump (Ser)", '>');
         } else {
-            setLine(2, " 4.Diag Dump (Ser)");
-            setLine(3, "%c5.BACK", '>');
+            setLine(2, " 5.Diag Dump (Ser)");
+            setLine(3, "%c6.BACK", '>');
         }
     } else if (m_state == STATE_VIEW_ALARMS) {
         setLine(0, "== RECENT ALARMS ==");
@@ -362,6 +369,25 @@ void EngineeringMenu::refreshMenuLines() {
             }
         }
         setLine(3, "%cBACK", '>');
+    } else if (m_state == STATE_IO_VIEW) {
+        setLine(0, "== LIVE I/O VIEW ==");
+        
+        // Bits: 7 6 5 4 3 2 1 0
+        char in_bits[10], out1_bits[10], out2_bits[10];
+        uint8_t in = elboI73GetRawState();
+        uint8_t out1 = elboQ73GetRawState();
+        uint8_t out2 = elboQ73GetAuxRawState();
+        
+        for(int i=7; i>=0; i--) {
+            in_bits[7-i] = (in & (1<<i)) ? '1' : '0';
+            out1_bits[7-i] = (out1 & (1<<i)) ? '1' : '0';
+            out2_bits[7-i] = (out2 & (1<<i)) ? '1' : '0';
+        }
+        in_bits[8] = out1_bits[8] = out2_bits[8] = '\0';
+        
+        setLine(1, "IN (X):  %s", in_bits);
+        setLine(2, "OUT(Y1): %s", out1_bits);
+        setLine(3, "OUT(Y2): %s %cBACK", out2_bits, '>');
     } else if (m_state == STATE_MODBUS_HEALTH) {
         uint8_t count = 0;
         rs485_device_t** devices = rs485GetDevices(&count);

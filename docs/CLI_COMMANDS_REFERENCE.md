@@ -2326,6 +2326,7 @@ rs485 <subcommand>
 | `diag` | Full diagnostics |
 | `raw` | Send raw hex data or ASCII string |
 | `reset` | Reset device registry |
+| `sniff` | Real-time bus monitor |
 
 #### `rs485 sniff` - Real-Time Bus Monitor
 

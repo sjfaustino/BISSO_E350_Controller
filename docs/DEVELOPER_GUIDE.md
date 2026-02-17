@@ -777,6 +777,35 @@ The `EngineeringMenu` class inherits from `BaseMenu` and implements a hierarchic
 3.  Implement the action logic in `selectOption()`.
 4.  Define the layout in `refreshMenuLines()`.
 
+#### Real-time I/O View
+The `STATE_IO_VIEW` provides a live bitmask display of the I2C input and output expanders:
+- **IN (X)**: Shows the 8-bit state of the ADDR_I73_INPUT board.
+- **OUT (Y1)**: Shows the 8-bit state of the ADDR_Q73_OUTPUT board.
+- **OUT (Y2)**: Shows the 8-bit state of the ADDR_Q73_AUX board.
+
+#### LCD Menu Layout (v2.4)
+```text
+ENGINEER MENU (3x BOOT Click)
+├── 1. Hardware CTRL
+│   ├── 1. Serial: [USB/UART]
+│   ├── 2. Lights: [ON/OFF]
+│   ├── 3. VFD: [ON/OFF]
+│   └── 4. BACK
+├── 2. Diagnostics
+│   ├── 1. View Alarms (Fault Ring Buffer)
+│   ├── 2. LogLvl: [DEBUG/INFO]
+│   ├── 3. Modbus Health (Slave Poll Stats)
+│   ├── 4. Live I/O View (I2C Bitmasks)
+│   ├── 5. Diag Dump (Serial Trigger)
+│   └── 6. BACK
+├── 3. System Utils
+│   ├── 1. Reboot
+│   ├── 2. Factory Reset (NVS Erase)
+│   └── 3. BACK
+└── 4. EXIT
+    └── [EXIT / SAVE CHANGES?]
+```
+
 ---
 
 ## 13. Common Tasks
