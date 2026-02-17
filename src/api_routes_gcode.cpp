@@ -131,7 +131,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
             j["queued_time"] = (unsigned long)jobs[i].queued_time_ms;
             j["start_time"] = (unsigned long)jobs[i].start_time_ms;
             j["end_time"] = (unsigned long)jobs[i].end_time_ms;
-            if (jobs[i].status == JOB_FAILED) {
+            if (jobs[i].status == QJOB_FAILED) {
                 j["error"] = (const char*)jobs[i].error;
             }
         }

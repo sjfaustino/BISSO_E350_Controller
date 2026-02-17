@@ -57,6 +57,9 @@ static SemaphoreHandle_t safety_state_mutex = NULL;
 void safetyInit() {
   logModuleInit("SAFETY");
 
+  // PHASE 5.28: Cursor AI Audit - Initialize Safety FSM Mutex first
+  safetyFsmInit();
+
   // PHASE 5.7: Cursor AI Fix - Create mutex for thread-safe safety state
   safety_state_mutex = xSemaphoreCreateMutex();
   if (safety_state_mutex == NULL) {

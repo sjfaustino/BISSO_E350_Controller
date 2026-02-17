@@ -67,10 +67,24 @@ bool MotionBuffer::push_unsafe(float x, float y, float z, float a,
   if (count >= MOTION_BUFFER_SIZE)
     return false;
 
-  buffer[head].x_counts = (int32_t)(x * motionGetAxisScale(0));
-  buffer[head].y_counts = (int32_t)(y * motionGetAxisScale(1));
-  buffer[head].z_counts = (int32_t)(z * motionGetAxisScale(2));
-  buffer[head].a_counts = (int32_t)(a * motionGetAxisScale(3));
+  // PHASE 5.27: Position overflow protection
+  float sx = x * motionGetAxisScale(0);
+  float sy = y * motionGetAxisScale(1);
+  float sz = z * motionGetAxisScale(2);
+  float sa = a * motionGetAxisScale(3);
+
+  if (sx > 2147483647.0f || sx < -2147483648.0f ||
+      sy > 2147483647.0f || sy < -2147483648.0f ||
+      sz > 2147483647.0f || sz < -2147483648.0f ||
+      sa > 2147483647.0f || sa < -2147483648.0f) {
+      logError("[BUFFER] Position overflow: [%.2f, %.2f, %.2f, %.2f]", sx, sy, sz, sa);
+      return false;
+  }
+
+  buffer[head].x_counts = (int32_t)sx;
+  buffer[head].y_counts = (int32_t)sy;
+  buffer[head].z_counts = (int32_t)sz;
+  buffer[head].a_counts = (int32_t)sa;
   buffer[head].speed_mm_s = speed;
 
   head = (head + 1) % MOTION_BUFFER_SIZE;
@@ -142,9 +156,11 @@ bool MotionBuffer::push(float x, float y, float z, float a, float speed) {
 
   if (!xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
     static uint32_t last_log = 0;
-    if (millis() - last_log > 5000) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= last_log) ? (now - last_log) : (UINT32_MAX - last_log + now + 1);
+    if (elapsed > 5000) {
       logWarning("[BUFFER] Push timeout - buffer locked");
-      last_log = millis();
+      last_log = now;
     }
     return false;
   }
@@ -163,9 +179,11 @@ bool MotionBuffer::pop(motion_cmd_t *cmd) {
 
   if (!xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
     static uint32_t last_log = 0;
-    if (millis() - last_log > 5000) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= last_log) ? (now - last_log) : (UINT32_MAX - last_log + now + 1);
+    if (elapsed > 5000) {
       logWarning("[BUFFER] Pop timeout - buffer locked");
-      last_log = millis();
+      last_log = now;
     }
     return false;
   }
@@ -190,9 +208,11 @@ bool MotionBuffer::peek(motion_cmd_t *cmd) {
 
   if (!xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
     static uint32_t last_log = 0;
-    if (millis() - last_log > 5000) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= last_log) ? (now - last_log) : (UINT32_MAX - last_log + now + 1);
+    if (elapsed > 5000) {
       logWarning("[BUFFER] Peek timeout - buffer locked");
-      last_log = millis();
+      last_log = now;
     }
     return false;
   }
@@ -211,9 +231,11 @@ bool MotionBuffer::isFull() {
 
   if (!xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
     static uint32_t last_log = 0;
-    if (millis() - last_log > 5000) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= last_log) ? (now - last_log) : (UINT32_MAX - last_log + now + 1);
+    if (elapsed > 5000) {
       logWarning("[BUFFER] IsFull timeout - assuming full");
-      last_log = millis();
+      last_log = now;
     }
     return true; // Return safe default
   }
@@ -232,9 +254,11 @@ bool MotionBuffer::isEmpty() {
 
   if (!xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
     static uint32_t last_log = 0;
-    if (millis() - last_log > 5000) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= last_log) ? (now - last_log) : (UINT32_MAX - last_log + now + 1);
+    if (elapsed > 5000) {
       logWarning("[BUFFER] IsEmpty timeout - assuming empty");
-      last_log = millis();
+      last_log = now;
     }
     return true; // Return safe default
   }
@@ -280,9 +304,11 @@ int MotionBuffer::available() {
 
   if (!xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
     static uint32_t last_log = 0;
-    if (millis() - last_log > 5000) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= last_log) ? (now - last_log) : (UINT32_MAX - last_log + now + 1);
+    if (elapsed > 5000) {
       logWarning("[BUFFER] Available timeout - returning stale count");
-      last_log = millis();
+      last_log = now;
     }
     return count; // Return stale value
   }

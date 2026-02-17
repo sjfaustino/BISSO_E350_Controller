@@ -52,7 +52,11 @@ bool encoderReadFrameWithStats(uint8_t* data, uint8_t max_len, uint32_t timeout_
   uint8_t pos = 0;
   uint8_t frame_buf[64];
 
-  while (millis() - start < timeout_ms) {
+  while (true) {
+      uint32_t now = millis();
+      uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
+      if (elapsed >= timeout_ms) break;
+
       if (encoder_serial->available()) {
           uint8_t b = encoder_serial->read();
           if (pos == 0 && b != 0xFD) continue; 

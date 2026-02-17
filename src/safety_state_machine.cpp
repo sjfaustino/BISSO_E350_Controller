@@ -1,6 +1,7 @@
 #include "safety_state_machine.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
+#include "safety.h"
 
 // ============================================================================
 // STATE MACHINE DEFINITION
@@ -8,8 +9,21 @@
 
 // Internal state
 static safety_fsm_state_t current_safety_state = FSM_OK;
+static SemaphoreHandle_t safety_fsm_mutex = NULL;
+
+void safetyFsmInit() {
+    if (safety_fsm_mutex == NULL) {
+        safety_fsm_mutex = xSemaphoreCreateMutex();
+        if (safety_fsm_mutex) {
+            logInfo("[SAFETY_FSM] Mutex initialized");
+        } else {
+            logError("[SAFETY_FSM] Failed to create mutex!");
+        }
+    }
+}
 
 // Transition definition structure
+// ... (omitting transition table structure for brevity) ...
 struct SafetyTransition {
     safety_fsm_state_t from;
     safety_fsm_state_t to;
@@ -85,8 +99,24 @@ bool safetyIsValidStateTransition(safety_fsm_state_t current, safety_fsm_state_t
 }
 
 bool safetySetState(safety_fsm_state_t new_state) {
+    if (safety_fsm_mutex == NULL) {
+        // CRITICAL FALLBACK: If mutex is missing, force emergency stop via hardware pin immediately
+        // This should not happen if safetyFsmInit() was called during boot
+        digitalWrite(SAFETY_ALARM_PIN, HIGH);
+        logError("[SAFETY_FSM] CRITICAL: Mutex NULL in setState! Forcing hardware E-stop.");
+        return false;
+    }
+
+    if (!xSemaphoreTake(safety_fsm_mutex, pdMS_TO_TICKS(100))) {
+        logError("[SAFETY] Mutex timeout on setState");
+        return false;
+    }
+
     // 1. No change check
-    if (current_safety_state == new_state) return true;
+    if (current_safety_state == new_state) {
+        xSemaphoreGive(safety_fsm_mutex);
+        return true;
+    }
 
     // 2. Lookup Transition
     const SafetyTransition* trans = findTransition(current_safety_state, new_state);
@@ -96,12 +126,15 @@ bool safetySetState(safety_fsm_state_t new_state) {
         logError("[SAFETY] Invalid FSM transition: %s -> %s", 
             safetyStateToString(current_safety_state), safetyStateToString(new_state));
         faultLogError(FAULT_BOOT_FAILED, "Invalid safety FSM transition attempt");
+        xSemaphoreGive(safety_fsm_mutex);
         return false;
     }
 
     // 4. Execute Transition
     safety_fsm_state_t previous = current_safety_state;
     current_safety_state = new_state;
+
+    xSemaphoreGive(safety_fsm_mutex);
 
     // 5. Log
     logInfo("[SAFETY] FSM: %s -> %s (%s)", 
@@ -124,5 +157,12 @@ bool safetySetState(safety_fsm_state_t new_state) {
 }
 
 safety_fsm_state_t safetyGetState() {
-  return current_safety_state;
+  if (safety_fsm_mutex == NULL) return FSM_OK;
+
+  safety_fsm_state_t state = FSM_OK;
+  if (xSemaphoreTake(safety_fsm_mutex, pdMS_TO_TICKS(50))) {
+      state = current_safety_state;
+      xSemaphoreGive(safety_fsm_mutex);
+  }
+  return state;
 }

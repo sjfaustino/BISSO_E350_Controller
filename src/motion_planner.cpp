@@ -103,7 +103,8 @@ bool MotionPlanner::checkLookAhead(Axis *axis, uint8_t active_axis,
     else if (active_axis == 3)
       next_target_counts = nextCmd.a_counts;
 
-    if (abs(next_target_counts - axis->target_position) < 10)
+    int32_t blend_threshold = configGetInt(KEY_MOTION_BLEND_THRESHOLD, 10);
+    if (abs(next_target_counts - axis->target_position) < blend_threshold)
       return false;
 
     bool current_dir = (axis->target_position > active_start_pos);

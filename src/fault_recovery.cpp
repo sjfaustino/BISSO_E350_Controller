@@ -76,9 +76,9 @@ bool faultRecoveryAttempt(fault_type_t fault_type) {
 
     // Implement exponential backoff
     if (recovery->last_recovery_ms > 0) {
-        uint32_t time_since_last = now - recovery->last_recovery_ms;
-        if (time_since_last < recovery->backoff_delay_ms) {
-            logInfo("[FAULT_RECOVERY] Backoff delay: waiting %lu ms", (unsigned long)(recovery->backoff_delay_ms - time_since_last));
+        uint32_t elapsed = (now >= recovery->last_recovery_ms) ? (now - recovery->last_recovery_ms) : (UINT32_MAX - recovery->last_recovery_ms + now + 1);
+        if (elapsed < recovery->backoff_delay_ms) {
+            logInfo("[FAULT_RECOVERY] Backoff delay: waiting %lu ms", (unsigned long)(recovery->backoff_delay_ms - elapsed));
             return false;
         }
     }

@@ -47,6 +47,13 @@ bool safe_strcpy(char* dest, size_t dest_size, const char* src) {
 
 bool safe_strcat(char* dest, size_t dest_size, const char* src) {
   if (!dest || !src || dest_size == 0) return false;
+  
+  // CRITICAL: Ensure destination buffer already contains a valid C-string
+  if (!safe_is_valid_string(dest, dest_size)) {
+    logError("[SAFETY] dest not null-terminated in safe_strcat");
+    return false;
+  }
+
   size_t dest_len = strlen(dest);
   size_t src_len = strlen(src);
 

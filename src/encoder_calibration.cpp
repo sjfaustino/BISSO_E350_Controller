@@ -28,9 +28,11 @@ void encoderCalibrationInit() {
 
 void encoderCalibrationUpdate() {
   if (calib_state != CALIBRATION_IN_PROGRESS) return;
-  if (millis() - calib_start_time > ENCODER_CALIBRATION_TIMEOUT_MS) {
+  uint32_t now = millis();
+  uint32_t elapsed = (now >= calib_start_time) ? (now - calib_start_time) : (UINT32_MAX - calib_start_time + now + 1);
+  if (elapsed > ENCODER_CALIBRATION_TIMEOUT_MS) {
     calib_state = CALIBRATION_ERROR;
-    logError("[CALIB] Timeout");
+    logError("[CALIB] Timeout after %lu ms", (unsigned long)elapsed);
     calibrating_axis = 255;
   }
 }
@@ -60,13 +62,15 @@ bool encoderCalibrationFinalize(uint8_t axis) {
     return false;
   }
   
-  int32_t distance_counts = calib_data[axis].end_position - calib_data[axis].start_position;
+  // PHASE 5.25: Overflow-safe distance calculation
+  int64_t distance_counts = (int64_t)calib_data[axis].end_position - (int64_t)calib_data[axis].start_position;
   if (distance_counts == 0) {
     logError("[CALIB] No motion detected");
     return false;
   }
   
-  double scale_factor = (double)distance_counts / calib_data[axis].manual_distance_mm;
+  // Use absolute value for PPM calculation if necessary, but here we expect positive or negative move
+  double scale_factor = (double)fabs((double)distance_counts) / calib_data[axis].manual_distance_mm;
   calib_data[axis].pulses_per_mm = scale_factor;
   calib_data[axis].is_valid = true;
   calib_data[axis].last_calibrated = millis();

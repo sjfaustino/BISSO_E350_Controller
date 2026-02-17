@@ -126,3 +126,63 @@ When ready to proceed, the implementation steps are:
 ## Performance Impact
 - **Server**: Negligible. Static file serving matches existing pattern.
 - **Client**: Minimal. One extra HTTP request (cached) for the JSON file. String replacement happens instantly on modern browsers.
+
+---
+
+## Accessibility & Visual Indicators
+
+To ensure the Web UI is usable for all operators and provides clear feedback on hardware states, we follow these standards:
+
+### 1. Hardware Presence Status (N/A)
+When a hardware component (spindle, VFD, DRO) is not connected or disabled in configuration, the UI must dynamically reflect this state.
+
+- **Standard**: Append a red `(N/A)` label to the card title or header.
+- **Backend Bindings**:
+    - `plc_hardware_present`: Controls I/O Bank (Dashboard/Inputs).
+    - `vfd.connected`: Controls Spindle and VFD Metrics.
+    - `dro_connected`: Controls Position (DRO) and Axis Quality.
+- **Implementation (Example)**:
+  ```javascript
+  // In dashboard.js - handleStatusUpdate()
+  const appendNA = (id, present) => {
+      const el = document.getElementById(id);
+      if (!present && !el.innerHTML.includes('(N/A)')) {
+          el.innerHTML += ' <span class="na-label">(N/A)</span>';
+      } else if (present) {
+          el.innerHTML = el.innerHTML.replace(' <span class="na-label">(N/A)</span>', '');
+      }
+  };
+
+  appendNA('spindle-card-title', status.vfd_connected);
+  appendNA('dro-card-title', status.dro_connected);
+  ```
+
+### 2. Form Accessibility (Labels)
+All interactive elements (checkboxes, inputs) must be linked to their descriptive text using the `for` attribute. This is critical for screen readers and improves the click-target area for touch screens.
+
+- **Standard**: Use `<label for="id">` for all inputs.
+- **Example**:
+  ```html
+  <div class="setting-row">
+      <label for="lcd_en" data-i18n="settings.lcd_en">Enable LCD</label>
+      <input type="checkbox" id="lcd_en">
+  </div>
+  ```
+
+### 3. Localization of Dynamic Strings
+Strings generated in JavaScript (e.g., alert messages, position labels) must use the `i18n.t()` helper.
+
+- **Standard**: Do not hardcode user-facing strings in `.js` files.
+- **Example**:
+  ```javascript
+  AlertManager.error(i18n.t('alarms.e_stop_active'));
+  ```
+
+---
+
+## Revision History
+
+| Date | Changes |
+|------|---------|
+| 2026-02-15 | Audit: Added (N/A) indicator guidelines, relative path support, and new CLI commands |
+| 2026-01-28 | Initial I18n Strategy document |

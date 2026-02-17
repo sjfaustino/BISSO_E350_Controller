@@ -192,7 +192,7 @@ wdt_status_t watchdogGetStatus() {
   
   uint32_t now = millis();
   for (int i = 0; i < wdt_task_count; i++) {
-    uint32_t time_since_feed = now - wdt_task_table[i].last_tick;
+    uint32_t time_since_feed = (now >= wdt_task_table[i].last_tick) ? (now - wdt_task_table[i].last_tick) : (UINT32_MAX - wdt_task_table[i].last_tick + now + 1);
     
     if (time_since_feed > (WATCHDOG_TIMEOUT_SEC * 1000 / 2)) {
       if (!wdt_task_table[i].fed_this_cycle) {
@@ -251,7 +251,7 @@ void watchdogShowTasks() {
   
   uint32_t now = millis();
   for (int i = 0; i < wdt_task_count; i++) {
-    uint32_t age = now - wdt_task_table[i].last_tick;
+    uint32_t age = (now >= wdt_task_table[i].last_tick) ? (now - wdt_task_table[i].last_tick) : (UINT32_MAX - wdt_task_table[i].last_tick + now + 1);
     
     const char* status_str = "[FAIL]";
     if (age < (WATCHDOG_TIMEOUT_SEC * 1000 / 2)) status_str = "[OK]";
@@ -288,7 +288,7 @@ bool watchdogIsTaskAlive(const char* task_name) {
   uint32_t now = millis();
   for (int i = 0; i < wdt_task_count; i++) {
     if (strcmp(wdt_task_table[i].task_name, task_name) == 0) {
-      uint32_t time_since_feed = now - wdt_task_table[i].last_tick;
+      uint32_t time_since_feed = (now >= wdt_task_table[i].last_tick) ? (now - wdt_task_table[i].last_tick) : (UINT32_MAX - wdt_task_table[i].last_tick + now + 1);
       // Task is alive if it fed within half the timeout period
       return (time_since_feed < (WATCHDOG_TIMEOUT_SEC * 1000 / 2));
     }
@@ -356,7 +356,11 @@ void watchdogResume() {
 
 void watchdogDelay(uint32_t ms) {
   uint32_t start = millis();
-  while (millis() - start < ms) {
+  while (true) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
+    if (elapsed >= ms) break;
+
     if (wdt_enabled && wdt_pause_count == 0) esp_task_wdt_reset();
     delay(10);
   }

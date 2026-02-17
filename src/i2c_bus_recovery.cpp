@@ -210,7 +210,14 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t *data,
 
 i2c_result_t i2cWriteWithRetry(uint8_t address, const uint8_t *data,
                                uint8_t len) {
-  uint8_t buffer[len];
+  // PHASE 5.26: Stack safety - Replace VLA with fixed buffer
+  // Most I2C transactions in this system are < 8 bytes (PLC, LCD, RTC)
+  const uint8_t I2C_MAX_WRITE_LEN = 32;
+  if (len > I2C_MAX_WRITE_LEN) {
+    logError("[I2C] Write too large: %d > %d", len, I2C_MAX_WRITE_LEN);
+    return I2C_RESULT_BUS_ERROR;
+  }
+  uint8_t buffer[I2C_MAX_WRITE_LEN];
   memcpy(buffer, data, len);
   return i2cTransactionWithRetry(address, buffer, len, false);
 }

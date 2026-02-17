@@ -302,9 +302,20 @@ void cliUpdate() {
         }
       }
     } else if (c == '\t') {
-      // C4: TAB COMPLETION
+      // C4: TAB COMPLETION / HISTORY RECALL
       last_was_eol = false;
-      if (cli_pos > 0) {
+      
+      // FEATURE: If buffer is empty, TAB recalls last command
+      if (cli_pos == 0 && strlen(history_buffer) > 0) {
+          strcpy(cli_buffer, history_buffer);
+          cli_pos = strlen(cli_buffer);
+          if (cli_echo_enabled) {
+              if (serialLoggerLock()) {
+                  CLI_SERIAL.print(cli_buffer);
+                  serialLoggerUnlock();
+              }
+          }
+      } else if (cli_pos > 0) {
         cli_buffer[cli_pos] = '\0';
         
         // Find matching commands
@@ -593,7 +604,7 @@ void cmd_help(int argc, char** argv) { cliPrintHelp(); }
 
 void cmd_echo(int argc, char** argv) {
   if (argc < 2) {
-    logInfo("Echo is currently %s", cli_echo_enabled ? "ON" : "OFF");
+    logPrintf("Echo is currently %s\n", cli_echo_enabled ? "ON" : "OFF");
     CLI_USAGE("echo", "[on|off] [save]");
     return;
   }
@@ -617,9 +628,9 @@ void cmd_echo(int argc, char** argv) {
   if (save_to_nvs) {
     configSetInt(KEY_CLI_ECHO, cli_echo_enabled ? 1 : 0);
     configUnifiedSave();
-    logInfo("Echo %s (saved to NVS)", cli_echo_enabled ? "ENABLED" : "DISABLED");
+    logPrintf("Echo %s (saved to NVS)\n", cli_echo_enabled ? "ENABLED" : "DISABLED");
   } else {
-    logInfo("Echo %s", cli_echo_enabled ? "ENABLED" : "DISABLED");
+    logPrintf("Echo %s\n", cli_echo_enabled ? "ENABLED" : "DISABLED");
   }
 }
 
@@ -633,20 +644,33 @@ bool cliDispatchSubcommand(const char* prefix, int argc, char** argv,
 
     // Check if argument exists
     if (argc <= arg_index) {
+        // Build help output in a single buffer to prevent interleaving
+        char* buf = (char*)psramMalloc(2048);
+        if (!buf) return false;
+        int pos = 0;
+
         if (has_prefix) {
-            logPrintf("%s Usage: %s [", prefix, argv[0]);
+            pos += snprintf(buf + pos, 2048 - pos, "%s Usage: %s [", prefix, argv[0]);
         } else {
-            logPrintf("Usage: %s [", argv[0]);
+            pos += snprintf(buf + pos, 2048 - pos, "Usage: %s [", argv[0]);
         }
+
         for (size_t i = 0; i < table_size; i++) {
-            logPrintf("%s%s", table[i].name, (i < table_size - 1) ? " | " : "");
+            pos += snprintf(buf + pos, 2048 - pos, "%s%s", table[i].name, (i < table_size - 1) ? " | " : "");
         }
-        logPrintln("]");
+        pos += snprintf(buf + pos, 2048 - pos, "]\r\n");
         
         // Print available subcommands with help
         for (size_t i = 0; i < table_size; i++) {
-            logPrintf("  %-12s %s\n", table[i].name, table[i].help);
+            pos += snprintf(buf + pos, 2048 - pos, "  %-12s %s\r\n", table[i].name, table[i].help);
         }
+
+        if (serialLoggerLock()) {
+            Serial.print(buf);
+            Serial.flush();
+            serialLoggerUnlock();
+        }
+        psramFree(buf);
         return false;
     }
     
@@ -660,9 +684,9 @@ bool cliDispatchSubcommand(const char* prefix, int argc, char** argv,
     
     // Not found
     if (has_prefix) {
-        logWarning("%s Unknown subcommand: %s", prefix, argv[arg_index]);
+        logPrintf("%s Unknown subcommand: %s\n", prefix, argv[arg_index]);
     } else {
-        logWarning("Unknown subcommand: %s", argv[arg_index]);
+        logPrintf("Unknown subcommand: %s\n", argv[arg_index]);
     }
     return false;
 }
@@ -715,5 +739,5 @@ void cliPrintTableRow(const char* c1, const char* c2, const char* c3,
     if (w5 > 0) pos += snprintf(line + pos, sizeof(line) - pos, "| %-*s ", w5, c5 ? c5 : "");
     pos += snprintf(line + pos, sizeof(line) - pos, "|");
     
-    logDirectPrintln(line);
+    logDirectPrintln("%s", line);
 }

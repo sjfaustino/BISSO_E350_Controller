@@ -24,7 +24,13 @@ static bool queue_paused = false;    // Paused due to error
 // Spinlock for thread safety
 static portMUX_TYPE queueSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
+// Helper to safely calculate ring buffer index relative to the head
+static uint16_t queueIndex(uint16_t offset_from_oldest) {
+    return (job_head - job_count + offset_from_oldest + GCODE_QUEUE_MAX_JOBS) % GCODE_QUEUE_MAX_JOBS;
+}
+
 void gcodeQueueInit() {
+    // ...
     // CRITICAL: Allocate jobs array in PSRAM for ESP32-S3
     if (jobs == nullptr) {
         jobs = (gcode_job_t*)psramCalloc(GCODE_QUEUE_MAX_JOBS, sizeof(gcode_job_t));
@@ -70,7 +76,7 @@ uint16_t gcodeQueueAdd(const char* command) {
     job->start_pos[3] = motionGetPositionMM(3);
     
     job->queued_time_ms = millis();
-    job->status = JOB_PENDING;
+    job->status = QJOB_PENDING;
     
     uint16_t id = job->id;
     
@@ -84,22 +90,27 @@ uint16_t gcodeQueueAdd(const char* command) {
     return id;
 }
 
-gcode_job_t* gcodeQueueGetCurrent() {
-    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return nullptr;
-    return &jobs[current_job_idx];
+bool gcodeQueueGetCurrent(gcode_job_t* out_job) {
+    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS || !out_job) return false;
+    portENTER_CRITICAL(&queueSpinlock);
+    memcpy(out_job, &jobs[current_job_idx], sizeof(gcode_job_t));
+    portEXIT_CRITICAL(&queueSpinlock);
+    return true;
 }
 
-gcode_job_t* gcodeQueueGetJob(uint16_t id) {
+bool gcodeQueueGetJob(uint16_t id, gcode_job_t* out_job) {
+    if (!out_job) return false;
     portENTER_CRITICAL(&queueSpinlock);
     for (uint16_t i = 0; i < job_count; i++) {
-        uint16_t idx = (job_head - 1 - i + GCODE_QUEUE_MAX_JOBS) % GCODE_QUEUE_MAX_JOBS;
+        uint16_t idx = queueIndex(i);
         if (jobs[idx].id == id) {
+            memcpy(out_job, &jobs[idx], sizeof(gcode_job_t));
             portEXIT_CRITICAL(&queueSpinlock);
-            return &jobs[idx];
+            return true;
         }
     }
     portEXIT_CRITICAL(&queueSpinlock);
-    return nullptr;
+    return false;
 }
 
 gcode_queue_state_t gcodeQueueGetState() {
@@ -110,14 +121,14 @@ gcode_queue_state_t gcodeQueueGetState() {
     state.paused = queue_paused;
     
     for (uint16_t i = 0; i < job_count; i++) {
-        uint16_t idx = (job_head - 1 - i + GCODE_QUEUE_MAX_JOBS) % GCODE_QUEUE_MAX_JOBS;
+        uint16_t idx = queueIndex(i);
         switch (jobs[idx].status) {
-            case JOB_PENDING: state.pending_count++; break;
-            case JOB_RUNNING: 
+            case QJOB_PENDING: state.pending_count++; break;
+            case QJOB_RUNNING: 
                 state.current_job_id = jobs[idx].id; 
                 break;
-            case JOB_COMPLETED: state.completed_count++; break;
-            case JOB_FAILED: state.failed_count++; break;
+            case QJOB_COMPLETED: state.completed_count++; break;
+            case QJOB_FAILED: state.failed_count++; break;
             default: break;
         }
     }
@@ -130,9 +141,9 @@ uint16_t gcodeQueueGetAll(gcode_job_t* out_jobs, uint16_t max_count) {
     portENTER_CRITICAL(&queueSpinlock);
     uint16_t count = (job_count < max_count) ? job_count : max_count;
     
-    // Copy jobs in reverse order (newest first)
+    // Copy jobs in newest-first order
     for (uint16_t i = 0; i < count; i++) {
-        uint16_t idx = (job_head - 1 - i + GCODE_QUEUE_MAX_JOBS) % GCODE_QUEUE_MAX_JOBS;
+        uint16_t idx = queueIndex(job_count - 1 - i);
         memcpy(&out_jobs[i], &jobs[idx], sizeof(gcode_job_t));
     }
     portEXIT_CRITICAL(&queueSpinlock);
@@ -144,9 +155,9 @@ void gcodeQueueMarkRunning() {
     // Find next pending job and mark it running
     portENTER_CRITICAL(&queueSpinlock);
     for (uint16_t i = 0; i < job_count; i++) {
-        uint16_t idx = (job_head - job_count + i + GCODE_QUEUE_MAX_JOBS) % GCODE_QUEUE_MAX_JOBS;
-        if (jobs[idx].status == JOB_PENDING) {
-            jobs[idx].status = JOB_RUNNING;
+        uint16_t idx = queueIndex(i);
+        if (jobs[idx].status == QJOB_PENDING) {
+            jobs[idx].status = QJOB_RUNNING;
             jobs[idx].start_time_ms = millis();
             current_job_idx = idx;
             portEXIT_CRITICAL(&queueSpinlock);
@@ -162,7 +173,7 @@ void gcodeQueueMarkCompleted() {
     if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return;
     
     portENTER_CRITICAL(&queueSpinlock);
-    jobs[current_job_idx].status = JOB_COMPLETED;
+    jobs[current_job_idx].status = QJOB_COMPLETED;
     jobs[current_job_idx].end_time_ms = millis();
     uint16_t id = jobs[current_job_idx].id;
     current_job_idx = UINT16_MAX;
@@ -175,7 +186,7 @@ void gcodeQueueMarkFailed(const char* error) {
     if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return;
     
     portENTER_CRITICAL(&queueSpinlock);
-    jobs[current_job_idx].status = JOB_FAILED;
+    jobs[current_job_idx].status = QJOB_FAILED;
     jobs[current_job_idx].end_time_ms = millis();
     if (error) {
         strncpy(jobs[current_job_idx].error, error, GCODE_ERR_MAX_LEN - 1);
@@ -192,7 +203,7 @@ bool gcodeQueueRetry() {
     if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return false;
     
     gcode_job_t* job = &jobs[current_job_idx];
-    if (job->status != JOB_FAILED) return false;
+    if (job->status != QJOB_FAILED) return false;
     
     // Move back to starting position
     logInfo("[QUEUE] Retrying job #%d - moving to start position", job->id);
@@ -207,7 +218,7 @@ bool gcodeQueueRetry() {
     
     // Reset job status and retry
     portENTER_CRITICAL(&queueSpinlock);
-    job->status = JOB_PENDING;
+    job->status = QJOB_PENDING;
     job->error[0] = '\0';
     queue_paused = false;
     portEXIT_CRITICAL(&queueSpinlock);
@@ -219,13 +230,13 @@ bool gcodeQueueResume() {
     if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return false;
     
     gcode_job_t* job = &jobs[current_job_idx];
-    if (job->status != JOB_FAILED) return false;
+    if (job->status != QJOB_FAILED) return false;
     
     logInfo("[QUEUE] Resuming queue from current position");
     
     // Mark current job as completed (operator says it's fine)
     portENTER_CRITICAL(&queueSpinlock);
-    job->status = JOB_COMPLETED;
+    job->status = QJOB_COMPLETED;
     job->end_time_ms = millis();
     queue_paused = false;
     current_job_idx = UINT16_MAX;
@@ -238,12 +249,12 @@ bool gcodeQueueSkip() {
     if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return false;
     
     gcode_job_t* job = &jobs[current_job_idx];
-    if (job->status != JOB_FAILED) return false;
+    if (job->status != QJOB_FAILED) return false;
     
     logInfo("[QUEUE] Skipping job #%d", job->id);
     
     portENTER_CRITICAL(&queueSpinlock);
-    job->status = JOB_SKIPPED;
+    job->status = QJOB_SKIPPED;
     job->end_time_ms = millis();
     queue_paused = false;
     current_job_idx = UINT16_MAX;

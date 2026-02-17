@@ -35,6 +35,34 @@ static const config_descriptor_t config_schema[] = {
         .unit = NULL,
         .critical = false
     },
+    {
+        .key = KEY_WIFI_AP_EN,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 0,
+        .int_max = 1,
+        .default_value = "1",
+        .description = "WiFi AP Mode Enable (1=on, 0=off)",
+        .unit = "bool",
+        .critical = false
+    },
+    {
+        .key = KEY_WIFI_AP_SSID,
+        .type = CONFIG_TYPE_STRING,
+        .string_max_len = 32,
+        .default_value = "BISSO-E350-Setup",
+        .description = "WiFi AP network name",
+        .unit = NULL,
+        .critical = false
+    },
+    {
+        .key = KEY_WIFI_AP_PASS,
+        .type = CONFIG_TYPE_STRING,
+        .string_max_len = 64,
+        .default_value = "password",
+        .description = "WiFi AP password",
+        .unit = NULL,
+        .critical = false
+    },
 
     // === WEB SERVER ===
     {
@@ -66,206 +94,214 @@ static const config_descriptor_t config_schema[] = {
         .critical = false
     },
 
-    // === MOTION ===
+    // === MOTION (ENCODER RESOLUTION) ===
     {
-        .key = "motion_x_steps_per_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = 10.0f,
-        .float_max = 1000.0f,
-        .default_value = "100.0",
+        .key = KEY_PPM_X,
+        .type = CONFIG_TYPE_INT, // Note: Code uses int32 for these
+        .int_min = 10,
+        .int_max = 200000,
+        .default_value = "100",
         .description = "X-axis encoder pulses per millimeter",
         .unit = "pulses/mm",
         .critical = true
     },
     {
-        .key = "motion_y_steps_per_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = 10.0f,
-        .float_max = 1000.0f,
-        .default_value = "100.0",
+        .key = KEY_PPM_Y,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 10,
+        .int_max = 200000,
+        .default_value = "100",
         .description = "Y-axis encoder pulses per millimeter",
         .unit = "pulses/mm",
         .critical = true
     },
     {
-        .key = "motion_z_steps_per_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = 10.0f,
-        .float_max = 1000.0f,
-        .default_value = "100.0",
+        .key = KEY_PPM_Z,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 10,
+        .int_max = 200000,
+        .default_value = "100",
         .description = "Z-axis encoder pulses per millimeter",
         .unit = "pulses/mm",
         .critical = true
     },
     {
-        .key = "motion_a_steps_per_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = 10.0f,
-        .float_max = 1000.0f,
-        .default_value = "100.0",
-        .description = "A-axis encoder pulses per degree (or mm for linear)",
-        .unit = "pulses/unit",
+        .key = KEY_PPM_A,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 10,
+        .int_max = 200000,
+        .default_value = "100",
+        .description = "A-axis encoder pulses per degree",
+        .unit = "pulses/deg",
         .critical = true
     },
+    
+    // === MOTION BEHAVIOR ===
     {
-        .key = "motion_max_speed",
+        .key = KEY_DEFAULT_SPEED,
         .type = CONFIG_TYPE_FLOAT,
         .float_min = 1.0f,
         .float_max = 500.0f,
         .default_value = "100.0",
-        .description = "Maximum motion speed",
+        .description = "Default motion speed",
         .unit = "mm/min",
         .critical = false
     },
     {
-        .key = "motion_accel",
+        .key = KEY_DEFAULT_ACCEL,
         .type = CONFIG_TYPE_FLOAT,
         .float_min = 1.0f,
         .float_max = 1000.0f,
         .default_value = "50.0",
-        .description = "Motion acceleration",
+        .description = "Default motion acceleration",
         .unit = "mm/sec²",
         .critical = false
     },
-
-    // === SPINDLE ===
     {
-        .key = "spindle_jxk10_address",
+        .key = KEY_MOTION_STRICT_LIMITS,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 0,
+        .int_max = 1,
+        .default_value = "1",
+        .description = "Strict soft limits (1=stop immediately)",
+        .unit = "bool",
+        .critical = true
+    },
+
+    // === VFD (ALTIVAR31) ===
+    {
+        .key = KEY_VFD_EN,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 0,
+        .int_max = 1,
+        .default_value = "1",
+        .description = "Enable VFD Communication (1=on, 0=off)",
+        .unit = "bool",
+        .critical = true
+    },
+    {
+        .key = KEY_VFD_ADDR,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 1,
+        .int_max = 247,
+        .default_value = "2",
+        .description = "VFD Modbus Address",
+        .unit = "addr",
+        .critical = true
+    },
+
+    // === SPINDLE MONITOR (JXK-10) ===
+    {
+        .key = KEY_JXK10_ENABLED,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 0,
+        .int_max = 1,
+        .default_value = "1",
+        .description = "Enable JXK-10 Current Sensor (1=on, 0=off)",
+        .unit = "bool",
+        .critical = true
+    },
+    {
+        .key = KEY_JXK10_ADDR,
         .type = CONFIG_TYPE_INT,
         .int_min = 1,
         .int_max = 247,
         .default_value = "1",
-        .description = "Modbus address of JXK-10 spindle monitor",
-        .unit = "address",
+        .description = "JXK-10 Modbus Address",
+        .unit = "addr",
         .critical = true
     },
     {
-        .key = "spindle_jxk10_baud",
-        .type = CONFIG_TYPE_INT,
-        .int_min = 9600,
-        .int_max = 115200,
-        .default_value = "19200",
-        .description = "Modbus serial baud rate",
-        .unit = "bps",
-        .critical = true
-    },
-    {
-        .key = "spindle_overcurrent_threshold_a",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = 1.0f,
-        .float_max = 50.0f,
-        .default_value = "20.0",
+        .key = KEY_SPINDLE_THRESHOLD,
+        .type = CONFIG_TYPE_INT, // Code uses int
+        .int_min = 1,
+        .int_max = 50,
+        .default_value = "30",
         .description = "Spindle overcurrent alarm threshold",
         .unit = "A",
         .critical = true
     },
 
+    // === TACHOMETER (YH-TC05) ===
+    {
+        .key = KEY_YHTC05_ENABLED,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 0,
+        .int_max = 1,
+        .default_value = "0", // Default disabled for now to avoid bus spam
+        .description = "Enable Tachometer (1=on, 0=off)",
+        .unit = "bool",
+        .critical = true
+    },
+    {
+        .key = KEY_YHTC05_ADDR,
+        .type = CONFIG_TYPE_INT,
+        .int_min = 1,
+        .int_max = 247,
+        .default_value = "3",
+        .description = "Tachometer Modbus Address",
+        .unit = "addr",
+        .critical = true
+    },
+
     // === SAFETY ===
     {
-        .key = "safety_stall_check_interval_ms",
+        .key = KEY_STALL_TIMEOUT,
         .type = CONFIG_TYPE_INT,
-        .int_min = 10,
-        .int_max = 1000,
-        .default_value = "100",
-        .description = "How often to check for motor stalls",
+        .int_min = 100,
+        .int_max = 10000,
+        .default_value = "2000",
+        .description = "Stall detection timeout",
         .unit = "ms",
         .critical = false
     },
     {
-        .key = "safety_timeout_motion_ms",
+        .key = KEY_ENC_DEV_TIMEOUT,
         .type = CONFIG_TYPE_INT,
         .int_min = 100,
-        .int_max = 60000,
+        .int_max = 10000,
         .default_value = "5000",
-        .description = "Maximum time for motion command",
+        .description = "Encoder deviation timeout",
         .unit = "ms",
         .critical = false
     },
 
     // === LIMITS ===
     {
-        .key = "motion_limit_x_min_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = -1000.0f,
-        .float_max = 0.0f,
-        .default_value = "-200.0",
-        .description = "X-axis minimum position limit",
-        .unit = "mm",
+        .key = KEY_X_LIMIT_MIN,
+        .type = CONFIG_TYPE_INT, 
+        .int_min = -1000000,
+        .int_max = 0,
+        .default_value = "-500000",
+        .description = "X-axis min limit",
+        .unit = "int",
         .critical = true
     },
     {
-        .key = "motion_limit_x_max_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = 0.0f,
-        .float_max = 1000.0f,
-        .default_value = "200.0",
-        .description = "X-axis maximum position limit",
-        .unit = "mm",
-        .critical = true
-    },
-    {
-        .key = "motion_limit_y_min_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = -1000.0f,
-        .float_max = 0.0f,
-        .default_value = "-200.0",
-        .description = "Y-axis minimum position limit",
-        .unit = "mm",
-        .critical = true
-    },
-    {
-        .key = "motion_limit_y_max_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = 0.0f,
-        .float_max = 1000.0f,
-        .default_value = "200.0",
-        .description = "Y-axis maximum position limit",
-        .unit = "mm",
-        .critical = true
-    },
-    {
-        .key = "motion_limit_z_min_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = -1000.0f,
-        .float_max = 0.0f,
-        .default_value = "-100.0",
-        .description = "Z-axis minimum position limit",
-        .unit = "mm",
-        .critical = true
-    },
-    {
-        .key = "motion_limit_z_max_mm",
-        .type = CONFIG_TYPE_FLOAT,
-        .float_min = 0.0f,
-        .float_max = 1000.0f,
-        .default_value = "100.0",
-        .description = "Z-axis maximum position limit",
-        .unit = "mm",
-        .critical = true
-    },
-
-    // === API ===
-    {
-        .key = "api_rate_limit_requests",
+        .key = KEY_X_LIMIT_MAX,
         .type = CONFIG_TYPE_INT,
-        .int_min = 10,
-        .int_max = 1000,
-        .default_value = "50",
-        .description = "API rate limit (requests per window)",
-        .unit = "requests",
-        .critical = false
+        .int_min = 0,
+        .int_max = 1000000,
+        .default_value = "500000",
+        .description = "X-axis max limit",
+        .unit = "int",
+        .critical = true
+    },
+    // Y Axis
+    {
+        .key = KEY_Y_LIMIT_MIN, .type = CONFIG_TYPE_INT, .int_min = -1000000, .int_max = 0, .default_value = "-500000", .description = "Y min limit", .unit = "int", .critical = true
     },
     {
-        .key = "api_rate_limit_window_ms",
-        .type = CONFIG_TYPE_INT,
-        .int_min = 1000,
-        .int_max = 60000,
-        .default_value = "60000",
-        .description = "API rate limit time window",
-        .unit = "ms",
-        .critical = false
+        .key = KEY_Y_LIMIT_MAX, .type = CONFIG_TYPE_INT, .int_min = 0, .int_max = 1000000, .default_value = "500000", .description = "Y max limit", .unit = "int", .critical = true
     },
-
+    // Z Axis
+    {
+        .key = KEY_Z_LIMIT_MIN, .type = CONFIG_TYPE_INT, .int_min = -1000000, .int_max = 0, .default_value = "-100000", .description = "Z min limit", .unit = "int", .critical = true
+    },
+    {
+        .key = KEY_Z_LIMIT_MAX, .type = CONFIG_TYPE_INT, .int_min = 0, .int_max = 1000000, .default_value = "100000", .description = "Z max limit", .unit = "int", .critical = true
+    },
+    
     // === SYSTEM ===
     {
         .key = "system_log_level",
@@ -278,7 +314,7 @@ static const config_descriptor_t config_schema[] = {
         .critical = false
     },
     {
-        .key = "status_light_en",
+        .key = KEY_STATUS_LIGHT_EN,
         .type = CONFIG_TYPE_INT,
         .int_min = 0,
         .int_max = 1,
@@ -288,7 +324,7 @@ static const config_descriptor_t config_schema[] = {
         .critical = false
     },
     {
-        .key = "buzzer_en",
+        .key = KEY_BUZZER_EN,
         .type = CONFIG_TYPE_INT,
         .int_min = 0,
         .int_max = 1,
@@ -298,7 +334,7 @@ static const config_descriptor_t config_schema[] = {
         .critical = false
     },
     {
-        .key = "lcd_en",
+        .key = KEY_LCD_EN,
         .type = CONFIG_TYPE_INT,
         .int_min = 0,
         .int_max = 1,
@@ -307,56 +343,37 @@ static const config_descriptor_t config_schema[] = {
         .unit = "bool",
         .critical = false
     },
-    {
-        .key = "status_light_green",
-        .type = CONFIG_TYPE_INT,
-        .int_min = 1,
-        .int_max = 16,
-        .default_value = "13",
-        .description = "Green status light pin (1-16)",
-        .unit = "pin",
-        .critical = false
-    },
-    {
-        .key = "status_light_yellow",
-        .type = CONFIG_TYPE_INT,
-        .int_min = 1,
-        .int_max = 16,
-        .default_value = "14",
-        .description = "Yellow status light pin (1-16)",
-        .unit = "pin",
-        .critical = false
-    },
-    {
-        .key = "status_light_red",
-        .type = CONFIG_TYPE_INT,
-        .int_min = 1,
-        .int_max = 16,
-        .default_value = "15",
-        .description = "Red status light pin (1-16)",
-        .unit = "pin",
-        .critical = false
-    },
-    {
-        .key = "buzzer_pin",
-        .type = CONFIG_TYPE_INT,
-        .int_min = 1,
-        .int_max = 16,
-        .default_value = "16",
-        .description = "Buzzer pin (1-16)",
-        .unit = "pin",
-        .critical = false
-    },
+    
+    // Status Pins
+    { .key = KEY_STATUS_LIGHT_GREEN, .type = CONFIG_TYPE_INT, .int_min = 1, .int_max = 48, .default_value = "13", .description = "Green light pin", .unit = "pin", .critical = false },
+    { .key = KEY_STATUS_LIGHT_YELLOW, .type = CONFIG_TYPE_INT, .int_min = 1, .int_max = 48, .default_value = "14", .description = "Yellow light pin", .unit = "pin", .critical = false },
+    { .key = KEY_STATUS_LIGHT_RED, .type = CONFIG_TYPE_INT, .int_min = 1, .int_max = 48, .default_value = "15", .description = "Red light pin", .unit = "pin", .critical = false },
+    { .key = KEY_BUZZER_PIN, .type = CONFIG_TYPE_INT, .int_min = 1, .int_max = 48, .default_value = "16", .description = "Buzzer pin", .unit = "pin", .critical = false },
+    { .key = KEY_ALARM_PIN, .type = CONFIG_TYPE_INT, .int_min = 1, .int_max = 48, .default_value = "2", .description = "Alarm input pin", .unit = "pin", .critical = false },
+
     {
         .key = "system_watchdog_timeout_s",
         .type = CONFIG_TYPE_INT,
         .int_min = 5,
         .int_max = 300,
         .default_value = "30",
-        .description = "Watchdog timeout before reboot",
+        .description = "Watchdog timeout",
         .unit = "seconds",
         .critical = false
     },
+    
+    // === HOME PROFILES ===
+    { .key = KEY_HOME_PROFILE_FAST, .type = CONFIG_TYPE_INT, .int_min = 0, .int_max = 2, .default_value = "2", .description="Fast Homing Profile", .unit="idx", .critical=false},
+    { .key = KEY_HOME_PROFILE_SLOW, .type = CONFIG_TYPE_INT, .int_min = 0, .int_max = 2, .default_value = "0", .description="Slow Homing Profile", .unit="idx", .critical=false},
+
+    // === RECOVERY ===
+    { .key = KEY_RECOV_EN, .type = CONFIG_TYPE_INT, .int_min = 0, .int_max = 1, .default_value = "1", .description="Job Recovery Enable", .unit="bool", .critical=false},
+    
+    // === BOOTLOG ===
+    { .key = KEY_BOOTLOG_EN, .type = CONFIG_TYPE_INT, .int_min = 0, .int_max = 1, .default_value = "1", .description="Boot Log Enable", .unit="bool", .critical=false},
+
+    // === MISC ===
+    { .key = KEY_CLI_ECHO, .type = CONFIG_TYPE_INT, .int_min = 0, .int_max = 1, .default_value = "1", .description="CLI Echo", .unit="bool", .critical=false},
 };
 #pragma GCC diagnostic pop
 

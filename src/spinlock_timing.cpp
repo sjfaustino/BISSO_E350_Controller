@@ -14,9 +14,18 @@ static spinlock_timing_stats_t spinlock_stats[MAX_SPINLOCK_LOCATIONS];
 static uint8_t spinlock_stats_count = 0;
 static SemaphoreHandle_t spinlock_stats_mutex = nullptr;
 
+void spinlockTimingInit() {
+    if (spinlock_stats_mutex == nullptr) {
+        spinlock_stats_mutex = xSemaphoreCreateMutex();
+        if (spinlock_stats_mutex) {
+            logInfo("[SPINLOCK] Timing stats mutex initialized");
+        }
+    }
+}
+
 spinlock_timing_stats_t* spinlockTimingGetStats(const char* location) {
   if (!spinlock_stats_mutex) {
-    spinlock_stats_mutex = xSemaphoreCreateMutex();
+    return nullptr;
   }
 
   xSemaphoreTake(spinlock_stats_mutex, portMAX_DELAY);

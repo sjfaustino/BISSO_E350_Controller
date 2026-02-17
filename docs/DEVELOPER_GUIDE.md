@@ -429,6 +429,9 @@ float motionGetPositionMM(uint8_t axis);
 
 // Check encoder health
 bool encoderMotionHasError(uint8_t axis);
+
+// Axis abstraction
+float motionGetAxisScale(uint8_t axis);
 ```
 
 ### 7.2 Hardware Abstraction Layer
@@ -446,12 +449,23 @@ bool encoderHalWrite(const uint8_t* buffer, size_t len);
 
 ```cpp
 // Store pulses per mm calibration
-// Accessed via MachineCalibration struct (machineCal)
-machineCal.X.pulses_per_mm = 100.0f;
-machineCal.Y.pulses_per_mm = 100.0f;
-machineCal.Z.pulses_per_mm = 100.0f;
-machineCal.A.pulses_per_degree = 22.222f;
+// Accessed via MachineCalibration struct (machineCal) using axes[4] array
+machineCal.axes[0].pulses_per_mm = 100.0f; // X
+machineCal.axes[1].pulses_per_mm = 100.0f; // Y
+machineCal.axes[2].pulses_per_mm = 100.0f; // Z
+machineCal.axes[3].pulses_per_degree = 22.222f; // A
 ```
+
+### 7.4 Protocol Identification
+
+The System provides an identification routine to distinguish between ASCII and Modbus RTU hardware.
+
+**Logic Flow**:
+1. Take RS-485 Mutex and pause background polling.
+2. Send ASCII Probe (`#xx\r`).
+3. Send Modbus Probe (Function 0x03).
+4. If ASCII detected but not Modbus, attempt a temporary protocol switch (`$xxP1\r`).
+5. Report capabilities and suggested recovery actions (e.g., INIT pin jumper).
 
 ---
 
@@ -570,7 +584,21 @@ The system maintains a high-frequency WebSocket connection (default `/ws`) for r
 
 ---
 
-## 9. Security Implementation
+## 9. RS-485 Bus Strategy & Backoff
+
+The RS-485 bus uses a **Priority-Based Dispatcher** with an exponential backoff strategy to prevent faulty devices from starving the bus.
+
+- **High Priority**: WJ66 Encoder (critical for motion).
+- **Normal Priority**: Spindle Sensors and VFD.
+
+**Backoff Algorithm**:
+- On communication failure, a device's **Backoff Timer** is increased.
+- Subsequent requests for that device are skipped until the backoff expires.
+- This ensures that a single disconnected or noisy device doesn't cause G-code execution delays.
+
+---
+
+## 10. Security Implementation
 
 ### 9.1 Credential Storage
 
@@ -754,6 +782,9 @@ void cmd_mycommand(int argc, char** argv) {
 cliRegisterCommand("mycommand", cmd_mycommand, "Description");
 ```
 
+> [!NOTE]
+> **Atomic Usage Printing**: When implementing subcommands, the `cliDispatchSubcommand` helper uses a dynamic buffer (PSRAM) to build the entire help message before printing. This prevents log interleaving when multiple tasks are printing to the serial port simultaneously.
+
 ### 13.2 Adding a New Configuration Option
 
 1. Add key in `config_keys.h`:
@@ -907,3 +938,12 @@ The project includes a GitHub Actions workflow (`.github/workflows/release.yml`)
 
 ### Workflow File
 Located at `.github/workflows/release.yml`. Triggered by tags matching `v*`.
+
+---
+
+## Revision History
+
+| Date | Changes |
+|------|---------|
+| 2026-02-15 | Audit: Updated MachineCalibration refactor, RS-485 backoff, and CLI hardening details |
+| 2026-01-25 | Initial guide structure |

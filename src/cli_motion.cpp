@@ -39,9 +39,9 @@ void cmd_predict_status(int argc, char** argv) {
 
 void cmd_estop_status(int argc, char** argv) {
   if (motionIsEmergencyStopped()) {
-    logWarning("[MOTION] EMERGENCY STOP ACTIVE");
+    logPrintf("EMERGENCY STOP ACTIVE\n");
   } else {
-    logInfo("[MOTION] [OK] System Enabled");
+    logPrintf("System Enabled\n");
   }
 }
 
@@ -51,29 +51,29 @@ void cmd_estop_status(int argc, char** argv) {
 
 void cmd_motion_stop(int argc, char** argv) {
   motionStop();
-  logInfo("[MOTION] Stop command sent");
+  logPrintf("Stop command sent\n");
 }
 
 void cmd_motion_pause(int argc, char** argv) {
   motionPause();
-  logInfo("[MOTION] Pause command sent");
+  logPrintf("Pause command sent\n");
 }
 
 void cmd_motion_resume(int argc, char** argv) {
   motionResume();
-  logInfo("[MOTION] Resume command sent");
+  logPrintf("Resume command sent\n");
 }
 
 void cmd_estop_on(int argc, char** argv) {
   motionEmergencyStop();
-  logError("[MOTION] CRITICAL: E-STOP TRIGGERED BY USER");
+  logError("CRITICAL: E-STOP TRIGGERED BY USER");
 }
 
 void cmd_estop_off(int argc, char** argv) {
   if (motionClearEmergencyStop()) {
-    logInfo("[MOTION] [OK] E-Stop Cleared");
+    logPrintf("E-Stop Cleared\n");
   } else {
-    logWarning("[MOTION] Could not clear E-Stop (Check Safety Alarms)");
+    logPrintf("Could not clear E-Stop (Check Safety Alarms)\n");
   }
 }
 
@@ -91,7 +91,7 @@ void cmd_estop_main(int argc, char** argv) {
         return;
     }
     
-    cliDispatchSubcommand("[ESTOP]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -107,7 +107,7 @@ void cmd_soft_limits(int argc, char** argv) {
   
   uint8_t axis = axisCharToIndex(argv[1]);
   if (axis == 255) {
-    logWarning("[MOTION] Invalid axis");
+    logPrintf("Invalid axis\n");
     return;
   }
   
@@ -120,12 +120,12 @@ void cmd_soft_limits(int argc, char** argv) {
     motionEnableSoftLimits(axis, enable);
   }
   
-  logInfo("[MOTION] Soft limits updated for Axis %d", axis);
+  logPrintf("Soft limits updated for Axis %d\n", axis);
 }
 
 void cmd_feed_override(int argc, char** argv) {
     if (argc < 2) {
-        logPrintf("[CLI] Current Feed: %.0f%%\n", motionGetFeedOverride() * 100.0f);
+        logPrintf("Current Feed: %.0f%%\n", motionGetFeedOverride() * 100.0f);
         return;
     }
 
@@ -135,7 +135,7 @@ void cmd_feed_override(int argc, char** argv) {
     if (factor > 10.0f) factor /= 100.0f;
 
     motionSetFeedOverride(factor);
-    logInfo("[CLI] Feed override set to %.2f", factor);
+    logPrintf("Feed override set to %.2f\n", factor);
 }
 
 // ============================================================================
@@ -154,13 +154,13 @@ void cmd_spinlock_main(int argc, char** argv) {
     };
     
     if (argc < 2) {
-        logPrintln("[SPINLOCK] === Spinlock Timing Diagnostics ===");
+        logPrintln("=== Spinlock Timing Diagnostics ===");
         CLI_USAGE("spinlock", "[stats | reset]");
         logPrintln("Purpose: Audit spinlock durations (>10us -> mutex)");
         // Usage printed by helper below anyway if we pass argc < 2, but let's keep the header
     }
 
-    cliDispatchSubcommand("[SPINLOCK]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 

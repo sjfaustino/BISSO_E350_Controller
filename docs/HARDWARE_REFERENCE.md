@@ -447,7 +447,8 @@ The ESP32 uses PCF8574 I/O expanders to interface with the PLC and other I/O:
 |--------|---------|-----------|----------|
 | PCF8574 OUT | 0x24 | ESP32 → PLC | Axis/Direction/Speed commands (Y1-Y8) |
 | PCF8574 IN | 0x21 | PLC → ESP32 | Consenso signals, limits |
-| PCF8574 IN2 | 0x20 | External → ESP32 | Software E-Stop, Door interlock |
+| PCF8574 IN2 | 0x22 | External → ESP32 | Software E-Stop, Door interlock |
+| PCF8574 OUT2| 0x25 | ESP32 → PLC      | Auxiliary relays, Lights, Buzzer |
 
 ### PCF8574 OUT Pin Mapping (ESP32 → PLC @ 0x24)
 
@@ -488,6 +489,29 @@ Output byte 0xFF = All HIGH = No axis selected
 | 5 | X2 | Y_AXIS_READY | Y axis "consenso" |
 | 6 | X3 | Z_AXIS_READY | Z axis "consenso" |
 
+### PCF8574 IN Pin Mapping (External → ESP32 @ 0x22)
+
+**Bank 2: Safety & Interlocks**
+
+| Bit | Signal | Function |
+|-----|--------|----------|
+| 0 | E-STOP_SW | Hard-wired E-stop loop status |
+| 1 | DOOR_SNS  | Safety door interlock status |
+| 2 | VFD_READY | VFD fault-free status |
+
+### PCF8574 OUT Pin Mapping (ESP32 → PLC @ 0x25)
+
+**Bank 2: Auxiliaries & Indicators**
+
+| Bit | Pin | Signal | Function |
+|-----|-----|--------|----------|
+| 0 | Y9 | LIGHT_GREEN | Tower Light (Green) |
+| 1 | Y10 | LIGHT_YELLOW| Tower Light (Yellow) |
+| 2 | Y11 | LIGHT_RED   | Tower Light (Red) |
+| 3 | Y12 | BUZZER      | Internal/External Alarm |
+| 4 | Y13 | COOLANT     | Flood Coolant Pump |
+| 5 | Y14 | -           | Available           |
+
 ### LCD Display
 
 | Parameter | Value |
@@ -496,6 +520,46 @@ Output byte 0xFF = All HIGH = No axis selected
 | Interface | I2C |
 | Address | 0x27 |
 | Controller | HD44780 compatible |
+
+---
+
+---
+
+## Encoder Protocol Configuration (WJ66)
+
+The Wayjun WJ66 DRO modules support both **ASCII** (Standard) and **Modbus RTU** protocols. While the controller supports both, **Modbus RTU is preferred** for industrial reliability and CRC-based error checking.
+
+### Protocol Comparison
+
+| Protocol | Advantages | Disadvantages |
+|----------|------------|---------------|
+| **ASCII** | Human-readable, easy to debug | No CRC (less robust), slower parsing |
+| **Modbus RTU** | Robust CRC error checking, industrial standard | Requires binary parser, address management |
+
+### Hardware "INIT" Procedure (The Recovery Jumper)
+
+If a module is in its factory default "ASCII-Only" mode or locked for configuration, you must use the **INIT hardware jumper** to enable software-level protocol switching.
+
+#### INIT Procedure Steps:
+1. **Connect INIT to GND**: Connect the module's "INIT" pin to any "GND" pin on the module.
+2. **Power Cycle**: Turn the encoder power OFF and then back ON.
+3. **Software Configuration**: Run `encoder identify` from the CLI. The module will now accept the `$01P1\r` switch command.
+4. **Remove Jumper**: Disconnect INIT from GND and power cycle again to resume normal operation.
+
+```text
+WJ66 PINOUT & JUMPER DIAGRAM:
+┌─────────────────────────────────────┐
+│             WJ66 MODULE             │
+│   (Top view, connector at bottom)   │
+│                                     │
+│  [ VCC ]  [ GND ]  [ INIT ]  [ ...] │
+│      │        │        │            │
+│      └────────┼────────┘            │
+│               │ (Bridge these pins  │
+│               │  during power-on to │
+│               │  unlock config)     │
+└───────────────┴─────────────────────┘
+```
 
 ---
 
@@ -560,6 +624,8 @@ Shared RS-485 bus for Modbus devices:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-15 | 1.5.0 | Audit: Corrected I2C Bank 2 addresses (0x22/0x25), added Bank 2 pin mapping, and WJ66 INIT procedure |
+| 2026-02-15 | 1.4.0 | Added WJ66 Encoder Protocol Configuration and INIT hardware procedure |
 | 2026-02-03 | 1.3.0 | Set KC868-A16 v3.1 (ESP32-S3-WROOM-1U) as standard definitive target |
 | 2026-02-02 | 1.2.0 | Added Spindle Rated Amps config and NVS 'SafeSave' documentation |
 | 2026-01-26 | 1.1.1 | Corrected standard board version from v1.5 to v1.6 |

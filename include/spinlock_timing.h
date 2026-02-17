@@ -21,6 +21,11 @@
 
 #if ENABLE_SPINLOCK_TIMING
 
+/**
+ * Initialize spinlock timing monitoring
+ */
+void spinlockTimingInit();
+
 // Stats structure for each instrumented location
 typedef struct {
   const char* location;      // Source code location identifier
@@ -68,6 +73,7 @@ void spinlockTimingResetStats();
 #define SPINLOCK_EXIT(spinlock, location) portEXIT_CRITICAL(&spinlock);
 
 // Stubs for non-debug builds
+#define spinlockTimingInit() do {} while(0)
 #define spinlockTimingPrintStats() do {} while(0)
 #define spinlockTimingResetStats() do {} while(0)
 

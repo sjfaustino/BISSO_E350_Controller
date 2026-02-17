@@ -152,7 +152,7 @@ bool GCodeParser::validateGCodeSyntax(const char* line, char* error_msg, size_t 
         }
         // Check for supported M-codes
         bool valid_m = (cmd_num == 0 || cmd_num == 1 || cmd_num == 2 || cmd_num == 3 || cmd_num == 5 ||
-                       cmd_num == 8 || cmd_num == 9 || cmd_num == 10 || cmd_num == 11 ||
+                       cmd_num == 8 || cmd_num == 9 ||
                        cmd_num == 112 || cmd_num == 114 || cmd_num == 115 ||
                        cmd_num == 117 || cmd_num == 154 || cmd_num == 226 || cmd_num == 255 ||
                        cmd_num == 999);
@@ -263,10 +263,7 @@ bool GCodeParser::processCommand(const char* line) {
             case 8:  plcSetOutput(getPin("output_coolant"), true); logInfo("[GCODE] Coolant ON (M8)"); break;   // Y13
             case 9:  
                 plcSetOutput(getPin("output_coolant"), false); 
-                plcSetOutput(getPin("output_vacuum"), false); 
                 logInfo("[GCODE] All Coolant/Aux OFF (M9)"); break;
-            case 10: plcSetOutput(getPin("output_vacuum"), true); logInfo("[GCODE] Vacuum ON (M10)"); break;   // Y14
-            case 11: plcSetOutput(getPin("output_vacuum"), false); logInfo("[GCODE] Vacuum OFF (M11)"); break;
             // PHASE 3.2: M117 - Display message on LCD (standard gcode command)
             case 117: handleM117(line); break;
             // PHASE 4.0: M114 - Get current position

@@ -32,7 +32,7 @@ static AxisCalibration* getAxisCalPtrForCli(uint8_t axis) {
 calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profile, float distance_mm, bool is_forward) {
     calibration_run_t run = {0, 0};
 
-    logInfo("[CALIB] Measuring %s on Axis %d (Profile %d) for %.1f mm...", 
+    logPrintf("Measuring %s on Axis %d (Profile %d) for %.1f mm...\n", 
             is_forward ? "FORWARD" : "REVERSE", axis, (int)profile, distance_mm);
     
     int32_t start_pos = wj66GetPosition(axis);
@@ -46,7 +46,11 @@ calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profi
     int32_t target_delta_counts = (int32_t)(distance_mm * MOTION_POSITION_SCALE_FACTOR);
     bool motion_complete = false;
     
-    while (millis() - start_time < max_timeout) {
+    while (true) {
+        uint32_t now = millis();
+        uint32_t elapsed = (now >= start_time) ? (now - start_time) : (UINT32_MAX - start_time + now + 1);
+        if (elapsed >= max_timeout) break;
+
         int32_t current_pos = wj66GetPosition(axis);
         int32_t actual_delta = abs(current_pos - start_pos);
         if (actual_delta >= target_delta_counts) {
@@ -63,7 +67,7 @@ calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profi
 
     if (!motion_complete || run.time_ms >= max_timeout - 100) { 
         // FIX: Format specifier %ld for int32_t
-        logError("[CALIB] [FAIL] Timeout on %s move. Measured: %ld counts.", is_forward ? "FORWARD" : "REVERSE", (long)run.counts);
+        logError("[FAIL] Timeout on %s move. Measured: %ld counts.", is_forward ? "FORWARD" : "REVERSE", (long)run.counts);
         faultLogError(FAULT_CALIBRATION_MISSING, "Speed calibration failed: Timeout");
         run.time_ms = 0xFFFFFFFF; 
     }
@@ -77,18 +81,18 @@ calibration_run_t perform_single_measurement(uint8_t axis, speed_profile_t profi
 
 void cmd_encoder_calib(int argc, char** argv) {
   if (argc < 3) {
-    logPrintln("[CLI] Usage: calib axis distance_mm (e.g., calib X 1000.0)");
+    logPrintln("Usage: calib axis distance_mm (e.g., calib X 1000.0)");
     return;
   }
   uint8_t axis = axisCharToIndex(argv[1]);
   float distance_mm = 0.0f;
 
   if (axis >= 4) {
-    logError("[CLI] Invalid axis. Use X, Y, Z, or A.");
+    logError("Invalid axis. Use X, Y, Z, or A.");
     return;
   }
   if (!parseAndValidateFloat(argv[2], &distance_mm, 10.0f, 10000.0f)) {
-      logError("[CLI] Invalid distance. Must be > 10.0mm.");
+      logError("Invalid distance. Must be > 10.0mm.");
       return;
   }
   encoderCalibrationStart(axis, distance_mm);
@@ -96,7 +100,7 @@ void cmd_encoder_calib(int argc, char** argv) {
 
 void cmd_encoder_reset(int argc, char** argv) {
     if (argc < 4) {
-        logPrintln("[CLI] Usage: calibrate speed reset [AXIS]");
+        logPrintln("Usage: calibrate speed reset [AXIS]");
         return;
     }
     // Subcommand dispatch: calibrate speed reset X
@@ -104,26 +108,26 @@ void cmd_encoder_reset(int argc, char** argv) {
     uint8_t axis = axisCharToIndex(argv[3]);
     
     if (axis >= 4) {
-        logError("[CLI] Invalid axis.");
+        logError("Invalid axis.");
         return;
     }
     
     AxisCalibration* cal = getAxisCalPtrForCli(axis);
     if (cal) {
-        logPrintf("[CLI] Resetting speed profiles for Axis %c...\n", axisIndexToChar(axis));
+        logPrintf("Resetting speed profiles for Axis %c...\n", axisIndexToChar(axis));
         cal->speed_slow_mm_min = 300.0f; 
         cal->speed_med_mm_min = 900.0f;
         cal->speed_fast_mm_min = 2400.0f;
         saveAllCalibration();
-        logInfo("[CLI] [OK] Speed profiles reset and saved.");
+        logPrintf("Speed profiles reset and saved.\n");
     } else {
-         logError("[CLI] Calibration data not found for Axis %c.", axisIndexToChar(axis));
+         logError("Calibration data not found for Axis %c.", axisIndexToChar(axis));
     }
 }
 
 void cmd_calib_ppmm_start(int argc, char** argv) {
     if (argc < 4) {
-        logPrintln("[CLI] Usage: calibrate ppmm [AXIS] [DISTANCE_MM]");
+        logPrintln("Usage: calibrate ppmm [DISTANCE_MM]");
         return;
     }
     // argv[0]=calibrate, argv[1]=ppmm, argv[2]=AXIS, argv[3]=DIST
@@ -132,20 +136,20 @@ void cmd_calib_ppmm_start(int argc, char** argv) {
     float distance_mm = 0.0f;
 
     if (axis >= 4) {
-        logError("[CLI] Invalid axis.");
+        logError("Invalid axis.");
         return;
     }
     if (!parseAndValidateFloat(argv[3], &distance_mm, 10.0f, 10000.0f)) {
-        logError("[CLI] Invalid distance.");
+        logError("Invalid distance.");
         return;
     }
     if (g_manual_calib.state != CALIBRATION_IDLE) {
-        logError("[CLI] Calibration already in progress.");
+        logError("Calibration already in progress.");
         return;
     }
     
     if (axis_char == 'A') {
-        logWarning("[CALIB] Note: Axis A is rotational (Distance = Degrees).");
+        logPrintf("Note: Axis A is rotational (Distance = Degrees).\n");
     }
 
     g_manual_calib.state = CALIB_MANUAL_START;
@@ -163,7 +167,7 @@ void cmd_calib_ppmm_start(int argc, char** argv) {
 
 void cmd_calib_ppmm_end(int argc, char** argv) {
     if (g_manual_calib.state != CALIB_MANUAL_WAIT_MOVE) {
-        logError("[CLI] No calibration in progress.");
+        logError("No calibration in progress.");
         return;
     }
 
@@ -173,7 +177,7 @@ void cmd_calib_ppmm_end(int argc, char** argv) {
     int32_t moved_counts = abs(end_counts - g_manual_calib.start_counts);
     
     if (moved_counts == 0) {
-        logError("[CLI] No movement detected.");
+        logError("No movement detected.");
         g_manual_calib.state = CALIBRATION_IDLE;
         return;
     }
@@ -191,24 +195,24 @@ void cmd_calib_ppmm_end(int argc, char** argv) {
 
 void cmd_calib_ppmm_reset(int argc, char** argv) {
     if (argc < 4) {
-        logPrintln("[CLI] Usage: calibrate ppmm reset [AXIS]");
+        logPrintln("Usage: calibrate ppmm reset [AXIS]");
         return;
     }
     // argv[0]=calibrate, argv[1]=ppmm, argv[2]=reset, argv[3]=AXIS
     uint8_t axis = axisCharToIndex(argv[3]);
 
     if (axis >= 4) {
-        logError("[CLI] Invalid axis.");
+        logError("Invalid axis.");
         return;
     }
     encoderCalibrationSetPPM(axis, (double)MOTION_POSITION_SCALE_FACTOR); 
     wj66Reset(); 
-    logInfo("[CLI] [OK] PPM reset to default (%d) for Axis %c.", MOTION_POSITION_SCALE_FACTOR, axisIndexToChar(axis));
+    logPrintf("PPM reset to default (%d) for Axis %c.\n", MOTION_POSITION_SCALE_FACTOR, axisIndexToChar(axis));
 }
 
 void cmd_auto_calibrate_speed(int argc, char** argv) {
     if (argc < 4) {
-        logPrintln("[CLI] Usage: calibrate speed [AXIS] [PROFILE] [DISTANCE]");
+        logPrintln("Usage: calibrate speed [PROFILE] [DISTANCE]");
         logPrintln("       calibrate speed reset [AXIS]");
         return;
     }
@@ -220,13 +224,13 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     }
 
     if (argc < 5) {
-        logPrintln("[CLI] Usage: calibrate speed [AXIS] [PROFILE] [DISTANCE]");
+        logPrintln("Usage: calibrate speed [PROFILE] [DISTANCE]");
         return;
     }
     // argv[0]=calibrate, argv[1]=speed, argv[2]=AXIS, argv[3]=PROFILE, argv[4]=DISTANCE
     uint8_t axis = axisCharToIndex(argv[2]);
     if (axis >= 4) {
-        logError("[CLI] Invalid axis.");
+        logError("Invalid axis.");
         return;
     }
 
@@ -235,13 +239,13 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     else if (strcmp(argv[3], "MEDIUM") == 0) profile = SPEED_PROFILE_2;
     else if (strcmp(argv[3], "FAST") == 0) profile = SPEED_PROFILE_3;
     else {
-        logError("[CLI] Invalid profile (SLOW/MEDIUM/FAST).");
+        logError("Invalid profile (SLOW/MEDIUM/FAST).");
         return;
     }
 
     float distance_mm = 0.0f;
     if (!parseAndValidateFloat(argv[4], &distance_mm, 50.0f, 10000.0f)) {
-        logError("[CLI] Invalid distance (> 50.0).");
+        logError("Invalid distance (> 50.0).");
         return;
     }
     
@@ -258,7 +262,7 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     int32_t total_counts = run_fwd.counts + run_rev.counts;
     
     if (total_time_ms == 0 || total_counts == 0) {
-        logError("[CALIB] Invalid measurement data.");
+        logError("Invalid measurement data.");
         return;
     }
 
@@ -274,7 +278,7 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
 
     AxisCalibration* cal = getAxisCalPtrForCli(axis);
     if (cal == NULL) {
-        logError("[CALIB] Axis lookup failed.");
+        logError("Axis lookup failed.");
         return;
     }
 
@@ -285,7 +289,7 @@ void cmd_auto_calibrate_speed(int argc, char** argv) {
     }
     
     saveAllCalibration(); 
-    logInfo("[CALIB] [OK] Calibration saved to NVS.");
+    logPrintf("Calibration saved to NVS.\n");
 }
 
 // ============================================================================
@@ -385,7 +389,7 @@ void cmd_vfd_calib_current(int argc, char** argv) {
                     logPrintf("[VFDCAL] Stall threshold set to: %.2f A\n", vfdCalibrationGetThreshold());
                     vfdCalibrationPrintSummary();
                     vfd_calib_state = VFD_CALIB_COMPLETE;
-                    logInfo("[VFDCAL] Calibration COMPLETE and saved!");
+                    logPrintf("[VFDCAL] Calibration COMPLETE and saved!\n");
                 }
             }
 
@@ -411,21 +415,21 @@ void cmd_vfd_calib_current(int argc, char** argv) {
                 logPrintf("[VFDCAL] Stall threshold set to: %.2f A\n", vfdCalibrationGetThreshold());
                 vfdCalibrationPrintSummary();
                 vfd_calib_state = VFD_CALIB_COMPLETE;
-                logInfo("[VFDCAL] Calibration COMPLETE and saved!");
+                logPrintf("[VFDCAL] Calibration COMPLETE and saved!\n");
             }
         } else {
             logError("[VFDCAL] Not in phase confirmation state.");
         }
 
     } else if (strcmp(argv[3], "abort") == 0) {
-        logWarning("[VFDCAL] Calibration aborted. Use 'start' to begin again.");
+        logPrintf("[VFDCAL] Calibration aborted. Use 'start' to begin again.\n");
         vfd_calib_state = VFD_CALIB_IDLE;
 
     } else if (strcmp(argv[3], "reset") == 0) {
-        logWarning("[VFDCAL] Resetting all VFD calibration data!");
+        logPrintf("[VFDCAL] Resetting all VFD calibration data!\n");
         vfdCalibrationReset();
         vfd_calib_state = VFD_CALIB_IDLE;
-        logInfo("[VFDCAL] All calibration data cleared.");
+        logPrintf("[VFDCAL] All calibration data cleared.\n");
 
     } else if (strcmp(argv[3], "status") == 0) {
         const char* state_names[] = {
@@ -439,7 +443,7 @@ void cmd_vfd_calib_current(int argc, char** argv) {
         vfdCalibrationPrintSummary();
 
     } else {
-        logWarning("[VFDCAL] Unknown subcommand. Use 'help' for usage.");
+        logPrintf("[VFDCAL] Unknown subcommand. Use 'help' for usage.\n");
     }
 }
 
@@ -454,21 +458,27 @@ void cmd_vfd_calib_current(int argc, char** argv) {
 void cmd_vfd_diagnostics(int argc, char** argv) {
     // argv[0]=vfd, argv[1]=diagnostics, argv[2]=SUB
     if (argc < 3 || strcmp(argv[2], "help") == 0) {
-        logPrintln("[VFDDIAG] === VFD Diagnostics ===");
-        logPrintln("Commands:");
-        logPrintln("  vfd diagnostics status    - Show real-time VFD status");
-        logPrintln("  vfd diagnostics thermal   - Show thermal monitoring details");
-        logPrintln("  vfd diagnostics current   - Show motor current measurements");
-        logPrintln("  vfd diagnostics frequency - Show output frequency data");
-        logPrintln("  vfd diagnostics full      - Comprehensive VFD report");
-        logPrintln("  vfd diagnostics calib     - Show calibration details");
+        if (serialLoggerLock()) {
+            logPrintln("[VFDDIAG] === VFD Diagnostics ===");
+            logPrintln("Commands:");
+            logPrintln("  vfd diagnostics status    - Show real-time VFD status");
+            logPrintln("  vfd diagnostics thermal   - Show thermal monitoring details");
+            logPrintln("  vfd diagnostics current   - Show motor current measurements");
+            logPrintln("  vfd diagnostics frequency - Show output frequency data");
+            logPrintln("  vfd diagnostics full      - Comprehensive VFD report");
+            logPrintln("  vfd diagnostics calib     - Show calibration details");
+            serialLoggerUnlock();
+        }
         return;
     }
 
     // Real-time status snapshot
     if (strcmp(argv[2], "status") == 0) {
-        logPrintln("\n[VFDDIAG] === VFD Real-Time Status ===");
-        altivar31PrintDiagnostics();
+        if (serialLoggerLock()) {
+            logPrintln("\n[VFDDIAG] === VFD Real-Time Status ===");
+            altivar31PrintDiagnostics();
+            serialLoggerUnlock();
+        }
 
     } else if (strcmp(argv[2], "thermal") == 0) {
         if (!serialLoggerLock()) return;
@@ -528,16 +538,22 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         serialLoggerUnlock();
 
     } else if (strcmp(argv[2], "frequency") == 0) {
-        logPrintln("\n[VFDDIAG] === Output Frequency ===");
-        float freq = altivar31GetFrequencyHz();
-        int16_t raw = altivar31GetFrequencyRaw();
+        if (serialLoggerLock()) {
+            logPrintln("\n[VFDDIAG] === Output Frequency ===");
+            float freq = altivar31GetFrequencyHz();
+            int16_t raw = altivar31GetFrequencyRaw();
 
-        logPrintf("Output Frequency:    %.1f Hz (raw: %d, 0.1Hz/unit)\n", freq, raw);
-        logPrintf("Status:              %s\n", freq > 0.0f ? "RUNNING" : "IDLE/STOPPED");
+            logPrintf("Output Frequency:    %.1f Hz (raw: %d, 0.1Hz/unit)\n", freq, raw);
+            logPrintf("Status:              %s\n", freq > 0.0f ? "RUNNING" : "IDLE/STOPPED");
+            serialLoggerUnlock();
+        }
 
     } else if (strcmp(argv[2], "calib") == 0) {
-        logPrintln("\n[VFDDIAG] === Calibration Details ===");
-        vfdCalibrationPrintSummary();
+        if (serialLoggerLock()) {
+            logPrintln("\n[VFDDIAG] === Calibration Details ===");
+            vfdCalibrationPrintSummary();
+            serialLoggerUnlock();
+        }
 
     } else if (strcmp(argv[2], "full") == 0) {
         if (!serialLoggerLock()) return;
@@ -572,7 +588,7 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         serialLoggerUnlock();
 
     } else {
-        logWarning("[VFDDIAG] Unknown subcommand. Use 'help' for usage.");
+        logPrintf("[VFDDIAG] Unknown subcommand. Use 'help' for usage.\n");
     }
 }
 
@@ -611,7 +627,7 @@ void cmd_vfd_config(int argc, char** argv) {
         configSetInt(KEY_VFD_STALL_MARGIN, (int32_t)margin);
         configUnifiedFlush();
         configUnifiedSave();
-        logInfo("[VFDCFG] Stall margin set to %.0f%%", margin);
+        logPrintf("[VFDCFG] Stall margin set to %.0f%%\n", margin);
 
     } else if (strcmp(argv[2], "timeout") == 0) {
         if (argc < 4) {
@@ -626,7 +642,7 @@ void cmd_vfd_config(int argc, char** argv) {
         configSetInt(KEY_STALL_TIMEOUT, (int32_t)timeout_ms);
         configUnifiedFlush();
         configUnifiedSave();
-        logInfo("[VFDCFG] Stall timeout set to %lu ms", (unsigned long)timeout_ms);
+        logPrintf("[VFDCFG] Stall timeout set to %lu ms\n", (unsigned long)timeout_ms);
 
     } else if (strcmp(argv[2], "temp") == 0) {
         if (argc < 5) {
@@ -642,10 +658,10 @@ void cmd_vfd_config(int argc, char** argv) {
 
         if (strcmp(argv[3], "warn") == 0) {
             configSetInt(KEY_VFD_TEMP_WARN, temp);
-            logInfo("[VFDCFG] Temperature warning threshold set to %ldC", (long)temp);
+            logPrintf("[VFDCFG] Temperature warning threshold set to %ldC\n", (long)temp);
         } else if (strcmp(argv[3], "crit") == 0) {
             configSetInt(KEY_VFD_TEMP_CRIT, temp);
-            logInfo("[VFDCFG] Temperature critical threshold set to %ldC", (long)temp);
+            logPrintf("[VFDCFG] Temperature critical threshold set to %ldC\n", (long)temp);
         } else {
             logError("[VFDCFG] Use 'warn' or 'crit'");
             return;
@@ -663,7 +679,7 @@ void cmd_vfd_config(int argc, char** argv) {
         configSetInt("vfd_stall_detect", enable ? 1 : 0);
         configUnifiedFlush();
         configUnifiedSave();
-        logInfo("[VFDCFG] VFD stall detection %s", enable ? "ENABLED" : "DISABLED");
+        logPrintf("[VFDCFG] VFD stall detection %s\n", enable ? "ENABLED" : "DISABLED");
 
     } else if (strcmp(argv[2], "show") == 0) {
         logPrintln("\n[VFDCFG] === Current VFD Configuration ===");
@@ -692,7 +708,7 @@ void cmd_vfd_config(int argc, char** argv) {
         }
 
     } else {
-        logWarning("[VFDCFG] Unknown subcommand. Use 'help' for usage.");
+        logPrintf("[VFDCFG] Unknown subcommand. Use 'help' for usage.\n");
     }
 }
 
@@ -700,7 +716,7 @@ void cmd_vfd_config(int argc, char** argv) {
 
 void cmd_calib_ppmm_dispatch(int argc, char** argv) {
     if (argc < 3) {
-        logPrintln("[CALIB] Usage: calibrate ppmm [axis distance | end | reset axis]");
+        logPrintln("Usage: calibrate ppmm [axis distance | end | reset axis]");
         return;
     }
     
@@ -717,7 +733,7 @@ void cmd_calibrate_vfd_dispatch(int argc, char** argv) {
     static const cli_subcommand_t subcmds[] = {
         {"current", cmd_vfd_calib_current, "VFD motor current calibration workflow"}
     };
-    cliDispatchSubcommand("[CALIB VFD]", argc, argv, subcmds, 1, 2);
+    cliDispatchSubcommand("", argc, argv, subcmds, 1, 2);
 }
 
 void cmd_calibrate_main(int argc, char** argv) {
@@ -726,7 +742,7 @@ void cmd_calibrate_main(int argc, char** argv) {
         {"ppmm",    cmd_calib_ppmm_dispatch,  "Manual PPM measurement"},
         {"vfd",     cmd_calibrate_vfd_dispatch, "VFD calibration tools"}
     };
-    cliDispatchSubcommand("[CALIB]", argc, argv, subcmds, 3, 1);
+    cliDispatchSubcommand("", argc, argv, subcmds, 3, 1);
 }
 
 void cmd_vfd_main(int argc, char** argv) {
@@ -734,7 +750,7 @@ void cmd_vfd_main(int argc, char** argv) {
         {"diagnostics", cmd_vfd_diagnostics, "VFD telemetry and health"},
         {"config",      cmd_vfd_config,      "Configure stall/thermal limits"}
     };
-    cliDispatchSubcommand("[VFD]", argc, argv, subcmds, 2, 1);
+    cliDispatchSubcommand("", argc, argv, subcmds, 2, 1);
 }
 
 void cliRegisterCalibCommands() {

@@ -17,14 +17,14 @@ void cmd_lcd_on() {
     configSetInt(KEY_LCD_EN, 1);
     lcdInterfaceSetMode(LCD_MODE_I2C);
     lcdInterfaceBacklight(true);
-    logInfo("[LCD] Enabled");
+    logPrintf("Enabled\n");
 }
 
 void cmd_lcd_off() {
     configSetInt(KEY_LCD_EN, 0);
     lcdInterfaceBacklight(false);
     lcdInterfaceSetMode(LCD_MODE_NONE);
-    logInfo("[LCD] Disabled");
+    logPrintf("Disabled\n");
 }
 
 void cmd_lcd_backlight(int argc, char** argv) {
@@ -34,7 +34,7 @@ void cmd_lcd_backlight(int argc, char** argv) {
     }
     bool on = (strcasecmp(argv[2], "on") == 0);
     lcdInterfaceBacklight(on);
-    logInfo("[LCD] Backlight %s", on ? "ON" : "OFF");
+    logPrintf("Backlight %s\n", on ? "ON" : "OFF");
 }
 
 void cmd_lcd_timeout(int argc, char** argv) {
@@ -60,7 +60,7 @@ static void wrap_lcd_test(int argc, char** argv) { (void)argc; (void)argv; lcdIn
 
 static void wrap_lcd_status(int argc, char** argv) {
     (void)argc; (void)argv;
-    logPrintln("\r\n[LCD] === Status ===");
+    logPrintln("\r\n=== Status ===");
     logPrintf("Enabled:   %s\r\n", configGetInt(KEY_LCD_EN, 1) ? "YES" : "NO");
     logPrintf("Mode:      %d\r\n", (int)lcdInterfaceGetMode());
     logPrintf("Sleeping:  %s\r\n", lcdSleepIsAsleep() ? "YES" : "NO");
@@ -70,17 +70,17 @@ static void wrap_lcd_status(int argc, char** argv) {
 
 static void wrap_lcd_scan(int argc, char** argv) {
     (void)argc; (void)argv;
-    logPrintln("\r\n[LCD] Scanning I2C Bus for LCD...");
+    logPrintln("\r\nScanning I2C Bus for LCD...");
     uint8_t addrs[] = {0x27, 0x3F};
     bool found = false;
     for (uint8_t a : addrs) {
         Wire.beginTransmission(a);
         if (Wire.endTransmission() == 0) {
-            logInfo("[LCD] Found LCD at 0x%02X", a);
+            logPrintf("Found LCD at 0x%02X\n", a);
             found = true;
         }
     }
-    if (!found) logWarning("[LCD] No LCD found at standard addresses (0x27, 0x3F)");
+    if (!found) logPrintf("No LCD found at standard addresses (0x27, 0x3F)\n");
 }
 
 // ============================================================================
@@ -102,9 +102,9 @@ void cmd_lcd_main(int argc, char** argv) {
     };
 
     if (argc < 2) {
-        logPrintln("\r\n[LCD] === LCD Control ===");
+        logPrintln("\r\n=== LCD Control ===");
     }
 
-    cliDispatchSubcommand("[LCD]", argc, argv, subcmds,
+    cliDispatchSubcommand("", argc, argv, subcmds,
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }

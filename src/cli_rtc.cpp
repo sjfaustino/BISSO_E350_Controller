@@ -19,7 +19,7 @@
 void cmd_rtc_status(int argc, char** argv) {
     (void)argc; (void)argv;
     
-    logPrintln("\n[RTC] === DS3231 RTC Status ===");
+    logPrintln("\n=== DS3231 RTC Status ===");
     
     if (!rtcIsAvailable()) {
         logPrintln("  Status: NOT AVAILABLE");
@@ -50,15 +50,15 @@ void cmd_rtc_get(int argc, char** argv) {
     (void)argc; (void)argv;
     
     if (!rtcIsAvailable()) {
-        logError("[RTC] RTC not available");
+        logError("RTC not available");
         return;
     }
     
     int y, m, d, h, min, s;
     if (rtcGetDateTime(&y, &m, &d, &h, &min, &s)) {
-        logPrintf("[RTC] %04d-%02d-%02d %02d:%02d:%02d\n", y, m, d, h, min, s);
+        logPrintf("%04d-%02d-%02d %02d:%02d:%02d\n", y, m, d, h, min, s);
     } else {
-        logError("[RTC] Failed to read time");
+        logError("Failed to read time");
     }
 }
 
@@ -68,34 +68,34 @@ void cmd_rtc_get(int argc, char** argv) {
 
 void cmd_rtc_date(int argc, char** argv) {
     if (argc < 3) {
-        logError("[RTC] Usage: rtc date YYYY-MM-DD");
-        logInfo("[RTC] Example: rtc date 2026-02-05");
+        logError("Usage: rtc date YYYY-MM-DD");
+        logPrintf("Example: rtc date 2026-02-05\n");
         return;
     }
     
     if (!rtcIsAvailable()) {
-        logError("[RTC] RTC not available");
+        logError("RTC not available");
         return;
     }
     
     // Parse YYYY-MM-DD format
     int y, m, d;
     if (sscanf(argv[2], "%d-%d-%d", &y, &m, &d) != 3) {
-        logError("[RTC] Invalid format. Use: YYYY-MM-DD");
+        logError("Invalid format. Use: YYYY-MM-DD");
         return;
     }
     
     // Keep current time, just update date
     int cy, cm, cd, ch, cmin, cs;
     if (!rtcGetDateTime(&cy, &cm, &cd, &ch, &cmin, &cs)) {
-        logError("[RTC] Failed to read current time");
+        logError("Failed to read current time");
         return;
     }
     
     if (rtcSetDateTime(y, m, d, ch, cmin, cs)) {
-        logInfo("[RTC] [OK] Date set to: %04d-%02d-%02d", y, m, d);
+        logPrintf("Date set to: %04d-%02d-%02d\n", y, m, d);
     } else {
-        logError("[RTC] Failed to set date");
+        logError("Failed to set date");
     }
 }
 
@@ -105,13 +105,13 @@ void cmd_rtc_date(int argc, char** argv) {
 
 void cmd_rtc_time(int argc, char** argv) {
     if (argc < 3) {
-        logError("[RTC] Usage: rtc time HH:MM:SS");
-        logInfo("[RTC] Example: rtc time 14:30:00");
+        logError("Usage: rtc time HH:MM:SS");
+        logPrintf("Example: rtc time 14:30:00\n");
         return;
     }
     
     if (!rtcIsAvailable()) {
-        logError("[RTC] RTC not available");
+        logError("RTC not available");
         return;
     }
     
@@ -121,7 +121,7 @@ void cmd_rtc_time(int argc, char** argv) {
         // Try HH:MM format
         s = 0;
         if (sscanf(argv[2], "%d:%d", &h, &m) != 2) {
-            logError("[RTC] Invalid format. Use: HH:MM:SS or HH:MM");
+            logError("Invalid format. Use: HH:MM:SS or HH:MM");
             return;
         }
     }
@@ -129,14 +129,14 @@ void cmd_rtc_time(int argc, char** argv) {
     // Keep current date, just update time
     int cy, cm, cd, ch, cmin, cs;
     if (!rtcGetDateTime(&cy, &cm, &cd, &ch, &cmin, &cs)) {
-        logError("[RTC] Failed to read current date");
+        logError("Failed to read current date");
         return;
     }
     
     if (rtcSetDateTime(cy, cm, cd, h, m, s)) {
-        logInfo("[RTC] [OK] Time set to: %02d:%02d:%02d", h, m, s);
+        logPrintf("Time set to: %02d:%02d:%02d\n", h, m, s);
     } else {
-        logError("[RTC] Failed to set time");
+        logError("Failed to set time");
     }
 }
 
@@ -146,36 +146,36 @@ void cmd_rtc_time(int argc, char** argv) {
 
 void cmd_rtc_set(int argc, char** argv) {
     if (argc < 4) {
-        logError("[RTC] Usage: rtc set YYYY-MM-DD HH:MM:SS");
-        logInfo("[RTC] Example: rtc set 2026-02-05 18:54:00");
+        logError("Usage: rtc set YYYY-MM-DD HH:MM:SS");
+        logPrintf("Example: rtc set 2026-02-05 18:54:00\n");
         return;
     }
     
     if (!rtcIsAvailable()) {
-        logError("[RTC] RTC not available");
+        logError("RTC not available");
         return;
     }
     
     // Parse date and time
     int y, mo, d, h, mi, s;
     if (sscanf(argv[2], "%d-%d-%d", &y, &mo, &d) != 3) {
-        logError("[RTC] Invalid date format. Use: YYYY-MM-DD");
+        logError("Invalid date format. Use: YYYY-MM-DD");
         return;
     }
     
     if (sscanf(argv[3], "%d:%d:%d", &h, &mi, &s) != 3) {
         s = 0;
         if (sscanf(argv[3], "%d:%d", &h, &mi) != 2) {
-            logError("[RTC] Invalid time format. Use: HH:MM:SS or HH:MM");
+            logError("Invalid time format. Use: HH:MM:SS or HH:MM");
             return;
         }
     }
     
     if (rtcSetDateTime(y, mo, d, h, mi, s)) {
-        logInfo("[RTC] [OK] DateTime set to: %04d-%02d-%02d %02d:%02d:%02d", 
+        logPrintf("DateTime set to: %04d-%02d-%02d %02d:%02d:%02d\n", 
                 y, mo, d, h, mi, s);
     } else {
-        logError("[RTC] Failed to set date/time");
+        logError("Failed to set date/time");
     }
 }
 
@@ -187,12 +187,12 @@ void cmd_rtc_sync(int argc, char** argv) {
     (void)argc; (void)argv;
     
     if (!rtcIsAvailable()) {
-        logError("[RTC] RTC not available");
+        logError("RTC not available");
         return;
     }
     
     rtcSyncSystemTime();
-    logInfo("[RTC] [OK] System time synced from RTC");
+    logPrintf("System time synced from RTC\n");
 }
 
 // =============================================================================
@@ -203,15 +203,15 @@ void cmd_rtc_temp(int argc, char** argv) {
     (void)argc; (void)argv;
     
     if (!rtcIsAvailable()) {
-        logError("[RTC] RTC not available");
+        logError("RTC not available");
         return;
     }
     
     float temp = rtcGetTemperature();
     if (temp > -100) {
-        logPrintf("[RTC] Temperature: %.1f C\n", temp);
+        logPrintf("Temperature: %.1f C\n", temp);
     } else {
-        logError("[RTC] Failed to read temperature");
+        logError("Failed to read temperature");
     }
 }
 
@@ -230,7 +230,7 @@ void cmd_rtc_main(int argc, char** argv) {
         {"temp",    cmd_rtc_temp,    "Get RTC temperature"}
     };
     
-    cliDispatchSubcommand("[RTC]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 

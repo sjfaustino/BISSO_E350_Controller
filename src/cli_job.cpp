@@ -8,13 +8,13 @@ void cmd_job_start(int argc, char** argv) {
         return;
     }
     if (jobManager.startJob(argv[1])) {
-        logInfo("[CLI] Job Started");
+        logPrintf("Job Started\n");
     }
 }
 
 void cmd_job_abort(int argc, char** argv) {
     jobManager.abortJob();
-    logInfo("[CLI] Job Aborted");
+    logPrintf("Job Aborted\n");
 }
 
 void cmd_job_status(int argc, char** argv) {
@@ -28,7 +28,7 @@ void cmd_job_eta(int argc, char** argv) {
     job_status_t s = jobManager.getStatus();
     
     if (s.state != JOB_RUNNING) {
-        logPrintln("[JOB] No job running");
+        logPrintln("No job running");
         return;
     }
     
@@ -47,7 +47,7 @@ void cmd_job_eta(int argc, char** argv) {
             uint32_t remaining_min = remaining_sec / 60;
             remaining_sec = remaining_sec % 60;
             
-            logPrintln("\n[JOB] === Job Progress ===");
+            logPrintln("\n=== Job Progress ===");
             logPrintf("File:      %s\n", s.filename);
             logPrintf("Progress:  %lu / %lu lines (%.1f%%)\n", 
                      (unsigned long)s.current_line, 
@@ -63,10 +63,10 @@ void cmd_job_eta(int argc, char** argv) {
             bar[20] = '\0';
             logPrintf("           [%s]\n", bar);
         } else {
-            logPrintln("[JOB] Calculating ETA...");
+            logPrintln("Calculating ETA...");
         }
     } else {
-        logPrintln("[JOB] Total lines unknown - ETA unavailable");
+        logPrintln("Total lines unknown - ETA unavailable");
         logPrintf("Current line: %lu\n", (unsigned long)s.current_line);
     }
 }

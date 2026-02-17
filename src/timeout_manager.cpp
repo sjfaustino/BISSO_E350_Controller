@@ -50,7 +50,9 @@ timeout_handle_t* timeoutStart(timeout_type_t type) {
 
 bool timeoutCheck(timeout_handle_t* handle) {
   if (!handle || !handle->active) return false;
-  if ((uint32_t)(millis() - handle->start_time) >= handle->timeout_ms) {
+  uint32_t now = millis();
+  uint32_t elapsed = (now >= handle->start_time) ? (now - handle->start_time) : (UINT32_MAX - handle->start_time + now + 1);
+  if (elapsed >= handle->timeout_ms) {
     handle->triggered = true;
     return true;
   }
@@ -67,12 +69,15 @@ void timeoutStop(timeout_handle_t* handle) {
 }
 
 uint32_t timeoutElapsed(timeout_handle_t* handle) {
-    return (handle && handle->active) ? (uint32_t)(millis() - handle->start_time) : 0;
+    if (!handle || !handle->active) return 0;
+    uint32_t now = millis();
+    return (now >= handle->start_time) ? (now - handle->start_time) : (UINT32_MAX - handle->start_time + now + 1);
 }
 
 uint32_t timeoutRemaining(timeout_handle_t* handle) {
     if (!handle || !handle->active) return 0;
-    uint32_t el = (uint32_t)(millis() - handle->start_time);
+    uint32_t now = millis();
+    uint32_t el = (now >= handle->start_time) ? (now - handle->start_time) : (UINT32_MAX - handle->start_time + now + 1);
     return (el >= handle->timeout_ms) ? 0 : (handle->timeout_ms - el);
 }
 

@@ -105,7 +105,7 @@ void cmd_i2c_scan(int argc, char** argv) {
     bool compare_baseline = hasOption(argc, argv, "--compare");
     const char* addr_str = getOptionValue(argc, argv, "-r");
 
-    logPrintln("\n[I2C] === Bus Scan ===");
+    logPrintln("\n=== Bus Scan ===");
 
     uint8_t start_addr = 0x08, end_addr = 0x77;
     // ... filtering and address range logic ...
@@ -120,17 +120,17 @@ void cmd_i2c_scan(int argc, char** argv) {
     // CRITICAL: Acquire I2C Mutex
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 5000)) {
-        logError("[I2C] Could not acquire bus mutex (busy)");
+        logError("Could not acquire bus mutex (busy)");
         return;
     }
 
     if (verbose) {
-        logPrintf("[I2C] Scanning range 0x%02X-0x%02X with timing...\n", start_addr, end_addr);
+        logPrintf("Scanning range 0x%02X-0x%02X with timing...\n", start_addr, end_addr);
         cliPrintTableHeader(10, 20, 12, 14);
         cliPrintTableRow("Address", "Device Name", "Status", 10, 20, 12, "Response", 14);
         cliPrintTableDivider(10, 20, 12, 14);
     } else {
-        logPrintf("[I2C] Scanning range 0x%02X-0x%02X...\n", start_addr, end_addr);
+        logPrintf("Scanning range 0x%02X-0x%02X...\n", start_addr, end_addr);
     }
 
     for (uint8_t addr = start_addr; addr <= end_addr; addr++) {
@@ -159,7 +159,7 @@ void cmd_i2c_scan(int argc, char** argv) {
                 snprintf(time_str, sizeof(time_str), "%lu us", (unsigned long)elapsed_us);
                 cliPrintTableRow(hex_addr, dev_name, "OK", 10, 20, 12, time_str, 14);
             } else {
-                logInfo("[I2C] Found 0x%02X: %s", addr, dev_name);
+                logPrintf("Found 0x%02X: %s\n", addr, dev_name);
             }
 
             if (found_count < 16) {
@@ -173,7 +173,7 @@ void cmd_i2c_scan(int argc, char** argv) {
         taskUnlockMutex(mutex);
         vTaskDelay(pdMS_TO_TICKS(1));
         if (!taskLockMutex(mutex, 100)) {
-            logError("[I2C] Lost mutex during scan");
+            logError("Lost mutex during scan");
             return;
         }
     }
@@ -182,7 +182,7 @@ void cmd_i2c_scan(int argc, char** argv) {
         cliPrintTableFooter(10, 20, 12, 14);
     }
 
-    logInfo("[I2C] Found %d device(s)", found_count);
+    logPrintf("Found %d device(s)\n", found_count);
     taskUnlockMutex(mutex);
 
     // Handle baseline operations (post-scan, no mutex needed for local state)
@@ -191,28 +191,28 @@ void cmd_i2c_scan(int argc, char** argv) {
         memcpy(baseline.addresses, found_addrs, found_count);
         memcpy(baseline.response_times, response_times, found_count * sizeof(float));
         baseline.timestamp_ms = millis();
-        logInfo("[I2C] Baseline saved.");
+        logPrintf("Baseline saved.\n");
     }
 
     if (compare_baseline && baseline.device_count > 0) {
         // ... comparison logic ...
-        logInfo("[I2C] Comparing with baseline...");
+        logPrintf("Comparing with baseline...\n");
         bool changes = false;
         for (int i = 0; i < baseline.device_count; i++) {
             bool found = false;
             for (int j = 0; j < found_count; j++) {
                 if (baseline.addresses[i] == found_addrs[j]) { found = true; break; }
             }
-            if (!found) { logWarning("[I2C] Device missing: 0x%02X", baseline.addresses[i]); changes = true; }
+            if (!found) { logPrintf("Device missing: 0x%02X\n", baseline.addresses[i]); changes = true; }
         }
         for (int i = 0; i < found_count; i++) {
             bool found = false;
             for (int j = 0; j < baseline.device_count; j++) {
                 if (found_addrs[i] == baseline.addresses[j]) { found = true; break; }
             }
-            if (!found) { logInfo("[I2C] New device: 0x%02X", found_addrs[i]); changes = true; }
+            if (!found) { logPrintf("New device: 0x%02X\n", found_addrs[i]); changes = true; }
         }
-        if (!changes) logInfo("[I2C] No changes detected from baseline");
+        if (!changes) logPrintf("No changes detected from baseline\n");
     }
 }
 
@@ -225,7 +225,7 @@ void cmd_i2c_test(int argc, char** argv) {
     bool stress = hasOption(argc, argv, "--stress");
     bool quick = hasOption(argc, argv, "-q");
 
-    logPrintln("\n[I2C] === Device Test ===");
+    logPrintln("\n=== Device Test ===");
 
     uint8_t test_addr = 0;
     if (argc > 1 && argv[1][0] == '0' && argv[1][1] == 'x') {
@@ -245,7 +245,7 @@ void cmd_i2c_test(int argc, char** argv) {
 
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 5000)) {
-        logError("[I2C] Could not acquire bus mutex");
+        logError("Could not acquire bus mutex");
         return;
     }
 
@@ -292,8 +292,8 @@ void cmd_i2c_test(int argc, char** argv) {
         if (read_res == I2C_RESULT_OK) passed++;
 
         if (stress) {
-            logPrintf("[I2C] Testing 0x%02X: %s\n", addr, (read_res == I2C_RESULT_OK) ? "OK" : "FAIL");
-            logPrintln("[I2C]   Stress test (500 trans)...");
+            logPrintf("Testing 0x%02X: %s\n", addr, (read_res == I2C_RESULT_OK) ? "OK" : "FAIL");
+            logPrintln("  Stress test (500 trans)...");
             int success = 0;
             for (int t = 0; t < 500; t++) {
                 watchdogFeed("CLI");
@@ -305,7 +305,7 @@ void cmd_i2c_test(int argc, char** argv) {
                     if (!taskLockMutex(mutex, 100)) return;
                 }
             }
-            logInfo("[I2C]   Success: %d/500 (%.1f%%)", success, (success / 5.0f));
+            logPrintf("  Success: %d/500 (%.1f%%)\n", success, (success / 5.0f));
         } else if (verbose) {
             char read_result[32], write_result[32], stab[16], addr_str[16];
             snprintf(addr_str, sizeof(addr_str), "0x%02X", addr);
@@ -314,7 +314,7 @@ void cmd_i2c_test(int argc, char** argv) {
             snprintf(stab, sizeof(stab), "%d%%", stability_score);
             cliPrintTableRow(addr_str, read_result, write_result, 10, 16, 12, stab, 12);
         } else {
-            logInfo("[I2C] 0x%02X: %s", addr, (read_res == I2C_RESULT_OK) ? "PASS" : "FAIL");
+            logPrintf("0x%02X: %s\n", addr, (read_res == I2C_RESULT_OK) ? "PASS" : "FAIL");
         }
         
         taskUnlockMutex(mutex);
@@ -323,7 +323,7 @@ void cmd_i2c_test(int argc, char** argv) {
     }
 
     if (!stress && verbose) cliPrintTableFooter(10, 16, 12, 12);
-    logInfo("[I2C] Passed: %d/%d", passed, test_count);
+    logPrintf("Passed: %d/%d\n", passed, test_count);
     taskUnlockMutex(mutex);
 }
 
@@ -337,7 +337,7 @@ void cmd_i2c_stats(int argc, char** argv) {
 
     if (reset) {
         i2cResetStats();
-        logInfo("[I2C] Statistics cleared");
+        logPrintf("Statistics cleared\n");
         return;
     }
 
@@ -356,7 +356,7 @@ void cmd_i2c_stats(int argc, char** argv) {
         logPrintf("  \"error_bus\": %lu\r\n", (unsigned long)stats.error_bus);
         logPrintln("}");
     } else {
-        logPrintln("\n[I2C] === Statistics ===");
+        logPrintln("\n=== Statistics ===");
         logPrintf("Total Transactions: %lu\n", (unsigned long)stats.transactions_total);
         logPrintf("Successful: %lu (%.1f%%)\n", (unsigned long)stats.transactions_success, stats.success_rate);
         logPrintf("Failed: %lu\n", (unsigned long)stats.transactions_failed);
@@ -377,22 +377,22 @@ void cmd_i2c_stats(int argc, char** argv) {
 // ============================================================================
 
 void cmd_i2c_recover(int argc, char** argv) {
-    logPrintln("\n[I2C] === Bus Recovery ===");
+    logPrintln("\n=== Bus Recovery ===");
 
     i2c_bus_status_t status = i2cCheckBusStatus();
     logPrintf("Current status: %s\n", i2cBusStatusToString(status));
 
     if (status == I2C_BUS_OK) {
-        logInfo("[I2C] Bus is healthy, no recovery needed");
+        logPrintf("Bus is healthy, no recovery needed\n");
         return;
     }
 
-    logInfo("[I2C] Recovering...");
+    logPrintf("Recovering...\n");
     i2cRecoverBus();
 
     delay(100);
     status = i2cCheckBusStatus();
-    logInfo("[I2C] Recovery complete. New status: %s", i2cBusStatusToString(status));
+    logPrintf("Recovery complete. New status: %s\n", i2cBusStatusToString(status));
 }
 
 // ============================================================================
@@ -405,19 +405,23 @@ void cmd_i2c_monitor(int argc, char** argv) {
     const char* dur_str = getOptionValue(argc, argv, "-t");
     if (dur_str) duration_sec = atoi(dur_str);
 
-    logPrintf("\n[I2C] === Monitoring for %d seconds ===\n", duration_sec);
-    logPrintln("[I2C] (Press Ctrl+C to stop)");
+    logPrintf("\n=== Monitoring for %d seconds ===\n", duration_sec);
+    logPrintln("(Press Ctrl+C to stop)");
 
     uint32_t start_time = millis();
     SemaphoreHandle_t mutex = taskGetI2cMutex();
 
-    while (millis() - start_time < duration_sec * 1000) {
+    while (true) {
+        uint32_t now = millis();
+        uint32_t elapsed_ms = (now >= start_time) ? (now - start_time) : (UINT32_MAX - start_time + now + 1);
+        if (elapsed_ms >= (uint32_t)duration_sec * 1000) break;
+
         watchdogFeed("CLI");
         
         // Check for Ctrl+C (0x03)
         if (CLI_SERIAL.available() > 0 && CLI_SERIAL.peek() == 0x03) {
             CLI_SERIAL.read(); // Consume 0x03
-            logInfo("\n[I2C] Monitor aborted by user");
+            logPrintf("\nMonitor aborted by user\n");
             break;
         }
 
@@ -427,17 +431,17 @@ void cmd_i2c_monitor(int argc, char** argv) {
                 uint8_t test_byte = 0;
                 i2c_result_t res = i2cReadWithRetry(addr, &test_byte, 1);
                 if (res == I2C_RESULT_OK) {
-                    logPrintf("[%lu] 0x%02X (%s): OK\n", (unsigned long)(millis() / 1000), addr, KNOWN_DEVICES[i].name);
+                    logPrintf("[%lu] 0x%02X (%s): OK\n", (unsigned long)(now / 1000), addr, KNOWN_DEVICES[i].name);
                 } else {
-                    logPrintf("[%lu] 0x%02X (%s): FAIL - %s\n", (unsigned long)(millis() / 1000), addr, KNOWN_DEVICES[i].name, i2cResultToString(res));
-                    if (with_alerts) logWarning("[ALERT] Device 0x%02X not responding!", addr);
+                    logPrintf("[%lu] 0x%02X (%s): FAIL - %s\n", (unsigned long)(now / 1000), addr, KNOWN_DEVICES[i].name, i2cResultToString(res));
+                    if (with_alerts) logPrintf("[ALERT] Device 0x%02X not responding!\n", addr);
                 }
             }
             taskUnlockMutex(mutex);
         }
         vTaskDelay(pdMS_TO_TICKS(1000)); // Sample every 1 second
     }
-    logInfo("[I2C] Monitor stopped");
+    logPrintf("Monitor stopped\n");
 }
 
 // ============================================================================
@@ -449,11 +453,11 @@ void cmd_i2c_benchmark(int argc, char** argv) {
     const char* iter_str = getOptionValue(argc, argv, "-n");
     if (iter_str) iterations = atoi(iter_str);
 
-    logPrintf("\n[I2C] === Benchmarking (%d iterations) ===\n", iterations);
+    logPrintf("\n=== Benchmarking (%d iterations) ===\n", iterations);
     
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 5000)) {
-        logError("[I2C] Could not acquire bus mutex");
+        logError("Could not acquire bus mutex");
         return;
     }
 
@@ -501,10 +505,10 @@ void cmd_i2c_benchmark(int argc, char** argv) {
 // ============================================================================
 
 void cmd_i2c_health(int argc, char** argv) {
-    logPrintln("\n[I2C] === Health Check ===");
+    logPrintln("\n=== Health Check ===");
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 1000)) {
-        logError("[I2C] Could not acquire bus mutex");
+        logError("Could not acquire bus mutex");
         return;
     }
 
@@ -536,17 +540,17 @@ void cmd_i2c_health(int argc, char** argv) {
 // ============================================================================
 
 void cmd_i2c_selftest(int argc, char** argv) {
-    logPrintln("\n[I2C] === I2C Self-Test Sequence ===");
+    logPrintln("\n=== I2C Self-Test Sequence ===");
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 2000)) {
-        logError("[I2C] Could not acquire bus mutex");
+        logError("Could not acquire bus mutex");
         return;
     }
 
     bool all_passed = true;
     logPrintln("[1/5] Checking GPIO pins...");
     i2c_bus_status_t status = i2cCheckBusStatus();
-    if (status == I2C_BUS_OK) logInfo("      [PASS] GPIO pins healthy");
+    if (status == I2C_BUS_OK) logPrintf("      [PASS] GPIO pins healthy\n");
     else { logError("      [FAIL] GPIO problem: %s", i2cBusStatusToString(status)); all_passed = false; }
 
     logPrintln("[2/5] Scanning bus...");
@@ -555,17 +559,17 @@ void cmd_i2c_selftest(int argc, char** argv) {
         uint8_t test_byte = 0;
         if (i2cReadWithRetry(KNOWN_DEVICES[i].address, &test_byte, 1) == I2C_RESULT_OK) device_count++;
     }
-    logInfo("      [PASS] Found %d devices", device_count);
+    logPrintf("      [PASS] Found %d devices\n", device_count);
 
     for (int i = 0; i < device_count && i < 3; i++) {
         watchdogFeed("CLI");
         logPrintf("[%d/5] Testing device 0x%02X...\n", i + 3, KNOWN_DEVICES[i].address);
         uint8_t test_byte = 0;
-        if (i2cReadWithRetry(KNOWN_DEVICES[i].address, &test_byte, 1) == I2C_RESULT_OK) logInfo("      [PASS]");
+        if (i2cReadWithRetry(KNOWN_DEVICES[i].address, &test_byte, 1) == I2C_RESULT_OK) logPrintf("      [PASS]\n");
         else { logError("      [FAIL]"); all_passed = false; }
     }
     taskUnlockMutex(mutex);
-    logInfo("\n[RESULT] %s", all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
+    logPrintf("\n%s\n", all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
 }
 
 // ============================================================================
@@ -573,7 +577,7 @@ void cmd_i2c_selftest(int argc, char** argv) {
 // ============================================================================
 
 void cmd_i2c_troubleshoot(int argc, char** argv) {
-    logPrintln("\n[I2C] === Interactive Troubleshooting Wizard ===");
+    logPrintln("\n=== Interactive Troubleshooting Wizard ===");
     uint8_t target_addr = 0;
     if (argc > 1 && argv[1][0] == '0' && argv[1][1] == 'x') {
         target_addr = strtol(argv[1], NULL, 16);
@@ -581,7 +585,7 @@ void cmd_i2c_troubleshoot(int argc, char** argv) {
 
     SemaphoreHandle_t mutex = taskGetI2cMutex();
     if (!taskLockMutex(mutex, 2000)) {
-        logError("[I2C] Could not acquire bus mutex");
+        logError("Could not acquire bus mutex");
         return;
     }
 
@@ -592,7 +596,7 @@ void cmd_i2c_troubleshoot(int argc, char** argv) {
 
     if (status != I2C_BUS_OK) {
         taskUnlockMutex(mutex);
-        logWarning("\n[I2C] Problem detected: I2C bus not responding");
+        logPrintf("\nProblem detected: I2C bus not responding\n");
         return;
     }
 
@@ -600,13 +604,13 @@ void cmd_i2c_troubleshoot(int argc, char** argv) {
     if (target_addr) {
         uint8_t test_byte = 0;
         i2c_result_t res = i2cReadWithRetry(target_addr, &test_byte, 1);
-        if (res == I2C_RESULT_OK) logInfo("  Device 0x%02X: FOUND", target_addr);
-        else logWarning("  Device 0x%02X: NOT FOUND (%s)", target_addr, i2cResultToString(res));
+        if (res == I2C_RESULT_OK) logPrintf("  Device 0x%02X: FOUND\n", target_addr);
+        else logPrintf("  Device 0x%02X: NOT FOUND (%s)\n", target_addr, i2cResultToString(res));
     } else {
         for (int i = 0; i < KNOWN_DEVICE_COUNT; i++) {
             uint8_t test_byte = 0;
             if (i2cReadWithRetry(KNOWN_DEVICES[i].address, &test_byte, 1) == I2C_RESULT_OK) {
-                logInfo("  0x%02X (%s): OK", KNOWN_DEVICES[i].address, KNOWN_DEVICES[i].name);
+                logPrintf("  0x%02X (%s): OK\n", KNOWN_DEVICES[i].address, KNOWN_DEVICES[i].name);
             }
         }
     }
@@ -619,7 +623,7 @@ void cmd_i2c_troubleshoot(int argc, char** argv) {
 
 void cmd_i2c_main(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("\n[I2C] Usage: i2c <command> [options]");
+        logPrintln("\nUsage: i2c <command> [options]");
         logPrintln("\nCommands:");
         logPrintln("  scan [options]      - Scan for I2C devices");
         logPrintln("                        Options: -v (verbose), --save, --compare");
@@ -648,7 +652,7 @@ void cmd_i2c_main(int argc, char** argv) {
     else if (strcasecmp(subcmd, "health") == 0) cmd_i2c_health(argc - 1, argv + 1);
     else if (strcasecmp(subcmd, "selftest") == 0) cmd_i2c_selftest(argc - 1, argv + 1);
     else if (strcasecmp(subcmd, "troubleshoot") == 0) cmd_i2c_troubleshoot(argc - 1, argv + 1);
-    else logWarning("[I2C] Unknown command: %s", subcmd);
+    else logPrintf("Unknown command: %s\n", subcmd);
 }
 
 // ============================================================================

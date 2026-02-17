@@ -75,37 +75,62 @@ void MotionStateMachine::executeExitAction(Axis* axis, motion_state_t state) {
     }
 }
 
+// --- TRANSITION TABLE ---
+// Defines ALL valid motion state changes. 
+// Any transition not directly listed here is blocked.
+struct MotionTransition {
+    motion_state_t from;
+    motion_state_t to;
+};
+
+static const MotionTransition motion_transition_table[] = {
+    // FROM IDLE
+    {MOTION_IDLE, MOTION_EXECUTING},
+    {MOTION_IDLE, MOTION_HOMING_APPROACH_FAST},
+    {MOTION_IDLE, MOTION_STOPPING},
+    {MOTION_IDLE, MOTION_ERROR},
+
+    // FROM EXECUTING
+    {MOTION_EXECUTING, MOTION_IDLE},      // Natural end
+    {MOTION_EXECUTING, MOTION_STOPPING},  // Operator stop
+    {MOTION_EXECUTING, MOTION_ERROR},     // Fault
+
+    // FROM HOMING SEQUENCE
+    {MOTION_HOMING_APPROACH_FAST, MOTION_HOMING_BACKOFF},
+    {MOTION_HOMING_APPROACH_FAST, MOTION_ERROR},
+    {MOTION_HOMING_BACKOFF,       MOTION_HOMING_APPROACH_FINE},
+    {MOTION_HOMING_BACKOFF,       MOTION_ERROR},
+    {MOTION_HOMING_APPROACH_FINE, MOTION_HOMING_SETTLE},
+    {MOTION_HOMING_APPROACH_FINE, MOTION_ERROR},
+    {MOTION_HOMING_SETTLE,        MOTION_IDLE},
+    {MOTION_HOMING_SETTLE,        MOTION_ERROR},
+
+    // FROM STOPPING
+    {MOTION_STOPPING, MOTION_IDLE},
+    {MOTION_STOPPING, MOTION_ERROR},
+
+    // FROM ERROR
+    {MOTION_ERROR, MOTION_IDLE}           // Recovery
+};
+
+static const size_t MOTION_TRANSITION_COUNT = sizeof(motion_transition_table) / sizeof(motion_transition_table[0]);
+
 bool MotionStateMachine::isValidTransition(motion_state_t from_state, motion_state_t to_state) {
-    // ERROR state can transition to any state (for recovery)
-    if (from_state == MOTION_ERROR) {
-        return true;
+    if (from_state == to_state) return true;
+
+    // Direct transition to ERROR is always allowed
+    if (to_state == MOTION_ERROR) return true;
+
+    for (size_t i = 0; i < MOTION_TRANSITION_COUNT; i++) {
+        if (motion_transition_table[i].from == from_state && 
+            motion_transition_table[i].to == to_state) {
+            return true;
+        }
     }
 
-    // Any state can transition to ERROR or IDLE
-    if (to_state == MOTION_ERROR || to_state == MOTION_IDLE) {
-        return true;
-    }
-
-    // IDLE can transition to any state (start of operations)
-    if (from_state == MOTION_IDLE) {
-        return true;
-    }
-
-    // Homing sequence must follow proper order
-    if (from_state == MOTION_HOMING_APPROACH_FAST && to_state != MOTION_HOMING_BACKOFF && to_state != MOTION_ERROR) {
-        return false;
-    }
-    if (from_state == MOTION_HOMING_BACKOFF && to_state != MOTION_HOMING_APPROACH_FINE && to_state != MOTION_ERROR) {
-        return false;
-    }
-    if (from_state == MOTION_HOMING_APPROACH_FINE && to_state != MOTION_HOMING_SETTLE && to_state != MOTION_ERROR) {
-        return false;
-    }
-
-    // EXECUTING should transition to STOPPING before IDLE
-    // (but we allow direct transitions for safety/emergency stop)
-
-    return true; // Allow transition
+    logWarning("[MOTION] Blocked invalid state transition: %s -> %s", 
+               motionStateToString(from_state), motionStateToString(to_state));
+    return false;
 }
 
 bool MotionStateMachine::transitionTo(Axis* axis, motion_state_t new_state) {
@@ -225,7 +250,9 @@ void state_wait_consenso_handler(Axis* axis, int32_t pos, int32_t target, bool c
     }
 
     // Check for timeout
-    if ((uint32_t)(millis() - axis->state_entry_ms) > MOTION_CONSENSO_TIMEOUT_MS) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= axis->state_entry_ms) ? (now - axis->state_entry_ms) : (UINT32_MAX - axis->state_entry_ms + now + 1);
+    if (elapsed > MOTION_CONSENSO_TIMEOUT_MS) {
         faultLogEntry(FAULT_ERROR, FAULT_PLC_COMM_LOSS, axis->id, 0, "Consensus Timeout");
         MotionStateMachine::transitionTo(axis, MOTION_ERROR);
         return;
@@ -292,7 +319,8 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
     // Hunting is intentionally disabled for the Y-axis (Cutting) because an automatic 
     // position correction (reversing) while the blade is inside the material could 
     // cause immediate blade breakage or severe damage to the workpiece/machine.
-    uint32_t settle_time = (uint32_t)(millis() - axis->state_entry_ms);
+    uint32_t now = millis();
+    uint32_t settle_time = (now >= axis->state_entry_ms) ? (now - axis->state_entry_ms) : (UINT32_MAX - axis->state_entry_ms + now + 1);
     if ((axis->id == 0 || axis->id == 2) && settle_time > 600) {
         logInfo("[AXIS %d] Position hunt: error=%ld counts. Reversing...", 
                 axis->id, (long)(target - pos));
@@ -312,7 +340,9 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
 
     // Check for timeout (Safety fallback if hunting fails or gets stuck)
     uint32_t timeout = configGetInt(KEY_STOP_TIMEOUT, 5000);
-    if ((uint32_t)(millis() - axis->state_entry_ms) > timeout) {
+    uint32_t now_stop = millis();
+    uint32_t elapsed_stop = (now_stop >= axis->state_entry_ms) ? (now_stop - axis->state_entry_ms) : (UINT32_MAX - axis->state_entry_ms + now_stop + 1);
+    if (elapsed_stop > timeout) {
         logWarning("[AXIS %d] Stop settlement timeout (pos=%ld, target=%ld, margin=%ld)", 
                    axis->id, (long)pos, (long)target, (long)margin_counts);
         MotionStateMachine::transitionTo(axis, MOTION_IDLE);
@@ -333,7 +363,9 @@ void state_homing_approach_fast_handler(Axis* axis, int32_t pos, int32_t target,
     bool hit = elboI73GetInput(AXIS_TO_I73_BIT[axis->id]);
 
     // Check for timeout
-    if ((uint32_t)(millis() - axis->state_entry_ms) > 45000) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= axis->state_entry_ms) ? (now - axis->state_entry_ms) : (UINT32_MAX - axis->state_entry_ms + now + 1);
+    if (elapsed > 45000) {
         logError("[HOME] Timeout on axis %d", axis->id);
         MotionStateMachine::transitionTo(axis, MOTION_ERROR);
         return;
@@ -353,7 +385,9 @@ void state_homing_backoff_handler(Axis* axis, int32_t pos, int32_t target, bool 
     // Wait until limit switch is released
     if (!elboI73GetInput(AXIS_TO_I73_BIT[axis->id])) {
         // Wait a bit after switch release
-        if ((uint32_t)(millis() - axis->state_entry_ms) > 1000) {
+        uint32_t now = millis();
+        uint32_t elapsed = (now >= axis->state_entry_ms) ? (now - axis->state_entry_ms) : (UINT32_MAX - axis->state_entry_ms + now + 1);
+        if (elapsed > 1000) {
             motionSetPLCAxisDirection(255, false, false);
             int slow_prof = configGetInt(KEY_HOME_PROFILE_SLOW, 0);
             motionSetPLCSpeedProfile((speed_profile_t)slow_prof);
@@ -367,7 +401,9 @@ void state_homing_approach_fine_handler(Axis* axis, int32_t pos, int32_t target,
     bool hit = elboI73GetInput(AXIS_TO_I73_BIT[axis->id]);
 
     // Check for timeout
-    if ((uint32_t)(millis() - axis->state_entry_ms) > 45000) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= axis->state_entry_ms) ? (now - axis->state_entry_ms) : (UINT32_MAX - axis->state_entry_ms + now + 1);
+    if (elapsed > 45000) {
         logError("[HOME] Fine approach timeout on axis %d", axis->id);
         MotionStateMachine::transitionTo(axis, MOTION_ERROR);
         return;
@@ -382,7 +418,9 @@ void state_homing_approach_fine_handler(Axis* axis, int32_t pos, int32_t target,
 
 void state_homing_settle_handler(Axis* axis, int32_t pos, int32_t target, bool consensus) {
     // Wait for mechanical settling
-    if ((uint32_t)(millis() - axis->state_entry_ms) > HOMING_SETTLE_MS) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= axis->state_entry_ms) ? (now - axis->state_entry_ms) : (UINT32_MAX - axis->state_entry_ms + now + 1);
+    if (elapsed > HOMING_SETTLE_MS) {
         // Zero the encoder
         wj66SetZero(axis->id);
         axis->position = 0;
@@ -399,7 +437,9 @@ void state_homing_settle_handler(Axis* axis, int32_t pos, int32_t target, bool c
 
 void state_dwell_handler(Axis* axis, int32_t pos, int32_t target, bool consensus) {
     // Wait for dwell timer to expire
-    if ((int32_t)(millis() - axis->dwell_end_ms) >= 0) {
+    // dwell_end_ms is an absolute time in the future
+    uint32_t now = millis();
+    if ((int32_t)(now - axis->dwell_end_ms) >= 0) {
         logInfo("[MOTION] Dwell complete on axis %d", axis->id);
         MotionStateMachine::transitionTo(axis, MOTION_IDLE);
     }
@@ -442,8 +482,9 @@ void state_wait_pin_handler(Axis* axis, int32_t pos, int32_t target, bool consen
     }
 
     // Check for timeout
-    if (axis->wait_pin_timeout_ms > 0 &&
-        (uint32_t)(millis() - axis->state_entry_ms) >= axis->wait_pin_timeout_ms) {
+    uint32_t now = millis();
+    uint32_t elapsed = (now >= axis->state_entry_ms) ? (now - axis->state_entry_ms) : (UINT32_MAX - axis->state_entry_ms + now + 1);
+    if (axis->wait_pin_timeout_ms > 0 && elapsed >= axis->wait_pin_timeout_ms) {
         faultLogEntry(FAULT_WARNING, FAULT_MOTION_TIMEOUT, axis->id, 0, "Pin wait timeout");
         logWarning("[MOTION] Pin %d wait timeout on axis %d", axis->wait_pin_id, axis->id);
         MotionStateMachine::transitionTo(axis, MOTION_ERROR);

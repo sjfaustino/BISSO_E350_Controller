@@ -19,6 +19,7 @@
 #include "config_validator_schema.h"  // PHASE 5.2: Configuration schema validation
 #include "timeout_manager.h"
 #include "watchdog_manager.h"
+#include "spinlock_timing.h"
 #include "auth_manager.h"  // PHASE 5.10: SHA-256 password hashing
 #include "web_server.h"
 #include "network_manager.h"
@@ -173,6 +174,9 @@ void setup() {
   
   serialLoggerInit(LOG_LEVEL);
   
+  // PHASE 5.28: Cursor AI Audit - Initialize spinlock timing mutex early
+  spinlockTimingInit();
+
   boot_time_ms = millis();
 
   char ver_str[FIRMWARE_VERSION_STRING_LEN];

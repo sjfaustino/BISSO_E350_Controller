@@ -19,11 +19,11 @@
 
 // Job execution status
 typedef enum {
-    JOB_PENDING = 0,    // Queued, not yet started
-    JOB_RUNNING,        // Currently executing
-    JOB_COMPLETED,      // Finished successfully
-    JOB_FAILED,         // Execution failed
-    JOB_SKIPPED         // Skipped by operator
+    QJOB_PENDING = 0,    // Queued, not yet started
+    QJOB_RUNNING,        // Currently executing
+    QJOB_COMPLETED,      // Finished successfully
+    QJOB_FAILED,         // Execution failed
+    QJOB_SKIPPED         // Skipped by operator
 } gcode_job_status_t;
 
 // Single job entry in the queue
@@ -54,11 +54,11 @@ void gcodeQueueInit();
 // Add a new job to the queue (returns job ID, 0 on failure)
 uint16_t gcodeQueueAdd(const char* command);
 
-// Get current job being executed (NULL if none)
-gcode_job_t* gcodeQueueGetCurrent();
+// Get current job being executed (returns true if found, copies to out_job)
+bool gcodeQueueGetCurrent(gcode_job_t* out_job);
 
-// Get job by ID (NULL if not found)
-gcode_job_t* gcodeQueueGetJob(uint16_t id);
+// Get job by ID (returns true if found, copies to out_job)
+bool gcodeQueueGetJob(uint16_t id, gcode_job_t* out_job);
 
 // Get queue state summary
 gcode_queue_state_t gcodeQueueGetState();

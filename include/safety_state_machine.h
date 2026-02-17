@@ -17,6 +17,11 @@ typedef enum {
 } safety_fsm_state_t; // This is the final name for the ENUM type
 
 /**
+ * Initialize safety state machine (mutexes, etc)
+ */
+void safetyFsmInit();
+
+/**
  * Validate safety state transition
  * * @param current Current safety state
  * @param new_state Requested new state

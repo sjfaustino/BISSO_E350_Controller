@@ -5,10 +5,12 @@
  */
 
 #include "job_manager.h"
+#include "gcode_queue.h"
 #include "gcode_parser.h"
 #include "motion.h"        // <-- FIX: Added missing include for motionStop
 #include "motion_buffer.h" // Provides MOTION_BUFFER_SIZE
 #include "serial_logger.h"
+#include <ctype.h>
 #include "fault_logging.h"
 #include "config_unified.h"
 #include "config_keys.h"
@@ -48,13 +50,22 @@ void JobManager::update() {
         if (motionBuffer.isFull()) break;
 
         if (jobFile.available()) {
-            String line = jobFile.readStringUntil('\n');
-            line.trim();
+            // PHASE 5.28: Avoid Arduino String heap fragmentation
+            char line_buf[GCODE_CMD_MAX_LEN];
+            size_t bytes_read = jobFile.readBytesUntil('\n', line_buf, sizeof(line_buf) - 1);
+            line_buf[bytes_read] = '\0';
+            
+            // Basic trim (manual)
+            char* trimmed = line_buf;
+            while(isspace(*trimmed)) trimmed++;
+            char* end = trimmed + strlen(trimmed) - 1;
+            while(end > trimmed && isspace(*end)) { *end = '\0'; end--; }
+
             status.current_line++;
 
-            if (line.length() > 0) {
-                if (!gcodeParser.processCommand(line.c_str())) {
-                    logWarning("[JOB] Line %d ignored: %s", status.current_line, line.c_str());
+            if (strlen(trimmed) > 0) {
+                if (!gcodeParser.processCommand(trimmed)) {
+                    logWarning("[JOB] Line %d ignored: %s", status.current_line, trimmed);
                 }
             }
         } else {
@@ -63,7 +74,10 @@ void JobManager::update() {
             jobFile.close();
             file_open = false;
             status.state = JOB_COMPLETED;
-            status.duration_ms = millis() - status.start_time;
+            uint32_t now_job = millis();
+            status.duration_ms = (now_job >= status.start_time) 
+                ? (now_job - status.start_time) 
+                : (UINT32_MAX - status.start_time + now_job + 1);
             
             // ITEM 3: Display session summary at job end
             cuttingEndSession();

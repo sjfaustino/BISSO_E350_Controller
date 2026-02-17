@@ -27,27 +27,27 @@ void cmd_wifi_scan(int argc, char** argv) {
     bool force = (argc >= 3 && strcasecmp(argv[2], "force") == 0);
     
     if (force) {
-        logPrintln("[WIFI] Forcing scan by disconnecting first...");
+        logPrintln("Forcing scan by disconnecting first...");
         WiFi.disconnect();
         delay(500);
     }
 
-    logPrintln("[WIFI] Scanning...");
+    logPrintln("Scanning...");
     // Scan without disconnecting to avoid breaking existing sessions
     int n = WiFi.scanNetworks(false, false, false, 300); // Fast scan
     
     if (n < 0) {
         if (n == -1) { // WIFI_SCAN_RUNNING
-            logPrintln("[WIFI] Scan already in progress.");
+            logPrintln("Scan already in progress.");
         } else {
-            logPrintf("[WIFI] Scan failed (Error code: %d).\n", n);
-            logPrintln("[WIFI] TIP: If you have invalid credentials saved, they might be blocking the scan.");
-            logPrintln("[WIFI] TIP: Try 'wifi scan force' or 'wifi disconnect' first.");
+            logPrintf("Scan failed (Error code: %d).\n", n);
+            logPrintln("TIP: If you have invalid credentials saved, they might be blocking the scan.");
+            logPrintln("TIP: Try 'wifi scan force' or 'wifi disconnect' first.");
         }
     } else if (n == 0) {
-        logPrintln("[WIFI] No networks found.");
+        logPrintln("No networks found.");
     } else {
-        logPrintf("[WIFI] Found %d networks:\r\n", n);
+        logPrintf("Found %d networks:\r\n", n);
         for (int i = 0; i < n; ++i) {
             logPrintf("  %2d: %-32.32s | %d dBm %s\r\n", 
                       i+1, 
@@ -61,21 +61,21 @@ void cmd_wifi_scan(int argc, char** argv) {
 }
 
 void cmd_wifi_disconnect(int argc, char** argv) {
-    logPrintln("[WIFI] Disconnecting and stopping auto-reconnect...");
+    logPrintln("Disconnecting and stopping auto-reconnect...");
     WiFi.setAutoReconnect(false);
     WiFi.disconnect(true, true); // eraseap = false, stopSTA = true? wait, signature is (eraseap, set_at_startup) or similar
     // Actually in ESP32 Arduino: WiFi.disconnect(bool wifioff = false, bool eraseap = false)
     WiFi.disconnect(false, false);
-    logPrintln("[WIFI] [OK] Background connection loop stopped.");
-    logPrintln("[WIFI] Use 'wifi connect' or 'wifi scan' now.");
+    logPrintln("Background connection loop stopped.");
+    logPrintln("Use 'wifi connect' or 'wifi scan' now.");
 }
 
 void cmd_wifi_connect(int argc, char** argv) {
     if (argc < 4) {
-        logPrintln("[WIFI] Usage: wifi connect <ssid> <password>");
+        logPrintln("Usage: wifi connect <ssid> <password>");
         return;
     }
-    logPrintf("[WIFI] Connecting to '%s'...\n", argv[2]);
+    logPrintf("Connecting to '%s'...\n", argv[2]);
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true); // Re-enable auto-reconnect
     WiFi.setTxPower(WIFI_POWER_19_5dBm); // Set maximum power for best range
@@ -84,19 +84,19 @@ void cmd_wifi_connect(int argc, char** argv) {
 
     // CRITICAL FIX: Non-blocking connection to prevent freezing motion control
     // WiFi connects in background - don't block CLI task with delay() loops
-    logPrintln("[WIFI] [OK] Connection initiated (non-blocking)");
-    logPrintln("[WIFI] Note: WiFi connects in background during normal operation");
-    logPrintln("[WIFI] Use 'wifi status' to check connection progress");
+    logPrintln("Connection initiated (non-blocking)");
+    logPrintln("Note: WiFi connects in background during normal operation");
+    logPrintln("Use 'wifi status' to check connection progress");
     logPrintln("");
-    logPrintln("[WIFI] SAFETY: This command does NOT block motion control");
-    logPrintln("[WIFI] Connection will complete within 10-20 seconds");
+    logPrintln("SAFETY: This command does NOT block motion control");
+    logPrintln("Connection will complete within 10-20 seconds");
 
     // Show immediate status
-    logPrintf("[WIFI] Current status: %s\r\n", wifiGetStatusString(WiFi.status()));
+    logPrintf("Current status: %s\r\n", wifiGetStatusString(WiFi.status()));
 }
 
 void cmd_wifi_status(int argc, char** argv) {
-    logPrintln("\n[WIFI] === Status ===");
+    logPrintln("\n=== Status ===");
     logPrintf("  Status: %s\r\n", wifiGetStatusString(WiFi.status()));
     logPrintf("  MAC:    %s\r\n", WiFi.macAddress().c_str());
     if (WiFi.status() == WL_CONNECTED) {
@@ -109,7 +109,7 @@ void cmd_wifi_status(int argc, char** argv) {
 
 void cmd_wifi_ap(int argc, char **argv) {
   if (argc < 3) {
-    logPrintln("\n[WIFI] === AP Mode Management ===");
+    logPrintln("\n=== AP Mode Management ===");
     CLI_USAGE("wifi", "ap [on|off|set|status]");
     CLI_HELP_LINE("on", "Enable AP mode");
     CLI_HELP_LINE("off", "Disable AP mode");
@@ -121,34 +121,34 @@ void cmd_wifi_ap(int argc, char **argv) {
   if (strcasecmp(argv[2], "on") == 0) {
     configSetInt(KEY_WIFI_AP_EN, 1);
     configUnifiedSave();
-    logInfo("[WIFI] [OK] AP Mode enabled. Reboot required.");
+    logPrintf("AP Mode enabled. Reboot required.\n");
   } else if (strcasecmp(argv[2], "off") == 0) {
     configSetInt(KEY_WIFI_AP_EN, 0);
     configUnifiedSave();
-    logInfo("[WIFI] [OK] AP Mode disabled. Reboot required.");
+    logPrintf("AP Mode disabled. Reboot required.\n");
   } else if (strcasecmp(argv[2], "status") == 0) {
     int en = configGetInt(KEY_WIFI_AP_EN, 1);
     const char *ssid = configGetString(KEY_WIFI_AP_SSID, "BISSO-E350-Setup");
-    logPrintf("[WIFI] AP Mode: %s\n", en ? "ENABLED" : "DISABLED");
-    logPrintf("[WIFI] AP SSID: %s\n", ssid);
+    logPrintf("AP Mode: %s\n", en ? "ENABLED" : "DISABLED");
+    logPrintf("AP SSID: %s\n", ssid);
   } else if (strcasecmp(argv[2], "set") == 0) {
     if (argc < 5) {
-      logError("[WIFI] Usage: wifi ap set <s|p> <value>");
+      logError("Usage: wifi ap set <s|p> <value>");
       return;
     }
     if (strcasecmp(argv[3], "s") == 0) {
       configSetString(KEY_WIFI_AP_SSID, argv[4]);
-      logInfo("[WIFI] [OK] AP SSID set to '%s'", argv[4]);
+      logPrintf("AP SSID set to '%s'\n", argv[4]);
     } else if (strcasecmp(argv[3], "p") == 0) {
       if (strlen(argv[4]) < 8) {
-        logError("[WIFI] AP Password must be at least 8 chars");
+        logError("AP Password must be at least 8 chars");
         return;
       }
       configSetString(KEY_WIFI_AP_PASS, argv[4]);
-      logInfo("[WIFI] [OK] AP Password updated");
+      logPrintf("AP Password updated\n");
     }
     configUnifiedSave();
-    logWarning("[WIFI] Reboot required for changes to take effect");
+    logPrintf("Reboot required for changes to take effect\n");
   }
 }
 
@@ -162,7 +162,7 @@ void cmd_wifi_main(int argc, char **argv) {
       {"ap",      cmd_wifi_ap,      "Configure Access Point"}
   };
 
-  cliDispatchSubcommand("[WIFI]", argc, argv, subcmds, 
+  cliDispatchSubcommand("", argc, argv, subcmds, 
                         sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -171,7 +171,7 @@ void cmd_wifi_main(int argc, char **argv) {
 // =============================================================================
 
 void cmd_eth_status(int argc, char** argv) {
-    logPrintln("\n[ETH] === Ethernet Status ===");
+    logPrintln("\n=== Ethernet Status ===");
     
     int enabled = configGetInt(KEY_ETH_ENABLED, 0);
     int dhcp = configGetInt(KEY_ETH_DHCP, 1);
@@ -218,26 +218,26 @@ static void cmd_eth_on(int argc, char** argv) {
     (void)argc; (void)argv;
     configSetInt(KEY_ETH_ENABLED, 1);
     configUnifiedSave();
-    logInfo("[ETH] [OK] Ethernet enabled. Reboot required.");
+    logPrintf("Ethernet enabled. Reboot required.\n");
 }
 
 static void cmd_eth_off(int argc, char** argv) {
     (void)argc; (void)argv;
     configSetInt(KEY_ETH_ENABLED, 0);
     configUnifiedSave();
-    logInfo("[ETH] [OK] Ethernet disabled. Reboot required.");
+    logPrintf("Ethernet disabled. Reboot required.\n");
 }
 
 static void cmd_eth_dhcp(int argc, char** argv) {
     (void)argc; (void)argv;
     configSetInt(KEY_ETH_DHCP, 1);
     configUnifiedSave();
-    logInfo("[ETH] [OK] DHCP mode enabled. Reboot required.");
+    logPrintf("DHCP mode enabled. Reboot required.\n");
 }
 
 static void cmd_eth_static(int argc, char** argv) {
     if (argc < 4) {
-        logError("[ETH] Usage: eth static <ip> <gateway> [mask]");
+        logError("Usage: eth static <ip> <gateway> [mask]");
         return;
     }
     configSetString(KEY_ETH_IP, argv[2]);
@@ -249,21 +249,21 @@ static void cmd_eth_static(int argc, char** argv) {
     }
     configSetInt(KEY_ETH_DHCP, 0);
     configUnifiedSave();
-    logInfo("[ETH] [OK] Static IP configured:");
+    logPrintf("Static IP configured:\n");
     logPrintf("  IP:      %s\n", argv[2]);
     logPrintf("  Gateway: %s\n", argv[3]);
     logPrintf("  Mask:    %s\n", argc >= 5 ? argv[4] : "255.255.255.0");
-    logWarning("[ETH] Reboot required for changes to take effect.");
+    logPrintf("Reboot required for changes to take effect.\n");
 }
 
 static void cmd_eth_dns(int argc, char** argv) {
     if (argc < 3) {
-        logError("[ETH] Usage: eth dns <dns_ip>");
+        logError("Usage: eth dns <dns_ip>");
         return;
     }
     configSetString(KEY_ETH_DNS, argv[2]);
     configUnifiedSave();
-    logInfo("[ETH] [OK] DNS set to %s. Reboot required.", argv[2]);
+    logPrintf("DNS set to %s. Reboot required.\n", argv[2]);
 }
 
 void cmd_eth_main(int argc, char** argv) {
@@ -277,7 +277,7 @@ void cmd_eth_main(int argc, char** argv) {
         {"dns",    cmd_eth_dns,    "Set DNS server"}
     };
     
-    cliDispatchSubcommand("[ETH]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -295,7 +295,7 @@ void ethTrackError() {
 
 void cmd_ping(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("[PING] Usage: ping <host> [count]");
+        logPrintln("Usage: ping <host> [count]");
         return;
     }
 
@@ -305,7 +305,7 @@ void cmd_ping(int argc, char** argv) {
     if (count <= 0) count = 4;
     if (count > 20) count = 20;
 
-    logPrintf("[PING] Pinging %s (%d times)...\n", host, count);
+    logPrintf("Pinging %s (%d times)...\n", host, count);
 
     int successful = 0;
     float total_time = 0;
@@ -331,12 +331,12 @@ void cmd_ping(int argc, char** argv) {
     }
 
     if (successful > 0) {
-        logPrintf("[PING] Statistics: Sent=%d, Received=%d, Lost=%d (%.0f%% loss)\n", 
+        logPrintf("Statistics: Sent=%d, Received=%d, Lost=%d (%.0f%% loss)\n", 
                   count, successful, count - successful, (float)(count - successful) / count * 100);
-        logPrintf("[PING] Round trip times: min=%.1fms, max=%.1fms, avg=%.1fms\n", 
+        logPrintf("Round trip times: min=%.1fms, max=%.1fms, avg=%.1fms\n", 
                   min_time, max_time, total_time / successful);
     } else {
-        logPrintf("[PING] Failed: %s is unreachable.\n", host);
+        logPrintf("Failed: %s is unreachable.\n", host);
     }
 }
 

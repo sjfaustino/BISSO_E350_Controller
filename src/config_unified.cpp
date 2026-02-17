@@ -160,7 +160,7 @@ static int findConfigEntry(const char *key) {
       xSemaphoreGiveRecursive(config_cache_mutex);
     } else {
       // Mutex timeout - log warning but still try unprotected for robustness
-      logWarning("[CONFIG] Cache mutex timeout - accessing without lock");
+      logWarning("Cache mutex timeout - accessing without lock");
       for (int i = 0; i < config_count; i++) {
         if (strcmp(config_table[i].key, key) == 0) {
           result = i;
@@ -233,7 +233,7 @@ static int32_t validateInt(const char *key, int32_t value) {
   // 1. Pulses Per MM/Degree (Must be positive)
   if (strstr(key, "ppm_") != NULL) {
     if (value <= 0) {
-      logError("[CONFIG] Invalid PPM value %ld (Must be > 0)", (long)value);
+      logError("Invalid PPM value %ld (Must be > 0)", (long)value);
       return 1000; // Default safe value
     }
   }
@@ -279,19 +279,19 @@ static void validateString(const char *key, char *value, size_t len) {
         strncpy(value, "password", len - 1);
       }
       value[len - 1] = '\0';
-      logWarning("[CONFIG] %s was empty, using default", key);
+      logWarning("%s was empty, using default", key);
     }
     // Enforce minimum length for password (not username)
     if (strcmp(key, KEY_WEB_PASSWORD) == 0 &&
         strlen(value) < MIN_PASSWORD_LENGTH) {
-      logWarning("[CONFIG] Password too short (min %d chars), using default",
+      logWarning("Password too short (min %d chars), using default",
                  MIN_PASSWORD_LENGTH);
       strncpy(value, "password", len - 1); // Default password is 8 chars
       value[len - 1] = '\0';
     }
     // Username minimum 4 chars (less strict than password)
     if (strcmp(key, KEY_WEB_USERNAME) == 0 && strlen(value) < 4) {
-      logWarning("[CONFIG] Username too short (min 4 chars), using default");
+      logWarning("Username too short (min 4 chars), using default");
       strncpy(value, "admin", len - 1);
       value[len - 1] = '\0';
     }
@@ -306,7 +306,7 @@ void configSetDefaults() {
   if (!initialized)
     return;
 
-  logInfo("[CONFIG] Applying Factory Defaults...");
+  logInfo("Applying Factory Defaults...");
 
   // SAFETY: Default to Strict Limits (1 = E-Stop on any drift)
   if (!prefs.isKey(KEY_MOTION_STRICT_LIMITS))
@@ -371,7 +371,7 @@ void configSetDefaults() {
 }
 
 void configUnifiedLoad() {
-  logInfo("[CONFIG] Pre-loading Cache...");
+  logInfo("Pre-loading Cache...");
 
   for (uint8_t i = 0; i < sizeof(critical_keys) / sizeof(critical_keys[0]);
        i++) {
@@ -397,7 +397,7 @@ result_t configUnifiedInit() {
   if (config_cache_mutex == NULL) {
     config_cache_mutex = xSemaphoreCreateRecursiveMutex();
     if (config_cache_mutex == NULL) {
-      logError("[CONFIG] [CRITICAL] Failed to create cache mutex!");
+      logError("[CRITICAL] Failed to create cache mutex!");
     }
   }
 
@@ -405,14 +405,14 @@ result_t configUnifiedInit() {
   config_count = 0;
 
   if (!prefs.begin("PosiPro_cfg", false)) {
-    logError("[CONFIG] NVS Mount Failed!");
+    logError("NVS Mount Failed!");
     return RESULT_ERROR_STORAGE;
   }
 
   initialized = true;
   configSetDefaults();
   configUnifiedLoad();
-  logInfo("[CONFIG] Ready. Loaded %d entries.", config_count);
+  logInfo("Ready. Loaded %d entries.", config_count);
   
   // Log NVS space usage on boot
   configLogNvsStats();
@@ -430,7 +430,7 @@ result_t configUnifiedInit() {
  * Should be called before system shutdown/reboot
  */
 void configUnifiedCleanup() {
-  logInfo("[CONFIG] Cleaning up resources...");
+  logInfo("Cleaning up resources...");
 
   // Close NVS preferences
   if (initialized) {
@@ -442,12 +442,12 @@ void configUnifiedCleanup() {
   if (config_cache_mutex != NULL) {
     vSemaphoreDelete(config_cache_mutex);
     config_cache_mutex = NULL;
-    logInfo("[CONFIG] Mutex deleted");
+    logInfo("Mutex deleted");
   }
 
   // Clear cache
   config_count = 0;
-  logInfo("[CONFIG] Cleanup complete");
+  logInfo("Cleanup complete");
 }
 
 // ============================================================================
@@ -526,7 +526,7 @@ result_t configSetInt(const char *key, int32_t value) {
   // PHASE 5.10: Protect config_table writes with mutex
   if (config_cache_mutex != NULL) {
     if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
-      logWarning("[CONFIG] Mutex timeout in configSetInt");
+      logWarning("Mutex timeout in configSetInt");
       return RESULT_TIMEOUT;
     }
   }
@@ -557,9 +557,9 @@ result_t configSetInt(const char *key, int32_t value) {
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putInt(key, value);
     config_dirty = false;
-    logInfo("[CONFIG] Set %s = %ld (Saved)", key, (long)value);
+    logDebug("Set %s = %ld (Saved)", key, (long)value);
   } else {
-    logInfo("[CONFIG] Set %s = %ld (Cached)", key, (long)value);
+    logDebug("Set %s = %ld (Cached)", key, (long)value);
   }
 
   // PHASE 5.10: Signal configuration change event
@@ -581,7 +581,7 @@ result_t configSetFloat(const char *key, float value) {
   // PHASE 5.10: Protect config_table writes with mutex
   if (config_cache_mutex != NULL) {
     if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
-      logWarning("[CONFIG] Mutex timeout in configSetFloat");
+      logWarning("Mutex timeout in configSetFloat");
       return RESULT_TIMEOUT;
     }
   }
@@ -613,6 +613,9 @@ result_t configSetFloat(const char *key, float value) {
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putFloat(key, value);
     config_dirty = false;
+    logDebug("Set %s = %.3f (Saved)", key, value);
+  } else {
+    logDebug("Set %s = %.3f (Cached)", key, value);
   }
 
   // PHASE 5.10: Signal configuration change event
@@ -641,7 +644,7 @@ result_t configSetString(const char *key, const char *value) {
   // PHASE 5.10: Protect config_table writes with mutex
   if (config_cache_mutex != NULL) {
     if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
-      logWarning("[CONFIG] Mutex timeout in configSetString");
+      logWarning("Mutex timeout in configSetString");
       return RESULT_TIMEOUT;
     }
   }
@@ -675,9 +678,9 @@ result_t configSetString(const char *key, const char *value) {
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putString(key, validated_value);
     config_dirty = false;
-    logInfo("[CONFIG] Set %s (Saved)", key);
+    logDebug("Set %s (Saved)", key);
   } else {
-    logInfo("[CONFIG] Set %s (Cached)", key);
+    logDebug("Set %s (Cached)", key);
   }
 
   // PHASE 5.10: Signal configuration change event
@@ -707,12 +710,12 @@ result_t configUnifiedSave() {
   if (!initialized || !config_dirty)
     return RESULT_OK;
 
-  logInfo("[CONFIG] Saving to NVS...");
+  logInfo("Saving to NVS...");
 
   // PHASE 5.10: Protect config_table read during save
   if (config_cache_mutex != NULL) {
     if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
-      logWarning("[CONFIG] Mutex timeout in configUnifiedSave");
+      logWarning("Mutex timeout in configUnifiedSave");
       return RESULT_TIMEOUT;
     }
   }
@@ -750,22 +753,22 @@ result_t configUnifiedSave() {
   }
   
   if (success) {
-    logInfo("[CONFIG] Save Complete.");
+    logInfo("Save Complete.");
     return RESULT_OK;
   } else {
-    logError("[CONFIG] Some keys failed to save");
+    logError("Some keys failed to save");
     return RESULT_ERROR_STORAGE;
   }
 }
 
 result_t configUnifiedReset() {
-  logWarning("[CONFIG] Resetting to Factory Defaults...");
+  logWarning("Resetting to Factory Defaults...");
 
   // PHASE 5.10: Clear in-memory cache before reset to prevent stale values
   configUnifiedClear();
 
   if (!prefs.clear()) {
-    logError("[CONFIG] Failed to clear NVS storage");
+    logError("Failed to clear NVS storage");
     return RESULT_ERROR_STORAGE;
   }
   
@@ -775,7 +778,7 @@ result_t configUnifiedReset() {
   configSetInt(KEY_X_LIMIT_MIN, -500000);
   configSetInt(KEY_X_LIMIT_MAX, 500000);
 
-  logInfo("[CONFIG] Reset Complete. Reboot recommended.");
+  logInfo("Reset Complete. Reboot recommended.");
   return RESULT_OK;
 }
 
@@ -812,14 +815,14 @@ int32_t configGetIntValidated(const char *key, int32_t default_val,
   // Apply validation bounds
   if (min_val >= 0 && value < min_val) {
     logWarning(
-        "[CONFIG] Value %ld below minimum %ld for key '%s', using minimum",
+        "Value %ld below minimum %ld for key '%s', using minimum",
         (long)value, (long)min_val, key);
     return min_val;
   }
 
   if (max_val >= 0 && value > max_val) {
     logWarning(
-        "[CONFIG] Value %ld exceeds maximum %ld for key '%s', using maximum",
+        "Value %ld exceeds maximum %ld for key '%s', using maximum",
         (long)value, (long)max_val, key);
     return max_val;
   }
@@ -837,14 +840,14 @@ float configGetFloatValidated(const char *key, float default_val, float min_val,
   // Apply validation bounds
   if (min_val >= 0.0f && value < min_val) {
     logWarning(
-        "[CONFIG] Value %.2f below minimum %.2f for key '%s', using minimum",
+        "Value %.2f below minimum %.2f for key '%s', using minimum",
         (double)value, (double)min_val, key);
     return min_val;
   }
 
   if (max_val >= 0.0f && value > max_val) {
     logWarning(
-        "[CONFIG] Value %.2f exceeds maximum %.2f for key '%s', using maximum",
+        "Value %.2f exceeds maximum %.2f for key '%s', using maximum",
         (double)value, (double)max_val, key);
     return max_val;
   }
@@ -854,29 +857,73 @@ float configGetFloatValidated(const char *key, float default_val, float min_val,
 
 // Added for CLI 'config dump' command
 void configUnifiedPrintAll() {
-  serialLoggerLock();
-  for (int i = 0; i < config_count; i++) {
-    if (!config_table[i].is_set)
-      continue;
+  // PHASE 5.4: Single-Buffer Strategy (same as cliPrintHelp)
+  // ESP32-S3 USB CDC drops data when Serial.print() is called many times.
+  // Serial.flush() does NOT reliably block until the host reads.
+  // Solution: Build entire output into one PSRAM buffer, print once.
 
-    char val_buf[128];
-    switch (config_table[i].type) {
-    case CONFIG_INT32:
-      SAFE_SNPRINTF(val_buf, sizeof(val_buf), "%ld", (long)config_table[i].value.int_val);
-      break;
-    case CONFIG_FLOAT:
-      SAFE_SNPRINTF(val_buf, sizeof(val_buf), "%.3f", config_table[i].value.float_val);
-      break;
-    case CONFIG_STRING:
-      SAFE_SNPRINTF(val_buf, sizeof(val_buf), "\"%s\"", config_table[i].value.str_val);
-      break;
-    default:
-      SAFE_STRCPY(val_buf, "???", sizeof(val_buf));
-    }
-    
-    cliPrintTableRow(config_table[i].key, val_buf, nullptr, 30, 20, 0);
+  const size_t BUF_SIZE = 4096;
+  char* buf = (char*)malloc(BUF_SIZE);
+  if (!buf) {
+      if (serialLoggerLock()) {
+          Serial.print("(config dump: alloc failed)\r\n");
+          Serial.flush();
+          serialLoggerUnlock();
+      }
+      return;
   }
-  serialLoggerUnlock();
+
+  int pos = 0;
+  char val_str[64];
+
+  // Header
+  pos += snprintf(buf + pos, BUF_SIZE - pos,
+      "\r\n=== FULL CONFIGURATION DUMP ===\r\n"
+      "+--------------------------------+----------------------+--+\r\n"
+      "| KEY                            | VALUE                |  |\r\n"
+      "+--------------------------------+----------------------+--+\r\n");
+
+  // Snapshot all set entries under cache lock
+  for (int i = 0; i < config_count && pos < (int)(BUF_SIZE - 80); i++) {
+     bool valid = false;
+     config_entry_t entry;
+     if (config_cache_mutex != NULL) {
+         if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+             if (config_table[i].is_set) {
+                 entry = config_table[i];
+                 valid = true;
+             }
+             xSemaphoreGiveRecursive(config_cache_mutex);
+         }
+     } else {
+         if (config_table[i].is_set) {
+             entry = config_table[i];
+             valid = true;
+         }
+     }
+
+     if (valid) {
+         switch (entry.type) {
+             case CONFIG_INT32: snprintf(val_str, sizeof(val_str), "%ld", (long)entry.value.int_val); break;
+             case CONFIG_FLOAT: snprintf(val_str, sizeof(val_str), "%.3f", entry.value.float_val); break;
+             case CONFIG_STRING: snprintf(val_str, sizeof(val_str), "%s", entry.value.str_val); break;
+             default: strncpy(val_str, "?", sizeof(val_str)); break;
+         }
+         pos += snprintf(buf + pos, BUF_SIZE - pos, "| %-30s | %-20s |  |\r\n", entry.key, val_str);
+     }
+  }
+
+  // Footer
+  pos += snprintf(buf + pos, BUF_SIZE - pos, "+--------------------------------+----------------------+--+\r\n");
+
+  // Single atomic print — acquire mutex, output, flush, release
+  if (serialLoggerLock()) {
+      Serial.print(buf);
+      Serial.flush();
+      serialLoggerUnlock();
+  }
+
+  free(buf);
 }
 
 void* configGetMutex() {
@@ -892,30 +939,30 @@ void configLogNvsStats() {
   esp_err_t err = nvs_get_stats(NULL, &nvs_stats);
   if (err == ESP_OK) {
     uint32_t used_pct = (nvs_stats.used_entries * 100) / nvs_stats.total_entries;
-    logInfo("[NVS] Entries: %d/%d used (%d%%), Free: %d", 
+    logInfo("Entries: %d/%d used (%d%%), Free: %d", 
             nvs_stats.used_entries, nvs_stats.total_entries, 
             used_pct, nvs_stats.free_entries);
     
     if (used_pct > 80) {
-      logWarning("[NVS] WARNING: Storage >80%% full! Consider erasing unused keys.");
+      logWarning("WARNING: Storage >80%% full! Consider erasing unused keys.");
     }
   } else {
-    logError("[NVS] Failed to get stats: %d", err);
+    logError("Failed to get stats: %d", err);
   }
 }
 
 void configDumpNvsContents() {
-  logInfo("[NVS] Starting NVS Dump...");
+  logInfo("Starting NVS Dump...");
   
   // Iterator for all namespaces and keys
   nvs_iterator_t it = nvs_entry_find("nvs", NULL, NVS_TYPE_ANY);
   
   if (it == NULL) {
-    logInfo("[NVS] No entries found or iterator failed.");
+    logInfo("No entries found or iterator failed.");
     return;
   }
 
-  logInfo("\n[NVS] === NVS CONTENT DUMP ===");
+  logInfo("\n=== NVS CONTENT DUMP ===");
   logPrintf("%-12s | %-20s | %-4s | %s\n", "Namespace", "Key", "Type", "Value");
   logPrintf("-------------|----------------------|------|--------------------------------\n");
 
@@ -1016,13 +1063,13 @@ void configDumpNvsContents() {
     it = nvs_entry_next(it);
   }
   
-  logInfo("[NVS] === END DUMP ===\n");
+  logInfo("=== END DUMP ===\n");
 }
 
 void configEraseNamespace(const char* ns) {
   if (ns == NULL || strlen(ns) == 0) return;
 
-  logInfo("[NVS] Erasing namespace '%s'...", ns);
+  logInfo("Erasing namespace '%s'...", ns);
   
   nvs_handle_t handle;
   esp_err_t err = nvs_open(ns, NVS_READWRITE, &handle);
@@ -1031,28 +1078,28 @@ void configEraseNamespace(const char* ns) {
     err = nvs_erase_all(handle);
     if (err == ESP_OK) {
       nvs_commit(handle);
-      logInfo("[NVS] [OK] Namespace '%s' erased.", ns);
+      logInfo("Namespace '%s' erased.", ns);
     } else {
-      logError("[NVS] Failed to erase: %d", err);
+      logError("Failed to erase: %d", err);
     }
     nvs_close(handle);
   } else {
-    logError("[NVS] Failed to open namespace '%s': %d", ns, err);
+    logError("Failed to open namespace '%s': %d", ns, err);
   }
 }
 
 bool configEraseNvs() {
-  logWarning("[NVS] Erasing all NVS data...");
+  logWarning("Erasing all NVS data...");
   prefs.end();
   esp_err_t err = nvs_flash_erase();
   if (err == ESP_OK) {
-    logInfo("[NVS] Erase complete. Rebooting in 2 seconds...");
+    logInfo("Erase complete. Rebooting in 2 seconds...");
     delay(2000);
     systemSafeReboot("NVS erase complete");
 
     return true;
   } else {
-    logError("[NVS] Erase failed: %d", err);
+    logError("Erase failed: %d", err);
     return false;
   }
 }

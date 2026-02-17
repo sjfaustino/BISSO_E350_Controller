@@ -38,6 +38,8 @@ CLI ARCHITECTURE:
 │   Command Structure:  <command> [subcommand] [args...]              │
 │   Example:            config set wifi_ssid "MyNetwork"               │
 │                                                                      │
+│   Usage Protection:   Subcommand usage is printed atomically via     │
+│                       dynamic buffer to prevent output corruption.   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -2074,6 +2076,8 @@ encoder <subcommand> [args...]
 | `test` | Test encoder communication |
 | `config` | Show/set configuration |
 | `protocol` | Show protocol settings |
+| `identify` | Probe protocol capabilities (ASCII/RTU) |
+| `deviation` | Encoder deviation diagnostics |
 
 **How It Works:**
 ```
@@ -2091,6 +2095,44 @@ WJ66 ENCODER INTERFACE:
 │                                                                    │
 │  UPDATE RATE: 50Hz (20ms polling interval)                        │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### `encoder identify` - Capability Probing
+
+**Syntax:**
+```
+encoder identify
+```
+
+**Description:**
+Probes the connected WJ66 device in both ASCII and Modbus RTU modes to determine its current protocol and configuration protection state.
+
+**How It Works:**
+The command performs a three-step probe:
+1. **ASCII Probe**: Sends `#01\r` (or current address) at current baud.
+2. **Modbus Probe**: Sends a Modbus register read request at current baud.
+3. **Switch Check**: If in ASCII, sends `$01P1\r` to see if the device acknowledges the RTU switch.
+
+**Expected Output:**
+```text
+[WJ66] Starting Protocol Capability Identification...
+[WJ66] Probing ASCII (Addr 01 @ 9600 baud)...
+[WJ66] ASCII Response Received: >00000000,00000000,11111111
+[WJ66] Probing Modbus RTU (Addr 01 @ 9600 baud)...
+[WJ66] Checking if ASCII device recognizes RTU switch command ($01P1)...
+[WJ66] Success: Device responded '!' to switch command.
+
+=== WJ66 CAPABILITY REPORT ===
+Device Address:  01
+ASCII Protocol:  DETECTED
+Modbus RTU:      NO RESPONSE
+RTU Capability:  CONFIRMED (Responded to $xxP1)
+
+[RESULT] Your module supports RTU but is currently in ASCII mode.
+         You can permanently switch it using: rs485 raw $01P1\r
+==============================
 ```
 
 ---
@@ -2282,13 +2324,32 @@ rs485 <subcommand>
 |------------|-------------|
 | `status` | Show all registered devices |
 | `diag` | Full diagnostics |
-| `raw` | Send raw hex data |
+| `raw` | Send raw hex data or ASCII string |
 | `reset` | Reset device registry |
 
-**Usage Example:**
+---
+
+#### `rs485 raw` - Send Custom Command
+
+**Syntax:**
 ```
-rs485 status
+rs485 raw <data>
 ```
+
+**Description:**
+Sends custom raw data to the RS-485 bus. Can be hex-encoded (e.g., `01 03 00 00 00 01`) or a raw ASCII string (e.g., `$01P1\r`).
+
+**Usage Examples:**
+```bash
+rs485 raw $01P1\r       # Switch WJ66 to Modbus RTU
+rs485 raw #01\r         # Manual ASCII poll
+rs485 raw 010300000001  # Manual hex Modbus poll
+```
+
+**How It Works:**
+The RS-485 registry is briefly paused to prevent polling conflicts. The command is sent directly to the bus, and any response is printed to the terminal.
+
+---
 
 **Expected Output:**
 ```text
@@ -2330,14 +2391,21 @@ RS485 DEVICE REGISTRY:
 
 **Syntax:**
 ```
-ls [path]
+ls [-d] [-R] [path]
 ```
 
+**Options:**
+| Flag | Description |
+|------|-------------|
+| `-d` | Show directory statistics (count, size) instead of contents |
+| `-R` | Recursive listing |
+
 **Usage Examples:**
-```
-ls
-ls /data
-ls /logs
+```bash
+ls                  # List root directory
+ls data             # List /data (relative paths supported)
+ls -d /logs         # Show stats for /logs
+ls -R /             # Full filesystem tree
 ```
 
 **Expected Output:**
@@ -2392,9 +2460,10 @@ LittleFS Partition Status:
 cat <filename>
 ```
 
-**Usage Example:**
-```
+**Usage Examples:**
+```bash
 cat /data/fault_log.txt
+cat config.json          # Relative paths supported
 ```
 
 **Expected Output:**
@@ -2441,9 +2510,244 @@ LOGGING ARCHITECTURE:
 
 ---
 
-## 10. 🎯 CALIBRATION & SETUP
+### `sd` - SD Card Management (v3.1 Boards)
+
+**Syntax:**
+```
+sd <subcommand> [args...]
+```
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `status`   | Show SD card detection and mount status |
+| `ls`       | List files `[-R recursive] [-d stats]` |
+| `cat`      | Display file contents |
+| `rm`       | Delete file/dir `[-r recursive]` |
+| `mkdir`    | Create directory |
+| `eject`    | Safely unmount SD card |
+| `health`   | Run filesystem health check |
+| `format`   | Format SD card (requires `-y`) |
+| `tree`     | Directory tree visualization |
+
+**Usage Examples:**
+```bash
+sd ls /data         # List SD data folder
+sd cat logs/1.log   # View SD log
+sd rm -r tmp_files  # Delete folder recursively
+sd tree -s /        # Show full tree with sizes
+```
+
+**How It Works:**
+```
+SD CARD INTEGRATION:
+┌─────────────────────────────────────────────────────────────────┐
+│  Hardware: SPI Bus (v3.1 PCB ONLY)                                 │
+│                                                                    │
+│  Mount Point: Internal (Virtual path /sd/)                       │
+│                                                                    │
+│  Features:                                                          │
+│  • Persistent boot logging                                         │
+│  • Large job file storage                                          │
+│  • G-code file streaming                                           │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
+
+## 10. 🛠️ ADVANCED DIAGNOSTICS
+
+---
+
+### `axis` - Motion Quality Diagnostics
+
+**Syntax:**
+```
+axis <subcommand> [args...]
+```
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `status`   | Show current axis motion state |
+| `sync`     | Display axis synchronization metrics |
+| `error`    | Show detailed error counters |
+
+**Usage Examples:**
+```bash
+axis status
+axis sync
+```
+
+---
+
+### `metrics` - Task Performance Monitoring
+
+**Syntax:**
+```
+metrics [reset]
+```
+
+**Description:**
+Displays CPU usage, execution time, and stack high-water mark for all system tasks.
+
+---
+
+### `task_list` - Detailed Task Inspection
+
+**Syntax:**
+```
+task_list
+```
+
+**Description:**
+Provides a tabular view of all FreeRTOS tasks, their priority, state, and remaining stack space.
+
+---
+
+### `memleak` - Memory Leak Analysis
+
+**Syntax:**
+```
+memleak
+```
+
+**Description:**
+Captures a memory snapshot and compares it against a baseline to identify potential leaks in long-running processes.
+
+---
+
+### `timeouts` - Bus Timeout Monitoring
+
+**Syntax:**
+```
+timeouts
+```
+
+**Description:**
+Displays detailed statistics on RS-485 and I2C communication timeouts and recovery events.
+
+---
+
+### `fault_recovery` - Recovery Management
+
+**Syntax:**
+```
+fault_recovery status
+```
+
+**Description:**
+Shows the status of the automatic fault recovery system, including retry counts for motors and sensors.
+
+---
+
+### `cutting` - Stone Cutting Analytics
+
+**Syntax:**
+```
+cutting stats
+```
+
+**Description:**
+Displays real-time analytics for the current cutting operation, including blade load and efficiency.
+
+---
+
+---
+
+## 12. ⚙️ SYSTEM & SECURITY
+
+---
+
+### `fs` - LittleFS Filesystem Mastery
+
+**Syntax:**
+```
+fs <subcommand> [args...]
+```
+
+**Description:**
+Master command for all LittleFS operations. Groups `ls`, `df`, `cat`, and `tree` for consistent management.
+
+---
+
+### `nvs` - NVS Storage Inspector
+
+**Syntax:**
+```
+nvs <subcommand> [args...]
+```
+
+**Subcommands:**
+| Subcommand | Description |
+|------------|-------------|
+| `list`     | List all keys in NVS partitions |
+| `get`      | Retrieve a specific key value |
+| `stats`    | Show NVS partition usage |
+
+---
+
+### `web` - Web Server Configuration
+
+**Syntax:**
+```
+web <subcommand>
+```
+
+**Description:**
+Manages the internal web server, allowing for interface selection (static/AP) and port changes.
+
+---
+
+### `auth` - Authentication Diagnostics
+
+**Syntax:**
+```
+auth <subcommand>
+```
+
+**Description:**
+Tests and reports on the state of the web/OTA authentication system, including session token status.
+
+---
+
+### `passwd` - Credential Management
+
+**Syntax:**
+```
+passwd <new_password>
+```
+
+**Description:**
+Updates the administrative password for Web UI and OTA firmware updates.
+
+---
+
+### `cache` - PSRAM Web Cache Manager
+
+**Syntax:**
+```
+cache <subcommand>
+```
+
+**Description:**
+Manages the high-speed PSRAM cache used for serving Web UI assets. 
+
+---
+
+### `dmesg` - System Boot Log Viewer
+
+**Syntax:**
+```
+dmesg
+```
+
+**Description:**
+Displays the persistent boot log stored on the SD card (if present), useful for diagnosing power-on issues.
+
+---
+
+## 13. 🎯 CALIBRATION & SETUP
 
 ### `calibrate` / `calib` - Calibration Commands
 
@@ -4294,9 +4598,9 @@ void systemSafeReboot(const char* reason) {
 ---
 
 **Document Version:** 2.2 Ultimate Master  
-**Last Updated:** 2026-02-05  
+**Last Updated:** 2026-02-15  
 **Firmware Compatibility:** v3.5.x+  
-**Total Commands Documented:** 83+  
+**Total Commands Documented:** 95+  
 
 **Author:** Antigravity (DeepMind Advanced Agentic Coding)  
 **Machine:** BISSO E350 PosiPro 4-Axis CNC Bridge Saw

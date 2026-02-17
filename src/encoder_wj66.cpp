@@ -384,7 +384,10 @@ static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void
         // Update state
         if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             uint32_t now = millis();
-            wj66_state.last_latency_ms = now - wj66_state.last_command_time;
+            wj66_state.last_latency_ms = (now >= wj66_state.last_command_time)
+                ? (now - wj66_state.last_command_time)
+                : (UINT32_MAX - wj66_state.last_command_time + now + 1);
+            if (wj66_state.last_latency_ms > 5000) wj66_state.last_latency_ms = 5000; // Cap
             for (int i = 0; i < axes_found; i++) {
                 wj66_state.position[i] = values[i];
                 wj66_state.last_read[i] = now;
@@ -402,10 +405,12 @@ static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void
     static uint32_t last_frag_time = 0;
 
     // Clear stale buffer (over 1s)
-    if (asm_idx > 0 && millis() - last_frag_time > 1000) {
+    uint32_t now = millis();
+    uint32_t elapsed_frag = (now >= last_frag_time) ? (now - last_frag_time) : (UINT32_MAX - last_frag_time + now + 1);
+    if (asm_idx > 0 && elapsed_frag > 1000) {
         asm_idx = 0;
     }
-    last_frag_time = millis();
+    last_frag_time = now;
 
     // Look for signatures (!) within the incoming data
     int sig_idx = -1;
@@ -495,7 +500,11 @@ static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void
                 wj66_state.last_read[i] = millis();
                 wj66_state.read_count[i]++;
             }
-            wj66_state.last_latency_ms = millis() - wj66_state.last_command_time;
+            uint32_t now = millis();
+            wj66_state.last_latency_ms = (now >= wj66_state.last_command_time)
+                ? (now - wj66_state.last_command_time)
+                : (UINT32_MAX - wj66_state.last_command_time + now + 1);
+            if (wj66_state.last_latency_ms > 5000) wj66_state.last_latency_ms = 5000;
             wj66_state.status = ENCODER_OK;
             xSemaphoreGive(wj66_mutex);
             // Diagnostic trace enabled for debugging the background issue
@@ -651,4 +660,154 @@ void wj66Diagnostics() {
     );
   }
   serialLoggerUnlock();
+}
+
+void wj66IdentifyCapability() {
+    if (!serialLoggerLock()) return;
+    
+    // Use logPrintf for all messages to ensure synchronicity and avoid async queue race
+    logPrintf("[WJ66] Starting Protocol Capability Identification...\r\n");
+    
+    // Suspend RS485 bus activity during scan
+    rs485SetBusPaused(true);
+    
+    // Acquire bus mutex
+    if (!rs485TakeBus(2000)) {
+        logPrintf("[WJ66] ERROR: Failed to acquire bus mutex for identification\r\n");
+        rs485SetBusPaused(false);
+        serialLoggerUnlock();
+        return;
+    }
+
+    // Small delay to allow any pending transaction to clear the UART hardware buffers
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    int addr = configGetInt(KEY_ENC_ADDR, 1);
+    const encoder_hal_config_t* hal = encoderHalGetConfig();
+    
+    // Determine which serial object to use
+#if !defined(CONFIG_IDF_TARGET_ESP32S2)
+    HardwareSerial* s = (hal->interface == ENCODER_INTERFACE_RS485_RXD2) ? &Serial2 : &Serial1;
+#else
+    HardwareSerial* s = &Serial1;
+#endif
+
+    bool ascii_ok = false;
+    bool rtu_ok = false;
+    bool switch_recognized = false;
+    uint8_t resp[128];
+    int len;
+
+    // 1. Probe current baud with ASCII
+    logPrintf("[WJ66] Probing ASCII (Addr %02d @ %lu baud)...\r\n", addr, (unsigned long)hal->baud_rate);
+    while(s->available()) s->read();
+    char cmd[16];
+    snprintf(cmd, sizeof(cmd), "#%02d\r", addr);
+    s->print(cmd);
+    s->flush();
+    
+    // Synchronous wait for response
+    uint32_t start = millis();
+    len = 0;
+    while(true) {
+        uint32_t now = millis();
+        uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
+        if (elapsed >= 400 || len >= (int)sizeof(resp)-1) break;
+        
+        if(s->available()) resp[len++] = s->read();
+        else vTaskDelay(1);
+    }
+    if (len > 0) {
+        resp[len] = '\0';
+        // WJ66 ASCII response starts with '!' or '>' or '*'
+        if (strchr((char*)resp, '!') || strchr((char*)resp, '>') || strchr((char*)resp, '*')) {
+            ascii_ok = true;
+            logPrintf("[WJ66] ASCII Response Received: %s\r\n", (char*)resp);
+        }
+    }
+
+    // 2. Probe current baud with Modbus RTU
+    logPrintf("[WJ66] Probing Modbus RTU (Addr %02d @ %lu baud)...\r\n", addr, (unsigned long)hal->baud_rate);
+    while(s->available()) s->read();
+    uint8_t frame[8];
+    modbusReadRegistersRequest((uint8_t)addr, 0x0000, 1, frame);
+    s->write(frame, 8);
+    s->flush();
+    
+    start = millis();
+    len = 0;
+    while(true) {
+        uint32_t now = millis();
+        uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
+        if (elapsed >= 400 || len >= (int)sizeof(resp)) break;
+        
+        if(s->available()) resp[len++] = s->read();
+        else vTaskDelay(1);
+    }
+    if (len >= 5 && resp[0] == addr && (resp[1] == 0x03 || resp[1] == 0x83) && modbusVerifyCrc(resp, len)) {
+        if (resp[1] == 0x03) {
+            rtu_ok = true;
+            logPrintf("[WJ66] Modbus RTU Response Received (Verified CRC)\r\n");
+        } else {
+            logPrintf("[WJ66] Modbus EXCEPTION Received (Error code: %d)\r\n", resp[2]);
+            rtu_ok = true; // Still counts as speaking Modbus
+        }
+    }
+
+    // 3. If ASCII works but RTU doesn't, check if it understands the protocol switch command
+    if (ascii_ok && !rtu_ok) {
+        logPrintf("[WJ66] Checking if ASCII device recognizes RTU switch command ($%02dP1)...\r\n", addr);
+        while(s->available()) s->read();
+        snprintf(cmd, sizeof(cmd), "$%02dP1\r", addr);
+        s->print(cmd);
+        s->flush();
+        
+        start = millis();
+        len = 0;
+        while(true) {
+            uint32_t now = millis();
+            uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
+            if (elapsed >= 500 || len >= (int)sizeof(resp)-1) break;
+            
+            if(s->available()) resp[len++] = s->read();
+            else vTaskDelay(1);
+        }
+        if (len > 0) {
+            resp[len] = '\0';
+            if (strchr((char*)resp, '!')) {
+                switch_recognized = true;
+                logPrintf("[WJ66] Success: Device responded '!' to switch command.\r\n");
+            } else {
+                logPrintf("[WJ66] Device responded with unknown sequence: %s\r\n", (char*)resp);
+            }
+        }
+    }
+
+    logPrintf("\r\n=== WJ66 CAPABILITY REPORT ===\r\n");
+    logPrintf("Device Address:  %02d\r\n", addr);
+    logPrintf("ASCII Protocol:  %s\r\n", ascii_ok ? "DETECTED" : "NO RESPONSE");
+    logPrintf("Modbus RTU:      %s\r\n", rtu_ok ? "DETECTED" : "NO RESPONSE");
+    
+    if (ascii_ok && !rtu_ok) {
+        logPrintf("RTU Capability:  %s\r\n", switch_recognized ? "CONFIRMED (Responded to $xxP1)" : "NOT DETECTED");
+        if (switch_recognized) {
+            logPrintf("\r\n[RESULT] Your module supports RTU but is currently in ASCII mode.\r\n");
+            logPrintf("         You can permanently switch it using: rs485 raw $%02dP1\\r\n", addr);
+        } else {
+            logPrintf("\r\n[RESULT] Module is in ASCII mode but ignores the RTU switch command.\r\n");
+            logPrintf("         You MUST connect the INIT pin to GND to enable config changes.\r\n");
+        }
+    } else if (rtu_ok) {
+        logPrintf("\r\n[RESULT] Device is already in Modbus RTU mode.\r\n");
+    } else if (!ascii_ok && !rtu_ok) {
+        logPrintf("\r\n[RESULT] No response from Address %02d. Things to check:\r\n", addr);
+        logPrintf("         - Is the module powered?\r\n");
+        logPrintf("         - Is the RS-485 / RS-232 wiring correct?\r\n");
+        logPrintf("         - Try 'encoder scan' to verify the baud rate.\r\n");
+    }
+    logPrintf("==============================\r\n");
+
+    rs485ReleaseBus();
+    rs485SetBusPaused(false);
+    serialLoggerUnlock();
 }

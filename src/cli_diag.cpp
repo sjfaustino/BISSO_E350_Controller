@@ -174,9 +174,11 @@ void cmd_status_dashboard(int argc, char** argv) {
         if (faults.total_faults == 0) {
             pos += snprintf(output + pos, sizeof(output) - pos, "|   [NONE] System healthy                                   |\n");
         } else {
+            uint32_t now = millis();
+            uint32_t elapsed_ms = (now >= faults.last_fault_time_ms) ? (now - faults.last_fault_time_ms) : (UINT32_MAX - faults.last_fault_time_ms + now + 1);
             pos += snprintf(output + pos, sizeof(output) - pos, "|   Total: %-8lu  |  Last Wait: %-10lu sec ago        |\n",
                           (unsigned long)faults.total_faults,
-                          (unsigned long)((millis() - faults.last_fault_time_ms) / 1000));
+                          (unsigned long)(elapsed_ms / 1000));
         }
     }
     
@@ -217,7 +219,9 @@ void runtimeInit() {
 }
 
 void cmd_runtime(int argc, char** argv) {
-    uint32_t session_mins = (millis() - boot_time_ms) / 60000;
+    uint32_t now = millis();
+    uint32_t elapsed_boot_ms = (now >= boot_time_ms) ? (now - boot_time_ms) : (UINT32_MAX - boot_time_ms + now + 1);
+    uint32_t session_mins = elapsed_boot_ms / 60000;
     uint32_t total_mins = session_start_mins + session_mins;
     uint32_t cycles = configGetInt(KEY_CYCLE_COUNT, 0);
     uint32_t last_maint = configGetInt(KEY_LAST_MAINT_MINS, 0);
@@ -226,7 +230,7 @@ void cmd_runtime(int argc, char** argv) {
     if (argc >= 2) {
         if (strcasecmp(argv[1], "reset") == 0) {
             configSetInt(KEY_CYCLE_COUNT, 0);
-            logInfo("[RUNTIME] Cycle counter reset to 0");
+            logPrintf("Cycle counter reset to 0\n");
             return;
         } else if (strcasecmp(argv[1], "maint") == 0) {
             configSetInt(KEY_LAST_MAINT_MINS, total_mins);
@@ -234,7 +238,7 @@ void cmd_runtime(int argc, char** argv) {
             extern void motionResetMaintenance();
             motionResetMaintenance();
             
-            logInfo("[RUNTIME] Maintenance recorded and axis counters reset");
+            logPrintf("Maintenance recorded and axis counters reset\n");
             return;
         }
     }
@@ -245,7 +249,7 @@ void cmd_runtime(int argc, char** argv) {
     
     if (!serialLoggerLock()) return;
 
-    logDirectPrintln("\n[RUNTIME] === Machine Usage Statistics ===\n");
+    logDirectPrintln("\n=== Machine Usage Statistics ===\n");
     
     cliPrintTableHeader(23, 18, 0);
     cliPrintTableRow("Metric", "Value", nullptr, 23, 18, 0);
@@ -296,7 +300,7 @@ void cmd_dio_main(int argc, char** argv) {
     };
     
     // Build header
-    pos += snprintf(output + pos, sizeof(output) - pos, "\n[DIO] === Digital I/O Status ===\n\n");
+    pos += snprintf(output + pos, sizeof(output) - pos, "\n=== Digital I/O Status ===\n\n");
     pos += snprintf(output + pos, sizeof(output) - pos, "+---------+----------------+------------------------------------------------------------------+\n");
     pos += snprintf(output + pos, sizeof(output) - pos, "| Addr    | Name           | State (MSB..LSB)                                                 |\n");
     pos += snprintf(output + pos, sizeof(output) - pos, "+---------+----------------+------------------------------------------------------------------+\n");
@@ -350,7 +354,7 @@ void cmd_dio_main(int argc, char** argv) {
 // ============================================================================
 static void cmd_spindle_alarm(int argc, char** argv) {
     if (argc < 3) {
-        logPrintln("\n[SPINDLE] Alarm commands:");
+        logPrintln("\nAlarm commands:");
         logPrintln("  spindle alarm status   - Show alarm states");
         logPrintln("  spindle alarm clear    - Clear all alarms");
         logPrintln("  spindle alarm toolbreak <amps> - Set threshold (1-20A)");
@@ -361,7 +365,7 @@ static void cmd_spindle_alarm(int argc, char** argv) {
     const spindle_monitor_state_t* state = spindleMonitorGetState();
     
     if (strcasecmp(argv[2], "status") == 0) {
-        logPrintln("\n[SPINDLE] === Alarm Status ===");
+        logPrintln("\n=== Alarm Status ===");
         logPrintf("Tool Breakage: %s (count: %lu)\r\n", 
                      state->alarm_tool_breakage ? "ACTIVE" : "OK",
                      (unsigned long)state->tool_breakage_count);
@@ -387,7 +391,7 @@ static void cmd_spindle_alarm(int argc, char** argv) {
 void cmd_selftest(int argc, char** argv) {
     // PHASE 5.2: Enhanced self-test with sub-commands
     if (argc > 1 && strcmp(argv[1], "help") == 0) {
-        logPrintln("\n[SELFTEST] === Self-Test Suite ===");
+        logPrintln("\n=== Self-Test Suite ===");
         CLI_USAGE("selftest", "[command] [options]");
         CLI_HELP_LINE("(no args)", "Run comprehensive test suite");
         CLI_HELP_LINE("quick", "Quick health check (fast tests only)");
@@ -410,9 +414,9 @@ void cmd_selftest(int argc, char** argv) {
     }
 
     if (argc > 1 && strcmp(argv[1], "quick") == 0) {
-        logPrintln("\n[SELFTEST] === Quick Health Check ===");
+        logPrintln("\n=== Quick Health Check ===");
         bool healthy = selftestQuickCheck();
-        logInfo("%s", healthy ? "[OK] Quick checks passed\n" : "[FAIL] Quick checks failed\n");
+        logPrintf("%s\n", healthy ? "Quick checks passed\n" : "[FAIL] Quick checks failed\n");
         return;
     }
 
@@ -460,7 +464,7 @@ void cmd_debug_main(int argc, char** argv) {
         {"stack",    wrap_debugStack,           "Task stack usage (HWM)"}
     };
     
-    cliDispatchSubcommand("[DEBUG]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -476,13 +480,13 @@ void cmd_test_main(int argc, char** argv) {
         {"buzzer",   [](int c, char** v){ 
             int p = (c >= 2) ? atoi(v[1]) : 1;
             buzzerPlay((buzzer_pattern_t)p);
-            logInfo("[TEST] Playing buzzer pattern %d", p);
+            logPrintf("Playing buzzer pattern %d\n", p);
         }, "Buzzer test <pattern_id>"},
         {"stress",   cmd_stress_test,           "Run system stress tests (all, jitter, etc.)"},
         {"all",      cmd_stress_test,           "Alias for 'test stress all'"}
     };
     
-    cliDispatchSubcommand("[TEST]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -498,33 +502,37 @@ extern void taskShowAllTasks();
 extern uint8_t taskGetCpuUsage();
 
 void cmd_wdt_test_stall(int argc, char** argv) {
-    logPrintln("\n[WDT TEST] === Watchdog Verification Test ===");
-    logPrintln("[WDT TEST] WARNING: This will deliberately stall for 10 seconds");
-    logPrintln("[WDT TEST] The watchdog should detect this and log a fault");
-    logPrintln("[WDT TEST] System will NOT reboot during this test");
-    logPrintln("\n[WDT TEST] Starting deliberate stall in 3 seconds...");
+    logPrintln("\n=== Watchdog Verification Test ===");
+    logPrintln("WARNING: This will deliberately stall for 10 seconds");
+    logPrintln("The watchdog should detect this and log a fault");
+    logPrintln("System will NOT reboot during this test");
+    logPrintln("\nStarting deliberate stall in 3 seconds...");
 
     // Give user time to read warning
-    delay(1000); logPrintln("[WDT TEST] 2...");
-    delay(1000); logPrintln("[WDT TEST] 1...");
-    delay(1000); logPrintln("[WDT TEST] Starting stall NOW");
+    delay(1000); logPrintln("2...");
+    delay(1000); logPrintln("1...");
+    delay(1000); logPrintln("Starting stall NOW");
 
     // Record starting stats
     watchdog_stats_t* stats_before = watchdogGetStats();
     uint32_t timeouts_before = stats_before->timeouts_detected;
     uint32_t missed_before = stats_before->missed_ticks;
 
-    logPrintln("[WDT TEST] CLI task will now stall for 10 seconds without feeding watchdog");
+    logPrintln("CLI task will now stall for 10 seconds without feeding watchdog");
 
     // DELIBERATELY stall without feeding watchdog
     uint32_t stall_start = millis();
-    while (millis() - stall_start < 10000) {
+    while (true) {
+        uint32_t now = millis();
+        uint32_t elapsed = (now >= stall_start) ? (now - stall_start) : (UINT32_MAX - stall_start + now + 1);
+        if (elapsed >= 10000) break;
+        
         // Do nothing - don't feed watchdog
         // This should trigger watchdog timeout detection
         delay(100);
     }
 
-    logPrintln("\n[WDT TEST] Stall complete - checking watchdog response...");
+    logPrintln("\nStall complete - checking watchdog response...");
 
     // Feed watchdog again to recover
     watchdogFeed("CLI");
@@ -536,7 +544,7 @@ void cmd_wdt_test_stall(int argc, char** argv) {
 
     bool test_passed = (timeouts_after > timeouts_before) || (missed_after > missed_before);
 
-    logPrintln("\n[WDT TEST] === Test Results ===");
+    logPrintln("\n=== Test Results ===");
     logPrintf("Timeouts Detected: %lu -> %lu (delta: %lu)\r\n",
                   (unsigned long)timeouts_before,
                   (unsigned long)timeouts_after,
@@ -547,19 +555,19 @@ void cmd_wdt_test_stall(int argc, char** argv) {
                   (unsigned long)(missed_after - missed_before));
 
     if (test_passed) {
-        logPrintln("\n[WDT TEST] [PASS] Watchdog successfully detected task stall");
-        logPrintln("[WDT TEST] System fault monitoring is functioning correctly");
+        logPrintln("\n[PASS] Watchdog successfully detected task stall");
+        logPrintln("System fault monitoring is functioning correctly");
     } else {
-        logPrintln("\n[WDT TEST] [FAIL] Watchdog did NOT detect stall");
-        logPrintln("[WDT TEST] WARNING: Watchdog monitoring may not be working properly");
+        logPrintln("\n[FAIL] Watchdog did NOT detect stall");
+        logPrintln("WARNING: Watchdog monitoring may not be working properly");
     }
 
-    logPrintln("\n[WDT TEST] Use 'faults show' to view logged faults");
+    logPrintln("\nUse 'faults show' to view logged faults");
 }
 
 void cmd_wdt_main(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("[WDT] Usage: wdt [status | tasks | stats | report | test]");
+        logPrintln("Usage: wdt [status | tasks | stats | report | test]");
         logPrintln("  test: Run watchdog verification test (deliberate 10s stall)");
         return;
     }
@@ -572,12 +580,12 @@ void cmd_wdt_main(int argc, char** argv) {
 
 void cmd_task_main(int argc, char** argv) {
     if (argc < 2) { 
-        logPrintln("[TASK] Usage: task [stats | list | cpu]");
+        logPrintln("Usage: task [stats | list | cpu]");
         return;
     }
     if (strcmp(argv[1], "stats") == 0) taskShowStats();
     else if (strcmp(argv[1], "list") == 0) taskShowAllTasks();
-    else if (strcmp(argv[1], "cpu") == 0) logInfo("[TASK] CPU: %u%%", taskGetCpuUsage());
+    else if (strcmp(argv[1], "cpu") == 0) logPrintf("CPU: %u%%\n", taskGetCpuUsage());
 }
 
 void cmd_memory_main(int argc, char** argv) {
@@ -587,7 +595,7 @@ void cmd_memory_main(int argc, char** argv) {
         {"detailed", cmd_memory_detailed, "Deep analysis with fragmentation"}
     };
     
-    cliDispatchSubcommand("[MEMORY]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -606,7 +614,7 @@ void cmd_faults_stats(int argc, char** argv) {
     fault_stats_t stats = faultGetStats();
     if (!serialLoggerLock()) return;
     
-    logPrintln("\n[FAULT] === Statistics ===");
+    logPrintln("\n=== Statistics ===");
     logPrintf("Total: %lu\r\n", (unsigned long)stats.total_faults);
     if (stats.total_faults > 0) {
         logPrintf("Last: %s\r\n", formatTimestamp(stats.last_fault_time_ms).c_str());
@@ -622,7 +630,7 @@ void cmd_faults_stats(int argc, char** argv) {
 
 void cmd_faults_main(int argc, char** argv) {
     if (argc < 2) { 
-        logPrintln("[FAULTS] Usage: faults [show | stats | clear]");
+        logPrintln("Usage: faults [show | stats | clear]");
         return;
     }
     if (strcmp(argv[1], "show") == 0) faultShowHistory();
@@ -644,7 +652,7 @@ static void rs485_send_and_receive(const uint8_t* payload, size_t len) {
     rs485ClearBuffer();
     
     if (!rs485Send(payload, len)) {
-        logError("[RS485] Failed to send");
+        logError("Failed to send");
         return;
     }
 
@@ -653,20 +661,20 @@ static void rs485_send_and_receive(const uint8_t* payload, size_t len) {
     uint8_t rx_buf[128];
     uint8_t rx_len = 0;
     if (rs485Receive(rx_buf, &rx_len) && rx_len > 0) {
-        logPrintf("[RS485] Received %d bytes: ", rx_len);
+        logPrintf("Received %d bytes: ", rx_len);
         for (int i = 0; i < rx_len; i++) {
             if (rx_buf[i] >= 32 && rx_buf[i] <= 126) logPrintf("%c", rx_buf[i]);
             else logPrintf("[%02X]", rx_buf[i]);
         }
         logPrintln("");
     } else {
-        logWarning("[RS485] No response received");
+        logPrintf("No response received\n");
     }
 }
 
 void cmd_rs485_raw(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("[RS485] Usage: rs485 raw <string>");
+        logPrintln("Usage: rs485 raw <string>");
         logPrintln("  Example: rs485 raw #00\\r");
         return;
     }
@@ -681,13 +689,13 @@ void cmd_rs485_raw(int argc, char** argv) {
     char* n = strstr(payload, "\\n");
     if (n) { *n = '\n'; memmove(n+1, n+2, strlen(n+2)+1); }
 
-    logPrintf("[RS485] Sending: %s (%d bytes)\r\n", argv[1], (int)strlen(payload));
+    logPrintf("Sending: %s (%d bytes)\r\n", argv[1], (int)strlen(payload));
     rs485_send_and_receive((const uint8_t*)payload, strlen(payload));
 }
 
 void cmd_rs485_hex(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("[RS485] Usage: rs485 hex <hex bytes...>");
+        logPrintln("Usage: rs485 hex <hex bytes...>");
         logPrintln("  Example: rs485 hex 23 30 30 0D (sends #00\\r)");
         return;
     }
@@ -699,7 +707,7 @@ void cmd_rs485_hex(int argc, char** argv) {
         payload[len++] = (uint8_t)strtol(argv[i], NULL, 16);
     }
 
-    logPrintf("[RS485] Sending Hex (%d bytes)\r\n", len);
+    logPrintf("Sending Hex (%d bytes)\r\n", len);
     rs485_send_and_receive(payload, len);
 }
 
@@ -820,7 +828,7 @@ void cmd_encoder_protocol(int argc, char** argv) {
 
     configSetInt(KEY_ENC_PROTO, proto);
     configUnifiedSave();
-    logInfo("Protocol set to %s. Changes will take effect on next poll.", 
+    logPrintf("Protocol set to %s. Changes will take effect on next poll.\n", 
             (proto == 1) ? "Modbus RTU" : "ASCII");
 }
 
@@ -874,7 +882,7 @@ void cmd_encoder_config_interface(int argc, char** argv) {
     } else if (strcmp(argv[2], "CUSTOM") == 0) {
         interface_type = ENCODER_INTERFACE_CUSTOM;
     } else {
-        logWarning("[ENCODER CONFIG] Unknown interface: %s", argv[2]);
+        logPrintf("[ENCODER CONFIG] Unknown interface: %s\n", argv[2]);
         return;
     }
 
@@ -883,11 +891,11 @@ void cmd_encoder_config_interface(int argc, char** argv) {
 
     // Switch interface
     if (encoderHalSwitchInterface(interface_type, baud_rate)) {
-        logInfo("Switched to %s", encoderHalGetInterfaceName(interface_type));
+        logPrintf("Switched to %s\n", encoderHalGetInterfaceName(interface_type));
 
         // Save to NVS
         configSetInt(KEY_ENC_INTERFACE, (int)interface_type);
-        logInfo("Configuration saved to NVS");
+        logPrintf("Configuration saved to NVS\n");
     } else {
         logError("Failed to switch interface");
     }
@@ -897,7 +905,7 @@ void cmd_encoder_config_baud(int argc, char** argv) {
     if (argc < 3) {
         const encoder_hal_config_t* config = encoderHalGetConfig();
         if (config) {
-            logInfo("[ENCODER CONFIG] Current Baud Rate: %lu", (unsigned long)config->baud_rate);
+            logPrintf("[ENCODER CONFIG] Current Baud Rate: %lu\n", (unsigned long)config->baud_rate);
         }
         logPrintln("[ENCODER CONFIG] Usage: encoder config baud <rate>");
         logPrintln("  Valid rates: 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200");
@@ -918,11 +926,11 @@ void cmd_encoder_config_baud(int argc, char** argv) {
 
     // Re-initialize with new baud rate
     if (encoderHalInit(interface, new_baud)) {
-        logInfo("Baud rate set to %lu", (unsigned long)new_baud);
+        logPrintf("Baud rate set to %lu\n", (unsigned long)new_baud);
 
         // Save to NVS
         configSetInt(KEY_ENC_BAUD, (int)new_baud);
-        logInfo("Configuration saved to NVS");
+        logPrintf("Configuration saved to NVS\n");
     } else {
         logError("Failed to set baud rate");
     }
@@ -940,12 +948,17 @@ void cmd_encoder_config_main(int argc, char** argv) {
                           sizeof(subcmds) / sizeof(subcmds[0]), 2);
 }
 
+void cmd_encoder_identify(int argc, char** argv) {
+    wj66IdentifyCapability();
+}
+
 void cmd_encoder_main(int argc, char** argv) {
     static const cli_subcommand_t subcmds[] = {
         {"status", cmd_encoder_status,      "Unified dashboard (config + runtime)"},
         {"read",   cmd_encoder_read,        "Display encoder positions N times (default 10) every 0.5s"},
         {"diag",   cmd_encoder_diag,        "Run encoder integration diagnostics"},
         {"deviation", cmd_encoder_deviation_diag, "Encoder deviation diagnostics"},
+        {"identify", cmd_encoder_identify,    "Identify encoder capabilities and protocol support"},
         {"test",   cmd_encoder_test,        "Show raw encoder counts and hardware stats"},
         {"baud",   cmd_encoder_baud_detect, "Auto-detect baud rate"},
         {"scan",   cmd_encoder_baud_detect, "Alias for baud (scan for encoder)"},
@@ -963,11 +976,11 @@ void cmd_encoder_main(int argc, char** argv) {
 // ============================================================================
 
 void cmd_spindle_config_show(int argc, char** argv) {
-    logPrintln("\n[SPINDLE CONFIG] === JXK-10 Configuration ===");
+    logPrintln("\n=== JXK-10 Configuration ===");
 
     const spindle_monitor_state_t* state = spindleMonitorGetState();
     if (!state) {
-        logError("[SPINDLE CONFIG] Unable to get spindle state");
+        logError("Unable to get spindle state");
         return;
     }
 
@@ -991,8 +1004,8 @@ void cmd_spindle_config_show(int argc, char** argv) {
 
 void cmd_spindle_config_enable(int argc, char** argv) {
     if (argc < 3) {
-        logPrintln("[SPINDLE CONFIG] Usage: spindle config enable [on | off]");
-        logInfo("Current status: %s", spindleMonitorIsEnabled() ? "ON" : "OFF");
+        logPrintln("Usage: spindle config enable [on | off]");
+        logPrintf("Current status: %s\n", spindleMonitorIsEnabled() ? "ON" : "OFF");
         return;
     }
 
@@ -1002,75 +1015,75 @@ void cmd_spindle_config_enable(int argc, char** argv) {
     } else if (strcmp(argv[2], "off") == 0 || strcmp(argv[2], "no") == 0 || strcmp(argv[2], "0") == 0) {
         enable = false;
     } else {
-        logError("[SPINDLE CONFIG] Invalid option (use: on, off)");
+        logError("Invalid option (use: on, off)");
         return;
     }
 
     spindleMonitorSetEnabled(enable);
     configSetInt(KEY_SPINDLE_ENABLED, enable ? 1 : 0);
-    logInfo("[SPINDLE CONFIG] Spindle monitoring %s and saved to NVS",
+    logPrintf("Spindle monitoring %s and saved to NVS\n",
                   enable ? "ENABLED" : "DISABLED");
 }
 
 void cmd_spindle_config_address(int argc, char** argv) {
     if (argc < 3) {
         const spindle_monitor_state_t* state = spindleMonitorGetState();
-        logInfo("[SPINDLE CONFIG] Current JXK-10 Address: %u", state->jxk10_slave_address);
-        logPrintln("[SPINDLE CONFIG] Usage: spindle config address <1-247>");
+        logPrintf("Current JXK-10 Address: %u\n", state->jxk10_slave_address);
+        logPrintln("Usage: spindle config address <1-247>");
         return;
     }
 
     int32_t addr_i32 = 0;
     if (!parseAndValidateInt(argv[2], &addr_i32, 1, 247)) {
-        logError("[SPINDLE CONFIG] Invalid address (must be 1-247)");
+        logError("Invalid address (must be 1-247)");
         return;
     }
 
     uint8_t addr = (uint8_t)addr_i32;
     configSetInt(KEY_SPINDLE_ADDRESS, (int)addr);
-    logInfo("[SPINDLE CONFIG] JXK-10 address set to %u and saved to NVS", addr);
-    logPrintln("[SPINDLE CONFIG] Restart system to apply address change");
-    logPrintln("[SPINDLE CONFIG] NOTE: Ensure JXK-10 DIP switches match this address");
+    logPrintf("JXK-10 address set to %u and saved to NVS\n", addr);
+    logPrintln("Restart system to apply address change");
+    logPrintln("NOTE: Ensure JXK-10 DIP switches match this address");
 }
 
 void cmd_spindle_config_threshold(int argc, char** argv) {
     if (argc < 3) {
         const spindle_monitor_state_t* state = spindleMonitorGetState();
-        logPrintf("[SPINDLE CONFIG] Current Threshold: %.1f A\n", state->overcurrent_threshold_amps);
-        logPrintln("[SPINDLE CONFIG] Usage: spindle config threshold <0-50>");
+        logPrintf("Current Threshold: %.1f A\n", state->overcurrent_threshold_amps);
+        logPrintln("Usage: spindle config threshold <0-50>");
         return;
     }
 
     float threshold = atof(argv[2]);
     if (threshold < 0.0f || threshold > 50.0f) {
-        logError("[SPINDLE CONFIG] Invalid threshold (must be 0.0-50.0 A)");
+        logError("Invalid threshold (must be 0.0-50.0 A)");
         return;
     }
 
     spindleMonitorSetThreshold(threshold);
     configSetInt(KEY_SPINDLE_THRESHOLD, (int)threshold);
-    logPrintf("[SPINDLE CONFIG] Overcurrent threshold set to %.1f A and saved to NVS\n", threshold);
+    logPrintf("Overcurrent threshold set to %.1f A and saved to NVS\n", threshold);
 }
 
 void cmd_spindle_config_interval(int argc, char** argv) {
     if (argc < 3) {
         const spindle_monitor_state_t* state = spindleMonitorGetState();
-        logInfo("[SPINDLE CONFIG] Current Poll Interval: %lu ms",
+        logPrintf("Current Poll Interval: %lu ms\n",
                       (unsigned long)state->poll_interval_ms);
-        logPrintln("[SPINDLE CONFIG] Usage: spindle config interval <100-60000>");
+        logPrintln("Usage: spindle config interval <100-60000>");
         return;
     }
 
     int32_t interval_i32 = 0;
     if (!parseAndValidateInt(argv[2], &interval_i32, 100, 60000)) {
-        logError("[SPINDLE CONFIG] Invalid interval (must be 100-60000 ms)");
+        logError("Invalid interval (must be 100-60000 ms)");
         return;
     }
 
     uint32_t interval = (uint32_t)interval_i32;
     spindleMonitorSetPollInterval(interval);
     configSetInt(KEY_SPINDLE_POLL_MS, (int)interval);
-    logInfo("[SPINDLE CONFIG] Poll interval set to %lu ms and saved to NVS",
+    logPrintf("Poll interval set to %lu ms and saved to NVS\n",
                   (unsigned long)interval);
 }
 
@@ -1084,7 +1097,7 @@ void cmd_spindle_config_main(int argc, char** argv) {
         {"interval",  cmd_spindle_config_interval,  "Set poll interval (100-60000 ms)"}
     };
     
-    cliDispatchSubcommand("[SPINDLE CONFIG]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 2);
 }
 
@@ -1096,7 +1109,7 @@ void cmd_spindle_main(int argc, char** argv) {
         {"alarm",  cmd_spindle_alarm,       "Alarm management"}
     };
     
-    cliDispatchSubcommand("[SPINDLE]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -1114,17 +1127,17 @@ void cmd_diag_scheduler_main(int argc, char** argv) {
 // DEBUG HANDLERS
 // ============================================================================
 void debugEncodersHandler() {
-    logPrintln("[DEBUG] -- Encoder Status --");
+    logPrintln("-- Encoder Status --");
     wj66Diagnostics();
 }
 
 void debugConfigHandler() {
-    logPrintln("[DEBUG] -- Config Status --");
+    logPrintln("-- Config Status --");
     configUnifiedDiagnostics();
 }
 
 void debugAllHandler() {
-    logPrintln("\n[DEBUG] === FULL SYSTEM DUMP ===");
+    logPrintln("\n=== FULL SYSTEM DUMP ===");
     char ver[FIRMWARE_VERSION_STRING_LEN]; 
     firmwareGetVersionString(ver, sizeof(ver));
     logPrintf("Firmware: %s | Uptime: %lu s\r\n", ver, (unsigned long)taskGetUptime());
@@ -1138,7 +1151,7 @@ void debugAllHandler() {
     configUnifiedDiagnostics();
     watchdogShowStatus();
     taskShowStats();
-    logPrintln("[DEBUG] === END DUMP ===");
+    logPrintln("=== END DUMP ===");
 }
 
 // ============================================================================
@@ -1159,11 +1172,11 @@ void cmd_fault_recovery_diag(int argc, char** argv) {
 void cmd_task_list_detailed(int argc, char** argv) {
     if (!serialLoggerLock()) return;
 
-    logPrintln("\n[TASK] === Detailed Task List ===");
+    logPrintln("\n=== Detailed Task List ===");
 
     int task_count = taskGetStatsCount();
     if (task_count <= 0) {
-        logPrintln("[TASK] No tasks registered");
+        logPrintln("No tasks registered");
         serialLoggerUnlock();
         return;
     }
@@ -1271,7 +1284,7 @@ void cmd_web_config_show(int argc, char** argv) {
     logPrintf("Username:            %s\r\n", username);
     logPrintf("Password Changed:    %s\r\n", pw_changed ? "YES" : "NO (default)");
     if (pw_changed == 0) {
-        logWarning("[WEB CONFIG] Using default password! Please set a new password.");
+        logPrintf("[WEB CONFIG] Using default password! Please set a new password.\n");
         logPrintln("[WEB CONFIG] Usage: web config password <password>");
     }
 }
@@ -1294,7 +1307,7 @@ void cmd_web_config_username(int argc, char** argv) {
     configUnifiedSave();
     webServer.loadCredentials();
 
-    logInfo("[WEB CONFIG] [OK] Username set to '%s' and saved to NVS", username);
+    logPrintf("[WEB CONFIG] Username set to '%s' and saved to NVS\n", username);
 }
 
 void cmd_web_config_password(int argc, char** argv) {
@@ -1315,8 +1328,8 @@ void cmd_web_config_password(int argc, char** argv) {
     configUnifiedSave();
     webServer.loadCredentials();
 
-    logInfo("[WEB CONFIG] [OK] Password updated and saved to NVS");
-    logWarning("[WEB CONFIG] Password is stored in plaintext in NVS");
+    logPrintf("[WEB CONFIG] Password updated and saved to NVS\n");
+    logPrintf("[WEB CONFIG] Password is stored in plaintext in NVS\n");
 }
 
 void cmd_web_config_main(int argc, char** argv) {
@@ -1335,20 +1348,20 @@ void cmd_web_config_main(int argc, char** argv) {
     } else if (strcmp(argv[2], "password") == 0) {
         cmd_web_config_password(argc, argv);
     } else {
-        logWarning("[WEB CONFIG] Unknown sub-command: %s", argv[2]);
+        logPrintf("[WEB CONFIG] Unknown sub-command: %s\n", argv[2]);
     }
 }
 
 void cmd_web_main(int argc, char** argv) {
     if (argc < 2) {
-        logPrintln("[WEB] Usage: web [config]");
+        logPrintln("Usage: web [config]");
         return;
     }
 
     if (strcmp(argv[1], "config") == 0) {
         cmd_web_config_main(argc, argv);
     } else {
-        logWarning("[WEB] Unknown sub-command: %s", argv[1]);
+        logPrintf("Unknown sub-command: %s\n", argv[1]);
     }
 }
 
@@ -1357,20 +1370,20 @@ void cmd_web_main(int argc, char** argv) {
 // ============================================================================
 
 void cmd_config_backup(int argc, char** argv) {
-    logPrintln("\n[CONFIG] === Backup Configuration ===");
+    logPrintln("\n=== Backup Configuration ===");
     logPrintln("Saving all NVS configuration to 'config_backup' key...");
 
     // Export entire config to JSON
     extern size_t configExportToJSON(char* buffer, size_t buffer_size);
     char* json_buffer = (char*)psramMalloc(2048);  // Use PSRAM for large buffer
     if (!json_buffer) {
-        logError("[CONFIG] Memory allocation failed");
+        logError("Memory allocation failed");
         return;
     }
 
     size_t json_size = configExportToJSON(json_buffer, 2048);
     if (json_size == 0) {
-        logError("[CONFIG] Failed to export configuration");
+        logError("Failed to export configuration");
         psramFree(json_buffer);
         return;
     }
@@ -1379,24 +1392,24 @@ void cmd_config_backup(int argc, char** argv) {
     configSetString("config_backup_json", json_buffer);
     configUnifiedSave();
 
-    logInfo("[CONFIG] [OK] Backup saved (%lu bytes)", (unsigned long)json_size);
-    logPrintln("[CONFIG] Use 'config restore' to restore from backup");
+    logPrintf("Backup saved (%lu bytes)\n", (unsigned long)json_size);
+    logPrintln("Use 'config restore' to restore from backup");
 
     psramFree(json_buffer);
 }
 
 void cmd_config_restore(int argc, char** argv) {
-    logPrintln("\n[CONFIG] === Restore Configuration ===");
+    logPrintln("\n=== Restore Configuration ===");
 
     // Load backup JSON from NVS
     const char* backup_json = configGetString("config_backup_json", NULL);
     if (!backup_json) {
-        logError("[CONFIG] No backup found");
+        logError("No backup found");
         return;
     }
 
-    logPrintln("[CONFIG] Restoring configuration from backup...");
-    logPrintln("[CONFIG] Backup JSON (first 256 chars):");
+    logPrintln("Restoring configuration from backup...");
+    logPrintln("Backup JSON (first 256 chars):");
     char preview[257];
     int len = 0;
     for (int i = 0; i < 256 && backup_json[i]; i++) {
@@ -1405,18 +1418,18 @@ void cmd_config_restore(int argc, char** argv) {
     preview[len] = '\0';
     logPrintln(preview);
     logPrintln("\n");
-    logPrintln("[CONFIG] [OK] Backup restored");
-    logPrintln("[CONFIG] Review with: config show");
+    logPrintln("Backup restored");
+    logPrintln("Review with: config show");
 }
 
 void cmd_config_show_backup(int argc, char** argv) {
     const char* backup = configGetString("config_backup_json", NULL);
     if (!backup) {
-        logPrintln("[CONFIG] No backup exists");
+        logPrintln("No backup exists");
         return;
     }
 
-    logPrintln("\n[CONFIG] === Stored Backup ===");
+    logPrintln("\n=== Stored Backup ===");
     logPrintln(backup);
     logPrintln("");
 }
@@ -1424,7 +1437,7 @@ void cmd_config_show_backup(int argc, char** argv) {
 void cmd_config_clear_backup(int argc, char** argv) {
     configSetString("config_backup_json", "");
     configUnifiedSave();
-    logInfo("[CONFIG] [OK] Backup cleared");
+    logPrintf("Backup cleared\n");
 }
 
 // ============================================================================
@@ -1436,7 +1449,7 @@ void cmd_api_ratelimit_diag(int argc, char** argv) {
 
 void cmd_api_ratelimit_reset(int argc, char** argv) {
     apiRateLimiterReset();
-    logInfo("[OK] API rate limiter reset");
+    logPrintf("API rate limiter reset\n");
 }
 
 void cmd_api_ratelimit_main(int argc, char** argv) {
@@ -1446,7 +1459,7 @@ void cmd_api_ratelimit_main(int argc, char** argv) {
         {"reset", cmd_api_ratelimit_reset, "Reset all rate limit counters"}
     };
     
-    cliDispatchSubcommand("[API]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -1464,7 +1477,7 @@ void cmd_metrics_detail(int argc, char** argv) {
 
 void cmd_metrics_reset(int argc, char** argv) {
     perfMonitorReset();
-    logInfo("[METRICS] [OK] Performance metrics reset");
+    logPrintf("Performance metrics reset\n");
 }
 
 void cmd_metrics_main(int argc, char** argv) {
@@ -1475,7 +1488,7 @@ void cmd_metrics_main(int argc, char** argv) {
         {"reset",   cmd_metrics_reset,   "Clear all collected metrics"}
     };
     
-    cliDispatchSubcommand("[METRICS]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -1489,7 +1502,7 @@ void cmd_ota_status(int argc, char** argv) {
 
 void cmd_ota_cancel(int argc, char** argv) {
     otaUpdaterCancel();
-    logInfo("[OTA] [OK] OTA update cancelled");
+    logPrintf("OTA update cancelled\n");
 }
 
 void cmd_ota_main(int argc, char** argv) {
@@ -1499,7 +1512,7 @@ void cmd_ota_main(int argc, char** argv) {
         {"cancel", cmd_ota_cancel, "Cancel current OTA operation"}
     };
     
-    cliDispatchSubcommand("[OTA]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -1512,13 +1525,13 @@ void cmd_ota_main(int argc, char** argv) {
 // ============================================================================
 
 void cmd_axis_status(int argc, char** argv) {
-    logPrintln("\n[AXIS] === Motion Quality Status (All Axes) ===");
+    logPrintln("\n=== Motion Quality Status (All Axes) ===");
     axisSynchronizationPrintSummary();
 }
 
 void cmd_axis_detail(int argc, char** argv) {
     if (argc < 2) {
-        logError("[AXIS] Usage: axis detail [X|Y|Z]");
+        logError("Usage: axis detail [X|Y|Z]");
         return;
     }
 
@@ -1528,17 +1541,17 @@ void cmd_axis_detail(int argc, char** argv) {
     else if (strcmp(argv[1], "Z") == 0 || strcmp(argv[1], "z") == 0) axis = 2;
 
     if (axis >= 3) {
-        logError("[AXIS] Invalid axis: %s (use X, Y, or Z)", argv[1]);
+        logError("Invalid axis: %s (use X, Y, or Z)", argv[1]);
         return;
     }
 
-    logPrintf("\n[AXIS] === Axis %c Detailed Diagnostics ===\n", 'X' + axis);
+    logPrintf("\n=== Axis %c Detailed Diagnostics ===\n", 'X' + axis);
     axisSynchronizationPrintAxisDiagnostics(axis);
 }
 
 void cmd_axis_reset(int argc, char** argv) {
     if (argc < 2) {
-        logError("[AXIS] Usage: axis reset [X|Y|Z|all]");
+        logError("Usage: axis reset [X|Y|Z|all]");
         return;
     }
 
@@ -1546,7 +1559,7 @@ void cmd_axis_reset(int argc, char** argv) {
         for (uint8_t i = 0; i < 3; i++) {
             axisSynchronizationResetAxis(i);
         }
-        logInfo("[AXIS] [OK] Reset metrics for all axes");
+        logPrintf("Reset metrics for all axes\n");
     } else {
         uint8_t axis = 255;
         if (strcmp(argv[1], "X") == 0 || strcmp(argv[1], "x") == 0) axis = 0;
@@ -1554,12 +1567,12 @@ void cmd_axis_reset(int argc, char** argv) {
         else if (strcmp(argv[1], "Z") == 0 || strcmp(argv[1], "z") == 0) axis = 2;
 
         if (axis >= 3) {
-            logError("[AXIS] Invalid axis: %s (use X, Y, Z, or all)", argv[1]);
+            logError("Invalid axis: %s (use X, Y, Z, or all)", argv[1]);
             return;
         }
 
         axisSynchronizationResetAxis(axis);
-        logInfo("[AXIS] [OK] Reset metrics for axis %c", 'X' + axis);
+        logPrintf("Reset metrics for axis %c\n", 'X' + axis);
     }
 }
 
@@ -1571,7 +1584,7 @@ void cmd_axis_main(int argc, char** argv) {
         {"reset",  cmd_axis_reset,  "Reset quality metrics (usage: axis reset X|Y|Z|all)"}
     };
     
-    cliDispatchSubcommand("[AXIS]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -1590,7 +1603,7 @@ void cmd_telemetry_main(int argc, char** argv) {
         {"detail",  cmd_telemetry_detail,  "Show complete telemetry data"}
     };
     
-    cliDispatchSubcommand("[TELEMETRY]", argc, argv, subcmds, 
+    cliDispatchSubcommand("", argc, argv, subcmds, 
                           sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
@@ -1608,10 +1621,10 @@ void cmd_cutting_main(int argc, char** argv) {
         cuttingPrintDiagnostics();
     } else if (strcmp(argv[1], "start") == 0) {
         cuttingStartSession();
-        logInfo("[CUTTING] Session started");
+        logPrintf("[CUTTING] Session started\n");
     } else if (strcmp(argv[1], "stop") == 0) {
         cuttingEndSession();
-        logInfo("[CUTTING] Session stopped");
+        logPrintf("[CUTTING] Session stopped\n");
     } else if (strcmp(argv[1], "reset") == 0) {
         cuttingResetStats();
     } else if (strcmp(argv[1], "depth") == 0 && argc >= 3) {
@@ -1721,13 +1734,13 @@ void cmd_log_enable(int argc, char** argv) {
     
     configSetInt(KEY_BOOTLOG_EN, enable ? 1 : 0);
     configUnifiedSave();
-    logInfo("[LOG] Boot log capture %s (takes effect on next boot)", enable ? "ENABLED" : "DISABLED");
+    logPrintf("[LOG] Boot log capture %s (takes effect on next boot)\n", enable ? "ENABLED" : "DISABLED");
 }
 
 void cmd_log_delete(int argc, char** argv) {
     if (LittleFS.exists("/bootlog.txt")) {
         if (LittleFS.remove("/bootlog.txt")) {
-            logInfo("[LOG] Boot log deleted");
+            logPrintf("[LOG] Boot log deleted\n");
         } else {
             logError("[LOG] Failed to delete boot log");
         }
@@ -1752,7 +1765,7 @@ void cmd_log_main(int argc, char** argv) {
     } else if (strcmp(argv[1], "delete") == 0) {
         cmd_log_delete(argc, argv);
     } else {
-        logWarning("[LOG] Unknown sub-command: %s", argv[1]);
+        logPrintf("[LOG] Unknown sub-command: %s\n", argv[1]);
     }
 }
 
@@ -1766,7 +1779,7 @@ void cmd_diag_summary(int argc, char** argv) {
     uint32_t hours = uptime_sec / 3600;
     uint32_t mins = (uptime_sec % 3600) / 60;
     
-    logPrintln("\n[DIAG] =========== SYSTEM SUMMARY ===========");
+    logPrintln("\n=========== SYSTEM SUMMARY ===========");
     logPrintf("Uptime:     %02lu:%02lu:%02lu\n", (unsigned long)hours, (unsigned long)mins, (unsigned long)(uptime_sec % 60));
     
     // Memory
@@ -1835,7 +1848,7 @@ void cmd_memory_leak_check(int argc, char** argv) {
     uint32_t elapsed_ms = millis() - leak_baseline_time;
     float elapsed_hours = elapsed_ms / 3600000.0f;
     
-    logPrintln("\n[MEMORY] === Memory Leak Analysis ===");
+    logPrintln("\n=== Memory Leak Analysis ===");
     logPrintf("Baseline:    %u KB (set %.1f hours ago)\n", (unsigned)(leak_baseline_heap/1024), elapsed_hours);
     logPrintf("Current:     %u KB\n", (unsigned)(current_heap/1024));
     
@@ -1850,16 +1863,16 @@ void cmd_memory_leak_check(int argc, char** argv) {
     
     // Leak warning thresholds
     if (delta_pct < -10.0f && elapsed_hours > 1.0f) {
-        logWarning("[MEMORY] !!! POTENTIAL LEAK: >10%% loss over %.1f hours !!!", elapsed_hours);
+        logPrintf("!!! POTENTIAL LEAK: >10%% loss over %.1f hours !!!\n", elapsed_hours);
     } else if (delta_pct < -5.0f && elapsed_hours > 0.5f) {
-        logWarning("[MEMORY] Gradual memory loss detected (%.1f%%)", delta_pct);
+        logPrintf("Gradual memory loss detected (%.1f%%)\n", delta_pct);
     } else {
-        logPrintln("[MEMORY] No significant leak detected");
+        logPrintln("No significant leak detected");
     }
     
     if (argc >= 2 && strcasecmp(argv[1], "reset") == 0) {
         memoryLeakInit();
-        logInfo("[MEMORY] Baseline reset to current heap");
+        logPrintf("Baseline reset to current heap\n");
     }
 }
 
@@ -1912,12 +1925,8 @@ void cliRegisterDiagCommands() {
     // Boot log viewer
     cliRegisterCommand("log", "Log management (boot log viewer)", cmd_log_main);
 
-    // Filesystem management (LittleFS)
-    extern void cmd_fs_ls(int argc, char** argv);
-    extern void cmd_fs_df(int argc, char** argv);
-    extern void cmd_fs_cat(int argc, char** argv);
-    cliRegisterCommand("ls", "List LittleFS files", cmd_fs_ls);
-    cliRegisterCommand("df", "Show LittleFS status", cmd_fs_df);
-    cliRegisterCommand("cat", "View LittleFS file content", cmd_fs_cat);
+    // Filesystem management (LittleFS) — grouped under 'fs'
+    extern void cmd_fs_main(int argc, char** argv);
+    cliRegisterCommand("fs", "LittleFS management (ls, df, cat, tree)", cmd_fs_main);
     cliRegisterCommand("test", "Hardware and stress tests", cmd_test_main);
 }

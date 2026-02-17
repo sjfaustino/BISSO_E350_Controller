@@ -166,8 +166,18 @@ static rs485_device_t* selectNextDevice(void) {
         if (!dev->enabled) continue;
         if (dev->pending_response) continue;
         
+        // PHASE 16: Aggressive Error Backoff Mechanism
+        // If device is erroring, exponentially back off polling to prevent bus blocking.
+        // Cap backoff at 2^10 (~1024x) to ensure we don't block high-priority bus traffic.
+        // For a 50ms interval, 1024x = 51.2 seconds.
+        uint32_t effective_interval = dev->poll_interval_ms;
+        if (dev->consecutive_errors > 0) {
+            uint8_t shift = (dev->consecutive_errors > 10) ? 10 : dev->consecutive_errors;
+            effective_interval <<= shift; 
+        }
+
         uint32_t elapsed = now - dev->last_poll_time_ms;
-        if (elapsed < dev->poll_interval_ms) continue;
+        if (elapsed < effective_interval) continue;
         
         // OPTIMIZATION: Prioritization during motion
         if (moving && dev->priority < 5) {
@@ -202,18 +212,19 @@ bool rs485Update(void) {
     if (registry.bus_busy) {
         rs485_device_t* current = registry.devices[registry.current_device_index];
         if (current && current->pending_response) {
-            if (now - current->last_poll_time_ms > 500) {
+            if (now - current->last_poll_time_ms > 250) {
                 // Timeout
                 current->pending_response = false;
                 current->error_count++;
                 current->consecutive_errors++;
                 registry.bus_busy = false;
+                registry.last_switch_time_ms = now; // Enforce gap after timeout
                 registry.total_errors++;
                 
                 // PHASE 16: Reduced spam for bare board/bench debugging.
                 // Log the first 3 errors to notify the user, then stay silent.
                 if (current->consecutive_errors <= 3) {
-                    logWarning("[RS485] Timeout: %s (Addr %d, after 500ms)", 
+                    logWarning("[RS485] Timeout: %s (Addr %d, after 250ms)", 
                                current->name, current->slave_address);
                     if (current->consecutive_errors == 3) {
                         logInfo("[RS485] %s timeout logging silenced until success.", current->name);
@@ -468,19 +479,27 @@ void rs485PrintDiagnostics(void) {
                   (unsigned long)registry.total_transactions,
                   (unsigned long)registry.total_errors);
     
-    logPrintln("Device          | Addr | Prio | Interval | Polls   | Errors  | Status");
-    logPrintln("----------------|------|------|----------|---------|---------|--------");
+    logPrintln("Device          | Addr | Prio | Base Int | Errors | Consec | Effective");
+    logPrintln("----------------|------|------|----------|--------|--------|-----------");
     
     for (uint8_t i = 0; i < registry.device_count; i++) {
         rs485_device_t* dev = registry.devices[i];
-        logPrintf("%-15s | %4d | %4d | %6dms | %7lu | %7lu | %s\n",
+        
+        // Calculate effective interval for display
+        uint32_t effective = dev->poll_interval_ms;
+        if (dev->consecutive_errors > 0) {
+            uint8_t shift = (dev->consecutive_errors > 10) ? 10 : dev->consecutive_errors;
+            effective <<= shift;
+        }
+
+        logPrintf("%-15s | %4d | %4d | %6dms | %6lu | %6d | %dms\n",
                       dev->name,
                       dev->slave_address,
                       dev->priority,
                       dev->poll_interval_ms,
-                      (unsigned long)dev->poll_count,
                       (unsigned long)dev->error_count,
-                      dev->enabled ? "ON" : "OFF");
+                      dev->consecutive_errors,
+                      effective);
     }
     logPrintln("");
     serialLoggerUnlock();

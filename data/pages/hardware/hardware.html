@@ -255,8 +255,8 @@
                     <input type="checkbox" id="rtc_en" data-config="rtc_en" checked disabled>
                 </div>
                 <div class="pin-row">
-                    <label data-i18n="hardware.i2c_addr">I2C Address:</label>
-                    <span class="fixed-pin">0x68</span>
+                    <span class="label-text" data-i18n="hardware.i2c_addr">I2C Address:</span>
+                    <span class="fixed-pin" id="rtc_addr_fixed">0x68</span>
                 </div>
                 <div class="device-note" data-i18n="hardware.rtc_note">High-accuracy battery-backed real-time clock
                 </div>
@@ -275,8 +275,8 @@
                     <input type="checkbox" id="oled_en" data-config="oled_en">
                 </div>
                 <div class="pin-row">
-                    <label data-i18n="hardware.i2c_addr">I2C Address:</label>
-                    <span class="fixed-pin">0x3C</span>
+                    <span class="label-text" data-i18n="hardware.i2c_addr">I2C Address:</span>
+                    <span class="fixed-pin" id="oled_addr_fixed">0x3C</span>
                 </div>
                 <div class="device-note" data-i18n="hardware.oled_note">On-board local status display (128x64)</div>
             </div>
@@ -311,13 +311,13 @@
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="vfd_rs485_a">RS485 A:</label>
+                    <label for="vfd_rs485_a" data-i18n="hardware.rs485_a">RS485 A:</label>
                     <select class="pin-select" id="vfd_rs485_a" data-signal="vfd_rs485_a" disabled>
                         <option value="16">RS485_A (GPIO16)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="vfd_rs485_b">RS485 B:</label>
+                    <label for="vfd_rs485_b" data-i18n="hardware.rs485_b">RS485 B:</label>
                     <select class="pin-select" id="vfd_rs485_b" data-signal="vfd_rs485_b" disabled>
                         <option value="13">RS485_B (GPIO13)</option>
                     </select>
@@ -344,13 +344,13 @@
             </div>
             <div class="card-content">
                 <div class="pin-row">
-                    <label for="jxk10_rs485_a">RS485 A:</label>
+                    <label for="jxk10_rs485_a" data-i18n="hardware.rs485_a">RS485 A:</label>
                     <select class="pin-select" id="jxk10_rs485_a" data-signal="jxk10_rs485_a" disabled>
                         <option value="16">RS485_A (GPIO16)</option>
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="jxk10_rs485_b">RS485 B:</label>
+                    <label for="jxk10_rs485_b" data-i18n="hardware.rs485_b">RS485 B:</label>
                     <select class="pin-select" id="jxk10_rs485_b" data-signal="jxk10_rs485_b" disabled>
                         <option value="13">RS485_B (GPIO13)</option>
                     </select>
@@ -537,12 +537,8 @@
                     <label for="output_coolant" data-i18n="hardware.coolant_relay">Coolant Relay:</label>
                     <select class="pin-select" id="output_coolant" data-signal="output_coolant"></select>
                 </div>
-                <div class="pin-row">
-                    <label for="output_vacuum" data-i18n="hardware.vacuum_relay">Vacuum Relay:</label>
-                    <select class="pin-select" id="output_vacuum" data-signal="output_vacuum"></select>
-                </div>
-                <div class="device-note" data-i18n="hardware.aux_note">Auxiliary output controls for coolant, vacuum,
-                    and other accessories</div>
+                <div class="device-note" data-i18n="hardware.aux_note">Auxiliary output controls for coolant, and other
+                    accessories</div>
             </div>
         </div>
     </div>

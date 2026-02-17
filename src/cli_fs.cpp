@@ -75,8 +75,8 @@ void cmd_fs_ls(int argc, char** argv) {
     bool flag_d = false;
     bool flag_R = false;
 
-    // Argument Parsing
-    for (int i = 1; i < argc; i++) {
+    // Argument Parsing (skip argv[0]="fs" and argv[1]="ls")
+    for (int i = 2; i < argc; i++) {
         if (argv[i][0] == '-') {
             for (int j = 1; argv[i][j] != '\0'; j++) {
                 if (argv[i][j] == 'd') flag_d = true;
@@ -106,10 +106,10 @@ void cmd_fs_ls(int argc, char** argv) {
     if (flag_R) {
         ls_recursive(path);
     } else {
-        logPrintf("\nListing [LittleFS]: %s\n", path);
-        logPrintln("-------------------------------------------------------------");
-        logPrintln("Type       Size        Name");
-        logPrintln("-------------------------------------------------------------");
+        logPrintf("\nListing [LittleFS]: %s\n"
+                  "-------------------------------------------------------------\n"
+                  "Type       Size        Name\n"
+                  "-------------------------------------------------------------\n", path);
 
         File root = LittleFS.open(path);
         if (!root) {
@@ -135,8 +135,8 @@ void cmd_fs_ls(int argc, char** argv) {
         }
         root.close();
 
-        logPrintln("-------------------------------------------------------------");
-        logPrintf("Total: %d items\n\n", count);
+        logPrintf("-------------------------------------------------------------\n"
+                  "Total: %d items\n\n", count);
     }
 }
 
@@ -155,15 +155,15 @@ void cmd_fs_df(int argc, char** argv) {
 }
 
 void cmd_fs_cat(int argc, char** argv) {
-    if (argc < 2) {
-        CLI_USAGE("cat", "<filename>");
+    if (argc < 3) {
+        logError("Usage: fs cat <filename>");
         return;
     }
 
     char path_buf[64];
-    const char* path = argv[1];
-    if (argv[1][0] != '/') {
-        snprintf(path_buf, sizeof(path_buf), "/%s", argv[1]);
+    const char* path = argv[2];
+    if (argv[2][0] != '/') {
+        snprintf(path_buf, sizeof(path_buf), "/%s", argv[2]);
         path = path_buf;
     }
 
@@ -204,4 +204,210 @@ void cmd_fs_dmesg(int argc, char** argv) {
     }
     logPrintf("\n--- DMESG: %s END ---\n", path);
     file.close();
+}
+
+// =============================================================================
+// TREE COMMAND (LittleFS)
+// =============================================================================
+
+static void tree_lfs_recurse(const char* path, const char* prefix, int& dirs, int& files, bool dirs_only, bool show_all, bool show_sizes) {
+    File root = LittleFS.open(path);
+    if (!root || !root.isDirectory()) return;
+
+    // Count visible entries first to know which is last
+    int count = 0;
+    File f = root.openNextFile();
+    while (f) {
+        bool hidden = (f.name()[0] == '.');
+        if ((show_all || !hidden) && (!dirs_only || f.isDirectory())) count++;
+        f = root.openNextFile();
+    }
+
+    // Iterate again with proper connectors
+    root.rewindDirectory();
+    f = root.openNextFile();
+    int idx = 0;
+    while (f) {
+        bool hidden = (f.name()[0] == '.');
+        if ((!show_all && hidden) || (dirs_only && !f.isDirectory())) { f = root.openNextFile(); continue; }
+        idx++;
+        bool last = (idx == count);
+        const char* connector = last ? "`-- " : "|-- ";
+        const char* child_prefix = last ? "    " : "|   ";
+
+        if (f.isDirectory()) {
+            dirs++;
+            logPrintf("%s%s%s\n", prefix, connector, f.name());
+            char subpath[128];
+            if (strcmp(path, "/") == 0) snprintf(subpath, sizeof(subpath), "/%s", f.name());
+            else snprintf(subpath, sizeof(subpath), "%s/%s", path, f.name());
+            char new_prefix[128];
+            snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, child_prefix);
+            tree_lfs_recurse(subpath, new_prefix, dirs, files, dirs_only, show_all, show_sizes);
+        } else {
+            files++;
+            if (show_sizes) logPrintf("%s%s%s (%lu)\n", prefix, connector, f.name(), (unsigned long)f.size());
+            else logPrintf("%s%s%s\n", prefix, connector, f.name());
+        }
+        f = root.openNextFile();
+    }
+}
+
+void cmd_fs_tree(int argc, char** argv) {
+    const char* path = "/";
+    char path_buf[64];
+    bool dirs_only = false;
+    bool show_all = false;
+    bool show_sizes = false;
+    for (int i = 2; i < argc; i++) {
+        if (argv[i][0] == '-') {
+            for (int j = 1; argv[i][j] != '\0'; j++) {
+                if (argv[i][j] == 'd') dirs_only = true;
+                if (argv[i][j] == 'a') show_all = true;
+                if (argv[i][j] == 's') show_sizes = true;
+            }
+        } else {
+            if (argv[i][0] != '/') {
+                snprintf(path_buf, sizeof(path_buf), "/%s", argv[i]);
+                path = path_buf;
+            } else {
+                path = argv[i];
+            }
+        }
+    }
+
+    logPrintf("%s\n", path);
+    int dirs = 0, files = 0;
+    tree_lfs_recurse(path, "", dirs, files, dirs_only, show_all, show_sizes);
+    if (dirs_only) logPrintf("\n%d directories\n", dirs);
+    else logPrintf("\n%d directories, %d files\n", dirs, files);
+}
+
+// =============================================================================
+// RM COMMAND (LittleFS)
+// =============================================================================
+
+static bool rm_lfs_recurse(const char* path, bool dry_run, int& del_files, int& del_dirs) {
+    File root = LittleFS.open(path);
+    if (!root || !root.isDirectory()) return false;
+
+    File f = root.openNextFile();
+    while (f) {
+        char subpath[128];
+        if (strcmp(path, "/") == 0) snprintf(subpath, sizeof(subpath), "/%s", f.name());
+        else snprintf(subpath, sizeof(subpath), "%s/%s", path, f.name());
+
+        if (f.isDirectory()) {
+            rm_lfs_recurse(subpath, dry_run, del_files, del_dirs);
+            if (dry_run) {
+                logPrintf("  rmdir %s\n", subpath);
+            } else {
+                LittleFS.rmdir(subpath);
+            }
+            del_dirs++;
+        } else {
+            if (dry_run) {
+                logPrintf("  rm    %s (%lu bytes)\n", subpath, (unsigned long)f.size());
+            } else {
+                LittleFS.remove(subpath);
+            }
+            del_files++;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1)); // Yield to prevent watchdog timeout
+        f = root.openNextFile();
+    }
+    return true;
+}
+
+void cmd_fs_rm(int argc, char** argv) {
+    bool recursive = false;
+    bool dry_run = false;
+    const char* path = nullptr;
+    char path_buf[64];
+
+    for (int i = 2; i < argc; i++) {
+        if (argv[i][0] == '-') {
+            for (int j = 1; argv[i][j] != '\0'; j++) {
+                if (argv[i][j] == 'r') recursive = true;
+                if (argv[i][j] == 'i') dry_run = true;
+            }
+        } else {
+            if (argv[i][0] != '/') {
+                snprintf(path_buf, sizeof(path_buf), "/%s", argv[i]);
+                path = path_buf;
+            } else {
+                path = argv[i];
+            }
+        }
+    }
+
+    if (!path) {
+        logError("Usage: fs rm [-r] [-i] <path>");
+        return;
+    }
+
+    if (!LittleFS.exists(path)) {
+        logError("Not found: %s", path);
+        return;
+    }
+
+    File file = LittleFS.open(path);
+    if (!file) {
+        logError("Cannot open: %s", path);
+        return;
+    }
+    bool isDir = file.isDirectory();
+    file.close();
+
+    if (isDir && !recursive) {
+        logError("'%s' is a directory — use -r to delete recursively", path);
+        return;
+    }
+
+    if (isDir) {
+        int del_files = 0, del_dirs = 0;
+        if (dry_run) {
+            logPrintf("Dry run — would delete:\n");
+            rm_lfs_recurse(path, true, del_files, del_dirs);
+            logPrintf("  rmdir %s\n", path);
+            del_dirs++;
+            logPrintf("Total: %d files, %d directories\n", del_files, del_dirs);
+            logPrintf("Run without -i to execute\n");
+        } else {
+            rm_lfs_recurse(path, false, del_files, del_dirs);
+            LittleFS.rmdir(path);
+            del_dirs++;
+            logPrintf("Deleted: %d files, %d directories\n", del_files, del_dirs);
+        }
+    } else {
+        if (dry_run) {
+            logPrintf("Dry run — would delete: %s\n", path);
+            logPrintf("Run without -i to execute\n");
+        } else {
+            if (LittleFS.remove(path)) {
+                logPrintf("Deleted: %s\n", path);
+            } else {
+                logError("Failed to delete: %s", path);
+            }
+        }
+    }
+}
+
+// =============================================================================
+// MAIN COMMAND DISPATCHER
+// =============================================================================
+
+void cmd_fs_main(int argc, char** argv) {
+    static const cli_subcommand_t subcmds[] = {
+        {"ls",      cmd_fs_ls,      "List directory [-R recursive] [-d stats]"},
+        {"df",      cmd_fs_df,      "Show partition status"},
+        {"cat",     cmd_fs_cat,     "Display file contents"},
+        {"rm",      cmd_fs_rm,      "Delete file/dir [-r recursive] [-i dry-run]"},
+        {"tree",    cmd_fs_tree,    "Directory tree [-d dirs] [-a all] [-s sizes]"},
+        {"cache",   cmd_fs_cache,   "Show web cache info"},
+        {"dmesg",   cmd_fs_dmesg,   "View boot log (from SD)"}
+    };
+
+    cliDispatchSubcommand("", argc, argv, subcmds,
+                          sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }

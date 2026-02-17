@@ -67,12 +67,12 @@ static void cmd_config_nvs(int argc, char **argv) {
   if (strcasecmp(argv[2], "stats") == 0) {
     configLogNvsStats();
   } else if (strcasecmp(argv[2], "erase") == 0) {
-    logWarning("[NVS] This will ERASE ALL configuration and REBOOT!");
-    logWarning("[NVS] Press Ctrl+C within 3 seconds to abort...");
+    logPrintf("This will ERASE ALL configuration and REBOOT!\n");
+    logPrintf("Press Ctrl+C within 3 seconds to abort...\n");
     delay(3000);
     configEraseNvs();
   } else {
-    logWarning("[NVS] Unknown nvs command: %s", argv[2]);
+    logPrintf("Unknown nvs command: %s\n", argv[2]);
   }
 }
 
@@ -102,17 +102,17 @@ void cmd_config_main(int argc, char **argv) {
   };
 
   if (argc < 2) {
-    logPrintln("\n[CONFIG] === Configuration Management ===");
+    logPrintln("\n=== Configuration Management ===");
   }
 
-  cliDispatchSubcommand("[CONFIG]", argc, argv, subcmds,
+  cliDispatchSubcommand("", argc, argv, subcmds,
                         sizeof(subcmds) / sizeof(subcmds[0]), 1);
 }
 
 
 void cmd_config_get(int argc, char **argv) {
   if (argc < 3) {
-    logPrintln("[CONFIG] Usage: config get <key>");
+    logPrintln("Usage: config get <key>");
     return;
   }
   const char *key = argv[2];
@@ -120,20 +120,20 @@ void cmd_config_get(int argc, char **argv) {
 
   if (type == NULL) {
     logWarning(
-        "[CONFIG] Key '%s' not in schema. Attempting raw fetch...",
+        "Key '%s' not in schema. Attempting raw fetch...",
         key);
     int32_t i_val = configGetInt(key, -999999);
     if (i_val != -999999) {
-      logInfo("%s = %ld (int)", key, (long)i_val);
+      logPrintf("%s = %ld (int)\n", key, (long)i_val);
       return;
     }
-    logError("[CONFIG] Key '%s' not found or unset.", key);
+    logError("Key '%s' not found or unset.", key);
     return;
   }
 
   if (strcmp(type, "int32") == 0) {
     int32_t val = configGetInt(key, 0);
-    logInfo("%s = %ld", key, (long)val);
+    logPrintf("%s = %ld\n", key, (long)val);
   } else if (strcmp(type, "float") == 0) {
     float val = configGetFloat(key, 0.0f);
     logPrintf("%s = %.3f\n", key, val);
@@ -143,21 +143,14 @@ void cmd_config_get(int argc, char **argv) {
 }
 
 void cmd_config_dump(int argc, char **argv) {
-  logPrintln("\n[CONFIG] === FULL CONFIGURATION DUMP ===");
-  
-  cliPrintTableHeader(30, 20, 0);
-  cliPrintTableRow("KEY", "VALUE", nullptr, 30, 20, 0);
-  cliPrintTableDivider(30, 20, 0);
-
+  // Single atomic dump (header + rows + footer built into one buffer)
   extern void configUnifiedPrintAll();
   configUnifiedPrintAll();
-
-  cliPrintTableFooter(30, 20, 0);
 }
 
 void cmd_config_set(int argc, char **argv) {
   if (argc < 4) {
-    logPrintln("[CONFIG] Usage: config set <key> <value>");
+    logPrintln("Usage: config set <key> <value>");
     return;
   }
 
@@ -166,23 +159,23 @@ void cmd_config_set(int argc, char **argv) {
   const char *type = configGetKeyType(key);
 
   if (type == NULL) {
-    logError("[CONFIG] Unknown key: '%s' (Check schema)", key);
+    logError("Unknown key: '%s' (Check schema)", key);
     return;
   }
 
   if (strcmp(type, "int32") == 0) {
     int32_t val = atol(value_str);
     configSetInt(key, val);
-    logInfo("[CONFIG] [OK] Set %s = %ld", key, (long)val);
+    logPrintf("Set %s = %ld\n", key, (long)val);
   } else if (strcmp(type, "float") == 0) {
     float val = atof(value_str);
     configSetFloat(key, val);
-    logPrintf("[CONFIG] [OK] Set %s = %.3f\n", key, val);
+    logPrintf("Set %s = %.3f\n", key, val);
   } else if (strcmp(type, "string") == 0) {
     configSetString(key, value_str);
-    logPrintf("[CONFIG] [OK] Set %s = \"%s\"\n", key, value_str);
+    logPrintf("Set %s = \"%s\"\n", key, value_str);
   } else {
-    logError("[CONFIG] Unsupported type for key '%s'", key);
+    logError("Unsupported type for key '%s'", key);
   }
 
   // --- REACTIVE HARDWARE HOOKS ---
@@ -191,9 +184,9 @@ void cmd_config_set(int argc, char **argv) {
       extern bool wj66SetBaud(uint32_t baud);
       uint32_t new_baud = (uint32_t)atol(value_str);
       if (wj66SetBaud(new_baud)) {
-          logInfo("[CONFIG] Hardware re-initialized at %lu baud", (unsigned long)new_baud);
+          logPrintf("Hardware re-initialized at %lu baud\n", (unsigned long)new_baud);
       } else {
-          logError("[CONFIG] Failed to re-initialize hardware at %lu baud", (unsigned long)new_baud);
+          logError("Failed to re-initialize hardware at %lu baud", (unsigned long)new_baud);
       }
   }
 }
@@ -201,15 +194,15 @@ void cmd_config_set(int argc, char **argv) {
 void cmd_config_show(int argc, char **argv) { configUnifiedDiagnostics(); }
 
 void cmd_config_reset(int argc, char **argv) {
-  logInfo("[CONFIG] Resetting ALL configuration to factory defaults...");
+  logPrintf("Resetting ALL configuration to factory defaults...\n");
   configUnifiedReset();
-  logInfo("[CONFIG] [OK] Factory reset complete.");
+  logPrintf("Factory reset complete.\n");
 }
 
 void cmd_config_save(int argc, char **argv) {
-  logInfo("[CONFIG] Saving configuration to NVS...");
+  logPrintf("Saving configuration to NVS...\n");
   configUnifiedSave();
-  logInfo("[CONFIG] [OK] Saved.");
+  logPrintf("Saved.\n");
 }
 
 void cmd_config_schema_show(int argc, char **argv) {
@@ -220,7 +213,7 @@ void cmd_config_migrate(int argc, char **argv) { configAutoMigrate(); }
 
 void cmd_config_rollback(int argc, char **argv) {
   if (argc < 2) {
-    logPrintln("[CLI] Usage: config rollback <version>");
+    logPrintln("Usage: config rollback <version>");
     return;
   }
   uint8_t target_version = atoi(argv[1]);
@@ -238,7 +231,7 @@ void cmd_config_validate(int argc, char **argv) {
 // ============================================================================
 
 void cmd_config_export(int argc, char **argv) {
-  logPrintln("\n[CONFIG] === Configuration Export (JSON) ===");
+  logPrintln("\n=== Configuration Export (JSON) ===");
   logPrintln("{\n  \"config\": {");
 
   // Export known critical keys in JSON format
@@ -283,14 +276,14 @@ void cmd_config_export(int argc, char **argv) {
   }
 
   logPrintln("\n  }\n}");
-  logPrintln("\n[CONFIG] Export complete. Copy JSON data above to save.");
+  logPrintln("\nExport complete. Copy JSON data above to save.");
 }
 
 void cmd_config_import(int argc, char **argv) {
-  logPrintln("\n[CONFIG] === Configuration Import (JSON) ===");
-  logPrintln("[CONFIG] Paste JSON data below (end with empty line):");
-  logPrintln("[CONFIG] Example: {\"config\": {\"ppm_0\": 100.5, \"speed_cal_0\": 1000}}");
-  logWarning("[CONFIG] This will overwrite current settings!");
+  logPrintln("\n=== Configuration Import (JSON) ===");
+  logPrintln("Paste JSON data below (end with empty line):");
+  logPrintln("Example: {\"config\": {\"ppm_0\": 100.5, \"speed_cal_0\": 1000}}");
+  logPrintf("This will overwrite current settings!\n");
 
   // CRITICAL FIX: Use ArduinoJson instead of manual string parsing
   // Prevents buffer overflows and fragile parsing logic
@@ -310,7 +303,7 @@ void cmd_config_import(int argc, char **argv) {
     
     // Ctrl+C (0x03) aborts the import
     if (c == 0x03) {
-      logInfo("\n[CONFIG] Import ABORTED by user.");
+      logPrintf("\nImport ABORTED by user.\n");
       return;
     }
 
@@ -335,15 +328,15 @@ void cmd_config_import(int argc, char **argv) {
   DeserializationError error = deserializeJson(doc, json_buffer);
 
   if (error) {
-    logError("[CONFIG] JSON parse failed: %s", error.c_str());
-    logError("[CONFIG] Check JSON format and try again");
+    logError("JSON parse failed: %s", error.c_str());
+    logError("Check JSON format and try again");
     return;
   }
 
   // Check for "config" object
   JsonObject config_obj = doc["config"];
   if (!config_obj) {
-    logError("[CONFIG] Missing 'config' object in JSON");
+    logError("Missing 'config' object in JSON");
     return;
   }
 
@@ -353,7 +346,7 @@ void cmd_config_import(int argc, char **argv) {
     const char *type = configGetKeyType(key);
 
     if (type == NULL) {
-      logWarning("[CONFIG] Skipping unknown key: %s", key);
+      logPrintf("Skipping unknown key: %s\n", key);
       continue;
     }
 
@@ -361,21 +354,21 @@ void cmd_config_import(int argc, char **argv) {
     if (strcmp(type, "int32") == 0) {
       int32_t val = kv.value().as<int32_t>();
       configSetInt(key, val);
-      logInfo("[CONFIG] Imported: %s = %ld (int)", key, (long)val);
+      logPrintf("Imported: %s = %ld (int)\n", key, (long)val);
       import_count++;
     } else if (strcmp(type, "float") == 0) {
       float val = kv.value().as<float>();
       configSetFloat(key, val);
-      logPrintf("[CONFIG] Imported: %s = %.3f (float)\n", key, val);
+      logPrintf("Imported: %s = %.3f (float)\n", key, val);
       import_count++;
     } else if (strcmp(type, "string") == 0) {
       const char *val = kv.value().as<const char *>();
       configSetString(key, val);
-      logPrintf("[CONFIG] Imported: %s = \"%s\" (string)\n", key, val);
+      logPrintf("Imported: %s = \"%s\" (string)\n", key, val);
       import_count++;
     }
   }
 
-  logInfo("\n[CONFIG] Import complete: %d settings loaded", import_count);
-  logInfo("[CONFIG] Run 'config save' to persist changes");
+  logPrintf("\nImport complete: %d settings loaded\n", import_count);
+  logPrintf("Run 'config save' to persist changes\n");
 }

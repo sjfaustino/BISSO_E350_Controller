@@ -181,6 +181,7 @@
 #define KEY_TARGET_MARGIN "tgt_margin"    // Target position margin in mm (default 0.1)
 #define KEY_MOTION_BUFFER_ENABLE "mot_buf_en"
 #define KEY_MOTION_STRICT_LIMITS "mot_strict"
+#define KEY_MOTION_BLEND_THRESHOLD "mot_blend_thr" // Blend threshold in counts (default 10)
 #define KEY_STRICT_LIMITS        KEY_MOTION_STRICT_LIMITS
 #define KEY_STOP_TIMEOUT "stop_timeout"
 

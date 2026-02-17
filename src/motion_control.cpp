@@ -144,8 +144,14 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
                        bool consensus_active) {
   // Calculate velocity (differentiate position over time)
   uint32_t current_time_ms = millis();
-  if (prev_update_ms > 0) {
-    uint32_t dt_ms = current_time_ms - prev_update_ms;
+    if (prev_update_ms > 0) {
+    uint32_t dt_ms = (current_time_ms >= prev_update_ms) 
+        ? (current_time_ms - prev_update_ms) 
+        : (UINT32_MAX - prev_update_ms + current_time_ms + 1);
+    
+    // Cap dt_ms to reasonable maximum (e.g., 1 second) to prevent math glitches
+    if (dt_ms > 1000) dt_ms = 1000;
+
     if (dt_ms > 0) {
       int32_t delta_pos = current_pos - prev_position;
       // Convert counts/ms to mm/s
@@ -167,7 +173,12 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
   if (current_pos != last_actual_position) {
     // We have fresh data from the RS485 bus
     if (last_actual_update_ms > 0) {
-      uint32_t dt_actual = current_time_ms - last_actual_update_ms;
+      uint32_t dt_actual = (current_time_ms >= last_actual_update_ms)
+          ? (current_time_ms - last_actual_update_ms)
+          : (UINT32_MAX - last_actual_update_ms + current_time_ms + 1);
+      
+      if (dt_actual > 1000) dt_actual = 1000;
+      
       if (dt_actual > 0) {
         // Calculate velocity in counts/ms for prediction
         velocity_counts_ms = (float)(current_pos - last_actual_position) / (float)dt_actual;
@@ -188,21 +199,23 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
   portEXIT_CRITICAL(&motionSpinlock);
 
   if (is_active) {
-      float total_dist = abs(global_target_pos - start_pos);
-      if (total_dist > 0.0f) {
-          float current_dist = abs(current_pos - start_pos);
-          float prog = (current_dist / total_dist) * 100.0f;
+      int32_t total_dist_counts = abs(global_target_pos - start_pos);
+      if (total_dist_counts > 0) {
+          int32_t current_dist_counts = abs(current_pos - start_pos);
+          float prog = ((float)current_dist_counts / (float)total_dist_counts) * 100.0f;
           if (prog > 100.0f) prog = 100.0f;
           
           portENTER_CRITICAL(&motionSpinlock);
           m_state.progress_percent = prog;
           
           // ETA Calculation
-          if (abs(current_velocity_mm_s) > 0.1f) {
+          float abs_velocity = fabsf(current_velocity_mm_s);
+          if (abs_velocity > 0.05f) { // Slightly tighter threshold
               float ppm = encoderCalibrationGetPPM(id);
-              if (ppm > 0) {
-                  float rem_dist_mm = (total_dist - current_dist) / ppm;
-                  m_state.remaining_seconds = rem_dist_mm / abs(current_velocity_mm_s);
+              if (ppm > 0.1f) { // Extra guard for ppm
+                  float rem_dist_mm = (float)(total_dist_counts - current_dist_counts) / ppm;
+                  // Avoid division by near-zero velocity
+                  m_state.remaining_seconds = (abs_velocity > 0.01f) ? (rem_dist_mm / abs_velocity) : 0.0f;
               }
           }
           portEXIT_CRITICAL(&motionSpinlock);
@@ -359,7 +372,10 @@ void motionUpdate() {
         if (dt_since_last_actual > 200) dt_since_last_actual = 200;
         
         // Extended encoder silence warning (diagnostic aid)
-        uint32_t actual_silence = (uint32_t)(millis() - axes[i].last_actual_update_ms);
+        uint32_t now_silence = millis();
+        uint32_t actual_silence = (now_silence >= axes[i].last_actual_update_ms) 
+            ? (now_silence - axes[i].last_actual_update_ms) 
+            : (UINT32_MAX - axes[i].last_actual_update_ms + now_silence + 1);
         if (actual_silence >= 2000) {
             if (!axes[i].prediction_stale_logged) {
                 logWarning("[MOTION] Axis %d: Encoder silence >2s - prediction capped", i);

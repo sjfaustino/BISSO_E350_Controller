@@ -178,10 +178,14 @@ bool encoderDiagnosticsVerifyCalibration(uint8_t axis_id, float distance_mm) {
     );
 
     // Wait for motion to complete
-    uint32_t timeout = millis() + 30000;  // 30 second timeout
-    while (motionIsMoving() && millis() < timeout) {
+    uint32_t start_wait = millis();
+    while (motionIsMoving()) {
+        uint32_t now = millis();
+        uint32_t elapsed = (now >= start_wait) ? (now - start_wait) : (UINT32_MAX - start_wait + now + 1);
+        if (elapsed >= 30000) break; // 30 second timeout
         vTaskDelay(pdMS_TO_TICKS(100));
     }
+    logInfo("[ENCODER_DIAG] Wait for motion complete: %s", motionIsMoving() ? "TIMEOUT" : "DONE");
 
     // Check end position
     float end_pos = motionGetPositionMM(axis_id);
@@ -208,7 +212,11 @@ uint8_t encoderDiagnosticsAnalyzeSignal(uint8_t axis_id, uint32_t duration_ms) {
     uint32_t error_count = 0;
     uint32_t read_count = 0;
 
-    while (millis() - start_time < duration_ms) {
+    while (true) {
+        uint32_t now = millis();
+        uint32_t elapsed = (now >= start_time) ? (now - start_time) : (UINT32_MAX - start_time + now + 1);
+        if (elapsed >= duration_ms) break;
+
         encoder_status_t status = wj66GetStatus();
         if (status != ENCODER_OK) {
             error_count++;

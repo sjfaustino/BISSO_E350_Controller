@@ -48,6 +48,8 @@ void* psramMalloc(size_t size) {
     ptr = heap_caps_malloc(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (ptr) {
         logDebug("[PSRAM] Allocated %u bytes in internal heap", size);
+    } else {
+        logError("[PSRAM] FAILED to allocate %u bytes in PSRAM OR internal heap!", size);
     }
     
     return ptr;
@@ -72,6 +74,8 @@ void* psramCalloc(size_t count, size_t size) {
     ptr = heap_caps_calloc(count, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (ptr) {
         logDebug("[PSRAM] Calloc %u bytes in internal heap", total);
+    } else {
+        logError("[PSRAM] FAILED calloc %u bytes in PSRAM OR internal heap!", total);
     }
     
     return ptr;

@@ -57,7 +57,8 @@ bool webAuthenticate(PsychicRequest *request);
 
 void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
     uint32_t now = millis();
-    if (now - last_history_sample_ms < TELEMETRY_HISTORY_INTERVAL_MS) return; // Sample history periodically
+    uint32_t elapsed = (now >= last_history_sample_ms) ? (now - last_history_sample_ms) : (UINT32_MAX - last_history_sample_ms + now + 1);
+    if (elapsed < TELEMETRY_HISTORY_INTERVAL_MS) return; 
     last_history_sample_ms = now;
 
     telemetry_history[history_head] = {cpu, heap, spindle};
@@ -598,8 +599,10 @@ void WebServerManager::checkWsHealth() {
     const uint32_t CHECK_INTERVAL = 5000;  // Check every 5s
     const uint32_t CLIENT_TIMEOUT = 60000; // Timeout after 60s inactivity (more lenient for WiFi)
 
-    if (millis() - last_check < CHECK_INTERVAL) return;
-    last_check = millis();
+    uint32_t now = millis();
+    uint32_t elapsed_check = (now >= last_check) ? (now - last_check) : (UINT32_MAX - last_check + now + 1);
+    if (elapsed_check < CHECK_INTERVAL) return;
+    last_check = now;
 
     // Iterate through tracked clients
     // Note: Use iterator to safely remove elements while iterating
@@ -607,7 +610,8 @@ void WebServerManager::checkWsHealth() {
         PsychicWebSocketClient* client = it->first;
         uint32_t last_seen = it->second;
 
-        if (millis() - last_seen > CLIENT_TIMEOUT) {
+        uint32_t elapsed_client = (now >= last_seen) ? (now - last_seen) : (UINT32_MAX - last_seen + now + 1);
+        if (elapsed_client > CLIENT_TIMEOUT) {
             logWarning("[WS] Client %s timed out (30s). Closing.", client->remoteIP().toString().c_str());
             
             // Close the connection (triggers onClose which will erase from map... 

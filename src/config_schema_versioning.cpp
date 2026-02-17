@@ -59,6 +59,89 @@ static const config_key_metadata_t key_metadata[] = {
   // NEW in v3.0
   {KEY_ENC_BAUD, 3, 0, "int32", "Encoder Baud Rate", true, true},
   {KEY_ENC_INTERFACE, 3, 0, "int32", "Encoder Interface (0=RS232, 1=RS485)", true, true},
+  
+  // VFD / RS485 Devices (Missing keys added)
+  {KEY_VFD_EN, 0, 0, "int32", "Enable VFD (0/1)", true, true},
+  {KEY_VFD_ADDR, 0, 0, "int32", "VFD Address", true, true},
+  {KEY_JXK10_ENABLED, 0, 0, "int32", "Enable JXK10 (0/1)", true, true},
+  {KEY_JXK10_ADDR, 0, 0, "int32", "JXK10 Address", true, true},
+  {KEY_YHTC05_ENABLED, 0, 0, "int32", "Enable Tachometer (0/1)", true, true},
+  {KEY_YHTC05_ADDR, 0, 0, "int32", "Tachometer Address", true, true},
+  {KEY_SPINDLE_THRESHOLD, 0, 0, "int32", "Spindle Threshold (A)", true, true},
+  
+  // Status Light
+  {KEY_STATUS_LIGHT_EN, 0, 0, "int32", "Status Light Enable (0/1)", true, true},
+  {KEY_STATUS_LIGHT_GREEN, 0, 0, "int32", "Green Light Pin", true, true},
+  {KEY_STATUS_LIGHT_YELLOW, 0, 0, "int32", "Yellow Light Pin", true, true},
+  {KEY_STATUS_LIGHT_RED, 0, 0, "int32", "Red Light Pin", true, true},
+
+  // Ethernet
+  {KEY_ETH_ENABLED, 0, 0, "int32", "Ethernet Enable (0/1)", true, true},
+  {KEY_ETH_DHCP, 0, 0, "int32", "Ethernet DHCP (0/1)", true, true},
+  {KEY_ETH_IP, 0, 0, "string", "Ethernet IP", true, true},
+  {KEY_ETH_GW, 0, 0, "string", "Ethernet Gateway", true, true},
+  {KEY_ETH_MASK, 0, 0, "string", "Ethernet Mask", true, true},
+  {KEY_ETH_DNS, 0, 0, "string", "Ethernet DNS", true, true},
+
+  // Buzzer & Recovery
+  {KEY_BUZZER_EN, 0, 0, "int32", "Buzzer Enable (0/1)", true, true},
+  {KEY_BUZZER_PIN, 0, 0, "int32", "Buzzer Pin", true, true},
+  {KEY_RECOV_INTERVAL, 0, 0, "int32", "Recovery Interval (lines)", true, true},
+
+  // Spindle Advanced
+  {KEY_SPINDL_PAUSE_EN, 0, 0, "int32", "Spindle Pause Enable", true, true},
+  {KEY_SPINDL_PAUSE_THR, 0, 0, "float", "Spindle Pause Current", true, true},
+  {KEY_SPINDL_TOOLBREAK_THR, 0, 0, "float", "Tool Break Threshold", true, true},
+  {KEY_SPINDLE_POLL_MS, 0, 0, "int32", "Spindle Poll (ms)", true, true},
+  {KEY_SPINDLE_RATED_AMPS, 0, 0, "float", "Rated Amps", true, true},
+  {KEY_SPINDLE_RATED_RPM, 0, 0, "int32", "Rated RPM", true, true},
+  {KEY_BLADE_DIAMETER_MM, 0, 0, "int32", "Blade Diameter (mm)", true, true},
+
+  // VFD Calibration & Safety
+  {KEY_VFD_IDLE_RMS, 0, 0, "float", "VFD Idle RMS", true, true},
+  {KEY_VFD_IDLE_PEAK, 0, 0, "float", "VFD Idle Peak", true, true},
+  {KEY_VFD_STD_CUT_RMS, 0, 0, "float", "VFD Std RMS", true, true},
+  {KEY_VFD_STD_CUT_PEAK, 0, 0, "float", "VFD Std Peak", true, true},
+  {KEY_VFD_HEAVY_RMS, 0, 0, "float", "VFD Heavy RMS", true, true},
+  {KEY_VFD_HEAVY_PEAK, 0, 0, "float", "VFD Heavy Peak", true, true},
+  {KEY_VFD_STALL_THR, 0, 0, "float", "VFD Stall Thr", true, true},
+  {KEY_VFD_STALL_MARGIN, 0, 0, "int32", "VFD Stall Margin", true, true},
+  {KEY_VFD_TEMP_WARN, 0, 0, "int32", "VFD Temp Warn", true, true},
+  {KEY_VFD_TEMP_CRIT, 0, 0, "int32", "VFD Temp Crit", true, true},
+
+  // Encoder & Bus
+  {KEY_ENC_ERR_THRESHOLD, 0, 0, "float", "Encoder Err Thr", true, true},
+  {KEY_ENC_DEV_TIMEOUT, 0, 0, "int32", "Encoder Dev Timeout", true, true},
+  {KEY_ENC_FEEDBACK, 0, 0, "int32", "Encoder Feedback (0/1)", true, true},
+  {KEY_ENC_PROTO, 0, 0, "int32", "Encoder Protocol", true, true},
+  {KEY_ENC_ADDR, 0, 0, "int32", "Encoder Address", true, true},
+  {KEY_RS485_BAUD, 0, 0, "int32", "RS485 Baud", true, true},
+  {KEY_I2C_SPEED, 0, 0, "int32", "I2C Speed", true, true},
+  
+  // Homing & Positions
+  {KEY_POS_SAFE_X, 0, 0, "float", "Safe X", true, true},
+  {KEY_POS_SAFE_Y, 0, 0, "float", "Safe Y", true, true},
+  {KEY_POS_SAFE_Z, 0, 0, "float", "Safe Z", true, true},
+  {KEY_POS_SAFE_A, 0, 0, "float", "Safe A", true, true},
+  {KEY_HOME_ENABLE, 0, 0, "int32", "Home Enable (0/1)", true, true},
+  {KEY_HOME_PROFILE_FAST, 0, 0, "int32", "Home Fast Prof", true, true},
+  {KEY_HOME_PROFILE_SLOW, 0, 0, "int32", "Home Slow Prof", true, true},
+
+  // Web, OTA, LCD & Misc
+  {KEY_WEB_USERNAME, 0, 0, "string", "Web User", true, true},
+  {KEY_WEB_PASSWORD, 0, 0, "string", "Web Pass", true, true},
+  {KEY_WEB_PORT, 0, 0, "int32", "Web Port", true, true},
+  {KEY_WEB_AUTH_ENABLED, 0, 0, "int32", "Web Auth Enable", true, true},
+  {KEY_OTA_PASSWORD, 0, 0, "string", "OTA Pass", true, true},
+  {KEY_OTA_CHECK_EN, 0, 0, "int32", "OTA Check Enable", true, true},
+  {KEY_LCD_EN, 0, 0, "int32", "LCD Enable (0/1)", true, true},
+  {KEY_ALARM_PIN, 0, 0, "int32", "Alarm Pin", true, true},
+  {KEY_BUTTONS_ENABLED, 0, 0, "int32", "Buttons Enable (0/1)", true, true},
+  
+  // Misc
+  {KEY_CLI_ECHO, 0, 0, "int32", "CLI Echo (0/1)", true, true},
+  {KEY_BOOTLOG_EN, 0, 0, "int32", "Bootlog Enable (0/1)", true, true},
+  {KEY_RECOV_EN, 0, 0, "int32", "Recovery Enable (0/1)", true, true},
 
   {NULL, 0, 0, NULL, NULL, false, false}
 };
