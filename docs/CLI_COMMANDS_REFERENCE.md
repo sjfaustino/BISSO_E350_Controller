@@ -4609,3 +4609,58 @@ void systemSafeReboot(const char* reason) {
 
 > [!TIP]
 > For G-code and motion commands, see [GCODE_REFERENCE.md](GCODE_REFERENCE.md)
+---
+
+## 4. 📡 COMMUNICATION & NETWORKING
+
+---
+
+### Serial Output Redirection
+
+**Description:**
+The system supports dynamic redirection of G-code output and system logs to either the primary USB-C port or an alternative Hardware UART. This is managed via the `serial_dest` configuration key.
+
+**How It Works:**
+The firmware uses a "Logger Stream Pointer" architecture. Instead of hardcoding `Serial.println()`, the system writes to `SerialOut` (a macro that points to the `active_serial_stream`). When the destination is changed, the pointer is atomically updated to either the USB CDC stream or the Hardware Serial1 stream.
+
+```text
+SERIAL REDIRECTION FLOW:
+┌─────────────────────────────────────────────────────────────────────┐
+│                          Logger Output Request                       │
+│                                    │                                 │
+│                                    ▼                                 │
+│                        ┌───────────────────────┐                    │
+│                        │ active_serial_stream  │                    │
+│                        └──────────┬────────────┘                    │
+│              ┌────────────────────┴────────────────────┐             │
+│              ▼                                         ▼             │
+│      [Mode 0: USB-CDC]                         [Mode 1: UART-ALT]    │
+│      (Built-in USB Port)                       (GPIO 40 TX / 39 RX)  │
+│                                                                      │
+│   Changing mode:                                                     │
+│   1. Acquire Serial Mutex                                            │
+│   2. Update Stream Pointer                                           │
+│   3. Save Preference to NVS (`serial_dest`)                          │
+│   4. Release Mutex                                                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Configuration Key:**
+- **Name**: `serial_dest`
+- **Values**: 
+    - `0`: USB-CDC (Default)
+    - `1`: UART-ALT (GPIO 40/39)
+
+**Usage Example:**
+```bash
+config set serial_dest 1
+config save
+reboot  # Or apply instantly via Engineering Menu
+```
+
+**Technical Integration**:
+- **Baud Rate**: Both CDC and UART-ALT default to **115200 8N1**.
+- **Buffer**: A 2KB TX buffer is allocated in PSRAM for smooth high-speed streaming.
+- **Hardware Pins**: GPIO 40 (TX), GPIO 39 (RX).
+
+---

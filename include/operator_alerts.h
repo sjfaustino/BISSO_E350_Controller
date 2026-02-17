@@ -48,6 +48,11 @@ typedef enum {
 void statusLightInit(void);
 
 /**
+ * @brief Enable or disable status light system at runtime
+ */
+void statusLightSetEnabled(bool en);
+
+/**
  * @brief Set status light state based on system condition
  * @param state Current system state
  */

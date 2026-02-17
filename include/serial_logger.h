@@ -150,6 +150,18 @@ bool serialLoggerLock();
  */
 void serialLoggerUnlock();
 
+/**
+ * @brief Dynamically set the active serial output stream
+ * @param stream Pointer to Stream object (Serial, AltSerial, File, etc.)
+ */
+void serialLoggerSetStream(Stream* stream);
+
+/**
+ * @brief Get the currently active serial output stream
+ * @return Pointer to current Stream object
+ */
+Stream* serialLoggerGetStream();
+
 // ============================================================================
 // BOOT LOG CAPTURE (LittleFS)
 // ============================================================================

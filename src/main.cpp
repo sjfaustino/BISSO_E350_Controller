@@ -37,6 +37,7 @@
 #include "system_utils.h"      // Safe reboot helper
 #include "trash_bin_manager.h" // Trash bin with auto-delete
 #include "memory_prealloc.h"  // PHASE 6.12: Memory pre-allocation
+#include "engineering_menu.h" // BOOT button menu
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -179,6 +180,9 @@ void setup() {
 
   boot_time_ms = millis();
 
+  // Initialize Engineering Menu (GPIO 0)
+  engineeringMenu.init();
+
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(ver_str, sizeof(ver_str));
   logInfo("=== %s STARTING ===", ver_str);
@@ -278,6 +282,7 @@ volatile uint32_t accumulated_loop_count = 0;
 void loop() {
   networkManager.update();
   jobManager.update();
+  engineeringMenu.update();
   accumulated_loop_count++;
   delay(10); 
 }

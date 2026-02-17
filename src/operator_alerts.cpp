@@ -88,6 +88,15 @@ void statusLightInit(void) {
     }
 }
 
+void statusLightSetEnabled(bool en) {
+    status_light_enabled = en;
+    if (en) {
+        statusLightSetState(current_state);
+    } else {
+        updateStatusLightOutputs(false, false, false);
+    }
+}
+
 void statusLightSetState(system_display_state_t state) {
     if (!status_light_enabled) return;
     

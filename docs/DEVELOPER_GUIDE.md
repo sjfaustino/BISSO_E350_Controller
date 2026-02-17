@@ -23,6 +23,10 @@
 11. [Configuration System](#11-configuration-system)
 12. [Debugging & Diagnostics](#12-debugging--diagnostics)
 13. [Common Tasks](#13-common-tasks)
+14. [System Robustness & Hardening](#14-system-robustness--hardening)
+    - [Safety FSM Mutex Protection](#safety-fsm-mutex-protection)
+    - [Millis Wraparound (50-Day) Strategy](#millis-wraparound-50-day-strategy)
+    - [Serial Output Redirection](#serial-output-redirection-1)
 
 ---
 
@@ -743,22 +747,32 @@ Connect at 115200 baud. Key commands:
 
 Navigate to `/api/docs` for Swagger UI with interactive API testing.
 
-### 12.3 Common Debug Patterns
+### 12.4 Engineering Menu Framework
 
-```cpp
-// Conditional debug logging
-#ifdef DEBUG_BUILD
-logDebug("[MODULE] Detailed state: %d", state);
-#endif
+The physical UI on the KC868 controller uses a structured menu system built on the **BaseMenu** framework.
 
-// Performance timing
-uint32_t start = micros();
-// ... operation ...
-uint32_t elapsed = micros() - start;
-if (elapsed > 1000) {
-    logWarning("[MODULE] Slow operation: %lu us", elapsed);
-}
-```
+#### BaseMenu Utility (`ui_menu_base.h/cpp`)
+The `BaseMenu` class provides a foundation for multi-line LCD menus. It handles:
+- **I2C LCD Mapping**: Direct integration with the 20x4 LCD.
+- **Line Management**: `setLine(row, format, ...)` for easy rendering.
+- **Inactivity Tracking**: Automatic timestamping of user interactions.
+
+#### EngineeringMenu Implementation (`engineering_menu.h/cpp`)
+The `EngineeringMenu` class inherits from `BaseMenu` and implements a hierarchical state machine:
+- **States**: `STATE_MAIN`, `STATE_HARDWARE`, `STATE_DIAGS`, `STATE_SYSTEM`, `STATE_MODBUS_HEALTH`.
+- **Navigation Logic**:
+    - **nextOption()**: Cycles selection based on the active state's item count.
+    - **selectOption()**: Handles transitions between sub-menus and performs actions (toggles, reboots).
+- **Physical Feedback Integration**:
+    - **Buzzer**: Selection and navigation beeps via `operator_alerts.h`.
+    - **Tower Light**: Maintenance mode (Yellow) trigger via `operator_alerts.h`.
+- **EMI Protection**: Uses a 15ms stable-state debouncer for the `BOOT` button to ignore industrial noise.
+
+#### Adding New Sub-Menus
+1.  Add a new value to the `MenuState` enum in `engineering_menu.h`.
+2.  Update `nextOption()` to define the number of items in the new state.
+3.  Implement the action logic in `selectOption()`.
+4.  Define the layout in `refreshMenuLines()`.
 
 ---
 
@@ -947,3 +961,52 @@ Located at `.github/workflows/release.yml`. Triggered by tags matching `v*`.
 |------|---------|
 | 2026-02-15 | Audit: Updated MachineCalibration refactor, RS-485 backoff, and CLI hardening details |
 | 2026-01-25 | Initial guide structure |
+---
+
+## 14. System Robustness & Hardening
+
+As an industrial controller, system uptime and state integrity are paramount. Several architectural safeguards have been implemented to ensure continuous operation for weeks or months.
+
+### Safety FSM Mutex Protection
+
+The **Safety State Machine** (FSM) is the core arbiter of motion permission. To prevent race conditions between the high-priority Safety Task (Core 1) and user-facing API/CLI tasks (Core 0), all state transitions are protected by a **Recursive Mutex**.
+
+*   **Logic**: `safety_state_machine.cpp`
+*   **Mechanism**: `safetyStateLock()` and `safetyStateUnlock()`.
+*   **Safety Invariant**: No motion actuation (PLC signals) can be modified without holding the Safety FSM mutex. This ensures that a fault detected on Core 1 immediately invalidates any motion requests partially processed on Core 0.
+
+### Millis Wraparound (50-Day) Strategy
+
+The Arduino `millis()` function overflows every ~49.7 days. The firmware handles this using the standard **Unsigned Subtraction Pattern**, which is naturally wraparound-safe.
+
+**Standard Pattern:**
+```cpp
+uint32_t now = millis();
+if (now - last_update >= interval) {
+    // This calculation works correctly even if 'now' has wrapped back to 0
+    // while 'last_update' is still near 0xFFFFFFFF.
+}
+```
+
+**Advanced Hardening**:
+For long-running timeouts (e.g., maintenance alerts or system logs), the controller uses a **64-bit millisecond counter** (`uint64_t`) maintained by a background task. This extends the wraparound period to over 500 million years, effectively eliminating the issue for the life of the hardware.
+
+### Serial Output Redirection
+
+The system supports dynamic redirection of logger output to allow for flexible field deployments.
+
+*   **Mechanism**: The `SerialOut` macro in `serial_logger.h` resolves to a `Stream*` pointer (`active_serial_stream`).
+*   **Runtime Switching**: The `serialLoggerSetStream(Stream* new_stream)` function allows swapping from `Serial` (USB-CDC) to `Serial1` (Hardware UART) at runtime.
+*   **Persistence**: The preference is stored in NVS (`serial_dest`). To prevent accidental writes, the system uses a **Two-Stage Confirmation Menu** on the hardware LCD:
+    1.  **Main Menu**: Adjust settings in-memory (applied to runtime immediately).
+    2.  **Confirmation Screen**: Triggered on 5s inactivity if settings changed. User must explicitly select "SAVE" to write to NVS.
+
+```mermaid
+graph TD
+    A[Log Macro] --> B{active_serial_stream}
+    B -->|0| C[Serial USB-CDC]
+    B -->|1| D[Hardware Serial1 GPIO 40/39]
+    E[Engineering Menu] -- Update --> B
+```
+
+---

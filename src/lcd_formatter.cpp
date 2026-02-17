@@ -14,8 +14,10 @@
 #include "lcd_message.h"
 #include "calibration.h"
 #include "spindle_current_monitor.h"
+#include "spindle_current_monitor.h"
 #include "fault_logging.h"
 #include "serial_logger.h"
+#include "engineering_menu.h"
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
@@ -75,30 +77,36 @@ void lcdFormatterUpdate() {
     lcd_format_buffer_t temp_buffer;
     memset(&temp_buffer, 0, sizeof(temp_buffer));
 
-    // Format line 0: Axis positions
-    snprintf(temp_buffer.line0, 21, "X:%6.1f Y:%6.1f", x_mm, y_mm);
-
-    // Format line 1: Status or second position line
-    if (motionIsMoving()) {
-        // Active axis info available but using static Z/A display for now
-        snprintf(temp_buffer.line1, 21, "Z:%6.1f A:%6.1f", z_mm, 0.0f);
+    if (engineeringMenu.isActive()) {
+        snprintf(temp_buffer.line0, 21, "%.20s", engineeringMenu.getLine(0));
+        snprintf(temp_buffer.line1, 21, "%.20s", engineeringMenu.getLine(1));
+        snprintf(temp_buffer.line2, 21, "%.20s", engineeringMenu.getLine(2));
+        snprintf(temp_buffer.line3, 21, "%.20s", engineeringMenu.getLine(3));
     } else {
-        snprintf(temp_buffer.line1, 21, "Z:%6.1f A:%6.1f", z_mm, 0.0f);
-    }
+        // Format line 0: Axis positions
+        snprintf(temp_buffer.line0, 21, "X:%6.1f Y:%6.1f", x_mm, y_mm);
 
-    // Format line 2 & 3: Alarm, message, or status
-    if (fsm_state == FSM_EMERGENCY || fsm_state == FSM_ALARM) {
-        snprintf(temp_buffer.line2, 21, "ALARM: HALTED");
-        snprintf(temp_buffer.line3, 21, "F#%02X", current_fault_code);
-    } else if (has_custom_msg) {
-        snprintf(temp_buffer.line2, 21, "READY S:%c", speed_char);
-        snprintf(temp_buffer.line3, 21, "%.19s", custom_msg.text);
-    } else if (motionIsMoving()) {
-        snprintf(temp_buffer.line2, 21, "MOVING S:%c", speed_char);
-        snprintf(temp_buffer.line3, 21, "ENC:%s", enc_status);
-    } else {
-        snprintf(temp_buffer.line2, 21, "READY S:%c", speed_char);
-        snprintf(temp_buffer.line3, 21, "ENC:%s", enc_status);
+        // Format line 1: Status or second position line
+        if (motionIsMoving()) {
+            snprintf(temp_buffer.line1, 21, "Z:%6.1f A:%6.1f", z_mm, 0.0f);
+        } else {
+            snprintf(temp_buffer.line1, 21, "Z:%6.1f A:%6.1f", z_mm, 0.0f);
+        }
+
+        // Format line 2 & 3: Alarm, message, or status
+        if (fsm_state == FSM_EMERGENCY || fsm_state == FSM_ALARM) {
+            snprintf(temp_buffer.line2, 21, "ALARM: HALTED");
+            snprintf(temp_buffer.line3, 21, "F#%02X", current_fault_code);
+        } else if (has_custom_msg) {
+            snprintf(temp_buffer.line2, 21, "READY S:%c", speed_char);
+            snprintf(temp_buffer.line3, 21, "%.19s", custom_msg.text);
+        } else if (motionIsMoving()) {
+            snprintf(temp_buffer.line2, 21, "MOVING S:%c", speed_char);
+            snprintf(temp_buffer.line3, 21, "ENC:%s", enc_status);
+        } else {
+            snprintf(temp_buffer.line2, 21, "READY S:%c", speed_char);
+            snprintf(temp_buffer.line3, 21, "ENC:%s", enc_status);
+        }
     }
 
     temp_buffer.last_update_ms = millis();

@@ -224,6 +224,9 @@
 // --- LCD DISPLAY (PHASE 4.0) ---
 #define KEY_LCD_EN "lcd_en"             // Enable LCD display (1=on, 0=off, default 1)
 
+// --- SERIAL OUTPUT REDIRECTION ---
+#define KEY_SERIAL_DEST "serial_dest"   // Destination for CLI/Logs (0=USB, 1=Alt UART)
+
 // --- BOOT LOG (DIAGNOSTICS) ---
 #define KEY_BOOTLOG_EN "bootlog_en"     // Enable boot log capture (1=on, 0=off, default 1)
 

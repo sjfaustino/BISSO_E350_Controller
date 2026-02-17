@@ -8,16 +8,15 @@
 #include "task_manager.h"
 
 // ESP32-S2/S3 USB CDC Serial
-#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
-    #define SerialOut Serial
-#else
-    #define SerialOut Serial
-#endif
+static Stream* active_serial_stream = &Serial;
+#define SerialOut (*active_serial_stream)
 
 #include <SD.h>
 #include "sd_card_manager.h"
 
 #define LOGGER_BUFFER_SIZE 512
+#include "config_unified.h"
+#include "config_keys.h"
 static log_level_t current_log_level = LOG_LEVEL_INFO;
 
 // Thread-safety: Mutex for serial output
@@ -99,8 +98,8 @@ static void vlogPrint(log_level_t level, const char* prefix, const char* format,
 
 void serialLoggerInit(log_level_t log_level) {
   // Initialize hardware buffer for USB CDC (ESP32-S3)
-  #if defined(CONFIG_IDF_TARGET_ESP32S3)
-  SerialOut.setTxBufferSize(2048);
+  #if defined(CONFIG_IDF_TARGET_ESP32S3) && defined(ARDUINO_USB_CDC_ON_BOOT)
+  Serial.setTxBufferSize(2048);
   #endif
 
   // Initialize mutex
@@ -110,6 +109,16 @@ void serialLoggerInit(log_level_t log_level) {
   }
   
   current_log_level = log_level;
+  
+  // PHASE 8.5: Load serial destination from NVS
+  int dest = configGetInt(KEY_SERIAL_DEST, 0); // 0=USB, 1=Alt UART
+  if (dest == 1) {
+      static HardwareSerial AltSerial(1);
+      AltSerial.begin(115200, SERIAL_8N1, PIN_ALT_UART_RX, PIN_ALT_UART_TX);
+      active_serial_stream = &AltSerial;
+  } else {
+      active_serial_stream = &Serial;
+  }
   
   char ver_str[FIRMWARE_VERSION_STRING_LEN];
   firmwareGetVersionString(ver_str, sizeof(ver_str));
@@ -279,13 +288,23 @@ void serialLoggerUnlock() {
   releaseSerialMutex();
 }
 
+void serialLoggerSetStream(Stream* stream) {
+    if (stream == nullptr) return;
+    if (acquireSerialMutex()) {
+        active_serial_stream = stream;
+        releaseSerialMutex();
+    }
+}
+
+Stream* serialLoggerGetStream() {
+    return active_serial_stream;
+}
+
 // ============================================================================
 // BOOT LOG CAPTURE (LittleFS)
 // ============================================================================
 
 #include <LittleFS.h>
-#include "config_keys.h"
-#include "config_unified.h"
 
 #define BOOT_LOG_PATH "/bootlog.txt"
 

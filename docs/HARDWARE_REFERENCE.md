@@ -449,6 +449,9 @@ The ESP32 uses PCF8574 I/O expanders to interface with the PLC and other I/O:
 | PCF8574 IN | 0x21 | PLC → ESP32 | Consenso signals, limits |
 | PCF8574 IN2 | 0x22 | External → ESP32 | Software E-Stop, Door interlock |
 | PCF8574 OUT2| 0x25 | ESP32 → PLC      | Auxiliary relays, Lights, Buzzer |
+| **BOOT Button**| GPIO 0 | Input         | Engineering Menu trigger (3x press) |
+| **Alt UART TX**| GPIO 40 | Output (UART1) | External G-code streaming (Alt-UART) |
+| **Alt UART RX**| GPIO 39 | Input (UART1)  | External G-code streaming (Alt-UART) |
 
 ### PCF8574 OUT Pin Mapping (ESP32 → PLC @ 0x24)
 
@@ -584,6 +587,18 @@ Shared RS-485 bus for Modbus devices:
 |-----------|-------------|-------------|-------|
 | **RX Pin** | 16 | 17 | Shared RS-485 bus |
 | **TX Pin** | 13 | 16 | Shared RS-485 bus |
+
+### Alternative UART (G-Code Streaming)
+
+On v3.1 boards, a secondary UART is available for external G-code streaming or high-speed telemetry. This can be toggled via the Engineering Menu.
+
+| Parameter | Pin (GPIO) | Direction | Function |
+|-----------|------------|-----------|----------|
+| **TXD1**  | 40         | Output    | Serial data out |
+| **RXD1**  | 39         | Input     | Serial data in |
+
+> [!NOTE]
+> The Alternative UART is only active if `serial_dest` is set to `1` (UART-ALT) in the configuration or Engineering Menu.
 
 | Device | Address | Priority | Notes |
 |--------|---------|----------|-------|

@@ -296,6 +296,10 @@ void lcdInterfaceSetMode(lcd_mode_t mode) {
 
 lcd_mode_t lcdInterfaceGetMode() { return lcd_state.mode; }
 
+bool lcdInterfaceIsHardwarePresent() {
+    return lcd_state.i2c_found && (lcd_state.mode == LCD_MODE_I2C);
+}
+
 void lcdInterfaceClear() {
   for (int i = 0; i < LCD_ROWS; i++) {
     memset(lcd_state.display[i], ' ', LCD_COLS);

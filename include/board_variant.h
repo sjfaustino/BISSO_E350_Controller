@@ -65,6 +65,11 @@
 #define PIN_FREE_GPIO2       40
 #define PIN_FREE_GPIO3       41
 
+// Special Pins
+#define PIN_BOOT_BUTTON      0   // "BOOT" button on PCB
+#define PIN_ALT_UART_TX      40  // Using Free GPIO 2
+#define PIN_ALT_UART_RX      39  // Using Free GPIO 1
+
 // I2C Device Addresses (v3.1 specific)
 #define I2C_ADDR_RTC_DS3231  0x68
 #define I2C_ADDR_OLED_SSD1306 0x3C

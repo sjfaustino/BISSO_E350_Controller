@@ -24,6 +24,7 @@ void lcdInterfaceSetMode(lcd_mode_t mode);
 lcd_mode_t lcdInterfaceGetMode();
 void lcdInterfaceClear();
 void lcdInterfaceBacklight(bool on);
+bool lcdInterfaceIsHardwarePresent();
 void lcdInterfaceResetErrors();
 void lcdInterfaceDiagnostics();
 

@@ -30,6 +30,13 @@
     - [Web UI LCD Mirroring](#web-ui-lcd-mirroring)
     - [Position Prediction & Smoothing](#position-prediction-smoothing)
     - [Diagnostic Verification](#diagnostic-verification)
+14. [Engineering Menu & Field Settings](#engineering-menu--field-settings)
+    - [Access Trigger](#access-trigger)
+    - [Menu Navigation](#menu-navigation)
+    - [Serial Output Redirection](#serial-output-redirection)
+15. [Machine States & Safety Logic](#machine-states--safety-logic)
+    - [Operational States](#operational-states)
+    - [Fault Recovery Path](#fault-recovery-path)
 
 ---
 
@@ -2227,3 +2234,90 @@ Upon login, you will see a banner: **"Power Loss Detected - Resume Job?"**.
 
 *Document generated for BISSO E350 CNC Controller Firmware v1.1.0 (PosiPro)*
 
+---
+
+## 14. Engineering Menu & Field Settings
+
+The **Engineering Menu** is a specialized diagnostic interface accessible directly from the physical controller hardware. It is designed for field technicians and advanced operators to verify hardware connectivity and troubleshoot system faults without needing a network connection.
+
+> [!IMPORTANT]
+> **Safety First**: Entering the Engineering Menu will automatically **PAUSE all active motion**. The menu is only available if a physical I2C LCD is detected.
+
+### Access Trigger
+
+The menu is hidden behind a specialized sequence on the **BOOT button** (GPIO 0).
+
+1. **Locate the BOOT button**: A small tactile switch on the KC868 controller board.
+2. **Action**: Press the button **3 times rapidly** (must be within 1.0 second).
+3. **Indicator**: The LCD screen will turn **Yellow** (Tower Light) and display `== ENGINEER MENU ==`.
+
+### Menu Navigation & Interaction
+
+- **Short Press (< 500ms)**: Cycle through menu items.
+- **Long Press (> 800ms)**: Select a sub-menu or toggle a setting.
+- **Physical Feedback**: 
+    - **Short Beep**: Navigation.
+    - **Long Beep**: Selection.
+    - **Tower Light**: Solid Yellow (Maintenance Mode).
+- **Inactivity Timeout**: If no button is pressed for **10 seconds**, the system automatically exits. If changes are pending, it will show the **SAVE CHANGES?** confirmation screen.
+
+### Hierarchy Structure
+
+The menu is organized into four primary categories for efficient navigation:
+
+#### 1. Hardware Control
+- **Serial**: Toggle output between **USB** and **UART-ALT** (GPIO 40/39).
+- **Status Lights**: Enable/Disable the physical tower lights.
+- **VFD**: Enable/Disable Modbus communication with the Altivar 31.
+- **BACK**: Return to the Main Menu.
+
+#### 2. Diagnostics Terminal
+- **View Alarms**: Displays the **2 most recent faults** (code and reason) from the system log.
+- **Log Level**: Toggles global logging between **INFO** and **DEBUG**.
+- **Modbus Health**: Real-time poll/error statistics for all RS-485 devices.
+- **Diag Dump**: Exports a full system state report to the serial port.
+- **BACK**: Return to the Main Menu.
+
+#### 3. System Utilities
+- **Reboot**: Immediate hardware restart.
+- **Factory Reset**: Erases all in-memory and NVS configuration (requires long-press confirmation).
+- **BACK**: Return to the Main Menu.
+
+#### 4. EXIT
+Provides an immediate departure from the menu. If settings were changed, you will be prompted to **SAVE** or **CANCEL**.
+
+---
+
+---
+
+## 15. Machine States & Safety Logic
+
+The BISSO E350 uses an internal Safety State Machine to protect both the operator and the mechanical components. Understanding the current "State" of the machine is critical for efficient operation.
+
+### Operational States
+
+The current state is displayed at the top of the **Dashboard** and on the **LCD Screen**.
+
+| State | Indicator | Description | Operator Action |
+|-------|-----------|-------------|-----------------|
+| **READY** | Green | System is idle and healthy. | Normal operation; ready for commands. |
+| **MOVING**| Pulsing Green| An axis is currently in motion. | **STAY CLEAR** of the bridge and carriage. |
+| **ALARM** | Yellow | A soft fault was detected (e.g., position lag). | Investigation required. Motion is paused. |
+| **EMERGENCY**| Red / Flashing| A critical safety fault (E-Stop or VFD failure). | **Immediate Halt**. Resolve physical cause, then Reset. |
+| **ENGINEER**| Blue (LCD) | Engineering Menu is active. | Technical settings only. Motion is disabled. |
+
+### Fault Recovery Path
+
+If the machine enters an **ALARM** or **EMERGENCY** state, follow this standard recovery sequence:
+
+1. **Identify the Fault**: Look at the "Active Faults" section on the Dashboard or the `F#XX` code on the LCD.
+2. **Clear the Obstruction**: Ensure axes are clear and the E-Stop button is pulled OUT.
+3. **Reset Safety**: Click **RESET** on the dashboard or type `estop off` in the terminal.
+4. **Homing**: After an Emergency Stop, it is highly recommended to **Home All Axes** (`$H`) to re-verify position accuracy.
+
+```text
+RECOVERY FLOW:
+[ ALARM ] --> [ Fix Issue ] --> [ Reset Button ] --> [ Home Axes ] --> [ READY ]
+```
+
+---
