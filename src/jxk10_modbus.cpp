@@ -23,13 +23,12 @@ Jxk10Driver::Jxk10Driver()
 }
 
 const jxk10_state_t* Jxk10Driver::getState() const {
-    // Sync base class stats to public state struct
-    // We cast away const to update the mutable stats in _state
-    // This maintains compatibility with the C-API struct
     jxk10_state_t* mutable_state = const_cast<jxk10_state_t*>(&_state);
     mutable_state->error_count = getErrorCount();
     mutable_state->consecutive_errors = getConsecutiveErrors();
-    mutable_state->read_count = getPollCount(); // Approximate
+    mutable_state->read_count = getPollCount();
+    mutable_state->last_read_time_ms = getLastReadTime();
+    mutable_state->last_error_time_ms = getLastErrorTime();
     mutable_state->enabled = isEnabled();
     mutable_state->slave_address = getSlaveAddress();
     
@@ -56,8 +55,6 @@ bool Jxk10Driver::onResponse(const uint8_t* data, uint16_t len) {
     uint8_t err = modbusParseReadResponse(data, len, 1, regs);
     
     if (err != MODBUS_ERR_NONE) {
-        _state.last_error_time_ms = millis();
-        // Base class handles error counting
         return false;
     }
 
@@ -71,7 +68,6 @@ bool Jxk10Driver::onResponse(const uint8_t* data, uint16_t len) {
         _state.current_amps = _state.current_raw / 10.0f;
     }
 
-    _state.last_read_time_ms = millis();
     return true;
 }
 
@@ -179,17 +175,13 @@ void jxk10ResetErrorCounters(void) {
     // But this is minor.
 }
 
-void jxk10PrintDiagnostics(void) {
-    const jxk10_state_t* s = Jxk10.getState();
+void Jxk10Driver::printDiagnostics() const {
+    ModbusDriver::printDiagnostics();
     serialLoggerLock();
-    logPrintln("\n[JXK10] === Diagnostics ===");
-    logPrintf("Slave Address:       %u\n", s->slave_address);
-    logPrintf("Current:             %.2f A (raw: %d)\n", s->current_amps, s->current_raw);
-    logPrintf("Read Count:          %lu\n", (unsigned long)s->read_count);
-    logPrintf("Error Count:         %lu\n", (unsigned long)s->error_count);
-    logPrintf("Consecutive Errors:  %lu\n", (unsigned long)s->consecutive_errors);
-    if (s->last_read_time_ms > 0) {
-        logPrintf("Last Read:           %lu ms ago\n", (unsigned long)(millis() - s->last_read_time_ms));
-    }
+    logPrintf("Current:             %.2f A (raw: %d)\n", _state.current_amps, _state.current_raw);
     serialLoggerUnlock();
+}
+
+void jxk10PrintDiagnostics(void) {
+    Jxk10.printDiagnostics();
 }

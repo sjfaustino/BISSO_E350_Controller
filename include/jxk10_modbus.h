@@ -18,12 +18,14 @@ typedef struct {
     uint8_t slave_address;              // Modbus slave ID (1-254, default 1)
     uint32_t baud_rate;                 // Baud rate in bps
     int16_t current_raw;                // Raw Modbus register value
-    float current_amps;                 // Calculated current in amperes
+    float current_amps;                 // Current in amperes
+
+    // Statistics (Now managed by base class)
     uint32_t last_read_time_ms;         // Timestamp of last successful read
     uint32_t last_error_time_ms;        // Timestamp of last error
-    uint32_t read_count;                // Statistics: successful reads
-    uint32_t error_count;               // Statistics: read errors
-    uint32_t consecutive_errors;        // Count of consecutive communication failures
+    uint32_t read_count;                // Successful poll count
+    uint32_t error_count;               // Total error count
+    uint32_t consecutive_errors;        // Number of sequential errors (for bus health)
 } jxk10_state_t;
 
 #ifdef __cplusplus
@@ -42,6 +44,9 @@ public:
     
     // Legacy State Access
     const jxk10_state_t* getState() const;
+
+    // Diagnostics
+    void printDiagnostics() const override;
 
 protected:
     bool poll() override;

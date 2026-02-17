@@ -243,41 +243,41 @@ void spindleMonitorPrintDiagnostics(void) {
   serialLoggerLock();
   logPrintln("\n[SPINDLE] === Current Monitor Diagnostics ===\n");
   
-  cliPrintTableHeader(25, 18, 0);
-  cliPrintTableRow("Metric", "Value", nullptr, 25, 18, 0);
-  cliPrintTableDivider(25, 18, 0);
+  cliPrintTableHeader(25, 18, 0, 0, 0);
+  cliPrintTableRow("Metric", "Value", nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
+  cliPrintTableDivider(25, 18, 0, 0, 0);
   
-  cliPrintTableRow("Status", monitor_state.enabled ? "ENABLED" : "DISABLED", nullptr, 25, 18, 0);
+  cliPrintTableRow("Status", monitor_state.enabled ? "ENABLED" : "DISABLED", nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
   
   char buf[32];
   snprintf(buf, sizeof(buf), "%.2f A (%.1f%%)", monitor_state.current_amps, spindleMonitorGetLoadPercent());
-  cliPrintTableRow("Current Load", buf, nullptr, 25, 18, 0);
+  cliPrintTableRow("Current Load", buf, nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
   
   snprintf(buf, sizeof(buf), "%.2f A", monitor_state.current_peak_amps);
-  cliPrintTableRow("Peak Current", buf, nullptr, 25, 18, 0);
+  cliPrintTableRow("Peak Current", buf, nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
   
   snprintf(buf, sizeof(buf), "%.1f A", monitor_state.overcurrent_threshold_amps);
-  cliPrintTableRow("Shutdown Threshold", buf, nullptr, 25, 18, 0);
+  cliPrintTableRow("Shutdown Threshold", buf, nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
   
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)monitor_state.overload_count);
-  cliPrintTableRow("Overload Events", buf, nullptr, 25, 18, 0);
+  cliPrintTableRow("Overload Events", buf, nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
   
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)monitor_state.shutdown_count);
-  cliPrintTableRow("Shutdown Events", buf, nullptr, 25, 18, 0);
+  cliPrintTableRow("Shutdown Events", buf, nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
   
   cliPrintTableFooter(25, 18, 0);
   
   // Alarm Status Table
   logPrintln("\n[SPINDLE] === Alarm Configuration ===\n");
-  cliPrintTableHeader(25, 18, 0);
-  cliPrintTableRow("Alarm Type", "Status/Threshold", nullptr, 25, 18, 0);
-  cliPrintTableDivider(25, 18, 0);
+  cliPrintTableHeader(25, 18, 0, 0, 0);
+  cliPrintTableRow("Alarm Type", "Status/Threshold", nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
+  cliPrintTableDivider(25, 18, 0, 0, 0);
   
   snprintf(buf, sizeof(buf), "%s (%.1f A drop)", monitor_state.alarm_tool_breakage ? "ACTIVE" : "OK", monitor_state.tool_breakage_drop_amps);
-  cliPrintTableRow("Tool Breakage", buf, nullptr, 25, 18, 0);
+  cliPrintTableRow("Tool Breakage", buf, nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
   
   snprintf(buf, sizeof(buf), "%s (%.1f A)", monitor_state.alarm_stall ? "ACTIVE" : "OK", monitor_state.stall_threshold_amps);
-  cliPrintTableRow("Stall", buf, nullptr, 25, 18, 0);
+  cliPrintTableRow("Stall", buf, nullptr, 25, 18, 0, nullptr, 0, nullptr, 0);
   
   cliPrintTableFooter(25, 18, 0);
   

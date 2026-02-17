@@ -387,19 +387,8 @@ static bool validateBool(JsonVariant value, char* error_msg, size_t len) {
 }
 
 
-/**
- * @brief Set configuration value
- */
 bool apiConfigSet(config_category_t category, const char *key,
                   JsonVariant value) {
-  char error_msg[256];
-
-  // Validate first
-  if (!apiConfigValidate(category, key, value, error_msg, sizeof(error_msg))) {
-    logWarning("[API_CONFIG] Validation failed for %s: %s", key, error_msg);
-    return false;
-  }
-
   // Apply based on category
   switch (category) {
   case CONFIG_CATEGORY_MOTION:

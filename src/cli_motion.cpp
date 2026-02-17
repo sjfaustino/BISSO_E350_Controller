@@ -6,9 +6,11 @@
 
 #include "cli.h"
 #include "motion.h"
+#include "axis.h"
 #include "motion_state.h" // <-- CRITICAL FIX: Provides status accessors
 #include "serial_logger.h"
 #include "input_validation.h" 
+#include "axis_utilities.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -26,15 +28,36 @@ void cmd_predict_status(int argc, char** argv) {
   if (axis == 255) axis = 0;
 
   const Axis* a = motionGetAxis(axis);
-  logPrintln("\n=== PREDICTION DIAGNOSTICS ===");
-  logPrintf("Axis:            %d\n", axis);
-  logPrintf("Raw Position:    %ld\n", (long)a->position);
-  logPrintf("Actual Latched:  %ld\n", (long)a->last_actual_position);
-  logPrintf("Predicted:       %ld\n", (long)a->predicted_position);
-  logPrintf("Prediction Gap:  %ld\n", (long)(a->predicted_position - a->last_actual_position));
-  logPrintf("Velocity:        %.3f counts/ms\n", a->velocity_counts_ms);
-  logPrintf("Update Age:      %lu ms\n", (unsigned long)(millis() - a->last_actual_update_ms));
-  logPrintln("");
+  if (!serialLoggerLock()) return;
+  logDirectPrintln("\n=== PREDICTION DIAGNOSTICS ===\n");
+  cliPrintTableHeader(18, 22, 0, 0, 0);
+  cliPrintTableRow("Metric", "Value", nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+  cliPrintTableDivider(18, 22, 0, 0, 0);
+  
+  char buf1[32], buf2[32];
+  snprintf(buf1, sizeof(buf1), "Axis %d (%c)", axis, axisIndexToChar(axis));
+  cliPrintTableRow("Target Axis", buf1, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+  
+  snprintf(buf1, sizeof(buf1), "%ld", (long)a->position);
+  cliPrintTableRow("Raw Position", buf1, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+  
+  snprintf(buf1, sizeof(buf1), "%ld", (long)a->last_actual_position);
+  cliPrintTableRow("Actual Latched", buf1, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+  
+  snprintf(buf1, sizeof(buf1), "%ld", (long)a->predicted_position);
+  cliPrintTableRow("Predicted", buf1, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+  
+  snprintf(buf1, sizeof(buf1), "%ld", (long)(a->predicted_position - a->last_actual_position));
+  cliPrintTableRow("Prediction Gap", buf1, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+  
+  snprintf(buf1, sizeof(buf1), "%.3f counts/ms", a->velocity_counts_ms);
+  cliPrintTableRow("Velocity", buf1, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+  
+  snprintf(buf1, sizeof(buf1), "%lu ms ago", (unsigned long)(millis() - a->last_actual_update_ms));
+  cliPrintTableRow("Update Age", buf1, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+  
+  cliPrintTableFooter(18, 22, 0, 0, 0);
+  serialLoggerUnlock();
 }
 
 void cmd_estop_status(int argc, char** argv) {

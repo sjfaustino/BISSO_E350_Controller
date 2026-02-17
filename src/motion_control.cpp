@@ -16,6 +16,7 @@
 #include "fault_logging.h"
 #include "lcd_sleep.h" // PHASE 4.0: M255 LCD sleep support
 #include "motion.h"
+#include "axis.h"
 #include "motion_planner.h"
 #include "motion_state.h"
 #include "string_safety.h"
@@ -84,147 +85,14 @@ void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
 void motionSetPLCSpeedProfile(speed_profile_t profile);
 
 // ============================================================================
-// AXIS CLASS IMPLEMENTATION
+// PUBLIC ACCESSORS FOR AXIS CLASS
 // ============================================================================
 
-Axis::Axis() {
-  id = 0;
-  state = MOTION_IDLE;
-  position = 0;
-  target_position = 0;
-  enabled = true;
-  _error_logged = false;
-  soft_limit_enabled = true;
-  soft_limit_min = -1000000;
-  soft_limit_max = 1000000;
-  dwell_end_ms = 0;
-  wait_pin_id = 0;
-  wait_pin_type = 0;
-  wait_pin_state = 0;
-  wait_pin_timeout_ms = 0;
-  current_velocity_mm_s = 0.0f;
-  prev_position = 0;
-  prev_update_ms = 0;
-  last_actual_position = 0;
-  last_actual_update_ms = 0;
-  predicted_position = 0;
-  velocity_counts_ms = 0.0f;
-}
-
-void Axis::init(uint8_t axis_id) {
-  id = axis_id;
-  state = MOTION_IDLE;
-  _error_logged = false;
-  enabled = true;
-}
-
-bool Axis::checkSoftLimits(bool strict_mode) {
-  if (!enabled || !soft_limit_enabled)
-    return false;
-  if (state >= MOTION_HOMING_APPROACH_FAST)
-    return false;
-
-  if (position < soft_limit_min || position > soft_limit_max) {
-    if (strict_mode) {
-      if (!_error_logged) {
-        faultLogEntry(FAULT_WARNING, FAULT_SOFT_LIMIT_EXCEEDED, id, position,
-                      "Strict Limit Hit");
-        logError("[AXIS %d] Strict Limit Violation: %ld", id, (long)position);
-        _error_logged = true;
-      }
-      return true;
-    }
-  } else {
-    _error_logged = false;
-  }
-  return false;
-}
-
-void Axis::updateState(int32_t current_pos, int32_t global_target_pos,
-                       bool consensus_active) {
-  // Calculate velocity (differentiate position over time)
-  uint32_t current_time_ms = millis();
-    if (prev_update_ms > 0) {
-    uint32_t dt_ms = (current_time_ms >= prev_update_ms) 
-        ? (current_time_ms - prev_update_ms) 
-        : (UINT32_MAX - prev_update_ms + current_time_ms + 1);
-    
-    // Cap dt_ms to reasonable maximum (e.g., 1 second) to prevent math glitches
-    if (dt_ms > 1000) dt_ms = 1000;
-
-    if (dt_ms > 0) {
-      int32_t delta_pos = current_pos - prev_position;
-      // Convert counts/ms to mm/s
-      // velocity = (delta_counts / dt_ms) * (1000 ms/s) * (1 mm / ppm counts)
-      float scale = getAxisScale(id);
-      if (scale > 0.0f) {
-        current_velocity_mm_s =
-            ((float)delta_pos / (float)dt_ms) * 1000.0f / scale;
-        
-        // Accumulate distance in units (mm or degrees)
-        accumulated_distance_units += (double)abs(delta_pos) / (double)scale;
-      } else {
-        current_velocity_mm_s = 0.0f;
-      }
-    }
-  }
-
-  // Update tracking variables
-  if (current_pos != last_actual_position) {
-    // We have fresh data from the RS485 bus
-    if (last_actual_update_ms > 0) {
-      uint32_t dt_actual = (current_time_ms >= last_actual_update_ms)
-          ? (current_time_ms - last_actual_update_ms)
-          : (UINT32_MAX - last_actual_update_ms + current_time_ms + 1);
-      
-      if (dt_actual > 1000) dt_actual = 1000;
-      
-      if (dt_actual > 0) {
-        // Calculate velocity in counts/ms for prediction
-        velocity_counts_ms = (float)(current_pos - last_actual_position) / (float)dt_actual;
-      }
-    }
-    last_actual_position = current_pos;
-    last_actual_update_ms = current_time_ms;
-  }
-
-  prev_position = current_pos;
-  prev_update_ms = current_time_ms;
-  position = current_pos; // This is the 'raw' position from wj66
-
-  // Calculate Progress & ETA (if this is the active axis)
+void motionUpdateExecutionMetrics(float progress, float remaining_seconds) {
   portENTER_CRITICAL(&motionSpinlock);
-  bool is_active = (this->id == m_state.active_axis);
-  int32_t start_pos = m_state.active_start_position;
+  m_state.progress_percent = progress;
+  m_state.remaining_seconds = remaining_seconds;
   portEXIT_CRITICAL(&motionSpinlock);
-
-  if (is_active) {
-      int32_t total_dist_counts = abs(global_target_pos - start_pos);
-      if (total_dist_counts > 0) {
-          int32_t current_dist_counts = abs(current_pos - start_pos);
-          float prog = ((float)current_dist_counts / (float)total_dist_counts) * 100.0f;
-          if (prog > 100.0f) prog = 100.0f;
-          
-          portENTER_CRITICAL(&motionSpinlock);
-          m_state.progress_percent = prog;
-          
-          // ETA Calculation
-          float abs_velocity = fabsf(current_velocity_mm_s);
-          if (abs_velocity > 0.05f) { // Slightly tighter threshold
-              float ppm = encoderCalibrationGetPPM(id);
-              if (ppm > 0.1f) { // Extra guard for ppm
-                  float rem_dist_mm = (float)(total_dist_counts - current_dist_counts) / ppm;
-                  // Avoid division by near-zero velocity
-                  m_state.remaining_seconds = (abs_velocity > 0.01f) ? (rem_dist_mm / abs_velocity) : 0.0f;
-              }
-          }
-          portEXIT_CRITICAL(&motionSpinlock);
-      }
-  }
-
-  // PHASE 5.10: Use formal state machine instead of switch/case
-  // State machine handles thread-safe state transitions internally
-  MotionStateMachine::update(this, current_pos, global_target_pos, consensus_active);
 }
 
 // ============================================================================

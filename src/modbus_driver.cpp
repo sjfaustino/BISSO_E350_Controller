@@ -18,6 +18,8 @@ ModbusDriver::ModbusDriver(const char* name, rs485_device_type_t type,
     
     _device.enabled = false;
     _baud_rate = 9600;
+    _last_read_time_ms = 0;
+    _last_error_time_ms = 0;
 }
 
 ModbusDriver::~ModbusDriver() {
@@ -70,6 +72,42 @@ void ModbusDriver::resetErrorCounters() {
     _device.poll_count = 0;
     _device.error_count = 0;
     _device.consecutive_errors = 0;
+    _last_read_time_ms = 0;
+    _last_error_time_ms = 0;
+}
+
+uint32_t ModbusDriver::getLastReadTime() const {
+    return _last_read_time_ms;
+}
+
+uint32_t ModbusDriver::getLastErrorTime() const {
+    return _last_error_time_ms;
+}
+
+#include "serial_logger.h"
+#include <Arduino.h>
+
+void ModbusDriver::printDiagnostics() const {
+    serialLoggerLock();
+    logPrintf("\n[%s] === Diagnostics ===\n", _device.name);
+    logPrintf("Slave Address:       %u\n", _device.slave_address);
+    logPrintf("Poll Interval:       %u ms\n", _device.poll_interval_ms);
+    logPrintf("Enabled:             %s\n", _device.enabled ? "YES" : "NO");
+    logPrintf("Poll Count:          %lu\n", (unsigned long)_device.poll_count);
+    logPrintf("Error Count:         %lu\n", (unsigned long)_device.error_count);
+    logPrintf("Consecutive Errors:  %lu\n", (unsigned long)_device.consecutive_errors);
+    
+    uint32_t now = millis();
+    if (_last_read_time_ms > 0) {
+        logPrintf("Last Successful:     %lu ms ago\n", (unsigned long)(now - _last_read_time_ms));
+    } else {
+        logPrintf("Last Successful:     NEVER\n");
+    }
+    
+    if (_last_error_time_ms > 0) {
+        logPrintf("Last Error:          %lu ms ago\n", (unsigned long)(now - _last_error_time_ms));
+    }
+    serialLoggerUnlock();
 }
 
 const rs485_device_t* ModbusDriver::getDeviceDescriptor() const {
@@ -97,7 +135,13 @@ bool ModbusDriver::staticPoll(void* ctx) {
 bool ModbusDriver::staticOnResponse(void* ctx, const uint8_t* data, uint16_t len) {
     ModbusDriver* driver = static_cast<ModbusDriver*>(ctx);
     if (driver) {
-        return driver->onResponse(data, len);
+        bool success = driver->onResponse(data, len);
+        if (success) {
+            driver->_last_read_time_ms = millis();
+        } else {
+            driver->_last_error_time_ms = millis();
+        }
+        return success;
     }
     return false;
 }

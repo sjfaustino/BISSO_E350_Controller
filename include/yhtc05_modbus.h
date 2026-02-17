@@ -35,15 +35,15 @@ typedef struct {
     uint32_t stall_time_ms;         // How long below threshold
     uint32_t stall_detect_time_ms;  // Time when stall was detected
     
-    // Statistics
+    // Peak tracking
+    uint16_t peak_rpm;              // Maximum RPM recorded
+
+    // Statistics (Now managed by base class)
     uint32_t last_read_time_ms;     // Timestamp of last successful read
     uint32_t last_error_time_ms;    // Timestamp of last error
     uint32_t read_count;            // Successful reads
     uint32_t error_count;           // Read errors
     uint32_t consecutive_errors;    // Consecutive failures
-    
-    // Peak tracking
-    uint16_t peak_rpm;              // Maximum RPM recorded
 } yhtc05_state_t;
 
 #ifdef __cplusplus
@@ -65,6 +65,9 @@ public:
     void resetPeakRPM();
     
     const yhtc05_state_t* getState() const;
+
+    // Diagnostics
+    void printDiagnostics() const override;
 
 protected:
     bool poll() override;

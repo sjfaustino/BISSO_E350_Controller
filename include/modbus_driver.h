@@ -36,6 +36,15 @@ public:
     uint32_t getConsecutiveErrors() const;
     void resetErrorCounters();
 
+    // Timestamps
+    uint32_t getLastReadTime() const;
+    uint32_t getLastErrorTime() const;
+
+    /**
+     * @brief Print standard diagnostics for this device
+     */
+    virtual void printDiagnostics() const;
+
     // Registry Access (for advanced use)
     const rs485_device_t* getDeviceDescriptor() const;
     rs485_device_t* getMutableDeviceDescriptor();
@@ -63,6 +72,8 @@ protected:
     // Internal state
     rs485_device_t _device;
     uint32_t _baud_rate;
+    uint32_t _last_read_time_ms;
+    uint32_t _last_error_time_ms;
 
 private:
     // Static trampoline functions for C-registry callbacks

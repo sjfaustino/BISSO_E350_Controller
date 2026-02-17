@@ -4,6 +4,7 @@
 #include "config_unified.h"
 #include "config_keys.h"
 #include "motion.h"
+#include "fault_logging.h"
 #include "lcd_interface.h"
 #include "operator_alerts.h"
 #include "altivar31_modbus.h"

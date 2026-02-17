@@ -8,6 +8,7 @@
 #include "telemetry_history.h" // PSRAM history
 #include "firmware_version.h"
 #include "serial_logger.h"
+#include "mcu_info.h"
 #include "altivar31_modbus.h"  // VFD run status
 #include "axis_synchronization.h"
 #include "dashboard_metrics.h"
@@ -17,6 +18,7 @@
 #include "motion.h"
 #include "motion_state.h"
 #include "safety.h"
+#include "motion_buffer.h"
 #include "spindle_current_monitor.h"
 #include "yhtc05_modbus.h"  // YH-TC05 RPM sensor
 #include "fault_logging.h"
@@ -218,6 +220,13 @@ void telemetryUpdate() {
     uint32_t vfd_fault = altivar31GetFaultCode();
     float spindle_load = spindleMonitorGetLoadPercent();
     
+    // MCU Identification
+    char mcu_rev[16];
+    char mcu_ser[32];
+    mcuGetRevisionString(mcu_rev, sizeof(mcu_rev));
+    uint64_t mac = ESP.getEfuseMac();
+    snprintf(mcu_ser, sizeof(mcu_ser), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
+
     float actual_feedrate_mm_s = 0.0f;
     uint8_t active_axis = motionGetActiveAxis();
     if (active_axis < 3) actual_feedrate_mm_s = abs(motionGetVelocity(active_axis));
@@ -228,6 +237,7 @@ void telemetryUpdate() {
     float j_amps[3] = {0};
     bool a_stalled[3] = {false};
     float v_errs[3] = {0};
+    bool m_warns[3] = {false};
     
     axisSynchronizationLock();
     for (int i = 0; i < 3; i++) {
@@ -237,6 +247,7 @@ void telemetryUpdate() {
             j_amps[i] = metrics->velocity_jitter_mms;
             a_stalled[i] = metrics->stalled;
             v_errs[i] = metrics->vfd_encoder_error_percent;
+            m_warns[i] = metrics->jitter_elevated;
         }
     }
     axisSynchronizationUnlock();
@@ -307,11 +318,17 @@ void telemetryUpdate() {
     telemetry_cache.sd_total_bytes = last_sd_total;
     telemetry_cache.sd_used_bytes = last_sd_used;
     
+    telemetry_cache.motion_errors = faultGetStats().motion_faults;
+    telemetry_cache.motion_buffer_count = motionBuffer.available();
+    telemetry_cache.motion_buffer_capacity = motionBuffer.getCapacity();
+    
     // DRY Phase 8 Fields
     telemetry_cache.vfd_connected = vfd_alive;
     telemetry_cache.vfd_frequency_hz = (isnan(vfd_freq) || vfd_freq < 0.0f) ? 0.0f : vfd_freq;
     telemetry_cache.vfd_thermal_state = (vfd_thermal < 0 || vfd_thermal > 200) ? 0 : vfd_thermal;
     telemetry_cache.vfd_fault_code = vfd_fault;
+    telemetry_cache.vfd_threshold_amps = vfdCalibrationGetThreshold();
+    telemetry_cache.vfd_calibration_valid = vfdCalibrationIsValid();
     telemetry_cache.spindle_load_percent = spindle_load;
     telemetry_cache.spindle_efficiency = efficiency;
     telemetry_cache.dro_connected = dro_alive;
@@ -320,6 +337,18 @@ void telemetryUpdate() {
     memcpy(telemetry_cache.axis_jitter_mms, j_amps, sizeof(j_amps));
     memcpy(telemetry_cache.axis_stalled, a_stalled, sizeof(a_stalled));
     memcpy(telemetry_cache.axis_vfd_error_percent, v_errs, sizeof(v_errs));
+    memcpy(telemetry_cache.axis_maintenance_warning, m_warns, sizeof(m_warns));
+
+    // Parser State
+    telemetry_cache.parser_absolute_mode = (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE);
+    telemetry_cache.parser_req_feedrate = gcodeParser.getCurrentFeedRate();
+    telemetry_cache.parser_actual_feedrate = actual_feedrate_mm_s;
+
+    // Identification
+    SAFE_STRCPY(telemetry_cache.mcu_revision, mcu_rev, sizeof(telemetry_cache.mcu_revision));
+    SAFE_STRCPY(telemetry_cache.mcu_serial, mcu_ser, sizeof(telemetry_cache.mcu_serial));
+    SAFE_STRCPY(telemetry_cache.mcu_model, mcuGetModelName(), sizeof(telemetry_cache.mcu_model));
+    SAFE_STRCPY(telemetry_cache.system_status_string, "NORMAL", sizeof(telemetry_cache.system_status_string)); // Default status string
 
     // LCD Mirror
     lcdInterfaceGetContent(telemetry_cache.lcd_lines);
@@ -363,99 +392,113 @@ system_health_t telemetryGetHealthStatus() {
     return calculateHealthStatus();
 }
 
-size_t telemetryExportJSON(char* buffer, size_t buffer_size) {
-    if (!buffer || buffer_size < 512) return 0;
+size_t telemetryExportJSON(char* buffer, size_t buffer_size, bool full) {
+    if (!buffer || buffer_size < 1024) return 0;
 
     system_telemetry_t t = telemetryGetSnapshot();
     
-    // OPTIMIZATION: Use lighter-weight formatting to reduce stack usage
-    // and improve speed. Avoid single massive snprintf.
-    int n = SAFE_SNPRINTF(buffer, buffer_size,
-        "{\"system\":{\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"plc_hardware_present\":%s,\"rtc_battery_low\":%s,\"firmware_version\":\"v%d.%d.%d\"},"
-        "\"memory\":{\"free_bytes\":%lu,\"stack_used\":%lu},"
-        "\"motion\":{\"enabled\":%s,\"moving\":%s,\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,\"wco\":[%.3f,%.3f,%.3f,%.3f],\"active_wcs\":%u},"
-        "\"spindle\":{\"enabled\":%s,\"running\":%s,\"current_amps\":%.2f,\"peak_amps\":%.2f,\"errors\":%lu,"
-        "\"overcurrent\":%s,\"fault\":%s},"
-        "\"safety\":{\"estop\":%s,\"alarm\":%s,\"faults\":%lu,\"critical\":%lu},"
-        "\"rpm_sensor\":{\"enabled\":%s,\"rpm\":%u,\"stall_detected\":%s},"
-        "\"tasks\":{\"slowest_id\":%u,\"slowest_us\":%lu},"
-        "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},"
-        "\"sd\":{\"mounted\":%s,\"health\":%u,\"total_bytes\":%llu,\"used_bytes\":%llu},"
-        "\"config\":{\"version\":%lu,\"is_default\":%s},"
-        "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}}",
+    // Identification Mode
+    char ver_str[32];
+    snprintf(ver_str, sizeof(ver_str), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
+
+    int n = snprintf(buffer, buffer_size,
+        "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
+        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"rtc_battery_low\":%s",
+        t.system_status_string,
         telemetryGetHealthStatusString(t.health_status),
         (unsigned long)t.uptime_seconds,
         t.cpu_usage_percent,
-        t.plc_hardware_present ? "true" : "false",
-        t.rtc_battery_low ? "true" : "false",
-        FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH,
         (unsigned long)t.free_heap_bytes,
-        (unsigned long)t.stack_used_bytes,
-        t.motion_enabled ? "true" : "false",
-        t.motion_moving ? "true" : "false",
+        t.temperature,
+        ver_str,
+        __DATE__,
+        t.rtc_battery_low ? "true" : "false"
+    );
+
+    if (n < 0 || (size_t)n >= buffer_size) return 0;
+    size_t offset = (size_t)n;
+
+    if (full) {
+        n = snprintf(buffer + offset, buffer_size - offset,
+            ",\"plc_hardware_present\":%s,\"hw_model\":\"%s\",\"hw_mcu\":\"%s\",\"hw_revision\":\"%s\",\"hw_serial\":\"%s\"",
+            t.plc_hardware_present ? "true" : "false",
+            t.mcu_model, mcuGetModelName(), t.mcu_revision, t.mcu_serial);
+        if (n > 0 && (offset + n) < buffer_size) offset += n;
+    }
+
+    n = snprintf(buffer + offset, buffer_size - offset,
+        "},\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,\"motion_active\":%s,"
+        "\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},",
         t.axis_x_mm, t.axis_y_mm, t.axis_z_mm, t.axis_a_mm,
-        t.wcs_offset_mm[0], t.wcs_offset_mm[1], t.wcs_offset_mm[2], t.wcs_offset_mm[3],
-        t.active_wcs,
-        t.spindle_enabled ? "true" : "false",
-        t.spindle_running ? "true" : "false",
-        t.spindle_current_amps,
-        t.spindle_current_peak_amps,
-        (unsigned long)t.spindle_errors,
-        t.spindle_overcurrent ? "true" : "false",
-        t.spindle_fault ? "true" : "false",
-        t.estop_active ? "true" : "false",
-        t.alarm_active ? "true" : "false",
-        (unsigned long)t.faults_logged,
-        (unsigned long)t.critical_faults,
-        t.rpm_sensor_enabled ? "true" : "false",
-        t.spindle_rpm,
-        t.rpm_stall_detected ? "true" : "false",
-        t.slowest_task_id,
-        (unsigned long)t.slowest_task_time_us,
-        t.wifi_connected ? "true" : "false",
-        t.wifi_signal_strength,
-        t.sd_mounted ? "true" : "false",
-        t.sd_health,
-        t.sd_total_bytes,
-        t.sd_used_bytes,
-        (unsigned long)configGetStoredSchemaVersion(),
-        t.config_is_default ? "true" : "false",
+        t.motion_moving ? "true" : "false",
+        t.motion_moving ? "true" : "false",
+        t.motion_buffer_count,
+        t.motion_buffer_capacity,
+        t.dro_connected ? "true" : "false");
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
+
+    n = snprintf(buffer + offset, buffer_size - offset,
+        "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
+        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f,\"load_pct\":%.1f},",
+        t.spindle_current_amps, t.vfd_frequency_hz, t.vfd_thermal_state, t.vfd_fault_code,
+        t.vfd_threshold_amps, t.vfd_calibration_valid ? "true" : "false", t.vfd_connected ? "true" : "false",
+        (float)t.spindle_rpm, 0.0f, t.spindle_efficiency, t.spindle_load_percent);
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
+
+    n = snprintf(buffer + offset, buffer_size - offset,
+        "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
+        "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
+        "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s}},"
+        "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},",
+        (uint32_t)t.axis_quality_score[0], t.axis_jitter_mms[0], t.axis_vfd_error_percent[0], 
+        t.axis_stalled[0] ? "true" : "false", t.axis_maintenance_warning[0] ? "true" : "false",
+        (uint32_t)t.axis_quality_score[1], t.axis_jitter_mms[1], t.axis_vfd_error_percent[1], 
+        t.axis_stalled[1] ? "true" : "false", t.axis_maintenance_warning[1] ? "true" : "false",
+        (uint32_t)t.axis_quality_score[2], t.axis_jitter_mms[2], t.axis_vfd_error_percent[2], 
+        t.axis_stalled[2] ? "true" : "false", t.axis_maintenance_warning[2] ? "true" : "false",
+        t.wifi_connected ? "true" : "false", t.wifi_signal_strength);
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
+
+    n = snprintf(buffer + offset, buffer_size - offset,
+        "\"sd\":{\"mounted\":%s,\"health\":%d,\"total_bytes\":%llu,\"used_bytes\":%llu},"
+        "\"parser\":{\"absolute_mode\":%s,\"feedrate\":%.1f,\"actual_feedrate\":%.1f},"
+        "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}",
+        t.sd_mounted ? "true" : "false", (int)t.sd_health, t.sd_total_bytes, t.sd_used_bytes,
+        t.parser_absolute_mode ? "true" : "false", t.parser_req_feedrate, t.parser_actual_feedrate,
         t.lcd_lines[0], t.lcd_lines[1], t.lcd_lines[2], t.lcd_lines[3]);
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
 
-    // Append Task Stack Usage (Memory Tuning)
-    if (n > 0 && (size_t)n < buffer_size - 64) {
-        // Remove the last '}' to append detailed stats
-        buffer[n - 1] = ','; 
-        
-        // Use n as our write position
-        size_t offset = (size_t)n;
-        offset += snprintf(buffer + offset, buffer_size - offset, "\"stack\":{");
-        
-        // Update stats first (lightweight)
-        taskUpdateStackUsage();
-        task_stats_t* stats = taskGetStatsArray();
-        int count = taskGetStatsCount();
-        
-        for(int i=0; i<count; i++) {
-            if(stats[i].handle) {
-                // Report FREE bytes (High Water Mark) - standard metric for tuning
-                offset += snprintf(buffer + offset, buffer_size - offset, "\"%s\":%u,", stats[i].name, stats[i].stack_high_water);
-                if(offset >= buffer_size - 10) break; 
+    if (t.motion_moving) {
+        n = snprintf(buffer + offset, buffer_size - offset,
+            ",\"exec\":{\"cmd\":\"%s\",\"progress\":%.1f,\"eta\":%lu}",
+            motionGetCurrentCommand(), motionGetExecutionProgress(), (unsigned long)motionGetEstimatedTimeRemaining());
+        if (n > 0 && (offset + n) < buffer_size) offset += n;
+    }
+
+    n = snprintf(buffer + offset, buffer_size - offset, ",\"stack\":{");
+    if (n > 0 && (offset + n) < buffer_size) offset += n;
+    
+    task_stats_t* stats = taskGetStatsArray();
+    int count = taskGetStatsCount();
+    bool first_stack = true;
+    for (int i = 0; i < count; i++) {
+        if (stats[i].handle) {
+            n = snprintf(buffer + offset, buffer_size - offset, "%s\"%s\":%u", first_stack ? "" : ",", stats[i].name, stats[i].stack_high_water);
+            if (n > 0 && (offset + n) < buffer_size) {
+                offset += n;
+                first_stack = false;
             }
+            if (offset >= buffer_size - 16) break;
         }
-        
-        // Remove trailing comma if exists
-        if (buffer[offset-1] == ',') offset--;
-        
-        // Close object and root
-        offset += snprintf(buffer + offset, buffer_size - offset, "}}");
-        return offset;
+    }
+    
+    if (offset < buffer_size - 2) {
+        buffer[offset++] = '}'; // Close stack
+        buffer[offset++] = '}'; // Close root
+        buffer[offset] = '\0';
     }
 
-    if (n < 0 || (size_t)n >= buffer_size) {
-        return buffer_size - 1; // Truncated or error
-    }
-    return (size_t)n;
+    return offset;
 }
 
 size_t telemetryExportCompactJSON(char* buffer, size_t buffer_size) {

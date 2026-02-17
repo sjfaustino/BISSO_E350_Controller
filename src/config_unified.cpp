@@ -229,39 +229,71 @@ static void addToCacheFloat(const char *key, float val) {
 // VALIDATION LOGIC (Safety Fix)
 // ----------------------------------------------------------------------------
 
-static int32_t validateInt(const char *key, int32_t value) {
-  // 1. Pulses Per MM/Degree (Must be positive)
+static result_t validateInt(const char *key, int32_t *value) {
+  int32_t val = *value;
+  result_t res = RESULT_OK;
+
+  // 1. Pulses Per MM/Degree (50-200)
   if (strstr(key, "ppm_") != NULL) {
-    if (value <= 0) {
-      logError("Invalid PPM value %ld (Must be > 0)", (long)value);
-      return 1000; // Default safe value
-    }
+    if (val < 50) { *value = 50; res = RESULT_INVALID_PARAM; }
+    else if (val > 500) { *value = 500; res = RESULT_INVALID_PARAM; }
   }
 
-  // 2. Timeout Safety
-  if (strcmp(key, KEY_STALL_TIMEOUT) == 0) {
-    return (value < 100) ? 100 : (value > 60000 ? 60000 : value);
+  // 2. Soft Limits (-1,000,000 to 1,000,000)
+  else if (strstr(key, "_limit_") != NULL) {
+    if (val < -1000000) { *value = -1000000; res = RESULT_INVALID_PARAM; }
+    else if (val > 1000000) { *value = 1000000; res = RESULT_INVALID_PARAM; }
+  }
+
+  // 3. Timeout Safety (100ms to 60s)
+  else if (strcmp(key, KEY_STALL_TIMEOUT) == 0 || strcmp(key, KEY_STOP_TIMEOUT) == 0) {
+    if (val < 100) { *value = 100; res = RESULT_INVALID_PARAM; }
+    else if (val > 60000) { *value = 60000; res = RESULT_INVALID_PARAM; }
   }
 
   // 4. Encoder Deviation Alarm Timeout (100ms to 10s)
-  if (strcmp(key, KEY_ENC_DEV_TIMEOUT) == 0) {
-    return (value < 100) ? 100 : (value > 10000 ? 10000 : value);
+  else if (strcmp(key, KEY_ENC_DEV_TIMEOUT) == 0) {
+    if (val < 100) { *value = 100; res = RESULT_INVALID_PARAM; }
+    else if (val > 10000) { *value = 10000; res = RESULT_INVALID_PARAM; }
   }
 
-  // 3. Profiles (0-2)
-  if (strstr(key, "home_prof_") != NULL) {
-    return (value < 0) ? 0 : (value > 2 ? 2 : value);
+  // 5. Profiles (0-2)
+  else if (strstr(key, "home_prof_") != NULL) {
+    if (val < 0) { *value = 0; res = RESULT_INVALID_PARAM; }
+    else if (val > 2) { *value = 2; res = RESULT_INVALID_PARAM; }
   }
 
-  return value;
+  // 6. Modbus Addresses (1-247)
+  else if (strstr(key, "_addr") != NULL) {
+    if (val < 1) { *value = 1; res = RESULT_INVALID_PARAM; }
+    else if (val > 247) { *value = 247; res = RESULT_INVALID_PARAM; }
+  }
+
+  // 7. GPIO Pins (1-39, with caveats but this is a broad check)
+  else if (strstr(key, "_pin") != NULL) {
+    if (val < 1) { *value = 1; res = RESULT_INVALID_PARAM; }
+    else if (val > 39) { *value = 39; res = RESULT_INVALID_PARAM; }
+  }
+
+  return res;
 }
 
-static float validateFloat(const char *key, float value) {
+static result_t validateFloat(const char *key, float *value) {
+  float val = *value;
+  result_t res = RESULT_OK;
+
   // 1. Acceleration / Speed (Must be positive)
   if (strstr(key, "default_") != NULL && (strstr(key, "accel") || strstr(key, "speed"))) {
-    if (value < 0.1f) return 0.1f;
+    if (val < 0.1f) { *value = 0.1f; res = RESULT_INVALID_PARAM; }
   }
-  return value;
+  
+  // 2. Target Margin (0.001 to 10.0mm)
+  else if (strcmp(key, KEY_TARGET_MARGIN) == 0) {
+    if (val < 0.001f) { *value = 0.001f; res = RESULT_INVALID_PARAM; }
+    else if (val > 10.0f) { *value = 10.0f; res = RESULT_INVALID_PARAM; }
+  }
+
+  return res;
 }
 
 static void validateString(const char *key, char *value, size_t len) {
@@ -515,12 +547,10 @@ result_t configSetInt(const char *key, int32_t value) {
     return RESULT_NOT_READY;
 
   // VALIDATION STEP
-  int32_t original_value = value;
-  value = validateInt(key, value);
-  if (original_value != value) {
-     // If validation changed the value significantly, we might consider it an error
-     // but for now we follow the existing "clamp and log" pattern.
-     // However, the audit suggests returning RESULT_ERROR_INVALID_PARAM.
+  result_t val_res = validateInt(key, &value);
+  if (val_res != RESULT_OK) {
+      logWarning("Validation clamped %s to %ld", key, (long)value);
+      // We continue with clamped value but eventually return the warning status if needed
   }
 
   // PHASE 5.10: Protect config_table writes with mutex
@@ -576,7 +606,10 @@ result_t configSetFloat(const char *key, float value) {
     return RESULT_NOT_READY;
 
   // VALIDATION STEP
-  value = validateFloat(key, value);
+  result_t val_res = validateFloat(key, &value);
+  if (val_res != RESULT_OK) {
+      logWarning("Validation clamped %s to %.3f", key, value);
+  }
 
   // PHASE 5.10: Protect config_table writes with mutex
   if (config_cache_mutex != NULL) {

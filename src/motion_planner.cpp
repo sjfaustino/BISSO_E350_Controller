@@ -4,6 +4,7 @@
  */
 
 #include "motion_planner.h"
+#include "axis.h"
 #include "config_keys.h"
 #include "config_unified.h"
 #include "encoder_calibration.h"

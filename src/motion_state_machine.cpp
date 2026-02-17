@@ -6,6 +6,7 @@
 
 #include "motion_state_machine.h"
 #include "motion.h"
+#include "axis.h"
 #include "config_unified.h"
 #include "config_keys.h"
 #include "hardware_config.h" // For machineCal axis calibration

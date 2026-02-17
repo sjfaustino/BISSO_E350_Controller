@@ -96,15 +96,30 @@ void cmd_wifi_connect(int argc, char** argv) {
 }
 
 void cmd_wifi_status(int argc, char** argv) {
-    logPrintln("\n=== Status ===");
-    logPrintf("  Status: %s\r\n", wifiGetStatusString(WiFi.status()));
-    logPrintf("  MAC:    %s\r\n", WiFi.macAddress().c_str());
+    if (!serialLoggerLock()) return;
+    logDirectPrintln("\n=== WiFi Status ===\n");
+    cliPrintTableHeader(18, 22, 0);
+    cliPrintTableRow("Metric", "Value", nullptr, 18, 22, 0);
+    cliPrintTableDivider(18, 22, 0);
+    
+    cliPrintTableRow("Status", wifiGetStatusString(WiFi.status()), nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+    cliPrintTableRow("MAC Address", WiFi.macAddress().c_str(), nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+    
     if (WiFi.status() == WL_CONNECTED) {
-        logPrintf("  SSID:   %s\r\n", WiFi.SSID().c_str());
-        logPrintf("  Channel:%d\r\n", WiFi.channel());
-        logPrintf("  IP:     %s\r\n", WiFi.localIP().toString().c_str());
-        logPrintf("  RSSI:   %d dBm\r\n", WiFi.RSSI());
+        cliPrintTableRow("SSID", WiFi.SSID().c_str(), nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d", WiFi.channel());
+        cliPrintTableRow("Channel", buf, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        
+        cliPrintTableRow("IP Address", WiFi.localIP().toString().c_str(), nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        
+        snprintf(buf, sizeof(buf), "%d dBm", WiFi.RSSI());
+        cliPrintTableRow("Signal Strength", buf, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
     }
+    
+    cliPrintTableFooter(18, 22, 0);
+    serialLoggerUnlock();
 }
 
 void cmd_wifi_ap(int argc, char **argv) {
@@ -171,47 +186,57 @@ void cmd_wifi_main(int argc, char **argv) {
 // =============================================================================
 
 void cmd_eth_status(int argc, char** argv) {
-    logPrintln("\n=== Ethernet Status ===");
+    if (!serialLoggerLock()) return;
+    logDirectPrintln("\n=== Ethernet Status ===\n");
+    
+    cliPrintTableHeader(18, 22, 0);
+    cliPrintTableRow("Metric", "Value", nullptr, 18, 22, 0);
+    cliPrintTableDivider(18, 22, 0);
     
     int enabled = configGetInt(KEY_ETH_ENABLED, 0);
     int dhcp = configGetInt(KEY_ETH_DHCP, 1);
     
-    logPrintf("  Enabled:     %s\n", enabled ? "YES" : "NO");
-    logPrintf("  Mode:        %s\n", dhcp ? "DHCP" : "Static IP");
+    cliPrintTableRow("Hardware Enabled", enabled ? "YES" : "NO", nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+    cliPrintTableRow("Config Mode", dhcp ? "DHCP" : "Static IP", nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
     
     if (networkManager.isEthernetConnected()) {
-        logPrintf("  Status:      CONNECTED\n");
-        logPrintf("  IP:          %s\n", ETH.localIP().toString().c_str());
-        logPrintf("  Gateway:     %s\n", ETH.gatewayIP().toString().c_str());
-        logPrintf("  Subnet:      %s\n", ETH.subnetMask().toString().c_str());
-        logPrintf("  DNS:         %s\n", ETH.dnsIP().toString().c_str());
-        logPrintf("  MAC:         %s\n", ETH.macAddress().c_str());
-        logPrintf("  Link Speed:  %d Mbps\n", networkManager.getEthernetLinkSpeed());
-        logPrintf("  Duplex:      %s\n", ETH.fullDuplex() ? "Full" : "Half");
+        cliPrintTableRow("Link Status", "CONNECTED", nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        cliPrintTableRow("IP Address", ETH.localIP().toString().c_str(), nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        cliPrintTableRow("Gateway", ETH.gatewayIP().toString().c_str(), nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        cliPrintTableRow("Subnet Mask", ETH.subnetMask().toString().c_str(), nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        cliPrintTableRow("MAC Address", ETH.macAddress().c_str(), nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
         
-        // Uptime
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d Mbps", networkManager.getEthernetLinkSpeed());
+        cliPrintTableRow("Link Speed", buf, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        cliPrintTableRow("Duplex", ETH.fullDuplex() ? "Full" : "Half", nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+        
         if (eth_connect_time > 0) {
             uint32_t uptime_sec = (millis() - eth_connect_time) / 1000;
             uint32_t hours = uptime_sec / 3600;
             uint32_t mins = (uptime_sec % 3600) / 60;
             uint32_t secs = uptime_sec % 60;
-            logPrintf("  Uptime:      %02d:%02d:%02d\n", hours, mins, secs);
+            snprintf(buf, sizeof(buf), "%02d:%02d:%02d", hours, mins, secs);
+            cliPrintTableRow("Link Uptime", buf, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
         }
     } else {
-        logPrintf("  Status:      DISCONNECTED\n");
+        cliPrintTableRow("Link Status", "DISCONNECTED", nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
     }
     
-    logPrintf("  Reconnects:  %lu\n", (unsigned long)eth_reconnect_count);
-    logPrintf("  Errors:      %lu\n", (unsigned long)eth_error_count);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)eth_reconnect_count);
+    cliPrintTableRow("Reconnect Count", buf, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)eth_error_count);
+    cliPrintTableRow("Error Count", buf, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
     
-    // Static IP config if set
+    cliPrintTableFooter(18, 22, 0);
+    
     if (!dhcp) {
-        logPrintln("\n  Static Configuration:");
-        logPrintf("    IP:      %s\n", configGetString(KEY_ETH_IP, "not set"));
-        logPrintf("    Gateway: %s\n", configGetString(KEY_ETH_GW, "not set"));
-        logPrintf("    Mask:    %s\n", configGetString(KEY_ETH_MASK, "255.255.255.0"));
-        logPrintf("    DNS:     %s\n", configGetString(KEY_ETH_DNS, "8.8.8.8"));
+        logDirectPrintln("\nStatic Configuration Details:");
+        logDirectPrintf("  Target IP: %s\n", configGetString(KEY_ETH_IP, "not set"));
+        logDirectPrintf("  Gateway:   %s\n", configGetString(KEY_ETH_GW, "not set"));
     }
+    serialLoggerUnlock();
 }
 
 static void cmd_eth_on(int argc, char** argv) {

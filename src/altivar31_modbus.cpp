@@ -39,6 +39,8 @@ const altivar31_state_t* Altivar31Driver::getState() const {
     mutable_state->read_count = getPollCount();
     mutable_state->error_count = getErrorCount();
     mutable_state->consecutive_errors = getConsecutiveErrors();
+    mutable_state->last_read_time_ms = getLastReadTime();
+    mutable_state->last_error_time_ms = getLastErrorTime();
     mutable_state->enabled = isEnabled();
     mutable_state->slave_address = getSlaveAddress();
     return &_state;
@@ -87,7 +89,6 @@ bool Altivar31Driver::onResponse(const uint8_t* data, uint16_t len) {
     uint8_t err = modbusParseReadResponse(data, len, expected_count, regs);
     
     if (err != MODBUS_ERR_NONE) {
-        _state.last_error_time_ms = millis();
         _pending_register = 0; // Clear on error too
         return false;
     }
@@ -124,8 +125,6 @@ bool Altivar31Driver::onResponse(const uint8_t* data, uint16_t len) {
         _state.current_raw = (int16_t)regs[3];      // 3204
         _state.current_amps = _state.current_raw * 0.1f;
     }
-
-    _state.last_read_time_ms = millis();
     return true;
 }
 
@@ -212,12 +211,20 @@ bool altivar31DetectFrequencyLoss(float previous_freq_hz) {
     return false;
 }
 
-void altivar31PrintDiagnostics(void) {
-    const altivar31_state_t* s = Altivar31.getState();
+void Altivar31Driver::printDiagnostics() const {
+    // Print standard base class diagnostics
+    ModbusDriver::printDiagnostics();
+    
+    // Print VFD specific stats
     serialLoggerLock();
-    logPrintln("\n[ALTIVAR31] === Diagnostics ===");
-    logPrintf("Addr: %u\n", s->slave_address);
-    logPrintf("Freq: %.1f Hz\n", s->frequency_hz);
-    logPrintf("Curr: %.1f A\n", s->current_amps);
+    logPrintf("Status Word:         0x%04X\n", _state.status_word);
+    logPrintf("Fault Code:          0x%04X\n", _state.fault_code);
+    logPrintf("Thermal State:       %d %%\n", _state.thermal_state);
+    logPrintf("Frequency:           %.1f Hz\n", _state.frequency_hz);
+    logPrintf("Current:             %.1f A\n", _state.current_amps);
     serialLoggerUnlock();
+}
+
+void altivar31PrintDiagnostics(void) {
+    Altivar31.printDiagnostics();
 }

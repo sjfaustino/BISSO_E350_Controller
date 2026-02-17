@@ -409,176 +409,15 @@ void WebServerManager::setAxisMaintenanceWarning(uint8_t axis, bool warned) {
 }
 
 // --- JSON Builder Helper ---
-// --- JSON Builder Helper is now replaced by serializeTelemetryToBuffer ---
-
-
-// PHASE 6.4: String-based JSON serialization to eliminate heap churn
-size_t WebServerManager::serializeTelemetryToBuffer(char* buffer, size_t buffer_size, const system_telemetry_t& telemetry, bool full) {
-    if (!buffer || buffer_size < 1024) return 0;
-
-    char ver_str[32];
-    snprintf(ver_str, sizeof(ver_str), "v%d.%d.%d", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
-
-    lcd_message_t custom_msg;
-    bool has_lcd_msg = lcdMessageGet(&custom_msg);
-
-    char lcd_lines[LCD_ROWS][LCD_COLS + 1];
-    lcdInterfaceGetContent(lcd_lines);
-
-    bool moving = motionIsMoving();
-    uint8_t active_axis = motionGetActiveAxis();
-    float req_feedrate = gcodeParser.getCurrentFeedRate();
-    float actual_feedrate = (active_axis < MOTION_AXES) ? motionGetCalibratedFeedRate(active_axis, req_feedrate / 60.0f) : req_feedrate;
-
-    char rev_str[16];
-    mcuGetRevisionString(rev_str, sizeof(rev_str));
-
-    char serial_str[32];
-    uint64_t mac = ESP.getEfuseMac();
-    snprintf(serial_str, sizeof(serial_str), "BS-E350-%02X%02X", (uint8_t)(mac >> 8), (uint8_t)mac);
-
-    portENTER_CRITICAL(&statusSpinlock);
-
-    // 1. System Info and Dashboard basics
-    int n = snprintf(buffer, buffer_size,
-        "{\"system\":{\"status\":\"%s\",\"health\":\"%s\",\"uptime_sec\":%lu,\"cpu_percent\":%u,\"free_heap_bytes\":%lu,\"temperature\":%.1f,"
-        "\"firmware_version\":\"%s\",\"build_date\":\"%s\",\"lcd_msg\":\"%s\",\"lcd_msg_id\":%llu,\"rtc_battery_low\":%s",
-        current_status.status,
-        telemetryGetHealthStatusString(telemetry.health_status),
-        (unsigned long)current_status.uptime_sec,
-        telemetry.cpu_usage_percent,
-        (unsigned long)telemetry.free_heap_bytes,
-        telemetry.temperature,
-        ver_str,
-        __DATE__,
-        has_lcd_msg ? (const char*)custom_msg.text : "",
-        (unsigned long long)(has_lcd_msg ? custom_msg.timestamp_ms : 0),
-        telemetry.rtc_battery_low ? "true" : "false"
-    );
-
-    if (n < 0 || (size_t)n >= buffer_size) {
-        portEXIT_CRITICAL(&statusSpinlock);
-        return (size_t)n;
-    }
-    size_t offset = (size_t)n;
-
-    // 2. Identification (Full mode only)
-    if (full) {
-        n = snprintf(buffer + offset, buffer_size - offset,
-            ",\"plc_hardware_present\":%s,\"hw_model\":\"BISSO E350\",\"hw_mcu\":\"%s\",\"hw_revision\":\"%s\",\"hw_serial\":\"%s\"",
-            telemetry.plc_hardware_present ? "true" : "false",
-            mcuGetModelName(),
-            rev_str,
-            serial_str);
-        if (n > 0 && (offset + n) < buffer_size) offset += n;
-    }
-
-    // 3. Motion state and raw coordinates
-    n = snprintf(buffer + offset, buffer_size - offset,
-        "},\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,\"motion_active\":%s,"
-        "\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},",
-        telemetry.axis_x_mm, telemetry.axis_y_mm, telemetry.axis_z_mm, telemetry.axis_a_mm,
-        moving ? "true" : "false",
-        moving ? "true" : "false",
-        motionBuffer.available(),
-        motionBuffer.getCapacity(),
-        current_status.dro_connected ? "true" : "false");
-    if (n > 0 && (offset + n) < buffer_size) offset += n;
-
-    // 4. VFD telemetry
-    n = snprintf(buffer + offset, buffer_size - offset,
-        "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
-        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f,\"load_pct\":%.1f},",
-        current_status.vfd_current_amps, current_status.vfd_frequency_hz, current_status.vfd_thermal_percent, current_status.vfd_fault_code,
-        current_status.vfd_threshold_amps, current_status.vfd_calibration_valid ? "true" : "false", current_status.vfd_connected ? "true" : "false",
-        current_status.spindle_rpm, current_status.spindle_speed_m_s, current_status.spindle_efficiency, current_status.spindle_load_pct);
-    if (n > 0 && (offset + n) < buffer_size) offset += n;
-
-    // 5. Axis metrics and Network
-    n = snprintf(buffer + offset, buffer_size - offset,
-        "\"axis\":{\"x\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
-        "\"y\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s},"
-        "\"z\":{\"quality\":%u,\"jitter_mms\":%.3f,\"vfd_error_percent\":%.2f,\"stalled\":%s,\"maint\":%s}},"
-        "\"network\":{\"wifi_connected\":%s,\"signal_percent\":%u},",
-        current_status.axis_metrics[0].quality_score, current_status.axis_metrics[0].jitter_mms, current_status.axis_metrics[0].vfd_error_percent, 
-        current_status.axis_metrics[0].quality_score < 10 ? "true" : "false", current_status.axis_metrics[0].maintenance_warning ? "true" : "false",
-        current_status.axis_metrics[1].quality_score, current_status.axis_metrics[1].jitter_mms, current_status.axis_metrics[1].vfd_error_percent, 
-        current_status.axis_metrics[1].quality_score < 10 ? "true" : "false", current_status.axis_metrics[1].maintenance_warning ? "true" : "false",
-        current_status.axis_metrics[2].quality_score, current_status.axis_metrics[2].jitter_mms, current_status.axis_metrics[2].vfd_error_percent, 
-        current_status.axis_metrics[2].quality_score < 10 ? "true" : "false", current_status.axis_metrics[2].maintenance_warning ? "true" : "false",
-        telemetry.wifi_connected ? "true" : "false", telemetry.wifi_signal_strength);
-    if (n > 0 && (offset + n) < buffer_size) offset += n;
-
-    // 6. SD, Parser and LCD
-    n = snprintf(buffer + offset, buffer_size - offset,
-        "\"sd\":{\"mounted\":%s,\"health\":%d,\"total_bytes\":%llu,\"used_bytes\":%llu},"
-        "\"parser\":{\"absolute_mode\":%s,\"feedrate\":%.1f,\"actual_feedrate\":%.1f},"
-        "\"lcd\":{\"lines\":[\"%s\",\"%s\",\"%s\",\"%s\"]}",
-        telemetry.sd_mounted ? "true" : "false", (int)telemetry.sd_health, telemetry.sd_total_bytes, telemetry.sd_used_bytes,
-        (gcodeParser.getDistanceMode() == G_MODE_ABSOLUTE) ? "true" : "false", req_feedrate, actual_feedrate,
-        lcd_lines[0], lcd_lines[1], lcd_lines[2], lcd_lines[3]);
-    if (n > 0 && (offset + n) < buffer_size) offset += n;
-
-    portEXIT_CRITICAL(&statusSpinlock);
-
-    if (n < 0 || (size_t)n >= buffer_size) return (size_t)n;
-
-    // Execution status if moving
-    if (moving) {
-        offset += snprintf(buffer + offset, buffer_size - offset,
-            ",\"exec\":{\"cmd\":\"%s\",\"progress\":%.1f,\"eta\":%lu}",
-            motionGetCurrentCommand(),
-            motionGetExecutionProgress(),
-            (unsigned long)motionGetEstimatedTimeRemaining());
-    }
-
-    // Stack Monitor
-    task_stats_t* stats = taskGetStatsArray();
-    int stats_count = taskGetStatsCount();
-    if (stats != nullptr) {
-        offset += snprintf(buffer + offset, buffer_size - offset, ",\"stack\":{");
-        bool first = true;
-        for (int i = 0; i < stats_count; i++) {
-            if (stats[i].name != nullptr) {
-                offset += snprintf(buffer + offset, buffer_size - offset, "%s\"%s\":%u", first ? "" : ",", stats[i].name, stats[i].stack_high_water);
-                first = false;
-                if (offset >= buffer_size - 10) break;
-            }
-        }
-        offset += snprintf(buffer + offset, buffer_size - offset, "}");
-    }
-
-    // Close Root
-    if (offset < buffer_size - 1) {
-        buffer[offset++] = '}';
-        buffer[offset] = '\0';
-    }
-
-    return offset;
-}
-
-// --- Broadcast state to all connected WebSocket clients ---
 void WebServerManager::broadcastState() {
-    // PHASE 6.9: Skip if no WebSocket clients connected
-    // Use PsychicHttp's own client count — NOT our ws_clients map (which may be stale)
     if (wsHandler.count() == 0) return;
     
-    // Skip broadcast if internal DRAM heap is critically low
-    // PsychicHttp's httpd_ws_send_frame_async allocates from internal DRAM only.
-    // CRITICAL: Must use MALLOC_CAP_INTERNAL, NOT MALLOC_CAP_8BIT (which includes PSRAM on S3).
     size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    if (largest_block < 40960) { // 40KB internal DRAM threshold
-        return;
-    }
+    if (largest_block < 40960) return;
     
-    // Get fresh telemetry snapshot
-    system_telemetry_t telemetry = telemetryGetSnapshot();
-    
-    // PHASE 6.4: String-based serialization (No heap churn)
-    // CRITICAL: Using PSRAM buffer to prevent stack overflow
     if (broadcast_buffer == nullptr) return;
     
-    size_t len = serializeTelemetryToBuffer(broadcast_buffer, 2048, telemetry, false);
+    size_t len = telemetryExportJSON(broadcast_buffer, 2048, false);
     
     if (len > 0 && len < 2048) {
         wsHandler.sendAll(broadcast_buffer);
@@ -588,7 +427,8 @@ void WebServerManager::broadcastState() {
     // Note: If len == 0, skip silently (no heartbeat needed - clients have their own timeout)
 
     // Update history tracking
-    updateHistory(telemetry.cpu_usage_percent, telemetry.free_heap_bytes, current_status.vfd_current_amps);
+    system_telemetry_t t = telemetryGetSnapshot();
+    updateHistory(t.cpu_usage_percent, t.free_heap_bytes, current_status.vfd_current_amps);
 
     // PHASE 6.8: Check WebSocket health (prune stale clients)
     checkWsHealth();

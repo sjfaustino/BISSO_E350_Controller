@@ -38,6 +38,11 @@ typedef struct {
     bool plc_hardware_present; // PHASE 5.11: Detected at boot
     bool rtc_battery_low;      // NEW: RTC Battery failure detection
 
+    // Identification
+    char mcu_revision[16];
+    char mcu_serial[32];
+    char mcu_model[32];
+
     // CPU & Memory
     uint8_t cpu_usage_percent;
     uint32_t free_heap_bytes;
@@ -55,6 +60,8 @@ typedef struct {
     uint8_t active_wcs;        // PHASE 5.1: 0=G54, 1=G55, etc.
     uint32_t steps_executed;
     uint32_t motion_errors;
+    uint16_t motion_buffer_count;
+    uint16_t motion_buffer_capacity;
 
     // Spindle
     bool spindle_enabled;       // Spindle monitoring enabled
@@ -75,6 +82,8 @@ typedef struct {
     float vfd_frequency_hz;
     int16_t vfd_thermal_state;
     uint32_t vfd_fault_code;
+    float vfd_threshold_amps;
+    bool vfd_calibration_valid;
     float spindle_load_percent;
     float spindle_efficiency;
     
@@ -83,6 +92,7 @@ typedef struct {
     float axis_jitter_mms[3];
     bool axis_stalled[3];
     float axis_vfd_error_percent[3];
+    bool axis_maintenance_warning[3];
 
     // Connectivity
     bool dro_connected;
@@ -115,12 +125,18 @@ typedef struct {
     uint32_t loop_cycle_count;
     uint32_t watchdog_resets;
     float temperature;
+    char system_status_string[32];
 
     // SD Card Metrics (PHASE 6.6)
     bool sd_mounted;
     uint8_t sd_health;         // Maps to SDCardHealth enum
     uint64_t sd_total_bytes;
     uint64_t sd_used_bytes;
+
+    // Parser State
+    bool parser_absolute_mode;
+    float parser_req_feedrate;
+    float parser_actual_feedrate;
 
     // LCD Mirror
     char lcd_lines[4][21];
@@ -189,7 +205,7 @@ system_health_t telemetryGetHealthStatus();
  * @param buffer_size Maximum buffer size
  * @return Number of bytes written, 0 on error
  */
-size_t telemetryExportJSON(char* buffer, size_t buffer_size);
+size_t telemetryExportJSON(char* buffer, size_t buffer_size, bool full = false);
 
 /**
  * Export compact telemetry (subset of fields) for lightweight clients

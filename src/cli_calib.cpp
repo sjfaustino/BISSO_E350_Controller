@@ -557,37 +557,57 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
 
     } else if (strcmp(argv[2], "full") == 0) {
         if (!serialLoggerLock()) return;
-        logPrintln("\n[VFDDIAG] === Comprehensive VFD Report ===");
-        logPrintln("\n--- Status ---");
-        altivar31PrintDiagnostics();
-
-        logPrintln("\n--- Current Measurements ---");
+        logDirectPrintln("\n=== COMPREHENSIVE VFD REPORT ===\n");
+        
+        // Use standard table for core measurements
+        cliPrintTableHeader(18, 22, 0);
+        cliPrintTableRow("Metric", "Value", nullptr, 18, 22, 0);
+        cliPrintTableDivider(18, 22, 0);
+        
+        char buf1[32], buf2[32];
+        
+        // Status & Frequency
+        float freq = altivar31GetFrequencyHz();
+        snprintf(buf1, sizeof(buf1), "%.1f Hz", freq);
+        cliPrintTableRow("Output Frequency", buf1, nullptr, 18, 22, 0);
+        
+        // Motor Current
         float current = altivar31GetCurrentAmps();
-        int32_t raw = altivar31GetCurrentRaw();
-        logPrintf("Motor Current:       %.2f A (raw: %ld)\r\n", current, (long)raw);
-
-        logPrintln("\n--- Thermal State ---");
+        snprintf(buf1, sizeof(buf1), "%.2f A", current);
+        cliPrintTableRow("Motor Current", buf1, nullptr, 18, 22, 0);
+        
+        // Thermal State
         int16_t thermal = altivar31GetThermalState();
         int32_t warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
         int32_t crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
-        logPrintf("Thermal State:       %d%% (warn: %ld%%, crit: %ld%%)\r\n",
-                      thermal, (long)(warn * 1.3), (long)(crit * 1.4));
-
-        logPrintln("\n--- Frequency ---");
-        float freq = altivar31GetFrequencyHz();
-        logPrintf("Output Frequency:    %.1f Hz\r\n", freq);
-
-        logPrintln("\n--- Calibration ---");
-        vfdCalibrationPrintSummary();
-
-        logPrintln("\n--- Configuration ---");
+        snprintf(buf1, sizeof(buf1), "%d%%", thermal);
+        snprintf(buf2, sizeof(buf2), "(Crit: %ld%%)", (long)(crit * 1.4));
+        cliPrintTableRow("Thermal State", buf1, buf2, 18, 22, 0);
+        
+        // Configuration
         float margin = configGetFloat(KEY_VFD_STALL_MARGIN, 20.0f);
         int32_t timeout = configGetInt(KEY_STALL_TIMEOUT, 2000);
-        logPrintf("Stall Margin:        %.0f%%\n", margin);
-        logPrintf("Stall Timeout:       %ld ms\n", (long)timeout);
-        serialLoggerUnlock();
-
-    } else {
+        snprintf(buf1, sizeof(buf1), "%.0f%%", margin);
+        cliPrintTableRow("Stall Margin", buf1, nullptr, 18, 22, 0);
+        
+        snprintf(buf1, sizeof(buf1), "%ld ms", (long)timeout);
+        cliPrintTableRow("Stall Timeout", buf1, nullptr, 18, 22, 0);
+        
+        // Stall Threshold (if calibrated)
+        const vfd_calibration_data_t* calib = vfdCalibrationGetData();
+        if (calib->is_calibrated) {
+            snprintf(buf1, sizeof(buf1), "%.2f A", calib->stall_threshold_amps);
+            cliPrintTableRow("Stall Threshold", buf1, nullptr, 18, 22, 0);
+        }
+        
+        cliPrintTableFooter(18, 22, 0);
+        
+        // Delegated detailed driver diagnostics
+        logDirectPrintln("\n--- Device Internal Diagnostics ---");
+        serialLoggerUnlock(); // Unlock to let sub-call lock (or re-entry? altivar31PrintDiagnostics locks)
+        altivar31PrintDiagnostics();
+    }
+ else {
         logPrintf("[VFDDIAG] Unknown subcommand. Use 'help' for usage.\n");
     }
 }

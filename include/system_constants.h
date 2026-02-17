@@ -35,6 +35,27 @@
 #define MOTION_MIN_SPEED_MM_S 0.1f                
 #define MOTION_MAX_SPEED_MM_S 200.0f              
 
+typedef enum {
+  SPEED_PROFILE_1 = 0,
+  SPEED_PROFILE_2 = 1,
+  SPEED_PROFILE_3 = 2
+} speed_profile_t;
+
+typedef enum {
+  MOTION_IDLE = 0,
+  MOTION_WAIT_CONSENSO = 1,
+  MOTION_EXECUTING = 2,
+  MOTION_STOPPING = 3,
+  MOTION_PAUSED = 4,
+  MOTION_ERROR = 5,
+  MOTION_HOMING_APPROACH_FAST = 6,
+  MOTION_HOMING_BACKOFF = 7,
+  MOTION_HOMING_APPROACH_FINE = 8,
+  MOTION_HOMING_SETTLE = 9,
+  MOTION_DWELL = 10,   // Non-blocking dwell/pause
+  MOTION_WAIT_PIN = 11 // Wait for GPIO/I2C pin state
+} motion_state_t;
+
 // ============================================================================
 // ENCODER COMMUNICATION CONSTANTS
 // ============================================================================

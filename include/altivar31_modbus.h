@@ -40,13 +40,12 @@ typedef struct {
     uint16_t fault_code;                // Fault code (0 = no fault)
     int16_t thermal_state;              // Thermal state (1% units, 100% = nominal)
 
-    // Statistics
-    uint32_t last_read_time_ms;         // Timestamp of last successful read
-    uint32_t last_error_time_ms;        // Timestamp of last error
-    uint32_t read_count;                // Successful reads
-    uint32_t error_count;               // Read errors
-    uint32_t consecutive_errors;        // Consecutive communication failures
-
+    // Statistics (Now managed by base class, synced for C-API compatibility if needed)
+    uint32_t last_read_time_ms;         
+    uint32_t last_error_time_ms;        
+    uint32_t read_count;                
+    uint32_t error_count;               
+    uint32_t consecutive_errors;        
 } altivar31_state_t;
 
 #ifdef __cplusplus
@@ -69,6 +68,9 @@ public:
     bool isRunning() const;
     
     const altivar31_state_t* getState() const;
+
+    // Diagnostics
+    void printDiagnostics() const override;
 
     // Commands (Queueing for next poll)
     void queueRequest(uint16_t register_addr);

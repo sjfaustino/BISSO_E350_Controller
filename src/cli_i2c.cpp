@@ -126,9 +126,9 @@ void cmd_i2c_scan(int argc, char** argv) {
 
     if (verbose) {
         logPrintf("Scanning range 0x%02X-0x%02X with timing...\n", start_addr, end_addr);
-        cliPrintTableHeader(10, 20, 12, 14);
-        cliPrintTableRow("Address", "Device Name", "Status", 10, 20, 12, "Response", 14);
-        cliPrintTableDivider(10, 20, 12, 14);
+        cliPrintTableHeader(10, 20, 12, 14, 0);
+        cliPrintTableRow("Address", "Device Name", "Status", 10, 20, 12, "Response", 14, nullptr, 0);
+        cliPrintTableDivider(10, 20, 12, 14, 0);
     } else {
         logPrintf("Scanning range 0x%02X-0x%02X...\n", start_addr, end_addr);
     }
@@ -157,7 +157,7 @@ void cmd_i2c_scan(int argc, char** argv) {
             if (verbose) {
                 char time_str[16];
                 snprintf(time_str, sizeof(time_str), "%lu us", (unsigned long)elapsed_us);
-                cliPrintTableRow(hex_addr, dev_name, "OK", 10, 20, 12, time_str, 14);
+                cliPrintTableRow(hex_addr, dev_name, "OK", 10, 20, 12, time_str, 14, nullptr, 0);
             } else {
                 logPrintf("Found 0x%02X: %s\n", addr, dev_name);
             }
@@ -179,7 +179,7 @@ void cmd_i2c_scan(int argc, char** argv) {
     }
 
     if (verbose) {
-        cliPrintTableFooter(10, 20, 12, 14);
+        cliPrintTableFooter(10, 20, 12, 14, 0);
     }
 
     logPrintf("Found %d device(s)\n", found_count);
@@ -250,9 +250,9 @@ void cmd_i2c_test(int argc, char** argv) {
     }
 
     if (!stress && verbose) {
-        cliPrintTableHeader(10, 16, 12, 12);
-        cliPrintTableRow("Address", "Read Test", "Write Test", 10, 16, 12, "Stability", 12);
-        cliPrintTableDivider(10, 16, 12, 12);
+        cliPrintTableHeader(10, 16, 12, 12, 0);
+        cliPrintTableRow("Address", "Read Test", "Write Test", 10, 16, 12, "Stability", 12, nullptr, 0);
+        cliPrintTableDivider(10, 16, 12, 12, 0);
     }
 
     int passed = 0;
@@ -312,7 +312,7 @@ void cmd_i2c_test(int argc, char** argv) {
             snprintf(read_result, sizeof(read_result), "%s (%lu ms)", read_res == I2C_RESULT_OK ? "OK" : "FAIL", (unsigned long)read_time);
             snprintf(write_result, sizeof(write_result), "%s (%lu ms)", write_res == I2C_RESULT_OK ? "OK" : "FAIL", (unsigned long)write_time);
             snprintf(stab, sizeof(stab), "%d%%", stability_score);
-            cliPrintTableRow(addr_str, read_result, write_result, 10, 16, 12, stab, 12);
+            cliPrintTableRow(addr_str, read_result, write_result, 10, 16, 12, stab, 12, nullptr, 0);
         } else {
             logPrintf("0x%02X: %s\n", addr, (read_res == I2C_RESULT_OK) ? "PASS" : "FAIL");
         }
@@ -322,7 +322,7 @@ void cmd_i2c_test(int argc, char** argv) {
         if (!taskLockMutex(mutex, 100)) return;
     }
 
-    if (!stress && verbose) cliPrintTableFooter(10, 16, 12, 12);
+    if (!stress && verbose) cliPrintTableFooter(10, 16, 12, 12, 0);
     logPrintf("Passed: %d/%d\n", passed, test_count);
     taskUnlockMutex(mutex);
 }

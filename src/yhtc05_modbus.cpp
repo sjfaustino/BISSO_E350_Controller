@@ -31,6 +31,8 @@ const yhtc05_state_t* YhTc05Driver::getState() const {
     mutable_state->read_count = getPollCount();
     mutable_state->error_count = getErrorCount();
     mutable_state->consecutive_errors = getConsecutiveErrors();
+    mutable_state->last_read_time_ms = getLastReadTime();
+    mutable_state->last_error_time_ms = getLastErrorTime();
     mutable_state->enabled = isEnabled();
     mutable_state->slave_address = getSlaveAddress();
     
@@ -78,7 +80,6 @@ bool YhTc05Driver::onResponse(const uint8_t* data, uint16_t len) {
     // Parse 3 registers
     uint8_t err = modbusParseReadResponse(data, len, 3, values);
     if (err != MODBUS_ERR_NONE) {
-        _state.last_error_time_ms = millis();
         return false;
     }
     
@@ -89,8 +90,7 @@ bool YhTc05Driver::onResponse(const uint8_t* data, uint16_t len) {
     // Assuming Reg 1 = Low, Reg 2 = High based on user log
     _state.pulse_count = ((uint32_t)values[2] << 16) | values[1];
     
-    _state.last_read_time_ms = millis();
-    // Base class handles counters
+    // Base class handles counters and last_read_time
     
     // Update peak tracking
     if (_state.rpm > _state.peak_rpm) {
@@ -204,16 +204,16 @@ void yhtc05ResetErrorCounters(void) {
     // Not easily exposed via driver yet
 }
 
-void yhtc05PrintDiagnostics(void) {
-    const yhtc05_state_t* s = YhTc05.getState();
+void YhTc05Driver::printDiagnostics() const {
+    ModbusDriver::printDiagnostics();
     serialLoggerLock();
-    logPrintln("\n[YH-TC05] === Diagnostics ===");
-    logPrintf("Address:         %d\r\n", s->slave_address);
-    logPrintf("RPM:             %u\r\n", s->rpm);
-    logPrintf("Spinning:        %s\r\n", s->is_spinning ? "YES" : "NO");
-    logPrintf("Stalled:         %s\r\n", s->is_stalled ? "YES" : "NO");
-    logPrintf("Read Count:      %lu\r\n", (unsigned long)s->read_count);
-    logPrintf("Errors:          %lu\r\n", (unsigned long)s->error_count);
-    logPrintln("");
+    logPrintf("RPM:             %u\r\n", _state.rpm);
+    logPrintf("Spinning:        %s\r\n", _state.is_spinning ? "YES" : "NO");
+    logPrintf("Stalled:         %s\r\n", _state.is_stalled ? "YES" : "NO");
+    logPrintf("Peak RPM:        %u\r\n", _state.peak_rpm);
     serialLoggerUnlock();
+}
+
+void yhtc05PrintDiagnostics(void) {
+    YhTc05.printDiagnostics();
 }

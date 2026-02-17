@@ -22,11 +22,10 @@ void systemDumpDiagnostics() {
     logPrintf("Motion  : %s\n", motionIsMoving() ? "MOVING" : "IDLE");
     
     // 3. Encoder Status
-    const encoder_wj66_stats_t* e = encoderWj66GetStats();
-    logPrintf("Encoder : Raw:%ld Pos:%.3f (Errors:%u)\n", 
-        encoderWj66GetLastValue(), 
-        motionGetAxisPosition(0), 
-        e->error_count);
+    int32_t raw_pos = wj66GetPosition(0);
+    uint32_t polls = wj66GetPollCount();
+    uint32_t reads = wj66GetReadCount(0);
+    logPrintf("Encoder : Raw:%ld (Polls:%u Reads:%u)\n", raw_pos, polls, reads);
         
     // 4. VFD Status
     const altivar31_state_t* v = altivar31GetState();

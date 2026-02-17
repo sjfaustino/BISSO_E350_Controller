@@ -8,7 +8,7 @@
 #define MOTION_STATE_H
 
 #include <stdint.h>
-#include "motion.h" // Needed for enum definitions
+#include "system_constants.h" // Needed for enum definitions
 
 // Accessors (Read-Only)
 int32_t motionGetPosition(uint8_t axis);
