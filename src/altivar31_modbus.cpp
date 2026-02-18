@@ -35,14 +35,7 @@ Altivar31Driver::Altivar31Driver()
 }
 
 const altivar31_state_t* Altivar31Driver::getState() const {
-    altivar31_state_t* mutable_state = const_cast<altivar31_state_t*>(&_state);
-    mutable_state->read_count = getPollCount();
-    mutable_state->error_count = getErrorCount();
-    mutable_state->consecutive_errors = getConsecutiveErrors();
-    mutable_state->last_read_time_ms = getLastReadTime();
-    mutable_state->last_error_time_ms = getLastErrorTime();
-    mutable_state->enabled = isEnabled();
-    mutable_state->slave_address = getSlaveAddress();
+    syncBaseStats(_state);
     return &_state;
 }
 
@@ -175,9 +168,7 @@ bool altivar31ModbusReadThermalState(void) {
     return true;
 }
 
-bool altivar31ModbusReceiveResponse(void) {
-    return true; 
-}
+
 
 float altivar31GetCurrentAmps(void) { return Altivar31.getCurrentAmps(); }
 int16_t altivar31GetCurrentRaw(void) { return Altivar31.getCurrentRaw(); }

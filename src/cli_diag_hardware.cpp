@@ -5,10 +5,14 @@
 
 #include "cli.h"
 #include "serial_logger.h"
-#include "watchdog_manager.h"
-#include "spindle_current_monitor.h"
-#include "jxk10_modbus.h"
+#include "system_constants.h"
+#include "plc_iface.h"
+#include "hardware_config.h"
+#include "spindle_current_monitor.h" // Restored
+#include "jxk10_modbus.h"            // Restored
+#include "watchdog_manager.h"        // Restored
 #include "rs485_device_registry.h"
+#include <Arduino.h>
 #include "i2c_bus_recovery.h"
 #include "board_inputs.h"
 #include "board_variant.h"
@@ -19,7 +23,7 @@
 
 void cmd_dio_main(int argc, char** argv) {
     (void)argc; (void)argv;
-    watchdogFeed("CLI");
+    // watchdogFeed("CLI");
     
     static char output[2048];
     int pos = 0;
@@ -80,6 +84,41 @@ void cmd_dio_main(int argc, char** argv) {
     Serial.print(output);
     Serial.flush();
     serialLoggerUnlock();
+}
+
+void cmd_plc_health(int argc, char** argv) {
+    (void)argc; (void)argv;
+    logPrintln("\n=== PLC (I2C) Bus Health ===");
+    logPrintf("  Hardware Present: %s\n", plcIsHardwarePresent() ? "YES" : "NO");
+    logPrintf("  Mutex Timeouts:   %lu\n", (unsigned long)elboGetMutexTimeoutCount());
+    logPrintf("  Shadow Dirty:     %s\n", elboIsShadowRegisterDirty() ? "YES (Out of Sync)" : "NO (In Sync)");
+
+    bus_latency_stats_t in, out;
+    plcGetInputLatency(&in);
+    plcGetOutputLatency(&out);
+
+    logPrintln("\n  Latency Analytics (micros):");
+    logPrintln("  Op Type | AvgUs | MinUs | MaxUs | ±Dev  | Samples");
+    logPrintln("  --------|-------|-------|-------|-------|--------");
+    logPrintf("  INPUT   | %5lu | %5lu | %5lu | %5lu | %lu\n", 
+              (unsigned long)in.avg_us, (unsigned long)in.min_us, (unsigned long)in.max_us, (unsigned long)in.std_dev_us, (unsigned long)in.samples);
+    logPrintf("  OUTPUT  | %5lu | %5lu | %5lu | %5lu | %lu\n", 
+              (unsigned long)out.avg_us, (unsigned long)out.min_us, (unsigned long)out.max_us, (unsigned long)out.std_dev_us, (unsigned long)out.samples);
+    logPrintln("");
+}
+
+void cmd_plc_reset(int argc, char** argv) {
+   (void)argc; (void)argv;
+   plcResetLatencyStats();
+   logPrintln("[PLC] Latency statistics reset.");
+}
+
+void cmd_plc_main(int argc, char** argv) {
+    static const cli_subcommand_t subcmds[] = {
+        {"status", cmd_plc_health, "Check bus health & latency"},
+        {"reset",  cmd_plc_reset,  "Reset latency counters"}
+    };
+    cliDispatchSubcommand("[PLC]", argc, argv, subcmds, sizeof(subcmds)/sizeof(subcmds[0]), 1);
 }
 
 void cmd_spindle_diag(int argc, char** argv) { 
@@ -263,7 +302,7 @@ void cmd_rs485_sniff(int argc, char** argv) {
             break;
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        watchdogFeed("CLI");
+        // watchdogFeed("CLI");
     }
     
     rs485SetSniffer(NULL);

@@ -66,6 +66,23 @@ protected:
      */
     virtual bool onResponse(const uint8_t* data, uint16_t len) = 0;
 
+    /**
+     * @brief Sync base class counters into a driver-specific state struct
+     * @details Call from getState() to populate common fields (error_count,
+     *          consecutive_errors, read_count, timestamps, enabled, slave_address)
+     * @tparam T Driver state struct type (must have the 7 standard counter fields)
+     */
+    template<typename T>
+    void syncBaseStats(T& state) const {
+        state.error_count = getErrorCount();
+        state.consecutive_errors = getConsecutiveErrors();
+        state.read_count = getPollCount();
+        state.last_read_time_ms = getLastReadTime();
+        state.last_error_time_ms = getLastErrorTime();
+        state.enabled = isEnabled();
+        state.slave_address = getSlaveAddress();
+    }
+
     // Helper to send data (wraps rs485Send)
     bool send(const uint8_t* data, uint8_t len);
 

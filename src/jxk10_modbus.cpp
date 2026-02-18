@@ -23,15 +23,7 @@ Jxk10Driver::Jxk10Driver()
 }
 
 const jxk10_state_t* Jxk10Driver::getState() const {
-    jxk10_state_t* mutable_state = const_cast<jxk10_state_t*>(&_state);
-    mutable_state->error_count = getErrorCount();
-    mutable_state->consecutive_errors = getConsecutiveErrors();
-    mutable_state->read_count = getPollCount();
-    mutable_state->last_read_time_ms = getLastReadTime();
-    mutable_state->last_error_time_ms = getLastErrorTime();
-    mutable_state->enabled = isEnabled();
-    mutable_state->slave_address = getSlaveAddress();
-    
+    syncBaseStats(_state);
     return &_state;
 }
 
@@ -132,18 +124,7 @@ bool jxk10ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
 }
 
 bool jxk10ModbusReadCurrent(void) {
-    // Now handled by registry scheduler
-    // Can force poll if needed, but Base Class doesn't expose "force poll" easily via C-API without casting.
-    // But rs485RequestImmediatePoll takes rs485_device_t*.
     return rs485RequestImmediatePoll(Jxk10.getMutableDeviceDescriptor());
-}
-
-bool jxk10ModbusReceiveResponse(void) {
-    return true; // Use registry
-}
-
-bool jxk10ModbusReadStatus(void) {
-    return jxk10ModbusReadCurrent();
 }
 
 float jxk10GetCurrentAmps(void) {
@@ -158,21 +139,13 @@ bool jxk10ModbusSetSlaveAddress(uint8_t new_address) {
     return Jxk10.setInternalSlaveAddress(new_address);
 }
 
-bool jxk10ModbusSetBaudRate(uint32_t baud_rate) {
-    // Shared bus
-    return true;
-}
 
 const jxk10_state_t* jxk10GetState(void) {
     return Jxk10.getState();
 }
 
 void jxk10ResetErrorCounters(void) {
-    // Reset via generic? 
-    // Driver doesn't support generic reset error count publicly yet? 
-    // Actually rs485_device_t has counters. 
-    // We can't easily clear them unless we expose it.
-    // But this is minor.
+    Jxk10.resetErrorCounters();
 }
 
 void Jxk10Driver::printDiagnostics() const {

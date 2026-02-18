@@ -13,6 +13,7 @@
 #include "yhtc05_modbus.h"
 #include "boot_validation.h"
 #include "serial_logger.h"
+#include "sd_card_manager.h" // Fixed: Added missing include
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
@@ -369,5 +370,78 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
     server.on("/api/hardware/rs485/reset", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         rs485ResetErrorCounters();
         return response->send(200, "application/json", "{\"success\":true}");
+    });
+
+    // GET /api/hardware/rs485/sniff - Live frame sniffer
+    server.on("/api/hardware/rs485/sniff", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        JsonArray frames = doc.to<JsonArray>();
+        
+        rs485_sniff_entry_t buffer[RS485_SNIFF_BUFFER_SIZE];
+        uint32_t count = rs485GetSniffData(buffer, RS485_SNIFF_BUFFER_SIZE);
+        
+        for (uint32_t i = 0; i < count; i++) {
+            JsonObject f = frames.add<JsonObject>();
+            f["ts"] = buffer[i].timestamp;
+            f["addr"] = buffer[i].address;
+            f["func"] = buffer[i].function;
+            f["len"] = buffer[i].length;
+            f["is_tx"] = buffer[i].is_tx;
+            
+            // Hex data
+            char hex[32] = {0};
+            for (int b = 0; b < 8 && b < buffer[i].length; b++) {
+                sprintf(hex + (b * 3), "%02X ", buffer[i].data[b]);
+            }
+            f["data"] = hex;
+        }
+        
+        return sendJsonResponse(response, doc);
+    });
+
+    // GET /api/system/health/buses - Unified health dashboard
+    server.on("/api/system/health/buses", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        JsonDocument doc;
+        JsonObject buses = doc.to<JsonObject>();
+        
+        // RS-485
+        const rs485_registry_state_t* rsState = rs485GetState();
+        JsonObject rsBus = buses["rs485"].to<JsonObject>();
+        rsBus["healthy"] = !rsState->watchdog_alert_active;
+        rsBus["tx_total"] = rsState->total_transactions;
+        rsBus["errors"] = rsState->total_errors;
+        
+        // I2C (PLC)
+        JsonObject i2cBus = buses["i2c"].to<JsonObject>();
+        i2cBus["healthy"] = plcIsHardwarePresent();
+        i2cBus["timeouts"] = elboGetMutexTimeoutCount();
+        
+        bus_latency_stats_t i2cIn, i2cOut;
+        plcGetInputLatency(&i2cIn);
+        plcGetOutputLatency(&i2cOut);
+        
+        JsonObject i2cStats = i2cBus["latency"].to<JsonObject>();
+        i2cStats["in_avg"] = i2cIn.avg_us;
+        i2cStats["in_stddev"] = i2cIn.std_dev_us;
+        i2cStats["out_avg"] = i2cOut.avg_us;
+        i2cStats["out_stddev"] = i2cOut.std_dev_us;
+        
+        // SPI (SD Card)
+        JsonObject spiBus = buses["spi"].to<JsonObject>();
+        spiBus["healthy"] = sdCardIsMounted();
+        spiBus["type"] = sdCardIsMounted() ? "SD Card" : "None";
+        spiBus["total_written_bytes"] = sdCardGetTotalWritten();
+        
+        bus_latency_stats_t sdRead, sdWrite;
+        sdCardGetReadLatency(&sdRead);
+        sdCardGetWriteLatency(&sdWrite);
+        
+        JsonObject sdStats = spiBus["latency"].to<JsonObject>();
+        sdStats["read_avg"] = sdRead.avg_us;
+        sdStats["read_stddev"] = sdRead.std_dev_us;
+        sdStats["write_avg"] = sdWrite.avg_us;
+        sdStats["write_stddev"] = sdWrite.std_dev_us;
+        
+        return sendJsonResponse(response, doc);
     });
 }

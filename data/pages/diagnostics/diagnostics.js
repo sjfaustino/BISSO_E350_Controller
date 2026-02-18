@@ -1,5 +1,6 @@
 window.DiagnosticsModule = window.DiagnosticsModule || {
     updateInterval: null, trendInterval: null, spindleInterval: null, spindleData: [], spindlePaused: !1, spindleMaxPoints: 120, tachometerInterval: null, rs485Interval: null,
+    snifferState: { paused: false, scroll: true, lastTs: 0 },
     setNA(t, e = "") {
         if (!t) return;
         t.innerText = "";
@@ -47,6 +48,18 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
                 }).catch(err => console.error("[Diagnostics] Reset failed:", err));
             }
         });
+        bind("btn-sniffer-pause", () => {
+            this.snifferState.paused = !this.snifferState.paused;
+            const btn = document.getElementById("btn-sniffer-pause");
+            if (btn) btn.textContent = this.snifferState.paused ? "Resume" : "Pause";
+        });
+        bind("btn-sniffer-clear", () => {
+            const log = document.getElementById("rs485-sniffer-log");
+            if (log) log.innerHTML = '<div style="color: var(--text-tertiary);">Log cleared. Waiting for traffic...</div>';
+        });
+        document.getElementById("chk-sniffer-scroll")?.addEventListener("change", (e) => {
+            this.snifferState.scroll = e.target.checked;
+        });
     },
     loadBootLog() { const textarea = document.getElementById("bootlog-content"); const sizeEl = document.getElementById("bootlog-size"); if (!textarea) return; if ("file:" === window.location.protocol) { textarea.value = "(Mock mode - boot log not available)"; if (sizeEl) sizeEl.textContent = "0"; return } window.API.get("logs/boot", null, { silent: true }).then(text => { textarea.value = text || "(Empty)"; if (sizeEl) sizeEl.textContent = text.length.toString() }).catch(err => { console.warn("[Diagnostics] Boot log fetch failed:", err); textarea.value = "(Failed to load boot log)"; if (sizeEl) sizeEl.textContent = "--" }) }, deleteBootLog() { if ("file:" === window.location.protocol) { AlertManager.add("Cannot delete in mock mode", "warning", 2e3); return } if (!confirm("Delete boot log?")) return; window.API.delete("logs/boot", "delete-bootlog-btn").then(data => { if (data.success) { AlertManager.add("Boot log deleted", "success", 2e3); this.loadBootLog() } else { AlertManager.add("Failed to delete boot log", "error", 3e3) } }).catch(err => { console.error("[Diagnostics] Delete boot log failed:", err); AlertManager.add("Failed to delete boot log", "error", 3e3) }) }, loadInitialData() { if ("file:" === window.location.protocol) return console.log("[Diagnostics] Mock mode - using simulated data"), void this.simulateDiagnosticData(); this.loadIOStatus(), this.loadFaultLog() }, onStateChanged() {
         const t = AppState.data;["x", "y", "z"].forEach(e => {
@@ -69,6 +82,11 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
 
         // SD Card Status (PHASE 6.6)
         this.updateSDStatus(t.sd);
+        this.updateSystemStats(t.system);
+        this.updateFaults(t.faults);
+        this.updateRS485Stats();
+        this.updateBusHealth();
+        this.updateSniffer();
     }, updateSDStatus(sd) {
         if (!sd) return;
         const indicator = document.getElementById("sd-status-indicator");
@@ -245,6 +263,82 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
                 </div>
             `;
         }).join("");
+    },
+    async updateBusHealth() {
+        try {
+            const data = await window.API.get('system/health/buses', null, { silent: true });
+
+            // Overall Dashboard Status
+            const dashboard = document.getElementById('bus-health-status');
+            if (dashboard) {
+                const allHealthy = data.rs485.healthy && data.i2c.healthy && data.spi.healthy;
+                dashboard.className = 'status-badge ' + (allHealthy ? 'status-ok' : 'status-alarm');
+                dashboard.textContent = allHealthy ? 'All Systems Healthy' : 'Degraded Performance';
+            }
+
+            // RS-485
+            const rsStatus = document.getElementById('health-rs485-status');
+            if (rsStatus) {
+                rsStatus.textContent = data.rs485.healthy ? 'READY' : 'FAULT';
+                rsStatus.style.color = data.rs485.healthy ? 'var(--color-optimal)' : 'var(--color-critical)';
+                document.getElementById('health-rs485-stats').textContent =
+                    `${data.rs485.tx_total} Tx | ${data.rs485.errors} Errors`;
+            }
+
+            // I2C
+            const i2cStatus = document.getElementById('health-i2c-status');
+            if (i2cStatus) {
+                i2cStatus.textContent = data.i2c.healthy ? 'ONLINE' : 'OFFLINE';
+                i2cStatus.style.color = data.i2c.healthy ? 'var(--color-optimal)' : 'var(--color-critical)';
+                const i2cL = data.i2c.latency;
+                document.getElementById('health-i2c-stats').textContent =
+                    `Avg: ${(i2cL.in_avg / 1000).toFixed(2)}ms | ±${(i2cL.in_stddev / 1000).toFixed(2)}`;
+            }
+
+            // SPI
+            const spiStatus = document.getElementById('health-spi-status');
+            if (spiStatus) {
+                spiStatus.textContent = data.spi.healthy ? 'MOUNTED' : 'NONE';
+                spiStatus.style.color = data.spi.healthy ? 'var(--color-optimal)' : 'var(--text-tertiary)';
+                const spiL = data.spi.latency;
+                document.getElementById('health-spi-stats').textContent =
+                    `Write: ${(spiL.write_avg / 1000).toFixed(2)}ms | Read: ${(spiL.read_avg / 1000).toFixed(2)}ms`;
+            }
+        } catch (e) { console.warn('[Diagnostics] Bus health poll failed'); }
+    },
+    async updateSniffer() {
+        if (this.snifferState.paused) return;
+        try {
+            const frames = await window.API.get('hardware/rs485/sniff', null, { silent: true });
+            const log = document.getElementById('rs485-sniffer-log');
+            if (!log || !frames || frames.length === 0) return;
+
+            // Filter only NEW frames
+            const newFrames = frames.filter(f => f.ts > this.snifferState.lastTs).reverse();
+            if (newFrames.length === 0) return;
+
+            // Remove "Waiting" message
+            if (log.textContent.includes('Waiting')) log.innerHTML = '';
+
+            newFrames.forEach(f => {
+                const entry = document.createElement('div');
+                entry.style.marginBottom = '2px';
+                entry.style.borderBottom = '1px solid #1a1a1a';
+                entry.style.paddingBottom = '2px';
+
+                const type = f.is_tx ? '<span style="color:#3b82f6">[TX]</span>' : '<span style="color:#22c55e">[RX]</span>';
+                const addr = f.addr.toString(16).toUpperCase().padStart(2, '0');
+                const func = f.func.toString(16).toUpperCase().padStart(2, '0');
+
+                entry.innerHTML = `<span style="color: #555;">${f.ts}</span> ${type} <b>${addr}</b> ${func} | <span style="color: #aaa;">${f.data}</span>`;
+                log.appendChild(entry);
+                this.snifferState.lastTs = Math.max(this.snifferState.lastTs, f.ts);
+            });
+
+            // Limit log size
+            while (log.children.length > 100) log.removeChild(log.firstChild);
+            if (this.snifferState.scroll) log.scrollTop = log.scrollHeight;
+        } catch (e) { console.warn('[Diagnostics] Sniffer poll failed'); }
     },
     formatNumber(n) { if (n >= 1e6) return (n / 1e6).toFixed(1) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(1) + "K"; return n.toString(); }
 }, window.currentPageModule = DiagnosticsModule;

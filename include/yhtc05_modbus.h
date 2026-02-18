@@ -74,7 +74,7 @@ protected:
     bool onResponse(const uint8_t* data, uint16_t len) override;
 
 private:
-    yhtc05_state_t _state;
+    mutable yhtc05_state_t _state;
     uint8_t _tx_buffer[16];
     bool _was_spinning;
     uint32_t _below_threshold_since_ms;

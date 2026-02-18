@@ -241,8 +241,7 @@ bool rs485Update(void) {
 
                 // Critical Path: WJ66 Encoder Watchdog
                 if (current->type == RS485_DEVICE_TYPE_ENCODER && motionIsMoving()) {
-                    logCritical("[RS485] CRITICAL: Encoder timeout during motion!");
-                    faultLogEntry(FAULT_CRITICAL, FAULT_ENCODER_TIMEOUT, 0, 0, "Encoder timeout during motion");
+                    faultLogCritical(FAULT_ENCODER_TIMEOUT, "Encoder timeout during motion");
                     emergencyStopSetActive(true);
                 }
 
@@ -292,6 +291,28 @@ bool rs485Update(void) {
     return false;
 }
 
+static uint8_t bus_rx_buffer[256];
+static uint16_t bus_rx_idx = 0;
+static uint32_t last_byte_time_ms = 0;
+
+// Sniffer Ring Buffer (PHASE 2.0)
+static rs485_sniff_entry_t sniff_buffer[RS485_SNIFF_BUFFER_SIZE];
+static uint32_t sniff_head = 0;
+static uint32_t total_sniff_entries = 0;
+
+static void pushSniff(uint8_t addr, uint8_t func, uint16_t len, bool tx, const uint8_t* data) {
+    rs485_sniff_entry_t* entry = &sniff_buffer[sniff_head % RS485_SNIFF_BUFFER_SIZE];
+    entry->timestamp = millis();
+    entry->address = addr;
+    entry->function = func;
+    entry->length = len;
+    entry->is_tx = tx;
+    memset(entry->data, 0, 8);
+    memcpy(entry->data, data, len > 8 ? 8 : len);
+    sniff_head++;
+    total_sniff_entries++;
+}
+
 bool rs485ProcessResponse(const uint8_t* data, uint16_t len) {
     if (!registry.bus_busy || registry.current_device_index >= registry.device_count) {
         return false;
@@ -309,6 +330,9 @@ bool rs485ProcessResponse(const uint8_t* data, uint16_t len) {
     if (current->on_response) {
         success = current->on_response(current->user_data, data, len);
     }
+    
+    // Sniffer hook (RX)
+    pushSniff(current->slave_address, data[1], len, false, data);
     
     if (success) {
         current->poll_count++;
@@ -344,9 +368,6 @@ bool rs485ProcessResponse(const uint8_t* data, uint16_t len) {
     return success;
 }
 
-static uint8_t bus_rx_buffer[256];
-static uint16_t bus_rx_idx = 0;
-static uint32_t last_byte_time_ms = 0;
 
 void rs485HandleBus(void) {
     if (!registry.bus_mutex) return;
@@ -455,6 +476,13 @@ bool rs485Send(const uint8_t* data, uint8_t len) {
         // Trigger sniffer if active
         if (registry.sniffer_cb) {
             registry.sniffer_cb(true, data, len);
+        }
+        
+        // Sniffer hook (TX)
+        if (len >= 2) { // Assuming Modbus RTU: byte 0 is address, byte 1 is function code
+            pushSniff(data[0], data[1], len, true, data);
+        } else {
+            pushSniff(0, 0, len, true, data); // Fallback for non-standard frames
         }
         
         ok = (bus_serial->write(data, len) == len);
@@ -663,4 +691,15 @@ void rs485PerformPanicRecovery(void) {
 
 void rs485SetSniffer(void (*cb)(bool is_tx, const uint8_t* data, uint16_t len)) {
     registry.sniffer_cb = cb;
+}
+uint32_t rs485GetSniffData(rs485_sniff_entry_t* dest, uint32_t max_entries) {
+    uint32_t count = (total_sniff_entries > RS485_SNIFF_BUFFER_SIZE) ? RS485_SNIFF_BUFFER_SIZE : total_sniff_entries;
+    if (count > max_entries) count = max_entries;
+    
+    for (uint32_t i = 0; i < count; i++) {
+        // Return in reverse chronological order (newest first)
+        uint32_t idx = (sniff_head - 1 - i) % RS485_SNIFF_BUFFER_SIZE;
+        dest[i] = sniff_buffer[idx];
+    }
+    return count;
 }

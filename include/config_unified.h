@@ -22,7 +22,8 @@
 typedef enum {
     CONFIG_INT32,
     CONFIG_FLOAT,
-    CONFIG_STRING
+    CONFIG_STRING,
+    CONFIG_UINT64
 } config_storage_type_t;
 
 typedef struct {
@@ -32,6 +33,7 @@ typedef struct {
         int32_t int_val;
         float float_val;
         char str_val[CONFIG_VALUE_LEN];
+        uint64_t uint64_val;
     } value;
     bool is_set;
 } config_entry_t;
@@ -43,10 +45,12 @@ void configSetDefaults();
 int32_t configGetInt(const char* key, int32_t default_val);
 float configGetFloat(const char* key, float default_val);
 const char* configGetString(const char* key, const char* default_val);
+uint64_t configGetUInt64(const char* key, uint64_t default_val);
 
 result_t configSetInt(const char* key, int32_t value);
 result_t configSetFloat(const char* key, float value);
 result_t configSetString(const char* key, const char* value);
+result_t configSetUInt64(const char* key, uint64_t value);
 
 void configUnifiedFlush();
 result_t configUnifiedSave();

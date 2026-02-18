@@ -53,7 +53,7 @@ protected:
     bool onResponse(const uint8_t* data, uint16_t len) override;
 
 private:
-    jxk10_state_t _state;
+    mutable jxk10_state_t _state;
     uint8_t _tx_buffer[16];
 };
 
@@ -104,19 +104,7 @@ bool jxk10ModbusInit(uint8_t slave_address, uint32_t baud_rate);
  */
 bool jxk10ModbusReadCurrent(void);
 
-/**
- * @brief Receive Modbus response and parse current value
- * @details Non-blocking reception of Modbus response
- *          Must be called after jxk10ModbusReadCurrent() with delay for response time
- * @return true if response received and parsed, false if no response or error
- */
-bool jxk10ModbusReceiveResponse(void);
 
-/**
- * @brief Read device status (overload/fault flags)
- * @return true if status read successful, false on error
- */
-bool jxk10ModbusReadStatus(void);
 
 /**
  * @brief Get current measurement in amperes
@@ -139,13 +127,7 @@ int16_t jxk10GetCurrentRaw(void);
  */
 bool jxk10ModbusSetSlaveAddress(uint8_t new_address);
 
-/**
- * @brief Change baud rate
- * @details Updates internal state and encoder_hal baud rate
- * @param baud_rate New baud rate in bps (must be standard RS485 rate)
- * @return true if successful, false on error
- */
-bool jxk10ModbusSetBaudRate(uint32_t baud_rate);
+
 
 /**
  * @brief Get device state/statistics

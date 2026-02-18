@@ -130,6 +130,18 @@ typedef struct {
     void (*sniffer_cb)(bool is_tx, const uint8_t* data, uint16_t len);
 } rs485_registry_state_t;
 
+// Sniffer Entry (PHASE 2.0)
+typedef struct {
+    uint32_t timestamp;
+    uint8_t address;
+    uint8_t function;
+    uint16_t length;
+    bool is_tx;
+    uint8_t data[8]; // Snapshot of first 8 bytes
+} rs485_sniff_entry_t;
+
+#define RS485_SNIFF_BUFFER_SIZE 50
+
 // Watchdog timeout (ms) - alert if no response in this time
 #define RS485_WATCHDOG_TIMEOUT_MS 5000
 
@@ -343,6 +355,14 @@ void rs485ReleaseBus(void);
  * @param cb Callback function or NULL to disable
  */
 void rs485SetSniffer(void (*cb)(bool is_tx, const uint8_t* data, uint16_t len));
+
+/**
+ * @brief Get the latest sniffed frames in reverse chronological order
+ * @param dest Destination buffer
+ * @param max_entries Maximum entries to copy
+ * @return Number of entries copied
+ */
+uint32_t rs485GetSniffData(rs485_sniff_entry_t* dest, uint32_t max_entries);
 
 #ifdef __cplusplus
 }

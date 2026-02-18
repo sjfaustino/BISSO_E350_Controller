@@ -1,4 +1,5 @@
 #include "board_inputs.h"
+#include "plc_iface.h"
 #include "config_keys.h"
 #include "config_unified.h"
 #include "fault_logging.h"
@@ -139,6 +140,18 @@ button_state_t boardInputsUpdate() {
   }
 
   // --- STABILITY FILTER (DEBOUNCE) ---
+  // Adaptive Debounce: Adjust based on I2C bus jitter to reject noise
+  // Base: 15 (75ms), Max: 30 (150ms)
+  bus_latency_stats_t jitter_stats;
+  plcGetInputLatency(&jitter_stats);
+  
+  uint8_t required_stability = 15; // Default 75ms
+  if (jitter_stats.std_dev_us > 500) {
+      required_stability = 30; // High noise -> 150ms
+  } else if (jitter_stats.std_dev_us > 200) {
+      required_stability = 22; // Moderate noise -> 110ms
+  }
+
   // Iterate through all 8 bits of the input byte
   for (int i = 0; i < 8; i++) {
     uint8_t bit_mask = (1 << i);
@@ -150,7 +163,7 @@ button_state_t boardInputsUpdate() {
       if (current_bit_raw == last_bit_raw) {
         // Input is stable but different from debounced state
         input_stability_count[i]++;
-        if (input_stability_count[i] >= DEBOUNCE_STABILITY_REQUIRED) {
+        if (input_stability_count[i] >= required_stability) {
           // Commit change to debounced cache
           if (current_bit_raw) debounced_input_cache |= bit_mask;
           else debounced_input_cache &= ~bit_mask;

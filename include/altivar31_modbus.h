@@ -80,7 +80,7 @@ protected:
     bool onResponse(const uint8_t* data, uint16_t len) override;
 
 private:
-    altivar31_state_t _state;
+    mutable altivar31_state_t _state;
     uint8_t _tx_buffer[16];
     
     // Polling state
@@ -161,12 +161,7 @@ bool altivar31ModbusReadFaultCode(void);
  */
 bool altivar31ModbusReadThermalState(void);
 
-/**
- * @brief Receive response from asynchronous Modbus query
- * @details Call after sending a read request; updates internal state on success
- * @return true if response received and parsed, false if still waiting or error
- */
-bool altivar31ModbusReceiveResponse(void);
+
 
 // ============================================================================
 // DATA ACCESSORS (Cached, non-blocking)

@@ -242,7 +242,9 @@ void cliRegisterDiagCommands() {
     cliRegisterCommand("encoder", "Encoder feedback", cmd_encoder_status);
     
     // Delegated to cli_diag_hardware.cpp
+    extern void cmd_plc_main(int argc, char** argv);
     cliRegisterCommand("dio", "Digital I/O status", cmd_dio_main);
+    cliRegisterCommand("plc", "PLC I2C bus diag", cmd_plc_main);
     cliRegisterCommand("spindle", "Spindle monitor", cmd_spindle_diag);
     cliRegisterCommand("rs485", "RS-485 bus diag", cmd_rs485_main);
     

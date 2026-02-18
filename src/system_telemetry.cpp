@@ -468,10 +468,12 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size, bool full) {
         t.lcd_lines[0], t.lcd_lines[1], t.lcd_lines[2], t.lcd_lines[3]);
     if (n > 0 && (offset + n) < buffer_size) offset += n;
 
-    if (t.motion_moving) {
-        n = snprintf(buffer + offset, buffer_size - offset,
-            ",\"exec\":{\"cmd\":\"%s\",\"progress\":%.1f,\"eta\":%lu}",
-            motionGetCurrentCommand(), motionGetExecutionProgress(), (unsigned long)motionGetEstimatedTimeRemaining());
+    if (t.motion_moving) {
+        char cmd_buf[64];
+        motionGetCurrentCommand(cmd_buf, sizeof(cmd_buf));
+        n = snprintf(buffer + offset, buffer_size - offset,
+            ",\"exec\":{\"cmd\":\"%s\",\"progress\":%.1f,\"eta\":%lu}",
+            cmd_buf, motionGetExecutionProgress(), (unsigned long)motionGetEstimatedTimeRemaining());
         if (n > 0 && (offset + n) < buffer_size) offset += n;
     }
 

@@ -236,15 +236,9 @@ void motionUpdate() {
             ? (now - axes[i].last_actual_update_ms) 
             : (UINT32_MAX - axes[i].last_actual_update_ms + now + 1);
         
-        // Clamp extrapolation time to 200ms to prevent runaway if bus is lost
-        if (dt_since_last_actual > 200) dt_since_last_actual = 200;
-        
         // Extended encoder silence warning (diagnostic aid)
-        uint32_t now_silence = millis();
-        uint32_t actual_silence = (now_silence >= axes[i].last_actual_update_ms) 
-            ? (now_silence - axes[i].last_actual_update_ms) 
-            : (UINT32_MAX - axes[i].last_actual_update_ms + now_silence + 1);
-        if (actual_silence >= 2000) {
+        // Check BEFORE clamping so the 2s threshold works correctly
+        if (dt_since_last_actual >= 2000) {
             if (!axes[i].prediction_stale_logged) {
                 logWarning("[MOTION] Axis %d: Encoder silence >2s - prediction capped", i);
                 axes[i].prediction_stale_logged = true;
@@ -252,6 +246,9 @@ void motionUpdate() {
         } else {
             axes[i].prediction_stale_logged = false;  // Reset when data resumes
         }
+        
+        // Clamp extrapolation time to 200ms to prevent runaway if bus is lost
+        if (dt_since_last_actual > 200) dt_since_last_actual = 200;
         
         int32_t offset = (int32_t)(axes[i].velocity_counts_ms * (float)dt_since_last_actual);
         
@@ -313,23 +310,7 @@ void motionUpdate() {
   uint32_t now = millis();
   bool should_save = (now - last_dist_save_ms > 3600000); // Hourly save fallback
   
-  // Maintenance check (every 50km = 50,000,000 mm)
-  #define MAINTENANCE_INTERVAL_MM 50000000.0
-  for (int i = 0; i < 3; i++) {
-      if (axes[i].accumulated_distance_units >= MAINTENANCE_INTERVAL_MM) {
-          if (!axes[i].maintenance_alert_logged) {
-              logWarning("[MAINTENANCE] Axis %d reached service interval (%.1f km)!", 
-                         i, axes[i].accumulated_distance_units / 1000000.0);
-              axes[i].maintenance_alert_logged = true;
-              
-              // PHASE 16: Automatically signal maintenance via status light
-              // We use SYSTEM_STATE_PAUSED as it's a visible Yellow blink
-              statusLightSetState(SYSTEM_STATE_PAUSED);
-              
-              faultLogWarning(FAULT_SOFT_LIMIT_EXCEEDED, "Service Interval Reached");
-          }
-      }
-  }
+
   
   if (!should_save) {
       for (int i = 0; i < 3; i++) {
@@ -360,8 +341,11 @@ void motionUpdate() {
           bool warned = (dist_m > maint_threshold);
           webServer.setAxisMaintenanceWarning(i, warned);
           
-          if (warned) {
-              logWarning("[MOTION] Axis %d maintenance threshold exceeded (%.1f km)", i, dist_m / 1000.0f);
+          if (warned && !axes[i].maintenance_alert_logged) {
+              logWarning("[MAINTENANCE] Axis %d reached service interval (%.1f km)", i, dist_m / 1000.0f);
+              axes[i].maintenance_alert_logged = true;
+              statusLightSetState(SYSTEM_STATE_PAUSED);
+              faultLogWarning(FAULT_SOFT_LIMIT_EXCEEDED, "Service Interval Reached");
           }
       }
       if (changed) {
@@ -524,10 +508,11 @@ float motionGetExecutionProgress() {
     return p;
 }
 
-const char* motionGetCurrentCommand() {
-    // Note: returning pointer to static buffer may be risky if modified rapidly,
-    // but command strings are set once per move.
-    return m_state.current_command;
+void motionGetCurrentCommand(char* buf, size_t len) {
+    if (!buf || len == 0) return;
+    portENTER_CRITICAL(&motionSpinlock);
+    SAFE_STRCPY(buf, m_state.current_command, len);
+    portEXIT_CRITICAL(&motionSpinlock);
 }
 
 float motionGetEstimatedTimeRemaining() {
@@ -737,11 +722,6 @@ float motionGetCalibratedFeedRate(uint8_t axis, float speed_mm_s) {
     if (prof == SPEED_PROFILE_1) return cal->speed_slow_mm_min;
     if (prof == SPEED_PROFILE_2) return cal->speed_med_mm_min;
     return cal->speed_fast_mm_min;
-}
-
-bool motionStartInternalMove(float x, float y, float z, float a,
-                             float speed_mm_s) {
-  return motionMoveAbsolute(x, y, z, a, speed_mm_s);
 }
 
 bool motionMoveRelative(float dx, float dy, float dz, float da,

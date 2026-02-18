@@ -1,15 +1,42 @@
 #include "sd_card_manager.h"
 #include "serial_logger.h"
 #include "board_variant.h"
-#include "system_utils.h" // PHASE 8.1: Standardized Logging
-#include <SD.h>
 #include <SPI.h>
+#include <SD.h>
+#include "system_utils.h" // PHASE 8.1: Standardized Logging
+#include "config_keys.h"
+#include "config_unified.h"
 
 // SD Card state
 static bool sd_initialized = false;
 static bool sd_mounted = false;
 static SDCardHealth last_health = SD_HEALTH_NOT_MOUNTED;
 static SPIClass sd_spi(HSPI);
+
+// Endurance Tracking
+static uint64_t g_total_bytes_written = 0;
+static uint64_t g_last_synced_bytes = 0;
+#define SD_WRITE_SYNC_THRESHOLD (1024 * 1024) // Sync to NVS every 1MB
+
+// Latency Tracking (PHASE 2.0)
+typedef struct {
+    uint32_t min_us;
+    uint32_t max_us;
+    uint64_t total_us;
+    uint64_t total_sq_us;
+    uint32_t samples;
+} sd_internal_latency_stats_t;
+
+static sd_internal_latency_stats_t read_latency = {UINT32_MAX, 0, 0, 0, 0};
+static sd_internal_latency_stats_t write_latency = {UINT32_MAX, 0, 0, 0, 0};
+
+static void updateLatency(sd_internal_latency_stats_t* stats, uint32_t us) {
+    if (us < stats->min_us) stats->min_us = us;
+    if (us > stats->max_us) stats->max_us = us;
+    stats->total_us += us;
+    stats->total_sq_us += (uint64_t)us * us;
+    stats->samples++;
+}
 
 /**
  * @brief Initialize SD card with custom SPI pins
@@ -25,6 +52,10 @@ result_t sdCardInit() {
         logDebug("[SD] Already initialized");
         return sd_mounted ? RESULT_OK : RESULT_ERROR;
     }
+    
+    // Load endurance data from NVS
+    g_total_bytes_written = configGetUInt64(KEY_SD_BYTES_WRITTEN, 0);
+    g_last_synced_bytes = g_total_bytes_written;
     
     logModuleInit("SD");
     
@@ -360,6 +391,7 @@ SDCardHealth sdCardHealthCheck() {
     const size_t patternSize = sizeof(testPattern);
     
     // Step 1: Try to write test file
+    uint32_t writeStart = micros();
     File writeFile = SD.open(testPath, FILE_WRITE);
     if (!writeFile) {
         logDebug("[SD] Health: Failed to create test file");
@@ -368,6 +400,8 @@ SDCardHealth sdCardHealthCheck() {
     
     size_t written = writeFile.write(testPattern, patternSize);
     writeFile.close();
+    sdCardRecordWrite(written);
+    updateLatency(&write_latency, micros() - writeStart);
     
     if (written != patternSize) {
         logDebug("[SD] Health: Write size mismatch (%u != %u)", written, patternSize);
@@ -376,6 +410,7 @@ SDCardHealth sdCardHealthCheck() {
     }
     
     // Step 2: Read back and verify
+    uint32_t readStart = micros();
     File readFile = SD.open(testPath, FILE_READ);
     if (!readFile) {
         logDebug("[SD] Health: Failed to open test file for read");
@@ -386,6 +421,7 @@ SDCardHealth sdCardHealthCheck() {
     uint8_t readBuffer[sizeof(testPattern)];
     size_t bytesRead = readFile.read(readBuffer, patternSize);
     readFile.close();
+    updateLatency(&read_latency, micros() - readStart);
     
     if (bytesRead != patternSize) {
         logDebug("[SD] Health: Read size mismatch (%u != %u)", bytesRead, patternSize);
@@ -539,4 +575,57 @@ result_t sdCardFormat() {
     logInfo("[SD] Default directories recreated: /gcode, /logs, /backups, /jobs");
     
     return RESULT_OK;
+}
+
+static void sdPopulateStats(sd_internal_latency_stats_t* src, bus_latency_stats_t* dest) {
+    if (src->samples == 0) {
+        dest->min_us = 0;
+        dest->max_us = 0;
+        dest->avg_us = 0;
+        dest->std_dev_us = 0;
+        dest->samples = 0;
+        return;
+    }
+    dest->min_us = src->min_us;
+    dest->max_us = src->max_us;
+    dest->avg_us = src->total_us / src->samples;
+    dest->samples = src->samples;
+    
+    uint64_t mean_sq = src->total_sq_us / src->samples;
+    uint64_t avg_sq = (uint64_t)dest->avg_us * dest->avg_us;
+    if (mean_sq > avg_sq) {
+        dest->std_dev_us = (uint32_t)sqrt(mean_sq - avg_sq);
+    } else {
+        dest->std_dev_us = 0;
+    }
+}
+
+void sdCardGetReadLatency(bus_latency_stats_t* stats) {
+    sdPopulateStats(&read_latency, stats);
+}
+
+void sdCardGetWriteLatency(bus_latency_stats_t* stats) {
+    sdPopulateStats(&write_latency, stats);
+}
+
+void sdCardResetLatencyStats() {
+    read_latency = {UINT32_MAX, 0, 0, 0, 0};
+    write_latency = {UINT32_MAX, 0, 0, 0, 0};
+}
+
+void sdCardRecordWrite(size_t bytes) {
+    g_total_bytes_written += bytes;
+    
+    // Periodic NVS sync to prevent excessive writes while maintaining endurance data
+    if (g_total_bytes_written - g_last_synced_bytes >= SD_WRITE_SYNC_THRESHOLD) {
+        g_last_synced_bytes = g_total_bytes_written;
+        // Store as string or large int? config_unified supports int64?
+        // Let's use configSetInt64 if available, or just configSetInt (32-bit is only 4GB, too small)
+        // Checking config_unified... it has configGetUInt64/configSetUInt64 usually.
+        configSetUInt64(KEY_SD_BYTES_WRITTEN, g_total_bytes_written);
+    }
+}
+
+uint64_t sdCardGetTotalWritten() {
+    return g_total_bytes_written;
 }

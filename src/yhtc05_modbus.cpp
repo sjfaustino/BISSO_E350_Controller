@@ -26,16 +26,7 @@ YhTc05Driver::YhTc05Driver()
 }
 
 const yhtc05_state_t* YhTc05Driver::getState() const {
-    // Sync base stats
-    yhtc05_state_t* mutable_state = const_cast<yhtc05_state_t*>(&_state);
-    mutable_state->read_count = getPollCount();
-    mutable_state->error_count = getErrorCount();
-    mutable_state->consecutive_errors = getConsecutiveErrors();
-    mutable_state->last_read_time_ms = getLastReadTime();
-    mutable_state->last_error_time_ms = getLastErrorTime();
-    mutable_state->enabled = isEnabled();
-    mutable_state->slave_address = getSlaveAddress();
-    
+    syncBaseStats(_state);
     return &_state;
 }
 
@@ -167,25 +158,7 @@ bool yhtc05UnregisterFromBus(void) {
     return rs485UnregisterDevice(const_cast<rs485_device_t*>(YhTc05.getDeviceDescriptor()));
 }
 
-bool yhtc05ModbusReadRPM(void* ctx) {
-    // Should be called by registry, which passes ctx (this)
-    // But if called manually with NULL?
-    // Wrapper shouldn't exists as a callback anymore, but as a C-API command?
-    // Wait, registry calls it via function pointer we assign?  
-    // NO! ModbusDriver sets .poll = staticPoll.
-    // So logic flow is: Registry -> ModbusDriver::staticPoll -> YhTc05Driver::poll
-    // THIS wrapper "yhtc05ModbusReadRPM" is likely NOT used by registry anymore.
-    // We can leave it empty or delete implementation if no one calls it (grep verified).
-    // But header declares it.
-    // We can stub it.
-    (void)ctx;
-    return false; // Should not be called
-}
 
-bool yhtc05ModbusOnResponse(void* ctx, const uint8_t* data, uint16_t len) {
-    (void)ctx; (void)data; (void)len;
-    return false; // Should not be called
-}
 
 uint16_t yhtc05GetRPM(void) { return YhTc05.getRPM(); }
 uint32_t yhtc05GetPulseCount(void) { return YhTc05.getPulseCount(); }
@@ -200,8 +173,8 @@ void yhtc05SetStallThreshold(uint16_t rpm_threshold, uint32_t time_ms) {
 
 void yhtc05ResetStallDetection(void) { YhTc05.resetStallDetection(); }
 void yhtc05ResetPeakRPM(void) { YhTc05.resetPeakRPM(); }
-void yhtc05ResetErrorCounters(void) { 
-    // Not easily exposed via driver yet
+void yhtc05ResetErrorCounters(void) {
+    YhTc05.resetErrorCounters();
 }
 
 void YhTc05Driver::printDiagnostics() const {

@@ -79,7 +79,8 @@ void sdTelemetryLoggerUpdate() {
         (unsigned long)t.free_heap_bytes
     );
 
-    logFile.println(line);
+    size_t written = logFile.println(line);
+    sdCardRecordWrite(written);
 
     // Sync every 10 seconds to protect against power loss without killing performance
     if (millis() - last_sync_ms > 10000) {

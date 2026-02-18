@@ -57,6 +57,26 @@ static uint32_t q73_mutex_timeout_count = 0;
 static bool g_plc_hardware_present = true;  // Optimistic default
 static bool plc_in_transaction = false;     // PHASE 1: I2C Performance (Batching)
 
+// Latency Tracking (PHASE 2.0)
+typedef struct {
+    uint32_t min_us;
+    uint32_t max_us;
+    uint64_t total_us;
+    uint64_t total_sq_us;
+    uint32_t samples;
+} internal_latency_stats_t;
+
+static internal_latency_stats_t input_latency = {UINT32_MAX, 0, 0, 0, 0};
+static internal_latency_stats_t output_latency = {UINT32_MAX, 0, 0, 0, 0};
+
+static void updateLatency(internal_latency_stats_t* stats, uint32_t us) {
+    if (us < stats->min_us) stats->min_us = us;
+    if (us > stats->max_us) stats->max_us = us;
+    stats->total_us += us;
+    stats->total_sq_us += (uint64_t)us * us;
+    stats->samples++;
+}
+
 #define I2C_RETRIES 3
 #define SHADOW_MUTEX_TIMEOUT_MS 100
 #define SHADOW_MUTEX_RETRIES 3
@@ -120,7 +140,9 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char *context) {
   }
 
   uint8_t buffer = data;
+  uint32_t start = micros();
   i2c_result_t res = i2cWriteWithRetry(address, &buffer, 1);
+  uint32_t latency = micros() - start;
 
   taskUnlockMutex(taskGetI2cPlcMutex());
 
@@ -129,6 +151,7 @@ static bool plcWriteI2C(uint8_t address, uint8_t data, const char *context) {
     // Shadow register is now in sync with hardware
     if (address == ADDR_Q73_OUTPUT || address == ADDR_Q73_AUX) {
       q73_shadow_dirty = false;
+      updateLatency(&output_latency, latency);
     }
     return true;
   }
@@ -396,26 +419,9 @@ void plcSetAuxRelay(uint8_t bit, bool state) {
   }
 }
 
-// ============================================================================
-// LEGACY API (Redirects to new API for backward compatibility)
-// ============================================================================
 
-void elboSetDirection(uint8_t axis, bool forward) {
-  // Legacy function - now sets BOTH axis and direction
-  // This maintains old API behavior
-  plcSetAxisSelect(axis);
-  plcSetDirection(forward);
-}
-
-void elboSetSpeedProfile(uint8_t profile_index) {
-  // Redirect to new API
-  plcSetSpeed(profile_index);
-}
-
-// PHASE 3.1: Added getter to read current speed profile
-// Allows LCD and diagnostics to display active speed profile
+// PHASE 3.1: Read current speed profile from shadow register
 uint8_t plcGetSpeedProfile() {
-  // Read speed profile bits (5, 6, 7) from shadow register
   if (xSemaphoreTake(plc_shadow_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
     logWarning("[PLC] Failed to acquire shadow mutex for GetSpeedProfile");
     return 0xFF;
@@ -425,7 +431,6 @@ uint8_t plcGetSpeedProfile() {
   xSemaphoreGive(plc_shadow_mutex);
 
   // Active-low: bit cleared = speed active
-  // Check in order: fast (5), medium (6), slow (7)
   if (!(reg & (1 << PLC_OUT_SPEED_FAST)))
     return 0; // Fast
   if (!(reg & (1 << PLC_OUT_SPEED_MEDIUM)))
@@ -434,10 +439,6 @@ uint8_t plcGetSpeedProfile() {
     return 2; // Slow
 
   return 0xFF; // No speed set
-}
-
-uint8_t elboGetSpeedProfile() {
-  return plcGetSpeedProfile();
 }
 
 void plcSetOutput(uint16_t pin, bool state) {
@@ -508,9 +509,11 @@ void elboI73Refresh() {
   // CRITICAL FIX: Acquire PLC I2C mutex
   if (!taskLockMutex(taskGetI2cPlcMutex(), 100)) return;
 
+  uint32_t start = micros();
   uint8_t count = Wire.requestFrom((uint8_t)ADDR_I73_INPUT, (uint8_t)1);
   if (count == 1) {
     i73_input_shadow = Wire.read();
+    updateLatency(&input_latency, micros() - start);
   }
 
   taskUnlockMutex(taskGetI2cPlcMutex());
@@ -566,9 +569,7 @@ void plcPrintDiagnostics() {
   }
 }
 
-void elboDiagnostics() {
-  plcPrintDiagnostics();
-}
+
 
 // PHASE 5.7: Fix - Shadow Register Health Monitoring
 uint32_t elboGetMutexTimeoutCount() { return q73_mutex_timeout_count; }
@@ -578,8 +579,49 @@ bool elboIsShadowRegisterDirty() { return q73_shadow_dirty; }
 // Hardware presence check - allows monitor tasks to skip I2C when no hardware
 bool plcIsHardwarePresent() { return g_plc_hardware_present; }
 
+uint32_t plcGetRecoveryCount() { 
+    return i2cGetStats().bus_recoveries; 
+}
+
 uint8_t elboI73GetRawState() { return i73_input_shadow; }
 
 uint8_t elboQ73GetRawState() { return q73_shadow_register; }
 
 uint8_t elboQ73GetAuxRawState() { return q73_aux_shadow; }
+
+void plcGetLatencyStats(internal_latency_stats_t* src, bus_latency_stats_t* dest) {
+    if (src->samples == 0) {
+        dest->min_us = 0;
+        dest->max_us = 0;
+        dest->avg_us = 0;
+        dest->std_dev_us = 0;
+        dest->samples = 0;
+        return;
+    }
+    dest->min_us = src->min_us;
+    dest->max_us = src->max_us;
+    dest->avg_us = src->total_us / src->samples;
+    dest->samples = src->samples;
+    
+    // StdDev calculation
+    uint64_t mean_sq = src->total_sq_us / src->samples;
+    uint64_t avg_sq = (uint64_t)dest->avg_us * dest->avg_us;
+    if (mean_sq > avg_sq) {
+        dest->std_dev_us = (uint32_t)sqrt(mean_sq - avg_sq);
+    } else {
+        dest->std_dev_us = 0;
+    }
+}
+
+void plcGetInputLatency(bus_latency_stats_t* stats) {
+    plcGetLatencyStats(&input_latency, stats);
+}
+
+void plcGetOutputLatency(bus_latency_stats_t* stats) {
+    plcGetLatencyStats(&output_latency, stats);
+}
+
+void plcResetLatencyStats() {
+    input_latency = {UINT32_MAX, 0, 0, 0, 0};
+    output_latency = {UINT32_MAX, 0, 0, 0, 0};
+}

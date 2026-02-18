@@ -60,6 +60,9 @@
 #define KEY_BUZZER_EN "buzzer_en"       // Enable buzzer (1=on, 0=off, default 1)
 #define KEY_BUZZER_PIN "buzzer_pin"     // Output pin number (1-16, default 16)
 
+// --- SD CARD DIAGNOSTICS ---
+#define KEY_SD_BYTES_WRITTEN "sd_bytes" // Total bytes written to SD (endurance tracking)
+
 // --- STATUS LIGHT ---
 #define KEY_STATUS_LIGHT_EN "sl_en"             // Enable status light (1=on, 0=off, default 0)
 #define KEY_STATUS_LIGHT_GREEN "sl_green"         // Green output pin (1-16, default 13)

@@ -29,6 +29,16 @@ void cmd_sd_status(int argc, char** argv) {
             logPrintf("  Used:        %llu MB (%d%%)\n", usedMB, usedPercent);
             logPrintf("  Free:        %llu MB\n", freeMB);
         }
+        
+        bus_latency_stats_t r, w;
+        sdCardGetReadLatency(&r);
+        sdCardGetWriteLatency(&w);
+        
+        logPrintln("\n  Performance (micros):");
+        logPrintf("    Read:  Avg %5lu | Min %5lu | Max %5lu | ±%lu\n", 
+                  (unsigned long)r.avg_us, (unsigned long)r.min_us, (unsigned long)r.max_us, (unsigned long)r.std_dev_us);
+        logPrintf("    Write: Avg %5lu | Min %5lu | Max %5lu | ±%lu\n", 
+                  (unsigned long)w.avg_us, (unsigned long)w.min_us, (unsigned long)w.max_us, (unsigned long)w.std_dev_us);
     }
     
     logPrintln("");

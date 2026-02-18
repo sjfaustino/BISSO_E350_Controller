@@ -484,7 +484,8 @@ void systemLogWrite(const char* message) {
     if (!system_logging_active || !system_log_file) return;
     
     // Write and flush periodically
-    system_log_file.println(message);
+    size_t len = system_log_file.println(message);
+    sdCardRecordWrite(len);
     
     // Safety: check if card is still mounted before flush
     if (sdCardIsMounted()) {

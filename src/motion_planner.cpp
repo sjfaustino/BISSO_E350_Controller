@@ -17,9 +17,9 @@
 
 MotionPlanner motionPlanner;
 
-// CRITICAL FIX: Signature matched to motion_control.cpp
-extern bool motionStartInternalMove(float x, float y, float z, float a,
-                                    float speed_mm_s);
+// Forward declaration for motion control
+extern bool motionMoveAbsolute(float x, float y, float z, float a,
+                               float speed_mm_s);
 
 #ifndef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -75,7 +75,7 @@ bool MotionPlanner::checkBufferDrain(uint8_t &active_axis) {
     float z_mm = (float)cmd.z_counts / motionGetAxisScale(2);
     float a_mm = (float)cmd.a_counts / motionGetAxisScale(3);
 
-    if (!motionStartInternalMove(x_mm, y_mm, z_mm, a_mm, cmd.speed_mm_s)) {
+    if (!motionMoveAbsolute(x_mm, y_mm, z_mm, a_mm, cmd.speed_mm_s)) {
       logError("[PLANNER] Buffered move failed to start!");
       // Retry logic or Halt could go here
     }

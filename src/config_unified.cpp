@@ -538,6 +538,20 @@ const char *configGetString(const char *key, const char *default_val) {
   return default_val ? default_val : "";
 }
 
+uint64_t configGetUInt64(const char *key, uint64_t default_val) {
+  if (!initialized)
+    return default_val;
+  int idx = findConfigEntry(key);
+  if (idx >= 0 && config_table[idx].type == CONFIG_UINT64 &&
+      config_table[idx].is_set) {
+    return config_table[idx].value.uint64_val;
+  }
+  if (prefs.isKey(key)) {
+    return prefs.getULong64(key, default_val);
+  }
+  return default_val;
+}
+
 // ============================================================================
 // SETTERS (With Validation)
 // ============================================================================
@@ -582,8 +596,6 @@ result_t configSetInt(const char *key, int32_t value) {
   config_dirty = true;
   last_nvs_save = millis();
 
-  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putInt(key, value);
     config_dirty = false;
@@ -591,6 +603,8 @@ result_t configSetInt(const char *key, int32_t value) {
   } else {
     logDebug("Set %s = %ld (Cached)", key, (long)value);
   }
+
+  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
 
   // PHASE 5.10: Signal configuration change event
   systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
@@ -641,8 +655,6 @@ result_t configSetFloat(const char *key, float value) {
   config_dirty = true;
   last_nvs_save = millis();
 
-  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putFloat(key, value);
     config_dirty = false;
@@ -650,6 +662,8 @@ result_t configSetFloat(const char *key, float value) {
   } else {
     logDebug("Set %s = %.3f (Cached)", key, value);
   }
+
+  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
 
   // PHASE 5.10: Signal configuration change event
   systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
@@ -706,8 +720,6 @@ result_t configSetString(const char *key, const char *value) {
   config_dirty = true;
   last_nvs_save = millis();
 
-  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
-
   if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
     prefs.putString(key, validated_value);
     config_dirty = false;
@@ -716,12 +728,63 @@ result_t configSetString(const char *key, const char *value) {
     logDebug("Set %s (Cached)", key);
   }
 
+  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
+
   // PHASE 5.10: Signal configuration change event
   systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
 
   // Update Typed Cache (PHASE 6.7)
   configCacheUpdate(key);
 
+  return RESULT_OK;
+}
+
+
+result_t configSetUInt64(const char *key, uint64_t value) {
+  if (!initialized)
+    return RESULT_NOT_READY;
+
+  // PHASE 5.10: Protect config_table writes with mutex
+  if (config_cache_mutex != NULL) {
+    if (xSemaphoreTakeRecursive(config_cache_mutex, pdMS_TO_TICKS(CONFIG_MUTEX_TIMEOUT_MS)) != pdTRUE) {
+      logWarning("Mutex timeout in configSetUInt64");
+      return RESULT_TIMEOUT;
+    }
+  }
+
+  int idx = findConfigEntry(key);
+  if (idx < 0) {
+    if (config_count >= CONFIG_MAX_KEYS) {
+      if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
+      return RESULT_ERROR_MEMORY;
+    }
+    idx = config_count++;
+    SAFE_STRCPY(config_table[idx].key, key, CONFIG_KEY_LEN);
+    config_table[idx].type = CONFIG_UINT64;
+  }
+
+  if (config_table[idx].is_set && config_table[idx].value.uint64_val == value) {
+    if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
+    return RESULT_OK;
+  }
+
+  config_table[idx].value.uint64_val = value;
+  config_table[idx].is_set = true;
+  config_dirty = true;
+  last_nvs_save = millis();
+
+  if (isCriticalKey(key) && NVS_SAVE_ON_CRITICAL) {
+    prefs.putULong64(key, value);
+    config_dirty = false;
+    logDebug("Set %s = %llu (Saved)", key, value);
+  } else {
+    logDebug("Set %s = %llu (Cached)", key, value);
+  }
+
+  if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
+
+  systemEventsSystemSet(EVENT_SYSTEM_CONFIG_CHANGED);
+  configCacheUpdate(key);
   return RESULT_OK;
 }
 
@@ -772,6 +835,9 @@ result_t configUnifiedSave() {
       break;
     case CONFIG_STRING:
       result = prefs.putString(config_table[i].key, config_table[i].value.str_val);
+      break;
+    case CONFIG_UINT64:
+      result = prefs.putULong64(config_table[i].key, config_table[i].value.uint64_val);
       break;
     }
     if (result == 0) success = false;

@@ -56,6 +56,17 @@
 #define ELBO_Q73_ENABLE 255  // No longer used (set axis instead)
 
 // ============================================================================
+// PERFORMANCE TRACKING
+// ============================================================================
+typedef struct {
+    uint32_t min_us;
+    uint32_t max_us;
+    uint32_t avg_us;
+    uint32_t std_dev_us;
+    uint32_t samples;
+} bus_latency_stats_t;
+
+// ============================================================================
 // PUBLIC API
 // ============================================================================
 
@@ -86,21 +97,8 @@ void plcPrintDiagnostics();               // NEW - detailed IO diagnostics
 void plcBeginTransaction();              // Delay I2C writes until EndTransaction
 void plcEndTransaction();                // Commit changes and resume immediate writes
 
-// --- LEGACY API (DEPRECATED) ---
-[[deprecated("Use plcSetDirection")]]
-void elboSetDirection(uint8_t axis, bool forward);
-
-[[deprecated("Use plcSetSpeed")]]
-void elboSetSpeedProfile(uint8_t profile_idx);
-
-[[deprecated("Use plcGetSpeedProfile")]]
-uint8_t elboGetSpeedProfile();
-
-[[deprecated("Use plcSetOutput or plcSetAuxRelay")]]
+// --- LEGACY API (still in use) ---
 void elboQ73SetRelay(uint8_t bit, bool state);
-
-[[deprecated("Use systemDumpDiagnostics")]]
-void elboDiagnostics();
 
 // Health monitoring
 uint32_t elboGetMutexTimeoutCount();
@@ -109,5 +107,11 @@ bool plcIsHardwarePresent();  // Returns false if PLC I2C board not detected at 
 uint8_t elboI73GetRawState();            // Read input shadow
 uint8_t elboQ73GetRawState();            // Read output shadow (Bank 1)
 uint8_t elboQ73GetAuxRawState();         // Read output shadow (Bank 2)
+
+// Performance Analytics
+void plcGetInputLatency(bus_latency_stats_t* stats);
+void plcGetOutputLatency(bus_latency_stats_t* stats);
+void plcResetLatencyStats();
+uint32_t plcGetRecoveryCount();           // NEW: Returns count of I2C bus recoveries
 
 #endif // PLC_IFACE_H

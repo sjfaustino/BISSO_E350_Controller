@@ -12,6 +12,7 @@
 #include <Arduino.h>
 
 #include "system_constants.h"
+#include "plc_iface.h" // Reuse bus_latency_stats_t
 
 // SD card initialization and status
 result_t sdCardInit();
@@ -84,3 +85,10 @@ SDCardHealth sdCardGetLastHealth();
  * @return true if successful, false on error
  */
 result_t sdCardFormat();
+
+// Performance Analytics
+void sdCardGetReadLatency(bus_latency_stats_t* stats);
+void sdCardGetWriteLatency(bus_latency_stats_t* stats);
+void sdCardResetLatencyStats();
+void sdCardRecordWrite(size_t bytes);    // NEW: Record bytes written for endurance tracking
+uint64_t sdCardGetTotalWritten();        // NEW: Returns total bytes written from NVS

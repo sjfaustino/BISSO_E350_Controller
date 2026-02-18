@@ -232,6 +232,33 @@
         </div>
     </div>
 
+    <!-- System Bus Health Overview -->
+    <div class="card full-width">
+        <div class="card-header">
+            <h2>System Bus Health Dashboard</h2>
+            <div id="bus-health-status" class="status-badge" style="margin-left: auto;">Scanning...</div>
+        </div>
+        <div class="card-content">
+            <div class="grid-3">
+                <div class="stat-group">
+                    <label>RS-485 Bus</label>
+                    <div class="value-large" id="health-rs485-status">--</div>
+                    <div class="value-unit" id="health-rs485-stats">0 Errors</div>
+                </div>
+                <div class="stat-group">
+                    <label>I2C (PLC) Bus</label>
+                    <div class="value-large" id="health-i2c-status">--</div>
+                    <div class="value-unit" id="health-i2c-stats">Avg: --ms | ±--</div>
+                </div>
+                <div class="stat-group">
+                    <label>SPI (SD Card) Bus</label>
+                    <div class="value-large" id="health-spi-status">--</div>
+                    <div class="value-unit" id="health-spi-stats">Write: --ms</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- RS485 Latency & Jitter Card -->
     <div class="card full-width">
         <div class="card-header">
@@ -244,6 +271,26 @@
                 <p style="text-align: center; color: var(--text-secondary); padding: 20px;">
                     No latency data available
                 </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live RS485 Sniffer -->
+    <div class="card full-width">
+        <div class="card-header">
+            <h2>Live RS485 Bus Sniffer</h2>
+            <div style="margin-left: auto; display: flex; gap: 10px;">
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 11px; cursor: pointer;">
+                    <input type="checkbox" id="chk-sniffer-scroll" checked> Auto-scroll
+                </label>
+                <button class="btn btn-sm btn-outline" id="btn-sniffer-pause">Pause</button>
+                <button class="btn btn-sm btn-outline" id="btn-sniffer-clear">Clear</button>
+            </div>
+        </div>
+        <div class="card-content">
+            <div id="rs485-sniffer-log"
+                style="font-family: 'Courier New', monospace; font-size: 11px; background: #0a0a0a; padding: 12px; border-radius: 4px; height: 180px; overflow-y: auto; border: 1px solid #333; line-height: 1.4;">
+                <div style="color: var(--text-tertiary);">Polling bus traffic...</div>
             </div>
         </div>
     </div>

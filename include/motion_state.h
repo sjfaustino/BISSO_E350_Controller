@@ -25,7 +25,7 @@ uint8_t motionGetActiveAxis();
 
 // Execution Status (New)
 float motionGetExecutionProgress();
-const char* motionGetCurrentCommand();
+void motionGetCurrentCommand(char* buf, size_t len);
 float motionGetEstimatedTimeRemaining();
 
 // Helpers
