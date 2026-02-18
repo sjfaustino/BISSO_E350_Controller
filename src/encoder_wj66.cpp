@@ -171,6 +171,81 @@ bool wj66SetBaud(uint32_t baud) {
     return ok;
 }
 
+// --- Autodetect Probe Helpers ---
+
+/**
+ * @brief Probe a device using Modbus RTU (FC03 on Position register)
+ * @return true if a valid Modbus response is received
+ */
+static bool wj66ProbeModbus(HardwareSerial* s, uint8_t addr) {
+    uint8_t frame[8];
+    modbusReadRegistersRequest(addr, 0x0010, 8, frame);
+    s->write(frame, 8);
+    s->flush();
+    s->setTimeout(150);
+    uint8_t resp[64];
+    int len = s->readBytes(resp, sizeof(resp));
+    return (len >= 5 && resp[0] == addr && resp[1] == 0x03 && modbusVerifyCrc(resp, len));
+}
+
+/**
+ * @brief Probe a device using ASCII protocol (tries #XX and #XX2 patterns)
+ * @return true if a WJ66-compatible ASCII response is received
+ */
+static bool wj66ProbeAscii(HardwareSerial* s, int addr) {
+    const char* probes[] = {"#%02d\r", "#%02d2\r"};
+    for (int p_idx = 0; p_idx < 2; p_idx++) {
+        char cmd[16];
+        snprintf(cmd, sizeof(cmd), probes[p_idx], addr);
+        s->print(cmd);
+        s->flush();
+        s->setTimeout(150);
+        uint8_t resp[64];
+        int len = s->readBytes(resp, sizeof(resp));
+        if (len > 0) {
+            resp[len] = '\0';
+            // WJ66 signature characters
+            if (strchr((char*)resp, '!') || strchr((char*)resp, '>')) {
+                return true;
+            }
+            // Fallback: digits + commas pattern = CSV position data
+            int digits = 0, commas = 0;
+            for (int i = 0; i < len; i++) {
+                if (isdigit(resp[i])) digits++;
+                if (resp[i] == ',') commas++;
+            }
+            if (digits >= 4 && commas >= 1) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * @brief Try ASCII broadcast (#AA) to auto-detect device address
+ * @return Detected address (0-254) or -1 if no response
+ */
+static int wj66BroadcastProbe(HardwareSerial* s) {
+    logDebug("[WJ66] Probing ASCII Broadcast (#AA)...");
+    s->print("#AA\r");
+    s->flush();
+    s->setTimeout(150);
+    uint8_t buf[32];
+    int len = s->readBytes(buf, sizeof(buf) - 1);
+    if (len > 0) {
+        buf[len] = '\0';
+        logInfo("[WJ66] Received response to Broadcast: %s", (char*)buf);
+        char* excl = strchr((char*)buf, '!');
+        if (excl && isdigit(excl[1])) {
+            int addr = atoi(excl + 1);
+            logInfo("[WJ66] Detected Address: %d", addr);
+            return addr;
+        }
+    }
+    return -1;
+}
+
 uint32_t wj66Autodetect() {
     if (!serialLoggerLock()) return 0;
     logInfo("[WJ66] Starting robust Auto-detect...");
@@ -207,85 +282,27 @@ uint32_t wj66Autodetect() {
         logInfo("[WJ66] Trying %lu baud...", (unsigned long)rate);
         s->updateBaudRate(rate);
         vTaskDelay(100 / portTICK_PERIOD_MS);
+        while (s->available()) s->read(); // Flush noise
         
-        while(s->available()) s->read(); // Flush noise
-        
-        // Try BOTH protocols at each baud rate
-        for (int proto_to_try = 0; proto_to_try <= 1; proto_to_try++) {
-            // Address range 0-10 covers most defaults and common setups
-            for (int addr_to_try = 0; addr_to_try <= 10; addr_to_try++) {
-                // Broadcast check (#AA\r) only for ASCII and only once per baud rate
-                if (proto_to_try == 0 && addr_to_try == 0) {
-                    logDebug("[WJ66] Probing ASCII Broadcast (#AA)...");
-                    s->print("#AA\r");
-                    s->flush();
-                    s->setTimeout(150);
-                    uint8_t buf[32];
-                    int len = s->readBytes(buf, sizeof(buf)-1);
-                    if (len > 0) {
-                        buf[len] = '\0';
-                        logInfo("[WJ66] Received response to Broadcast: %s", (char*)buf);
-                        // Extract address from response if possible (!01, !02, etc)
-                        char* excl = strchr((char*)buf, '!');
-                        if (excl && isdigit(excl[1])) {
-                             addr_to_try = atoi(excl + 1);
-                             logInfo("[WJ66] Detected Address: %d", addr_to_try);
-                        }
-                    }
-                }
+        // Try ASCII broadcast first to detect address
+        int broadcast_addr = wj66BroadcastProbe(s);
+        int start_addr = (broadcast_addr >= 0) ? broadcast_addr : 0;
 
+        // Try BOTH protocols at each baud rate
+        for (int proto = 0; proto <= 1; proto++) {
+            for (int addr = start_addr; addr <= 10; addr++) {
                 bool got_response = false;
-                if (proto_to_try == 1) {
-                    // MODBUS PROBE
-                    if (addr_to_try == 0) continue; // Modbus dev 0 is broadcast-only
-                    uint8_t frame[8];
-                    // Try FC03 on reg 0x0010 (Position)
-                    modbusReadRegistersRequest((uint8_t)addr_to_try, 0x0010, 8, frame);
-                    s->write(frame, 8);
-                    s->flush();
-                    s->setTimeout(150);
-                    uint8_t resp[64];
-                    int len = s->readBytes(resp, sizeof(resp));
-                    if (len >= 5 && resp[0] == addr_to_try && resp[1] == 0x03 && modbusVerifyCrc(resp, len)) {
-                        got_response = true;
-                    }
+                if (proto == 1) {
+                    if (addr == 0) continue; // Modbus addr 0 is broadcast-only
+                    got_response = wj66ProbeModbus(s, (uint8_t)addr);
                 } else {
-                    // ASCII PROBE
-                    // Try BOTH #01\r and #012\r patterns
-                    const char* probes[] = {"#%02d\r", "#%02d2\r"};
-                    for (int p_idx = 0; p_idx < 2; p_idx++) {
-                        char cmd[16];
-                        snprintf(cmd, sizeof(cmd), probes[p_idx], addr_to_try);
-                        s->print(cmd);
-                        s->flush();
-                        s->setTimeout(150);
-                        uint8_t resp[64];
-                        int len = s->readBytes(resp, sizeof(resp));
-                        if (len > 0) {
-                            resp[len] = '\0';
-                            // If we see signatures, it's definitely a WJ66
-                            if (strchr((char*)resp, '!') || strchr((char*)resp, '>')) {
-                                got_response = true;
-                                break;
-                            }
-                            // Fallback: If we see digits and commas, it's probably a match
-                            int digits = 0, commas = 0;
-                            for(int i=0; i<len; i++) {
-                                if(isdigit(resp[i])) digits++;
-                                if(resp[i] == ',') commas++;
-                            }
-                            if (digits >= 4 && commas >= 1) {
-                                got_response = true;
-                                break;
-                            }
-                        }
-                    }
+                    got_response = wj66ProbeAscii(s, addr);
                 }
 
                 if (got_response) {
                     found_rate = rate;
-                    found_addr = addr_to_try;
-                    found_proto = proto_to_try;
+                    found_addr = addr;
+                    found_proto = proto;
                     logInfo("[WJ66] FOUND: %s @ %lu baud, Addr %d!", 
                              (found_proto == 1) ? "Modbus" : "ASCII", 
                              (unsigned long)found_rate, found_addr);
