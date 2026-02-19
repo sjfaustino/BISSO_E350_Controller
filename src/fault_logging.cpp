@@ -7,11 +7,45 @@
 #include "system_tuning.h"  // MAINTAINABILITY FIX: Centralized tuning parameters
 #include "task_manager.h"
 #include "system_events.h" // PHASE 5.10: Event-driven architecture
+#include "sd_card_manager.h"
+#include <SD.h>
 #include <Preferences.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include "system_utils.h" // PHASE 8.1
+
+// --- SD ALARM HISTORY ---
+#define ALARM_CSV_PATH "/logs/alarms.csv"
+static uint32_t last_sd_alarm_write_ms = 0;
+static const uint32_t SD_ALARM_WRITE_COOLDOWN_MS = 1000; // Max 1 write/sec
+
+static void faultAppendToSD(const fault_entry_t* entry) {
+    if (!entry || !sdCardIsMounted()) return;
+
+    uint32_t now = millis();
+    if (now - last_sd_alarm_write_ms < SD_ALARM_WRITE_COOLDOWN_MS) return;
+    last_sd_alarm_write_ms = now;
+
+    bool needs_header = !sdCardFileExists(ALARM_CSV_PATH);
+
+    File f = SD.open(ALARM_CSV_PATH, FILE_APPEND);
+    if (!f) return;
+
+    if (needs_header) {
+        f.println("timestamp_ms,severity,code,code_name,axis,value,message");
+    }
+
+    f.printf("%lu,%s,0x%02X,%s,%ld,%ld,%s\n",
+             (unsigned long)entry->timestamp,
+             faultSeverityToString(entry->severity),
+             (int)entry->code,
+             faultCodeToString(entry->code),
+             (long)entry->axis,
+             (long)entry->value,
+             entry->message);
+    f.close();
+}
 
 
 #pragma GCC diagnostic push
@@ -220,6 +254,9 @@ void faultLogEntry(fault_severity_t severity, fault_code_t code, int32_t axis,
     logWarning("[FAULT_RT] Queue Full! Using ring buffer fallback.");
     faultAddToRingBuffer(payload);
   }
+
+  // Persist to SD card alarm history
+  faultAppendToSD(payload);
 
   if (severity == FAULT_CRITICAL) {
     emergencyStopSetActive(true);

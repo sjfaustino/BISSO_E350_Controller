@@ -40,7 +40,8 @@ struct {
   uint32_t last_command_time;
   bool waiting_for_response; // Added for flow control
   uint32_t last_latency_ms;  // Latency of last successful read
-} wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false, 0};
+  uint32_t noise_rejections; // Count of frames rejected due to delta > MAX_DELTA
+} wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false, 0, 0};
 
 // RS-485 Registry Device Descriptor
 static bool wj66Poll(void* ctx);
@@ -508,6 +509,7 @@ static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void
                 // If the jump is >100k counts and it's not the first reading, ignore it.
                 int32_t delta = abs(current_values[i] - wj66_state.position[i]);
                 if (wj66_state.read_count[i] > 0 && delta > WJ66_MAX_DELTA_COUNTS) {
+                    wj66_state.noise_rejections++;
                     logWarning("[WJ66] Noise detected on Axis %d! Jumped %ld counts (Current: %ld, New: %ld). Discarding frame.",
                                i, (long)delta, (long)wj66_state.position[i], (long)current_values[i]);
                     continue;
@@ -827,4 +829,28 @@ void wj66IdentifyCapability() {
     rs485ReleaseBus();
     rs485SetBusPaused(false);
     serialLoggerUnlock();
+}
+
+// --- ENCODER HEALTH ACCESSORS ---
+
+uint32_t wj66GetErrorCount() {
+    return wj66_state.error_count;
+}
+
+uint32_t wj66GetLatencyMs() {
+    return wj66_state.last_latency_ms;
+}
+
+float wj66GetErrorRate() {
+    uint32_t total_reads = 0;
+    for (int i = 0; i < WJ66_AXES; i++) {
+        total_reads += wj66_state.read_count[i];
+    }
+    uint32_t total_ops = wj66_state.error_count + total_reads;
+    if (total_ops == 0) return 0.0f;
+    return (wj66_state.error_count * 100.0f) / (float)total_ops;
+}
+
+uint32_t wj66GetNoiseRejections() {
+    return wj66_state.noise_rejections;
 }

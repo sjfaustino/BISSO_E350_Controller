@@ -40,4 +40,10 @@ void wj66ProcessSerial();
 
 void wj66Diagnostics();
 
+// Encoder Health Accessors
+uint32_t wj66GetErrorCount();
+uint32_t wj66GetLatencyMs();
+float    wj66GetErrorRate();       // errors / (errors + reads) as percentage
+uint32_t wj66GetNoiseRejections(); // count of delta > MAX_DELTA frames
+
 #endif

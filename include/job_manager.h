@@ -27,6 +27,16 @@ typedef struct {
     job_state_t state;
 } job_status_t;
 
+// Per-job statistics
+typedef struct {
+    uint32_t move_count;
+    float total_distance_mm;
+    uint32_t pause_count;
+    uint32_t pause_duration_ms;
+    uint32_t alarm_count;
+    uint32_t elapsed_ms;
+} job_stats_t;
+
 class JobManager {
 public:
     JobManager();
@@ -42,6 +52,12 @@ public:
     job_status_t getStatus();
     bool isRunning();
 
+    // Per-job statistics
+    job_stats_t getJobStats();
+    void logJobComplete();
+    void recordMove(float distance_mm);
+    void recordAlarm();
+
 private:
     File jobFile;
     job_status_t status;
@@ -49,6 +65,10 @@ private:
     
     // Config
     uint32_t buffer_low_water_mark; // When to resume filling buffer
+
+    // Per-job stats tracking
+    job_stats_t stats;
+    uint32_t pause_start_time;
 };
 
 extern JobManager jobManager;

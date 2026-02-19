@@ -94,6 +94,23 @@ size_t otaUpdaterExportJSON(char* buffer, size_t buffer_size);
  */
 void otaUpdaterPrintDiagnostics();
 
+/**
+ * Validate running firmware (cancels rollback timer)
+ * Call after boot validation succeeds
+ */
+void otaValidateRunningFirmware();
+
+/**
+ * Check if a valid previous firmware partition exists for rollback
+ */
+bool otaIsRollbackAvailable();
+
+/**
+ * Rollback to previous firmware partition and reboot
+ * @return true if rollback initiated (will reboot), false on error
+ */
+bool otaRollback();
+
 #ifdef __cplusplus
 }
 #endif

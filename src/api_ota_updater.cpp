@@ -298,5 +298,64 @@ void otaUpdaterPrintDiagnostics() {
     }
 
     logPrintln("");
+
+    // Show rollback info
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    if (running) {
+        logPrintf("Running partition: %s (0x%lX)\n", running->label, (unsigned long)running->address);
+    }
+    logPrintf("Rollback available: %s\n", otaIsRollbackAvailable() ? "YES" : "NO");
+
     serialLoggerUnlock();
+}
+
+// --- OTA ROLLBACK ---
+
+void otaValidateRunningFirmware() {
+    esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
+    if (err == ESP_OK) {
+        logInfo("[OTA] Firmware validated — rollback cancelled");
+    } else {
+        // Not an error if rollback wasn't pending (ESP_ERR_NOT_FOUND)
+        if (err != ESP_ERR_NOT_FOUND) {
+            logWarning("[OTA] Failed to validate firmware: %d", (int)err);
+        }
+    }
+}
+
+bool otaIsRollbackAvailable() {
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    if (!running) return false;
+
+    // Find the other OTA partition
+    const esp_partition_t* other = esp_ota_get_next_update_partition(running);
+    if (!other) return false;
+
+    // Check if it has valid firmware
+    esp_app_desc_t app_desc;
+    esp_err_t err = esp_ota_get_partition_description(other, &app_desc);
+    return (err == ESP_OK);
+}
+
+bool otaRollback() {
+    if (!otaIsRollbackAvailable()) {
+        logError("[OTA] No rollback partition available");
+        return false;
+    }
+
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    const esp_partition_t* other = esp_ota_get_next_update_partition(running);
+
+    logInfo("[OTA] Rolling back from %s to %s...", running->label, other->label);
+
+    esp_err_t err = esp_ota_set_boot_partition(other);
+    if (err != ESP_OK) {
+        logError("[OTA] Rollback failed: %d", (int)err);
+        return false;
+    }
+
+    logInfo("[OTA] Rollback set. Rebooting in 2 seconds...");
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    systemSafeReboot("OTA firmware rollback");
+    return true;
 }

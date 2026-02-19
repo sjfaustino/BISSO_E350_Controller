@@ -17,12 +17,15 @@
 #include "cutting_analytics.h"  // ITEM 3: Session summary at job end
 #include "operator_alerts.h"    // ITEM 3: Job complete alert
 #include "system_utils.h" // PHASE 8.1
+#include "sd_card_manager.h"
+#include <SD.h>
 #include <LittleFS.h>
 
 JobManager jobManager;
 
-JobManager::JobManager() : file_open(false), buffer_low_water_mark(4) {
+JobManager::JobManager() : file_open(false), buffer_low_water_mark(4), pause_start_time(0) {
     memset(&status, 0, sizeof(status));
+    memset(&stats, 0, sizeof(stats));
     status.state = JOB_IDLE;
 }
 
@@ -95,6 +98,9 @@ void JobManager::update() {
             }
             logPrintln("[JOB] ======================================");
             
+            // Log per-job stats to SD CSV
+            logJobComplete();
+            
             // Trigger job complete alert (buzzer + status light)
             alertJobComplete();
             
@@ -140,6 +146,9 @@ bool JobManager::startJob(const char* filename) {
     status.start_time = millis();
     status.state = JOB_RUNNING;
     
+    // Zero job stats
+    memset(&stats, 0, sizeof(stats));
+    
     motionBuffer.clear();
     
     logInfo("[JOB] Started: %s", filename);
@@ -149,6 +158,8 @@ bool JobManager::startJob(const char* filename) {
 void JobManager::pauseJob() {
     if (status.state == JOB_RUNNING) {
         status.state = JOB_PAUSED;
+        stats.pause_count++;
+        pause_start_time = millis();
         logInfo("[JOB] Paused");
         motionPause();
     }
@@ -157,6 +168,10 @@ void JobManager::pauseJob() {
 void JobManager::resumeJob() {
     if (status.state == JOB_PAUSED) {
         status.state = JOB_RUNNING;
+        if (pause_start_time > 0) {
+            stats.pause_duration_ms += millis() - pause_start_time;
+            pause_start_time = 0;
+        }
         logInfo("[JOB] Resumed");
         motionResume();
     }
@@ -170,8 +185,64 @@ void JobManager::abortJob() {
     
     motionStop(); // FIX: Now compiles because motion.h is included
     
+    // Log stats even on abort
+    logJobComplete();
+    
     logWarning("[JOB] Aborted");
 }
 
 job_status_t JobManager::getStatus() { return status; }
 bool JobManager::isRunning() { return status.state == JOB_RUNNING; }
+
+job_stats_t JobManager::getJobStats() {
+    stats.elapsed_ms = status.duration_ms;
+    if (status.state == JOB_RUNNING || status.state == JOB_PAUSED) {
+        stats.elapsed_ms = millis() - status.start_time;
+    }
+    return stats;
+}
+
+void JobManager::recordMove(float distance_mm) {
+    stats.move_count++;
+    stats.total_distance_mm += distance_mm;
+}
+
+void JobManager::recordAlarm() {
+    stats.alarm_count++;
+}
+
+void JobManager::logJobComplete() {
+    if (!sdCardIsMounted()) return;
+
+    stats.elapsed_ms = status.duration_ms;
+
+    bool needs_header = !sdCardFileExists("/jobs/job_log.csv");
+
+    File f = SD.open("/jobs/job_log.csv", FILE_APPEND);
+    if (!f) return;
+
+    if (needs_header) {
+        f.println("filename,lines,moves,distance_mm,elapsed_ms,pauses,pause_ms,alarms,state");
+    }
+
+    const char* state_str = "UNKNOWN";
+    switch (status.state) {
+        case JOB_COMPLETED: state_str = "COMPLETED"; break;
+        case JOB_ERROR:     state_str = "ERROR"; break;
+        case JOB_IDLE:      state_str = "ABORTED"; break;
+        default:            state_str = "OTHER"; break;
+    }
+
+    f.printf("%s,%lu,%lu,%.1f,%lu,%lu,%lu,%lu,%s\n",
+             status.filename,
+             (unsigned long)status.current_line,
+             (unsigned long)stats.move_count,
+             stats.total_distance_mm,
+             (unsigned long)stats.elapsed_ms,
+             (unsigned long)stats.pause_count,
+             (unsigned long)stats.pause_duration_ms,
+             (unsigned long)stats.alarm_count,
+             state_str);
+    f.close();
+    logInfo("[JOB] Stats logged to /jobs/job_log.csv");
+}

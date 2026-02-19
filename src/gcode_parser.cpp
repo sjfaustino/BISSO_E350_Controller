@@ -26,8 +26,10 @@
 
 GCodeParser gcodeParser;
 
-GCodeParser::GCodeParser() : distanceMode(G_MODE_ABSOLUTE), currentFeedRate(50.0f), currentWCS(WCS_G54), machineCoordinatesMode(false), programPaused(false), pauseStartTime(0) {
+GCodeParser::GCodeParser() : distanceMode(G_MODE_ABSOLUTE), currentFeedRate(50.0f), currentWCS(WCS_G54), machineCoordinatesMode(false), programPaused(false), pauseStartTime(0), dryRunMode(false) {
     memset(wcs_offsets, 0, sizeof(wcs_offsets));
+    memset(&dryRunResult, 0, sizeof(dryRunResult));
+    memset(dryRunLastPos, 0, sizeof(dryRunLastPos));
 }
 
 void GCodeParser::init() {
@@ -394,6 +396,38 @@ void GCodeParser::handleG4(const char* line) {
 }
 
 bool GCodeParser::pushMove(float x, float y, float z, float a) {
+    // --- DRY-RUN MODE: validate and track stats without actual motion ---
+    if (dryRunMode) {
+        dryRunResult.move_count++;
+
+        // Update bounding box
+        if (dryRunResult.move_count == 1) {
+            dryRunResult.min_x = dryRunResult.max_x = x;
+            dryRunResult.min_y = dryRunResult.max_y = y;
+            dryRunResult.min_z = dryRunResult.max_z = z;
+        } else {
+            if (x < dryRunResult.min_x) dryRunResult.min_x = x;
+            if (x > dryRunResult.max_x) dryRunResult.max_x = x;
+            if (y < dryRunResult.min_y) dryRunResult.min_y = y;
+            if (y > dryRunResult.max_y) dryRunResult.max_y = y;
+            if (z < dryRunResult.min_z) dryRunResult.min_z = z;
+            if (z > dryRunResult.max_z) dryRunResult.max_z = z;
+        }
+
+        // Accumulate distance
+        float dx = x - dryRunLastPos[0];
+        float dy = y - dryRunLastPos[1];
+        float dz = z - dryRunLastPos[2];
+        dryRunResult.total_distance_mm += sqrtf(dx*dx + dy*dy + dz*dz);
+
+        dryRunLastPos[0] = x;
+        dryRunLastPos[1] = y;
+        dryRunLastPos[2] = z;
+        dryRunLastPos[3] = a;
+        return true;
+    }
+
+    // --- NORMAL MODE ---
     if (configGetInt(KEY_MOTION_BUFFER_ENABLE, 0)) {
         if (!motionBuffer.isFull()) {
             motionBuffer.push(x, y, z, a, currentFeedRate);
@@ -408,6 +442,17 @@ bool GCodeParser::pushMove(float x, float y, float z, float a) {
             return false; 
         }
         return true;
+    }
+}
+
+void GCodeParser::setDryRun(bool enable) {
+    dryRunMode = enable;
+    if (enable) {
+        memset(&dryRunResult, 0, sizeof(dryRunResult));
+        // Initialize last pos to current machine position
+        for (int i = 0; i < 4; i++) {
+            dryRunLastPos[i] = motionGetPositionMM(i);
+        }
     }
 }
 

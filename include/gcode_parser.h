@@ -18,6 +18,18 @@ typedef enum {
     WCS_G54 = 0, WCS_G55, WCS_G56, WCS_G57, WCS_G58, WCS_G59
 } wcs_system_t;
 
+// Dry-run validation result
+typedef struct {
+    uint32_t total_lines;
+    uint32_t move_count;
+    uint32_t error_count;
+    float min_x, max_x;
+    float min_y, max_y;
+    float min_z, max_z;
+    float total_distance_mm;
+    char first_error[64];
+} dryrun_result_t;
+
 class GCodeParser {
 public:
     GCodeParser();
@@ -38,6 +50,11 @@ public:
     float getWorkPosition(uint8_t axis, float mpos);
     void getWCO(float* wco_array); 
     wcs_system_t getCurrentWCOSystem() { return currentWCS; }
+
+    // Dry-run mode (G-code validation without motion)
+    void setDryRun(bool enable);
+    bool isDryRun() const { return dryRunMode; }
+    dryrun_result_t getDryRunResult() const { return dryRunResult; }
 
 private:
     gcode_distance_mode_t distanceMode;
@@ -82,6 +99,11 @@ private:
     void loadWCS();
     void saveWCS(uint8_t system);
     bool pushMove(float x, float y, float z, float a);
+
+    // Dry-run state
+    bool dryRunMode;
+    dryrun_result_t dryRunResult;
+    float dryRunLastPos[4]; // Last known position for distance calc
 };
 
 extern GCodeParser gcodeParser;

@@ -24,6 +24,7 @@
 #include "web_server.h"
 #include "network_manager.h"
 #include "ota_manager.h" // Needed for otaCheckForUpdate at boot
+#include "api_ota_updater.h" // OTA rollback support
 #include "encoder_diagnostics.h"  // PHASE 5.3: Advanced encoder diagnostics
 #include "load_manager.h"  // PHASE 5.3: Graceful degradation under load
 #include "dashboard_metrics.h"  // PHASE 5.3: Web UI dashboard metrics
@@ -45,6 +46,12 @@
 
 static uint32_t boot_time_ms = 0;
 extern WebServerManager webServer;
+
+// OTA rollback validation timer callback
+static void otaValidationTimerCallback(TimerHandle_t xTimer) {
+    (void)xTimer;
+    otaValidateRunningFirmware();
+}
 
 extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
   static volatile bool handling = false;
@@ -275,6 +282,14 @@ void setup() {
   }
   
   logInfo("[BOOT] [OK] Complete in %lu ms", (unsigned long)(millis() - boot_time_ms));
+
+  // OTA Rollback: Validate firmware 60 seconds after boot
+  // If firmware crashes before this timer fires, ESP-IDF auto-reverts to previous partition
+  TimerHandle_t otaTimer = xTimerCreate("ota_valid", pdMS_TO_TICKS(60000), pdFALSE, NULL, otaValidationTimerCallback);
+  if (otaTimer) {
+      xTimerStart(otaTimer, 0);
+      logInfo("[OTA] Firmware validation timer started (60s)");
+  }
 }
 
 volatile uint32_t accumulated_loop_count = 0;
