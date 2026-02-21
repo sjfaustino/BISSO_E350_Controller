@@ -1,0 +1,74 @@
+/******************************************************************
+ *  FILE: FB18.AWL
+ *  PURPOSE: INCLBANC – Controls table hydraulics up/down based on inputs.
+ *  INPUTS: IW8 (Sensor?), DW44 (Mask), FW10 (Value?), I9.0-9.4 (Switches?)
+ *  OUTPUTS: F10.0-10.4 (Flags), Q7.3 (Hydraulic on), Q72.7/Q73.5-73.7 (Relays)
+ *  CALLED BY: OB1
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    INCLBANC
+
+//===============================================================
+// NETWORK 1 : Table Position Logic and Relay Control
+//===============================================================
+L    IW 8                // LOAD FROM INPUT WORD IW8 (Position sensor?)
+L    DW 44               // LOAD FROM DW44 FB18RO (Mask?)
+AW                       // AND WORD
+T    FW 50               // TRANSFER TO FW50 (Masked value)
+L    FW 10               // LOAD FROM FW10 (Previous?)
+L    DW 44               // LOAD FROM DW44
+AW                       // AND WORD
+L    FW 50               // LOAD FROM FW50
+><F                      // COMPARE NOT EQUAL FLOATING POINT
+=    F 10.0              // TURN ON F10.0 (Position changed flag)
+A    I 9.0               // IF I9.0 (Table switch 1?) IS ON
+=    F 11.0              // TURN ON F11.0
+A    I 9.1               // IF I9.1 IS ON
+=    F 11.1              // TURN ON F11.1
+A    I 9.2               // IF I9.2 IS ON
+=    F 11.2              // TURN ON F11.2
+A    I 9.3               // IF I9.3 IS ON
+=    F 11.3              // TURN ON F11.3
+A    I 9.4               // IF I9.4 IS ON
+=    F 11.4              // TURN ON F11.4
+A    I 9.1               // IF I9.1 IS ON
+A    I 9.0               // AND I9.0 IS ON
+AN   I 9.2               // AND I9.2 IS OFF
+=    F 10.1              // TURN ON F10.1 (Combo 1)
+A    I 9.2               // IF I9.2 IS ON
+A    I 9.0               // AND I9.0 IS ON
+AN   I 9.1               // AND I9.1 IS OFF
+=    F 10.2              // TURN ON F10.2 (Combo 2)
+A    I 9.3               // IF I9.3 IS ON
+AN   I 9.0               // AND I9.0 IS OFF
+AN   I 9.4               // AND I9.4 IS OFF
+=    F 10.3              // TURN ON F10.3 (Combo 3)
+A    I 9.4               // IF I9.4 IS ON
+AN   I 9.0               // AND I9.0 IS OFF
+AN   I 9.3               // AND I9.3 IS OFF
+=    F 10.4              // TURN ON F10.4 (Combo 4)
+A(                       
+O    F 10.1              // OR IF F10.1 IS ON
+O    F 10.2              // OR F10.2 IS ON
+O    F 10.3              // OR F10.3 IS ON
+O    F 10.4              // OR F10.4 IS ON
+)                        
+A    F 10.0              // AND F10.0 IS ON
+L    KT 120.2            // LOAD FROM CONSTANT KT120.2 = 12s
+SE   T 26                // START PULSE TIMER Tmr TableHidraulics (Timer 120s hidraulica das mesas) with 12s
+A    T 26                // IF T26 IS RUNNING
+=    Q 7.3               // TURN ON XXX_Q7.3 (Hydraulic pump?)
+A    F 10.1              // IF F10.1 IS ON
+A    Q 7.3               // AND Q7.3 IS ON
+=    Q 72.7              // TURN ON Rlay Tbl2_Down (Rele Exterior Baixar Mesa 2 (R3))
+A    F 10.2              // IF F10.2 IS ON
+A    Q 7.3               // AND Q7.3 IS ON
+=    Q 73.5              // TURN ON XXX_Q73.5 (??? Repetizione FC Avanzamento Indietro)
+A    F 10.3              // IF F10.3 IS ON
+A    Q 7.3               // AND Q7.3 IS ON
+=    Q 73.6              // TURN ON XXX_Q73.6 (??? Repetizione FC Translazione Sinistra)
+A    F 10.4              // IF F10.4 IS ON
+A    Q 7.3               // AND Q7.3 IS ON
+=    Q 73.7              // TURN ON Rlay Tbl1_Up (Rele Exterior Subir Mesa 1 (R4))
+BE                       // BLOCK END

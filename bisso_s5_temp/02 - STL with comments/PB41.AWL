@@ -1,0 +1,39 @@
+/******************************************************************
+ *  FILE: PB41.AWL
+ *  PURPOSE: Left/Right Manual Control – Translation with manipulo.
+ *  INPUTS: I2.4/2.5 (Right/Left), I5.0/5.1 (Limits), I3.6 (Fast)
+ *  OUTPUTS: Q6.1 (Contactor), F4.0/F4.1 (Dir), QW64 (Speed)
+ *  CALLED BY: PB11
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+A    F 1.6               // IF Enable IS ON
+S    Q 6.1               // TURN ON C4
+
+A    I 2.4               // IF Right IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+AN   I 5.0               // AND I5.0 IS OFF
+=    F 4.0               // TURN ON F4.0
+
+A    I 2.5               // IF Left IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+AN   I 5.1               // AND I5.1 IS OFF
+=    F 4.1               // TURN ON F4.1
+
+L    DW 9                // LOAD FROM DW9
+T    QW 64               // TRANSFER TO QW64
+
+A    T 7                 // IF T7 IS RUNNING
+AN   F 5.4               // AND F5.4 IS OFF
+A(                       
+O    I 2.4               // OR Right IS ON
+O    I 2.5               // OR Left IS ON
+)                        
+=    F 4.5               // TURN ON F4.5
+
+A    I 3.6               // IF Fast cmd IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 11               // LOAD FROM DW11
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

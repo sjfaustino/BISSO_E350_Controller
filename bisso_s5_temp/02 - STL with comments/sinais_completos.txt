@@ -1,0 +1,187 @@
+=================================================================
+SISTEMA: SERRA DE PONTE AUTOMÁTICA (PLC SIEMENS S5 - AWL)
+ARQUIVO: sinais_completos.txt
+DATA: 2025-11-02
+AUTOR: Grok (xAI) - Análise baseada em lógica STL + contexto mecânico
+=================================================================
+
+LEGENDAS:
+- I = Input (entrada física)
+- Q = Output (saída física)
+- F = Flag (bit de memória)
+- T = Timer
+- FW = Flag Word (16 bits)
+- DW = Data Word (16 bits)
+- IW = Input Word (leitura analógica/posição)
+- QW = Output Word (referência de velocidade VFD)
+- ?? = Nome inferido (não confirmado no código original)
+
+=================================================================
+ENTRADAS (I) - NOMES COMPLETOS
+=================================================================
+
+I 2.0    Cmd_Auto_Mode                    ; Botão Modo Automático
+I 2.1    Mnp_Front                        ; Manipulo Frente (Avanço)
+I 2.2    Mnp_Back                         ; Manipulo Trás (Recuo)
+I 2.3    Mnp_Left                         ; Manipulo Esquerda
+I 2.4    Mnp_Transl_Right                 ; Manipulo Translação Direita (46) → used in FB15 Network 3
+I 2.5    Mnp_Transl_Left                  ; Manipulo Translação Esquerda (47) → used in FB15 Network 3
+I 2.6    Mnp_Front                        ; Manipulo Avanço (48) → used in FB15 Network 2
+I 2.7    Mnp_Back                         ; Manipulo Recuo (49) → used in FB15 Network 2
+I 3.0    Mnp_Down                         ; Manipulo Baixar (Vertical)
+I 3.1    Mnp_Up                           ; Manipulo Subir (Vertical)
+I 3.2    Mnp_RotTable_CW                  ; Manipulo Rotação Mesa Horário
+I 3.3    Mnp_RotTable_CCW                 ; Manipulo Rotação Mesa Anti-Horário
+I 3.4    Mnp_Disk_Up                      ; Manipulo Rotação Disco Subir
+I 3.5    Mnp_Disk_Down                    ; Manipulo Rotação Disco Descer
+I 3.6    Cmd_Fast                         ; Botão Modo Rápido
+I 3.7    Cmd_Fast_Manual                  ; Botão Rápido (manual)
+
+I 4.5    Btn_Speed_Plus                   ; Botão Aumentar Velocidade
+I 4.6    Btn_Speed_Minus                  ; Botão Diminuir Velocidade
+
+I 5.0    FC_Right_Limit                   ; Fim de Curso Direita (Translação)
+I 5.1    FC_Left_Limit                    ; Fim de Curso Esquerda (Translação)
+I 5.2    FC_Front_Limit                   ; Fim de Curso Frente (Avanço)
+I 5.3    FC_Back_Limit                    ; Fim de Curso Trás (Recuo)
+I 5.4    FC_Down_Limit_Partial            ; Fim de Curso Baixo (Parcial)
+I 5.5    FC_Up_Limit_Partial              ; Fim de Curso Cima (Parcial)
+I 5.6    FC_Down_Limit_Full               ; Fim de Curso Baixo (Completo)
+I 5.7    FC_Up_Limit_Full                 ; Fim de Curso Cima (Completo)
+
+I 9.0    Btn_Table1_Up                    ; Botão Subir Mesa 1
+I 9.1    Btn_Table1_Down                  ; Botão Baixar Mesa 1
+I 9.2    Btn_Table2_Up                    ; Botão Subir Mesa 2
+I 9.3    Btn_Table2_Down                  ; Botão Baixar Mesa 2
+
+I 72.0   Elbo_Medium                      ; ELBO Médio (2°–5°)
+I 72.1   Cmd_Transl                       ; Comando Translação (X/Y)
+I 72.2   Cmd_Rot                          ; Comando Rotação/Inclinação
+I 72.3   Cmd_LockTable                    ; Trava da Mesa (ativa rotação)
+I 72.4   Elbo_Disk                        ; ELBO do Disco de Corte
+I 72.5   Elbo_Fast                        ; ELBO Rápido (>5°)
+I 72.6   Elbo_Slow                        ; ELBO Lento (<2°)
+I 72.7   Elbo_Emergency                   ; Emergência via ELBO (falha crítica)
+
+I 73.0   ??CNC_Consenso                   ; Consenso do Controlador CNC
+I 73.1   ??CNC_Home_Done                  ; Homing concluído
+
+=================================================================
+SAÍDAS (Q) - NOMES COMPLETOS
+=================================================================
+
+Q 6.0    Contactor_FwdRev                 ; Contator Avanço/Recuo (C3)
+Q 6.1    Contactor_LeftRight              ; Contator Esquerda/Direita (C4)
+Q 6.2    Contactor_UpDown_Partial         ; Contator Vertical Parcial (C5)
+Q 6.3    Contactor_UpDown_Full            ; Contator Vertical Completo (C6)
+Q 6.4    Contactor_RotTable               ; Contator Rotação Mesa (C7)
+Q 6.5    Contactor_DiskRot                ; Contator Rotação Disco (C9)
+
+Q 8.7    Table_Lock_Relay                 ; Trava da Mesa (ativa rotação)
+
+Q 72.7   Relay_Table2_Down                ; Relé Exterior Baixar Mesa 2 (R3)
+Q 73.5   Relay_Advance_Repeat             ; Repetição FC Avanço
+Q 73.6   Relay_Left_Repeat                ; Repetição FC Esquerda
+Q 73.7   Relay_Table1_Up                  ; Relé Exterior Subir Mesa 1 (R4)
+
+QW 64    VFD_Speed_Reference              ; Referência de Velocidade para VFD (0–16384)
+
+=================================================================
+FLAGS (F) - NOMES COMPLETOS
+=================================================================
+
+F 0.0    ??Mode_Auto                      ; Modo Automático
+F 0.1    ??Mode_Manual_Fwd                ; Manipulo Frente
+F 0.2    ??Mode_Manual_Rev                ; Manipulo Trás
+F 0.3    ??Mode_Manual_Left               ; Manipulo Esquerda
+F 0.4    Spianatura_Active                ; Nivelamento Automático Ativo
+F 0.5    ??Toggle_Clock                    ; T13 (0.5s) pulse – clock for F0.6/F1.2 flip-flop
+F 0.6    ??Toggle_State                    ; Flip-flop state latch (toggled by F0.5 clock)
+F 0.7    General_Enable                   ; Habilitação Geral
+
+F 1.2    ??Spianatura_Trigger             ; Dispara Spianatura
+F 1.6    ??System_Ready                   ; Sistema Pronto
+
+F 2.0    ??Speed_Plus_Active              ; +Vel Ativo
+F 2.1    ??Speed_Minus_Active             ; -Vel Ativo
+F 2.2    ??Speed_Adjusting                ; Ajuste de Velocidade
+F 2.3    ??Speed_Up_Pressed               ; Botão +Vel
+F 2.4    ??Speed_Down_Pressed             ; Botão -Vel
+
+F 3.0    ??Auto_Mode_Active               ; Modo Auto Completo
+F 3.2    ??Fast_Mode_Active               ; Velocidade Alta
+F 3.3    ??Medium_Mode_Active             ; Velocidade Média
+F 3.4    ??Medium_Mode_Override           ; Força Média
+F 3.5    ??Speed_Plus_Flag                ; Flag +Vel
+F 3.6    ??Speed_Minus_Flag               ; Flag -Vel
+
+F 4.0    ??Direction_Forward_Active       ; Direção Positiva
+F 4.1    ??Direction_Reverse_Active       ; Direção Negativa
+F 4.5    ??Movement_Active                ; Movimento em Andamento
+
+F 5.0    ??All_Axes_Stopped               ; Todos Eixos Parados
+F 5.4    ??General_Fault                  ; Falha Geral
+
+F 6.0    ??Axis_FwdRev_Selected           ; Eixo Avanço/Recuo Selecionado
+F 6.1    ??Axis_LeftRight_Selected        ; Eixo Translação Selecionado
+F 6.3    ??Speed_Edit_Mode                ; Speed parameter editing mode (set by 3x I3.7 press in 2s)
+F 6.4    ??Axis_FwdRev_Active             ; Eixo Avanço/Recuo Ativo
+F 6.5    ??Axis_UpDown_Active             ; Eixo Vertical Ativo
+F 6.6    ??Axis_LeftRight_Active          ; Eixo Translação Ativo
+F 6.7    ??Axis_RotTable_Active           ; Rotação Mesa Ativa
+
+F 10.0   ??Position_Changed               ; Posição Alterada
+F 10.1   ??Table1_Up_Active               ; Mesa 1 Subir
+F 10.2   ??Table1_Down_Active             ; Mesa 1 Baixar
+F 10.3   ??Table2_Up_Active               ; Mesa 2 Subir
+F 10.4   ??Table2_Down_Active             ; Mesa 2 Baixar
+
+=================================================================
+TIMERS (T) - NOMES COMPLETOS
+=================================================================
+
+T 7      ??Ramp_Delay_Timer               ; Rampa de Aceleração (1-2s)
+T 8      ??Table_Lock_Debounce            ; Debounce Trava Mesa
+T 12     ??Ramp_Forward_Timer             ; Rampa Avanço
+T 16     ??Ramp_Reverse_Timer             ; Rampa Recuo
+T 18     ??Speed_Adjust_Timer             ; Debounce Velocidade
+T 26     ??Hydraulic_Pulse_Timer          ; Pulso Hidráulico 12s
+
+=================================================================
+DATA WORDS (DW) - VELOCIDADES (em DB10)
+=================================================================
+
+DW 0     Speed_Base                       ; Velocidade Base (0%)
+DW 1     Speed_Level_1                    ; Nível 1 (~10%)
+DW 2     Speed_Level_2                    ; Nível 2 (~20%)
+DW 3     Speed_Medium                     ; Velocidade Média (~30%)
+DW 4     Speed_High                       ; Velocidade Alta (~40%)
+DW 5     Speed_Max                        ; Velocidade Máxima (~50%)
+DW 6     Speed_Auto_Medium                ; Auto Médio
+DW 7     Speed_Auto_High                  ; Auto Alto
+DW 8     Speed_Auto_Max                   ; Auto Máximo
+DW 9     Speed_Transl_Base                ; Translação Base
+DW 10    Speed_Transl_High                ; Translação Alta
+DW 11    Speed_Transl_Max                 ; Translação Máxima
+DW 12    Speed_RotTable_Base              ; Rotação Mesa Base
+DW 13    Speed_RotTable_Fast              ; Rotação Rápida
+DW 14    Speed_RotTable_Ultra             ; Rotação Ultra
+DW 18    Speed_Zero                       ; Velocidade Zero (parada)
+
+=================================================================
+FLAG WORDS (FW) - TEMPOS DE RAMPA
+=================================================================
+
+FW 22    Ramp_Time_Reverse                ; Tempo de rampa recuo (ms)
+FW 24    Ramp_Time_Forward                ; Tempo de rampa avanço (ms)
+FW 26    ??Ramp_Time_Temp                 ; Rampa temporária (posição)
+
+=================================================================
+INPUT WORDS (IW)
+=================================================================
+
+IW 8     CNC_Position_Feedback            ; Posição atual do controlador CNC
+
+=================================================================
+FIM DO ARQUIVO
+=================================================================

@@ -1,0 +1,16 @@
+/******************************************************************
+ *  FILE: FB241.AWL
+ *  PURPOSE: COD:16 – 16-bit code conversion (dual to BCD or vice versa).
+ *  INPUTS: DUAL (Input Word – Binary/dual value)
+ *  OUTPUTS: SBCD (Signed flag), BCD2 (High BCD byte), BCD1 (Low BCD word)
+ *  CALLED BY: FB10 (CALC1), FB11 (CALC2)
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    COD:16
+DECL:    DUAL    IW      // DECLARE INPUT WORD DUAL (Binary input value)
+DECL:    SBCD    QBI     // DECLARE OUTPUT BIT INDICATOR SBCD (Signed BCD flag)
+DECL:    BCD2    QBY     // DECLARE OUTPUT BYTE BCD2 (High BCD digits)
+DECL:    BCD1    QW      // DECLARE OUTPUT WORD BCD1 (Low BCD digits)
+
+BE                       // BLOCK END (System block – no user code; internal BCD conversion)

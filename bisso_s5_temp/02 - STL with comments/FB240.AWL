@@ -1,0 +1,15 @@
+/******************************************************************
+ *  FILE: FB240.AWL
+ *  PURPOSE: COD:B4 – Converts BCD to binary (4 digits). Standard S5 block.
+ *  INPUTS: BCD (Input Word – BCD value)
+ *  OUTPUTS: SBCD (Signed flag), DUAL (Binary output)
+ *  CALLED BY: Possibly custom blocks for display/conversion.
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    COD:B4
+DECL:    BCD     IW      // DECLARE INPUT WORD BCD (BCD input value)
+DECL:    SBCD    IBI     // DECLARE INPUT BYTE INDICATOR SBCD (Signed BCD flag)
+DECL:    DUAL    QW      // DECLARE OUTPUT WORD DUAL (Converted binary)
+
+BE                       // BLOCK END (System block – no user code; internal conversion logic)

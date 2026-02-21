@@ -1,0 +1,45 @@
+/******************************************************************
+ *  FILE: PB32.AWL
+ *  PURPOSE: Full Auto Tilt/Vertical – Similar to PB30 but with different speed levels.
+ *  INPUTS: I72.5/72.6 (Elbo), I5.6/5.7 (Limits), I72.2 (Cmd Rot)
+ *  OUTPUTS: Q6.3 (Contactor), F4.0/F4.1 (Dir), QW64 (Speed)
+ *  CALLED BY: PB30
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+A    F 1.6               // IF Enable IS ON
+S    Q 6.3               // TURN ON C6
+
+A    I 72.5              // IF Elbo Fast IS ON
+AN   I 5.6               // AND I5.6 IS OFF
+AN   F 5.4               // AND F5.4 IS OFF
+A    I 72.2              // AND Cmd Rot IS ON
+=    F 4.0               // TURN ON F4.0
+
+A    I 72.6              // IF Elbo Slow IS ON
+AN   I 5.7               // AND I5.7 IS OFF
+A    I 72.2              // AND Cmd Rot IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+A    F 0.7               // AND F0.7 IS ON
+=    F 4.1               // TURN ON F4.1
+
+L    DW 6                // LOAD FROM DW6
+T    QW 64               // TRANSFER TO QW64
+
+A    T 7                 // IF T7 IS RUNNING
+AN   F 5.4               // AND F5.4 IS OFF
+A    I 72.2              // AND Cmd Rot IS ON
+A    I 72.7              // OR I72.7 IS ON
+=    F 4.5               // TURN ON F4.5
+
+A    I 73.0              // IF I73.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 7                // LOAD FROM DW7
+T    QW 64               // TRANSFER TO QW64
+A    I 73.1              // IF I73.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 8                // LOAD FROM DW8
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

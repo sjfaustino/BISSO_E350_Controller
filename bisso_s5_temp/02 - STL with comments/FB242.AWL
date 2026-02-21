@@ -1,0 +1,17 @@
+/******************************************************************
+ *  FILE: FB242.AWL
+ *  PURPOSE: MUL:16 – 16-bit integer multiplication.
+ *  INPUTS: Z1 (Multiplicand), Z2 (Multiplier)
+ *  OUTPUTS: Z3=0 (Zero flag), Z32 (High word result), Z31 (Low word result)
+ *  CALLED BY: Possibly for speed calculations in other FBs.
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    MUL:16
+DECL:    Z1      IW      // DECLARE INPUT WORD Z1 (Multiplicand)
+DECL:    Z2      IW      // DECLARE INPUT WORD Z2 (Multiplier)
+DECL:    Z3=0    QBI     // DECLARE OUTPUT BIT INDICATOR Z3=0 (Result zero flag)
+DECL:    Z32     QW      // DECLARE OUTPUT WORD Z32 (High 16 bits of 32-bit product)
+DECL:    Z31     QW      // DECLARE OUTPUT WORD Z31 (Low 16 bits of 32-bit product)
+
+BE                       // BLOCK END (System block – no user code; internal multiplication)

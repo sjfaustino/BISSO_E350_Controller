@@ -1,0 +1,160 @@
+	I 72.0	Elbo Fast	Sinal Elbo Rapido
+	I 72.1	Elbo Medium	Sinal Elbo Medio
+	I 72.2	Cmd Rot	Manipulo Rotacao
+	I 72.3	Cmd LockTable	Manipulo Trancar Mesa
+	I 72.4	Pressostato	Pressostato agua
+	I 72.5	VFD1_IsRunning	Variador 1 em Run
+	I 72.6	VFD2_IsRunning	Variador 2 em Run
+	I 72.7	VFDDisk_IsRunning	Variador do Disco em Run
+	I 73.0	Elbo I73.0	??? Sinal Elbo Eixo Corte
+	I 73.1	Elbo I73.1	??? Sinal Elbo Eixo Translacao
+	I 73.2	Elbo I73.2	??? Sinal Elbo Eixo Cala
+	I 73.3	Elbo I73.3	??? Sinal Elbo Eixo Rotacao Mesa
+	I 73.4	----Elbo_I73.4	??? Sinal Elbo Eixo Rotacao Disco
+	I 73.5	Elbo I73.5	??? Sinal Elbo Direcao "+"
+	I 73.6	Elbo I73.6	??? Sinal Elbo Direcao "-"
+	I 73.7	Elbo I73.7	??? Sinal Elbo V/S
+			
+	Q 72.0	Lamp ProgActiv	Luz Programa Activo (37)
+	Q 72.1	Lamp Disc_ON	Luz motor disco (38)
+	Q 72.2	Lamp FC	Luz Fim de Curso (39)
+	Q 72.3	----Lamp Inv1_OFF	Luz Inverter 1 em erro (40)
+	Q 72.4	Lamp Inv2_OFF	Luz Inverter 2 em erro (41)
+	Q 72.5	Rlay Tbl1_Down	Rele Exterior Baixar Mesa 1 (R1)
+	Q 72.6	Rlay Tbl1_Up	Rele Exterior Subir Mesa 1 (R2)
+	Q 72.7	Rlay Tbl2_Down	Rele Exterior Baixar Mesa 2 (R3)
+	Q 73.0	XXX_Q73.0	??? Consenso a Elbo per cala automatica
+	Q 73.1	XXX_Q73.1	??? Consenso a Elbo per Translaz automat
+	Q 73.2	XXX_Q73.2	??? Consenso a Elbo per Spianatura Autom
+	Q 73.3	XXX_Q73.3	??? Consenso a Elbo per Autom./Manuale
+	Q 73.4	XXX_Q73.4	??? Repetizione FC Avanzamento Avanti
+	Q 73.5	XXX_Q73.5	??? Repetizione FC Avanzamento Indietro
+	Q 73.6	XXX_Q73.6	??? Repetizione FC Translazione Sinistra
+	Q 73.7	Rlay Tbl2_Up	Rele Exterior Subir Mesa 2 (R4)
+			
+	I 2.0	Mnp Prog_M	Manipulo Programa Manual (42)
+	I 2.1	Mnp Prog_T	Manipulo Programa Translacao (43)
+	I 2.2	Mnp Prog_CT	Manipulo Prog. Passagens Translacao (44)
+	I 2.3	Mnp Prog_C	Manipulo Programa Passagens (45)
+	I 2.4	Mnp Right	Manipulo Translacao Direita (46)
+	I 2.5	Mnp Left	Manipulo Translacao Esquerda (47)
+	I 2.6	Mnp Front	Manipulo Avanco (48)
+	I 2.7	Mnp Back	Manipulo Recuo  (49)
+			
+	I 3.0	Mnp Down	Manipulo Baixar (51)
+	I 3.1	Mnp Up	Manipulo Subir (52)
+	I 3.2	Mnp RotMesHor	Manipulo Rotacao Mesa Horario (53)
+	I 3.3	Mnp RotMesAnt	Manipulo Rotacao Mesa Anti-Horario (54)
+	I 3.4	Mnp RotDskDown	Manipulo Rotacao Disco para baixo
+	I 3.5	Mnp RotDskUp	Manipulo Rotaao Disco para cima
+	I 3.6	Mnp FastAll	Manipulo Todos movimentos Rapidos (55)
+	I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)
+			
+	I 4.0	Mnp Disk_ON	Manipulo Ligar Disco (57)
+	I 4.1	Mnp Disk_OFF	Manipulo Desligar Disco (58)
+	I 4.2	Mnp StarDelta-VFD	Manipulo Estrela-Triangulo/Variador (59)
+	I 4.3	Mnp Tilt-Vertical	Manipulo Inclinado Vertical (60)
+	I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)
+	I 4.5	Mnp + Speed	Manipulo Aumentar Velocidade (62)
+	I 4.6	Mnp - Speed	Manipulo Diminuir Velocidade (63)
+	I 4.7	Mnp Laser	Manipulo Ligar/desligar Laser (64)
+			
+	I 5.0	FC Right	Fim de Curso Mov. Direita (65)
+	I 5.1	FC Left	Fim de Curso Mov. Esquerda (66)
+	I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)
+	I 5.3	FC Back	Fim de Curso Mov. Recuo (68)
+	I 5.4	FC Down	Fim de Curso Mov. Descida (69)
+	I 5.5	FC Up	Fim de Curso Mov. Subida (70)
+	I 5.6	FC Tilt_Down	Fim de Curso Mov. Inclinado Descida (71)
+	I 5.7	FC Tilt_Up	Fim de Curso Mov. Inclinado Subida (72)
+			
+	Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)
+	Q 6.1	Cnt Left/Right	Contactor Translacao (C4)
+	Q 6.2	Cnt Up/Down	Contactor Vertical (C5)
+	Q 6.3	Cnt Tilt	Contactor Inclinado (C7)
+	Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)
+	Q 6.5	Cnt RotDsk	Contactor Rotacao Disco (C10)
+	Q 6.6	Cnt Disk_Star	Contactor Motor Disco em Estrela (RL1)
+	Q 6.7	Cnt Disk_Delta	Contactor Motor Disco em Triangulo (RL3)
+			
+	Q 7.0	Cnt RL2	Contacor Motor Disco Linha (RL2)
+	Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)
+	Q 7.2	Cnt Laser	Contactor Laser (C8)
+	Q 7.3	Cnt Oil_Pump	Rele Hidraulica para mesas
+	Q 7.4	XXX_PowerOn	Tensao Auxiliar
+	Q 7.5	XXX_Q7.5	??? Nao Utilizado
+	Q 7.6	Cnt Inv1	Contactor Inversor 1 (C1)
+	Q 7.7	Cnt Inv2	Contactor Inversor 2 (C2)
+			
+	IW 8	XXX_IW8	
+			
+	Q 8.0	Inv1_Fwd	Comando FWD do Inverter 1
+	Q 8.1	Inv1_Rev	Comando REV do Inverter 1
+	Q 8.2	XXX_Q8.2	
+	Q 8.3	XXX_Q8.3	
+	Q 8.4	Inv2_Fwd	Comando FWD do Inverter 2
+	Q 8.5	Inv2_Rev	Comando REV do Inverter 2
+	Q 8.6	XXX_Q8.6	
+	Q 8.7	LockTable	Tranca da mesa
+			
+	QW 64	XXX_QW64	
+	QW 66	XXX_QW66	
+			
+	I 9.0	FC Table2_Axle	??? Fim de Curso Eixo Mesa 2
+	I 9.1	Mnp Table1_Up	Manipulo subir mesa 1
+	I 9.2	Mnp Table1_Down	Manipulo baixar mesa 1
+	I 9.3	Mnp Table2_Up	Manipulo subir mesa 2
+	I 9.4	Mnp Table2_Down	Manipulo baixar mesa 2
+			
+	F 2.3	F + Speed	
+	F 2.4	F - Speed	
+			
+	F 3.2	F PB20 3.2	
+	F 3.3	F PB20 3.3	
+	F 3.4	F PB20 3.4	
+			
+	F 4.6	F FB12 4.6	
+			
+	F 5.6	F FB12 5.6	
+	F 5.7	F FB13 5.7	
+			
+	F 6.0	F PB10 6.0	
+	F 6.1	F PB10 6.1	
+	F 6.2	F PB10 6.2	
+	F 6.4	F PB11 6.4	
+	F 6.5	F PB11 6.5	
+	F 6.6	F PB11 6.6	
+	F 6.7	F PB11 6.7	
+			
+	F 7.0	F FB15 7.0	
+	F 7.1	F FB15 7.1	
+	F 7.2	F FB15 7.2	
+	F 7.3	F FB15 7.3	
+	F 7.4	F FB15 7.4	
+	F 7.5	F FB15 7.5	
+	F 7.6	F FB15 7.6	
+	F 7.7	F FB15 7.7	
+			
+	F 8.0	F FB15 8.0	
+	F 8.1	F FB15 8.1	
+	F 8.2	F FB15 8.2	
+	F 8.4	F FB11 8.4	
+	F 8.5	F FB11 8.5	
+	F 8.6	F FB11 8.6	
+			
+	F 9.0	F FB10 9.0	
+	F 9.2	F FB12 9.2	
+			
+	FW 10	F FB18 FW10	
+	F 10.0	F FB18 F10.0	
+	F 10.1	F FB18 F10.1	
+	F 10.2	F FB18 F10.2	
+	F 10.3	F FB18 F10.3	
+	F 10.4	F FB18 F10.4	
+	F 11.0	F FC Table2_Axle	
+	F 11.1	F Table1_Up	
+	F 11.2	F Table1_Down	
+	F 11.3	F Table2_Up	
+	F 11.4	F Table2_Down	
+			
+

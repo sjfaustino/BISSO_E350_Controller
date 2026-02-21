@@ -1,0 +1,20 @@
+/******************************************************************
+ *  FILE: FB243.AWL
+ *  PURPOSE: DIV:16 – 16-bit integer division.
+ *  INPUTS: Z1 (Dividend), Z2 (Divisor)
+ *  OUTPUTS: OV (Overflow), FEH (Error), Z3=0/Z4=0 (Zero flags), Z3 (Quotient), Z4 (Remainder)
+ *  CALLED BY: FB10 (CALC1), FB11 (CALC2), FB16 (SCALAR)
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    DIV:16
+DECL:    Z1      IW      // DECLARE INPUT WORD Z1 (Dividend)
+DECL:    Z2      IW      // DECLARE INPUT WORD Z2 (Divisor)
+DECL:    OV      QBI     // DECLARE OUTPUT BIT INDICATOR OV (Overflow flag)
+DECL:    FEH     QBI     // DECLARE OUTPUT BIT INDICATOR FEH (Division error flag)
+DECL:    Z3=0    QBI     // DECLARE OUTPUT BIT INDICATOR Z3=0 (Quotient zero flag)
+DECL:    Z4=0    QBI     // DECLARE OUTPUT BIT INDICATOR Z4=0 (Remainder zero flag)
+DECL:    Z3      QW      // DECLARE OUTPUT WORD Z3 (Quotient result)
+DECL:    Z4      QW      // DECLARE OUTPUT WORD Z4 (Remainder)
+
+BE                       // BLOCK END (System block – no user code; internal division)

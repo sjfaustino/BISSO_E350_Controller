@@ -1,0 +1,118 @@
+/******************************************************************
+ *  FILE: PB51.AWL
+ *  PURPOSE: Table Rotation Manual Control – Handles clockwise/anticlockwise rotation
+ *           of the table using manipulo inputs (I3.2/I3.3), with lock logic (Q8.7),
+ *           speed selection, and safety checks.
+ *  INPUTS: 
+ *      I3.2  – Mnp RotMesHor (Manipulo Rotacao Mesa Horario / Clockwise)
+ *      I3.3  – Mnp RotMesAnt (Manipulo Rotacao Mesa Anti-Horario / Anticlockwise)
+ *      I72.3 – Cmd LockTable (Sinal Trancar Mesa / Table Lock Command)
+ *      I72.5 – Elbo Fast (Sinal Elbo Rapido)
+ *      I72.6 – Elbo Slow (Sinal Elbo Lento)
+ *      I72.7 – Emergency / Override?
+ *      I73.0 – Fast mode / Spianatura related?
+ *      I73.1 – Secondary fast?
+ *      F0.4  – Spianatura mode active
+ *      F1.6  – General Enable (Habilita Movimentos)
+ *      F5.4  – General Error / Fault flag
+ *      T7    – Delay/Ramp timer (shared)
+ *      T8    – Table lock debounce timer
+ *  OUTPUTS:
+ *      Q6.4  – Contactor Rotacao Mesa (C7 – Table Rotation Contactor)
+ *      Q8.7  – Table Lock Relay (Trava Mesa)
+ *      F4.0  – Direction: Clockwise
+ *      F4.1  – Direction: Anticlockwise
+ *      F4.5  – Movement Active Flag
+ *      QW64  – Speed Reference to VFD (0–16384 → 0–100%)
+ *  CALLED BY: PB11 → when Q6.4 is active and manual mode
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+//===============================================================
+// NETWORK 1 : Table Lock Control (Q8.7) with Debounce
+//===============================================================
+A    F 1.6               // IF General Enable IS ON
+AN   Q 8.7               // AND Table Lock IS OFF
+S    Q 8.7               // TURN ON Q8.7 (Engage table lock)
+
+AN   T 8                 // IF T8 (Debounce timer) IS OFF
+BEC                      // BLOCK END CONDITIONAL (skip activation if timer not ready)
+
+A    T 8                 // IF T8 IS RUNNING (debounce complete)
+A    Q 8.7               // AND Q8.7 IS ON
+A    F 1.6               // AND Enable IS ON
+S    Q 6.4               // TURN ON C7 – Contactor Rotacao Mesa (start rotation)
+
+//===============================================================
+// NETWORK 2 : Direction Detection – Clockwise (F4.0)
+//===============================================================
+A    I 3.2               // IF Mnp RotMesHor (Clockwise) IS ON
+AN   F 5.4               // AND No Fault
+AN   I 72.3              // AND Cmd LockTable IS OFF
+O                        // OR
+AN   F 5.4               // IF No Fault
+A    I 72.3              // AND Cmd LockTable IS ON
+A    I 72.5              // AND Elbo Fast IS ON
+=    F 4.0               // TURN ON F4.0 → Clockwise direction active
+
+//===============================================================
+// NETWORK 3 : Direction Detection – Anticlockwise (F4.1)
+//===============================================================
+A    I 3.3               // IF Mnp RotMesAnt (Anticlockwise) IS ON
+AN   F 5.4               // AND No Fault
+AN   I 72.3              // AND Cmd LockTable IS OFF
+O                        // OR
+AN   F 5.4               // IF No Fault
+A    I 72.3              // AND Cmd LockTable IS ON
+A    I 72.6              // AND Elbo Slow IS ON
+=    F 4.1               // TURN ON F4.1 → Anticlockwise direction active
+
+//===============================================================
+// NETWORK 4 : Base Speed Output
+//===============================================================
+L    DW 12               // LOAD FROM DW 12 → Speed Level 12 (Table rotation base speed)
+T    QW 64               // TRANSFER TO QW64 → VFD analog reference
+
+//===============================================================
+// NETWORK 5 : Movement Active Flag (F4.5) – Ramp & Safety
+//===============================================================
+A    T 7                 // IF T7 (Ramp delay timer) IS RUNNING
+AN   F 5.4               // AND No Fault
+A(                       
+O    I 3.2               // OR Clockwise button pressed
+O    I 3.3               // OR Anticlockwise button pressed
+O(                       
+A    I 72.7              // OR Emergency override
+A    I 72.3              // AND Cmd LockTable
+)                        
+)                        
+=    F 4.5               // TURN ON F4.5 → Movement in progress
+
+//===============================================================
+// NETWORK 6 : Fast Mode / Spianatura Override – Speed Level 13
+//===============================================================
+AN   I 72.3              // IF Cmd LockTable IS OFF
+A    I 3.6               // AND Fast command (I3.6) IS ON
+AN   F 0.4               // AND Spianatura IS OFF
+O                        // OR
+A    I 73.0              // IF I73.0 (Fast mode) IS ON
+A    I 72.3              // AND Cmd LockTable IS ON
+BEC                      // BLOCK END CONDITIONAL → Use higher speed
+
+L    DW 13               // LOAD FROM DW 13 → Speed Level 13 (Fast table rotation)
+T    QW 64               // TRANSFER TO QW64
+A    I 72.3              // IF Cmd LockTable IS ON
+A    I 73.1              // AND I73.1 (Secondary fast) IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 14               // LOAD FROM DW 14 → Speed Level 14 (Ultra-fast or override)
+T    QW 64               // TRANSFER TO QW64
+AN   F 0.4               // IF Spianatura IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 7 : Default Speed (Spianatura Mode or Fallback)
+//===============================================================
+L    DW 18               // LOAD FROM DW 18 → Min Speed or Deadband (fallback)
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

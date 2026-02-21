@@ -1,0 +1,42 @@
+/******************************************************************
+ *  FILE: PB33.AWL
+ *  PURPOSE: Up/Down Axis Control – Vertical movement with safety and ramp.
+ *  INPUTS: I3.0 (Down), I3.1 (Up), I5.6/5.7 (Limits), F5.4 (Error)
+ *  OUTPUTS: Q6.3 (Contactor Inclinacao), F4.0/F4.1 (Dir), QW64 (Speed)
+ *  CALLED BY: PB31
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+//===============================================================
+// NETWORK 1 : Up/Down Direction & Contactor
+//===============================================================
+A    F 1.6               // IF Enable IS ON
+S    Q 6.3               // TURN ON Contactor Inclinacao (C6)
+
+A    I 3.0               // IF Mnp Down IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+AN   I 5.6               // AND I5.6 (Limit down) IS OFF
+=    F 4.0               // TURN ON F4.0 (Down direction)
+
+A    I 3.1               // IF Mnp Up IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+AN   I 5.7               // AND I5.7 (Limit up) IS OFF
+=    F 4.1               // TURN ON F4.1 (Up direction)
+
+L    DW 6                // LOAD FROM DW Speed 6
+T    QW 64               // TRANSFER TO QW64
+
+A    T 7                 // IF T7 (Ramp delay) IS RUNNING
+AN   F 5.4               // AND F5.4 IS OFF
+A(                       
+O    I 3.0               // OR IF Down IS ON
+O    I 3.1               // OR Up IS ON
+)                        
+=    F 4.5               // TURN ON F4.5 (Movement active)
+
+A    I 3.6               // IF Fast cmd (I3.6) IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 8                // LOAD FROM DW Speed 8
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

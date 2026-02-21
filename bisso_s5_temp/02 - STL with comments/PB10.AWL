@@ -1,0 +1,81 @@
+/******************************************************************
+ *  FILE: PB10.AWL
+ *  PURPOSE: Axis/Program Selection Logic – Checks conditions and jumps to specific PB for axis control.
+ *  INPUTS: F5.0 (Axes stopped), F0.4 (Spianatura), I72.0-72.4 (Elbo signals), Q6.0-6.5 (Contactors)
+ *  OUTPUTS: F6.0-6.2 (Axis flags)
+ *  CALLED BY: OB1
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+//===============================================================
+// NETWORK 1 : Fwd/Rev Axis Check (Translation)
+//===============================================================
+AN   F 5.0               // IF F PB10 5.0 (All axes stopped) IS OFF
+AN   F 0.4               // AND IF F 0.4 (Spianatura mode enable) IS OFF
+A(                       
+O    I 72.0              // OR IF Elbo Fast (Sinal Elbo Rapido) IS ON
+O    I 72.2              // OR IF Cmd Rot (Manipulo Rotacao) IS ON
+)                        
+O    Q 6.0               // OR IF Contactor Avanco (C3) IS ON
+JC   PB 20               // JUMP CONDITIONAL TO PB20 (Fwd/Rev control)
+
+//===============================================================
+// NETWORK 2 : Tilt/Vertical Check
+//===============================================================
+A    I 72.2              // IF Cmd Rot IS ON
+AN   F 5.0               // AND IF F PB10 5.0 IS OFF
+O    Q 6.2               // OR IF Contactor Cala (C5) IS ON
+O    Q 6.3               // OR IF Contactor Inclinacao (C6) IS ON
+=    F 6.0               // TURN ON F6.0 (Tilt/Vertical flag)
+
+A    F 6.0               // IF F6.0 IS ON
+JC   PB 30               // JUMP CONDITIONAL TO PB30 (Tilt control)
+
+A    F 6.0               // IF F6.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 3 : Left/Right Axis Check (Translation)
+//===============================================================
+AN   F 5.0               // IF F PB10 5.0 IS OFF
+A    I 72.1              // AND IF Elbo Medium (Sinal Elbo Medio) IS ON
+O    Q 6.1               // OR IF Contactor Translacao (C4) IS ON
+=    F 6.1               // TURN ON F6.1 (Left/Right flag)
+
+A    F 6.1               // IF F6.1 IS ON
+JC   PB 40               // JUMP CONDITIONAL TO PB40 (Left/Right control)
+
+A    F 6.1               // IF F6.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 4 : Rot Table / Spianatura Check
+//===============================================================
+O(                       
+AN   F 5.0               // OR IF (F PB10 5.0 IS OFF
+A    I 72.3              // AND Cmd LockTable (Manipulo Trancar Mesa) IS ON
+AN   F 0.4               // AND F 0.4 IS OFF)
+)                        
+O    Q 6.4               // OR IF Contactor Rotacao Mesa (C7) IS ON
+O(                       
+AN   F 5.0               // OR IF (F PB10 5.0 IS OFF
+A    I 72.0              // AND Elbo Fast IS ON
+A    F 0.4               // AND F 0.4 IS ON)
+)                        
+=    F 6.2               // TURN ON F6.2 (Rot Table flag)
+
+A    F 6.2               // IF F6.2 IS ON
+JC   PB 50               // JUMP CONDITIONAL TO PB50 (Rot Table control)
+
+A    F 6.2               // IF F6.2 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 5 : Rot Disk Check
+//===============================================================
+AN   F 5.0               // IF F PB10 5.0 IS OFF
+A    I 72.4              // AND IF ----Elbo_I73.4 (??? Sinal Elbo Eixo Rotacao Disco) IS ON
+O    Q 6.5               // OR IF Contactor Rotacao Disco (C9) IS ON
+JC   PB 52               // JUMP CONDITIONAL TO PB52? (Assuming Rot Disk control, but PB52 not provided)
+
+BE                       // BLOCK END

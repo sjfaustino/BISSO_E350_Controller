@@ -1,0 +1,101 @@
+/******************************************************************
+ *  FILE: PB21.AWL
+ *  PURPOSE: Fwd/Rev Manual Control – Similar to PB20 but with manipulo priority.
+ *  INPUTS: I2.6/2.7 (Front/Back), I5.2/5.3 (Limits), I3.6/3.7 (Fast)
+ *  OUTPUTS: Q6.0 (Contactor), F4.0/F4.1 (Dir), QW64 (Speed)
+ *  CALLED BY: PB11
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+//===============================================================
+// NETWORK 1 : Contactor & Ramp Timers
+//===============================================================
+A    F 1.6               // IF Enable IS ON
+S    Q 6.0               // TURN ON C3
+
+A    Q 6.0               // IF C3 IS ON
+A    I 5.2               // AND I5.2 IS ON
+A    F 4.0               // AND F4.0 IS ON
+AN   I 3.6               // AND I3.6 IS OFF
+AN   I 3.7               // AND I3.7 IS OFF
+L    FW 24               // LOAD FROM FW24
+SP   T 12                // START T12
+
+A    Q 6.0               // IF C3 IS ON
+A    I 5.3               // AND I5.3 IS ON
+A    F 4.1               // AND F4.1 IS ON
+AN   I 3.6               // AND I3.6 IS OFF
+AN   I 3.7               // AND I3.7 IS OFF
+L    FW 24               // LOAD FROM FW24
+SP   T 16                // START T16
+
+//===============================================================
+// NETWORK 2 : Direction Logic
+//===============================================================
+A    I 2.6               // IF Front IS ON
+AN   I 5.2               // AND I5.2 IS OFF
+AN   F 5.4               // AND F5.4 IS OFF
+O                        // OR
+A    T 12                // IF T12 IS RUNNING
+A    I 5.2               // AND I5.2 IS ON
+A    F 4.0               // AND F4.0 IS ON
+A    I 2.6               // AND Front IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+=    F 4.0               // TURN ON F4.0
+
+A    I 2.7               // IF Back IS ON
+AN   I 5.3               // AND I5.3 IS OFF
+AN   F 5.4               // AND F5.4 IS OFF
+O                        // OR
+AN   F 5.4               // IF F5.4 IS OFF
+A    F 4.1               // AND F4.1 IS ON
+A    I 5.3               // AND I5.3 IS ON
+A    T 16                // AND T16 IS RUNNING
+A    I 2.7               // AND Back IS ON
+=    F 4.1               // TURN ON F4.1
+
+L    DW 0                // LOAD FROM DW0
+T    QW 64               // TRANSFER TO QW64
+
+A    T 7                 // IF T7 IS RUNNING
+AN   F 5.4               // AND F5.4 IS OFF
+A(                       
+O    I 2.6               // OR Front IS ON
+O    I 2.7               // OR Back IS ON
+)                        
+O                        // OR
+A    T 7                 // IF T7 IS RUNNING
+A(                       
+O    F 4.0               // OR F4.0 IS ON
+O    F 4.1               // OR F4.1 IS ON
+)                        
+AN   F 5.4               // AND F5.4 IS OFF
+A    F 4.5               // AND F4.5 IS ON
+=    F 4.5               // TURN ON F4.5
+
+//===============================================================
+// NETWORK 3 : End Detection
+//===============================================================
+A(                       
+O(                       
+AN   I 5.2               // IF I5.2 OFF AND
+AN   I 5.3               // I5.3 OFF
+)                        
+O(                       
+A    I 5.2               // OR I5.2 ON AND
+AN   F 4.0               // F4.0 OFF
+)                        
+O(                       
+A    I 5.3               // OR I5.3 ON AND
+AN   F 4.1               // F4.1 OFF
+)                        
+)                        
+A(                       
+O    I 3.6               // OR Fast cmd
+O    I 3.7               // OR Fast cmd
+)                        
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 1                // LOAD FROM DW1
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

@@ -1,0 +1,19 @@
+/******************************************************************
+ *  FILE: PB9.AWL
+ *  PURPOSE: Simple flag setting for speed buttons (+/-).
+ *  INPUTS: I4.5 (+Speed), I4.6 (-Speed)
+ *  OUTPUTS: F2.3 (+ flag), F2.4 (- flag)
+ *  CALLED BY: OB1 (in fast mode)
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+//===============================================================
+// NETWORK 1 : Set Speed Adjustment Flags
+//===============================================================
+A    I 4.5               // IF Manipulo Aumentar Velocidade (62) IS ON
+=    F 2.3               // TURN ON F + Speed (Flag +Speed pressed)
+
+A    I 4.6               // IF Manipulo Diminuir Velocidade (63) IS ON
+=    F 2.4               // TURN ON F - Speed (Flag -Speed pressed)
+
+BE                       // BLOCK END

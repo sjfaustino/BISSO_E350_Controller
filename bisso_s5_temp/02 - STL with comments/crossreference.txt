@@ -1,0 +1,1357 @@
+Address	Symbol	Comment	Block	Network	Position	Access	Instruction
+I 2.0	Mnp Prog_M	Manipulo Programa Manual (42)	OB 1	1	2	reading	A
+I 2.0	Mnp Prog_M	Manipulo Programa Manual (42)	OB 1	1	17	reading	ON
+I 2.0	Mnp Prog_M	Manipulo Programa Manual (42)	OB 1	6	0	reading	O
+I 2.0	Mnp Prog_M	Manipulo Programa Manual (42)	OB 1	6	1	reading	ON
+I 2.1	Mnp Prog_T	Manipulo Programa Translacao (43)	OB 1	1	21	reading	A
+I 2.1	Mnp Prog_T	Manipulo Programa Translacao (43)	OB 1	1	26	reading	ON
+I 2.2	Mnp Prog_CT	Manipulo Prog. Passagens Translacao (44)	OB 1	1	30	reading	A
+I 2.2	Mnp Prog_CT	Manipulo Prog. Passagens Translacao (44)	OB 1	1	34	reading	ON
+I 2.3	Mnp Prog_C	Manipulo Programa Passagens (45)	OB 1	1	38	reading	A
+I 2.3	Mnp Prog_C	Manipulo Programa Passagens (45)	OB 1	1	42	reading	ON
+I 2.4	Mnp Right	Manipulo Translacao Direita (46)	OB 1	1	4	reading	AN
+I 2.4	Mnp Right	Manipulo Translacao Direita (46)	PB 11	1	32	reading	O
+I 2.4	Mnp Right	Manipulo Translacao Direita (46)	PB 41	1	3	reading	A
+I 2.4	Mnp Right	Manipulo Translacao Direita (46)	PB 41	1	16	reading	O
+I 2.4	Mnp Right	Manipulo Translacao Direita (46)	FB 15	3	1	reading	O
+I 2.5	Mnp Left	Manipulo Translacao Esquerda (47)	OB 1	1	5	reading	AN
+I 2.5	Mnp Left	Manipulo Translacao Esquerda (47)	PB 11	1	33	reading	O
+I 2.5	Mnp Left	Manipulo Translacao Esquerda (47)	PB 41	1	7	reading	A
+I 2.5	Mnp Left	Manipulo Translacao Esquerda (47)	PB 41	1	17	reading	O
+I 2.5	Mnp Left	Manipulo Translacao Esquerda (47)	FB 15	3	2	reading	O
+I 2.6	Mnp Front	Manipulo Avanco (48)	OB 1	1	6	reading	AN
+I 2.6	Mnp Front	Manipulo Avanco (48)	PB 11	1	3	reading	O
+I 2.6	Mnp Front	Manipulo Avanco (48)	PB 21	1	16	reading	A
+I 2.6	Mnp Front	Manipulo Avanco (48)	PB 21	1	23	reading	A
+I 2.6	Mnp Front	Manipulo Avanco (48)	PB 21	1	41	reading	O
+I 2.6	Mnp Front	Manipulo Avanco (48)	FB 15	2	1	reading	O
+I 2.7	Mnp Back	Manipulo Recuo  (49)	OB 1	1	7	reading	AN
+I 2.7	Mnp Back	Manipulo Recuo  (49)	OB 1	10	16	reading	A
+I 2.7	Mnp Back	Manipulo Recuo  (49)	PB 11	1	4	reading	O
+I 2.7	Mnp Back	Manipulo Recuo  (49)	PB 21	1	26	reading	A
+I 2.7	Mnp Back	Manipulo Recuo  (49)	PB 21	1	34	reading	A
+I 2.7	Mnp Back	Manipulo Recuo  (49)	PB 21	1	42	reading	O
+I 2.7	Mnp Back	Manipulo Recuo  (49)	FB 15	2	2	reading	O
+I 3.0	Mnp Down	Manipulo Baixar (51)	OB 1	1	8	reading	AN
+I 3.0	Mnp Down	Manipulo Baixar (51)	PB 11	1	19	reading	O
+I 3.0	Mnp Down	Manipulo Baixar (51)	PB 31	1	6	reading	A
+I 3.0	Mnp Down	Manipulo Baixar (51)	PB 31	1	19	reading	O
+I 3.0	Mnp Down	Manipulo Baixar (51)	PB 33	1	2	reading	A
+I 3.0	Mnp Down	Manipulo Baixar (51)	PB 33	1	15	reading	O
+I 3.0	Mnp Down	Manipulo Baixar (51)	FB 15	4	1	reading	O
+I 3.1	Mnp Up	Manipulo Subir (52)	OB 1	1	9	reading	AN
+I 3.1	Mnp Up	Manipulo Subir (52)	PB 11	1	20	reading	O
+I 3.1	Mnp Up	Manipulo Subir (52)	PB 31	1	10	reading	A
+I 3.1	Mnp Up	Manipulo Subir (52)	PB 31	1	20	reading	O
+I 3.1	Mnp Up	Manipulo Subir (52)	PB 33	1	6	reading	A
+I 3.1	Mnp Up	Manipulo Subir (52)	PB 33	1	16	reading	O
+I 3.1	Mnp Up	Manipulo Subir (52)	FB 15	4	2	reading	O
+I 3.2	Mnp RotMesHor	Manipulo Rotacao Mesa Horario (53)	OB 1	1	10	reading	AN
+I 3.2	Mnp RotMesHor	Manipulo Rotacao Mesa Horario (53)	OB 1	8	15	reading	AN
+I 3.2	Mnp RotMesHor	Manipulo Rotacao Mesa Horario (53)	PB 11	1	45	reading	O
+I 3.2	Mnp RotMesHor	Manipulo Rotacao Mesa Horario (53)	PB 51	1	12	reading	A
+I 3.2	Mnp RotMesHor	Manipulo Rotacao Mesa Horario (53)	PB 51	1	35	reading	O
+I 3.2	Mnp RotMesHor	Manipulo Rotacao Mesa Horario (53)	FB 15	5	1	reading	O
+I 3.3	Mnp RotMesAnt	Manipulo Rotacao Mesa Anti-Horario (54)	OB 1	1	11	reading	AN
+I 3.3	Mnp RotMesAnt	Manipulo Rotacao Mesa Anti-Horario (54)	OB 1	8	16	reading	AN
+I 3.3	Mnp RotMesAnt	Manipulo Rotacao Mesa Anti-Horario (54)	PB 11	1	47	reading	O
+I 3.3	Mnp RotMesAnt	Manipulo Rotacao Mesa Anti-Horario (54)	PB 51	1	21	reading	A
+I 3.3	Mnp RotMesAnt	Manipulo Rotacao Mesa Anti-Horario (54)	PB 51	1	36	reading	O
+I 3.3	Mnp RotMesAnt	Manipulo Rotacao Mesa Anti-Horario (54)	FB 15	5	2	reading	O
+I 3.4	Mnp RotDskDown	Manipulo Rotacao Disco para baixo	OB 1	1	12	reading	AN
+I 3.4	Mnp RotDskDown	Manipulo Rotacao Disco para baixo	PB 11	1	59	reading	O
+I 3.4	Mnp RotDskDown	Manipulo Rotacao Disco para baixo	FB 15	6	1	reading	O
+I 3.5	Mnp RotDskUp	Manipulo Rotaao Disco para cima	OB 1	1	13	reading	AN
+I 3.5	Mnp RotDskUp	Manipulo Rotaao Disco para cima	PB 11	1	60	reading	O
+I 3.5	Mnp RotDskUp	Manipulo Rotaao Disco para cima	FB 15	6	2	reading	O
+I 3.6	Mnp FastAll	Manipulo Todos movimentos Rapidos (55)	PB 21	1	5	reading	AN
+I 3.6	Mnp FastAll	Manipulo Todos movimentos Rapidos (55)	PB 21	1	12	reading	AN
+I 3.6	Mnp FastAll	Manipulo Todos movimentos Rapidos (55)	PB 21	1	68	reading	O
+I 3.6	Mnp FastAll	Manipulo Todos movimentos Rapidos (55)	PB 31	1	23	reading	A
+I 3.6	Mnp FastAll	Manipulo Todos movimentos Rapidos (55)	PB 33	1	19	reading	A
+I 3.6	Mnp FastAll	Manipulo Todos movimentos Rapidos (55)	PB 41	1	20	reading	A
+I 3.6	Mnp FastAll	Manipulo Todos movimentos Rapidos (55)	PB 51	1	45	reading	A
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	OB 1	1	110	reading	A
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	OB 1	1	118	reading	A
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	PB 20	1	15	reading	AN
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	PB 20	1	34	reading	AN
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	PB 20	1	94	reading	O
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	PB 21	1	6	reading	AN
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	PB 21	1	13	reading	AN
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	PB 21	1	69	reading	O
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	FB 15	1	2	reading	A
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	FB 15	1	15	reading	A
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	FB 15	1	21	reading	AN
+I 3.7	Mnp FastCmd	Manipulo Botoneira Rapido (56)	FB 15	1	24	reading	A
+I 4.0	Mnp Disk_ON	Manipulo Ligar Disco (57)	OB 1	2	13	reading	A
+I 4.0	Mnp Disk_ON	Manipulo Ligar Disco (57)	OB 1	2	33	reading	A
+I 4.1	Mnp Disk_OFF	Manipulo Desligar Disco (58)	OB 1	2	23	reading	ON
+I 4.1	Mnp Disk_OFF	Manipulo Desligar Disco (58)	OB 1	2	40	reading	ON
+I 4.2	Mnp StarDelta-VFD	Manipulo Estrela-Triangulo/Variador (59)	OB 1	2	0	reading	A
+I 4.2	Mnp StarDelta-VFD	Manipulo Estrela-Triangulo/Variador (59)	OB 1	2	8	reading	AN
+I 4.2	Mnp StarDelta-VFD	Manipulo Estrela-Triangulo/Variador (59)	OB 1	2	31	reading	AN
+I 4.3	Mnp Tilt-Vertical	Manipulo Inclinado Vertical (60)	OB 1	6	11	reading	A
+I 4.3	Mnp Tilt-Vertical	Manipulo Inclinado Vertical (60)	OB 1	6	18	reading	AN
+I 4.3	Mnp Tilt-Vertical	Manipulo Inclinado Vertical (60)	FB 15	4	4	reading	AN
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	1	18	reading	ON
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	1	27	reading	ON
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	1	35	reading	ON
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	1	43	reading	ON
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	1	52	reading	ON
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	1	107	reading	AN
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	2	22	reading	ON
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	2	42	reading	ON
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	3	7	reading	A
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	7	13	reading	A
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	7	42	reading	ON
+I 4.4	Mnp Power	Manipulo Tensao Auxiliar (61)	OB 1	7	53	reading	AN
+I 4.5	Mnp + Speed	Manipulo Aumentar Velocidade (62)	OB 1	10	0	reading	A
+I 4.5	Mnp + Speed	Manipulo Aumentar Velocidade (62)	OB 1	10	5	reading	AN
+I 4.5	Mnp + Speed	Manipulo Aumentar Velocidade (62)	OB 1	10	40	reading	A
+I 4.5	Mnp + Speed	Manipulo Aumentar Velocidade (62)	PB 9	1	0	reading	A
+I 4.5	Mnp + Speed	Manipulo Aumentar Velocidade (62)	FB 15	1	78	reading	A
+I 4.5	Mnp + Speed	Manipulo Aumentar Velocidade (62)	FB 15	1	82	reading	AN
+I 4.6	Mnp - Speed	Manipulo Diminuir Velocidade (63)	OB 1	10	1	reading	AN
+I 4.6	Mnp - Speed	Manipulo Diminuir Velocidade (63)	OB 1	10	4	reading	A
+I 4.6	Mnp - Speed	Manipulo Diminuir Velocidade (63)	OB 1	10	43	reading	A
+I 4.6	Mnp - Speed	Manipulo Diminuir Velocidade (63)	PB 9	1	3	reading	A
+I 4.6	Mnp - Speed	Manipulo Diminuir Velocidade (63)	FB 15	1	79	reading	AN
+I 4.6	Mnp - Speed	Manipulo Diminuir Velocidade (63)	FB 15	1	83	reading	A
+I 4.7	Mnp Laser	Manipulo Ligar/desligar Laser (64)	OB 1	1	143	reading	AN
+I 4.7	Mnp Laser	Manipulo Ligar/desligar Laser (64)	OB 1	1	146	reading	A
+I 4.7	Mnp Laser	Manipulo Ligar/desligar Laser (64)	OB 1	1	151	reading	A
+I 5.0	FC Right	Fim de Curso Mov. Direita (65)	OB 1	5	10	reading	O
+I 5.0	FC Right	Fim de Curso Mov. Direita (65)	PB 40	1	3	reading	AN
+I 5.0	FC Right	Fim de Curso Mov. Direita (65)	PB 41	1	5	reading	AN
+I 5.1	FC Left	Fim de Curso Mov. Esquerda (66)	OB 1	5	11	reading	O
+I 5.1	FC Left	Fim de Curso Mov. Esquerda (66)	OB 1	5	52	reading	A
+I 5.1	FC Left	Fim de Curso Mov. Esquerda (66)	PB 40	1	8	reading	AN
+I 5.1	FC Left	Fim de Curso Mov. Esquerda (66)	PB 41	1	9	reading	AN
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	OB 1	5	3	reading	O
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	OB 1	5	42	reading	A
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 20	1	5	reading	A
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 20	1	10	reading	AN
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 20	1	18	reading	A
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 20	1	81	reading	AN
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 20	1	85	reading	A
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 21	1	3	reading	A
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 21	1	17	reading	AN
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 21	1	21	reading	A
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 21	1	55	reading	AN
+I 5.2	FC Fwd	Fim de Curso Mov. Frente (67)	PB 21	1	59	reading	A
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	OB 1	5	4	reading	O
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	OB 1	5	49	reading	A
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 20	1	23	reading	A
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 20	1	29	reading	AN
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 20	1	37	reading	A
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 20	1	82	reading	AN
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 20	1	89	reading	A
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 21	1	10	reading	A
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 21	1	27	reading	AN
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 21	1	32	reading	A
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 21	1	56	reading	AN
+I 5.3	FC Back	Fim de Curso Mov. Recuo (68)	PB 21	1	63	reading	A
+I 5.4	FC Down	Fim de Curso Mov. Descida (69)	OB 1	5	17	reading	O
+I 5.4	FC Down	Fim de Curso Mov. Descida (69)	PB 30	1	7	reading	AN
+I 5.4	FC Down	Fim de Curso Mov. Descida (69)	PB 31	1	8	reading	AN
+I 5.5	FC Up	Fim de Curso Mov. Subida (70)	OB 1	5	18	reading	O
+I 5.5	FC Up	Fim de Curso Mov. Subida (70)	PB 30	1	13	reading	AN
+I 5.5	FC Up	Fim de Curso Mov. Subida (70)	PB 31	1	12	reading	AN
+I 5.6	FC Tilt_Down	Fim de Curso Mov. Inclinado Descida (71)	OB 1	5	24	reading	O
+I 5.6	FC Tilt_Down	Fim de Curso Mov. Inclinado Descida (71)	PB 32	1	3	reading	AN
+I 5.6	FC Tilt_Down	Fim de Curso Mov. Inclinado Descida (71)	PB 33	1	4	reading	AN
+I 5.7	FC Tilt_Up	Fim de Curso Mov. Inclinado Subida (72)	OB 1	5	25	reading	O
+I 5.7	FC Tilt_Up	Fim de Curso Mov. Inclinado Subida (72)	PB 32	1	8	reading	AN
+I 5.7	FC Tilt_Up	Fim de Curso Mov. Inclinado Subida (72)	PB 33	1	8	reading	AN
+IW 8	XXX_IW8		FB 18	1	2	reading	L
+I 9.0	FC Table2_Axle	??? Fim de Curso Eixo Mesa 2	FB 18	1	12	reading	A
+I 9.0	FC Table2_Axle	??? Fim de Curso Eixo Mesa 2	FB 18	1	23	reading	A
+I 9.0	FC Table2_Axle	??? Fim de Curso Eixo Mesa 2	FB 18	1	27	reading	A
+I 9.0	FC Table2_Axle	??? Fim de Curso Eixo Mesa 2	FB 18	1	31	reading	AN
+I 9.0	FC Table2_Axle	??? Fim de Curso Eixo Mesa 2	FB 18	1	35	reading	AN
+I 9.1	Mnp Table1_Up	Manipulo subir mesa 1	FB 18	1	14	reading	A
+I 9.1	Mnp Table1_Up	Manipulo subir mesa 1	FB 18	1	22	reading	A
+I 9.1	Mnp Table1_Up	Manipulo subir mesa 1	FB 18	1	28	reading	AN
+I 9.2	Mnp Table1_Down	Manipulo baixar mesa 1	FB 18	1	16	reading	A
+I 9.2	Mnp Table1_Down	Manipulo baixar mesa 1	FB 18	1	24	reading	AN
+I 9.2	Mnp Table1_Down	Manipulo baixar mesa 1	FB 18	1	26	reading	A
+I 9.3	Mnp Table2_Up	Manipulo subir mesa 2	FB 18	1	18	reading	A
+I 9.3	Mnp Table2_Up	Manipulo subir mesa 2	FB 18	1	30	reading	A
+I 9.3	Mnp Table2_Up	Manipulo subir mesa 2	FB 18	1	36	reading	AN
+I 9.4	Mnp Table2_Down	Manipulo baixar mesa 2	FB 18	1	20	reading	A
+I 9.4	Mnp Table2_Down	Manipulo baixar mesa 2	FB 18	1	32	reading	AN
+I 9.4	Mnp Table2_Down	Manipulo baixar mesa 2	FB 18	1	34	reading	A
+I 72.0	Elbo Fast	Sinal Elbo Rapido	OB 1	5	30	reading	A
+I 72.0	Elbo Fast	Sinal Elbo Rapido	OB 1	5	36	reading	A
+I 72.0	Elbo Fast	Sinal Elbo Rapido	PB 10	1	3	reading	O
+I 72.0	Elbo Fast	Sinal Elbo Rapido	PB 10	1	40	reading	A
+I 72.0	Elbo Fast	Sinal Elbo Rapido	PB 20	1	11	reading	A
+I 72.0	Elbo Fast	Sinal Elbo Rapido	PB 20	1	30	reading	A
+I 72.0	Elbo Fast	Sinal Elbo Rapido	PB 20	1	66	reading	A
+I 72.0	Elbo Fast	Sinal Elbo Rapido	PB 50	1	20	reading	A
+I 72.0	Elbo Fast	Sinal Elbo Rapido	PB 50	1	37	reading	A
+I 72.1	Elbo Medium	Sinal Elbo Medio	PB 10	1	22	reading	A
+I 72.1	Elbo Medium	Sinal Elbo Medio	PB 40	1	5	reading	A
+I 72.1	Elbo Medium	Sinal Elbo Medio	PB 40	1	10	reading	A
+I 72.1	Elbo Medium	Sinal Elbo Medio	PB 40	1	16	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 10	1	4	reading	O
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 10	1	9	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 20	1	0	reading	AN
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 20	1	43	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 20	1	49	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 20	1	53	reading	AN
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 20	1	57	reading	AN
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 30	1	8	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 30	1	14	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 30	1	22	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 32	1	5	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 32	1	9	reading	A
+I 72.2	Cmd Rot	Manipulo Rotacao	PB 32	1	17	reading	A
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	OB 1	8	8	reading	AN
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	OB 1	8	14	reading	AN
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 10	1	34	reading	A
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 11	1	46	reading	O
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 50	1	12	reading	A
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 50	1	23	reading	A
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 50	1	34	reading	O
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 51	1	14	reading	AN
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 51	1	17	reading	A
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 51	1	23	reading	AN
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 51	1	26	reading	A
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 51	1	39	reading	A
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 51	1	44	reading	AN
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 51	1	49	reading	A
+I 72.3	Cmd LockTable	Manipulo Trancar Mesa	PB 51	1	54	reading	A
+I 72.4	Pressostato	Pressostato agua	PB 10	1	52	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	OB 1	5	37	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	PB 20	1	8	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	PB 20	1	44	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	PB 30	1	6	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	PB 32	1	2	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	PB 40	1	2	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	PB 50	1	13	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	PB 50	1	19	reading	A
+I 72.5	VFD1_IsRunning	Variador 1 em Run	PB 51	1	18	reading	A
+I 72.6	VFD2_IsRunning	Variador 2 em Run	PB 20	1	28	reading	A
+I 72.6	VFD2_IsRunning	Variador 2 em Run	PB 30	1	12	reading	A
+I 72.6	VFD2_IsRunning	Variador 2 em Run	PB 32	1	7	reading	A
+I 72.6	VFD2_IsRunning	Variador 2 em Run	PB 40	1	7	reading	A
+I 72.6	VFD2_IsRunning	Variador 2 em Run	PB 50	1	24	reading	A
+I 72.6	VFD2_IsRunning	Variador 2 em Run	PB 51	1	27	reading	A
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	OB 1	1	23	reading	AN
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	OB 1	1	31	reading	AN
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	OB 1	1	39	reading	AN
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	OB 1	1	48	reading	AN
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	PB 20	1	69	reading	A
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	PB 30	1	23	reading	A
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	PB 32	1	18	reading	A
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	PB 40	1	17	reading	A
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	PB 50	1	32	reading	A
+I 72.7	VFDDisk_IsRunning	Variador do Disco em Run	PB 51	1	38	reading	A
+I 73.0	Elbo I73.0	??? Sinal Elbo Eixo Corte	PB 20	1	14	reading	AN
+I 73.0	Elbo I73.0	??? Sinal Elbo Eixo Corte	PB 20	1	33	reading	AN
+I 73.0	Elbo I73.0	??? Sinal Elbo Eixo Corte	PB 30	1	25	reading	A
+I 73.0	Elbo I73.0	??? Sinal Elbo Eixo Corte	PB 32	1	20	reading	A
+I 73.0	Elbo I73.0	??? Sinal Elbo Eixo Corte	PB 40	1	19	reading	A
+I 73.0	Elbo I73.0	??? Sinal Elbo Eixo Corte	PB 50	1	42	reading	A
+I 73.0	Elbo I73.0	??? Sinal Elbo Eixo Corte	PB 51	1	48	reading	A
+I 73.1	Elbo I73.1	??? Sinal Elbo Eixo Translacao	PB 30	1	29	reading	A
+I 73.1	Elbo I73.1	??? Sinal Elbo Eixo Translacao	PB 32	1	24	reading	A
+I 73.1	Elbo I73.1	??? Sinal Elbo Eixo Translacao	PB 40	1	23	reading	A
+I 73.1	Elbo I73.1	??? Sinal Elbo Eixo Translacao	PB 50	1	48	reading	A
+I 73.1	Elbo I73.1	??? Sinal Elbo Eixo Translacao	PB 51	1	55	reading	A
+I 73.2	Elbo I73.2	??? Sinal Elbo Eixo Cala	OB 1	1	47	reading	A
+I 73.2	Elbo I73.2	??? Sinal Elbo Eixo Cala	OB 1	1	51	reading	ON
+I 73.3	Elbo I73.3	??? Sinal Elbo Eixo Rotacao Mesa	OB 1	8	0	reading	A
+I 73.3	Elbo I73.3	??? Sinal Elbo Eixo Rotacao Mesa	OB 1	8	13	reading	AN
+I 73.5	Elbo I73.5	??? Sinal Elbo Direcao "+"	OB 1	3	5	reading	AN
+I 73.5	Elbo I73.5	??? Sinal Elbo Direcao "+"	OB 1	7	15	reading	AN
+I 73.5	Elbo I73.5	??? Sinal Elbo Direcao "+"	OB 1	7	58	reading	AN
+I 73.6	Elbo I73.6	??? Sinal Elbo Direcao "-"	OB 1	3	6	reading	AN
+I 73.6	Elbo I73.6	??? Sinal Elbo Direcao "-"	OB 1	7	40	reading	AN
+I 73.6	Elbo I73.6	??? Sinal Elbo Direcao "-"	OB 1	7	62	reading	AN
+I 73.7	Elbo I73.7	??? Sinal Elbo V/S	OB 1	2	9	reading	AN
+I 73.7	Elbo I73.7	??? Sinal Elbo V/S	OB 1	4	4	reading	A
+I 73.7	Elbo I73.7	??? Sinal Elbo V/S	OB 1	4	14	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	OB 1	1	100	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	OB 1	5	1	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	OB 1	7	83	writing	R
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	OB 1	7	100	reading	O
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	OB 1	9	0	reading	O
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 10	1	6	reading	O
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 11	1	0	reading	O
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 20	1	2	writing	S
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 20	1	3	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 20	1	22	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 20	1	52	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 20	1	56	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 20	1	60	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 20	1	63	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 21	1	1	writing	S
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 21	1	2	reading	A
+Q 6.0	Cnt Fwd/Rev	Contactor Avanco (C3)	PB 21	1	9	reading	A
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	OB 1	1	97	reading	A
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	OB 1	5	8	reading	A
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	OB 1	6	26	reading	O
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	OB 1	7	86	writing	R
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	OB 1	7	101	reading	O
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	OB 1	9	1	reading	O
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	PB 10	1	23	reading	O
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	PB 11	1	28	reading	O
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	PB 40	1	1	writing	S
+Q 6.1	Cnt Left/Right	Contactor Translacao (C4)	PB 41	1	1	writing	S
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	OB 1	5	15	reading	A
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	OB 1	6	27	reading	O
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	OB 1	7	89	writing	R
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	OB 1	7	102	reading	O
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	OB 1	9	2	reading	O
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	PB 10	1	11	reading	O
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	PB 11	1	14	reading	O
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	PB 30	1	5	writing	S
+Q 6.2	Cnt Up/Down	Contactor Vertical (C5)	PB 31	1	5	writing	S
+Q 6.3	Cnt Tilt	Contactor Inclinado (C7)	OB 1	5	22	reading	A
+Q 6.3	Cnt Tilt	Contactor Inclinado (C7)	OB 1	7	92	writing	R
+Q 6.3	Cnt Tilt	Contactor Inclinado (C7)	OB 1	7	103	reading	O
+Q 6.3	Cnt Tilt	Contactor Inclinado (C7)	OB 1	9	3	reading	O
+Q 6.3	Cnt Tilt	Contactor Inclinado (C7)	PB 10	1	12	reading	O
+Q 6.3	Cnt Tilt	Contactor Inclinado (C7)	PB 11	1	15	reading	O
+Q 6.3	Cnt Tilt	Contactor Inclinado (C7)	PB 32	1	1	writing	S
+Q 6.3	Cnt Tilt	Contactor Inclinado (C7)	PB 33	1	1	writing	S
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	OB 1	7	95	writing	R
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	OB 1	7	104	reading	O
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	OB 1	8	9	reading	AN
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	OB 1	8	17	reading	AN
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	OB 1	9	4	reading	O
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	PB 10	1	37	reading	O
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	PB 11	1	41	reading	O
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	PB 50	1	10	writing	S
+Q 6.4	Cnt RotTable	Contactor Rotacao mesa (C6)	PB 51	1	10	writing	S
+Q 6.5	Cnt RotDsk	Contactor Rotacao Disco (C10)	OB 1	7	98	writing	R
+Q 6.5	Cnt RotDsk	Contactor Rotacao Disco (C10)	OB 1	7	105	reading	O
+Q 6.5	Cnt RotDsk	Contactor Rotacao Disco (C10)	OB 1	9	5	reading	O
+Q 6.5	Cnt RotDsk	Contactor Rotacao Disco (C10)	PB 10	1	53	reading	O
+Q 6.5	Cnt RotDsk	Contactor Rotacao Disco (C10)	PB 11	1	55	reading	O
+Q 6.6	Cnt Disk_Star	Contactor Motor Disco em Estrela (RL1)	OB 1	2	50	writing	=
+Q 6.7	Cnt Disk_Delta	Contactor Motor Disco em Triangulo (RL3)	OB 1	2	59	writing	=
+Q 6.7	Cnt Disk_Delta	Contactor Motor Disco em Triangulo (RL3)	OB 1	4	8	reading	A
+Q 7.0	Cnt RL2	Contacor Motor Disco Linha (RL2)	OB 1	2	53	writing	=
+Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)	OB 1	2	2	writing	S
+Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)	OB 1	2	11	writing	R
+Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)	OB 1	2	14	reading	A
+Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)	OB 1	2	25	reading	ON
+Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)	OB 1	2	32	reading	AN
+Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)	OB 1	2	58	reading	A
+Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)	OB 1	4	1	reading	A
+Q 7.1	Cnt Disk_VFD	Contactor Selecciona Inversor (RL INV)	OB 1	4	12	reading	A
+Q 7.2	Cnt Laser	Contactor Laser (C8)	OB 1	1	139	reading	AN
+Q 7.2	Cnt Laser	Contactor Laser (C8)	OB 1	1	149	writing	=
+Q 7.3	Cnt Oil_Pump	Rele Hidraulica para mesas	FB 18	1	48	writing	=
+Q 7.3	Cnt Oil_Pump	Rele Hidraulica para mesas	FB 18	1	50	reading	A
+Q 7.3	Cnt Oil_Pump	Rele Hidraulica para mesas	FB 18	1	53	reading	A
+Q 7.3	Cnt Oil_Pump	Rele Hidraulica para mesas	FB 18	1	56	reading	A
+Q 7.3	Cnt Oil_Pump	Rele Hidraulica para mesas	FB 18	1	59	reading	A
+Q 7.4	XXX_PowerOn	Tensao Auxiliar	OB 1	6	2	writing	S
+Q 7.4	XXX_PowerOn	Tensao Auxiliar	OB 1	6	9	writing	R
+Q 7.5	XXX_Q7.5	??? Nao Utilizado	OB 1	6	34	writing	=
+Q 7.6	Cnt Inv1	Contactor Inversor 1 (C1)	OB 1	9	26	writing	=
+Q 7.7	Cnt Inv2	Contactor Inversor 2 (C2)	OB 1	9	46	writing	=
+Q 8.0	Inv1_Fwd	Comando FWD do Inverter 1	OB 1	1	102	reading	O
+Q 8.0	Inv1_Fwd	Comando FWD do Inverter 1	OB 1	7	7	reading	O
+Q 8.0	Inv1_Fwd	Comando FWD do Inverter 1	OB 1	9	31	writing	=
+Q 8.0	Inv1_Fwd	Comando FWD do Inverter 1	OB 1	9	39	reading	O
+Q 8.1	Inv1_Rev	Comando REV do Inverter 1	OB 1	7	8	reading	O
+Q 8.1	Inv1_Rev	Comando REV do Inverter 1	OB 1	9	36	writing	=
+Q 8.1	Inv1_Rev	Comando REV do Inverter 1	OB 1	9	40	reading	O
+Q 8.2	XXX_Q8.2		OB 1	7	5	reading	A
+Q 8.2	XXX_Q8.2		OB 1	9	43	writing	=
+Q 8.3	XXX_Q8.3		OB 1	7	30	reading	A
+Q 8.3	XXX_Q8.3		OB 1	9	65	writing	=
+Q 8.4	Inv2_Fwd	Comando FWD do Inverter 2	OB 1	1	103	reading	O
+Q 8.4	Inv2_Fwd	Comando FWD do Inverter 2	OB 1	7	32	reading	O
+Q 8.4	Inv2_Fwd	Comando FWD do Inverter 2	OB 1	9	52	writing	=
+Q 8.4	Inv2_Fwd	Comando FWD do Inverter 2	OB 1	9	61	reading	O
+Q 8.5	Inv2_Rev	Comando REV do Inverter 2	OB 1	7	33	reading	O
+Q 8.5	Inv2_Rev	Comando REV do Inverter 2	OB 1	9	58	writing	=
+Q 8.5	Inv2_Rev	Comando REV do Inverter 2	OB 1	9	62	reading	O
+Q 8.6	XXX_Q8.6	??? Rif. Motore Mandrino Via	OB 1	2	29	writing	=
+Q 8.6	XXX_Q8.6	??? Rif. Motore Mandrino Via	OB 1	2	61	reading	O
+Q 8.6	XXX_Q8.6	??? Rif. Motore Mandrino Via	OB 1	4	2	reading	A
+Q 8.6	XXX_Q8.6	??? Rif. Motore Mandrino Via	OB 1	4	13	reading	A
+Q 8.7	LockTable	Tranca da mesa	OB 1	8	1	writing	S
+Q 8.7	LockTable	Tranca da mesa	OB 1	8	18	writing	R
+Q 8.7	LockTable	Tranca da mesa	OB 1	8	20	reading	A
+Q 8.7	LockTable	Tranca da mesa	PB 50	1	1	reading	AN
+Q 8.7	LockTable	Tranca da mesa	PB 50	1	2	writing	S
+Q 8.7	LockTable	Tranca da mesa	PB 50	1	8	reading	A
+Q 8.7	LockTable	Tranca da mesa	PB 51	1	1	reading	AN
+Q 8.7	LockTable	Tranca da mesa	PB 51	1	2	writing	S
+Q 8.7	LockTable	Tranca da mesa	PB 51	1	8	reading	A
+QW 64	XXX_QW64		PB 20	1	42	writing	T
+QW 64	XXX_QW64		PB 20	1	104	writing	T
+QW 64	XXX_QW64		PB 20	1	108	writing	T
+QW 64	XXX_QW64		PB 21	1	37	writing	T
+QW 64	XXX_QW64		PB 21	1	73	writing	T
+QW 64	XXX_QW64		PB 30	1	19	writing	T
+QW 64	XXX_QW64		PB 30	1	28	writing	T
+QW 64	XXX_QW64		PB 30	1	32	writing	T
+QW 64	XXX_QW64		PB 31	1	15	writing	T
+QW 64	XXX_QW64		PB 31	1	26	writing	T
+QW 64	XXX_QW64		PB 32	1	14	writing	T
+QW 64	XXX_QW64		PB 32	1	23	writing	T
+QW 64	XXX_QW64		PB 32	1	27	writing	T
+QW 64	XXX_QW64		PB 33	1	11	writing	T
+QW 64	XXX_QW64		PB 33	1	22	writing	T
+QW 64	XXX_QW64		PB 40	1	13	writing	T
+QW 64	XXX_QW64		PB 40	1	22	writing	T
+QW 64	XXX_QW64		PB 40	1	26	writing	T
+QW 64	XXX_QW64		PB 41	1	12	writing	T
+QW 64	XXX_QW64		PB 41	1	23	writing	T
+QW 64	XXX_QW64		PB 50	1	29	writing	T
+QW 64	XXX_QW64		PB 50	1	47	writing	T
+QW 64	XXX_QW64		PB 50	1	53	writing	T
+QW 64	XXX_QW64		PB 50	1	58	writing	T
+QW 64	XXX_QW64		PB 51	1	31	writing	T
+QW 64	XXX_QW64		PB 51	1	53	writing	T
+QW 64	XXX_QW64		PB 51	1	59	writing	T
+QW 64	XXX_QW64		PB 51	1	64	writing	T
+QW 66	XXX_QW66		OB 1	10	56	writing	T
+QW 66	XXX_QW66		FB 14	1	12	writing	T
+QW 66	XXX_QW66		FB 14	1	44	writing	T
+QW 66	XXX_QW66		FB 15	2	23	writing	T
+QW 66	XXX_QW66		FB 16	1	10	writing?	
+Q 72.0	Lamp ProgActiv	Luz Programa Activo (37)	OB 1	1	95	writing	=
+Q 72.1	Lamp Disc_ON	Luz motor disco (38)	OB 1	1	89	writing	=
+Q 72.2	Lamp FC	Luz Fim de Curso (39)	OB 1	1	92	writing	=
+Q 72.4	Lamp Inv2_OFF	Luz Inverter 2 em erro (41)	OB 1	5	47	writing	=
+Q 72.5	Rlay Tbl1_Down	Rele Exterior Baixar Mesa 1 (R1)	OB 1	5	50	writing	=
+Q 72.6	Rlay Tbl2_Up	Rele Exterior Subir Mesa 2 (R2)	OB 1	5	53	writing	=
+Q 72.7	Rlay Tbl2_Down	Rele Exterior Baixar Mesa 2 (R3)	FB 18	1	51	writing	=
+Q 73.0	XXX_Q73.0	??? Consenso a Elbo per cala automatica	OB 1	1	86	writing	=
+Q 73.0	XXX_Q73.0	??? Consenso a Elbo per cala automatica	FB 15	1	95	writing	=
+Q 73.1	XXX_Q73.1	??? Consenso a Elbo per Translaz automat	OB 1	2	63	writing	=
+Q 73.2	XXX_Q73.2	??? Consenso a Elbo per Spianatura Autom	OB 1	1	127	writing	=
+Q 73.2	XXX_Q73.2	??? Consenso a Elbo per Spianatura Autom	OB 1	5	28	writing	=
+Q 73.3	XXX_Q73.3	??? Consenso a Elbo per Autom./Manuale	OB 1	7	19	writing	=
+Q 73.3	XXX_Q73.3	??? Consenso a Elbo per Autom./Manuale	FB 15	1	66	writing	=
+Q 73.4	XXX_Q73.4	??? Repetizione FC Avanzamento Avanti	OB 1	7	51	writing	=
+Q 73.4	XXX_Q73.4	??? Repetizione FC Avanzamento Avanti	FB 15	1	76	writing	=
+Q 73.5	XXX_Q73.5	??? Repetizione FC Avanzamento Indietro	FB 18	1	54	writing	=
+Q 73.6	XXX_Q73.6	??? Repetizione FC Translazione Sinistra	FB 18	1	57	writing	=
+Q 73.7	Rlay Tbl1_Up	Rele Exterior Subir Mesa 1 (R4)	FB 18	1	60	writing	=
+F 0.0	F Prog M	Flag Programa M	OB 1	1	15	writing	S
+F 0.0	F Prog M	Flag Programa M	OB 1	1	19	writing	R
+F 0.0	F Prog M	Flag Programa M	OB 1	1	78	reading	O
+F 0.0	F Prog M	Flag Programa M	OB 1	1	108	reading	AN
+F 0.0	F Prog M	Flag Programa M	OB 1	7	71	reading	AN
+F 0.0	F Prog M	Flag Programa M	OB 1	7	74	reading	A
+F 0.0	F Prog M	Flag Programa M	OB 1	8	12	reading	A
+F 0.0	F Prog M	Flag Programa M	OB 1	8	35	reading	AN
+F 0.0	F Prog M	Flag Programa M	OB 1	8	52	reading	A
+F 0.0	F Prog M	Flag Programa M	OB 1	8	58	reading	AN
+F 0.1	F Prog T	Flag Programa T	OB 1	1	24	writing	S
+F 0.1	F Prog T	Flag Programa T	OB 1	1	28	writing	R
+F 0.1	F Prog T	Flag Programa T	OB 1	1	46	reading	AN
+F 0.1	F Prog T	Flag Programa T	OB 1	1	79	reading	O
+F 0.1	F Prog T	Flag Programa T	OB 1	1	88	reading	A
+F 0.1	F Prog T	Flag Programa T	OB 1	1	91	reading	A
+F 0.1	F Prog T	Flag Programa T	OB 1	1	153	reading	O
+F 0.1	F Prog T	Flag Programa T	OB 1	3	3	reading	O
+F 0.1	F Prog T	Flag Programa T	OB 1	8	4	reading	O
+F 0.1	F Prog T	Flag Programa T	OB 1	8	24	reading	O
+F 0.1	F Prog T	Flag Programa T	OB 1	8	46	reading	AN
+F 0.2	F Prog CT	Flag Progama CT	OB 1	1	32	writing	S
+F 0.2	F Prog CT	Flag Progama CT	OB 1	1	36	writing	R
+F 0.2	F Prog CT	Flag Progama CT	OB 1	1	80	reading	O
+F 0.2	F Prog CT	Flag Progama CT	OB 1	1	154	reading	O
+F 0.2	F Prog CT	Flag Progama CT	OB 1	3	1	reading	O
+F 0.2	F Prog CT	Flag Progama CT	OB 1	8	5	reading	O
+F 0.2	F Prog CT	Flag Progama CT	OB 1	8	25	reading	O
+F 0.2	F Prog CT	Flag Progama CT	OB 1	8	47	reading	AN
+F 0.2	F Prog CT	Flag Progama CT	OB 1	10	13	reading	O
+F 0.3	F Prog C	Flag Programa C	OB 1	1	40	writing	S
+F 0.3	F Prog C	Flag Programa C	OB 1	1	44	writing	R
+F 0.3	F Prog C	Flag Programa C	OB 1	1	81	reading	O
+F 0.3	F Prog C	Flag Programa C	OB 1	1	94	reading	A
+F 0.3	F Prog C	Flag Programa C	OB 1	1	155	reading	O
+F 0.3	F Prog C	Flag Programa C	OB 1	3	2	reading	O
+F 0.3	F Prog C	Flag Programa C	OB 1	8	26	reading	O
+F 0.3	F Prog C	Flag Programa C	OB 1	8	48	reading	AN
+F 0.3	F Prog C	Flag Programa C	OB 1	10	14	reading	O
+F 0.4			OB 1	1	22	reading	AN
+F 0.4			OB 1	1	49	writing	S
+F 0.4			OB 1	1	53	writing	R
+F 0.4			OB 1	1	83	reading	A
+F 0.4			OB 1	5	31	reading	A
+F 0.4			OB 1	5	35	reading	A
+F 0.4			OB 1	5	43	reading	AN
+F 0.4			OB 1	5	45	reading	A
+F 0.4			OB 1	8	7	reading	AN
+F 0.4			OB 1	8	11	reading	AN
+F 0.4			OB 1	10	23	reading	A
+F 0.4			PB 10	1	1	reading	AN
+F 0.4			PB 10	1	35	reading	AN
+F 0.4			PB 10	1	41	reading	A
+F 0.4			PB 11	1	6	reading	AN
+F 0.4			PB 20	1	65	reading	AN
+F 0.4			PB 20	1	71	reading	AN
+F 0.4			PB 50	1	17	reading	A
+F 0.4			PB 50	1	36	reading	A
+F 0.4			PB 50	1	43	reading	AN
+F 0.4			PB 50	1	49	reading	AN
+F 0.4			PB 50	1	54	reading	AN
+F 0.4			PB 51	1	46	reading	AN
+F 0.4			PB 51	1	60	reading	AN
+F 0.4			FB 12	1	44	reading	A
+F 0.4			FB 13	1	24	reading	A
+F 0.5			OB 1	1	55	reading	AN
+F 0.5			OB 1	1	60	writing	=
+F 0.5			OB 1	1	62	reading	A
+F 0.5			OB 1	1	66	reading	A
+F 0.5			OB 1	1	70	reading	AN
+F 0.5			OB 1	1	74	reading	AN
+F 0.6			OB 1	1	63	reading	AN
+F 0.6			OB 1	1	67	reading	A
+F 0.6			OB 1	1	72	writing	S
+F 0.6			OB 1	1	76	writing	R
+F 0.7			OB 1	4	10	writing	=
+F 0.7			PB 20	1	9	reading	A
+F 0.7			PB 20	1	16	reading	A
+F 0.7			PB 20	1	31	reading	A
+F 0.7			PB 20	1	35	reading	A
+F 0.7			PB 30	1	10	reading	A
+F 0.7			PB 32	1	11	reading	A
+F 0.7			PB 50	1	18	reading	A
+F 1.0			OB 1	2	1	reading	AN
+F 1.0			OB 1	2	34	writing	S
+F 1.0			OB 1	2	36	reading	A
+F 1.0			OB 1	2	43	writing	R
+F 1.0			OB 1	2	45	reading	A
+F 1.0			OB 1	2	52	reading	A
+F 1.0			OB 1	2	56	reading	A
+F 1.0			OB 1	2	62	reading	O
+F 1.0			OB 1	4	7	reading	A
+F 1.1			OB 1	2	4	reading	AN
+F 1.1			OB 1	2	16	writing	S
+F 1.1			OB 1	2	18	reading	A
+F 1.1			OB 1	2	26	writing	R
+F 1.2			OB 1	1	64	writing	S
+F 1.2			OB 1	1	68	writing	R
+F 1.2			OB 1	1	71	reading	A
+F 1.2			OB 1	1	75	reading	AN
+F 1.2			OB 1	1	84	reading	A
+F 1.2			OB 1	1	126	reading	A
+F 1.2			FB 12	1	33	reading	A
+F 1.2			FB 13	1	13	reading	A
+F 1.2			FB 15	1	65	reading	A
+F 1.2			FB 15	1	70	reading	AN
+F 1.2			FB 15	1	74	reading	A
+F 1.2			FB 15	1	94	reading	AN
+F 1.3			OB 1	7	0	reading	AN
+F 1.3			OB 1	7	23	writing	S
+F 1.3			OB 1	7	25	reading	A
+F 1.3			OB 1	7	29	reading	A
+F 1.3			OB 1	7	43	writing	R
+F 1.3			OB 1	7	45	reading	AN
+F 1.3			OB 1	7	50	reading	AN
+F 1.3			OB 1	7	61	reading	A
+F 1.3			OB 1	7	65	reading	AN
+F 1.3			OB 1	9	45	reading	A
+F 1.3			OB 1	9	49	reading	A
+F 1.3			OB 1	9	55	reading	A
+F 1.4			OB 1	7	2	writing	S
+F 1.4			OB 1	7	4	reading	A
+F 1.4			OB 1	7	16	writing	R
+F 1.4			OB 1	7	18	reading	AN
+F 1.4			OB 1	7	21	reading	AN
+F 1.4			OB 1	7	46	reading	AN
+F 1.4			OB 1	7	57	reading	A
+F 1.4			OB 1	7	66	reading	AN
+F 1.4			OB 1	9	25	reading	A
+F 1.4			OB 1	9	29	reading	A
+F 1.4			OB 1	9	34	reading	A
+F 1.5			OB 1	7	1	reading	AN
+F 1.5			OB 1	7	22	reading	AN
+F 1.5			OB 1	7	47	writing	S
+F 1.5			OB 1	7	49	reading	A
+F 1.5			OB 1	7	54	writing	R
+F 1.6			OB 1	7	76	writing	=
+F 1.6			OB 1	7	82	reading	A
+F 1.6			OB 1	7	85	reading	A
+F 1.6			OB 1	7	88	reading	A
+F 1.6			OB 1	7	91	reading	A
+F 1.6			OB 1	7	94	reading	A
+F 1.6			OB 1	7	97	reading	A
+F 1.6			PB 20	1	1	reading	A
+F 1.6			PB 21	1	0	reading	A
+F 1.6			PB 30	1	4	reading	A
+F 1.6			PB 31	1	4	reading	A
+F 1.6			PB 32	1	0	reading	A
+F 1.6			PB 33	1	0	reading	A
+F 1.6			PB 40	1	0	reading	A
+F 1.6			PB 41	1	0	reading	A
+F 1.6			PB 50	1	0	reading	A
+F 1.6			PB 50	1	9	reading	A
+F 1.6			PB 51	1	0	reading	A
+F 1.6			PB 51	1	9	reading	A
+F 1.7			OB 1	7	68	writing	=
+F 1.7			OB 1	7	70	reading	A
+F 1.7			OB 1	7	73	reading	A
+F 1.7			OB 1	7	78	reading	A
+F 2.0			OB 1	10	17	writing	=
+F 2.0			OB 1	10	26	reading	AN
+F 2.0			OB 1	10	34	reading	O
+F 2.0			OB 1	10	46	reading	O
+F 2.0			FB 10	1	54	reading	AN
+F 2.0			FB 10	1	59	reading	A
+F 2.0			FB 12	1	39	reading	O
+F 2.0			FB 13	1	19	reading	O
+F 2.0			FB 14	1	2	reading	AN
+F 2.0			FB 14	1	13	reading	A
+F 2.1			OB 1	10	24	writing	=
+F 2.1			OB 1	10	27	reading	AN
+F 2.1			OB 1	10	35	reading	O
+F 2.1			OB 1	10	47	reading	O
+F 2.1			FB 14	1	16	reading	AN
+F 2.1			FB 14	1	31	reading	A
+F 2.2			OB 1	10	32	writing	=
+F 2.2			OB 1	10	36	reading	O
+F 2.2			OB 1	10	48	reading	O
+F 2.2			FB 10	1	62	reading	AN
+F 2.2			FB 12	1	40	reading	O
+F 2.2			FB 13	1	20	reading	O
+F 2.2			FB 14	1	34	reading	AN
+F 2.3	F + Speed		OB 1	10	41	writing	=
+F 2.3	F + Speed		PB 9	1	1	writing	=
+F 2.3	F + Speed		FB 12	1	2	reading	A
+F 2.3	F + Speed		FB 12	1	28	reading	A
+F 2.3	F + Speed		FB 12	1	48	reading	ON
+F 2.4	F - Speed		OB 1	10	44	writing	=
+F 2.4	F - Speed		PB 9	1	4	writing	=
+F 2.4	F - Speed		FB 13	1	2	reading	A
+F 2.4	F - Speed		FB 13	1	28	reading	ON
+F 2.5	F FB12 2.5		FB 12	1	10	writing	=
+F 2.5	F FB12 2.5		FB 12	1	12	reading	AN
+F 2.7			OB 1	1	98	writing	S
+F 2.7			OB 1	1	105	writing	R
+F 2.7			PB 20	1	97	reading	AN
+F 3.0			OB 1	6	13	writing	S
+F 3.0			OB 1	6	15	reading	A
+F 3.0			OB 1	6	23	writing	R
+F 3.0			PB 30	1	0	reading	A
+F 3.0			PB 30	1	2	reading	A
+F 3.0			PB 31	1	0	reading	A
+F 3.0			PB 31	1	2	reading	A
+F 3.1			OB 1	6	16	writing	R
+F 3.1			OB 1	6	20	writing	S
+F 3.1			OB 1	6	22	reading	A
+F 3.2	F PB20 3.2		PB 20	1	45	writing	S
+F 3.2	F PB20 3.2		PB 20	1	46	reading	AN
+F 3.2	F PB20 3.2		PB 20	1	58	writing	R
+F 3.3	F PB20 3.3		PB 20	1	47	reading	A
+F 3.3	F PB20 3.3		PB 20	1	61	writing	S
+F 3.3	F PB20 3.3		PB 20	1	64	writing	R
+F 3.4	F PB20 3.4		PB 20	1	48	writing	S
+F 3.4	F PB20 3.4		PB 20	1	50	writing	R
+F 3.4	F PB20 3.4		PB 20	1	98	reading	A
+F 3.5	F Mnp +Speed	Flag Manipulo +speed premido	OB 1	10	2	writing	=
+F 3.5	F Mnp +Speed	Flag Manipulo +speed premido	OB 1	10	9	reading	O
+F 3.5	F Mnp +Speed	Flag Manipulo +speed premido	OB 1	10	20	reading	O
+F 3.5	F Mnp +Speed	Flag Manipulo +speed premido	OB 1	10	29	reading	O
+F 3.5	F Mnp +Speed	Flag Manipulo +speed premido	FB 15	1	80	writing	=
+F 3.5	F Mnp +Speed	Flag Manipulo +speed premido	FB 17	1	2	reading	A
+F 3.6	F Mnp -Speed	Flag Manipulo -speed premido	OB 1	10	6	writing	=
+F 3.6	F Mnp -Speed	Flag Manipulo -speed premido	OB 1	10	10	reading	O
+F 3.6	F Mnp -Speed	Flag Manipulo -speed premido	OB 1	10	21	reading	O
+F 3.6	F Mnp -Speed	Flag Manipulo -speed premido	OB 1	10	30	reading	O
+F 3.6	F Mnp -Speed	Flag Manipulo -speed premido	FB 15	1	84	writing	=
+F 3.6	F Mnp -Speed	Flag Manipulo -speed premido	FB 17	1	5	reading	A
+F 3.7	F Laser_ON	Flag Laser ligado	OB 1	1	144	writing	R
+F 3.7	F Laser_ON	Flag Laser ligado	OB 1	1	147	reading	AN
+F 3.7	F Laser_ON	Flag Laser ligado	OB 1	1	161	writing	S
+F 4.0			OB 1	5	41	reading	AN
+F 4.0			OB 1	9	9	reading	A
+F 4.0			OB 1	9	17	reading	A
+F 4.0			PB 20	1	4	reading	A
+F 4.0			PB 20	1	19	reading	A
+F 4.0			PB 20	1	21	writing	=
+F 4.0			PB 20	1	51	reading	A
+F 4.0			PB 20	1	59	reading	A
+F 4.0			PB 20	1	73	reading	O
+F 4.0			PB 20	1	86	reading	AN
+F 4.0			PB 20	1	105	reading	A
+F 4.0			PB 21	1	4	reading	A
+F 4.0			PB 21	1	22	reading	A
+F 4.0			PB 21	1	25	writing	=
+F 4.0			PB 21	1	47	reading	O
+F 4.0			PB 21	1	60	reading	AN
+F 4.0			PB 30	1	11	writing	=
+F 4.0			PB 31	1	9	writing	=
+F 4.0			PB 32	1	6	writing	=
+F 4.0			PB 33	1	5	writing	=
+F 4.0			PB 40	1	6	writing	=
+F 4.0			PB 41	1	6	writing	=
+F 4.0			PB 50	1	21	writing	=
+F 4.0			PB 51	1	19	writing	=
+F 4.1			OB 1	9	13	reading	A
+F 4.1			OB 1	9	21	reading	A
+F 4.1			PB 20	1	24	reading	A
+F 4.1			PB 20	1	38	reading	A
+F 4.1			PB 20	1	40	writing	=
+F 4.1			PB 20	1	55	reading	A
+F 4.1			PB 20	1	62	reading	A
+F 4.1			PB 20	1	74	reading	O
+F 4.1			PB 20	1	90	reading	AN
+F 4.1			PB 20	1	99	reading	A
+F 4.1			PB 21	1	11	reading	A
+F 4.1			PB 21	1	31	reading	A
+F 4.1			PB 21	1	35	writing	=
+F 4.1			PB 21	1	48	reading	O
+F 4.1			PB 21	1	64	reading	AN
+F 4.1			PB 30	1	17	writing	=
+F 4.1			PB 31	1	13	writing	=
+F 4.1			PB 32	1	12	writing	=
+F 4.1			PB 33	1	9	writing	=
+F 4.1			PB 40	1	11	writing	=
+F 4.1			PB 41	1	10	writing	=
+F 4.1			PB 50	1	26	writing	=
+F 4.1			PB 51	1	28	writing	=
+F 4.2			OB 1	9	11	writing	=
+F 4.2			OB 1	9	30	reading	A
+F 4.2			OB 1	9	50	reading	A
+F 4.3			OB 1	9	15	writing	=
+F 4.3			OB 1	9	35	reading	A
+F 4.3			OB 1	9	56	reading	A
+F 4.5			OB 1	9	42	reading	A
+F 4.5			OB 1	9	64	reading	A
+F 4.5			PB 20	1	77	reading	A
+F 4.5			PB 20	1	78	writing	=
+F 4.5			PB 21	1	51	reading	A
+F 4.5			PB 21	1	52	writing	=
+F 4.5			PB 30	1	24	writing	=
+F 4.5			PB 31	1	22	writing	=
+F 4.5			PB 32	1	19	writing	=
+F 4.5			PB 33	1	18	writing	=
+F 4.5			PB 40	1	18	writing	=
+F 4.5			PB 41	1	19	writing	=
+F 4.5			PB 50	1	40	writing	=
+F 4.5			PB 51	1	42	writing	=
+F 4.6	F FB12 4.6		FB 12	1	21	writing	=
+F 4.6	F FB12 4.6		FB 12	1	23	reading	A
+F 5.0			OB 1	1	14	reading	AN
+F 5.0			OB 1	6	12	reading	AN
+F 5.0			OB 1	6	19	reading	AN
+F 5.0			OB 1	7	106	writing	=
+F 5.0			OB 1	8	49	reading	AN
+F 5.0			OB 1	8	59	reading	AN
+F 5.0			PB 10	1	0	reading	AN
+F 5.0			PB 10	1	10	reading	AN
+F 5.0			PB 10	1	21	reading	AN
+F 5.0			PB 10	1	33	reading	AN
+F 5.0			PB 10	1	39	reading	AN
+F 5.0			PB 10	1	51	reading	AN
+F 5.0			PB 11	1	7	reading	AN
+F 5.0			PB 11	1	17	reading	AN
+F 5.0			PB 11	1	30	reading	AN
+F 5.0			PB 11	1	43	reading	AN
+F 5.0			PB 11	1	57	reading	AN
+F 5.1			OB 1	8	30	reading	A
+F 5.1			OB 1	8	40	writing	S
+F 5.1			OB 1	8	42	reading	A
+F 5.1			OB 1	8	50	writing	R
+F 5.2			OB 1	8	34	reading	A
+F 5.2			OB 1	8	43	reading	AN
+F 5.2			OB 1	8	53	writing	S
+F 5.2			OB 1	8	55	reading	A
+F 5.2			OB 1	8	60	writing	R
+F 5.3			OB 1	8	27	writing	=
+F 5.3			OB 1	8	31	reading	AN
+F 5.3			OB 1	8	39	reading	A
+F 5.4			OB 1	8	37	writing	=
+F 5.4			OB 1	9	28	reading	AN
+F 5.4			OB 1	9	33	reading	AN
+F 5.4			OB 1	9	48	reading	AN
+F 5.4			OB 1	9	54	reading	AN
+F 5.4			PB 20	1	12	reading	AN
+F 5.4			PB 20	1	20	reading	AN
+F 5.4			PB 20	1	27	reading	AN
+F 5.4			PB 20	1	39	reading	AN
+F 5.4			PB 20	1	68	reading	AN
+F 5.4			PB 20	1	76	reading	AN
+F 5.4			PB 21	1	18	reading	AN
+F 5.4			PB 21	1	24	reading	AN
+F 5.4			PB 21	1	28	reading	AN
+F 5.4			PB 21	1	30	reading	AN
+F 5.4			PB 21	1	39	reading	AN
+F 5.4			PB 21	1	50	reading	AN
+F 5.4			PB 30	1	9	reading	AN
+F 5.4			PB 30	1	15	reading	AN
+F 5.4			PB 30	1	21	reading	AN
+F 5.4			PB 31	1	7	reading	AN
+F 5.4			PB 31	1	11	reading	AN
+F 5.4			PB 31	1	17	reading	AN
+F 5.4			PB 32	1	4	reading	AN
+F 5.4			PB 32	1	10	reading	AN
+F 5.4			PB 32	1	16	reading	AN
+F 5.4			PB 33	1	3	reading	AN
+F 5.4			PB 33	1	7	reading	AN
+F 5.4			PB 33	1	13	reading	AN
+F 5.4			PB 40	1	4	reading	AN
+F 5.4			PB 40	1	9	reading	AN
+F 5.4			PB 40	1	15	reading	AN
+F 5.4			PB 41	1	4	reading	AN
+F 5.4			PB 41	1	8	reading	AN
+F 5.4			PB 41	1	14	reading	AN
+F 5.4			PB 50	1	14	reading	AN
+F 5.4			PB 50	1	16	reading	AN
+F 5.4			PB 50	1	25	reading	AN
+F 5.4			PB 50	1	31	reading	AN
+F 5.4			PB 51	1	13	reading	AN
+F 5.4			PB 51	1	16	reading	AN
+F 5.4			PB 51	1	22	reading	AN
+F 5.4			PB 51	1	25	reading	AN
+F 5.4			PB 51	1	33	reading	AN
+F 5.6	F FB12 5.6		FB 12	1	29	reading	A
+F 5.6	F FB12 5.6		FB 12	1	37	writing	=
+F 5.6	F FB12 5.6		FB 12	1	50	reading	ON
+F 5.7	F FB13 5.7		FB 13	1	9	reading	A
+F 5.7	F FB13 5.7		FB 13	1	17	writing	=
+F 5.7	F FB13 5.7		FB 13	1	30	reading	ON
+F 6.0	F PB10 6.0		PB 10	1	13	writing	=
+F 6.0	F PB10 6.0		PB 10	1	15	reading	A
+F 6.0	F PB10 6.0		PB 10	1	18	reading	A
+F 6.1	F PB10 6.1		PB 10	1	24	writing	=
+F 6.1	F PB10 6.1		PB 10	1	26	reading	A
+F 6.1	F PB10 6.1		PB 10	1	29	reading	A
+F 6.2	F PB10 6.2		PB 10	1	43	writing	=
+F 6.2	F PB10 6.2		PB 10	1	45	reading	A
+F 6.2	F PB10 6.2		PB 10	1	48	reading	A
+F 6.3			OB 1	1	3	reading	AN
+F 6.3			OB 1	1	123	writing	S
+F 6.3			OB 1	1	125	reading	A
+F 6.3			OB 1	1	129	reading	A
+F 6.3			OB 1	1	133	reading	A
+F 6.3			OB 1	1	136	reading	A
+F 6.3			FB 15	1	9	writing	R
+F 6.3			FB 15	1	11	reading	AN
+F 6.4	F PB11 6.4		PB 11	1	9	writing	=
+F 6.4	F PB11 6.4		PB 11	1	10	reading	A
+F 6.4	F PB11 6.4		PB 11	1	12	reading	A
+F 6.5	F PB11 6.5		PB 11	1	23	writing	=
+F 6.5	F PB11 6.5		PB 11	1	24	reading	A
+F 6.5	F PB11 6.5		PB 11	1	26	reading	A
+F 6.6	F PB11 6.6		PB 11	1	36	writing	=
+F 6.6	F PB11 6.6		PB 11	1	37	reading	A
+F 6.6	F PB11 6.6		PB 11	1	39	reading	A
+F 6.7	F PB11 6.7		PB 11	1	50	writing	=
+F 6.7	F PB11 6.7		PB 11	1	51	reading	A
+F 6.7	F PB11 6.7		PB 11	1	53	reading	A
+F 7.0	F FB15 7.0		FB 15	1	3	reading	AN
+F 7.0	F FB15 7.0		FB 15	1	52	reading	O
+F 7.0	F FB15 7.0		FB 15	1	87	reading	O
+F 7.0	F FB15 7.0		FB 15	2	9	writing	=
+F 7.0	F FB15 7.0		FB 15	2	11	reading	AN
+F 7.0	F FB15 7.0		FB 15	2	24	reading	A
+F 7.0	F FB15 7.0		FB 15	3	4	reading	AN
+F 7.0	F FB15 7.0		FB 15	4	5	reading	AN
+F 7.0	F FB15 7.0		FB 15	5	4	reading	AN
+F 7.0	F FB15 7.0		FB 15	6	4	reading	AN
+F 7.1	F FB15 7.1		FB 15	1	4	reading	AN
+F 7.1	F FB15 7.1		FB 15	1	53	reading	O
+F 7.1	F FB15 7.1		FB 15	1	88	reading	O
+F 7.1	F FB15 7.1		FB 15	2	4	reading	AN
+F 7.1	F FB15 7.1		FB 15	3	9	writing	=
+F 7.1	F FB15 7.1		FB 15	3	11	reading	AN
+F 7.1	F FB15 7.1		FB 15	3	61	reading	A
+F 7.1	F FB15 7.1		FB 15	4	6	reading	AN
+F 7.1	F FB15 7.1		FB 15	5	5	reading	AN
+F 7.1	F FB15 7.1		FB 15	6	5	reading	AN
+F 7.2	F FB15 7.2		FB 15	1	5	reading	AN
+F 7.2	F FB15 7.2		FB 15	1	54	reading	O
+F 7.2	F FB15 7.2		FB 15	1	89	reading	O
+F 7.2	F FB15 7.2		FB 15	2	5	reading	AN
+F 7.2	F FB15 7.2		FB 15	3	5	reading	AN
+F 7.2	F FB15 7.2		FB 15	4	10	writing	=
+F 7.2	F FB15 7.2		FB 15	4	12	reading	AN
+F 7.2	F FB15 7.2		FB 15	5	6	reading	AN
+F 7.2	F FB15 7.2		FB 15	6	6	reading	AN
+F 7.3	F FB15 7.3		FB 15	1	6	reading	AN
+F 7.3	F FB15 7.3		FB 15	1	55	reading	O
+F 7.3	F FB15 7.3		FB 15	1	90	reading	O
+F 7.3	F FB15 7.3		FB 15	2	6	reading	AN
+F 7.3	F FB15 7.3		FB 15	3	6	reading	AN
+F 7.3	F FB15 7.3		FB 15	4	7	reading	AN
+F 7.3	F FB15 7.3		FB 15	4	88	reading	A
+F 7.3	F FB15 7.3		FB 15	5	7	reading	AN
+F 7.3	F FB15 7.3		FB 15	6	7	reading	AN
+F 7.4	F FB15 7.4		FB 15	1	7	reading	AN
+F 7.4	F FB15 7.4		FB 15	1	56	reading	O
+F 7.4	F FB15 7.4		FB 15	1	91	reading	O
+F 7.4	F FB15 7.4		FB 15	2	7	reading	AN
+F 7.4	F FB15 7.4		FB 15	3	7	reading	AN
+F 7.4	F FB15 7.4		FB 15	4	8	reading	AN
+F 7.4	F FB15 7.4		FB 15	5	9	writing	=
+F 7.4	F FB15 7.4		FB 15	5	11	reading	AN
+F 7.4	F FB15 7.4		FB 15	5	61	reading	A
+F 7.4	F FB15 7.4		FB 15	6	8	reading	AN
+F 7.5	F FB15 7.5		FB 15	1	8	reading	AN
+F 7.5	F FB15 7.5		FB 15	1	57	reading	O
+F 7.5	F FB15 7.5		FB 15	1	92	reading	O
+F 7.5	F FB15 7.5		FB 15	2	8	reading	AN
+F 7.5	F FB15 7.5		FB 15	3	8	reading	AN
+F 7.5	F FB15 7.5		FB 15	4	9	reading	AN
+F 7.5	F FB15 7.5		FB 15	5	8	reading	AN
+F 7.5	F FB15 7.5		FB 15	6	9	writing	=
+F 7.5	F FB15 7.5		FB 15	6	11	reading	AN
+F 7.6	F FB15 7.6		FB 15	1	14	reading	A
+F 7.6	F FB15 7.6		FB 15	1	18	reading	A
+F 7.6	F FB15 7.6		FB 15	1	19	writing	R
+F 7.6	F FB15 7.6		FB 15	1	26	writing	S
+F 7.6	F FB15 7.6		FB 15	1	29	reading	A
+F 7.6	F FB15 7.6		FB 15	1	33	reading	A
+F 7.6	F FB15 7.6		FB 15	1	38	reading	A
+F 7.6	F FB15 7.6		FB 15	1	50	reading	A
+F 7.7	F FB15 7.7		FB 15	1	16	writing	S
+F 7.7	F FB15 7.7		FB 15	1	22	writing	R
+F 7.7	F FB15 7.7		FB 15	1	25	reading	AN
+F 8.0	F FB15 8.0		FB 15	1	32	reading	A
+F 8.0	F FB15 8.0		FB 15	1	37	reading	AN
+F 8.0	F FB15 8.0		FB 15	1	45	writing	R
+F 8.0	F FB15 8.0		FB 15	1	47	reading	AN
+F 8.0	F FB15 8.0		FB 15	1	59	writing	S
+F 8.0	F FB15 8.0		FB 15	1	63	reading	O
+F 8.0	F FB15 8.0		FB 15	1	69	reading	A
+F 8.0	F FB15 8.0		FB 15	2	14	reading	AN
+F 8.0	F FB15 8.0		FB 15	3	16	reading	AN
+F 8.0	F FB15 8.0		FB 15	3	29	reading	A
+F 8.0	F FB15 8.0		FB 15	4	17	reading	AN
+F 8.0	F FB15 8.0		FB 15	4	30	reading	A
+F 8.0	F FB15 8.0		FB 15	4	57	reading	A
+F 8.0	F FB15 8.0		FB 15	5	16	reading	AN
+F 8.0	F FB15 8.0		FB 15	5	29	reading	A
+F 8.0	F FB15 8.0		FB 15	6	16	reading	AN
+F 8.0	F FB15 8.0		FB 15	6	29	reading	A
+F 8.1	F FB15 8.1		FB 15	1	34	writing	S
+F 8.1	F FB15 8.1		FB 15	1	36	reading	A
+F 8.1	F FB15 8.1		FB 15	1	42	writing	R
+F 8.1	F FB15 8.1		FB 15	1	44	reading	A
+F 8.1	F FB15 8.1		FB 15	1	48	reading	AN
+F 8.1	F FB15 8.1		FB 15	1	62	reading	O
+F 8.1	F FB15 8.1		FB 15	3	32	reading	AN
+F 8.1	F FB15 8.1		FB 15	3	45	reading	A
+F 8.1	F FB15 8.1		FB 15	4	33	reading	AN
+F 8.1	F FB15 8.1		FB 15	4	46	reading	A
+F 8.1	F FB15 8.1		FB 15	4	60	reading	AN
+F 8.1	F FB15 8.1		FB 15	4	72	reading	A
+F 8.1	F FB15 8.1		FB 15	5	32	reading	AN
+F 8.1	F FB15 8.1		FB 15	5	45	reading	A
+F 8.1	F FB15 8.1		FB 15	6	32	reading	AN
+F 8.1	F FB15 8.1		FB 15	6	45	reading	A
+F 8.2	F FB15 8.2		FB 15	1	28	reading	A
+F 8.2	F FB15 8.2		FB 15	1	30	writing	R
+F 8.2	F FB15 8.2		FB 15	1	39	writing	S
+F 8.2	F FB15 8.2		FB 15	1	41	reading	A
+F 8.2	F FB15 8.2		FB 15	1	49	reading	AN
+F 8.2	F FB15 8.2		FB 15	1	73	reading	A
+F 8.2	F FB15 8.2		FB 15	3	48	reading	AN
+F 8.2	F FB15 8.2		FB 15	4	75	reading	AN
+F 8.2	F FB15 8.2		FB 15	5	48	reading	AN
+F 8.2	F FB15 8.2		FB 15	6	48	reading	AN
+F 8.4	F FB11 8.4		FB 11	1	12	writing?	
+F 8.4	F FB11 8.4		FB 11	1	29	reading	O
+F 8.4	F FB11 8.4		FB 11	1	56	reading	AN
+F 8.4	F FB11 8.4		FB 11	1	62	reading	O
+F 8.5	F FB11 8.5		FB 11	1	21	writing	=
+F 8.5	F FB11 8.5		FB 11	1	32	reading	A
+F 8.5	F FB11 8.5		FB 11	1	53	reading	A
+F 8.5	F FB11 8.5		FB 11	1	66	reading	AN
+F 8.5	F FB11 8.5		FB 11	1	73	reading	A
+F 8.6	F FB11 8.6		FB 11	1	26	writing	=
+F 8.6	F FB11 8.6		FB 11	1	28	reading	O
+F 8.6	F FB11 8.6		FB 11	1	57	reading	AN
+F 8.6	F FB11 8.6		FB 11	1	63	reading	O
+F 8.7			FB 10	1	11	writing?	
+F 8.7			FB 10	1	13	writing?	
+F 8.7			FB 10	1	14	writing?	
+F 8.7			FB 10	1	41	writing?	
+F 8.7			FB 11	1	11	writing?	
+F 8.7			FB 11	1	13	writing?	
+F 8.7			FB 11	1	14	writing?	
+F 8.7			FB 11	1	39	writing?	
+F 8.7			FB 11	1	40	writing?	
+F 8.7			FB 11	1	41	writing?	
+F 8.7			FB 11	1	42	writing?	
+F 8.7			FB 11	1	49	writing?	
+F 8.7			FB 16	1	6	writing?	
+F 8.7			FB 16	1	7	writing?	
+F 8.7			FB 16	1	8	writing?	
+F 8.7			FB 16	1	9	writing?	
+F 9.0	F FB10 9.0		FB 10	1	12	writing?	
+F 9.0	F FB10 9.0		FB 10	1	30	reading	A
+F 9.0	F FB10 9.0		FB 10	1	49	reading	AN
+F 9.2	F FB12 9.2		FB 10	1	28	writing	=
+F 9.2	F FB12 9.2		FB 10	1	33	reading	AN
+F 9.4			OB 1	5	39	writing	=
+F 9.4			OB 1	5	46	reading	A
+F 10.0	F FB18 F10.0		FB 18	1	11	writing	=
+F 10.0	F FB18 F10.0		FB 18	1	44	reading	A
+FW 10	F FB18 FW10		FB 18	1	6	reading	L
+F 10.1	F Table1_Up	Flag Mesa 1 Vertical	FB 18	1	25	writing	=
+F 10.1	F Table1_Up	Flag Mesa 1 Vertical	FB 18	1	39	reading	O
+F 10.1	F Table1_Up	Flag Mesa 1 Vertical	FB 18	1	49	reading	A
+F 10.2	F Table1_Down	Flag Mesa 1 Horizontal	FB 18	1	29	writing	=
+F 10.2	F Table1_Down	Flag Mesa 1 Horizontal	FB 18	1	40	reading	O
+F 10.2	F Table1_Down	Flag Mesa 1 Horizontal	FB 18	1	52	reading	A
+F 10.3	F Table2_Up	Flag Mesa 2 Vertical	FB 18	1	33	writing	=
+F 10.3	F Table2_Up	Flag Mesa 2 Vertical	FB 18	1	41	reading	O
+F 10.3	F Table2_Up	Flag Mesa 2 Vertical	FB 18	1	55	reading	A
+F 10.4	F Table2_Down	Flag Mesa 2 Horizontal	FB 18	1	37	writing	=
+F 10.4	F Table2_Down	Flag Mesa 2 Horizontal	FB 18	1	42	reading	O
+F 10.4	F Table2_Down	Flag Mesa 2 Horizontal	FB 18	1	58	reading	A
+F 11.0	F ???FC Table2_Axle		FB 18	1	13	writing	=
+F 11.1	F MnpTable1_Up	Flag Manipulo Mesa 1 Vertical	FB 18	1	15	writing	=
+F 11.2	F MnpTable1_Down	Flag Manipulo Mesa 1 Horizontal	FB 18	1	17	writing	=
+F 11.3	F MnpTable2_Up	Flag Manipulo Mesa 2 Vertical	FB 18	1	19	writing	=
+F 11.4	F MnpTable2_Down	Flag Manipulo Mesa 2 Horizontal	FB 18	1	21	writing	=
+FW 16			FB 10	1	15	writing?	
+FW 16			FB 10	1	21	reading	L
+FW 18			FB 10	1	20	writing	T
+FW 18			FB 10	1	22	reading	L
+FW 20			FB 10	1	24	writing	T
+FW 20			FB 10	1	25	reading	L
+FW 20			FB 10	1	37	writing	T
+FW 20			FB 10	1	40	reading?	
+FW 20			FB 10	1	43	writing?	
+FW 20			FB 10	1	45	reading	L
+FW 20			FB 10	1	48	writing	T
+FW 20			FB 10	1	53	writing	T
+FW 20			FB 10	1	57	reading	L
+FW 20			FB 10	1	65	reading	L
+FW 22			PB 20	1	25	reading	L
+FW 22			FB 10	1	58	writing	T
+FW 24			PB 20	1	6	reading	L
+FW 24			PB 21	1	7	reading	L
+FW 24			PB 21	1	14	reading	L
+FW 24			FB 10	1	66	writing	T
+FW 26			OB 1	5	32	reading	L
+FW 26			FB 11	1	61	writing	T
+FW 26			FB 11	1	72	writing	T
+FW 26			FB 11	1	79	writing	T
+FW 30			FB 11	1	15	writing?	
+FW 30			FB 11	1	18	reading	L
+FW 30			FB 11	1	23	reading	L
+FW 30			FB 11	1	37	reading?	
+FW 30			FB 11	1	43	writing?	
+FW 30			FB 11	1	48	reading?	
+FW 30			FB 11	1	51	writing?	
+FW 30			FB 11	1	69	reading	L
+FW 30			FB 11	1	76	reading	L
+FW 32			FB 12	1	6	writing	T
+FW 32			FB 12	1	16	reading	L
+FW 32			FB 12	1	53	reading	L
+FW 32			FB 12	1	55	writing	T
+FW 32			FB 13	1	6	writing	T
+FW 32			FB 13	1	33	reading	L
+FW 32			FB 13	1	35	writing	T
+FW 34			FB 10	1	2	reading	L
+FW 34			FB 11	1	2	reading	L
+FW 34			FB 12	1	7	reading	L
+FW 34			FB 12	1	15	reading	L
+FW 34			FB 12	1	18	writing	T
+FW 34			FB 12	1	27	writing	T
+FW 34			FB 13	1	7	reading	L
+FW 34			FB 14	1	6	writing	T
+FW 34			FB 14	1	10	reading	L
+FW 34			FB 14	1	22	writing	T
+FW 34			FB 14	1	26	reading	L
+FW 34			FB 14	1	38	writing	T
+FW 34			FB 14	1	42	reading	L
+FW 34			FB 15	2	18	writing	T
+FW 34			FB 15	2	21	reading	L
+FW 34			FB 15	3	20	writing	T
+FW 34			FB 15	3	24	reading	L
+FW 34			FB 15	3	36	writing	T
+FW 34			FB 15	3	40	reading	L
+FW 34			FB 15	3	52	writing	T
+FW 34			FB 15	3	56	reading	L
+FW 34			FB 15	4	21	writing	T
+FW 34			FB 15	4	25	reading	L
+FW 34			FB 15	4	37	writing	T
+FW 34			FB 15	4	41	reading	L
+FW 34			FB 15	4	52	reading	L
+FW 34			FB 15	4	64	writing	T
+FW 34			FB 15	4	68	reading	L
+FW 34			FB 15	4	79	writing	T
+FW 34			FB 15	4	83	reading	L
+FW 34			FB 15	5	20	writing	T
+FW 34			FB 15	5	24	reading	L
+FW 34			FB 15	5	36	writing	T
+FW 34			FB 15	5	40	reading	L
+FW 34			FB 15	5	52	writing	T
+FW 34			FB 15	5	56	reading	L
+FW 34			FB 15	6	20	writing	T
+FW 34			FB 15	6	24	reading	L
+FW 34			FB 15	6	36	writing	T
+FW 34			FB 15	6	40	reading	L
+FW 34			FB 15	6	52	writing	T
+FW 34			FB 15	6	56	reading	L
+FW 34			FB 16	1	4	reading?	
+F 34.2			FB 15	4	49	reading	AN
+FY 36			FB 10	1	42	writing?	
+FY 36			FB 11	1	50	writing?	
+FW 36			FB 10	1	16	writing?	
+FW 36			FB 11	1	16	writing?	
+FW 36			FB 11	1	44	writing?	
+FW 36			FB 16	1	11	writing?	
+FW 38			FB 14	1	20	writing	T
+FW 38			FB 15	3	15	writing	T
+FW 38			FB 15	4	16	writing	T
+FW 38			FB 15	5	15	writing	T
+FW 38			FB 15	6	15	writing	T
+FW 38			FB 16	1	5	reading?	
+FW 40			FB 10	1	6	writing	T
+FW 40			FB 10	1	10	reading?	
+FW 40			FB 10	1	18	reading	L
+FW 42			FB 11	1	6	writing	T
+FW 42			FB 11	1	10	reading?	
+FW 50			FB 18	1	5	writing	T
+FW 50			FB 18	1	9	reading	L
+DW 0	DW Speed 0	Data DW0 Velocidade	PB 20	1	41	reading	L
+DW 0	DW Speed 0	Data DW0 Velocidade	PB 21	1	36	reading	L
+DW 0	DW Speed 0	Data DW0 Velocidade	FB 15	2	17	reading	L
+DW 0	DW Speed 0	Data DW0 Velocidade	FB 15	2	22	writing	T
+DW 1	DW1???		OB 1	10	55	reading	L
+DW 1	DW1???		PB 20	1	103	reading	L
+DW 1	DW1???		PB 21	1	72	reading	L
+DW 1	DW1???		FB 14	1	37	reading	L
+DW 1	DW1???		FB 14	1	43	writing	T
+DW 2	DW2???		PB 20	1	107	reading	L
+DW 2	DW2???		FB 13	1	8	reading	L
+DW 2	DW2???		FB 14	1	5	reading	L
+DW 2	DW2???		FB 14	1	11	writing	T
+DW 3	DW Speed 3	Data DW3 Velocidade	PB 30	1	18	reading	L
+DW 3	DW Speed 3	Data DW3 Velocidade	PB 31	1	14	reading	L
+DW 3	DW Speed 3	Data DW3 Velocidade	FB 15	4	20	reading	L
+DW 3	DW Speed 3	Data DW3 Velocidade	FB 15	4	26	writing	T
+DW 4	DW Speed 4	Data DW4 Velocidade	PB 30	1	27	reading	L
+DW 4	DW Speed 4	Data DW4 Velocidade	FB 15	4	36	reading	L
+DW 4	DW Speed 4	Data DW4 Velocidade	FB 15	4	42	writing	T
+DW 5	DW5???		PB 30	1	31	reading	L
+DW 5	DW5???		PB 31	1	25	reading	L
+DW 6	DW Speed 6	Data DW6 Velocidade	PB 32	1	13	reading	L
+DW 6	DW Speed 6	Data DW6 Velocidade	PB 33	1	10	reading	L
+DW 6	DW Speed 6	Data DW6 Velocidade	FB 15	4	53	writing	T
+DW 7	DW Speed 7	Data DW7 Velocidade	PB 32	1	22	reading	L
+DW 7	DW Speed 7	Data DW7 Velocidade	FB 15	4	63	reading	L
+DW 7	DW Speed 7	Data DW7 Velocidade	FB 15	4	69	writing	T
+DW 8	DW Speed 8	Data DW8 Velocidade	PB 32	1	26	reading	L
+DW 8	DW Speed 8	Data DW8 Velocidade	PB 33	1	21	reading	L
+DW 8	DW Speed 8	Data DW8 Velocidade	FB 15	4	78	reading	L
+DW 8	DW Speed 8	Data DW8 Velocidade	FB 15	4	84	writing	T
+DW 9	DW Speed 9	Data DW9 Velocidade	PB 40	1	12	reading	L
+DW 9	DW Speed 9	Data DW9 Velocidade	PB 41	1	11	reading	L
+DW 9	DW Speed 9	Data DW9 Velocidade	FB 15	3	19	reading	L
+DW 9	DW Speed 9	Data DW9 Velocidade	FB 15	3	25	writing	T
+DW 10	DW Speed 10	Data DW10 Velocidade	PB 40	1	21	reading	L
+DW 10	DW Speed 10	Data DW10 Velocidade	FB 15	3	35	reading	L
+DW 10	DW Speed 10	Data DW10 Velocidade	FB 15	3	41	writing	T
+DW 11	DW Speed 11	Data DW11 Velocidade	PB 40	1	25	reading	L
+DW 11	DW Speed 11	Data DW11 Velocidade	PB 41	1	22	reading	L
+DW 11	DW Speed 11	Data DW11 Velocidade	FB 15	3	51	reading	L
+DW 11	DW Speed 11	Data DW11 Velocidade	FB 15	3	57	writing	T
+DW 12	DW Speed 12	Data DW12 Velocidade	PB 50	1	28	reading	L
+DW 12	DW Speed 12	Data DW12 Velocidade	PB 51	1	30	reading	L
+DW 12	DW Speed 12	Data DW12 Velocidade	FB 15	5	19	reading	L
+DW 12	DW Speed 12	Data DW12 Velocidade	FB 15	5	25	writing	T
+DW 13	DW Speed 13	Data DW13 Velocidade	PB 50	1	46	reading	L
+DW 13	DW Speed 13	Data DW13 Velocidade	PB 51	1	52	reading	L
+DW 13	DW Speed 13	Data DW13 Velocidade	FB 15	5	35	reading	L
+DW 13	DW Speed 13	Data DW13 Velocidade	FB 15	5	41	writing	T
+DW 14	DW Speed 14	Data DW14 Velocidade	PB 50	1	52	reading	L
+DW 14	DW Speed 14	Data DW14 Velocidade	PB 51	1	58	reading	L
+DW 14	DW Speed 14	Data DW14 Velocidade	FB 15	5	51	reading	L
+DW 14	DW Speed 14	Data DW14 Velocidade	FB 15	5	57	writing	T
+DW 15	DW Speed 15	Data DW15 Velocidade	FB 15	6	19	reading	L
+DW 15	DW Speed 15	Data DW15 Velocidade	FB 15	6	25	writing	T
+DW 16	DW Speed 16	Data DW16 Velocidade	FB 15	6	35	reading	L
+DW 16	DW Speed 16	Data DW16 Velocidade	FB 15	6	41	writing	T
+DW 17	DW Speed 17	Data DW17 Velocidade	FB 15	6	51	reading	L
+DW 17	DW Speed 17	Data DW17 Velocidade	FB 15	6	57	writing	T
+DW 18	DW18???		PB 50	1	57	reading	L
+DW 18	DW18???		PB 51	1	63	reading	L
+DW 18	DW18???		FB 14	1	21	reading	L
+DW 18	DW18???		FB 14	1	27	writing	T
+DW 20	DW20 FB10RO		FB 10	1	9	reading?	
+DW 22	DW22 FB10RO		FB 10	1	26	reading	L
+DW 22	DW22 FB10RO		FB 10	1	36	reading	L
+DW 23	DW23 FB10RO		FB 10	1	52	reading	L
+DW 24	DW24 FB10RO		FB 10	1	46	reading	L
+DW 25	DW25 FB10RO		FB 10	1	4	reading	L
+DW 26	DW26 FB11RO		FB 11	1	4	reading	L
+DW 27	DW27 FB12-13RO		FB 12	1	5	reading	L
+DW 27	DW27 FB12-13RO		FB 13	1	5	reading	L
+DW 28	DW28 FB12RO		FB 12	1	8	reading	L
+DW 28	DW28 FB12RO		FB 12	1	19	reading	L
+DW 28	DW28 FB12RO		FB 12	1	26	reading	L
+DW 31	DW31 FB11RO		FB 11	1	38	reading?	
+DW 32	DW32 FB11RO		FB 11	1	9	reading?	
+DW 33	DW33 FB11RO		FB 11	1	19	reading	L
+DW 34	DW34 FB11RO		FB 11	1	60	reading	L
+DW 35	DW35 FB11RO		FB 11	1	70	reading	L
+DW 36	DW36 FB11RO		FB 11	1	77	reading	L
+DW 37	DW37 FB11RO		FB 11	1	24	reading	L
+DW 39	DW39 FB15RO		FB 15	3	14	reading	L
+DW 40	DW40 FB15RO		FB 15	4	15	reading	L
+DW 41	DW41 FB14-15RO		FB 14	1	19	reading	L
+DW 41	DW41 FB14-15RO		FB 15	5	14	reading	L
+DW 42	DW42 FB15R0		FB 15	6	14	reading	L
+DW 44	DW44 FB18RO		FB 18	1	3	reading	L
+DW 44	DW44 FB18RO		FB 18	1	7	reading	L
+T 0	XXX_T0	SF KT060.2 =60s	OB 1	2	15	reading	AN
+T 0	XXX_T0	SF KT060.2 =60s	OB 1	2	38	writing	SF
+T 1	XXX_T1	SD KT600.1 =60s	OB 1	2	24	reading	O
+T 1	XXX_T1	SD KT600.1 =60s	OB 1	2	41	reading	O
+T 1	XXX_T1	SD KT600.1 =60s	OB 1	3	9	writing	SD
+T 1	XXX_T1	SD KT600.1 =60s	OB 1	6	4	reading	A
+T 2	XXX_T2	SP KT080.1 = 8s	OB 1	2	47	writing	SP
+T 2	XXX_T2	SP KT080.1 = 8s	OB 1	2	49	reading	A
+T 2	XXX_T2	SP KT080.1 = 8s	OB 1	2	55	reading	AN
+T 3	XXX_T3	SD KT400.1 =40s	OB 1	4	3	reading	A
+T 3	XXX_T3	SD KT400.1 =40s	OB 1	4	16	writing	SD
+T 4	XXX_T4	SD KT030.2 =30s	OB 1	6	6	writing	SD
+T 4	XXX_T4	SD KT030.2 =30s	OB 1	6	8	reading	A
+T 5	XXX_T5	SD KT050.1 = 5s	OB 1	7	11	writing	SD
+T 5	XXX_T5	SD KT050.1 = 5s	OB 1	7	14	reading	A
+T 6	XXX_T6	SD KT050.1 = 5s	OB 1	7	36	writing	SD
+T 6	XXX_T6	SD KT050.1 = 5s	OB 1	7	39	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	OB 1	9	7	writing	SD
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 20	1	67	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 21	1	38	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 21	1	45	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 30	1	20	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 31	1	16	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 32	1	15	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 33	1	12	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 40	1	14	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 41	1	13	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 50	1	30	reading	A
+T 7	XXX_T7	SD KT050.0 =0,5s	PB 51	1	32	reading	A
+T 8	XXX_T8	SD KT020.1 = 2s	OB 1	8	22	writing	SD
+T 8	XXX_T8	SD KT020.1 = 2s	PB 50	1	4	reading	AN
+T 8	XXX_T8	SD KT020.1 = 2s	PB 50	1	7	reading	A
+T 8	XXX_T8	SD KT020.1 = 2s	PB 51	1	4	reading	AN
+T 8	XXX_T8	SD KT020.1 = 2s	PB 51	1	7	reading	A
+T 9	XXX_T9	SD KT010.0 =0,1s	OB 1	9	10	reading	A
+T 9	XXX_T9	SD KT010.0 =0,1s	OB 1	9	19	writing	SD
+T 10	XXX_T10	SD KT010.0 =0,1s	OB 1	9	14	reading	A
+T 10	XXX_T10	SD KT010.0 =0,1s	OB 1	9	23	writing	SD
+T 11	XXX_T11	SD KT015.1 =1,5s	OB 1	7	75	reading	A
+T 11	XXX_T11	SD KT015.1 =1,5s	OB 1	7	80	writing	SD
+T 12			PB 20	1	7	writing	SP
+T 12			PB 20	1	17	reading	A
+T 12			PB 21	1	8	writing	SP
+T 12			PB 21	1	20	reading	A
+T 13	XXX_T13	SD KT005.1 =0,5s	OB 1	1	57	writing	SD
+T 13	XXX_T13	SD KT005.1 =0,5s	OB 1	1	59	reading	A
+T 14	XXX_Laser_T14	SE KT300.1 =30s	OB 1	1	141	writing	SE
+T 14	XXX_Laser_T14	SE KT300.1 =30s	OB 1	1	148	reading	AN
+T 15	Tmr Laser 5m	Timer 5m Laser	OB 1	1	158	writing	SD
+T 15	Tmr Laser 5m	Timer 5m Laser	OB 1	1	160	reading	A
+T 16			PB 20	1	26	writing	SP
+T 16			PB 20	1	36	reading	A
+T 16			PB 21	1	15	writing	SP
+T 16			PB 21	1	33	reading	A
+T 17	XXX_T17	SE KT020.1 = 2s	OB 1	1	109	reading	AN
+T 17	XXX_T17	SE KT020.1 = 2s	OB 1	1	112	writing	SE
+T 17	XXX_T17	SE KT020.1 = 2s	OB 1	1	114	reading	A
+T 17	XXX_T17	SE KT020.1 = 2s	OB 1	1	122	reading	A
+T 18	XXX_T18	SF KT030.1 = 3s	OB 1	10	50	writing	SF
+T 18	XXX_T18	SF KT030.1 = 3s	OB 1	10	52	reading	A
+T 19	XXX_T19	SD	OB 1	5	33	writing	SD
+T 19	XXX_T19	SD	OB 1	5	38	reading	A
+T 20	XXX_T20	SD KT020.1 = 2s	OB 1	2	6	writing	SD
+T 20	XXX_T20	SD KT020.1 = 2s	OB 1	2	10	reading	A
+T 21	XXX_T21	SD KT020.1 = 2s	OB 1	2	20	writing	SD
+T 21	XXX_T21	SD KT020.1 = 2s	OB 1	2	28	reading	A
+T 22	XXX_T22	SD KT050.1 = 5s	OB 1	7	27	writing	SD
+T 22	XXX_T22	SD KT050.1 = 5s	OB 1	9	51	reading	A
+T 22	XXX_T22	SD KT050.1 = 5s	OB 1	9	57	reading	A
+T 24	XXX_T24	SE KT020.1 = 2s	OB 1	6	31	writing	SE
+T 24	XXX_T24	SE KT020.1 = 2s	OB 1	6	33	reading	A
+T 25	XXX_T25	SE KT180.3 = 30m	OB 1	6	29	reading	AN
+T 25	XXX_T25	SE KT180.3 = 30m	OB 1	6	37	writing	SE
+T 26	Tmr TableHidraulics	Timer 120s hidraulica das mesas	FB 18	1	46	writing	SE
+T 26	Tmr TableHidraulics	Timer 120s hidraulica das mesas	FB 18	1	47	reading	A
+C 1	C Mnp Fast	Counter 3x para aceder a velocidades	OB 1	1	116	writing	S
+C 1	C Mnp Fast	Counter 3x para aceder a velocidades	OB 1	1	119	reading	CD
+C 1	C Mnp Fast	Counter 3x para aceder a velocidades	OB 1	1	121	reading	AN
+C 2	C2???		FB 12	1	31	writing	S
+C 2	C2???		FB 12	1	34	reading	CD
+C 2	C2???		FB 12	1	36	reading	AN
+C 2	C2???		FB 12	1	49	reading	O
+C 3	C3???		FB 13	1	11	writing	S
+C 3	C3???		FB 13	1	14	reading	CD
+C 3	C3???		FB 13	1	16	reading	AN
+C 3	C3???		FB 13	1	29	reading	O
+PB 9			OB 1	1	134	reading	JC
+PB 10			OB 1	8	44	reading	JC
+PB 11			OB 1	8	56	reading	JC
+PB 20			PB 10	1	7	reading	JC
+PB 21			PB 11	1	11	reading	JC
+PB 30			PB 10	1	16	reading	JC
+PB 31			PB 11	1	25	reading	JC
+PB 32			PB 30	1	1	reading	JC
+PB 33			PB 31	1	1	reading	JC
+PB 40			PB 10	1	27	reading	JC
+PB 41			PB 11	1	38	reading	JC
+PB 50			PB 10	1	46	reading	JC
+PB 51			PB 11	1	52	reading	JC
+PB 52			PB 10	1	54	reading	JC
+PB 53			PB 11	1	63	reading	JC
+FB 10			FB 12	1	41	reading	JC
+FB 10			FB 13	1	21	reading	JC
+FB 11			FB 12	1	45	reading	JC
+FB 11			FB 13	1	25	reading	JC
+FB 12			FB 17	1	3	reading	JC
+FB 13			FB 17	1	6	reading	JC
+FB 14			OB 1	10	37	reading	JC
+FB 15			OB 1	1	130	reading	JC
+FB 16			FB 14	1	28	reading	JU
+FB 16			FB 15	3	26	reading	JU
+FB 16			FB 15	3	42	reading	JU
+FB 16			FB 15	3	58	reading	JU
+FB 16			FB 15	4	27	reading	JU
+FB 16			FB 15	4	43	reading	JU
+FB 16			FB 15	4	54	reading	JU
+FB 16			FB 15	4	70	reading	JU
+FB 16			FB 15	4	85	reading	JU
+FB 16			FB 15	5	26	reading	JU
+FB 16			FB 15	5	42	reading	JU
+FB 16			FB 15	5	58	reading	JU
+FB 16			FB 15	6	26	reading	JU
+FB 16			FB 15	6	42	reading	JU
+FB 16			FB 15	6	58	reading	JU
+FB 17			FB 14	1	7	reading	JU
+FB 17			FB 14	1	23	reading	JU
+FB 17			FB 14	1	39	reading	JU
+FB 17			FB 15	2	19	reading	JU
+FB 17			FB 15	3	21	reading	JU
+FB 17			FB 15	3	37	reading	JU
+FB 17			FB 15	3	53	reading	JU
+FB 17			FB 15	4	22	reading	JU
+FB 17			FB 15	4	38	reading	JU
+FB 17			FB 15	4	50	reading	JU
+FB 17			FB 15	4	65	reading	JU
+FB 17			FB 15	4	80	reading	JU
+FB 17			FB 15	5	21	reading	JU
+FB 17			FB 15	5	37	reading	JU
+FB 17			FB 15	5	53	reading	JU
+FB 17			FB 15	6	21	reading	JU
+FB 17			FB 15	6	37	reading	JU
+FB 17			FB 15	6	53	reading	JU
+FB 18			OB 1	6	38	reading	JU
+FB 241			FB 10	1	38	reading	JU
+FB 241			FB 11	1	46	reading	JU
+FB 243			FB 10	1	7	reading	JU
+FB 243			FB 11	1	7	reading	JU
+FB 243			FB 11	1	35	reading	JU
+FB 243			FB 16	1	2	reading	JU

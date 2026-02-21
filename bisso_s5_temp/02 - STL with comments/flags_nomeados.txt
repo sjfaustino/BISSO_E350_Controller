@@ -1,0 +1,113 @@
+=================================================================
+SISTEMA: SERRA DE PONTE AUTOMÁTICA (PLC SIEMENS S5 - AWL)
+ARQUIVO: flags_nomeados.txt
+DATA: 2025-11-02
+AUTOR: Grok (xAI) - Análise baseada em lógica STL
+=================================================================
+
+LEGENDAS:
+- F = Flag (bit de memória)
+- ?? = Nome inferido (não confirmado no código original)
+- I = Input (entrada física)
+- Q = Output (saída física)
+- T = Timer
+- DW/FW = Data Word / Flag Word (valores de velocidade, posição)
+
+=================================================================
+FLAGS (F) - NOMES SUGERIDOS
+=================================================================
+
+F 0.0    ??Mode_Auto                     ; Ativado por I 2.0 + condições → Modo automático
+F 0.1    ??Mode_Manual_Fwd               ; Manipulo frente (I 2.1)
+F 0.2    ??Mode_Manual_Rev               ; Manipulo trás (I 2.2)
+F 0.3    ??Mode_Manual_Left              ; Manipulo esquerda (I 2.3)
+F 0.4    Spianatura_Active               ; Modo nivelamento automático ativo
+F 0.5    ??Toggle_Clock                   ; T13 (0.5s) pulse – clock for F0.6/F1.2 toggle flip-flop
+F 0.6    ??Toggle_State                   ; Flip-flop state latch, toggled by F0.5 clock
+F 0.7    General_Enable                  ; Habilitação geral do sistema
+
+F 1.2    ??Toggle_Output                  ; Toggle flip-flop output: SET when F0.5=1 AND F0.6=0, RESET when F0.5=1 AND F0.6=1
+F 1.6    ??System_Ready                  ; Pré-condição para ligar contatores (Q6.x)
+
+F 2.0    ??Speed_Plus_Active             ; Botão +Vel (I 4.5) + I 2.7
+F 2.1    ??Speed_Minus_Active            ; Botão -Vel (I 4.6) + F 0.4
+F 2.2    ??Speed_Adjusting               ; Qualquer ajuste de velocidade ativo
+F 2.3    ??Speed_Up_Pressed              ; Botão I 4.5 (Aumentar velocidade)
+F 2.4    ??Speed_Down_Pressed            ; Botão I 4.6 (Diminuir velocidade)
+
+F 3.0    ??Auto_Mode_Active              ; Modo automático completo (usado em PB30/PB32)
+F 3.2    ??Fast_Mode_Active              ; Velocidade alta (I72.5 + I72.2)
+F 3.3    ??Medium_Mode_Active            ; Velocidade média (fallback)
+F 3.4    ??Medium_Mode_Override          ; Força velocidade média mesmo com fast
+F 3.5    ??Speed_Plus_Flag               ; Flag de +Speed (usada em OB1)
+F 3.6    ??Speed_Minus_Flag              ; Flag de -Speed
+
+F 4.0    ??Direction_Forward_Active      ; Direção positiva: frente, subir, direita, horário
+F 4.1    ??Direction_Reverse_Active      ; Direção negativa: trás, descer, esquerda, anti-horário
+F 4.5    ??Movement_Active               ; Qualquer eixo em movimento (ativa rampa)
+
+F 5.0    ??All_Axes_Stopped              ; Todos os eixos parados (usado em PB10)
+F 5.4    ??General_Fault                 ; Falha geral (bloqueia movimento)
+
+F 6.0    ??Axis_FwdRev_Selected          ; Eixo Avanço/Recuo selecionado
+F 6.1    ??Axis_LeftRight_Selected       ; Eixo Esquerda/Direita selecionado
+F 6.2    ??Axis_RotTable_Selected        ; Rotação da mesa selecionada
+F 6.3    ??Speed_Edit_Mode               ; Speed parameter editing mode (set by 3x I3.7 press within 2s via C1)
+F 6.4    ??Axis_FwdRev_Active            ; Eixo Avanço/Recuo em execução
+F 6.5    ??Axis_UpDown_Active            ; Eixo Vertical em execução
+F 6.6    ??Axis_LeftRight_Active         ; Eixo Translação em execução
+F 6.7    ??Axis_RotTable_Active          ; Rotação da mesa em execução
+
+F 10.0   ??Position_Changed              ; IW 8 ≠ FW 50 → Mudança de posição detectada
+F 10.1   ??Table1_Up_Active              ; I 9.0 → Subir Mesa 1
+F 10.2   ??Table1_Down_Active            ; I 9.1 → Baixar Mesa 1
+F 10.3   ??Table2_Up_Active              ; I 9.2 → Subir Mesa 2
+F 10.4   ??Table2_Down_Active            ; I 9.3 + I 9.0 OFF → Baixar Mesa 2
+
+F 11.0   ??Table1_Switch1                ; I 9.0 (botão físico)
+F 11.1   ??Table1_Switch2                ; I 9.1 (botão físico)
+
+=================================================================
+TIMERS (T) - NOMES SUGERIDOS
+=================================================================
+
+T 7      ??Ramp_Delay_Timer              ; Rampa de aceleração (1-2s) em todos os eixos
+T 8      ??Table_Lock_Debounce           ; Debounce para trava da mesa (Q8.7)
+T 12     ??Ramp_Forward_Timer            ; Rampa no avanço (FW24)
+T 16     ??Ramp_Reverse_Timer            ; Rampa no recuo (FW22)
+T 18     ??Speed_Adjust_Timer            ; Debounce de botões de velocidade
+T 26     ??Hydraulic_Pulse_Timer         ; Pulso de 12s para hidráulica
+
+=================================================================
+SAÍDAS (Q) - NOMES SUGERIDOS
+=================================================================
+
+Q 6.0    Contactor_FwdRev                ; Contator Avanço/Recuo (C3)
+Q 6.1    Contactor_LeftRight             ; Contator Esquerda/Direita (C4)
+Q 6.2    Contactor_UpDown_Partial        ; Contator Vertical Parcial (C5)
+Q 6.3    Contactor_UpDown_Full           ; Contator Vertical Completo (C6)
+Q 6.4    Contactor_RotTable              ; Contator Rotação Mesa (C7)
+Q 6.5    Contactor_DiskRot               ; Contator Rotação Disco (C9)
+
+Q 72.7   ??Relay_Table2_Down             ; Relé Exterior Baixar Mesa 2 (R3)
+Q 73.5   ??Relay_Advance_Repeat          ; Repetição FC Avanço
+Q 73.6   ??Relay_Left_Repeat             ; Repetição FC Esquerda
+Q 73.7   ??Relay_Table1_Up               ; Relé Exterior Subir Mesa 1 (R4)
+
+Q 8.7    Table_Lock_Relay                ; Trava da Mesa (ativa rotação)
+
+=================================================================
+ENTRADAS (I) - NOMES CONFIRMADOS
+=================================================================
+
+I 72.0   Elbo_Medium                     ; ELBO médio (2°-5°)
+I 72.1   Cmd_Transl                      ; Comando translação
+I 72.2   Cmd_Rot                         ; Comando rotação/inclinação
+I 72.3   Cmd_LockTable                   ; Trava da mesa
+I 72.5   Elbo_Fast                       ; ELBO rápido (>5°)
+I 72.6   Elbo_Slow                       ; ELBO lento (<2°)
+I 72.7   Elbo_Emergency                  ; Parada de emergência via ELBO
+
+=================================================================
+FIM DO ARQUIVO
+=================================================================

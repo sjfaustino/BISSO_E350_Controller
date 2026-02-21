@@ -1,0 +1,19 @@
+/******************************************************************
+ *  FILE: FB251.AWL
+ *  PURPOSE: RLG:AA – Analog output scaling (RLG = Regelung, Analog Output).
+ *  INPUTS: XE (Analog value), BG (Device), KNKT (Channel), OGR/UGR (Limits)
+ *  OUTPUTS: FEH (Error flag), BU (Busy bit)
+ *  CALLED BY: Possibly for VFD speed reference output.
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    RLG:AA
+DECL:    XE      IW      // DECLARE INPUT WORD XE (Analog input value to scale)
+DECL:    BG      DKF     // DECLARE DEVICE CONSTANT FIXED BG (Peripheral address)
+DECL:    KNKT    DKY     // DECLARE DEVICE CONSTANT BYTE KNKT (Channel number)
+DECL:    OGR     DKF     // DECLARE DEVICE CONSTANT FIXED OGR (Upper limit)
+DECL:    UGR     DKF     // DECLARE DEVICE CONSTANT FIXED UGR (Lower limit)
+DECL:    FEH     QBI     // DECLARE OUTPUT BIT INDICATOR FEH (Error flag)
+DECL:    BU      QBI     // DECLARE OUTPUT BIT INDICATOR BU (Busy bit)
+
+BE                       // BLOCK END (System block – no user code; internal analog write/scale)

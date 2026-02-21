@@ -1,0 +1,428 @@
+/******************************************************************
+ *  FILE: FB15.AWL
+ *  PURPOSE: HELP. – Fast mode helper for manual axis control, speed scaling.
+ *  INPUTS: I3.7 (Fast cmd), F7.0-7.5 (Axis flags), I4.5/I4.6 (Speed +/-), I2.4-3.5 (Manipulos)
+ *  OUTPUTS: F6.3 (Fast mode), Q73.0/Q73.3/Q73.4 (Elbo consensus), QW66 (Speed), DW0/DW3-17 (Speeds)
+ *  CALLED BY: OB1
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    HELP.
+
+//===============================================================
+// NETWORK 1 : Fast Mode Reset and Flags
+//===============================================================
+A    I 3.7               // IF Mnp FastCmd (Manipulo Botoneira Rapido (56)) IS ON
+AN   F 7.0               // AND IF F7.0 IS OFF
+AN   F 7.1               // AND F7.1 IS OFF
+AN   F 7.2               // AND F7.2 IS OFF
+AN   F 7.3               // AND F7.3 IS OFF
+AN   F 7.4               // AND F7.4 IS OFF
+AN   F 7.5               // AND F7.5 IS OFF
+R    F 6.3               // TURN OFF Flag FB12 6.3 (Fast mode enabled)
+
+AN   F 6.3               // IF Flag FB12 6.3 IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+A    F 7.6               // IF F7.6 IS ON
+A    I 3.7               // AND Mnp FastCmd IS ON
+S    F 7.7               // TURN ON F7.7
+
+A    F 7.6               // IF F7.6 IS ON
+R    F 7.6               // TURN OFF F7.6
+
+AN   I 3.7               // IF Mnp FastCmd IS OFF
+R    F 7.7               // TURN OFF F7.7
+
+A    I 3.7               // IF Mnp FastCmd IS ON
+AN   F 7.7               // AND F7.7 IS OFF
+S    F 7.6               // TURN ON F7.6
+
+A    F 8.2               // IF F8.2 IS ON
+A    F 7.6               // AND F7.6 IS ON
+R    F 8.2               // TURN OFF F8.2
+
+A    F 8.0               // IF F8.0 IS ON
+A    F 7.6               // AND F7.6 IS ON
+S    F 8.1               // TURN ON F8.1
+
+A    F 8.1               // IF F8.1 IS ON
+AN   F 8.0               // AND F8.0 IS OFF
+A    F 7.6               // AND F7.6 IS ON
+S    F 8.2               // TURN ON F8.2
+
+A    F 8.2               // IF F8.2 IS ON
+R    F 8.1               // TURN OFF F8.1
+
+A    F 8.1               // IF F8.1 IS ON
+R    F 8.0               // TURN OFF F8.0
+
+AN   F 8.0               // IF F8.0 IS OFF
+AN   F 8.1               // AND F8.1 IS OFF
+AN   F 8.2               // AND F8.2 IS OFF
+A    F 7.6               // AND F7.6 IS ON
+A(                       
+O    F 7.0               // OR IF F7.0 IS ON
+O    F 7.1               // OR F7.1 IS ON
+O    F 7.2               // OR F7.2 IS ON
+O    F 7.3               // OR F7.3 IS ON
+O    F 7.4               // OR F7.4 IS ON
+O    F 7.5               // OR F7.5 IS ON
+)                        
+S    F 8.0               // TURN ON F8.0
+
+A(                       
+O    F 8.1               // OR IF F8.1 IS ON
+O    F 8.0               // OR F8.0 IS ON
+)                        
+A    F 1.2               // AND F1.2 IS ON
+=    Q 73.3              // TURN ON XXX_Q73.3 (??? Consenso a Elbo per Autom./Manuale)
+
+O(                       
+A    F 8.0               // OR IF (F8.0 IS ON
+AN   F 1.2               // AND F1.2 IS OFF)
+)                        
+O(                       
+A    F 8.2               // OR IF (F8.2 IS ON
+A    F 1.2               // AND F1.2 IS ON)
+)                        
+=    Q 73.4              // TURN ON XXX_Q73.4 (??? Repetizione FC Avanzamento Avanti)
+
+A    I 4.5               // IF Mnp + Speed (Manipulo Aumentar Velocidade (62)) IS ON
+AN   I 4.6               // AND Mnp - Speed IS OFF
+=    F 3.5               // TURN ON F Mnp +Speed
+
+AN   I 4.5               // IF Mnp + Speed IS OFF
+A    I 4.6               // AND Mnp - Speed (Manipulo Diminuir Velocidade (63)) IS ON
+=    F 3.6               // TURN ON F Mnp -Speed
+
+A(                       
+O    F 7.0               // OR IF F7.0 IS ON
+O    F 7.1               // OR F7.1 IS ON
+O    F 7.2               // OR F7.2 IS ON
+O    F 7.3               // OR F7.3 IS ON
+O    F 7.4               // OR F7.4 IS ON
+O    F 7.5               // OR F7.5 IS ON
+)                        
+AN   F 1.2               // AND F1.2 IS OFF
+=    Q 73.0              // TURN ON XXX_Q73.0 (??? Consenso a Elbo per cala automatica)
+
+//===============================================================
+// NETWORK 2 : Fwd/Rev Axis (I2.6/I2.7)
+//===============================================================
+A(                       
+O    I 2.6               // OR IF Mnp Front (Manipulo Avanco (48)) IS ON
+O    I 2.7               // OR Mnp Back (Manipulo Recuo (49)) IS ON
+)                        
+AN   F 7.1               // AND F7.1 IS OFF
+AN   F 7.2               // AND F7.2 IS OFF
+AN   F 7.3               // AND F7.3 IS OFF
+AN   F 7.4               // AND F7.4 IS OFF
+AN   F 7.5               // AND F7.5 IS OFF
+=    F 7.0               // TURN ON F7.0 (Fwd/Rev flag)
+
+AN   F 7.0               // IF F7.0 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+AN   F 8.0               // IF F8.0 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 0                // LOAD FROM DW Speed 0 (Data DW0 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 0                // TRANSFER TO DW0
+T    QW 66               // TRANSFER TO QW66
+M001: A    F 7.0           // IF F7.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 3 : Left/Right Axis (I2.4/I2.5)
+//===============================================================
+A(                       
+O    I 2.4               // OR IF Mnp Right (Manipulo Translacao Direita (46)) IS ON
+O    I 2.5               // OR Mnp Left (Manipulo Translacao Esquerda (47)) IS ON
+)                        
+AN   F 7.0               // AND F7.0 IS OFF
+AN   F 7.2               // AND F7.2 IS OFF
+AN   F 7.3               // AND F7.3 IS OFF
+AN   F 7.4               // AND F7.4 IS OFF
+AN   F 7.5               // AND F7.5 IS OFF
+=    F 7.1               // TURN ON F7.1 (Left/Right flag)
+
+AN   F 7.1               // IF F7.1 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 39               // LOAD FROM DW39 (Left/Right axis scale factor)
+T    FW 38               // TRANSFER TO FW38 (Scale)
+AN   F 8.0               // IF F8.0 IS OFF
+JC   =M002               // JUMP CONDITIONAL TO M002
+
+L    DW 3                // LOAD FROM DW Speed 3 (Data DW3 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 3                // TRANSFER TO DW3
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.0               // IF F8.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M002: AN   F 8.1           // IF F8.1 IS OFF
+JC   =M003               // JUMP CONDITIONAL TO M003
+
+L    DW 4                // LOAD FROM DW Speed 4 (Data DW4 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 4                // TRANSFER TO DW4
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.1               // IF F8.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M003: AN   F 8.2           // IF F8.2 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 11               // LOAD FROM DW Speed 11 (Data DW11 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 11               // TRANSFER TO DW11
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+M001: A    F 7.1           // IF F7.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 4 : Up/Down Axis (I3.0/I3.1)
+//===============================================================
+A(                       
+O    I 3.0               // OR IF Mnp Down (Manipulo Baixar (51)) IS ON
+O    I 3.1               // OR Mnp Up (Manipulo Subir (52)) IS ON
+)                        
+AN   I 4.3               // AND I4.3 (vertical axis safety interlock) IS OFF
+AN   F 7.0               // AND F7.0 IS OFF
+AN   F 7.1               // AND F7.1 IS OFF
+AN   F 7.3               // AND F7.3 IS OFF
+AN   F 7.4               // AND F7.4 IS OFF
+AN   F 7.5               // AND F7.5 IS OFF
+=    F 7.2               // TURN ON F7.2 (Up/Down flag)
+
+AN   F 7.2               // IF F7.2 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 40               // LOAD FROM DW40 (Up/Down axis scale factor)
+T    FW 38               // TRANSFER TO FW38 (Scale)
+AN   F 8.0               // IF F8.0 IS OFF
+JC   =M002               // JUMP CONDITIONAL TO M002
+
+L    DW 6                // LOAD FROM DW Speed 6 (Data DW6 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 6                // TRANSFER TO DW6
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.0               // IF F8.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M002: AN   F 8.1           // IF F8.1 IS OFF
+JC   =M003               // JUMP CONDITIONAL TO M003
+
+L    DW 7                // LOAD FROM DW Speed 7 (Data DW7 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 7                // TRANSFER TO DW7
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.1               // IF F8.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M003: AN   F 34.2          // IF F34.2 IS OFF
+JC   =M004               // JUMP CONDITIONAL TO M004
+
+L    DW 5                // LOAD FROM DW Speed 5 (Data DW5 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 6                // TRANSFER TO DW6
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.0               // IF F8.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+AN   F 8.1               // IF F8.1 IS OFF
+M001: JC   =M005           // JUMP CONDITIONAL TO M005
+
+L    DW 7                // LOAD FROM DW Speed 7 (Data DW7 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 7                // TRANSFER TO DW7
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+A    F 8.1               // IF F8.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M005: AN   F 8.2           // IF F8.2 IS OFF
+JC   =M006               // JUMP CONDITIONAL TO M006
+
+L    DW 8                // LOAD FROM DW Speed 8 (Data DW8 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 8                // TRANSFER TO DW8
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+M006: A    F 7.3           // IF F7.3 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 5 : Rot Table Axis (I3.2/I3.3)
+//===============================================================
+A(                       
+O    I 3.2               // OR IF Mnp RotMesHor (Manipulo Rotacao Mesa Horario (53)) IS ON
+O    I 3.3               // OR Mnp RotMesAnt (Manipulo Rotacao Mesa Anti-Horario (54)) IS ON
+)                        
+AN   F 7.0               // AND F7.0 IS OFF
+AN   F 7.1               // AND F7.1 IS OFF
+AN   F 7.2               // AND F7.2 IS OFF
+AN   F 7.3               // AND F7.3 IS OFF
+AN   F 7.5               // AND F7.5 IS OFF
+=    F 7.4               // TURN ON F7.4 (Rot Table flag)
+
+AN   F 7.4               // IF F7.4 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 41               // LOAD FROM DW41
+T    FW 38               // TRANSFER TO FW38
+AN   F 8.0               // IF F8.0 IS OFF
+JC   =M002               // JUMP CONDITIONAL TO M002
+
+L    DW 12               // LOAD FROM DW Speed 12 (Data DW12 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+
+L    FW 34               // LOAD FROM FW34
+T    DW 12               // TRANSFER TO DW12
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.0               // IF F8.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M002: AN   F 8.1           // IF F8.1 IS OFF
+JC   =M003               // JUMP CONDITIONAL TO M003
+
+L    DW 13               // LOAD FROM DW Speed 13 (Data DW13 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+
+L    FW 34               // LOAD FROM FW34
+T    DW 13               // TRANSFER TO DW13
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.1               // IF F8.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M003: AN   F 8.2           // IF F8.2 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 14               // LOAD FROM DW Speed 14 (Data DW14 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+
+L    FW 34               // LOAD FROM FW34
+T    DW 14               // TRANSFER TO DW14
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+M001: A    F 7.4           // IF F7.4 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 6 : Rot Disk Axis (I3.4/I3.5)
+//===============================================================
+A(                       
+O    I 3.4               // OR IF Mnp RotDskDown (Manipulo Rotacao Disco para baixo) IS ON
+O    I 3.5               // OR Mnp RotDskUp (Manipulo Rotaao Disco para cima) IS ON
+)                        
+AN   F 7.0               // AND F7.0 IS OFF
+AN   F 7.1               // AND F7.1 IS OFF
+AN   F 7.2               // AND F7.2 IS OFF
+AN   F 7.3               // AND F7.3 IS OFF
+AN   F 7.4               // AND F7.4 IS OFF
+=    F 7.5               // TURN ON F7.5 (Rot Disk flag)
+
+AN   F 7.5               // IF F7.5 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 42               // LOAD FROM DW42 FB15R0 (Scale?)
+T    FW 38               // TRANSFER TO FW38
+AN   F 8.0               // IF F8.0 IS OFF
+JC   =M002               // JUMP CONDITIONAL TO M002
+
+L    DW 15               // LOAD FROM DW Speed 15 (Data DW15 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+
+L    FW 34               // LOAD FROM FW34
+T    DW 15               // TRANSFER TO DW15
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.0               // IF F8.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M002: AN   F 8.1           // IF F8.1 IS OFF
+JC   =M003               // JUMP CONDITIONAL TO M003
+
+L    DW 16               // LOAD FROM DW Speed 16 (Data DW16 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+
+L    FW 34               // LOAD FROM FW34
+T    DW 16               // TRANSFER TO DW16
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 8.1               // IF F8.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M003: AN   F 8.2           // IF F8.2 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 17               // LOAD FROM DW Speed 17 (Data DW17 Velocidade)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+
+L    FW 34               // LOAD FROM FW34
+T    DW 17               // TRANSFER TO DW17
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+M001: BE                   // BLOCK END

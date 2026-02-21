@@ -1,0 +1,70 @@
+/******************************************************************
+ *  FILE: PB50.AWL
+ *  PURPOSE: Table Rotation Auto – Spianatura and lock table logic.
+ *  INPUTS: I72.3 (Cmd LockTable), I72.5/72.6 (Elbo), F0.4 (Spianatura), T8 (Timer)
+ *  OUTPUTS: Q8.7 (Lock?), Q6.4 (Contactor), F4.0/F4.1 (Dir), QW64 (Speed)
+ *  CALLED BY: PB10
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+A    F 1.6               // IF Enable IS ON
+AN   Q 8.7               // AND Q8.7 IS OFF
+S    Q 8.7               // TURN ON Q8.7 (Table lock?)
+
+AN   T 8                 // IF T8 IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+A    T 8                 // IF T8 IS RUNNING
+A    Q 8.7               // AND Q8.7 IS ON
+A    F 1.6               // AND Enable IS ON
+S    Q 6.4               // TURN ON C7
+
+A    I 72.3              // IF Cmd LockTable IS ON
+A    I 72.5              // AND Elbo Fast IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+O                        // OR
+AN   F 5.4               // IF F5.4 IS OFF
+A    F 0.4               // AND Spianatura IS ON
+A    F 0.7               // AND F0.7 IS ON
+A    I 72.5              // AND Elbo Fast IS ON
+A    I 72.0              // AND Elbo Medium IS ON
+=    F 4.0               // TURN ON F4.0
+
+A    I 72.3              // IF Cmd LockTable IS ON
+A    I 72.6              // AND Elbo Slow IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+=    F 4.1               // TURN ON F4.1
+
+L    DW 12               // LOAD FROM DW12
+T    QW 64               // TRANSFER TO QW64
+
+A    T 7                 // IF T7 IS RUNNING
+AN   F 5.4               // AND F5.4 IS OFF
+A    I 72.7              // AND I72.7 IS ON
+A(                       
+O    I 72.3              // OR Cmd LockTable IS ON
+O(                       
+A    F 0.4               // OR Spianatura IS ON
+A    I 72.0              // AND Elbo Medium IS ON
+)                        
+)                        
+=    F 4.5               // TURN ON F4.5
+
+A    I 73.0              // IF I73.0 IS ON
+AN   F 0.4               // AND Spianatura IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 13               // LOAD FROM DW13
+T    QW 64               // TRANSFER TO QW64
+A    I 73.1              // IF I73.1 IS ON
+AN   F 0.4               // AND Spianatura IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 14               // LOAD FROM DW14
+T    QW 64               // TRANSFER TO QW64
+AN   F 0.4               // IF Spianatura IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 18               // LOAD FROM DW18
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

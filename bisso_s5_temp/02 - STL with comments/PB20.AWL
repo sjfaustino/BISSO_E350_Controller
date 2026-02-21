@@ -1,0 +1,159 @@
+/******************************************************************
+ *  FILE: PB20.AWL
+ *  PURPOSE: Fwd/Rev Axis Control – Handles forward/backward movement with ramp timers,
+ *           safety checks, and speed selection based on inputs.
+ *  INPUTS: I72.2 (Cmd Rot?), I72.5/72.6 (Elbo signals), I5.2/5.3 (Limit switches), I3.7 (Fast)
+ *  OUTPUTS: Q6.0 (Contactor Avanco), F4.0/F4.1 (Direction flags), QW64 (Speed ref)
+ *  CALLED BY: PB10 (Axis selection)
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+//===============================================================
+// NETWORK 1 : Forward Movement Control (I5.2)
+//===============================================================
+AN   I 72.2              // IF Cmd Rot IS OFF
+A    F 1.6               // AND F1.6 (Enable?) IS ON
+S    Q 6.0               // TURN ON Contactor Avanco (C3)
+
+A    Q 6.0               // IF C3 IS ON
+A    F 4.0               // AND F4.0 (Forward active) IS ON
+A    I 5.2               // AND I5.2 (Limit switch forward) IS ON
+L    FW 24               // LOAD FROM FW24 (Ramp time forward)
+SP   T 12                // START PULSE TIMER T12 (Ramp timer forward)
+
+// F4.0 = (I72.5 AND F0.7 AND NOT I5.2 AND I72.0 AND NOT F5.4)
+//        OR
+//        (NOT I73.0 AND NOT I3.7 AND F0.7 AND T12 AND I5.2 AND F4.0 AND NOT F5.4)
+A    I 72.5              // IF Elbo Fast IS ON
+A    F 0.7               // AND F0.7 IS ON
+AN   I 5.2               // AND I5.2 IS OFF (not at forward limit)
+A    I 72.0              // AND Elbo Medium IS ON
+AN   F 5.4               // AND F5.4 (General fault) IS OFF
+O                        // --- OR-BEFORE: starts new AND chain, OR'd with above ---
+AN   I 73.0              // AND I73.0 (CNC consensus) IS OFF
+AN   I 3.7               // AND I3.7 (Fast cmd) IS OFF
+A    F 0.7               // AND F0.7 IS ON
+A    T 12                // AND T12 (Ramp timer) IS RUNNING
+A    I 5.2               // AND I5.2 IS ON (at forward limit)
+A    F 4.0               // AND F4.0 (already moving forward) IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+=    F 4.0               // = F4.0 (Forward direction active)
+
+//===============================================================
+// NETWORK 2 : Reverse Movement Control (I5.3)
+//===============================================================
+A    Q 6.0               // IF C3 IS ON
+A    I 5.3               // AND I5.3 (Limit switch reverse) IS ON
+A    F 4.1               // AND F4.1 (Reverse active) IS ON
+L    FW 22               // LOAD FROM FW22 (Ramp time reverse)
+SP   T 16                // START PULSE TIMER T16 (Ramp timer reverse)
+
+// F4.1 = (NOT F5.4 AND I72.6 AND NOT I5.3 AND I72.0 AND F0.7)
+//        OR
+//        (NOT I73.0 AND NOT I3.7 AND F0.7 AND T16 AND I5.3 AND F4.1 AND NOT F5.4)
+AN   F 5.4               // IF F5.4 (General fault) IS OFF
+A    I 72.6              // AND Elbo Slow IS ON
+AN   I 5.3               // AND I5.3 IS OFF (not at reverse limit)
+A    I 72.0              // AND Elbo Medium IS ON
+A    F 0.7               // AND F0.7 IS ON
+O                        // --- OR-BEFORE: starts new AND chain, OR'd with above ---
+AN   I 73.0              // AND I73.0 (CNC consensus) IS OFF
+AN   I 3.7               // AND I3.7 IS OFF
+A    F 0.7               // AND F0.7 IS ON
+A    T 16                // AND T16 (Ramp timer) IS RUNNING
+A    I 5.3               // AND I5.3 IS ON (at reverse limit)
+A    F 4.1               // AND F4.1 (already moving reverse) IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+=    F 4.1               // = F4.1 (Reverse direction active)
+
+//===============================================================
+// NETWORK 3 : Speed Selection & Fast Mode
+//===============================================================
+L    DW 0                // LOAD FROM DW Speed 0 (Base speed)
+T    QW 64               // TRANSFER TO QW64 (VFD speed ref)
+
+A    I 72.2              // IF Cmd Rot IS ON
+A    I 72.5              // AND Elbo Fast IS ON
+S    F 3.2               // TURN ON F3.2 (Fast mode flag)
+
+AN   F 3.2               // IF F3.2 IS OFF
+A    F 3.3               // AND F3.3 (Medium mode?) IS ON
+S    F 3.4               // TURN ON F3.4 (Medium mode active)
+
+A    I 72.2              // IF Cmd Rot IS ON
+R    F 3.4               // TURN OFF F3.4
+
+A    F 4.0               // IF F4.0 IS ON
+A    Q 6.0               // AND C3 IS ON
+AN   I 72.2              // AND Cmd Rot IS OFF
+O                        // OR
+A    F 4.1               // IF F4.1 IS ON
+A    Q 6.0               // AND C3 IS ON
+AN   I 72.2              // AND Cmd Rot IS OFF
+R    F 3.2               // TURN OFF F3.2
+
+A    F 4.0               // IF F4.0 IS ON
+A    Q 6.0               // AND C3 IS ON
+S    F 3.3               // TURN ON F3.3
+
+A    F 4.1               // IF F4.1 IS ON
+A    Q 6.0               // AND C3 IS ON
+R    F 3.3               // TURN OFF F3.3
+
+//===============================================================
+// NETWORK 4 : Safety & Emergency Stop Logic
+//===============================================================
+// F4.5 = (NOT F0.4 AND I72.0 AND T7 AND NOT F5.4 AND I72.7)
+//        OR
+//        (NOT F0.4 AND (F4.0 OR F4.1) AND NOT F5.4 AND F4.5)
+AN   F 0.4               // IF Spianatura IS OFF
+A    I 72.0              // AND Elbo Medium IS ON
+A    T 7                 // AND T7 (Delay timer) IS RUNNING
+AN   F 5.4               // AND F5.4 IS OFF
+A    I 72.7              // AND I72.7 (Elbo Emergency) IS ON
+O                        // --- OR-BEFORE: starts new AND chain, OR'd with above ---
+AN   F 0.4               // AND Spianatura IS OFF
+A(                       
+O    F 4.0               // OR F4.0 IS ON
+O    F 4.1               // OR F4.1 IS ON
+)                        
+AN   F 5.4               // AND F5.4 IS OFF
+A    F 4.5               // AND F4.5 (self-latch) IS ON
+=    F 4.5               // = F4.5 (Movement enable flag)
+
+//===============================================================
+// NETWORK 5 : End of Movement Detection
+//===============================================================
+A(                       
+O(                       
+AN   I 5.2               // IF I5.2 IS OFF
+AN   I 5.3               // AND I5.3 IS OFF
+)                        
+O(                       
+A    I 5.2               // OR IF I5.2 IS ON
+AN   F 4.0               // AND F4.0 IS OFF
+)                        
+O(                       
+A    I 5.3               // OR IF I5.3 IS ON
+AN   F 4.1               // AND F4.1 IS OFF
+)                        
+)                        
+A(                       
+O    I 3.7               // OR IF Fast cmd IS ON
+O(                       
+AN   F 2.7               // OR IF F2.7 IS OFF
+A    F 3.4               // AND F3.4 IS ON
+A    F 4.1               // AND F4.1 IS ON
+)                        
+)                        
+BEC                      // BLOCK END CONDITIONAL (End of movement)
+
+// Default speeds
+L    DW 1                // LOAD FROM DW Speed 1
+T    QW 64               // TRANSFER TO QW64
+A    F 4.0               // IF F4.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 2                // LOAD FROM DW Speed 2
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

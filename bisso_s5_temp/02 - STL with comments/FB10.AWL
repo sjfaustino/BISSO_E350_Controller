@@ -1,0 +1,82 @@
+/******************************************************************
+ *  FILE: FB10.AWL
+ *  PURPOSE: Calculation Function Block 1 – Performs division, subtraction,
+ *           comparison, and BCD conversion for speed/potentiometer values.
+ *  INPUTS: FW34 (Pot raw value?), DW20 (Divisor), DW22 (Threshold)
+ *  OUTPUTS: FW20 (Processed value), QW64? (via other blocks)
+ *  CALLED BY: FB12 (POT.+), FB13 (POT.-), PB11
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    CALC1
+
+//===============================================================
+// NETWORK 1 : Scale and Divide Pot Value
+//   Shifts FW34 right by 4, adds DW25, divides by DW20
+//===============================================================
+L    FW 34               // LOAD FROM FLAG WORD FW34 (Potentiometer raw reading?)
+SRW  4                   // SHIFT RIGHT WORD BY 4 BITS (divide by 16)
+L    DW 25               // LOAD FROM DATA WORD DW25 FB10RO (Speed step?)
++F                       // ADD FIXED-POINT 16-BIT INTEGER (ACCU1 = ACCU2 + ACCU1)
+T    FW 40               // TRANSFER TO FLAG WORD FW40 (Temp result)
+JU   FB 243              // JUMP TO FUNCTION BLOCK FB243 (DIV:16 – 16-bit division)
+NAME:    DIV:16  
+Z1  :    DW 20           // DIVIDEND: DW20 FB10RO (Divisor base)
+Z2  :    FW 40           // DIVISOR: FW40 (Scaled pot)
+OV  :    F 8.7           // OVERFLOW FLAG: F8.7 (Error if overflow)
+FEH :    F 9.0           // ERROR FLAG: F9.0 (Division error)
+Z3=0:    F 8.7           // ZERO RESULT FLAG: F8.7
+Z4=0:    F 8.7           // ZERO DIVISOR FLAG: F8.7
+Z3  :    FW 16           // RESULT: FW16 (Quotient)
+Z4  :    FW 36           // REMAINDER: FW36 (Temp)
+
+L    FW 40               // LOAD FROM FW40 (Scaled pot)
+SRW  8                   // SHIFT RIGHT WORD BY 8 BITS (divide by 256)
+T    FW 18               // TRANSFER TO FW18 (High byte?)
+L    FW 16               // LOAD FROM FW16 (Quotient)
+L    FW 18               // LOAD FROM FW18
+-F                       // SUBTRACT FIXED-POINT 16-BIT INTEGER (ACCU1 = ACCU2 - ACCU1)
+T    FW 20               // TRANSFER TO FW20 (Adjusted value)
+L    FW 20               // LOAD FROM FW20
+L    DW 22               // LOAD FROM DW22 FB10RO (Upper threshold?)
+<=F                      // COMPARE LESS THAN OR EQUAL FIXED-POINT 16-BIT INTEGER
+=    F 9.2               // TURN ON F9.2 (Below threshold flag)
+
+A    F 9.0               // IF F9.0 (Division error) IS ON
+JC   =M001               // JUMP CONDITIONAL TO LABEL M001
+
+AN   F 9.2               // IF F9.2 IS OFF
+JC   =M002               // JUMP CONDITIONAL TO M002
+
+L    DW 22               // LOAD FROM DW22 (Threshold)
+T    FW 20               // TRANSFER TO FW20
+M002: JU   FB 241          // JUMP TO FB241 (COD:16 – Code conversion)
+NAME:    COD:16  
+DUAL:    FW 20           // INPUT DUAL: FW20 (Value to convert)
+SBCD:    F 8.7           // SIGNED BCD FLAG: F8.7
+BCD2:    FY 36           // BCD BYTE 2: FY36
+BCD1:    FW 20           // BCD BYTE 1: FW20
+
+L    FW 20               // LOAD FROM FW20 (Converted value)
+L    DW 24               // LOAD FROM DW24 FB10RO (Mask?)
+OW                       // OR WORD
+T    FW 20               // TRANSFER TO FW20
+AN   F 9.0               // IF F9.0 IS OFF
+JC   =M003               // JUMP CONDITIONAL TO M003
+
+M001: L    DW 23           // LOAD FROM DW23 FB10RO (Default value?)
+T    FW 20               // TRANSFER TO FW20
+M003: AN   F 2.0           // IF F2.0 IS OFF
+JC   =M004               // JUMP CONDITIONAL TO M004
+
+L    FW 20               // LOAD FROM FW20
+T    FW 22               // TRANSFER TO FW22 (Stored for mode?)
+A    F 2.0               // IF F2.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M004: AN   F 2.2           // IF F2.2 IS OFF
+JC   =M005               // JUMP CONDITIONAL TO M005
+
+L    FW 20               // LOAD FROM FW20
+T    FW 24               // TRANSFER TO FW24 (Another store?)
+M005: BE                   // BLOCK END

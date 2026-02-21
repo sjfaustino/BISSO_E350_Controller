@@ -1,0 +1,57 @@
+/******************************************************************
+ *  FILE: FB14.AWL
+ *  PURPOSE: RICH.POT – Rich potentiometer handler, selects mode and calls RIC/SCALAR.
+ *  INPUTS: F2.0-2.2 (Modes), DW2 (Base), DW41 (Scale), DW18 (Value), DW1 (Default)
+ *  OUTPUTS: DW2/DW18/DW1 (Updated), QW66 (Speed out)
+ *  CALLED BY: OB1
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    RICH.POT
+
+//===============================================================
+// NETWORK 1 : Mode Selection for Pot Adjustment
+//===============================================================
+AN   F 2.0               // IF F2.0 IS OFF
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 2                // LOAD FROM DW2??? (Base value)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+L    FW 34               // LOAD FROM FW34
+T    DW 2                // TRANSFER TO DW2
+T    QW 66               // TRANSFER TO QW66 (VFD ref)
+A    F 2.0               // IF F2.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M001: AN   F 2.1           // IF F2.1 IS OFF
+JC   =M002               // JUMP CONDITIONAL TO M002
+
+L    DW 41               // LOAD FROM DW41 FB14-15RO (Scale factor?)
+T    FW 38               // TRANSFER TO FW38
+L    DW 18               // LOAD FROM DW18??? (Stored value)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+
+L    FW 34               // LOAD FROM FW34
+T    DW 18               // TRANSFER TO DW18
+JU   FB 16               // JUMP TO FB16 (SCALAR)
+NAME:    SCALAR  
+
+A    F 2.1               // IF F2.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M002: AN   F 2.2           // IF F2.2 IS OFF
+JC   =M003               // JUMP CONDITIONAL TO M003
+
+L    DW 1                // LOAD FROM DW1??? (Default)
+T    FW 34               // TRANSFER TO FW34
+JU   FB 17               // JUMP TO FB17 (RIC(+/-))
+NAME:    RIC(+/-)
+
+L    FW 34               // LOAD FROM FW34
+T    DW 1                // TRANSFER TO DW1
+T    QW 66               // TRANSFER TO QW66
+M003: BE                   // BLOCK END

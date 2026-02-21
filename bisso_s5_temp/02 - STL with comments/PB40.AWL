@@ -1,0 +1,44 @@
+/******************************************************************
+ *  FILE: PB40.AWL
+ *  PURPOSE: Left/Right Auto Control – Translation axis with Elbo signals.
+ *  INPUTS: I72.5/72.6 (Elbo), I5.0/5.1 (Limits), I72.1 (Cmd Transl)
+ *  OUTPUTS: Q6.1 (Contactor), F4.0/F4.1 (Dir), QW64 (Speed)
+ *  CALLED BY: PB10
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+A    F 1.6               // IF Enable IS ON
+S    Q 6.1               // TURN ON C4
+
+A    I 72.5              // IF Elbo Fast IS ON
+AN   I 5.0               // AND I5.0 IS OFF
+AN   F 5.4               // AND F5.4 IS OFF
+A    I 72.1              // AND Cmd Transl IS ON
+=    F 4.0               // TURN ON F4.0
+
+A    I 72.6              // IF Elbo Slow IS ON
+AN   I 5.1               // AND I5.1 IS OFF
+AN   F 5.4               // AND F5.4 IS OFF
+A    I 72.1              // AND Cmd Transl IS ON
+=    F 4.1               // TURN ON F4.1
+
+L    DW 9                // LOAD FROM DW9
+T    QW 64               // TRANSFER TO QW64
+
+A    T 7                 // IF T7 IS RUNNING
+AN   F 5.4               // AND F5.4 IS OFF
+A    I 72.1              // AND Cmd Transl IS ON
+A    I 72.7              // OR I72.7 IS ON
+=    F 4.5               // TURN ON F4.5
+
+A    I 73.0              // IF I73.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 10               // LOAD FROM DW10
+T    QW 64               // TRANSFER TO QW64
+A    I 73.1              // IF I73.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 11               // LOAD FROM DW11
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

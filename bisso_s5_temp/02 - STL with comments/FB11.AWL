@@ -1,0 +1,93 @@
+/******************************************************************
+ *  FILE: FB11.AWL
+ *  PURPOSE: CALC2 – Advanced calculation for speed scaling, bounds check, BCD.
+ *  INPUTS: FW34 (Pot), DW26 (Offset), DW32 (Divisor), DW31 (Scale), DW33-37 (Bounds)
+ *  OUTPUTS: FW26 (Final speed), FW30 (Temp quotient), F8.4-8.6 (Error flags)
+ *  CALLED BY: FB12 (POT.+), FB13 (POT.-)
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    CALC2
+
+//===============================================================
+// NETWORK 1 : Scale, Divide, and Bounds Check
+//===============================================================
+L    FW 34               // LOAD FROM FW34 (Pot value)
+SRW  5                   // SHIFT RIGHT WORD BY 5 BITS (divide by 32)
+L    DW 26               // LOAD FROM DW26 FB11RO (Offset?)
++F                       // ADD FIXED-POINT 16-BIT INTEGER (ACCU1 = ACCU2 + ACCU1)
+T    FW 42               // TRANSFER TO FW42 (Temp)
+JU   FB 243              // JUMP TO FB243 (DIV:16)
+NAME:    DIV:16  
+Z1  :    DW 32           // DIVIDEND: DW32 FB11RO (Base divisor)
+Z2  :    FW 42           // DIVISOR: FW42
+OV  :    F 8.7           // OVERFLOW: F8.7
+FEH :    F 8.4           // ERROR: F8.4 (Division error)
+Z3=0:    F 8.7           // ZERO RESULT: F8.7
+Z4=0:    F 8.7           // ZERO DIVISOR: F8.7
+Z3  :    FW 30           // RESULT: FW30 (Quotient)
+Z4  :    FW 36           // REMAINDER: FW36
+
+L    FW 30               // LOAD FROM FW30
+L    DW 33               // LOAD FROM DW33 FB11RO (Lower bound?)
+<=F                      // COMPARE LESS THAN OR EQUAL FIXED-POINT 16-BIT INTEGER
+=    F 8.5               // TURN ON F8.5 (Below min flag)
+
+L    FW 30               // LOAD FROM FW30
+L    DW 37               // LOAD FROM DW37 FB14-15RO (Upper bound?)
+>=F                      // COMPARE GREATER THAN OR EQUAL FIXED-POINT 16-BIT INTEGER
+=    F 8.6               // TURN ON F8.6 (Above max flag)
+
+O    F 8.6               // OR IF F8.6 IS ON
+O    F 8.4               // OR IF F8.4 IS ON
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+A    F 8.5               // IF F8.5 IS ON
+JC   =M002               // JUMP CONDITIONAL TO M002
+
+JU   FB 243              // JUMP TO FB243 (DIV:16 – Further division)
+NAME:    DIV:16  
+Z1  :    FW 30           // DIVIDEND: FW30
+Z2  :    DW 31           // DIVISOR: DW31 FB11RO (Scale factor?)
+OV  :    F 8.7           // OVERFLOW: F8.7
+FEH :    F 8.7           // ERROR: F8.7
+Z3=0:    F 8.7           // ZERO RESULT: F8.7
+Z4=0:    F 8.7           // ZERO DIVISOR: F8.7
+Z3  :    FW 30           // RESULT: FW30
+Z4  :    FW 36           // REMAINDER: FW36
+
+M002: JU   FB 241          // JUMP TO FB241 (COD:16 – BCD conversion)
+NAME:    COD:16  
+DUAL:    FW 30           // INPUT: FW30
+SBCD:    F 8.7           // SIGNED: F8.7
+BCD2:    FY 36           // BCD2: FY36
+BCD1:    FW 30           // BCD1: FW30
+
+A    F 8.5               // IF F8.5 IS ON
+JC   =M003               // JUMP CONDITIONAL TO M003
+
+M001: AN   F 8.4           // IF F8.4 IS OFF
+AN   F 8.6               // AND F8.6 IS OFF
+JC   =M003               // JUMP CONDITIONAL TO M003
+
+L    DW 34               // LOAD FROM DW34 FB11RO (Default low?)
+T    FW 26               // TRANSFER TO FW26 (Output speed)
+O    F 8.4               // OR IF F8.4 IS ON
+O    F 8.6               // OR IF F8.6 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M003: AN   F 8.5           // IF F8.5 IS OFF
+JC   =M004               // JUMP CONDITIONAL TO M004
+
+L    FW 30               // LOAD FROM FW30
+L    DW 35               // LOAD FROM DW35 FB11RO (Low mask?)
+OW                       // OR WORD
+T    FW 26               // TRANSFER TO FW26
+A    F 8.5               // IF F8.5 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+M004: L    FW 30           // LOAD FROM FW30
+L    DW 36               // LOAD FROM DW36 FB11RO (High mask?)
+OW                       // OR WORD
+T    FW 26               // TRANSFER TO FW26
+BE                       // BLOCK END

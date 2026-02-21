@@ -1,0 +1,11 @@
+###PG:84000000
+[1	
+NAME:	RIC(+/-)
+
+	A	F 3.5
+	JC	FB 12
+NAME:	POT.+   
+	A	F 3.6
+	JC	FB 13
+NAME:	POT.-   
+	BE	]

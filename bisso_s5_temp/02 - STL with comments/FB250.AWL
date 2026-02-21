@@ -1,0 +1,20 @@
+/******************************************************************
+ *  FILE: FB250.AWL
+ *  PURPOSE: RLG:AE – Analog input scaling (RLG = Regelung, Analog Input).
+ *  INPUTS: BG (Device address), KNKT (Channel), OGR/UGR (Upper/Lower limits), EINZ (Enable)
+ *  OUTPUTS: XA (Scaled analog value), FB (Fault bit), BU (Busy bit)
+ *  CALLED BY: Possibly for potentiometer or sensor scaling in FB14/FB15.
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    RLG:AE
+DECL:    BG      DKF     // DECLARE DEVICE CONSTANT FIXED BG (Peripheral address)
+DECL:    KNKT    DKY     // DECLARE DEVICE CONSTANT BYTE KNKT (Channel number)
+DECL:    OGR     DKF     // DECLARE DEVICE CONSTANT FIXED OGR (Upper limit)
+DECL:    UGR     DKF     // DECLARE DEVICE CONSTANT FIXED UGR (Lower limit)
+DECL:    EINZ    IBI     // DECLARE INPUT BIT INDICATOR EINZ (Enable input)
+DECL:    XA      QW      // DECLARE OUTPUT WORD XA (Scaled analog value)
+DECL:    FB      QBI     // DECLARE OUTPUT BIT INDICATOR FB (Fault bit)
+DECL:    BU      QBI     // DECLARE OUTPUT BIT INDICATOR BU (Busy/processing bit)
+
+BE                       // BLOCK END (System block – no user code; internal analog read/scale)

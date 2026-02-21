@@ -1,0 +1,97 @@
+/******************************************************************
+ *  FILE: PB11.AWL
+ *  PURPOSE: Axis Router – Routes movement commands to specific PB based on contactors and inputs.
+ *  INPUTS: Q6.0-6.5 (Contactors), I2.4-3.5 (Manipulos), F5.0 (Stopped)
+ *  OUTPUTS: F6.4-6.7 (Axis flags)
+ *  CALLED BY: OB1
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+//===============================================================
+// NETWORK 1 : Fwd/Rev Axis (Avanco/Recuo)
+//===============================================================
+O    Q 6.0               // IF C3 IS ON
+O(                       
+A(                       
+O    I 2.6               // OR Mnp Front IS ON
+O    I 2.7               // OR Mnp Back IS ON
+)                        
+AN   F 0.4               // AND Spianatura IS OFF
+AN   F 5.0               // AND Axes stopped IS OFF
+)                        
+=    F 6.4               // TURN ON F6.4 (Fwd/Rev active)
+
+A    F 6.4               // IF F6.4 IS ON
+JC   PB 21               // JUMP TO PB21 (Fwd/Rev manual)
+A    F 6.4               // IF F6.4 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 2 : Up/Down Axis
+//===============================================================
+O    Q 6.2               // IF C5 IS ON
+O    Q 6.3               // OR C6 IS ON
+O(                       
+AN   F 5.0               // AND Axes stopped IS OFF
+A(                       
+O    I 3.0               // OR Down IS ON
+O    I 3.1               // OR Up IS ON
+)                        
+)                        
+=    F 6.5               // TURN ON F6.5 (Up/Down active)
+
+A    F 6.5               // IF F6.5 IS ON
+JC   PB 31               // JUMP TO PB31 (Up/Down manual)
+A    F 6.5               // IF F6.5 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 3 : Left/Right Axis
+//===============================================================
+O    Q 6.1               // IF C4 IS ON
+O(                       
+AN   F 5.0               // AND Axes stopped IS OFF
+A(                       
+O    I 2.4               // OR Right IS ON
+O    I 2.5               // OR Left IS ON
+)                        
+)                        
+=    F 6.6               // TURN ON F6.6 (Left/Right active)
+
+A    F 6.6               // IF F6.6 IS ON
+JC   PB 41               // JUMP TO PB41 (Left/Right manual)
+A    F 6.6               // IF F6.6 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 4 : Table Rotation
+//===============================================================
+O    Q 6.4               // IF C7 IS ON
+O(                       
+AN   F 5.0               // AND Axes stopped IS OFF
+A(                       
+O    I 3.2               // OR Rot Horario IS ON
+O    I 72.3              // OR Cmd LockTable IS ON
+O    I 3.3               // OR Rot Anti-Horario IS ON
+)                        
+)                        
+=    F 6.7               // TURN ON F6.7 (Table rot active)
+
+A    F 6.7               // IF F6.7 IS ON
+JC   PB 51               // JUMP TO PB51 (Table rot manual)
+A    F 6.7               // IF F6.7 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+//===============================================================
+// NETWORK 5 : Disk Rotation
+//===============================================================
+O    Q 6.5               // IF C9 IS ON
+O(                       
+AN   F 5.0               // AND Axes stopped IS OFF
+A(                       
+O    I 3.4               // OR Rot Down IS ON
+O    I 3.5               // OR Rot Up IS ON
+)                        
+)                        
+JC   PB 53               // JUMP TO PB53 (Disk rot manual)
+BE                       // BLOCK END

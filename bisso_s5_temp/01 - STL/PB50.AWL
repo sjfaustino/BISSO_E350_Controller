@@ -1,0 +1,62 @@
+###PG:80000000
+[1	
+	A	F 1.6
+	AN	Q 8.7
+	S	Q 8.7
+		
+	AN	T 8
+	BEC	
+		
+	A	T 8
+	A	Q 8.7
+	A	F 1.6
+	S	Q 6.4
+		
+	A	I 72.3
+	A	I 72.5
+	AN	F 5.4
+	O	
+	AN	F 5.4
+	A	F 0.4
+	A	F 0.7
+	A	I 72.5
+	A	I 72.0
+	=	F 4.0
+		
+	A	I 72.3
+	A	I 72.6
+	AN	F 5.4
+	=	F 4.1
+		
+	L	DW 12
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A	I 72.7
+	A(	
+	O	I 72.3
+	O(	
+	A	F 0.4
+	A	I 72.0
+	)	
+	)	
+	=	F 4.5
+		
+	A	I 73.0
+	AN	F 0.4
+	BEC	
+		
+	L	DW 13
+	T	QW 64
+	A	I 73.1
+	AN	F 0.4
+	BEC	
+		
+	L	DW 14
+	T	QW 64
+	AN	F 0.4
+	BEC	
+		
+	L	DW 18
+	T	QW 64
+	BE	]

@@ -1,0 +1,50 @@
+/******************************************************************
+ *  FILE: PB30.AWL
+ *  PURPOSE: Tilt/Vertical Auto Control – Uses Elbo signals for direction and speed.
+ *  INPUTS: I72.5/72.6 (Elbo), I5.4/5.5 (Limits), I72.2 (Cmd Rot)
+ *  OUTPUTS: Q6.2 (Contactor Cala), F4.0/F4.1 (Dir), QW64 (Speed)
+ *  CALLED BY: PB10
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+A    F 3.0               // IF F3.0 (Auto mode?) IS ON
+JC   PB 32               // JUMP TO PB32 (Full auto)
+A    F 3.0               // IF F3.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+A    F 1.6               // IF Enable IS ON
+S    Q 6.2               // TURN ON C5
+
+A    I 72.5              // IF Elbo Fast IS ON
+AN   I 5.4               // AND I5.4 IS OFF
+A    I 72.2              // AND Cmd Rot IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+A    F 0.7               // AND F0.7 IS ON
+=    F 4.0               // TURN ON F4.0
+
+A    I 72.6              // IF Elbo Slow IS ON
+AN   I 5.5               // AND I5.5 IS OFF
+A    I 72.2              // AND Cmd Rot IS ON
+AN   F 5.4               // AND F5.4 IS OFF
+=    F 4.1               // TURN ON F4.1
+
+L    DW 3                // LOAD FROM DW3
+T    QW 64               // TRANSFER TO QW64
+
+A    T 7                 // IF T7 IS RUNNING
+AN   F 5.4               // AND F5.4 IS OFF
+A    I 72.2              // AND Cmd Rot IS ON
+A    I 72.7              // OR I72.7 IS ON
+=    F 4.5               // TURN ON F4.5
+
+A    I 73.0              // IF I73.0 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 4                // LOAD FROM DW4
+T    QW 64               // TRANSFER TO QW64
+A    I 73.1              // IF I73.1 IS ON
+BEC                      // BLOCK END CONDITIONAL
+
+L    DW 5                // LOAD FROM DW5
+T    QW 64               // TRANSFER TO QW64
+BE                       // BLOCK END

@@ -1,0 +1,49 @@
+/******************************************************************
+ *  FILE: FB13.AWL
+ *  PURPOSE: POT.- – Decrements potentiometer/speed value with step doubling.
+ *  INPUTS: F2.4 (- pressed?), DW27 (Min step), DW2 (Base), F5.7 (Count flag)
+ *  OUTPUTS: FW32 (Step size), FW34 (Updated pot), C3 (Counter for doubling)
+ *  CALLED BY: FB17 (RIC(+/-))
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    POT.-
+
+//===============================================================
+// NETWORK 1 : Decrement Logic with Step Control
+//===============================================================
+A    F 2.4               // IF F - Speed IS ON
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 27               // LOAD FROM DW27 FB10RO (Minimum step size)
+T    FW 32               // TRANSFER TO FW32 (Current step)
+M001: L    FW 34           // LOAD FROM FW34 (Current pot value)
+L    DW 2                // LOAD FROM DW2??? (Base subtractor?)
+A    F 5.7               // IF F5.7 (Doubling active) IS ON
+L    KC 002              // LOAD FROM CONSTANT KC002 = 2
+S    C 3                 // SET COUNTER C3 (Pot decrement counter) TO 2
+
+A    F 1.2               // IF F1.2 (Spianatura active flag) IS ON
+CD   C 3                 // DECREMENT COUNTER C3
+
+AN   C 3                 // IF C3 IS 0
+=    F 5.7               // TURN ON F5.7 (Doubling flag)
+
+O    F 2.0               // OR IF F2.0 IS ON
+O    F 2.2               // OR IF F2.2 IS ON
+JC   FB 10               // JUMP CONDITIONAL TO FB10 (CALC1)
+NAME:    CALC1   
+
+A    F 0.4               // IF F0.4 (Spianatura mode enable) IS ON
+JC   FB 11               // JUMP CONDITIONAL TO FB11 (CALC2)
+NAME:    CALC2   
+
+ON   F 2.4               // OR IF F - Speed IS OFF
+O    C 3                 // OR IF C3 IS ON (>0)
+ON   F 5.7               // OR IF F5.7 IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+L    FW 32               // LOAD FROM FW32 (Step)
+SLW  1                   // SHIFT LEFT WORD BY 1 BIT (double step)
+T    FW 32               // TRANSFER TO FW32
+BE                       // BLOCK END

@@ -1,0 +1,23 @@
+/******************************************************************
+ *  FILE: FB17.AWL
+ *  PURPOSE: RIC(+/-) – Calls POT.+ or POT.- based on flags for speed adjustment.
+ *  INPUTS: F3.5 (+ flag), F3.6 (- flag)
+ *  OUTPUTS: Adjusted speeds via FB12/FB13
+ *  CALLED BY: FB14 (RICH.POT), FB15 (HELP.)
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    RIC(+/-)
+
+//===============================================================
+// NETWORK 1 : Select + or - Adjustment
+//===============================================================
+A    F 3.5               // IF F Mnp +Speed (Flag Manipulo +speed premido) IS ON
+JC   FB 12               // JUMP CONDITIONAL TO FB12 (POT.+)
+NAME:    POT.+   
+
+A    F 3.6               // IF F Mnp -Speed (Flag Manipulo -speed premido) IS ON
+JC   FB 13               // JUMP CONDITIONAL TO FB13 (POT.-)
+NAME:    POT.-   
+
+BE                       // BLOCK END

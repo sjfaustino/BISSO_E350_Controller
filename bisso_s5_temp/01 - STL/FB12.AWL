@@ -1,0 +1,59 @@
+###PG:84000000
+[1	
+NAME:	POT.+
+
+	A	F 2.3
+	JC	=M001
+		
+	L	DW 27
+	T	FW 32
+M001:	L	FW 34
+	L	DW 28
+	<F	
+	=	F 2.5
+		
+	AN	F 2.5
+	BEC	
+		
+	L	FW 34
+	L	FW 32
+	+F	
+	T	FW 34
+	L	DW 28
+	<=F	
+	=	F 4.6
+		
+	A	F 4.6
+	JC	=M002
+		
+	L	DW 28
+	T	FW 34
+M002:	A	F 2.3
+	A	F 5.6
+	L	KC 002
+	S	C 2
+		
+	A	F 1.2
+	CD	C 2
+		
+	AN	C 2
+	=	F 5.6
+		
+	O	F 2.0
+	O	F 2.2
+	JC	FB 10
+NAME:	CALC1   
+		
+	A	F 0.4
+	JC	FB 11
+NAME:	CALC2   
+		
+	ON	F 2.3
+	O	C 2
+	ON	F 5.6
+	BEC	
+		
+	L	FW 32
+	SLW	1
+	T	FW 32
+	BE	]

@@ -1,0 +1,69 @@
+/******************************************************************
+ *  FILE: FB12.AWL
+ *  PURPOSE: POT.+ – Increments potentiometer/speed value with bounds and doubling.
+ *  INPUTS: F2.3 (+ pressed?), DW27 (Min step), DW28 (Max), F5.6 (Doubling flag)
+ *  OUTPUTS: FW34 (Updated pot), FW32 (Step size), C2 (Counter)
+ *  CALLED BY: FB17 (RIC(+/-))
+ *  REVISION: 1.0 – Fully verbose commented by Grok on 2025-11-02
+ ******************************************************************/
+
+NAME:    POT.+
+
+//===============================================================
+// NETWORK 1 : Increment Logic with Bounds and Step Doubling
+//===============================================================
+A    F 2.3               // IF F + Speed IS ON
+JC   =M001               // JUMP CONDITIONAL TO M001
+
+L    DW 27               // LOAD FROM DW27 FB10RO (Min step)
+T    FW 32               // TRANSFER TO FW32 (Current step)
+M001: L    FW 34           // LOAD FROM FW34 (Current value)
+L    DW 28               // LOAD FROM DW28 FB12RO (Max limit?)
+<F                       // COMPARE LESS THAN FIXED-POINT 16-BIT INTEGER
+=    F 2.5               // TURN ON F2.5 (Below max flag)
+
+AN   F 2.5               // IF F2.5 IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+L    FW 34               // LOAD FROM FW34
+L    FW 32               // LOAD FROM FW32 (Step)
++F                       // ADD FIXED-POINT 16-BIT INTEGER (ACCU1 = ACCU2 + ACCU1)
+T    FW 34               // TRANSFER TO FW34
+L    DW 28               // LOAD FROM DW28
+<=F                      // COMPARE LESS THAN OR EQUAL FIXED-POINT 16-BIT INTEGER
+=    F 4.6               // TURN ON F4.6 (At max flag)
+
+A    F 4.6               // IF F4.6 IS ON
+JC   =M002               // JUMP CONDITIONAL TO M002
+
+L    DW 28               // LOAD FROM DW28 (Max)
+T    FW 34               // TRANSFER TO FW34
+M002: A    F 2.3           // IF F + Speed IS ON
+A    F 5.6               // AND F5.6 (Doubling flag) IS ON
+L    KC 002              // LOAD FROM CONSTANT KC002 = 2
+S    C 2                 // SET COUNTER C2 TO 2
+
+A    F 1.2               // IF F1.2 IS ON
+CD   C 2                 // DECREMENT COUNTER C2
+
+AN   C 2                 // IF C2 IS 0
+=    F 5.6               // TURN ON F5.6
+
+O    F 2.0               // OR IF F2.0 IS ON
+O    F 2.2               // OR IF F2.2 IS ON
+JC   FB 10               // JUMP CONDITIONAL TO FB10 (CALC1)
+NAME:    CALC1   
+
+A    F 0.4               // IF F0.4 IS ON
+JC   FB 11               // JUMP CONDITIONAL TO FB11 (CALC2)
+NAME:    CALC2   
+
+ON   F 2.3               // OR IF F + Speed IS OFF
+O    C 2                 // OR IF C2 IS ON
+ON   F 5.6               // OR IF F5.6 IS OFF
+BEC                      // BLOCK END CONDITIONAL
+
+L    FW 32               // LOAD FROM FW32
+SLW  1                   // SHIFT LEFT WORD BY 1 BIT (double)
+T    FW 32               // TRANSFER TO FW32
+BE                       // BLOCK END
