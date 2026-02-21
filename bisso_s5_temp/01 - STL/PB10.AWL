@@ -1,6 +1,15 @@
 ###PG:80000000
 [1	
+	A(
 	AN	F 5.0
+	O(
+	A	F 0.2
+	AN	Q 6.2
+	AN	Q 6.3
+	AN	Q 6.4
+	AN	Q 6.5
+	)
+	)
 	AN	F 0.4
 	A(	
 	O	I 72.0
@@ -10,6 +19,7 @@
 	JC	PB 20
 		
 	A	Q 6.0
+	AN	F 0.2
 	BEC
 		
 	A	I 72.2
@@ -24,7 +34,16 @@
 	A	F 6.0
 	BEC	
 		
+	A(
 	AN	F 5.0
+	O(
+	A	F 0.2
+	AN	Q 6.2
+	AN	Q 6.3
+	AN	Q 6.4
+	AN	Q 6.5
+	)
+	)
 	A	I 72.1
 	O	Q 6.1
 	=	F 6.1
