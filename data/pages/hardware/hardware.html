@@ -378,15 +378,15 @@
             <div class="card-content">
                 <div class="pin-grid-4col">
                     <div class="pin-row">
-                        <label for="input_c" data-i18n="hardware.consenso_c">Consenso C:</label>
+                        <label for="input_c" data-i18n="hardware.consenso_c">Mode C (Corte):</label>
                         <select class="pin-select" id="input_c" data-signal="input_c"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="input_t" data-i18n="hardware.consenso_t">Consenso T:</label>
+                        <label for="input_t" data-i18n="hardware.consenso_t">Mode T (Transl.):</label>
                         <select class="pin-select" id="input_t" data-signal="input_t"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="input_ct" data-i18n="hardware.consenso_ct">Consenso C+T:</label>
+                        <label for="input_ct" data-i18n="hardware.consenso_ct">Mode C+T (Comb.):</label>
                         <select class="pin-select" id="input_ct" data-signal="input_ct"></select>
                     </div>
                     <div class="pin-row">
@@ -394,7 +394,35 @@
                         <select class="pin-select" id="input_manual" data-signal="input_manual"></select>
                     </div>
                 </div>
-                <div class="device-note" data-i18n="hardware.plc_input_note">Mode selection signals from ELBO PLC
+
+                <div class="feedback-section"
+                    style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <h4 data-i18n="hardware.table_tilt" style="margin-bottom: 10px;">Table Tilt (Hydraulics)</h4>
+                    <div class="pin-grid-4col">
+                        <div class="pin-row">
+                            <label for="input_tbl1_up" data-i18n="hardware.table1_up">T1 Up (Horiz):</label>
+                            <select class="pin-select" id="input_tbl1_up" data-signal="input_tbl1_up"></select>
+                        </div>
+                        <div class="pin-row">
+                            <label for="input_tbl1_down" data-i18n="hardware.table1_down">T1 Down (Vert):</label>
+                            <select class="pin-select" id="input_tbl1_down" data-signal="input_tbl1_down"></select>
+                        </div>
+                        <div class="pin-row">
+                            <label for="input_tbl2_up" data-i18n="hardware.table2_up">T2 Up (Horiz):</label>
+                            <select class="pin-select" id="input_tbl2_up" data-signal="input_tbl2_up"></select>
+                        </div>
+                        <div class="pin-row">
+                            <label for="input_tbl2_down" data-i18n="hardware.table2_down">T2 Down (Vert):</label>
+                            <select class="pin-select" id="input_tbl2_down" data-signal="input_tbl2_down"></select>
+                        </div>
+                        <div class="pin-row">
+                            <label for="input_tbl_sel" data-i18n="hardware.table_selector">T-Selector:</label>
+                            <select class="pin-select" id="input_tbl_sel" data-signal="input_tbl_sel"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="device-note" data-i18n="hardware.plc_input_note">Mode selection and table signals from
+                    Siemens S5 PLC
                 </div>
             </div>
         </div>
@@ -434,39 +462,39 @@
             <div class="card-content">
                 <div class="pin-grid-4col">
                     <div class="pin-row">
-                        <label for="output_axis_x" data-i18n="hardware.axis_x">Axis X:</label>
+                        <label for="output_axis_x" data-i18n="hardware.axis_x">Axis X (Bank 2):</label>
                         <select class="pin-select" id="output_axis_x" data-signal="output_axis_x"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_axis_y" data-i18n="hardware.axis_y">Axis Y:</label>
+                        <label for="output_axis_y" data-i18n="hardware.axis_y">Axis Y (Bank 2):</label>
                         <select class="pin-select" id="output_axis_y" data-signal="output_axis_y"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_axis_z" data-i18n="hardware.axis_z">Axis Z:</label>
+                        <label for="output_axis_z" data-i18n="hardware.axis_z">Axis Z (Bank 2):</label>
                         <select class="pin-select" id="output_axis_z" data-signal="output_axis_z"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_dir_plus" data-i18n="hardware.dir_plus">Direction +:</label>
+                        <label for="output_dir_plus" data-i18n="hardware.dir_plus">Direction + (Bank 2):</label>
                         <select class="pin-select" id="output_dir_plus" data-signal="output_dir_plus"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_dir_minus" data-i18n="hardware.dir_minus">Direction −:</label>
+                        <label for="output_dir_minus" data-i18n="hardware.dir_minus">Direction − (Bank 2):</label>
                         <select class="pin-select" id="output_dir_minus" data-signal="output_dir_minus"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_speed_fast" data-i18n="hardware.speed_fast">Speed Fast:</label>
+                        <label for="output_speed_fast" data-i18n="hardware.speed_fast">Speed Fast (Bank 2):</label>
                         <select class="pin-select" id="output_speed_fast" data-signal="output_speed_fast"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_speed_med" data-i18n="hardware.speed_med">Speed Med:</label>
+                        <label for="output_speed_med" data-i18n="hardware.speed_med">Speed Medium (Bank 2):</label>
                         <select class="pin-select" id="output_speed_med" data-signal="output_speed_med"></select>
                     </div>
                     <div class="pin-row">
-                        <label for="output_speed_slow" data-i18n="hardware.speed_slow">Speed Slow:</label>
+                        <label for="output_speed_slow" data-i18n="hardware.speed_slow">Speed Slow (Bank 3):</label>
                         <select class="pin-select" id="output_speed_slow" data-signal="output_speed_slow"></select>
                     </div>
                 </div>
-                <div class="device-note" data-i18n="hardware.plc_output_note">Control signals to ELBO PLC via
+                <div class="device-note" data-i18n="hardware.plc_output_note">Control signals to Siemens S5 PLC via
                     KC868-A16
                     digital outputs</div>
             </div>

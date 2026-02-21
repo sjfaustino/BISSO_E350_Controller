@@ -95,6 +95,13 @@ const SignalDef signalDefinitions[] = {
     {"input_pause",    "Pause Button",       "Pause operation",       105, "input", "i_pause"},
     {"input_resume",   "Resume Button",      "Resume operation",      106, "input", "i_resume"},
 
+    // Table Tilt / Hydraulics (X8-X12 default)
+    {"input_tbl1_up",     "Table 1 Up",        "T1 Horizontal",         108, "input", "i_t1_up"},
+    {"input_tbl1_down",   "Table 1 Down",      "T1 Vertical",           109, "input", "i_t1_dn"},
+    {"input_tbl2_up",     "Table 2 Up",        "T2 Horizontal",         110, "input", "i_t2_up"},
+    {"input_tbl2_down",   "Table 2 Down",      "T2 Vertical",           111, "input", "i_t2_dn"},
+    {"input_tbl_sel",     "Table Selector",    "T-Selector toggle",     112, "input", "i_t_sel"},
+
     // PLC Outputs (Y1-Y16, Virtual 116-131)
     {"output_axis_x",     "Axis X Select",     "Select X axis",        116, "output", "o_axis_x"},
     {"output_axis_y",     "Axis Y Select",     "Select Y axis",        117, "output", "o_axis_y"},

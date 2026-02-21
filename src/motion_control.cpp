@@ -74,11 +74,12 @@ static uint32_t m_max_jitter_us = 0;
 
 // PHASE 6.7: Uses Global Typed Cache (g_config) instead of local cache
 
-const uint8_t AXIS_TO_I73_BIT[] = {ELBO_I73_AXIS_X, ELBO_I73_AXIS_Y,
-                                   ELBO_I73_AXIS_Z, ELBO_I73_AXIS_A};
-const uint8_t AXIS_TO_CONSENSO_BIT[] = {
-    ELBO_I73_CONSENSO_X, ELBO_I73_CONSENSO_Y, ELBO_I73_CONSENSO_Z,
-    ELBO_I73_CONSENSO_A};
+// Protocol Mapping: 
+// S5 Q 73.2 (Bit 2) = Composite Limit Hit (Correct for PosiPro protocol)
+// S5 Q 72.5 (Bit 13) = Backward Limit X
+// S5 Q 72.6 (Bit 14) = Left Limit Y
+const uint8_t AXIS_TO_I73_BIT[]      = {13, 14, 2, 2}; // X (Rev Limit), Y (Rev Limit), Z (Limit), A (Limit)
+const uint8_t AXIS_TO_CONSENSO_BIT[]  = {0, 0, 0, 0};   // Use Q 73.0 (Ready) as global Consensus
 
 // Forward Declarations
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
@@ -680,14 +681,23 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
 // ============================================================================
 
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus) {
+  plcBeginTransaction();
   if (!enable || axis >= MOTION_AXES) {
-    // Stop: clear all outputs
+    // Stop all motion and clear handshakes
     plcClearAllOutputs();
-    return;
+  } else {
+    // Set Axis and Direction on Bank 2 (I 72)
+    plcSetAxisSelect(axis);
+    plcSetDirection(is_plus);
+
+    // ELBO PROTOCOL: Must hold Master Enable (I 73.7) and System Ready (I 72.7)
+    // Bank 1 (0x24): Bit 7 is I 73.7
+    elboQ73SetRelay(PLC_OUT_MASTER_ENABLE, true);
+    
+    // Bank 2 (0x25): Bit 7 is I 72.7 (Handshake required by PB30/20)
+    elboQ73SetRelay(8 + PLC_OUT_SYSTEM_READY, true);
   }
-  // Set axis, direction, and speed in correct order
-  plcSetAxisSelect(axis);
-  plcSetDirection(is_plus);
+  plcEndTransaction();
 }
 
 void motionSetPLCSpeedProfile(speed_profile_t profile) {

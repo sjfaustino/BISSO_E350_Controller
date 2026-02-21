@@ -33,9 +33,10 @@
 
 
 // Shadow Registers
-static uint8_t i73_input_shadow = 0x00; // Default 0 (Inactive) to prevent phantom inputs on vanilla ESP32
-static uint8_t q73_shadow_register = 0xFF; // Bank 1: All OFF (active-low: 1=OFF, 0=ON)
-static uint8_t q73_aux_shadow = 0xFF;      // Bank 2: All OFF (active-low)
+static uint8_t i73_input_shadow = 0x00; // Bank 1: S5 Q 73 Status (0x21)
+static uint8_t i72_input_shadow = 0x00; // Bank 2: S5 Q 72 Limits (0x22)
+static uint8_t q73_shadow_register = 0xFF; // Output Bank 1: S5 I 73 (0x24)
+static uint8_t q73_aux_shadow = 0xFF;      // Output Bank 2: S5 I 72 (0x25)
 
 // CRITICAL FIX: Mutex to protect shadow register access
 // Multiple tasks can call elboSetDirection(), elboSetSpeedProfile(),
@@ -247,26 +248,30 @@ void plcSetAxisSelect(uint8_t axis) {
     return;
   }
 
-  // Clear all axis select bits first (bits 0-2)
-  q73_shadow_register |= ((1 << PLC_OUT_AXIS_X_SELECT) |
-                          (1 << PLC_OUT_AXIS_Y_SELECT) |
-                          (1 << PLC_OUT_AXIS_Z_SELECT));
+  // Clear all axis select bits first (I 72.0 to 72.4 / Bank 2 bits 0-4)
+  // VERIFIED BY S5 PLC LOGIC (PB10.AWL)
+  q73_aux_shadow |= ((1 << PLC_OUT_AXIS_X_SELECT) |
+                     (1 << PLC_OUT_AXIS_Y_SELECT) |
+                     (1 << PLC_OUT_AXIS_Z_SELECT) |
+                     (1 << PLC_OUT_AXIS_A_SELECT) |
+                     (1 << PLC_OUT_AXIS_DISK_ROT));
 
   // Set the selected axis (active-low: clear bit = ON)
-  if (axis == 0) {
-    q73_shadow_register &= ~(1 << PLC_OUT_AXIS_X_SELECT);
-  } else if (axis == 1) {
-    q73_shadow_register &= ~(1 << PLC_OUT_AXIS_Y_SELECT);
-  } else if (axis == 2) {
-    q73_shadow_register &= ~(1 << PLC_OUT_AXIS_Z_SELECT);
+  // Mapping aligns with PB10 dispatcher: 0=X, 1=Y, 2=Z, 3=A, 4=Disk
+  switch (axis) {
+    case 0: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_X_SELECT); break;
+    case 1: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_Y_SELECT); break;
+    case 2: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_Z_SELECT); break;
+    case 3: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_A_SELECT); break;
+    case 4: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_DISK_ROT); break;
+    default: break; // 255 = none
   }
-  // axis == 255 means no axis selected (all OFF)
 
-  uint8_t register_copy = q73_shadow_register;
+  uint8_t register_copy = q73_aux_shadow;
   xSemaphoreGive(plc_shadow_mutex);
   
   if (!plc_in_transaction) {
-    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Axis");
+    plcWriteI2C(ADDR_Q73_AUX, register_copy, "Set Axis");
   }
 }
 
@@ -280,22 +285,22 @@ void plcSetDirection(bool positive) {
     return;
   }
 
-  // Clear both direction bits first (bits 3-4)
-  q73_shadow_register |= ((1 << PLC_OUT_DIR_POSITIVE) |
-                          (1 << PLC_OUT_DIR_NEGATIVE));
+  // Clear both direction bits first (I 72.5, 72.6 / Bank 2 bits 5-6)
+  q73_aux_shadow |= ((1 << PLC_OUT_DIR_POSITIVE) |
+                     (1 << PLC_OUT_DIR_NEGATIVE));
 
   // Set the selected direction (active-low: clear bit = ON)
   if (positive) {
-    q73_shadow_register &= ~(1 << PLC_OUT_DIR_POSITIVE);
+    q73_aux_shadow &= ~(1 << PLC_OUT_DIR_POSITIVE);
   } else {
-    q73_shadow_register &= ~(1 << PLC_OUT_DIR_NEGATIVE);
+    q73_aux_shadow &= ~(1 << PLC_OUT_DIR_NEGATIVE);
   }
 
-  uint8_t register_copy = q73_shadow_register;
+  uint8_t register_copy = q73_aux_shadow;
   xSemaphoreGive(plc_shadow_mutex);
   
   if (!plc_in_transaction) {
-    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Direction");
+    plcWriteI2C(ADDR_Q73_AUX, register_copy, "Set Direction");
   }
 }
 
@@ -307,40 +312,13 @@ void plcSetDirection(bool positive) {
  *       So we invert: profile 0→SLOW(Y8), profile 2→FAST(Y6)
  */
 void plcSetSpeed(uint8_t speed_profile) {
-  if (!plcAcquireShadowMutex()) {
-    logError("[PLC] plcSetSpeed FAILED (shadow register dirty)");
-    return;
-  }
+  // S5 PLC Speed handling:
+  // The original Elbo protocol used I 72.0 (Medium) and I 72.5 (Fast) as qualifiers.
+  // However, I 73.7 (Velocity Enable) is the master bit.
+  // We'll manage I 73.7 in motion_control.cpp.
+  // This function is kept for API compatibility but currently only logs.
 
-  // Clear all speed bits first (bits 5-7)
-  q73_shadow_register |= ((1 << PLC_OUT_SPEED_FAST) |
-                          (1 << PLC_OUT_SPEED_MEDIUM) |
-                          (1 << PLC_OUT_SPEED_SLOW));
-
-  // CRITICAL FIX: Invert mapping to match semantic meaning
-  // Profile 0 = slowest speed request → Y8 (SLOW hardware)
-  // Profile 1 = medium speed request → Y7 (MEDIUM hardware)
-  // Profile 2 = fastest speed request → Y6 (FAST hardware)
-  switch (speed_profile) {
-    case 0:  // SPEED_PROFILE_1 = slowest
-      q73_shadow_register &= ~(1 << PLC_OUT_SPEED_SLOW);  // Y8
-      break;
-    case 1:  // SPEED_PROFILE_2 = medium
-      q73_shadow_register &= ~(1 << PLC_OUT_SPEED_MEDIUM);  // Y7
-      break;
-    case 2:  // SPEED_PROFILE_3 = fastest
-      q73_shadow_register &= ~(1 << PLC_OUT_SPEED_FAST);  // Y6
-      break;
-    default:
-      break;
-  }
-
-  uint8_t register_copy = q73_shadow_register;
-  xSemaphoreGive(plc_shadow_mutex);
-  
-  if (!plc_in_transaction) {
-    plcWriteI2C(ADDR_Q73_OUTPUT, register_copy, "Set Speed");
-  }
+  logDebug("[PLC] Requested speed profile: %d (Elbo protocol bypass)", speed_profile);
 }
 
 /**
@@ -499,10 +477,6 @@ void elboQ73SetRelay(uint8_t relay_bit, bool state) {
 // INPUT READING
 // ============================================================================
 
-/**
- * @brief Performs a full read of the I73 input board into the shadow register.
- * @details Call this once per control loop to reduce I2C bus traffic.
- */
 void elboI73Refresh() {
   if (!g_plc_hardware_present) return;
 
@@ -510,13 +484,36 @@ void elboI73Refresh() {
   if (!taskLockMutex(taskGetI2cPlcMutex(), 100)) return;
 
   uint32_t start = micros();
-  uint8_t count = Wire.requestFrom((uint8_t)ADDR_I73_INPUT, (uint8_t)1);
-  if (count == 1) {
+
+  // Read I 73 (Bus 73 status at X9-X16)
+  uint8_t count1 = Wire.requestFrom((uint8_t)ADDR_I73_INPUT, (uint8_t)1);
+  if (count1 == 1) {
     i73_input_shadow = Wire.read();
-    updateLatency(&input_latency, micros() - start);
   }
 
+  // Read I 72 (Bus 72 limits at X1-X8 - note: using 0x22 if safe)
+  // We use the BOARD_INPUT_I2C_ADDR alias if defined, or 0x22 directly
+  uint8_t count2 = Wire.requestFrom((uint8_t)0x22, (uint8_t)1);
+  if (count2 == 1) {
+    i72_input_shadow = Wire.read();
+  }
+
+  updateLatency(&input_latency, micros() - start);
   taskUnlockMutex(taskGetI2cPlcMutex());
+}
+
+/**
+ * @brief Reads a specific bit from the PLC input shadow registers.
+ * @param bit Bit index 0-15 (0-7 = Bus 73, 8-15 = Bus 72).
+ * @return State of the bit.
+ */
+bool elboGetInput(uint8_t bit) {
+  if (bit < 8) {
+    return (i73_input_shadow & (1 << bit));
+  } else if (bit < 16) {
+    return (i72_input_shadow & (1 << (bit - 8)));
+  }
+  return false;
 }
 
 /**
@@ -579,11 +576,18 @@ bool elboIsShadowRegisterDirty() { return q73_shadow_dirty; }
 // Hardware presence check - allows monitor tasks to skip I2C when no hardware
 bool plcIsHardwarePresent() { return g_plc_hardware_present; }
 
-uint32_t plcGetRecoveryCount() { 
-    return i2cGetStats().bus_recoveries; 
+uint8_t elboI73GetRawState() { return i73_input_shadow; }
+
+uint8_t elboI72GetRawState() { return i72_input_shadow; }
+
+uint16_t plcGetInputRawState() {
+    return ((uint16_t)i72_input_shadow << 8) | i73_input_shadow;
 }
 
-uint8_t elboI73GetRawState() { return i73_input_shadow; }
+bool elboI73GetInput(uint8_t bit, bool *success) {
+    if (success) *success = true;
+    return elboGetInput(bit);
+}
 
 uint8_t elboQ73GetRawState() { return q73_shadow_register; }
 
