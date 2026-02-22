@@ -122,6 +122,7 @@ void telemetryUpdate() {
     float ax_y = motionGetPositionMM(1);
     float ax_z = motionGetPositionMM(2);
     float ax_a = motionGetPositionMM(3);
+    bool coord_mode = motionIsCoordinatedEnabled();
     
     float wco[4] = {0, 0, 0, 0};
     gcodeParser.getWCO(wco);
@@ -144,7 +145,19 @@ void telemetryUpdate() {
         sp_fault = spindleMonitorIsFault();
     }
     // Get actual run status from VFD Modbus status word
-    sp_running = altivar31IsRunning();
+    sp_running = AltivarX.isRunning() || AltivarYZA.isRunning();
+
+    // VFD 1 (X)
+    bool vfd1_alive = AltivarX.isEnabled() && AltivarX.getPollCount() > 0 && AltivarX.getConsecutiveErrors() < 5;
+    float vfd1_freq = AltivarX.getFrequencyHz();
+    float vfd1_current = AltivarX.getCurrentAmps();
+    uint32_t vfd1_fault = AltivarX.getFaultCode();
+
+    // VFD 2 (YZA)
+    bool vfd2_alive = AltivarYZA.isEnabled() && AltivarYZA.getPollCount() > 0 && AltivarYZA.getConsecutiveErrors() < 5;
+    float vfd2_freq = AltivarYZA.getFrequencyHz();
+    float vfd2_current = AltivarYZA.getCurrentAmps();
+    uint32_t vfd2_fault = AltivarYZA.getFaultCode();
 
     // RPM Sensor (YH-TC05)
     bool rpm_en = false;
@@ -206,18 +219,14 @@ void telemetryUpdate() {
     // uint32_t cfg_ver = configGetInt("schema_version", 1); // Unused
     bool cfg_default = (configGetInt(KEY_WEB_PW_CHANGED, 0) == 0);
 
-    // VFD & Spindle Load (DRY Phase 8)
-    const jxk10_state_t* jxk_state = jxk10GetState();
-    bool vfd_alive = jxk_state 
-                     && jxk_state->enabled 
-                     && (jxk_state->read_count > 5)
-                     && (jxk_state->consecutive_errors < 5)
-                     && (now - jxk_state->last_read_time_ms < 5000);
-
-    float vfd_freq = altivar31GetFrequencyHz();
-    float vfd_current = jxk10GetCurrentAmps();
-    int16_t vfd_thermal = altivar31GetThermalState();
-    uint32_t vfd_fault = altivar31GetFaultCode();
+    // Consolidated VFD State (for legacy UI compatibility)
+    // We'll report VFD2 as primary if VFD1 is idle, or consolidated fault/thermal
+    float vfd_freq = (vfd1_freq > 0.5f) ? vfd1_freq : vfd2_freq;
+    int16_t vfd_thermal = (AltivarX.getThermalState() > AltivarYZA.getThermalState()) 
+                          ? AltivarX.getThermalState() : AltivarYZA.getThermalState();
+    uint32_t vfd_fault = vfd1_fault | vfd2_fault;
+    bool vfd_alive = vfd1_alive || vfd2_alive;
+    float vfd_current = (vfd1_current > vfd2_current) ? vfd1_current : vfd2_current;
     float spindle_load = spindleMonitorGetLoadPercent();
     
     // MCU Identification
@@ -288,6 +297,7 @@ void telemetryUpdate() {
     telemetry_cache.axis_y_mm = ax_y;
     telemetry_cache.axis_z_mm = ax_z;
     telemetry_cache.axis_a_mm = ax_a;
+    telemetry_cache.coordinated_mode = coord_mode;
     memcpy(telemetry_cache.wcs_offset_mm, wco, sizeof(wco));
     telemetry_cache.active_wcs = (uint8_t)gcodeParser.getCurrentWCOSystem();
     telemetry_cache.spindle_enabled = sp_en;
@@ -327,6 +337,18 @@ void telemetryUpdate() {
     telemetry_cache.vfd_frequency_hz = (isnan(vfd_freq) || vfd_freq < 0.0f) ? 0.0f : vfd_freq;
     telemetry_cache.vfd_thermal_state = (vfd_thermal < 0 || vfd_thermal > 200) ? 0 : vfd_thermal;
     telemetry_cache.vfd_fault_code = vfd_fault;
+
+    // Dual VFD Fields
+    telemetry_cache.vfd1_connected = vfd1_alive;
+    telemetry_cache.vfd1_frequency_hz = vfd1_freq;
+    telemetry_cache.vfd1_current_amps = vfd1_current;
+    telemetry_cache.vfd1_fault_code = vfd1_fault;
+
+    telemetry_cache.vfd2_connected = vfd2_alive;
+    telemetry_cache.vfd2_frequency_hz = vfd2_freq;
+    telemetry_cache.vfd2_current_amps = vfd2_current;
+    telemetry_cache.vfd2_fault_code = vfd2_fault;
+
     telemetry_cache.vfd_threshold_amps = vfdCalibrationGetThreshold();
     telemetry_cache.vfd_calibration_valid = vfdCalibrationIsValid();
     telemetry_cache.spindle_load_percent = spindle_load;
@@ -439,10 +461,14 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size, bool full) {
 
     n = snprintf(buffer + offset, buffer_size - offset,
         "\"vfd\":{\"current_amps\":%.2f,\"frequency_hz\":%.2f,\"thermal_percent\":%d,\"fault_code\":%u,"
-        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f,\"load_pct\":%.1f},",
+        "\"stall_threshold\":%.2f,\"calibration_valid\":%s,\"connected\":%s,\"rpm\":%.1f,\"speed_m_s\":%.2f,\"efficiency\":%.2f,\"load_pct\":%.1f,"
+        "\"vfd1\":{\"connected\":%s,\"freq\":%.1f,\"amps\":%.1f,\"fault\":%u},"
+        "\"vfd2\":{\"connected\":%s,\"freq\":%.1f,\"amps\":%.1f,\"fault\":%u}},",
         t.spindle_current_amps, t.vfd_frequency_hz, t.vfd_thermal_state, t.vfd_fault_code,
         t.vfd_threshold_amps, t.vfd_calibration_valid ? "true" : "false", t.vfd_connected ? "true" : "false",
-        (float)t.spindle_rpm, 0.0f, t.spindle_efficiency, t.spindle_load_percent);
+        (float)t.spindle_rpm, 0.0f, t.spindle_efficiency, t.spindle_load_percent,
+        t.vfd1_connected ? "true" : "false", t.vfd1_frequency_hz, t.vfd1_current_amps, t.vfd1_fault_code,
+        t.vfd2_connected ? "true" : "false", t.vfd2_frequency_hz, t.vfd2_current_amps, t.vfd2_fault_code);
     if (n > 0 && (offset + n) < buffer_size) offset += n;
 
     n = snprintf(buffer + offset, buffer_size - offset,
@@ -468,12 +494,18 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size, bool full) {
         t.lcd_lines[0], t.lcd_lines[1], t.lcd_lines[2], t.lcd_lines[3]);
     if (n > 0 && (offset + n) < buffer_size) offset += n;
 
-    if (t.motion_moving) {
-        char cmd_buf[64];
-        motionGetCurrentCommand(cmd_buf, sizeof(cmd_buf));
-        n = snprintf(buffer + offset, buffer_size - offset,
-            ",\"exec\":{\"cmd\":\"%s\",\"progress\":%.1f,\"eta\":%lu}",
-            cmd_buf, motionGetExecutionProgress(), (unsigned long)motionGetEstimatedTimeRemaining());
+    if (t.motion_moving) {
+
+        char cmd_buf[64];
+
+        motionGetCurrentCommand(cmd_buf, sizeof(cmd_buf));
+
+        n = snprintf(buffer + offset, buffer_size - offset,
+
+            ",\"exec\":{\"cmd\":\"%s\",\"progress\":%.1f,\"eta\":%lu}",
+
+            cmd_buf, motionGetExecutionProgress(), (unsigned long)motionGetEstimatedTimeRemaining());
+
         if (n > 0 && (offset + n) < buffer_size) offset += n;
     }
 

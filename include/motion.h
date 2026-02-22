@@ -57,6 +57,8 @@ bool motionIsEncoderFeedbackEnabled();
 
 // --- DIAGNOSTICS ---
 void motionDiagnostics();
+void motionSetCoordinatedMode(bool enable);
+bool motionIsCoordinatedEnabled();
 
 // --- ACCESSORS ---
 int32_t motionGetPosition(uint8_t axis);
@@ -79,6 +81,7 @@ speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed);
 float motionGetCalibratedFeedRate(uint8_t axis, float speed_mm_s);
 void motionSetPLCSpeedProfile(speed_profile_t profile);
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
+void motionSetVFDVelocities(float freq1_hz, float freq2_hz);
 
 // --- PERFORMANCE DIAGNOSTICS ---
 void motionPrintSpinlockStats();  // Print spinlock critical section timing report

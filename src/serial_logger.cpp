@@ -113,9 +113,14 @@ void serialLoggerInit(log_level_t log_level) {
   // PHASE 8.5: Load serial destination from NVS
   int dest = configGetInt(KEY_SERIAL_DEST, 0); // 0=USB, 1=Alt UART
   if (dest == 1) {
+#if defined(PIN_ALT_UART_RX) && defined(PIN_ALT_UART_TX)
       static HardwareSerial AltSerial(1);
       AltSerial.begin(115200, SERIAL_8N1, PIN_ALT_UART_RX, PIN_ALT_UART_TX);
       active_serial_stream = &AltSerial;
+#else
+      active_serial_stream = &Serial;
+      logWarning("[LOGGER] Alt UART not supported on this variant");
+#endif
   } else {
       active_serial_stream = &Serial;
   }

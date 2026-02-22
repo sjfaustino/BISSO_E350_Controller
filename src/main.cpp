@@ -11,6 +11,7 @@
 #include "lcd_interface.h"
 #include "motion.h"
 #include "plc_iface.h"
+#include "dac_interface.h"
 #include "safety.h"
 #include "serial_logger.h"
 #include "system_constants.h"
@@ -39,6 +40,7 @@
 #include "trash_bin_manager.h" // Trash bin with auto-delete
 #include "memory_prealloc.h"  // PHASE 6.12: Memory pre-allocation
 #include "engineering_menu.h" // BOOT button menu
+#include "altivar31_modbus.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -134,9 +136,16 @@ bool init_recovery_wrapper() { recoveryInit(); return true; }
 bool init_alerts_wrapper() { buzzerInit(); statusLightInit(); return true; }
 // PHASE 5.0: Initialize Spindle Monitor with default JXK-10 address (1) and threshold (30A)
 bool init_spindle_wrapper() { 
-    uint8_t addr = (uint8_t)configGetInt(KEY_JXK10_ADDR, 1); // Consolidate on single key
-    // Fix: Use dedicated threshold key for shutdown, NOT pause threshold
+    // Initialize Analog Speed Card (DAC)
+    dacInit();
+
+    uint8_t addr = (uint8_t)configGetInt(KEY_JXK10_ADDR, 1);
     float thr = (float)configGetInt(KEY_SPINDLE_THRESHOLD, 30);
+    
+    // Initialize Modbus VFDs (handles both instances)
+    uint32_t rs485_baud = (uint32_t)configGetInt(KEY_RS485_BAUD, 19200);
+    altivar31ModbusInit(2, rs485_baud); 
+
     return spindleMonitorInit(addr, thr); 
 }
 

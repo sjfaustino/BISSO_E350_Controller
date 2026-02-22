@@ -32,7 +32,6 @@ A    F 6.0               // IF F6.0 IS ON
 JC   PB 30               // JUMP CONDITIONAL TO PB30 (Tilt control)
 
 A    F 6.0               // IF F6.0 IS ON
-BEC                      // BLOCK END CONDITIONAL
 
 //===============================================================
 // NETWORK 3 : Left/Right Axis Check (Translation)
@@ -46,7 +45,6 @@ A    F 6.1               // IF F6.1 IS ON
 JC   PB 40               // JUMP CONDITIONAL TO PB40 (Left/Right control)
 
 A    F 6.1               // IF F6.1 IS ON
-BEC                      // BLOCK END CONDITIONAL
 
 //===============================================================
 // NETWORK 4 : Rot Table / Spianatura Check
@@ -68,7 +66,6 @@ A    F 6.2               // IF F6.2 IS ON
 JC   PB 50               // JUMP CONDITIONAL TO PB50 (Rot Table control)
 
 A    F 6.2               // IF F6.2 IS ON
-BEC                      // BLOCK END CONDITIONAL
 
 //===============================================================
 // NETWORK 5 : Rot Disk Check

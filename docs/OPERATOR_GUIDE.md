@@ -134,7 +134,13 @@ The Schneider Altivar 31 VFD (which controls axis motors ONLY) is pre-configured
 | **Vns** | 380 V | Nominal motor voltage (3-phase supply) |
 | **FrS** | 50 Hz | Nominal motor frequency (European motor standard) |
 | **tFr** | 105 Hz | Maximum output frequency (hardware limit for axis control) |
-| **r1** | Error Relay Output | VFD fault output that signals PLC when VFD is in error state (allows ESP32 to detect VFD faults) |
+| **LAC** | L3 | Expanded configuration access |
+| **CHCF** | SEP | Separate mode (Reference and Command independent) |
+| **Fr1** | AI1 | Primary Reference: PLC Analog 0-10V |
+| **Fr2** | nnd | Secondary Reference: Modbus RTU Override |
+| **rFC** | n15 | Reference Switch: Controlled via Modbus Bit 15 |
+| **SLL** | LFF | Fault Fallback: Revert to Fr1 (Follow PLC) on error |
+| **r1** | Error Relay Output | VFD fault output that signals PLC when VFD is in error state |
 
 ⚠️ **NOTE**: These parameters control AXIS MOTOR speed ONLY. The spindle has a separate VFD with independent parameters controlled manually by the operator.
 

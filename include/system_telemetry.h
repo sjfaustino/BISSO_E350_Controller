@@ -56,6 +56,7 @@ typedef struct {
     float axis_y_mm;
     float axis_z_mm;
     float axis_a_mm;
+    bool coordinated_mode;     // PHASE 22: Simultaneous X/Y enabled
     float wcs_offset_mm[4];    // PHASE 5.1: X, Y, Z, A offsets
     uint8_t active_wcs;        // PHASE 5.1: 0=G54, 1=G55, etc.
     uint32_t steps_executed;
@@ -78,10 +79,22 @@ typedef struct {
     bool rpm_stall_detected;
 
     // VFD & Spindle Detail (PHASE 8 DRY)
-    bool vfd_connected;
+    bool vfd_connected;             // Primary/Consolidated
     float vfd_frequency_hz;
     int16_t vfd_thermal_state;
     uint32_t vfd_fault_code;
+
+    // VFD 1 (X-Axis)
+    bool vfd1_connected;
+    float vfd1_frequency_hz;
+    float vfd1_current_amps;
+    uint32_t vfd1_fault_code;
+
+    // VFD 2 (Aux Axes: Y, Z, A)
+    bool vfd2_connected;
+    float vfd2_frequency_hz;
+    float vfd2_current_amps;
+    uint32_t vfd2_fault_code;
     float vfd_threshold_amps;
     bool vfd_calibration_valid;
     float spindle_load_percent;

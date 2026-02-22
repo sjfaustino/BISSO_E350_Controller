@@ -13,12 +13,12 @@ S    Q 6.1               // TURN ON C4
 A    I 2.4               // IF Right IS ON
 AN   F 5.4               // AND F5.4 IS OFF
 AN   I 5.0               // AND I5.0 IS OFF
-=    F 4.0               // TURN ON F4.0
+S    F 4.0               // TURN ON F4.0
 
 A    I 2.5               // IF Left IS ON
 AN   F 5.4               // AND F5.4 IS OFF
 AN   I 5.1               // AND I5.1 IS OFF
-=    F 4.1               // TURN ON F4.1
+S    F 4.1               // TURN ON F4.1
 
 L    DW 9                // LOAD FROM DW9
 T    QW 64               // TRANSFER TO QW64

@@ -6,8 +6,9 @@
 #include <Arduino.h>
 #include <string.h>
 
-// Global instance
-Altivar31Driver Altivar31;
+// Global instances
+Altivar31Driver AltivarX("VFD1(X)");
+Altivar31Driver AltivarYZA("VFD2(YZA)");
 
 // Polling sequence
 static const uint16_t poll_registers[] = {
@@ -23,11 +24,11 @@ static const uint16_t poll_registers[] = {
 // CLASS IMPLEMENTATION
 // ============================================================================
 
-Altivar31Driver::Altivar31Driver() 
-    : ModbusDriver("Altivar31", RS485_DEVICE_TYPE_VFD, 2, 50, 5) 
+Altivar31Driver::Altivar31Driver(const char* name) 
+    : ModbusDriver(name, RS485_DEVICE_TYPE_VFD, 2, 50, 5) 
 {
     memset(&_state, 0, sizeof(_state));
-    _state.slave_address = 2;
+    _state.slave_address = 2; // Default, will be overridden
     _state.baud_rate = 19200;
     
     _poll_step = 0;
@@ -53,6 +54,43 @@ bool Altivar31Driver::isRunning() const { return (_state.status_word & 0x0008) !
 void Altivar31Driver::queueRequest(uint16_t register_addr) {
     _pending_register = register_addr;
     rs485RequestImmediatePoll(getMutableDeviceDescriptor());
+}
+
+bool Altivar31Driver::writeFrequency(float hz) {
+    if (!isEnabled()) return false;
+
+    // Clamp Hz (0-50Hz usually)
+    if (hz < 0.0f) hz = 0.0f;
+    if (hz > 60.0f) hz = 60.0f; // Safety cap
+
+    // Altivar expects 0.1 Hz units (e.g., 50.0Hz -> 500)
+    uint16_t raw_val = (uint16_t)(hz * 10.0f);
+    
+    uint8_t buffer[16];
+    uint16_t len = modbusWriteSingleRegisterRequest(getSlaveAddress(), 
+                                                   ALTIVAR31_REG_FREQ_SETPOINT, 
+                                                   raw_val, buffer);
+    
+    // Immediate send for frequency updates as they are time-critical for motion
+    return send(buffer, len);
+}
+
+bool Altivar31Driver::setModbusPriority(bool active) {
+    if (!isEnabled()) return false;
+
+    // Command word: bits 0-3 = enable/run, bit 15 = Fr1/Fr2 switch
+    // Assuming VFD param rFC is set to n15
+    uint16_t cmd = 0x000F; // Standard Run Enable
+    if (active) {
+        cmd |= 0x8000; // Set Bit 15 to take priority (Fr2)
+    }
+
+    uint8_t buffer[16];
+    uint16_t len = modbusWriteSingleRegisterRequest(getSlaveAddress(), 
+                                                   ALTIVAR31_REG_COMMAND_WORD, 
+                                                   cmd, buffer);
+    
+    return send(buffer, len);
 }
 
 bool Altivar31Driver::poll() {
@@ -128,19 +166,27 @@ bool Altivar31Driver::onResponse(const uint8_t* data, uint16_t len) {
 
 bool altivar31ModbusInit(uint8_t slave_address, uint32_t baud_rate) {
     if (configGetInt(KEY_VFD_EN, 1) == 0) {
-        logInfo("[ALTIVAR31] Disabled in configuration");
-        Altivar31.setEnabled(false);
+        logInfo("[ALTIVAR31] Monitoring disabled in configuration");
+        AltivarX.setEnabled(false);
+        AltivarYZA.setEnabled(false);
         return true;
     }
     
-    uint8_t cfg_addr = (uint8_t)configGetInt(KEY_VFD_ADDR, slave_address);
-    Altivar31.setSlaveAddress(cfg_addr);
-    
-    if (Altivar31.begin(baud_rate)) {
-        logInfo("[ALTIVAR31] Initialized (Addr: %u)", cfg_addr);
-        return true;
+    // VFD1 (X)
+    uint8_t addr1 = (uint8_t)configGetInt(KEY_VFD_ADDR, 2);
+    AltivarX.setSlaveAddress(addr1);
+    if (AltivarX.begin(baud_rate)) {
+        logInfo("[ALTIVAR31] VFD1(X) Initialized (Addr: %u)", addr1);
     }
-    return false;
+    
+    // VFD2 (YZA)
+    uint8_t addr2 = (uint8_t)configGetInt(KEY_VFD2_ADDR, 4);
+    AltivarYZA.setSlaveAddress(addr2);
+    if (AltivarYZA.begin(baud_rate)) {
+        logInfo("[ALTIVAR31] VFD2(YZA) Initialized (Addr: %u)", addr2);
+    }
+    
+    return true;
 }
 
 bool altivar31ModbusReadCurrent(void) {

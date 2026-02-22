@@ -53,7 +53,7 @@ O                        // OR
 AN   F 5.4               // IF No Fault
 A    I 72.3              // AND Cmd LockTable IS ON
 A    I 72.5              // AND Elbo Fast IS ON
-=    F 4.0               // TURN ON F4.0 → Clockwise direction active
+S    F 4.0               // TURN ON F4.0 → Clockwise direction active
 
 //===============================================================
 // NETWORK 3 : Direction Detection – Anticlockwise (F4.1)
@@ -65,7 +65,7 @@ O                        // OR
 AN   F 5.4               // IF No Fault
 A    I 72.3              // AND Cmd LockTable IS ON
 A    I 72.6              // AND Elbo Slow IS ON
-=    F 4.1               // TURN ON F4.1 → Anticlockwise direction active
+S    F 4.1               // TURN ON F4.1 → Anticlockwise direction active
 
 //===============================================================
 // NETWORK 4 : Base Speed Output

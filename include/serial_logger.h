@@ -154,13 +154,17 @@ void serialLoggerUnlock();
  * @brief Dynamically set the active serial output stream
  * @param stream Pointer to Stream object (Serial, AltSerial, File, etc.)
  */
+#ifdef ARDUINO
 void serialLoggerSetStream(Stream* stream);
+#endif
 
 /**
  * @brief Get the currently active serial output stream
  * @return Pointer to current Stream object
  */
+#ifdef ARDUINO
 Stream* serialLoggerGetStream();
+#endif
 
 // ============================================================================
 // BOOT LOG CAPTURE (LittleFS)

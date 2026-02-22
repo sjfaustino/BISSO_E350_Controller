@@ -51,6 +51,10 @@
 // This byte contains secondary status and velocity enable signals.
 #define PLC_OUT_MASTER_ENABLE 7  // Y8  -> I 73.7 (OB1: Velocity Enable)
 
+#define PLC_OUT_SPEED_FAST    5
+#define PLC_OUT_SPEED_MEDIUM  6
+#define PLC_OUT_SPEED_SLOW    7
+
 // Legacy aliases for backward compatibility 
 #define ELBO_Q73_SPEED_1      0  // Dummy for now
 #define ELBO_Q73_SPEED_2      1

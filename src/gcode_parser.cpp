@@ -139,7 +139,8 @@ bool GCodeParser::validateGCodeSyntax(const char* line, char* error_msg, size_t 
             return false;
         }
         // Check for supported G-codes
-        bool valid_g = (cmd_num == 0 || cmd_num == 1 || cmd_num == 4 || cmd_num == 10 ||
+        bool valid_g = (cmd_num == 0 || cmd_num == 1 || cmd_num == 2 || cmd_num == 3 ||
+                       cmd_num == 4 || cmd_num == 10 ||
                        cmd_num == 28 || cmd_num == 30 || cmd_num == 53 ||
                        (cmd_num >= 54 && cmd_num <= 59) ||
                        cmd_num == 90 || cmd_num == 91 || cmd_num == 92);
@@ -239,6 +240,8 @@ bool GCodeParser::processCommand(const char* line) {
         switch (cmd) {
             case 0:
             case 1:  return handleG0_G1(line);
+            case 2:  return handleG2_G3(line, true);  // CW Arc
+            case 3:  return handleG2_G3(line, false); // CCW Arc
             case 4:  handleG4(line); break;  // G4 Dwell
             case 10: handleG10(line); break; // G10 L20 P1...
             case 28: handleG28(line); break; // PHASE 5.1: G28 Home
@@ -279,6 +282,7 @@ bool GCodeParser::processCommand(const char* line) {
             // PHASE 4.0: M255 - LCD sleep/backlight timeout
             case 255: handleM255(line); break;
             case 112: motionEmergencyStop(); break;
+            case 402: handleM402(line); break; // Coordinated Motion Mode toggle
             default: return false;
         }
         return true;
@@ -865,3 +869,92 @@ bool GCodeParser::hasCode(const char* line, char code) {
 }
 
 gcode_distance_mode_t GCodeParser::getDistanceMode() { return distanceMode; }
+void GCodeParser::handleM402(const char* line) {
+    float pVal = 0;
+    if (parseCode(line, 'P', pVal)) {
+        bool enable = ((int)pVal != 0);
+        motionSetCoordinatedMode(enable);
+        logInfo("[GCODE] Coordinated Mode (C+T): %s", enable ? "ENABLED" : "DISABLED");
+    }
+}
+
+bool GCodeParser::handleG2_G3(const char* line, bool clockwise) {
+    // Current position in MM
+    float x = motionGetPositionMM(0);
+    float y = motionGetPositionMM(1);
+    float z = motionGetPositionMM(2);
+    float a = motionGetPositionMM(3);
+
+    // Targets
+    float target_x = x, target_y = y;
+    float val_x = 0, val_y = 0;
+    if (parseCode(line, 'X', val_x)) {
+        if (distanceMode == G_MODE_ABSOLUTE) {
+            target_x = val_x + wcs_offsets[currentWCS][0];
+        } else {
+            target_x = x + val_x;
+        }
+    }
+    if (parseCode(line, 'Y', val_y)) {
+        if (distanceMode == G_MODE_ABSOLUTE) {
+            target_y = val_y + wcs_offsets[currentWCS][1];
+        } else {
+            target_y = y + val_y;
+        }
+    }
+
+    // Center offsets (I and J are always relative to start point in standard G-code)
+    float i_off = 0, j_off = 0;
+    bool has_i = parseCode(line, 'I', i_off);
+    bool has_j = parseCode(line, 'J', j_off);
+
+    if (!has_i && !has_j) {
+        logError("[GCODE] Arcs require I or J offsets");
+        return false;
+    }
+
+    // Geometry calculations
+    float center_x = x + i_off;
+    float center_y = y + j_off;
+    float radius = sqrt(i_off * i_off + j_off * j_off);
+
+    float start_angle = atan2(y - center_y, x - center_x);
+    float end_angle = atan2(target_y - center_y, target_x - center_x);
+
+    // Calculate angular sweep based on direction
+    float sweep = end_angle - start_angle;
+    if (clockwise) {
+        if (sweep >= 0) sweep -= 2.0f * M_PI;
+    } else {
+        if (sweep <= 0) sweep += 2.0f * M_PI;
+    }
+
+    // Arc segmentation (PHASE 22: Target 0.5mm chordal error or segments)
+    // For simplicity, let's use 1mm linear segments
+    float arc_length = abs(sweep) * radius;
+    int segments = (int)ceil(arc_length / 1.0f); // 1.0mm per segment
+    if (segments < 1) segments = 1;
+    if (segments > 100) segments = 100; // Cap to avoid blocking
+
+    bool success = true;
+    for (int s = 1; s <= segments; s++) {
+        float frac = (float)s / segments;
+        float angle = start_angle + sweep * frac;
+        
+        float seg_x = center_x + radius * cos(angle);
+        float seg_y = center_y + radius * sin(angle);
+        
+        // Final segment should land exactly on target to avoid accumulation
+        if (s == segments) {
+            seg_x = target_x;
+            seg_y = target_y;
+        }
+
+        if (!pushMove(seg_x, seg_y, z, a)) {
+            success = false;
+            break;
+        }
+    }
+
+    return success;
+}

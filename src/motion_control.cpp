@@ -34,6 +34,9 @@
 #include "system_tuning.h"
 #include "axis_utilities.h" // PHASE 4.1: Centralized units
 #include "system_utils.h" // PHASE 8.1
+#include "engineering_menu.h" // BOOT button menu
+#include "altivar31_modbus.h" // Dual VFD Analog Control
+#include "dac_interface.h" // Dual VFD Analog Control
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <math.h>
@@ -56,7 +59,8 @@ static struct {
   char current_command[64];
   float progress_percent;
   float remaining_seconds;
-} m_state = {255, 0, true, 1, "", 0.0f, 0.0f};
+  bool coordinated_mode; // Enable X/Y simultaneous motion
+} m_state = {255, 0, true, 1, "", 0.0f, 0.0f, false};
 
 // PHASE 5.10: Non-static to allow external access from motion_state_machine.cpp
 portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -84,6 +88,8 @@ const uint8_t AXIS_TO_CONSENSO_BIT[]  = {0, 0, 0, 0};   // Use Q 73.0 (Ready) as
 // Forward Declarations
 void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus);
 void motionSetPLCSpeedProfile(speed_profile_t profile);
+speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed_mm_s);
+float calculateHzForSpeed(uint8_t axis, float speed_mm_s);
 
 // ============================================================================
 // PUBLIC ACCESSORS FOR AXIS CLASS
@@ -94,6 +100,17 @@ void motionUpdateExecutionMetrics(float progress, float remaining_seconds) {
   m_state.progress_percent = progress;
   m_state.remaining_seconds = remaining_seconds;
   portEXIT_CRITICAL(&motionSpinlock);
+}
+
+// PHASE 22: Coordinated Motion Support (C+T Mode)
+void motionSetCoordinatedMode(bool enable) {
+  portENTER_CRITICAL(&motionSpinlock);
+  m_state.coordinated_mode = enable;
+  portEXIT_CRITICAL(&motionSpinlock);
+}
+
+bool motionIsCoordinatedEnabled() {
+  return m_state.coordinated_mode;
 }
 
 // ============================================================================
@@ -279,20 +296,19 @@ void motionUpdate() {
   motionPlanner.update(axes, m_state.active_axis,
                        m_state.active_start_position);
 
-  if (m_state.active_axis != 255) {
-    // Use effective consensus state. If active_axis changed (rare race),
-    // we use 'false' to be safe (axis stays in WAIT_CONSENSO).
-    bool effective =
-        (m_state.active_axis == current_axis) ? consensus_active : false;
-    axes[m_state.active_axis].updateState(
-        axes[m_state.active_axis].position,
-        axes[m_state.active_axis].target_position, effective);
-        
-    // Logic/State machine now operates on PREDICTED position for better responsiveness
-    // (Actual position tracking stays in updateState for statistics)
-    
-    // Re-run state machine logic if needed OR let it use predicted
-    // The state_executing_handler and state_stopping_handler will now see 'current' as predicted
+  bool any_axis_active = false;
+  for (int i = 0; i < MOTION_AXES; i++) {
+    if (axes[i].state != MOTION_IDLE) {
+        any_axis_active = true;
+        bool axis_consensus = elboI73GetInput(AXIS_TO_CONSENSO_BIT[i]);
+        axes[i].updateState(axes[i].position, axes[i].target_position, axis_consensus);
+    }
+  }
+
+  if (!any_axis_active) {
+    portENTER_CRITICAL(&motionSpinlock);
+    m_state.active_axis = 255;
+    portEXIT_CRITICAL(&motionSpinlock);
   }
 
   taskUnlockMutex(taskGetMotionMutex());
@@ -363,6 +379,19 @@ void motionUpdate() {
   // PHASE 5.0: Update spindle current monitoring (non-blocking, includes safety
   // shutdown)
   spindleMonitorUpdate();
+
+  // SAFETY & LOCKOUT (PHASE 8.6)
+  // If PosiPro is IDLE, ensure VFDs return control back to the PLC Analog Terminal
+  if (m_state.active_axis == 255) {
+      AltivarX.setModbusPriority(false);
+      AltivarYZA.setModbusPriority(false);
+      
+      // Also ensure DAC is at 0V just in case relay logic fails
+      if (dacIsAnalogEnabled()) {
+          dacSetFrequency(0, 0.0f);
+          dacSetFrequency(1, 0.0f);
+      }
+  }
 }
 
 // ============================================================================
@@ -629,7 +658,12 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
     }
   }
 
-  if (cnt > 1 || cnt == 0 || m_state.active_axis != 255) {
+  // Relax check for coordinated X/Y motion
+  bool is_coord_xy = (m_state.coordinated_mode && cnt == 2 && 
+                      (targets[0] != motionGetPositionMM(0)) && 
+                      (targets[1] != motionGetPositionMM(1)));
+
+  if ((cnt > 1 && !is_coord_xy) || cnt == 0 || m_state.active_axis != 255) {
     taskUnlockMutex(taskGetMotionMutex());
     return false;
   }
@@ -661,16 +695,47 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   m_state.active_start_position = axes[target_axis].position;
   portEXIT_CRITICAL(&motionSpinlock);
 
-  // PHASE 5.10: Use formal state machine for state transitions
-  MotionStateMachine::transitionTo(&axes[target_axis], MOTION_WAIT_CONSENSO);
+  if (is_coord_xy) {
+      MotionStateMachine::transitionTo(&axes[0], MOTION_WAIT_CONSENSO);
+      MotionStateMachine::transitionTo(&axes[1], MOTION_WAIT_CONSENSO);
+      axes[0].target_position = (int32_t)(targets[0] * motionGetAxisScale(0));
+      axes[1].target_position = (int32_t)(targets[1] * motionGetAxisScale(1));
+      axes[0].commanded_speed_mm_s = speed_mm_s;
+      axes[1].commanded_speed_mm_s = speed_mm_s;
+      
+      bool is_fwd_x = (axes[0].target_position > axes[0].position);
+      bool is_fwd_y = (axes[1].target_position > axes[1].position);
 
-  taskUnlockMutex(taskGetMotionMutex());
+      plcBeginTransaction();
+      // PHASE 8.6: Use precise Modbus velocities for coordinated motion
+      float hz_x = calculateHzForSpeed(0, speed_mm_s);
+      float hz_y = calculateHzForSpeed(1, speed_mm_s);
+      motionSetVFDVelocities(hz_x, hz_y);
+      
+      plcSetAxisSelect(0xFF); // Combined X+Y
+      plcSetDirection(is_fwd_x); 
+      plcEndTransaction();
+  } else {
+      // PHASE 5.10: Use formal state machine for state transitions
+      MotionStateMachine::transitionTo(&axes[target_axis], MOTION_WAIT_CONSENSO);
 
-  // I2C calls moved outside mutex - wrapped in transaction for performance
-  plcBeginTransaction();
-  motionSetPLCSpeedProfile(prof);
-  motionSetPLCAxisDirection(target_axis, true, is_fwd);
-  plcEndTransaction();
+      // PHASE 8.6: Use precise Modbus velocity for single-axis moves
+      float target_hz = calculateHzForSpeed(target_axis, eff_spd);
+      
+      plcBeginTransaction();
+      // Write frequency before enabling direction to avoid torque jerks
+      if (target_axis == 0) { // X Axis
+          motionSetVFDVelocities(target_hz, 0.0f);
+      } else { // Y1, Z2, A3
+          motionSetVFDVelocities(0.0f, target_hz);
+      }
+      
+      // Safety: Also set the legacy PLC speed profile as a fallback
+      motionSetPLCSpeedProfile(prof);
+      
+      motionSetPLCAxisDirection(target_axis, true, is_fwd);
+      plcEndTransaction();
+  }
 
   taskSignalMotionUpdate();
   return true;
@@ -701,7 +766,40 @@ void motionSetPLCAxisDirection(uint8_t axis, bool enable, bool is_plus) {
 }
 
 void motionSetPLCSpeedProfile(speed_profile_t profile) {
+  // Legacy discrete profile selection
   plcSetSpeed((uint8_t)profile);
+  
+  // PHASE 8.5: If analog control enabled, also update VFD DAC frequencies
+  if (dacIsAnalogEnabled()) {
+      // In single-axis mode (legacy), we use the commanded axis to set BOTH VFDs to the same speed
+      // as a safety fallback, or map specifically if we know the axis.
+      // We'll improve this in the coordinate motion dispatcher.
+      float target_hz = 0.0f;
+      if (profile == SPEED_PROFILE_1) target_hz = configGetFloat("vfd_hz_slow", 15.0f);
+      else if (profile == SPEED_PROFILE_2) target_hz = configGetFloat("vfd_hz_med", 30.0f);
+      else target_hz = configGetFloat("vfd_hz_fast", 50.0f);
+      
+      dacSetFrequency(0, target_hz); // VFD1 (X)
+      dacSetFrequency(1, target_hz); // VFD2 (YZA)
+  }
+}
+
+/**
+ * @brief Sets independent frequencies for Dual VFD configuration
+ */
+void motionSetVFDVelocities(float freq1_hz, float freq2_hz) {
+    // Take Modbus Priority to override the shared analog wire and/or PLC inputs
+    AltivarX.setModbusPriority(true);
+    AltivarYZA.setModbusPriority(true);
+    
+    // Write frequencies via Modbus
+    AltivarX.writeFrequency(freq1_hz);
+    AltivarYZA.writeFrequency(freq2_hz);
+    
+    // Fallback DAC for X-VFD (Analog monitoring or legacy wiring)
+    if (dacIsAnalogEnabled()) {
+        dacSetFrequency(0, freq1_hz); 
+    }
 }
 
 speed_profile_t motionMapSpeedToProfile(uint8_t axis, float speed_mm_s) {
@@ -732,6 +830,26 @@ float motionGetCalibratedFeedRate(uint8_t axis, float speed_mm_s) {
     if (prof == SPEED_PROFILE_1) return cal->speed_slow_mm_min;
     if (prof == SPEED_PROFILE_2) return cal->speed_med_mm_min;
     return cal->speed_fast_mm_min;
+}
+
+float calculateHzForSpeed(uint8_t axis, float speed_mm_s) {
+    if (axis >= MOTION_AXES) return 0.0f;
+    
+    // Max calibrated speed for this axis (usually Speed Fast)
+    float max_mm_min = machineCal.axes[axis].speed_fast_mm_min;
+    if (max_mm_min < 1.0f) max_mm_min = 2400.0f;
+    
+    float target_mm_min = speed_mm_s * 60.0f;
+    float max_hz = configGetFloat("vfd_max_hz", 50.0f);
+    
+    // Freq = (Target / Max) * MaxHz
+    float hz = (target_mm_min / max_mm_min) * max_hz;
+    
+    // Clamp to range
+    if (hz < 5.0f && target_mm_min > 0.1f) hz = 5.0f; // Minimum torque freq
+    if (hz > max_hz) hz = max_hz;
+    
+    return hz;
 }
 
 bool motionMoveRelative(float dx, float dy, float dz, float da,
@@ -925,22 +1043,26 @@ bool motionResume() {
     float effective_speed =
         axes[axis].commanded_speed_mm_s * motionPlanner.getFeedOverride();
     prof = motionMapSpeedToProfile(axis, effective_speed);
+    
+    // PHASE 8.6: Calculate precise frequency for resumption
+    float target_hz = calculateHzForSpeed(axis, effective_speed);
 
     is_fwd = (axes[axis].target_position > axes[axis].position);
 
     // PHASE 5.10: Use formal state machine for state transitions
     MotionStateMachine::transitionTo(&axes[axis], MOTION_WAIT_CONSENSO);
-    valid_resume = true;
-  }
-
-  taskUnlockMutex(taskGetMotionMutex());
-
-  // I2C call moved outside mutex - wrapped in transaction for performance
-  if (valid_resume) {
+    
     plcBeginTransaction();
-    motionSetPLCSpeedProfile(prof);
+    if (axis == 0) {
+        motionSetVFDVelocities(target_hz, 0.0f);
+    } else {
+        motionSetVFDVelocities(0.0f, target_hz);
+    }
+    motionSetPLCSpeedProfile(prof); // Fallback
     motionSetPLCAxisDirection(axis, true, is_fwd);
     plcEndTransaction();
+    
+    valid_resume = true;
   }
 
   taskSignalMotionUpdate();

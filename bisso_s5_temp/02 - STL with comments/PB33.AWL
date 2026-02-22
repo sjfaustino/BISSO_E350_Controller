@@ -16,12 +16,12 @@ S    Q 6.3               // TURN ON Contactor Inclinacao (C6)
 A    I 3.0               // IF Mnp Down IS ON
 AN   F 5.4               // AND F5.4 IS OFF
 AN   I 5.6               // AND I5.6 (Limit down) IS OFF
-=    F 4.0               // TURN ON F4.0 (Down direction)
+S    F 4.0               // TURN ON F4.0 (Down direction)
 
 A    I 3.1               // IF Mnp Up IS ON
 AN   F 5.4               // AND F5.4 IS OFF
 AN   I 5.7               // AND I5.7 (Limit up) IS OFF
-=    F 4.1               // TURN ON F4.1 (Up direction)
+S    F 4.1               // TURN ON F4.1 (Up direction)
 
 L    DW 6                // LOAD FROM DW Speed 6
 T    QW 64               // TRANSFER TO QW64

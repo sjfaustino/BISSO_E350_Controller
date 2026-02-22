@@ -76,7 +76,9 @@
 
 // --- VFD (ALTIVAR31) CONFIGURATION ---
 #define KEY_VFD_EN "vfd_en"             // Enable VFD communication (1=on, 0=off, default 1)
-#define KEY_VFD_ADDR "vfd_addr"         // Modbus slave address (1-247, default 2)
+#define KEY_VFD_ADDR "vfd_addr"         // VFD1 (X) Modbus address (default 2)
+#define KEY_VFD2_ADDR "vfd2_addr"       // VFD2 (YZA) Modbus address (default 4)
+#define KEY_VFD_ANALOG_EN "vfd_ana_en"  // Enable analog speed control (1=on, 0=off)
 
 // --- JXK-10 CURRENT MONITOR ---
 #define KEY_JXK10_ADDR "jxk10_addr"     // JXK-10 Modbus Address (default 2)
@@ -111,6 +113,7 @@
 #define KEY_ENC_PROTO "enc_proto"   // WJ66 protocol (0=ASCII, 1=Modbus RTU)
 #define KEY_RS485_BAUD "rs485_baud" // Global RS-485 bus baud rate
 #define KEY_I2C_SPEED "i2c_speed"   // I2C bus speed in Hz (100000 or 400000)
+#define KEY_DAC_ADDR  "dac_addr"    // PLC Analog Card I2C address (default 0x60)
 
 // --- SPINDLE CURRENT SENSOR ---
 #define KEY_SPINDLE_ENABLED   KEY_JXK10_ENABLED
@@ -179,6 +182,7 @@
 // --- MOTION BEHAVIOR ---
 #define KEY_DEFAULT_SPEED "def_spd"
 #define KEY_DEFAULT_ACCEL "def_acc"
+#define KEY_MOTION_COORD_MODE "mot_coord_en" // Enable coordinated X/Y motion (C+T mode)
 #define KEY_X_APPROACH "x_appr"           // Final approach (SLOW) threshold in mm (default 5)
 #define KEY_X_APPROACH_MED "x_appr_med"   // Medium approach threshold in mm (default 20)
 #define KEY_TARGET_MARGIN "tgt_margin"    // Target position margin in mm (default 0.1)

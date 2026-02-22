@@ -53,7 +53,7 @@ typedef struct {
 
 class Altivar31Driver : public ModbusDriver {
 public:
-    Altivar31Driver();
+    Altivar31Driver(const char* name = "Altivar31");
     
     // Accessors
     float getCurrentAmps() const;
@@ -66,6 +66,9 @@ public:
     
     bool isFaulted() const;
     bool isRunning() const;
+    
+    bool writeFrequency(float hz); // Write frequency setpoint (LFRD)
+    bool setModbusPriority(bool active); // Take/Release priority over analog terminal
     
     const altivar31_state_t* getState() const;
 
@@ -88,7 +91,11 @@ private:
     uint8_t _poll_step;
 };
 
-extern Altivar31Driver Altivar31;
+extern Altivar31Driver AltivarX;    // VFD1 (X-Axis)
+extern Altivar31Driver AltivarYZA;  // VFD2 (Y, Z, A Axes)
+
+// Legacy alias for single-VFD backward compatibility
+#define Altivar31 AltivarX
 #endif
 
 #ifdef __cplusplus
@@ -105,6 +112,8 @@ extern "C" {
 #define ALTIVAR31_REG_DRIVE_STATUS      3201    // ETA: Status word (bit flags)
 #define ALTIVAR31_REG_FAULT_CODE        8606    // ERRD: Fault code
 #define ALTIVAR31_REG_THERMAL_STATE     3209    // tHd: Drive heatsink thermal state (1% units)
+#define ALTIVAR31_REG_FREQ_SETPOINT     8502    // LFRD: Frequency setpoint (0.1 Hz units)
+#define ALTIVAR31_REG_COMMAND_WORD      8501    // CMD: Command word
 
 // Drive status values
 #define ALTIVAR31_STATUS_IDLE           0

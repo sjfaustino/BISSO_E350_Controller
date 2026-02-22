@@ -20,13 +20,13 @@ AN   I 5.4               // AND I5.4 IS OFF
 A    I 72.2              // AND Cmd Rot IS ON
 AN   F 5.4               // AND F5.4 IS OFF
 A    F 0.7               // AND F0.7 IS ON
-=    F 4.0               // TURN ON F4.0
+S    F 4.0               // TURN ON F4.0
 
 A    I 72.6              // IF Elbo Slow IS ON
 AN   I 5.5               // AND I5.5 IS OFF
 A    I 72.2              // AND Cmd Rot IS ON
 AN   F 5.4               // AND F5.4 IS OFF
-=    F 4.1               // TURN ON F4.1
+S    F 4.1               // TURN ON F4.1
 
 L    DW 3                // LOAD FROM DW3
 T    QW 64               // TRANSFER TO QW64

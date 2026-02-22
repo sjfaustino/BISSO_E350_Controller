@@ -68,6 +68,7 @@ private:
     bool hasCode(const char* line, char code);
     
     bool handleG0_G1(const char* line);
+    bool handleG2_G3(const char* line, bool clockwise); // G2/G3 Arc
     void handleG4(const char* line);   // G4 Dwell command
     void handleG10(const char* line);
     void handleG5x(int system_idx);
@@ -91,6 +92,7 @@ private:
     void handleM255(const char* line);
     // PHASE 5.1: M0/M1 Program Stop/Pause handler
     void handleM0_M1(const char* line);
+    void handleM402(const char* line); // Coordinated Motion Mode toggle
 
     // PHASE 5.1: State for M0/M1 program pause
     bool programPaused;

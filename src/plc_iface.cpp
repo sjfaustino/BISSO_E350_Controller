@@ -258,13 +258,18 @@ void plcSetAxisSelect(uint8_t axis) {
 
   // Set the selected axis (active-low: clear bit = ON)
   // Mapping aligns with PB10 dispatcher: 0=X, 1=Y, 2=Z, 3=A, 4=Disk
-  switch (axis) {
-    case 0: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_X_SELECT); break;
-    case 1: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_Y_SELECT); break;
-    case 2: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_Z_SELECT); break;
-    case 3: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_A_SELECT); break;
-    case 4: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_DISK_ROT); break;
-    default: break; // 255 = none
+  // PHASE 22: Support multi-axis selection for coordinated motion
+  if (axis == 0xFF) { // Special case for X+Y Coordinated
+      q73_aux_shadow &= ~((1 << PLC_OUT_AXIS_X_SELECT) | (1 << PLC_OUT_AXIS_Y_SELECT));
+  } else {
+      switch (axis) {
+        case 0: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_X_SELECT); break;
+        case 1: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_Y_SELECT); break;
+        case 2: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_Z_SELECT); break;
+        case 3: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_A_SELECT); break;
+        case 4: q73_aux_shadow &= ~(1 << PLC_OUT_AXIS_DISK_ROT); break;
+        default: break; // 255 = none
+      }
   }
 
   uint8_t register_copy = q73_aux_shadow;
@@ -582,11 +587,6 @@ uint8_t elboI72GetRawState() { return i72_input_shadow; }
 
 uint16_t plcGetInputRawState() {
     return ((uint16_t)i72_input_shadow << 8) | i73_input_shadow;
-}
-
-bool elboI73GetInput(uint8_t bit, bool *success) {
-    if (success) *success = true;
-    return elboGetInput(bit);
 }
 
 uint8_t elboQ73GetRawState() { return q73_shadow_register; }

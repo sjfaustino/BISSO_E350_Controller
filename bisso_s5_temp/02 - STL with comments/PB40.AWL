@@ -14,13 +14,13 @@ A    I 72.5              // IF Elbo Fast IS ON
 AN   I 5.0               // AND I5.0 IS OFF
 AN   F 5.4               // AND F5.4 IS OFF
 A    I 72.1              // AND Cmd Transl IS ON
-=    F 4.0               // TURN ON F4.0
+S    F 4.0               // TURN ON F4.0
 
 A    I 72.6              // IF Elbo Slow IS ON
 AN   I 5.1               // AND I5.1 IS OFF
 AN   F 5.4               // AND F5.4 IS OFF
 A    I 72.1              // AND Cmd Transl IS ON
-=    F 4.1               // TURN ON F4.1
+S    F 4.1               // TURN ON F4.1
 
 L    DW 9                // LOAD FROM DW9
 T    QW 64               // TRANSFER TO QW64

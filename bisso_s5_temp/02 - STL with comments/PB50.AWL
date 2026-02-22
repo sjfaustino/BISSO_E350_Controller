@@ -28,12 +28,12 @@ A    F 0.4               // AND Spianatura IS ON
 A    F 0.7               // AND F0.7 IS ON
 A    I 72.5              // AND Elbo Fast IS ON
 A    I 72.0              // AND Elbo Medium IS ON
-=    F 4.0               // TURN ON F4.0
+S    F 4.0               // TURN ON F4.0
 
 A    I 72.3              // IF Cmd LockTable IS ON
 A    I 72.6              // AND Elbo Slow IS ON
 AN   F 5.4               // AND F5.4 IS OFF
-=    F 4.1               // TURN ON F4.1
+S    F 4.1               // TURN ON F4.1
 
 L    DW 12               // LOAD FROM DW12
 T    QW 64               // TRANSFER TO QW64

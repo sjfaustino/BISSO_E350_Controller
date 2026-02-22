@@ -35,8 +35,12 @@ EngineeringMenu::EngineeringMenu() :
 }
 
 void EngineeringMenu::init() {
+#ifdef PIN_BOOT_BUTTON
     pinMode(PIN_BOOT_BUTTON, INPUT_PULLUP);
     m_raw_button_state = m_debounced_state = digitalRead(PIN_BOOT_BUTTON);
+#else
+    m_raw_button_state = m_debounced_state = true; // Always released
+#endif
 }
 
 void EngineeringMenu::update() {
@@ -46,7 +50,10 @@ void EngineeringMenu::update() {
     }
 
     uint32_t now = millis();
-    bool raw = digitalRead(PIN_BOOT_BUTTON);
+    bool raw = true;
+#ifdef PIN_BOOT_BUTTON
+    raw = digitalRead(PIN_BOOT_BUTTON);
+#endif
 
     // 1. EMI Filter (Debouncer)
     // Low-pass: State must be stable for >15ms
@@ -276,12 +283,17 @@ void EngineeringMenu::selectOption() {
 
 void EngineeringMenu::applyHardwareState(int dest, int lights, int vfd) {
     if (dest == 1) {
+#if defined(PIN_ALT_UART_RX) && defined(PIN_ALT_UART_TX)
         static HardwareSerial* AltSerial = nullptr;
         if (!AltSerial) {
             AltSerial = new HardwareSerial(1);
             AltSerial->begin(115200, SERIAL_8N1, PIN_ALT_UART_RX, PIN_ALT_UART_TX);
         }
         serialLoggerSetStream(AltSerial);
+#else
+        logWarning("[BOARD] Alt UART not supported on this variant - falling back to USB");
+        serialLoggerSetStream(&Serial);
+#endif
     } else {
         serialLoggerSetStream(&Serial);
     }

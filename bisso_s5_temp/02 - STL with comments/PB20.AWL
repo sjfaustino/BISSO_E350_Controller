@@ -37,7 +37,7 @@ A    T 12                // AND T12 (Ramp timer) IS RUNNING
 A    I 5.2               // AND I5.2 IS ON (at forward limit)
 A    F 4.0               // AND F4.0 (already moving forward) IS ON
 AN   F 5.4               // AND F5.4 IS OFF
-=    F 4.0               // = F4.0 (Forward direction active)
+S    F 4.0               // = F4.0 (Forward direction active)
 
 //===============================================================
 // NETWORK 2 : Reverse Movement Control (I5.3)
@@ -64,7 +64,7 @@ A    T 16                // AND T16 (Ramp timer) IS RUNNING
 A    I 5.3               // AND I5.3 IS ON (at reverse limit)
 A    F 4.1               // AND F4.1 (already moving reverse) IS ON
 AN   F 5.4               // AND F5.4 IS OFF
-=    F 4.1               // = F4.1 (Reverse direction active)
+S    F 4.1               // = F4.1 (Reverse direction active)
 
 //===============================================================
 // NETWORK 3 : Speed Selection & Fast Mode

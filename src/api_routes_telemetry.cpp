@@ -68,6 +68,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             "\"hw_eth_chip\":\"%s\""
             "},"
             "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
+            "\"coordinated_mode\":%s,"
             "\"motion_enabled\":%s,\"motion_moving\":%s,\"estop\":%s,\"alarm\":%s}",
             telemetry.estop_active ? "E-STOP" : (telemetry.alarm_active ? "ALARMED" : (telemetry.motion_moving ? "MOVING" : "READY")),
             telemetryGetHealthStatusString(telemetry.health_status),
@@ -92,6 +93,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             telemetry.axis_y_mm,
             telemetry.axis_z_mm,
             telemetry.axis_a_mm,
+            telemetry.coordinated_mode ? "true" : "false",
             telemetry.motion_enabled ? "true" : "false",
             telemetry.motion_moving ? "true" : "false",
             telemetry.estop_active ? "true" : "false",

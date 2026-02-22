@@ -99,7 +99,38 @@ window.DashboardModule = window.DashboardModule || {
 
         const e = t.system.cpu_percent || 0, i = t.system.free_heap_bytes || 0, s = t.system.health || "UNKNOWN", n = t.system.status || "IDLE", a = document.getElementById("health-value"); a && (a.textContent = s, a.className = "card-value " + s.toLowerCase()); const o = document.getElementById("health-detail"); o && (o.textContent = window.i18n.t('dashboard.status') + ": " + n); const r = document.getElementById("health-bar"); r && (r.className = "progress-fill " + s.toLowerCase()); const d = document.getElementById("cpu-value"); d && (d.textContent = e.toFixed(1) + "%"); const h = document.getElementById("cpu-bar"); h && (h.style.width = e + "%", h.className = "progress-fill", e > 85 && h.classList.add("warning"), e > 95 && h.classList.add("critical")); const l = document.getElementById("mem-value"); l && (l.textContent = (i / 1024).toFixed(0) + " KB"); const c = document.getElementById("mem-bar"); if (c) { const t = 32e4, e = Math.min(100, i / t * 100); c.style.width = e + "%" }
     },
-    updateMotionStatus(t) { console.log("DASHBOARD: LOAD CARD STABILIZED (SYNTAX FIX)"); const e = !t.system || t.system.plc_hardware_present !== false; if (this.updateHeaderNA("header-motion", window.i18n.t('dashboard.motion_status'), e), this.updateHeaderNA("header-motion-load", window.i18n.t('dashboard.motion_load_header') || window.i18n.t('dashboard.motion_system_load'), true), t.motion) { const i = document.getElementById("motion-status"); i && (e ? (i.textContent = window.i18n.t(t.motion.moving ? 'dashboard.moving' : 'dashboard.stopped'), i.style.color = "") : this.setNA(i)) } if (t.safety) { const i = document.getElementById("safety-status"); if (i) if (e) { let e = window.i18n.t('dashboard.ok'); t.safety.estop ? e = window.i18n.t('dashboard.estop') : t.safety.alarm && (e = window.i18n.t('dashboard.alarm')), i.textContent = e, i.style.color = "" } else this.setNA(i) } }, updateVFDStatus(t) { if (!t.vfd) return; this.updateHeaderNA("header-vfd", window.i18n.t('dashboard.axis_drive'), t.vfd.connected), this.updateHeaderNA("header-spindle-trend", window.i18n.t('dashboard.spindle_trend_header') || window.i18n.t('dashboard.spindle_current_trend'), t.vfd.connected); const e = document.getElementById("vfd-status"), i = document.getElementById("spindle-rpm"), s = document.getElementById("spindle-speed"), n = document.getElementById("spindle-current"); if (t.vfd.connected) { const a = t.vfd.rpm > 0 ? window.i18n.t('dashboard.running') : window.i18n.t('dashboard.idle'); e && (e.textContent = a), i && (i.textContent = (t.vfd.rpm || 0).toFixed(0)), s && (s.textContent = (t.vfd.speed_m_s || 0).toFixed(1) + " m/s"), n && (n.textContent = (t.vfd.current_amps || 0).toFixed(2) + " A"); const o = document.getElementById("spindle-bar"); if (o) { const e = Math.min(100, (t.vfd.current_amps || 0) / 30 * 100); o.style.width = e + "%" } } else { e && (e.textContent = window.i18n.t('dashboard.disconnected')), this.setNA(i), this.setNA(s, " m/s"), this.setNA(n, " A"); const t = document.getElementById("spindle-bar"); t && (t.style.width = "0%") } const a = document.getElementById("vfd-freq"); t.vfd.connected ? a && (a.textContent = (t.vfd.frequency_hz || 0).toFixed(1) + " Hz") : this.setNA(a, " Hz") }, updateNetworkStatus(t) { if (!t.network) return; const e = document.getElementById("wifi-signal"); e && (e.textContent = t.network.signal_percent + "%"); const i = document.getElementById("wifi-bar"); i && (i.style.width = t.network.signal_percent + "%"); const s = document.getElementById("wifi-status"); s && (s.textContent = t.network.wifi_connected ? window.i18n.t('dashboard.connected_chk') : window.i18n.t('dashboard.disconnected_chk')) }, updateHistoryData(t) {
+    updateMotionStatus(t) { console.log("DASHBOARD: LOAD CARD STABILIZED (SYNTAX FIX)"); const e = !t.system || t.system.plc_hardware_present !== false; if (this.updateHeaderNA("header-motion", window.i18n.t('dashboard.motion_status'), e), this.updateHeaderNA("header-motion-load", window.i18n.t('dashboard.motion_load_header') || window.i18n.t('dashboard.motion_system_load'), true), t.motion) { const i = document.getElementById("motion-status"); i && (e ? (i.textContent = window.i18n.t(t.motion.moving ? 'dashboard.moving' : 'dashboard.stopped'), i.style.color = "") : this.setNA(i)) } const cStatus = document.getElementById("coordinated-status"); if (cStatus) { if (e) { const isCoord = t.coordinated_mode === true; cStatus.textContent = window.i18n.t(isCoord ? 'dashboard.coordinated_xy' : 'dashboard.single_axis'); cStatus.style.color = isCoord ? "var(--color-optimal)" : ""; } else { this.setNA(cStatus); } } if (t.safety) { const i = document.getElementById("safety-status"); if (i) if (e) { let e = window.i18n.t('dashboard.ok'); t.safety.estop ? e = window.i18n.t('dashboard.estop') : t.safety.alarm && (e = window.i18n.t('dashboard.alarm')), i.textContent = e, i.style.color = "" } else this.setNA(i) } }, updateVFDStatus(t) {
+        if (!t.vfd) return;
+        this.updateHeaderNA("header-vfd", window.i18n.t('dashboard.axis_drive'), t.vfd.connected);
+        this.updateHeaderNA("header-spindle-trend", window.i18n.t('dashboard.spindle_trend_header') || window.i18n.t('dashboard.spindle_current_trend'), t.vfd.connected);
+
+        // VFD 1 (X)
+        const v1Freq = document.getElementById("vfd1-freq"), v1Amps = document.getElementById("vfd1-amps");
+        if (t.vfd.vfd1) {
+            if (t.vfd.vfd1.connected) {
+                if (v1Freq) v1Freq.textContent = (t.vfd.vfd1.freq || 0).toFixed(1) + " Hz";
+                if (v1Amps) v1Amps.textContent = (t.vfd.vfd1.amps || 0).toFixed(2) + " A";
+            } else {
+                this.setNA(v1Freq, " Hz");
+                this.setNA(v1Amps, " A");
+            }
+        }
+
+        // VFD 2 (Aux)
+        const v2Freq = document.getElementById("vfd2-freq"), v2Amps = document.getElementById("vfd2-amps");
+        if (t.vfd.vfd2) {
+            if (t.vfd.vfd2.connected) {
+                if (v2Freq) v2Freq.textContent = (t.vfd.vfd2.freq || 0).toFixed(1) + " Hz";
+                if (v2Amps) v2Amps.textContent = (t.vfd.vfd2.amps || 0).toFixed(2) + " A";
+            } else {
+                this.setNA(v2Freq, " Hz");
+                this.setNA(v2Amps, " A");
+            }
+        }
+
+        const e = document.getElementById("vfd-status"), i = document.getElementById("spindle-rpm"), s = document.getElementById("spindle-speed"), n = document.getElementById("spindle-current"); if (t.vfd.connected) { const a = t.vfd.rpm > 0 ? window.i18n.t('dashboard.running') : window.i18n.t('dashboard.idle'); e && (e.textContent = a), i && (i.textContent = (t.vfd.rpm || 0).toFixed(0)), s && (s.textContent = (t.vfd.speed_m_s || 0).toFixed(1) + " m/s"), n && (n.textContent = (t.vfd.current_amps || 0).toFixed(2) + " A"); const o = document.getElementById("spindle-bar"); if (o) { const e = Math.min(100, (t.vfd.current_amps || 0) / 30 * 100); o.style.width = e + "%" } } else { e && (e.textContent = window.i18n.t('dashboard.disconnected')), this.setNA(i), this.setNA(s, " m/s"), this.setNA(n, " A"); const t = document.getElementById("spindle-bar"); t && (t.style.width = "0%") }
+    }
+    , updateNetworkStatus(t) { if (!t.network) return; const e = document.getElementById("wifi-signal"); e && (e.textContent = t.network.signal_percent + "%"); const i = document.getElementById("wifi-bar"); i && (i.style.width = t.network.signal_percent + "%"); const s = document.getElementById("wifi-status"); s && (s.textContent = t.network.wifi_connected ? window.i18n.t('dashboard.connected_chk') : window.i18n.t('dashboard.disconnected_chk')) }, updateHistoryData(t) {
         this.history.cpu.push((t.system && t.system.cpu_percent) || 0);
 
         const freeHeap = (t.system && t.system.free_heap_bytes) || 0;

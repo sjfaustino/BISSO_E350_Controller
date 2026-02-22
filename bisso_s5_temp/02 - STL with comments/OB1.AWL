@@ -2,6 +2,9 @@
 [1	
 	C	DB 10	;;Load Database
 		
+	R	F 4.0               // RESET Direction Forward flag at start of scan
+	R	F 4.1               // RESET Direction Reverse flag at start of scan
+		
 	A	I 2.0
 	AN	F 6.3
 	AN	I 2.4
