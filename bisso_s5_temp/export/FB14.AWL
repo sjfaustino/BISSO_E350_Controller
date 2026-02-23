@@ -1,0 +1,48 @@
+###PG:84000000
+[1	
+NAME:	RICH.POT
+
+	AN	F 2.0
+	JC	=M001
+		
+	L	DW 2
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 2
+	T	QW 66
+	A	F 2.0
+	BEC	
+		
+M001:	AN	F 2.1
+	JC	=M002
+		
+	L	DW 41
+	T	FW 38
+	L	DW 18
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 18
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 2.1
+	BEC	
+		
+M002:	AN	F 2.2
+	JC	=M003
+		
+	L	DW 1
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 1
+	T	QW 66
+M003:	BE	]

@@ -1,0 +1,112 @@
+###PG:80000000
+[1	
+	AN	I 72.2
+	A	F 1.6
+	S	Q 6.0
+	A	Q 6.0
+	A	F 4.0
+	A	I 5.2
+	L	FW 24
+	SP	T 12
+	A	I 72.5
+	A	F 0.7
+	AN	I 5.2
+	A	I 72.0
+	AN	F 5.4
+	O	
+	AN	I 73.0
+	AN	I 3.7
+	A	F 0.7
+	A	T 12
+	A	I 5.2
+	A	F 4.0
+	AN	F 5.4
+	=	F 4.0
+	A	Q 6.0
+	A	I 5.3
+	A	F 4.1
+	L	FW 22
+	SP	T 16
+	AN	F 5.4
+	A	I 72.6
+	AN	I 5.3
+	A	I 72.0
+	A	F 0.7
+	O	
+	AN	I 73.0
+	AN	I 3.7
+	A	F 0.7
+	A	T 16
+	A	I 5.3
+	A	F 4.1
+	AN	F 5.4
+	=	F 4.1
+	L	DW 0
+	T	QW 64
+	A	I 72.2
+	A	I 72.5
+	S	F 3.2
+	AN	F 3.2
+	A	F 3.3
+	S	F 3.4
+	A	I 72.2
+	R	F 3.4
+	A	F 4.0
+	A	Q 6.0
+	AN	I 72.2
+	O	
+	A	F 4.1
+	A	Q 6.0
+	AN	I 72.2
+	R	F 3.2
+	A	F 4.0
+	A	Q 6.0
+	S	F 3.3
+	A	F 4.1
+	A	Q 6.0
+	R	F 3.3
+	AN	F 0.4
+	A	I 72.0
+	A	T 7
+	AN	F 5.4
+	A	I 72.7
+	O	
+	AN	F 0.4
+	A(	
+	O	F 4.0
+	O	F 4.1
+	)	
+	AN	F 5.4
+	A	F 4.5
+	=	F 4.5
+	A(	
+	O(	
+	AN	I 5.2
+	AN	I 5.3
+	)	
+	O(	
+	A	I 5.2
+	AN	F 4.0
+	)	
+	O(	
+	A	I 5.3
+	AN	F 4.1
+	)	
+	)	
+	A(	
+	O	I 3.7
+		
+	O(	
+	AN	F 2.7
+	A	F 3.4
+	A	F 4.1
+	)	
+	)	
+	BEC	
+	L	DW 1
+	T	QW 64
+	A	F 4.0
+	BEC	
+	L	DW 2
+	T	QW 64
+	BE	]

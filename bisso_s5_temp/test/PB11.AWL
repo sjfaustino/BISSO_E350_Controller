@@ -1,0 +1,67 @@
+###PG:80000000
+[1	
+	O	Q 6.0
+	O(	
+	A(	
+	O	I 2.6
+	O	I 2.7
+	)	
+	AN	F 0.4
+	AN	F 5.0
+	)	
+	=	F 6.4
+	A	F 6.4
+	JC	PB 21
+	A	F 6.4
+	BEC	
+	O	Q 6.2
+	O	Q 6.3
+	O(	
+	AN	F 5.0
+	A(	
+	O	I 3.0
+	O	I 3.1
+	)	
+	)	
+	=	F 6.5
+	A	F 6.5
+	JC	PB 31
+	A	F 6.5
+	BEC	
+	O	Q 6.1
+	O(	
+	AN	F 5.0
+	A(	
+	O	I 2.4
+	O	I 2.5
+	)	
+	)	
+	=	F 6.6
+	A	F 6.6
+	JC	PB 41
+	A	F 6.6
+	BEC	
+	O	Q 6.4
+	O(	
+	AN	F 5.0
+	A(	
+	O	I 3.2
+	O	I 72.3
+	O	I 3.3
+	)	
+	)	
+	=	F 6.7
+	A	F 6.7
+	JC	PB 51
+	A	F 6.7
+	BEC	
+	O	Q 6.5
+	O(	
+	AN	F 5.0
+	A(	
+	O	I 3.4
+	O	I 3.5
+	)	
+	)	
+	JC	PB 53
+	BE	]

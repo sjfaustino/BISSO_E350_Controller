@@ -1,0 +1,411 @@
+###PG:84000000
+[1	
+NAME:	HELP.
+
+	A	I 3.7
+	AN	F 7.0
+	AN	F 7.1
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.4
+	AN	F 7.5
+	R	F 6.3
+		
+	AN	F 6.3
+	BEC	
+		
+	A	F 7.6
+	A	I 3.7
+	S	F 7.7
+		
+	A	F 7.6
+	R	F 7.6
+		
+	AN	I 3.7
+	R	F 7.7
+		
+	A	I 3.7
+	AN	F 7.7
+	S	F 7.6
+		
+	A	F 8.2
+	A	F 7.6
+	R	F 8.2
+		
+	A	F 8.0
+	A	F 7.6
+	S	F 8.1
+		
+	A	F 8.1
+	AN	F 8.0
+	A	F 7.6
+	S	F 8.2
+		
+	A	F 8.2
+	R	F 8.1
+		
+	A	F 8.1
+	R	F 8.0
+		
+	AN	F 8.0
+	AN	F 8.1
+	AN	F 8.2
+	A	F 7.6
+	A(	
+	O	F 7.0
+	O	F 7.1
+	O	F 7.2
+	O	F 7.3
+	O	F 7.4
+	O	F 7.5
+	)	
+	S	F 8.0
+		
+	A(	
+	O	F 8.1
+	O	F 8.0
+	)	
+	A	F 1.2
+	=	Q 73.3
+		
+	O(	
+	A	F 8.0
+	AN	F 1.2
+	)	
+	O(	
+	A	F 8.2
+	A	F 1.2
+	)	
+	=	Q 73.4
+		
+	A	I 4.5
+	AN	I 4.6
+	=	F 3.5
+		
+	AN	I 4.5
+	A	I 4.6
+	=	F 3.6
+		
+	A(	
+	O	F 7.0
+	O	F 7.1
+	O	F 7.2
+	O	F 7.3
+	O	F 7.4
+	O	F 7.5
+	)	
+	AN	F 1.2
+	=	Q 73.0
+	***	]
+[2	
+	A(	
+	O	I 2.6
+	O	I 2.7
+	)	
+	AN	F 7.1
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.4
+	AN	F 7.5
+	=	F 7.0
+		
+	AN	F 7.0
+	JC	=M001
+		
+	AN	F 8.0
+	JC	=M001
+		
+	L	DW 0
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+	L	FW 34
+	T	DW 0
+	T	QW 66
+M001:	A	F 7.0
+	BEC	
+	***	]
+[3	
+	A(	
+	O	I 2.4
+	O	I 2.5
+	)	
+	AN	F 7.0
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.4
+	AN	F 7.5
+	=	F 7.1
+		
+	AN	F 7.1
+	JC	=M001
+		
+	L	DW 39
+	T	FW 38
+	AN	F 8.0
+	JC	=M002
+		
+	L	DW 9
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 9
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+M002:	AN	F 8.1
+	JC	=M003
+		
+	L	DW 10
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 10
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.1
+	BEC	
+		
+M003:	AN	F 8.2
+	JC	=M001
+		
+	L	DW 11
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 11
+	JU	FB 16
+NAME:	SCALAR  
+		
+M001:	A	F 7.1
+	BEC	
+	***	]
+[4	
+	A(	
+	O	I 3.0
+	O	I 3.1
+	)	
+	AN	I 4.3
+	AN	F 7.0
+	AN	F 7.1
+	AN	F 7.3
+	AN	F 7.4
+	AN	F 7.5
+	=	F 7.2
+		
+	AN	F 7.2
+	JC	=M001
+		
+	L	DW 40
+	T	FW 38
+	AN	F 8.0
+	JC	=M002
+		
+	L	DW 3
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 3
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+M002:	AN	F 8.1
+	JC	=M003
+		
+	L	DW 4
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 4
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.1
+	BEC	
+		
+M003:	AN	F 34.2
+	JU	FB 17
+NAME:	RIC(+/-)
+	L	FW 34
+	T	DW 6
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+	AN	F 8.1
+M001:	JC	=M004
+		
+	L	DW 7
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 7
+	JU	FB 16
+NAME:	SCALAR  
+	A	F 8.1
+	BEC	
+		
+M004:	AN	F 8.2
+	JC	=M005
+		
+	L	DW 8
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 8
+	JU	FB 16
+NAME:	SCALAR  
+		
+M005:	A	F 7.3
+	BEC	
+	***	]
+[5	
+	A(	
+	O	I 3.2
+	O	I 3.3
+	)	
+	AN	F 7.0
+	AN	F 7.1
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.5
+	=	F 7.4
+		
+	AN	F 7.4
+	JC	=M001
+		
+	L	DW 41
+	T	FW 38
+	AN	F 8.0
+	JC	=M002
+		
+	L	DW 12
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 12
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+M002:	AN	F 8.1
+	JC	=M003
+		
+	L	DW 13
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 13
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.1
+	BEC	
+		
+M003:	AN	F 8.2
+	JC	=M001
+		
+	L	DW 14
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 14
+	JU	FB 16
+NAME:	SCALAR  
+		
+M001:	A	F 7.4
+	BEC	
+	***	]
+[6	
+	A(	
+	O	I 3.4
+	O	I 3.5
+	)	
+	AN	F 7.0
+	AN	F 7.1
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.4
+	=	F 7.5
+		
+	AN	F 7.5
+	JC	=M001
+		
+	L	DW 42
+	T	FW 38
+	AN	F 8.0
+	JC	=M002
+		
+	L	DW 15
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 15
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+M002:	AN	F 8.1
+	JC	=M003
+		
+	L	DW 16
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 16
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.1
+	BEC	
+		
+M003:	AN	F 8.2
+	JC	=M001
+		
+	L	DW 17
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 17
+	JU	FB 16
+NAME:	SCALAR  
+M001:	BE	]

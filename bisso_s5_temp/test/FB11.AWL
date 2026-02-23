@@ -1,0 +1,83 @@
+###PG:84000000
+[1	
+NAME:	CALC2
+
+	L	FW 34
+	SRW	5
+	L	DW 26
+	+F	
+	T	FW 42
+	JU	FB 243
+NAME:	DIV:16  
+Z1  :	DW 32
+Z2  :	FW 42
+OV  :	F 8.7
+FEH :	F 8.4
+Z3=0:	F 8.7
+Z4=0:	F 8.7
+Z3  :	FW 30
+Z4  :	FW 36
+		
+	L	FW 30
+	L	DW 33
+	<=F	
+	=	F 8.5
+		
+	L	FW 30
+	L	DW 37
+	>=F	
+	=	F 8.6
+		
+	O	F 8.6
+	O	F 8.4
+	JC	=M001
+		
+	A	F 8.5
+	JC	=M002
+		
+	JU	FB 243
+NAME:	DIV:16  
+Z1  :	FW 30
+Z2  :	DW 31
+OV  :	F 8.7
+FEH :	F 8.7
+Z3=0:	F 8.7
+Z4=0:	F 8.7
+Z3  :	FW 30
+Z4  :	FW 36
+		
+M002:	JU	FB 241
+NAME:	COD:16  
+DUAL:	FW 30
+SBCD:	F 8.7
+BCD2:	FY 36
+BCD1:	FW 30
+		
+	A	F 8.5
+	JC	=M003
+		
+M001:	AN	F 8.4
+	AN	F 8.6
+	JC	=M003
+		
+	L	DW 34
+	T	FW 26
+	O	F 8.4
+	O	F 8.6
+	BEC	
+		
+M003:	AN	F 8.5
+	JC	=M004
+		
+	L	FW 30
+	L	DW 35
+	OW	
+	T	FW 26
+	A	F 8.5
+	BEC	
+		
+M004:	L	FW 30
+	L	DW 36
+	OW	
+	T	FW 26
+	BE	]

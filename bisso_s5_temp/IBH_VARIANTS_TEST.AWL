@@ -1,0 +1,17 @@
+PROGRAM BLOCK 10
+BEGIN
+      A   I 72.2
+      =   Q 6.0
+BE
+
+BLOCK PB 11
+BEGIN
+      A   I 72.2
+      =   Q 6.0
+BE
+
+PB 12
+BEGIN
+      A   I 72.2
+      =   Q 6.0
+BE

@@ -1,0 +1,59 @@
+###PG:80000000
+[1	
+	AN	F 5.0
+	AN	F 0.4
+	A(	
+	O	I 72.0
+	O	I 72.2
+	)	
+	O	Q 6.0
+	JC	PB 20
+		
+	A	I 72.2
+	AN	F 5.0
+	O	Q 6.2
+	O	Q 6.3
+	=	F 6.0
+		
+	A	F 6.0
+	JC	PB 30
+		
+	A	F 6.0
+	BEC	
+		
+	AN	F 5.0
+	A	I 72.1
+	O	Q 6.1
+	=	F 6.1
+		
+	A	F 6.1
+	JC	PB 40
+		
+	A	F 6.1
+	BEC	
+		
+	O(	
+	AN	F 5.0
+	A	I 72.3
+	AN	F 0.4
+	)	
+	O	Q 6.4
+	O(	
+	AN	F 5.0
+	A	I 72.0
+	A	F 0.4
+	)	
+	=	F 6.2
+		
+	A	F 6.2
+	JC	PB 50
+		
+	A	F 6.2
+	BEC	
+		
+	AN	F 5.0
+	A	I 72.4
+	O	Q 6.5
+	JC	PB 52
+		
+	BE	]

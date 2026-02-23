@@ -1,0 +1,66 @@
+
+
+###PG:84000000
+[1	Move tables Up/Down
+NAME:	INCLBANC
+
+	L	IW 8
+	L	DW 44
+	AW	
+	T	FW 50
+	L	FW 10
+	L	DW 44
+	AW	
+	L	FW 50
+	><F	
+	=	F 10.0
+	A	I 9.0
+	=	F 11.0
+	A	I 9.1
+	=	F 11.1
+	A	I 9.2
+	=	F 11.2
+	A	I 9.3
+	=	F 11.3
+	A	I 9.4
+	=	F 11.4
+	A	I 9.1
+	A	I 9.0
+	AN	I 9.2
+	=	F 10.1
+	A	I 9.2
+	A	I 9.0
+	AN	I 9.1
+	=	F 10.2
+	A	I 9.3
+	AN	I 9.0
+	AN	I 9.4
+	=	F 10.3
+	A	I 9.4
+	AN	I 9.0
+	AN	I 9.3
+	=	F 10.4
+	A(	
+	O	F 10.1
+	O	F 10.2
+	O	F 10.3
+	O	F 10.4
+	)	
+	A	F 10.0
+	L	KT 120.2
+	SE	T 26
+	A	T 26
+	=	Q 7.3
+	A	F 10.1
+	A	Q 7.3
+	=	Q 72.7
+	A	F 10.2
+	A	Q 7.3
+	=	Q 73.5
+	A	F 10.3
+	A	Q 7.3
+	=	Q 73.6
+	A	F 10.4
+	A	Q 7.3
+	=	Q 73.7
+	BE	]

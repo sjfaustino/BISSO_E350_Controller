@@ -1,0 +1,20 @@
+PROGRAM_BLOCK PB 10
+BEGIN
+      AN  I 72.2
+      A   F 1.6
+      S   Q 6.0
+BE
+
+FUNCTION_BLOCK FB 15
+NAME: HELP
+BEGIN
+      A   I 3.7
+      AN  F 7.0
+      JC  FB 15
+BE
+
+DATA_BLOCK DB 10
+BEGIN
+0:	KH 25BF
+1:	KH 047E
+BE
