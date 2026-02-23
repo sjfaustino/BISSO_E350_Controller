@@ -1,7 +1,7 @@
 # BISSO E350 Controller - Developer Guide
 
-**Version:** 1.2  
-**Last Updated:** January 11, 2026  
+**Version:** 1.6.0  
+**Last Updated:** February 23, 2026  
 **Firmware Version:** See `include/firmware_version.h`  
 
 > **For operators:** See [OPERATOR_QUICKSTART.md](OPERATOR_QUICKSTART.md) for operation instructions.
@@ -77,6 +77,22 @@ BISSO_E350_Controller/
 ├── platformio.ini        # Build configuration
 └── optimize_assets.py    # Asset build script
 ```
+
+### 3.4 VFD & Spindle Control
+
+The `VFDController` class manages communication with one or more Altivar 31 VFDs via Modbus RTU.
+
+- **Dual VFD Support**: The system supports independent X and YZA VFDs.
+- **Configurable addresses**: Modbus IDs are defined in `vfd_config_t`.
+- **Analog Override**: Optional MCP4725 DAC support for bypass speed control.
+- **Precise Speed Control**: The `calculateHzForSpeed` function in `motion_control.cpp` dynamically calculates VFD target frequencies based on feedrate, machine calibration, and VFD limits.
+
+### 3.5 Motion Path Calculation (Arc Coordinated Motion)
+
+`ArcMotion` provides logic for Circular Interpolation (G2/G3):
+- **Incremental I/J** or **Absolute R** radius modes.
+- **Step Generation**: Calculates sub-segments for smooth arc execution.
+- **Axis Coordination**: Synchronizes feedrates across X and Y axes.
 
 ---
 

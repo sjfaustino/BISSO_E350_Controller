@@ -154,7 +154,13 @@ class AppState {
         },
         motion: { position: { x: 0, y: 0, z: 0, a: 0 }, moving: false, buffer_count: 0, buffer_capacity: 32, status: 'STOPPED' },
         safety: { estop: false, alarm: false },
-        vfd: { current_amps: 0, frequency_hz: 0, thermal_percent: 0, fault_code: 0, stall_threshold: 0, calibration_valid: false, connected: false },
+        vfd: {
+            connected: false,
+            vfd1: { current_amps: 0, frequency_hz: 0, thermal_percent: 0, fault_code: 0, stall_threshold: 0, calibration_valid: false, connected: false },
+            vfd2: { current_amps: 0, frequency_hz: 0, thermal_percent: 0, fault_code: 0, stall_threshold: 0, calibration_valid: false, connected: false },
+            // Legacy/Aggregate fields for backward compatibility and single-VFD UI elements
+            current_amps: 0, frequency_hz: 0, thermal_percent: 0, fault_code: 0, rpm: 0, speed_m_s: 0
+        },
         axis: {
             x: { quality: 0, jitter_mms: 0, stalled: false, vfd_error_percent: 0 },
             y: { quality: 0, jitter_mms: 0, stalled: false, vfd_error_percent: 0 },

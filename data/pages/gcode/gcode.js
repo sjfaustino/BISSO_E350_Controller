@@ -259,6 +259,12 @@
                     state.textContent = txt;
                     state.style.color = data.motion_active ? "var(--color-warning)" : "var(--color-optimal)";
                 }
+                const coord = document.getElementById("coord-status");
+                if (coord && data.motion) {
+                    const isCoord = data.motion.coordinated;
+                    coord.textContent = window.i18n ? window.i18n.t(isCoord ? "gcode.coordinated" : "gcode.independent") : (isCoord ? "Coordinated" : "Independent");
+                    coord.style.color = isCoord ? "var(--color-optimal)" : "var(--color-warning)";
+                }
                 if (data.parser) {
                     const mode = document.getElementById("distance-mode");
                     if (mode) mode.textContent = data.parser.absolute_mode ? "G90 (Absolute)" : "G91 (Relative)";

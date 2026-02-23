@@ -77,7 +77,37 @@ window.DiagnosticsModule = window.DiagnosticsModule || {
                 if (d) this.setNA(d);
             }
         }); this.updateEncoderStatus(t); if (t.vfd) {
-            this.updateHeaderNA("diag-header-vfd", "VFD Diagnostics", t.vfd.connected), this.updateHeaderNA("diag-header-spindle-rt", "🪚 Saw Blade Current (Real-time)", t.vfd.connected), this.updateHeaderNA("diag-header-spindle-trend", "Spindle Current (A)", t.vfd.connected); const e = document.getElementById("diag-vfd-current"), n = document.getElementById("diag-vfd-freq"), a = document.getElementById("diag-vfd-thermal"), s = document.getElementById("diag-vfd-fault"); t.vfd.connected ? (e && (e.textContent = (t.vfd.current_amps || 0).toFixed(1) + " A"), n && (n.textContent = (t.vfd.frequency_hz || 0).toFixed(1) + " Hz"), a && (a.textContent = (t.vfd.thermal_percent || 0) + "%"), s && (s.textContent = "0x" + (t.vfd.fault_code || 0).toString(16).padStart(4, "0").toUpperCase())) : (e && (e.textContent = "N/A"), n && (n.textContent = "N/A"), a && (a.textContent = "N/A"), s && (s.textContent = "N/A"))
+            this.updateHeaderNA("diag-header-vfd", "VFD Diagnostics", t.vfd.connected),
+                this.updateHeaderNA("diag-header-spindle-rt", "🪚 Saw Blade Current (Real-time)", t.vfd.connected),
+                this.updateHeaderNA("diag-header-spindle-trend", "Spindle Current (A)", t.vfd.connected);
+
+            // VFD 1 (X)
+            const v1Current = document.getElementById("diag-vfd1-current"), v1Freq = document.getElementById("diag-vfd1-freq"), v1Fault = document.getElementById("diag-vfd1-fault");
+            if (t.vfd.vfd1) {
+                if (t.vfd.vfd1.connected) {
+                    if (v1Current) v1Current.textContent = (t.vfd.vfd1.amps || 0).toFixed(2) + " A";
+                    if (v1Freq) v1Freq.textContent = (t.vfd.vfd1.freq || 0).toFixed(1) + " Hz";
+                    if (v1Fault) v1Fault.textContent = "0x" + (t.vfd.vfd1.fault || 0).toString(16).padStart(4, "0").toUpperCase();
+                } else {
+                    [v1Current, v1Freq, v1Fault].forEach(el => { if (el) el.textContent = "N/A"; });
+                }
+            }
+
+            // VFD 2 (Aux)
+            const v2Current = document.getElementById("diag-vfd2-current"), v2Freq = document.getElementById("diag-vfd2-freq"), v2Fault = document.getElementById("diag-vfd2-fault");
+            if (t.vfd.vfd2) {
+                if (t.vfd.vfd2.connected) {
+                    if (v2Current) v2Current.textContent = (t.vfd.vfd2.amps || 0).toFixed(2) + " A";
+                    if (v2Freq) v2Freq.textContent = (t.vfd.vfd2.freq || 0).toFixed(1) + " Hz";
+                    if (v2Fault) v2Fault.textContent = "0x" + (t.vfd.vfd2.fault || 0).toString(16).padStart(4, "0").toUpperCase();
+                } else {
+                    [v2Current, v2Freq, v2Fault].forEach(el => { if (el) el.textContent = "N/A"; });
+                }
+            }
+
+            // Consolidated / Thermal
+            const vThermal = document.getElementById("diag-vfd-thermal");
+            if (vThermal) vThermal.textContent = (t.vfd.thermal_percent || 0) + "%";
         } t.safety && this.setIOIndicator("io-estop", t.safety.estop, !0);
 
         // SD Card Status (PHASE 6.6)

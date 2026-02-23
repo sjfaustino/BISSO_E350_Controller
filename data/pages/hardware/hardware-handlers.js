@@ -57,9 +57,14 @@ window.HardwareHandlers = {
         const vfdEn = document.getElementById("vfd_enabled")?.checked;
         const jxk10En = document.getElementById("jxk10_enabled")?.checked;
         const vfdAddr = parseInt(document.getElementById("vfd_addr")?.value || 0);
+        const vfd2Addr = parseInt(document.getElementById("vfd2_addr")?.value || 0);
         const jxk10Addr = parseInt(document.getElementById("jxk10_addr")?.value || 0);
 
-        if (vfdEn && jxk10En && vfdAddr === jxk10Addr) {
+        // Check for address conflicts on the shared Modbus RS485 bus
+        const hasConflict = (vfdEn && jxk10En && (vfdAddr === jxk10Addr || vfd2Addr === jxk10Addr)) ||
+            (vfdEn && vfdAddr === vfd2Addr);
+
+        if (hasConflict) {
             module.showStatus(window.i18n.t('hardware.addr_error'), "error");
             return;
         }

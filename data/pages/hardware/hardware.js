@@ -276,6 +276,7 @@ window.HardwareModule = window.HardwareModule || {
             const spindle = data.spindle || {};
             setChecked("vfd_enabled", spindle.jxk10_en);  // VFD uses JXK10 enable
             setValue("vfd_addr", data.vfd?.address);
+            setValue("vfd2_addr", data.vfd2?.address);
             setChecked("jxk10_enabled", spindle.jxk10_en);
             setValue("jxk10_addr", spindle.jxk10_addr);
             setChecked("tach_enabled", spindle.yhtc05_en);

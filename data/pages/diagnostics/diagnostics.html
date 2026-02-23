@@ -320,21 +320,47 @@
             <h2 id="diag-header-vfd" data-i18n="diagnostics.vfd_diagnostics">VFD Diagnostics</h2>
         </div>
         <div class="card-content">
-            <div class="metric-card">
-                <div class="metric-label">Current Draw</div>
-                <div class="metric-value" id="diag-vfd-current">-- A</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- VFD 1 (X) -->
+                <div>
+                    <h4 style="margin-bottom: 10px; font-size: 14px; color: var(--text-secondary);"
+                        data-i18n="dashboard.vfd_x">VFD 1 (X)</h4>
+                    <div class="metric-card">
+                        <div class="metric-label">Current Draw</div>
+                        <div class="metric-value" id="diag-vfd1-current">-- A</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Frequency</div>
+                        <div class="metric-value" id="diag-vfd1-freq">-- Hz</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Fault Code</div>
+                        <div class="metric-value" id="diag-vfd1-fault">0x0000</div>
+                    </div>
+                </div>
+                <!-- VFD 2 (Aux) -->
+                <div>
+                    <h4 style="margin-bottom: 10px; font-size: 14px; color: var(--text-secondary);"
+                        data-i18n="dashboard.vfd_aux">VFD 2 (Aux)</h4>
+                    <div class="metric-card">
+                        <div class="metric-label">Current Draw</div>
+                        <div class="metric-value" id="diag-vfd2-current">-- A</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Frequency</div>
+                        <div class="metric-value" id="diag-vfd2-freq">-- Hz</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Fault Code</div>
+                        <div class="metric-value" id="diag-vfd2-fault">0x0000</div>
+                    </div>
+                </div>
             </div>
-            <div class="metric-card">
-                <div class="metric-label">Frequency</div>
-                <div class="metric-value" id="diag-vfd-freq">-- Hz</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Thermal State</div>
-                <div class="metric-value" id="diag-vfd-thermal">--%</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Fault Code</div>
-                <div class="metric-value" id="diag-vfd-fault">0x0000</div>
+            <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <div class="metric-card">
+                    <div class="metric-label">Max Thermal State</div>
+                    <div class="metric-value" id="diag-vfd-thermal">--%</div>
+                </div>
             </div>
         </div>
     </div>

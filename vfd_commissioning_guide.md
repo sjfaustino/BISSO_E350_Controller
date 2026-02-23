@@ -9,8 +9,16 @@ This guide outlines the keypad settings required to support the "Digital Overrid
 
 ## 2. Menu Settings (Keypad)
 
+### Modbus Addressing
+- **VFD 1 (X Axis)**: Address `2` (Default)
+- **VFD 2 (Y/Z/A Axis)**: Address `4` (Default)
+
 ### CTL (Control) Menu
 - **LAC**: `L3` (Advanced Function Level)
+- **FR1**: `nnd` (Modbus control)
+- **CHCF**: `SEP` (Separate control/frequency reference)
+- **CD1**: `nnd` (Modbus command)
+- **CCS**: `CD1` (Command channel 1)
 - **Fr1**: `nnd` (Modbus - Frequency reference comes from RS485)
 - **CHCF**: `SEP` (Separate - allows Modbus control for speed but PLC/Hardware for Run/Stop)
 - **Cd1**: `tEr` (Terminal - Start/Stop commands via PLC terminal logic)

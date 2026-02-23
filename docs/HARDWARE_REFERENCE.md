@@ -1,7 +1,7 @@
 # BISSO E350 Controller - Hardware Reference
 
-**Version:** 1.1.0  
-**Last Updated:** 2026-01-01  
+**Version:** 1.6.0  
+**Last Updated:** 2026-02-23  
 **Machine:** BISSO E350 Stone Bridge Saw
 
 ---
@@ -12,7 +12,7 @@
 2. [Control System Architecture](#control-system-architecture)
 3. [ESP32 ↔ PLC Interface](#esp32--plc-interface)
 4. [Axis Configuration](#axis-configuration)
-5. [Spindle System](#spindle-system)
+5. [Spindle and VFD System](#spindle-and-vfd-system)
 6. [VFD Configuration](#vfd-configuration)
 7. [Sensors and Feedback](#sensors-and-feedback)
 8. [Safety Systems](#safety-systems)
@@ -51,42 +51,32 @@ The ESP32 controller **replaces a broken ELBO positioning controller**. It inter
 - Safety interlocks
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                         BISSO E350 Control System                       │
-├────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌─────────────────────┐          ┌─────────────────────┐             │
-│  │   ESP32 Controller  │◄────────►│   Siemens S5 PLC    │             │
-│  │   (KC868-A16 v3.1)  │  PCF8574 │   (Original)        │             │
-│  │                     │  I/O     │                     │             │
-│  │  • Position control │          │  • Contactor control│             │
-│  │  • User interface   │          │  • VFD speed ref    │             │
-│  │  • Encoder reading  │          │  • Safety interlocks│             │
-│  └──────────┬──────────┘          └──────────┬──────────┘             │
-│             │                                 │                        │
-│     ┌───────┴───────┐              ┌─────────┴─────────┐              │
-│     │   RS-232      │              │   Contactors      │              │
-│     │   WJ66 x4     │              │   (X/Y/Z Select)  │              │
-│     │   (Encoders)  │              └─────────┬─────────┘              │
-│     └───────────────┘                        │                        │
-│                                      ┌───────▼───────┐                │
-│  ┌─────────────────────┐            │  Altivar 31   │                │
-│  │   RS-485 Bus        │            │  (Shared VFD) │                │
-│  │  • JXK-10 (current) │            └───────┬───────┘                │
-│  │  • Altivar 31 (mon) │                    │                        │
-│  └─────────────────────┘         ┌──────────┼──────────┐             │
-│                                  ▼          ▼          ▼             │
-│                            ┌─────────┐ ┌─────────┐ ┌─────────┐      │
-│                            │ X Motor │ │ Y Motor │ │ Z Motor │      │
-│                            └─────────┘ └─────────┘ └─────────┘      │
-│                                                                       │
-│  ┌──────────────────────────────────────────────────────────┐       │
-│  │                    Spindle System                          │       │
-│  │  Unidrive SP (VFD) ──► FIMET 22kW Motor ──► Saw Blade     │       │
-│  │  JXK-10 (current monitor)                                  │       │
-│  └──────────────────────────────────────────────────────────┘       │
-│                                                                       │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    BISSO E350 SYSTEM ARCHITECTURE                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ┌─────────────┐    RS-485 (Modbus)  ┌───────────────────────────┐  │
+│   │   ESP32     │───┬─────────────────┤  SIEMENS S7-200 PLC       │  │
+│   │  Controller │   │          │      │  (Motion Sequencer)       │  │
+│   └─────────────┘   │          │      └───────────┬───────────────┘  │
+│          │          │          │                  │                  │
+│          │ I2C      │          │           Contactor Control         │
+│          │          │          │                  │                  │
+│   ┌──────┴──────┐   │   ┌──────┴─────┐      ┌─────┴───────────┐      │
+│   │  MCP4725    │   │   │ ALTIVAR 31 │      │ ALTIVAR 31 VFD  │      │
+│   │  DAC (Ana)  │   │   │ VFD (X)    │      │  (Y/Z/A Motors) │      │
+│   └─────────────┘   │   └─────┬──────┘      └────────┬────────┘      │
+│                     │         │                      │               │
+│               Modbus RTU      │                ┌─────┴─────┐         │
+│               (RS485)         │                │           │         │
+│                     │   ┌─────┴─────┐    ┌─────┴────┐┌─────┴────┐┌───┴───┐│
+│                     └───┤  X MOTOR  │    │ Y MOTOR  ││ Z MOTOR  ││A MOTOR││
+│                         │ (Carriage)│    │ (Bridge) ││ (Blade)  ││(Head) ││
+│                         └───────────┘    └──────────┘└──────────┘└───────┘│
+│                                                                      │
+│         ★ DUAL VFD: X and Y/Z can now move simultaneously! ★         │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### ESP32 Controller Board
@@ -154,53 +144,77 @@ The ESP32 communicates with the Siemens S5 PLC via **PCF8574 I/O expanders** (I2
 
 ### Summary
 
-| Axis | Type | Motorized | Drive | Position Feedback | Purpose |
-|------|------|-----------|-------|-------------------|----------|
-| **X** | Linear | ✅ Yes | Shared VFD | Encoder + WJ66 | Material feed |
-| **Y** | Linear | ✅ Yes | Shared VFD | Encoder + WJ66 | Cross travel |
-| **Z** | Linear | ✅ Yes | Shared VFD | Encoder + WJ66 | Blade height |
-| **A** | Rotary | ❌ No | Manual | Encoder + WJ66 | Angle adjustment |
+| Parameter | Constraint | Description | Impact on G-Code |
+|------------|-------------|------------------|------------------|
+| **Dual VFD** | Two Altivar 31 drives split X and YZA duties | X and Y can move **simultaneously** in Coordinated Mode | G0/G1 X Y Z A |
+| **PLC Contactors** | Motor selection happens in PLC for YZA | Automatic sequencing for Z→Y; X is independent | G0/G1 Z Y A |
+| **22kW Spindle** | Main VFD can drive the saw blade motor | M3/M5 controls spindle | M3/M5 |
+| **A-Axis Motorized** | Latest versions support motorized A axis | G28 A supported; coordinated rotation | G0/G1 A |
+| **WJ66 Encoders** | Hall-effect pulse counting at 1000 Hz | High-precision positioning (0.01mm) | All axis movements |
 
 ### Axis Drive Architecture
 
-The X, Y, Z axes share a **single Altivar 31 VFD** through a contactor-based switching system controlled by the **Siemens S5 PLC**.
+The machine features a **dual VFD system**. One **Altivar 31 VFD (VFD-X)** is dedicated to the **X-axis motor**, allowing independent and simultaneous movement. The other **Altivar 31 VFD (VFD-YZA)** is shared by the **Y, Z, and A axes** through a contactor-based switching system controlled by the **Siemens S5 PLC** (or S7-200 Motion Sequencer depending on machine variant).
 
 ```
 ┌─────────────────────────────────────────────────────────┐
+│              DUAL VFD AXIS ARCHITECTURE                 │
+├─────────────────────────────────────────────────────────┤
 │                                                          │
 │   ┌──────────┐     ┌───────────────┐                    │
 │   │ Siemens  │────▶│  Contactors   │                    │
-│   │  S5 PLC  │     │  (Selector)   │                    │
+│   │ PLC/ESP32│     │  (Selector)   │                    │
 │   └──────────┘     └───────┬───────┘                    │
 │                            │                            │
-│                    ┌───────▼───────┐                    │
-│                    │  Altivar 31   │                    │
-│                    │   (1x VFD)    │                    │
-│                    └───────┬───────┘                    │
-│                            │                            │
-│         ┌──────────────────┼──────────────────┐        │
-│         ▼                  ▼                  ▼        │
-│   ┌──────────┐      ┌──────────┐      ┌──────────┐    │
-│   │ X Motor  │      │ Y Motor  │      │ Z Motor  │    │
-│   └──────────┘      └──────────┘      └──────────┘    │
+│           ┌────────────────┴────────────────┐           │
+│           │                                 │           │
+│   ┌───────▼───────┐                 ┌───────▼───────┐   │
+│   │  Altivar 31   │                 │  Altivar 31   │   │
+│   │    (VFD-X)    │                 │   (VFD-YZA)   │   │
+│   └───────┬───────┘                 └───────┬───────┘   │
+│           │                                 │           │
+│           │                         ┌───────┴───────┐   │
+│           │                         ▼       ▼       ▼   │
+│     ┌─────▼─────┐             ┌────────┐┌────────┐┌────────┐
+│     │  X Motor  │             │Y Motor ││Z Motor ││A Motor │
+│     └───────────┘             └────────┘└────────┘└────────┘
 │                                                          │
 └─────────────────────────────────────────────────────────┘
 ```
 
 **Key Characteristics:**
-- **Single VFD** shared by all 3 motorized axes
-- **Sequential motion only** - one axis moves at a time
-- **Contactor switching** selects which motor receives power
-- **Siemens S5 PLC** controls axis selection logic
+- **VFD-X**: Dedicated to X-axis; always available.
+- **VFD-YZA**: Shared by Y, Z, and A axes.
+- **Coordinated Motion**: X and Y (or X and Z) can move **simultaneously**.
+- **Sequential Motion**: Only one of Y, Z, or A can move at a time (constrained by shared VFD).
+- **Contactor switching**: Selects which motor receives power from VFD-YZA.
 
-### Altivar 31 VFD
+### Altivar 31 VFD (Dual Channel)
 
-| Parameter | Value |
-|-----------|-------|
-| VFD Model | Altivar 31 (ATV31) |
-| Quantity | 1 (shared) |
-| Control | Via Siemens S5 PLC |
-| Communication | Modbus RTU @ 9600 baud (if enabled) |
+| Parameter | VFD1 (X-Axis) | VFD2 (Y, Z, A Axes) |
+|-----------|---------------|---------------------|
+| **Modbus ID** | 2 | 4 |
+| **Control** | Direct RS485 / Modbus | PLC Contactor Switched |
+| **Comm.** | Modbus RTU @ 9600 | Modbus RTU @ 9600 |
+| **Analog** | **Optional** (via DAC) | PLC Wired |
+
+#### Precise Speed Control (RS485)
+The firmware implements precise speed control by calculating the required Hertz (Hz) for a given feedrate ($mm/min$).
+
+**Calculation Logic:**
+$$Hz = \frac{\text{Target Feedrate} (mm/min)}{\text{Max Calibrated Speed} (mm/min)} \times \text{Max Frequency} (Hz)$$
+
+- **Max Frequency**: Usually 50.0 Hz or 60.0 Hz (configured in VFD parameter `tFr`).
+- **Real-time Clipping**: Frequencies are automatically clipped to the VFD's configured `LSP` (Low Speed) and `HSP` (High Speed) limits to prevent motor stall or overspeed.
+- **Modbus Command**: The calculated frequency is written to the VFD via Modbus register `0x2136` (Frequency Reference).
+
+### Analog Speed Override (DAC)
+
+For machines requiring precise analog speed control bypassing the PLC presets, an **MCP4725 DAC** is used:
+- **Interface**: I2C (Address `0x60` or `0x61`)
+- **Output**: 0-5V or 0-10V (via signal conditioner)
+- **Config Key**: `vfd_ana_en` (Set to 1 to enable)
+- **DAC Address**: `dac_addr` (Default: `0x60`)
 
 ### A Axis (Non-Motorized)
 
@@ -281,20 +295,19 @@ To prevent internal flash wear (ESP32 is rated for ~100,000 writes), the control
 
 ---
 
-## VFD Configuration
-
 ### Altivar 31 (Axis Motors)
 
-The single Altivar 31 VFD is controlled by the **Siemens S5 PLC** via standard analog/digital connections. The **ESP32 monitors status via separate RS-485 Modbus RTU**.
+The machine uses two Altivar 31 VFDs. They are controlled by the **Siemens PLC** via standard analog/digital connections, with the **ESP32 monitoring status via RS-485 Modbus RTU**.
 
 | Parameter | Value |
 |-----------|-------|
 | VFD Model | Altivar 31 (ATV31) |
-| Quantity | 1 (shared via contactors) |
+| Quantity | 2 (VFD-X and VFD-YZA) |
 | PLC Control | Standard I/O (analog speed ref, digital run/stop) |
-| PLC → Motor Selection | Contactors |
+| Motor Selection | VFD-X (Fixed); VFD-YZA (Contactor Switched) |
 | ESP32 Monitoring | RS-485 Modbus RTU (read-only) |
 | Modbus Baud Rate | 9600 |
+| Modbus Addresses | X: 2, YZA: 4 (Standard) |
 
 **PLC → VFD Connections (Standard):**
 - Analog speed reference (0-10V or 4-20mA)
@@ -637,8 +650,7 @@ On v3.1 boards, a secondary UART is available for external G-code streaming or h
 
 ## Revision History
 
-| Date | Version | Changes |
-|------|---------|---------|
+| 2026-02-22 | 1.6.0 | Updated for Dual VFD architecture and simultaneous axis movement support |
 | 2026-02-15 | 1.5.0 | Audit: Corrected I2C Bank 2 addresses (0x22/0x25), added Bank 2 pin mapping, and WJ66 INIT procedure |
 | 2026-02-15 | 1.4.0 | Added WJ66 Encoder Protocol Configuration and INIT hardware procedure |
 | 2026-02-03 | 1.3.0 | Set KC868-A16 v3.1 (ESP32-S3-WROOM-1U) as standard definitive target |

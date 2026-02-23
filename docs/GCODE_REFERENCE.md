@@ -1,4 +1,4 @@
-# 📟 BISSO E350 - THE DEFINITIVE G-CODE MASTER REFERENCE (V2.0) 📟
+# 📟 BISSO E350 - THE DEFINITIVE G-CODE MASTER REFERENCE (V3.0) 📟
 
 ```text
    ____  ____  ___  ____  _____     ____  _____ _____ 
@@ -40,8 +40,8 @@ Understanding the BISSO E350 hardware is **CRITICAL** for effective G-code progr
 │          │ I2C                         Contactor Control             │
 │          │                                    │                      │
 │   ┌──────┴──────┐                    ┌────────┴─────────┐           │
-│   │  PCF8574    │                    │ ALTIVAR 31 VFD   │           │
-│   │  I/O Expdr  │                    │  (Single Motor)  │           │
+│   │  PCF8574    │                    │ DUAL ALTIVAR 31  │           │
+│   │  I/O Expdr  │                    │   VFD SYSTEM     │           │
 │   └─────────────┘                    └────────┬─────────┘           │
 │                                               │                      │
 │                              ┌────────────────┼────────────────┐    │
@@ -51,7 +51,7 @@ Understanding the BISSO E350 hardware is **CRITICAL** for effective G-code progr
 │                         │(Carriage)│      │(Bridge) │     │(Blade) │ │
 │                         └─────────┘      └─────────┘     └────────┘ │
 │                                                                      │
-│            ★ CRITICAL: Only ONE motor can run at a time! ★           │
+│            ★ DUAL VFD: Independent Spindle and Axis Control ★         │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -60,9 +60,10 @@ Understanding the BISSO E350 hardware is **CRITICAL** for effective G-code progr
 
 | Constraint | Description | Impact on G-Code |
 |------------|-------------|------------------|
-| **Single VFD** | One Altivar 31 drives all axis motors via contactors | Axes move **sequentially**, never simultaneously |
-| **PLC Contactors** | Motor selection happens in PLC, not ESP32 | Automatic sequencing: Z→Y→X for moves |
-| **22kW Spindle** | Same VFD can drive the saw blade motor | M3/M5 controls spindle |
+| **Dual VFD** | Independent VFDs for Spindle and Axis motors | Spindle can run during all motions |
+| **PLC Contactors** | Motor selection happens in PLC, not ESP32 | Automatic sequencing for standard moves |
+| **Coordinated X/Y**| Supported via Dual-Driver Logic | **G2/G3 Arcs** and **M402** movement |
+| **22kW Spindle** | Dedicated VFD (VFD1) | M3/M5/M113 controls spindle |
 | **A-Axis Manual** | Rotary head has no motor; encoder-only | G28 A is skipped; manual positioning only |
 | **WJ66 Encoders** | Hall-effect pulse counting at 1000 Hz | High-precision positioning (0.01mm) |
 
@@ -278,6 +279,119 @@ FEEDRATE → PLC PROFILE MAPPING:
 │                                                                 │
 └────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+### `G2 / G3` - Circular / Arc Motion
+
+**Command Syntax:**
+```gcode
+G2 [X<target>] [Y<target>] [I<offset>] [J<offset>] [F<feed>]  ; Clockwise Arc
+G2 [X<target>] [Y<target>] [R<radius>] [F<feed>]              ; Clockwise Arc (Radius)
+G3 [X<target>] [Y<target>] [I<offset>] [J<offset>] [F<feed>]  ; Counter-Clockwise Arc
+G3 [X<target>] [Y<target>] [R<radius>] [F<feed>]              ; Counter-Clockwise (Radius)
+```
+
+**Description:**
+`G2` and `G3` perform coordinated circular interpolation between X and Y axes. This requires the **Dual VFD** hardware where the ESP32 can control both X and Y drivers simultaneously through the software-based Coordinated Motion Driver.
+
+**Parameters:**
+| Parameter | Description | Valid Range | Default |
+|-----------|-------------|-------------|---------|
+| `X<target>`| Target X coordinate | Machine limits | Current X |
+| `Y<target>`| Target Y coordinate | Machine limits | Current Y |
+| `I<offset>`| X distance from start to center (Incremental) | Millimeters | 0 |
+| `J<offset>`| Y distance from start to center (Incremental) | Millimeters | 0 |
+| `R<radius>`| Arc radius (Positive = Small arc, Negative = Large arc) | Millimeters | N/A |
+| `F<feed>`  | Cutting speed | 10-5000 | Last F |
+
+**How It Works:**
+The controller uses **Arc Decomposition**. It breaks the geometric arc into many tiny linear segments (G1 segments) based on `$12` (Arc Tolerance). These segments are then executed at the requested feedrate, driving both X and Y VFDs in sync.
+
+**Usage Examples:**
+```gcode
+; Example 1: 90-degree corner clockwise using I/J
+G90 X0 Y0
+G2 X100 Y100 I100 J0 F800 ; Arc starts at 0,0 ends at 100,100, center is 100,0
+
+; Example 2: Semi-circle using Radius
+G3 X200 Y0 R100 F1000      ; CCW semi-circle with 100mm radius
+```
+
+**Industrial Use Case:**
+- Cutting sink cutouts with rounded corners.
+- Profiling slab edges with custom radii.
+- Precise circular holes (using two semi-arcs).
+
+---
+
+### `M402` - Coordinated Motion Mode Control
+
+**Command Syntax:**
+```gcode
+M402 P<mode>
+```
+
+**Description:**
+Enables or disables **Coordinated Motion Mode**. This is a safety and functional toggle that determines how the machine handles multi-axis motion commands.
+
+**Parameters:**
+| Parameter | Description | Valid Range |
+|-----------|-------------|-------------|
+| `P0`      | **Disable** Coordinated Mode (Default) |
+| `P1`      | **Enable** Coordinated Mode |
+
+**How It Works:**
+1. **P0 (Sequential Mode)**: For safety, standard G1 moves involving multiple axes (e.g., `G1 X100 Y100`) are split into sequential moves (X then Y). This minimizes the risk of diagonal crashes if the operator is not expecting simultaneous movement.
+2. **P1 (Coordinated Mode)**: Allows simultaneous X and Y motion. This is **REQUIRED** for diagonal cuts and is automatically enabled/disabled internally by arc commands (`G2`/`G3`).
+
+**Usage Examples:**
+```gcode
+; Example: Perform a diagonal move
+M402 P1         ; Enable coordinated mode
+G1 X100 Y100 F800 ; Both axes move together
+M402 P0         ; Return to safe sequential mode
+```
+
+**Expected Console Output:**
+```text
+[DRV] Coordinated Motion Mode: ENABLED
+ok
+```
+
+> [!WARNING]
+> Use `M402 P1` with caution. Ensure the path is clear of obstructions as the machine will move in a straight diagonal line.
+
+---
+
+### `M403` - VFD Frequency Control (Hz)
+
+**Command Syntax:**
+```gcode
+M403 S<hertz> P<vfd_id>
+```
+
+**Description:**
+Sets the output frequency of a specific VFD directly in Hertz. This allows for precise manual speed control bypassing the standard feedrate-to-frequency mapping.
+
+**Parameters:**
+| Parameter | Description | Valid Range | Default |
+|-----------|-------------|-------------|---------|
+| `S<hertz>` | Target frequency in Hz | 0.0 to 100.0 | N/A |
+| `P<vfd_id>`| VFD Identifier | 1 (Spindle), 2 (X), 4 (YZA) | 2 (X) |
+
+**How It Works:**
+The value is sent directly to the VFD's internal frequency reference register via Modbus. This will override any existing motion-based speed calculations until the next `G1` command with an `F` value occurs.
+
+**Usage Examples:**
+```gcode
+; Example: Run X VFD at exactly 35.5 Hz
+M403 S35.5 P2
+```
+
+**Note:** Frequencies are still subject to the `LSP` (Low Speed) and `HSP` (High Speed) limits programmed into the VFD firmware for hardware protection.
+
+---
 
 **Usage Examples:**
 
@@ -1423,9 +1537,9 @@ When something goes wrong, the controller returns error codes in Grbl format:
 
 ---
 
-**Document Version:** 2.0 Ultimate Master  
-**Last Updated:** 2026-01-27  
-**Firmware Compatibility:** v3.5.x+  
+**Document Version:** 3.1.0  
+**Last Updated:** 2026-02-23  
+**Firmware Compatibility:** v3.6.x+  
 **Author:** Antigravity (DeepMind Advanced Agentic Coding)  
 **Machine:** BISSO E350 PosiPro 4-Axis CNC Bridge Saw
 

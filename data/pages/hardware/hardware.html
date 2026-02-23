@@ -306,7 +306,7 @@
         <!-- VFD Card -->
         <div class="card device-card">
             <div class="card-header device-header vfd">
-                <h3 data-i18n="hardware.vfd_altivar">⚡ VFD (Altivar31)</h3>
+                <h3 data-i18n="hardware.vfd_altivar_dual">⚡ Dual VFD (Altivar31)</h3>
                 <span class="device-protocol">RS485 Modbus</span>
             </div>
             <div class="card-content">
@@ -323,9 +323,14 @@
                     </select>
                 </div>
                 <div class="pin-row">
-                    <label for="vfd_addr" data-i18n="hardware.modbus_addr">Modbus Address:</label>
-                    <input type="number" class="pin-input" id="vfd_addr" value="1" min="1" max="247"
+                    <label for="vfd_addr" data-i18n="hardware.modbus_addr">VFD 1 (X) Address:</label>
+                    <input type="number" class="pin-input" id="vfd_addr" value="2" min="1" max="247"
                         data-config="vfd_addr">
+                </div>
+                <div class="pin-row">
+                    <label for="vfd2_addr" data-i18n="hardware.modbus_addr2">VFD 2 (Aux) Address:</label>
+                    <input type="number" class="pin-input" id="vfd2_addr" value="4" min="1" max="247"
+                        data-config="vfd2_addr">
                 </div>
                 <div class="pin-row" style="margin-top: 10px;">
                     <label for="vfd_enabled" data-i18n="hardware.enabled">Enabled:</label>
@@ -339,7 +344,7 @@
         <!-- JXK-10 Card -->
         <div class="card device-card">
             <div class="card-header device-header jxk10">
-                <h3 data-i18n="hardware.jxk10_current">🔋 JXK-10 Current Monitor</h3>
+                <h3 data-i18n="hardware.spindle_monitor">🔋 Spindle Current Monitor</h3>
                 <span class="device-protocol">RS485 Modbus</span>
             </div>
             <div class="card-content">

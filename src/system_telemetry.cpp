@@ -450,13 +450,14 @@ size_t telemetryExportJSON(char* buffer, size_t buffer_size, bool full) {
 
     n = snprintf(buffer + offset, buffer_size - offset,
         "},\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,\"motion_active\":%s,"
-        "\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s},",
+        "\"motion\":{\"moving\":%s,\"buffer_count\":%d,\"buffer_capacity\":%d,\"dro_connected\":%s,\"coordinated\":%s},",
         t.axis_x_mm, t.axis_y_mm, t.axis_z_mm, t.axis_a_mm,
         t.motion_moving ? "true" : "false",
         t.motion_moving ? "true" : "false",
         t.motion_buffer_count,
         t.motion_buffer_capacity,
-        t.dro_connected ? "true" : "false");
+        t.dro_connected ? "true" : "false",
+        t.coordinated_mode ? "true" : "false");
     if (n > 0 && (offset + n) < buffer_size) offset += n;
 
     n = snprintf(buffer + offset, buffer_size - offset,
