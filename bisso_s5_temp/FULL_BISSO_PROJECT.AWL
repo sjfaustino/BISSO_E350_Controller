@@ -1,0 +1,2240 @@
+###PG:80000000
+[1
+0:	KH 25BF
+1:	KH 047E
+2:	KH 0B38
+3:	KH 19FE
+4:	KH 0C90
+5:	KH 0357
+6:	KH 382F
+7:	KH 1600
+8:	KH 04BE
+9:	KH 2B58
+10:	KH 0125
+11:	KH 00A0
+12:	KH 0FBD
+13:	KH 027A
+14:	KH 0053
+15:	KH 4000
+16:	KH 1600
+17:	KH 0000
+18:	KH 4000
+19:	KH 0000
+20:	KH 101E
+21:	KH 0005
+22:	KH 0000
+23:	KH 1520
+24:	KH 1000
+25:	KH 0008
+26:	KH 0004
+27:	KH 0001
+28:	KH 4000
+29:	KH 0000
+30:	KH 0000
+31:	KH 000A
+32:	KH 7FD0
+33:	KH 03E7
+34:	KH 3200
+35:	KH 2000
+36:	KH 3000
+37:	KH 07D0
+38:	KH 0000
+39:	KH 0003
+40:	KH 001C
+41:	KH 0010
+42:	KH 0001
+43:	KH 0000
+44:	KH 001F
+]
+###PG:84000000
+[1	
+NAME:	HELP.
+
+	A	I 3.7
+	AN	F 7.0
+	AN	F 7.1
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.4
+	AN	F 7.5
+	R	F 6.3
+		
+	AN	F 6.3
+	BEC	
+		
+	A	F 7.6
+	A	I 3.7
+	S	F 7.7
+		
+	A	F 7.6
+	R	F 7.6
+		
+	AN	I 3.7
+	R	F 7.7
+		
+	A	I 3.7
+	AN	F 7.7
+	S	F 7.6
+		
+	A	F 8.2
+	A	F 7.6
+	R	F 8.2
+		
+	A	F 8.0
+	A	F 7.6
+	S	F 8.1
+		
+	A	F 8.1
+	AN	F 8.0
+	A	F 7.6
+	S	F 8.2
+		
+	A	F 8.2
+	R	F 8.1
+		
+	A	F 8.1
+	R	F 8.0
+		
+	AN	F 8.0
+	AN	F 8.1
+	AN	F 8.2
+	A	F 7.6
+	A(	
+	O	F 7.0
+	O	F 7.1
+	O	F 7.2
+	O	F 7.3
+	O	F 7.4
+	O	F 7.5
+	)	
+	S	F 8.0
+		
+	A(	
+	O	F 8.1
+	O	F 8.0
+	)	
+	A	F 1.2
+	=	Q 73.3
+		
+	O(	
+	A	F 8.0
+	AN	F 1.2
+	)	
+	O(	
+	A	F 8.2
+	A	F 1.2
+	)	
+	=	Q 73.4
+		
+	A	I 4.5
+	AN	I 4.6
+	=	F 3.5
+		
+	AN	I 4.5
+	A	I 4.6
+	=	F 3.6
+		
+	A(	
+	O	F 7.0
+	O	F 7.1
+	O	F 7.2
+	O	F 7.3
+	O	F 7.4
+	O	F 7.5
+	)	
+	AN	F 1.2
+	=	Q 73.0
+	***	]
+[2	
+	A(	
+	O	I 2.6
+	O	I 2.7
+	)	
+	AN	F 7.1
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.4
+	AN	F 7.5
+	=	F 7.0
+		
+	AN	F 7.0
+	JC	=M001
+		
+	AN	F 8.0
+	JC	=M001
+		
+	L	DW 0
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+	L	FW 34
+	T	DW 0
+	T	QW 66
+M001:	A	F 7.0
+	BEC	
+	***	]
+[3	
+	A(	
+	O	I 2.4
+	O	I 2.5
+	)	
+	AN	F 7.0
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.4
+	AN	F 7.5
+	=	F 7.1
+		
+	AN	F 7.1
+	JC	=M001
+		
+	L	DW 39
+	T	FW 38
+	AN	F 8.0
+	JC	=M002
+		
+	L	DW 9
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 9
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+M002:	AN	F 8.1
+	JC	=M003
+		
+	L	DW 10
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 10
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.1
+	BEC	
+		
+M003:	AN	F 8.2
+	JC	=M001
+		
+	L	DW 11
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 11
+	JU	FB 16
+NAME:	SCALAR  
+		
+M001:	A	F 7.1
+	BEC	
+	***	]
+[4	
+	A(	
+	O	I 3.0
+	O	I 3.1
+	)	
+	AN	I 4.3
+	AN	F 7.0
+	AN	F 7.1
+	AN	F 7.3
+	AN	F 7.4
+	AN	F 7.5
+	=	F 7.2
+		
+	AN	F 7.2
+	JC	=M001
+		
+	L	DW 40
+	T	FW 38
+	AN	F 8.0
+	JC	=M002
+		
+	L	DW 3
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 3
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+M002:	AN	F 8.1
+	JC	=M003
+		
+	L	DW 4
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 4
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.1
+	BEC	
+		
+M003:	AN	F 34.2
+	JU	FB 17
+NAME:	RIC(+/-)
+	L	FW 34
+	T	DW 6
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+	AN	F 8.1
+M001:	JC	=M004
+		
+	L	DW 7
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 7
+	JU	FB 16
+NAME:	SCALAR  
+	A	F 8.1
+	BEC	
+		
+M004:	AN	F 8.2
+	JC	=M005
+		
+	L	DW 8
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 8
+	JU	FB 16
+NAME:	SCALAR  
+		
+M005:	A	F 7.3
+	BEC	
+	***	]
+[5	
+	A(	
+	O	I 3.2
+	O	I 3.3
+	)	
+	AN	F 7.0
+	AN	F 7.1
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.5
+	=	F 7.4
+		
+	AN	F 7.4
+	JC	=M001
+		
+	L	DW 41
+	T	FW 38
+	AN	F 8.0
+	JC	=M002
+		
+	L	DW 12
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 12
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+M002:	AN	F 8.1
+	JC	=M003
+		
+	L	DW 13
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 13
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.1
+	BEC	
+		
+M003:	AN	F 8.2
+	JC	=M001
+		
+	L	DW 14
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 14
+	JU	FB 16
+NAME:	SCALAR  
+		
+M001:	A	F 7.4
+	BEC	
+	***	]
+[6	
+	A(	
+	O	I 3.4
+	O	I 3.5
+	)	
+	AN	F 7.0
+	AN	F 7.1
+	AN	F 7.2
+	AN	F 7.3
+	AN	F 7.4
+	=	F 7.5
+		
+	AN	F 7.5
+	JC	=M001
+		
+	L	DW 42
+	T	FW 38
+	AN	F 8.0
+	JC	=M002
+		
+	L	DW 15
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 15
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.0
+	BEC	
+		
+M002:	AN	F 8.1
+	JC	=M003
+		
+	L	DW 16
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 16
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 8.1
+	BEC	
+		
+M003:	AN	F 8.2
+	JC	=M001
+		
+	L	DW 17
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 17
+	JU	FB 16
+NAME:	SCALAR  
+M001:	BE	]
+###PG:84000000
+[1	
+NAME:	SCALAR
+
+	JU	FB 243
+NAME:	DIV:16  
+Z1  :	FW 34
+Z2  :	FW 38
+OV  :	F 8.7
+FEH :	F 8.7
+Z3=0:	F 8.7
+Z4=0:	F 8.7
+Z3  :	QW 66
+Z4  :	FW 36
+	BE	]
+###PG:84000000
+[1	
+NAME:	RIC(+/-)
+
+	A	F 3.5
+	JC	FB 12
+NAME:	POT.+   
+	A	F 3.6
+	JC	FB 13
+NAME:	POT.-   
+	BE	]
+###PG:84000000
+[1	
+NAME:	RICH.POT
+
+	AN	F 2.0
+	JC	=M001
+		
+	L	DW 2
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 2
+	T	QW 66
+	A	F 2.0
+	BEC	
+		
+M001:	AN	F 2.1
+	JC	=M002
+		
+	L	DW 41
+	T	FW 38
+	L	DW 18
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 18
+	JU	FB 16
+NAME:	SCALAR  
+		
+	A	F 2.1
+	BEC	
+		
+M002:	AN	F 2.2
+	JC	=M003
+		
+	L	DW 1
+	T	FW 34
+	JU	FB 17
+NAME:	RIC(+/-)
+		
+	L	FW 34
+	T	DW 1
+	T	QW 66
+M003:	BE	]
+###PG:84000000
+[1	
+NAME:	CALC2
+
+	L	FW 34
+	SRW	5
+	L	DW 26
+	+F	
+	T	FW 42
+	JU	FB 243
+NAME:	DIV:16  
+Z1  :	DW 32
+Z2  :	FW 42
+OV  :	F 8.7
+FEH :	F 8.4
+Z3=0:	F 8.7
+Z4=0:	F 8.7
+Z3  :	FW 30
+Z4  :	FW 36
+		
+	L	FW 30
+	L	DW 33
+	<=F	
+	=	F 8.5
+		
+	L	FW 30
+	L	DW 37
+	>=F	
+	=	F 8.6
+		
+	O	F 8.6
+	O	F 8.4
+	JC	=M001
+		
+	A	F 8.5
+	JC	=M002
+		
+	JU	FB 243
+NAME:	DIV:16  
+Z1  :	FW 30
+Z2  :	DW 31
+OV  :	F 8.7
+FEH :	F 8.7
+Z3=0:	F 8.7
+Z4=0:	F 8.7
+Z3  :	FW 30
+Z4  :	FW 36
+		
+M002:	JU	FB 241
+NAME:	COD:16  
+DUAL:	FW 30
+SBCD:	F 8.7
+BCD2:	FY 36
+BCD1:	FW 30
+		
+	A	F 8.5
+	JC	=M003
+		
+M001:	AN	F 8.4
+	AN	F 8.6
+	JC	=M003
+		
+	L	DW 34
+	T	FW 26
+	O	F 8.4
+	O	F 8.6
+	BEC	
+		
+M003:	AN	F 8.5
+	JC	=M004
+		
+	L	FW 30
+	L	DW 35
+	OW	
+	T	FW 26
+	A	F 8.5
+	BEC	
+		
+M004:	L	FW 30
+	L	DW 36
+	OW	
+	T	FW 26
+	BE	]
+###PG:84000000
+[1	
+NAME:	POT.+
+
+	A	F 2.3
+	JC	=M001
+		
+	L	DW 27
+	T	FW 32
+M001:	L	FW 34
+	L	DW 28
+	<F	
+	=	F 2.5
+		
+	AN	F 2.5
+	BEC	
+		
+	L	FW 34
+	L	FW 32
+	+F	
+	T	FW 34
+	L	DW 28
+	<=F	
+	=	F 4.6
+		
+	A	F 4.6
+	JC	=M002
+		
+	L	DW 28
+	T	FW 34
+M002:	A	F 2.3
+	A	F 5.6
+	L	KC 002
+	S	C 2
+		
+	A	F 1.2
+	CD	C 2
+		
+	AN	C 2
+	=	F 5.6
+		
+	O	F 2.0
+	O	F 2.2
+	JC	FB 10
+NAME:	CALC1   
+		
+	A	F 0.4
+	JC	FB 11
+NAME:	CALC2   
+		
+	ON	F 2.3
+	O	C 2
+	ON	F 5.6
+	BEC	
+		
+	L	FW 32
+	SLW	1
+	T	FW 32
+	BE	]
+###PG:84000000
+[1	
+NAME:	POT.-
+
+	A	F 2.4
+	JC	=M001
+		
+	L	DW 27
+	T	FW 32
+M001:	L	FW 34
+	L	DW 2
+	A	F 5.7
+	L	KC 002
+	S	C 3
+		
+	A	F 1.2
+	CD	C 3
+		
+	AN	C 3
+	=	F 5.7
+		
+	O	F 2.0
+	O	F 2.2
+	JC	FB 10
+NAME:	CALC1   
+		
+	A	F 0.4
+	JC	FB 11
+NAME:	CALC2   
+		
+	ON	F 2.4
+	O	C 3
+	ON	F 5.7
+	BEC	
+		
+	L	FW 32
+	SLW	1
+	T	FW 32
+	BE	]
+###PG:8D810BC6
+[1	
+NAME:	DIV:16
+DECL:	Z1	IW
+DECL:	Z2	IW
+DECL:	OV	QBI
+DECL:	FEH	QBI
+DECL:	Z3=0	QBI
+DECL:	Z4=0	QBI
+DECL:	Z3	QW
+DECL:	Z4	QW
+
+	BE	]
+###PG:8D000000
+[1	
+NAME:	RLG:AE
+DECL:	BG	DKF
+DECL:	KNKT	DKY
+DECL:	OGR	DKF
+DECL:	UGR	DKF
+DECL:	EINZ	IBI
+DECL:	XA	QW
+DECL:	FB	QBI
+DECL:	BU	QBI
+
+	BE	]
+###PG:8D000000
+[1	
+NAME:	RLG:AA
+DECL:	XE	IW
+DECL:	BG	DKF
+DECL:	KNKT	DKY
+DECL:	OGR	DKF
+DECL:	UGR	DKF
+DECL:	FEH	QBI
+DECL:	BU	QBI
+
+	BE	]
+###PG:8D810BC2
+[1	
+NAME:	MUL:16
+DECL:	Z1	IW
+DECL:	Z2	IW
+DECL:	Z3=0	QBI
+DECL:	Z32	QW
+DECL:	Z31	QW
+
+	BE	]
+
+
+###PG:84000000
+[1	Move tables Up/Down
+NAME:	INCLBANC
+
+	L	IW 8
+	L	DW 44
+	AW	
+	T	FW 50
+	L	FW 10
+	L	DW 44
+	AW	
+	L	FW 50
+	><F	
+	=	F 10.0
+	A	I 9.0
+	=	F 11.0
+	A	I 9.1
+	=	F 11.1
+	A	I 9.2
+	=	F 11.2
+	A	I 9.3
+	=	F 11.3
+	A	I 9.4
+	=	F 11.4
+	A	I 9.1
+	A	I 9.0
+	AN	I 9.2
+	=	F 10.1
+	A	I 9.2
+	A	I 9.0
+	AN	I 9.1
+	=	F 10.2
+	A	I 9.3
+	AN	I 9.0
+	AN	I 9.4
+	=	F 10.3
+	A	I 9.4
+	AN	I 9.0
+	AN	I 9.3
+	=	F 10.4
+	A(	
+	O	F 10.1
+	O	F 10.2
+	O	F 10.3
+	O	F 10.4
+	)	
+	A	F 10.0
+	L	KT 120.2
+	SE	T 26
+	A	T 26
+	=	Q 7.3
+	A	F 10.1
+	A	Q 7.3
+	=	Q 72.7
+	A	F 10.2
+	A	Q 7.3
+	=	Q 73.5
+	A	F 10.3
+	A	Q 7.3
+	=	Q 73.6
+	A	F 10.4
+	A	Q 7.3
+	=	Q 73.7
+	BE	]
+###PG:8D810BCC
+[1	
+NAME:	COD:B4
+DECL:	BCD	IW
+DECL:	SBCD	IBI
+DECL:	DUAL	QW
+
+	BE	]
+###PG:8D810BCE
+[1	
+NAME:	COD:16
+DECL:	DUAL	IW
+DECL:	SBCD	QBI
+DECL:	BCD2	QBY
+DECL:	BCD1	QW
+
+	BE	]
+
+
+###PG:84000000
+[1	
+NAME:	CALC1
+
+	L	FW 34
+	SRW	4
+	L	DW 25
+	+F	
+	T	FW 40
+	JU	FB 243
+NAME:	DIV:16  
+Z1  :	DW 20
+Z2  :	FW 40
+OV  :	F 8.7
+FEH :	F 9.0
+Z3=0:	F 8.7
+Z4=0:	F 8.7
+Z3  :	FW 16
+Z4  :	FW 36
+		
+	L	FW 40
+	SRW	8
+	T	FW 18
+	L	FW 16
+	L	FW 18
+	-F	
+	T	FW 20
+	L	FW 20
+	L	DW 22
+	<=F	
+	=	F 9.2
+		
+	A	F 9.0
+	JC	=M001
+		
+	AN	F 9.2
+	JC	=M002
+		
+	L	DW 22
+	T	FW 20
+M002:	JU	FB 241
+NAME:	COD:16  
+DUAL:	FW 20
+SBCD:	F 8.7
+BCD2:	FY 36
+BCD1:	FW 20
+		
+	L	FW 20
+	L	DW 24
+	OW	
+	T	FW 20
+	AN	F 9.0
+	JC	=M003
+		
+M001:	L	DW 23
+	T	FW 20
+M003:	AN	F 2.0
+	JC	=M004
+		
+	L	FW 20
+	T	FW 22
+	A	F 2.0
+	BEC	
+		
+M004:	AN	F 2.2
+	JC	=M005
+		
+	L	FW 20
+	T	FW 24
+M005:	BE	]
+###PG:80000000
+[1	
+	AN	I 72.2
+	A	F 1.6
+	S	Q 6.0
+	A	Q 6.0
+	A	F 4.0
+	A	I 5.2
+	L	FW 24
+	SP	T 12
+	A	I 72.5
+	A	F 0.7
+	AN	I 5.2
+	A	I 72.0
+	AN	F 5.4
+	O	
+	AN	I 73.0
+	AN	I 3.7
+	A	F 0.7
+	A	T 12
+	A	I 5.2
+	A	F 4.0
+	AN	F 5.4
+	S       F 4.0
+	A	Q 6.0
+	A	I 5.3
+	A	F 4.1
+	L	FW 22
+	SP	T 16
+	AN	F 5.4
+	A	I 72.6
+	AN	I 5.3
+	A	I 72.0
+	A	F 0.7
+	O	
+	AN	I 73.0
+	AN	I 3.7
+	A	F 0.7
+	A	T 16
+	A	I 5.3
+	A	F 4.1
+	AN	F 5.4
+	S       F 4.1
+	L	DW 0
+	T	QW 64
+	A	I 72.2
+	A	I 72.5
+	S	F 3.2
+	AN	F 3.2
+	A	F 3.3
+	S	F 3.4
+	A	I 72.2
+	R	F 3.4
+	A	F 4.0
+	A	Q 6.0
+	AN	I 72.2
+	O	
+	A	F 4.1
+	A	Q 6.0
+	AN	I 72.2
+	R	F 3.2
+	A	F 4.0
+	A	Q 6.0
+	S	F 3.3
+	A	F 4.1
+	A	Q 6.0
+	R	F 3.3
+	AN	F 0.4
+	A	I 72.0
+	A	T 7
+	AN	F 5.4
+	A	I 72.7
+	O	
+	AN	F 0.4
+	A(	
+	O	F 4.0
+	O	F 4.1
+	)	
+	AN	F 5.4
+	A	F 4.5
+	=	F 4.5
+	A(	
+	O(	
+	AN	I 5.2
+	AN	I 5.3
+	)	
+	O(	
+	A	I 5.2
+	AN	F 4.0
+	)	
+	O(	
+	A	I 5.3
+	AN	F 4.1
+	)	
+	)	
+	A(	
+	O	I 3.7
+		
+	O(	
+	AN	F 2.7
+	A	F 3.4
+	A	F 4.1
+	)	
+	)	
+	BEC	
+	L	DW 1
+	T	QW 64
+	A	F 4.0
+	BEC	
+	L	DW 2
+	T	QW 64
+	BE	]
+###PG:80000000
+[1	
+	A	F 1.6
+	S	Q 6.0
+	A	Q 6.0
+	A	I 5.2
+	A	F 4.0
+	AN	I 3.6
+	AN	I 3.7
+	L	FW 24
+	SP	T 12
+	A	Q 6.0
+	A	I 5.3
+	A	F 4.1
+	AN	I 3.6
+	AN	I 3.7
+	L	FW 24
+	SP	T 16
+	A	I 2.6
+	AN	I 5.2
+	AN	F 5.4
+	O	
+	A	T 12
+	A	I 5.2
+	A	F 4.0
+	A	I 2.6
+	AN	F 5.4
+	S       F 4.0
+	A	I 2.7
+	AN	I 5.3
+	AN	F 5.4
+	O	
+	AN	F 5.4
+	A	F 4.1
+	A	I 5.3
+	A	T 16
+	A	I 2.7
+	S       F 4.1
+	L	DW 0
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A(	
+	O	I 2.6
+	O	I 2.7
+	)	
+	O	
+	A	T 7
+	A(	
+	O	F 4.0
+	O	F 4.1
+	)	
+	AN	F 5.4
+	A	F 4.5
+	=	F 4.5
+	A(	
+	O(	
+	AN	I 5.2
+	AN	I 5.3
+	)	
+	O(	
+	A	I 5.2
+	AN	F 4.0
+	)	
+	O(	
+	A	I 5.3
+	AN	F 4.1
+	)	
+	)	
+	A(	
+	O	I 3.6
+	O	I 3.7
+	)	
+	BEC	
+	L	DW 1
+	T	QW 64
+	BE	]
+###PG:80000000
+[1	
+	A	F 3.0
+	JC	PB 32
+	A	F 3.0
+	BEC	
+	A	F 1.6
+	S	Q 6.2
+	A	I 72.5
+	AN	I 5.4
+	A	I 72.2
+	AN	F 5.4
+	A	F 0.7
+	S       F 4.0
+	A	I 72.6
+	AN	I 5.5
+	A	I 72.2
+	AN	F 5.4
+		
+	S       F 4.1
+	L	DW 3
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A	I 72.2
+	A	I 72.7
+	=	F 4.5
+	A	I 73.0
+	BEC	
+	L	DW 4
+	T	QW 64
+	A	I 73.1
+	BEC	
+	L	DW 5
+	T	QW 64
+	BE	]
+
+
+###PG:80000000
+[1	Set Flags based on Speed Buttons
+	A	I 4.5
+	=	F 2.3
+		
+	A	I 4.6
+	=	F 2.4
+		
+	BE	]
+###PG:80000000
+[1	
+	A(
+	AN	F 5.0
+	O(
+	A	F 0.2
+	AN	Q 6.2
+	AN	Q 6.3
+	AN	Q 6.4
+	AN	Q 6.5
+	)
+	)
+	AN	F 0.4
+	A(	
+	O	I 72.0
+	O	I 72.2
+	)	
+	O	Q 6.0
+	JC	PB 20
+		
+	A	Q 6.0
+	AN	F 0.2
+	BEC
+		
+	A	I 72.2
+	AN	F 5.0
+	O	Q 6.2
+	O	Q 6.3
+	=	F 6.0
+		
+	A	F 6.0
+	JC	PB 30
+		
+	A	F 6.0
+	BEC	
+		
+	A(
+	AN	F 5.0
+	O(
+	A	F 0.2
+	AN	Q 6.2
+	AN	Q 6.3
+	AN	Q 6.4
+	AN	Q 6.5
+	)
+	)
+	A	I 72.1
+	O	Q 6.1
+	=	F 6.1
+		
+	A	F 6.1
+	JC	PB 40
+		
+	A	F 6.1
+	BEC	
+		
+	O(	
+	AN	F 5.0
+	A	I 72.3
+	AN	F 0.4
+	)	
+	O	Q 6.4
+	O(	
+	AN	F 5.0
+	A	I 72.0
+	A	F 0.4
+	)	
+	=	F 6.2
+		
+	A	F 6.2
+	JC	PB 50
+		
+	A	F 6.2
+	BEC	
+		
+	AN	F 5.0
+	A	I 72.4
+	O	Q 6.5
+	JC	PB 52
+		
+	BE	]
+###PG:80000000
+[1	
+	O	Q 6.0
+	O(	
+	A(	
+	O	I 2.6
+	O	I 2.7
+	)	
+	AN	F 0.4
+	AN	F 5.0
+	)	
+	=	F 6.4
+	A	F 6.4
+	JC	PB 21
+	A	F 6.4
+	BEC	
+	O	Q 6.2
+	O	Q 6.3
+	O(	
+	AN	F 5.0
+	A(	
+	O	I 3.0
+	O	I 3.1
+	)	
+	)	
+	=	F 6.5
+	A	F 6.5
+	JC	PB 31
+	A	F 6.5
+	BEC	
+	O	Q 6.1
+	O(	
+	AN	F 5.0
+	A(	
+	O	I 2.4
+	O	I 2.5
+	)	
+	)	
+	=	F 6.6
+	A	F 6.6
+	JC	PB 41
+	A	F 6.6
+	BEC	
+	O	Q 6.4
+	O(	
+	AN	F 5.0
+	A(	
+	O	I 3.2
+	O	I 72.3
+	O	I 3.3
+	)	
+	)	
+	=	F 6.7
+	A	F 6.7
+	JC	PB 51
+	A	F 6.7
+	BEC	
+	O	Q 6.5
+	O(	
+	AN	F 5.0
+	A(	
+	O	I 3.4
+	O	I 3.5
+	)	
+	)	
+	JC	PB 53
+	BE	]
+###PG:80000000
+[1	
+	A	F 3.0
+	JC	PB 33
+	A	F 3.0
+	BEC	
+	A	F 1.6
+	S	Q 6.2
+	A	I 3.0
+	AN	F 5.4
+	AN	I 5.4
+	S       F 4.0
+	A	I 3.1
+	AN	F 5.4
+	AN	I 5.5
+	S       F 4.1
+	L	DW 3
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A(	
+	O	I 3.0
+	O	I 3.1
+	)	
+	=	F 4.5
+	A	I 3.6
+	BEC	
+	L	DW 5
+	T	QW 64
+	BE	]
+###PG:80000000
+[1	
+	A	F 1.6
+	S	Q 6.1
+		
+	A	I 2.4
+	AN	F 5.4
+	AN	I 5.0
+	S       F 4.0
+	A	I 2.5
+	AN	F 5.4
+	AN	I 5.1
+	S       F 4.1
+	L	DW 9
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A(	
+	O	I 2.4
+	O	I 2.5
+	)	
+	=	F 4.5
+	A	I 3.6
+	BEC	
+	L	DW 11
+	T	QW 64
+	BE	]
+###PG:80000000
+[1	
+	A	F 1.6
+	AN	Q 8.7
+	S	Q 8.7
+		
+	AN	T 8
+	BEC	
+		
+	A	T 8
+	A	Q 8.7
+	A	F 1.6
+	S	Q 6.4
+		
+	A	I 72.3
+	A	I 72.5
+	AN	F 5.4
+	O	
+	AN	F 5.4
+	A	F 0.4
+	A	F 0.7
+	A	I 72.5
+	A	I 72.0
+	S       F 4.0
+		
+	A	I 72.3
+	A	I 72.6
+	AN	F 5.4
+	S       F 4.1
+		
+	L	DW 12
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A	I 72.7
+	A(	
+	O	I 72.3
+	O(	
+	A	F 0.4
+	A	I 72.0
+	)	
+	)	
+	=	F 4.5
+		
+	A	I 73.0
+	AN	F 0.4
+	BEC	
+		
+	L	DW 13
+	T	QW 64
+	A	I 73.1
+	AN	F 0.4
+	BEC	
+		
+	L	DW 14
+	T	QW 64
+	AN	F 0.4
+	BEC	
+		
+	L	DW 18
+	T	QW 64
+	BE	]
+###PG:80000000
+[1	
+	A	F 1.6
+	AN	Q 8.7
+	S	Q 8.7
+		
+	AN	T 8
+	BEC	
+		
+	A	T 8
+	A	Q 8.7
+	A	F 1.6
+	S	Q 6.4
+		
+	A	I 3.2
+	AN	F 5.4
+	AN	I 72.3
+	O	
+	AN	F 5.4
+	A	I 72.3
+	A	I 72.5
+	S       F 4.0
+		
+	A	I 3.3
+	AN	F 5.4
+	AN	I 72.3
+	O	
+	AN	F 5.4
+	A	I 72.3
+	A	I 72.6
+	S       F 4.1
+		
+	L	DW 12
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A(	
+	O	I 3.2
+	O	I 3.3
+	O(	
+	A	I 72.7
+	A	I 72.3
+	)	
+	)	
+	=	F 4.5
+		
+	AN	I 72.3
+	A	I 3.6
+	AN	F 0.4
+	O	
+	A	I 73.0
+	A	I 72.3
+	BEC	
+		
+	L	DW 13
+	T	QW 64
+	A	I 72.3
+	A	I 73.1
+	BEC	
+		
+	L	DW 14
+	T	QW 64
+	AN	F 0.4
+	BEC	
+		
+	L	DW 18
+	T	QW 64
+	BE	]
+###PG:80000000
+[1	
+	A	F 1.6
+	S	Q 6.3
+	A	I 72.5
+	AN	I 5.6
+	AN	F 5.4
+	A	I 72.2
+	S       F 4.0
+	A	I 72.6
+	AN	I 5.7
+	A	I 72.2
+	AN	F 5.4
+	A	F 0.7
+	S       F 4.1
+	L	DW 6
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A	I 72.2
+	A	I 72.7
+	=	F 4.5
+	A	I 73.0
+	BEC	
+	L	DW 7
+	T	QW 64
+	A	I 73.1
+	BEC	
+	L	DW 8
+	T	QW 64
+	BE	]
+###PG:80000000
+[1	
+	A	F 1.6
+	S	Q 6.3
+	A	I 3.0
+	AN	F 5.4
+	AN	I 5.6
+	S       F 4.0
+	A	I 3.1
+	AN	F 5.4
+	AN	I 5.7
+	S       F 4.1
+	L	DW 6
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A(	
+	O	I 3.0
+	O	I 3.1
+	)	
+	=	F 4.5
+	A	I 3.6
+	BEC	
+	L	DW 8
+	T	QW 64
+	BE	]
+###PG:80000000
+[1	
+	A	F 1.6
+	S	Q 6.1
+	A	I 72.5
+	AN	I 5.0
+	AN	F 5.4
+	A	I 72.1
+	S       F 4.0
+	A	I 72.6
+	AN	I 5.1
+	AN	F 5.4
+	A	I 72.1
+	S       F 4.1
+	L	DW 9
+	T	QW 64
+	A	T 7
+	AN	F 5.4
+	A	I 72.1
+	A	I 72.7
+	=	F 4.5
+	A	I 73.0
+	BEC	
+	L	DW 10
+	T	QW 64
+	A	I 73.1
+	BEC	
+	L	DW 11
+	T	QW 64
+	BE	]
+###PG:82000001
+[1	
+	C	DB 10	;;Load Database
+		
+	A	I 2.0
+	AN	F 6.3
+	AN	I 2.4
+	AN	I 2.5
+	AN	I 2.6
+	AN	I 2.7
+	AN	I 3.0
+	AN	I 3.1
+	AN	I 3.2
+	AN	I 3.3
+	AN	I 3.4
+	AN	I 3.5
+	AN	F 5.0
+	S	F 0.0
+		
+	ON	I 2.0
+	ON	I 4.4
+	R	F 0.0
+		
+	A	I 2.1
+	AN	F 0.4
+	AN	I 72.7
+	S	F 0.1
+		
+	ON	I 2.1
+	ON	I 4.4
+	R	F 0.1
+		
+	A	I 2.2
+	AN	I 72.7
+	S	F 0.2
+		
+	ON	I 2.2
+	ON	I 4.4
+	R	F 0.2
+		
+	A	I 2.3
+	AN	I 72.7
+	S	F 0.3
+		
+	ON	I 2.3
+	ON	I 4.4
+	R	F 0.3
+		
+	AN	F 0.1
+	A	I 73.2
+	AN	I 72.7
+	S	F 0.4
+		
+	ON	I 73.2
+	ON	I 4.4
+	R	F 0.4
+		
+	AN	F 0.5
+	L	KT 005.1
+	SD	T 13
+		
+	A	T 13
+	=	F 0.5
+		
+	A	F 0.5	;;IF F0.5 = 1
+	AN	F 0.6	;;AND F0.6 = 0
+	S	F 1.2	;;F1.2 = 1
+		
+	A	F 0.5	;;IF F0.5 = 1
+	A	F 0.6	;;AND F0.6 = 1 (A = AND, not AN = AND NOT)
+	R	F 1.2	;;F1.2 = 0
+		
+	AN	F 0.5
+	A	F 1.2
+	S	F 0.6
+		
+	AN	F 0.5
+	AN	F 1.2
+	R	F 0.6
+		
+	O	F 0.0
+	O	F 0.1
+	O	F 0.2
+	O	F 0.3
+	O(	
+	A	F 0.4
+	A	F 1.2
+	)	
+	=	Q 73.0
+		
+	A	F 0.1
+	=	Q 72.1
+		
+	A	F 0.1
+	=	Q 72.2
+		
+	A	F 0.3
+	=	Q 72.0
+		
+	A	Q 6.1
+	S	F 2.7
+		
+	A	Q 6.0
+	A(	
+	O	Q 8.0
+	O	Q 8.4
+	)	
+	R	F 2.7
+		
+	AN	I 4.4	;;-IF Power = Off
+	AN	F 0.0	;;AND F Prog M = 0ff
+	AN	T 17	;;AND Timer T17 = Off
+	A	I 3.7	;;AND FastCmd = pressed
+	L	KT 020.1	;;
+	SE	T 17	;;Start T17 with 2s
+		
+	A	T 17	;;-IF T17 running
+	L	KC 003	;;
+	S	C 1	;;Set Counter Mnp Fast = 3
+		
+	A	I 3.7	;;-IF Mnp FastCmd pressed
+	CD	C 1	;;Decrement the counter
+		
+	AN	C 1	;;If Counter Mnp Fast = 0
+	A	T 17	;;AND Timer T17 is still running
+	S	F 6.3	;;SET Flag 6.3
+		
+	A	F 6.3
+	A	F 1.2
+	=	Q 73.2
+		
+	A	F 6.3
+	JC	FB 15
+NAME:	HELP.   
+		
+	A	F 6.3
+	JC	PB 9
+		
+	A	F 6.3
+	BEC	
+		
+	AN	Q 7.2
+	L	KT 300.1
+	SE	T 14
+		
+	AN	I 4.7
+	R	F 3.7
+		
+	A	I 4.7
+	AN	F 3.7
+	AN	T 14
+	=	Q 7.2
+		
+	A	I 4.7
+	A(	
+	O	F 0.1
+	O	F 0.2
+	O	F 0.3
+	)	
+	L	KT 300.2
+	SD	T 15
+		
+	A	T 15
+	S	F 3.7
+	***	]
+[2	
+	A	I 4.2
+	AN	F 1.0
+	S	Q 7.1
+		
+	AN	F 1.1
+	L	KT 020.1
+	SD	T 20
+		
+	AN	I 4.2
+	AN	I 73.7
+	A	T 20
+	R	Q 7.1
+		
+	A	I 4.0
+	A	Q 7.1
+	AN	T 0
+	S	F 1.1
+		
+	A	F 1.1
+	L	KT 020.1
+	SD	T 21
+		
+	ON	I 4.4
+	ON	I 4.1
+	O	T 1
+	ON	Q 7.1
+	R	F 1.1
+		
+	A	T 21
+	=	Q 8.6
+		
+	AN	I 4.2
+	AN	Q 7.1
+	A	I 4.0
+	S	F 1.0
+		
+	A	F 1.0
+	L	KT 060.2
+	SF	T 0
+		
+	ON	I 4.1
+	O	T 1
+	ON	I 4.4
+	R	F 1.0
+		
+	A	F 1.0
+	L	KT 080.1
+	SP	T 2
+		
+	A	T 2
+	=	Q 6.6
+		
+	A	F 1.0
+	=	Q 7.0
+		
+	AN	T 2
+	A	F 1.0
+	O	
+	A	Q 7.1
+	=	Q 6.7
+		
+	O	Q 8.6
+	O	F 1.0
+	=	Q 73.1
+	***	]
+[3	
+	A(	
+	O	F 0.2
+	O	F 0.3
+	O	F 0.1
+	)	
+	AN	I 73.5
+	AN	I 73.6
+	A	I 4.4
+	L	KT 600.1
+	SD	T 1
+	***	]
+[4	
+	O(	
+	A	Q 7.1
+	A	Q 8.6
+	A	T 3
+	A	I 73.7
+	)	
+	O(	
+	A	F 1.0
+	A	Q 6.7
+	)	
+	=	F 0.7
+		
+	A	Q 7.1
+	A	Q 8.6
+	A	I 73.7
+	L	KT 400.1
+	SD	T 3
+	***	]
+[5	
+	O(	
+	A	Q 6.0
+	A(	
+	O	I 5.2
+	O	I 5.3
+	)	
+	)	
+	O(	
+	A	Q 6.1
+	A(	
+	O	I 5.0
+	O	I 5.1
+	)	
+	)	
+	O(	
+	A	Q 6.2
+	A(	
+	O	I 5.4
+	O	I 5.5
+	)	
+	)	
+	O(	
+	A	Q 6.3
+	A(	
+	O	I 5.6
+	O	I 5.7
+	)	
+	)	
+	=	Q 73.2
+		
+	A	I 72.0
+	A	F 0.4
+	L	FW 26
+	SD	T 19
+		
+	A	F 0.4
+	A	I 72.0
+	A	I 72.5
+	A	T 19
+	=	F 9.4
+		
+	AN	F 4.0
+	A	I 5.2
+	AN	F 0.4
+	O	
+	A	F 0.4
+	A	F 9.4
+	=	Q 72.4
+		
+	A	I 5.3
+	=	Q 72.5
+		
+	A	I 5.1
+	=	Q 72.6
+	***	]
+[6	
+	O	I 2.0
+	ON	I 2.0
+	S	Q 7.4
+		
+	A	T 1
+	L	KT 030.2
+	SD	T 4
+		
+	A	T 4
+	R	Q 7.4
+		
+	A	I 4.3
+	AN	F 5.0
+	S	F 3.0
+		
+	A	F 3.0
+	R	F 3.1
+		
+	AN	I 4.3
+	AN	F 5.0
+	S	F 3.1
+		
+	A	F 3.1
+	R	F 3.0
+		
+	A(	
+	O	Q 6.1
+	O	Q 6.2
+	)	
+	AN	T 25
+	L	KT 020.1
+	SE	T 24
+		
+	A	T 24
+	=	Q 7.5
+		
+	L	KT 180.3
+	SE	T 25
+	JU	FB 18
+NAME:	INCLBANC
+	***	]
+[7	
+	AN	F 1.3
+	AN	F 1.5
+	S	F 1.4
+		
+	A	F 1.4
+	A	Q 8.2
+	A(	
+	O	Q 8.0
+	O	Q 8.1
+	)	
+	L	KT 050.1
+	SD	T 5
+		
+	A	I 4.4
+	A	T 5
+	AN	I 73.5
+	R	F 1.4
+		
+	AN	F 1.4
+	=	Q 73.3
+		
+	AN	F 1.4
+	AN	F 1.5
+	S	F 1.3
+		
+	A	F 1.3
+	L	KT 050.1
+	SD	T 22
+		
+	A	F 1.3
+	A	Q 8.3
+	A(	
+	O	Q 8.4
+	O	Q 8.5
+	)	
+	L	KT 050.1
+	SD	T 6
+		
+	O(	
+	A	T 6
+	AN	I 73.6
+	)	
+	ON	I 4.4
+	R	F 1.3
+		
+	AN	F 1.3
+	AN	F 1.4
+	S	F 1.5
+		
+	A	F 1.5
+	AN	F 1.3
+	=	Q 73.4
+		
+	AN	I 4.4
+	R	F 1.5
+		
+	O(	
+	A	F 1.4
+	AN	I 73.5
+	)	
+	O(	
+	A	F 1.3
+	AN	I 73.6
+	)	
+	O(	
+	AN	F 1.3
+	AN	F 1.4
+	)	
+	=	F 1.7
+		
+	A	F 1.7
+	AN	F 0.0
+	O	
+	A	F 1.7
+	A	F 0.0
+	A	T 11
+	AN	I 2.4
+	AN	I 2.5
+	AN	I 2.6
+	AN	I 2.7
+	AN	I 3.0
+	AN	I 3.1
+	=	F 1.6
+		
+	A	F 1.7
+	L	KT 015.1
+	SD	T 11
+		
+	A	F 1.6
+	R	Q 6.0
+		
+	A	F 1.6
+	R	Q 6.1
+		
+	A	F 1.6
+	R	Q 6.2
+		
+	A	F 1.6
+	R	Q 6.3
+		
+	A	F 1.6
+	R	Q 6.4
+		
+	A	F 1.6
+	R	Q 6.5
+		
+	O	Q 6.0
+	O	Q 6.1
+	O	Q 6.2
+	O	Q 6.3
+	O	Q 6.4
+	O	Q 6.5
+	=	F 5.0
+	***	]
+[8	
+	A	I 73.3
+	S	Q 8.7
+		
+	A(	
+	O	F 0.1
+	O	F 0.2
+	)	
+	AN	F 0.4
+	AN	I 72.3
+	AN	Q 6.4
+	O	
+	AN	F 0.4
+	A	F 0.0
+	AN	I 73.3
+	AN	I 72.3
+	AN	I 3.2
+	AN	I 3.3
+	AN	Q 6.4
+	R	Q 8.7
+		
+	A	Q 8.7
+	L	KT 020.1
+	SD	T 8
+		
+	O	F 0.1
+	O	F 0.2
+	O	F 0.3
+	=	F 5.3
+		
+	O(	
+	A	F 5.1
+	AN	F 5.3
+	)	
+	O(	
+	A	F 5.2
+	AN	F 0.0
+	)	
+	=	F 5.4
+		
+	A	F 5.3
+	S	F 5.1
+		
+	A	F 5.1
+	AN	F 5.2
+	JC	PB 10
+		
+	AN	F 0.1
+	AN	F 0.2
+	AN	F 0.3
+	AN	F 5.0
+	R	F 5.1
+		
+	A	F 0.0
+	S	F 5.2
+		
+	A	F 5.2
+	JC	PB 11
+		
+	AN	F 0.0
+	AN	F 5.0
+	R	F 5.2
+	***	]
+[9	
+	O	Q 6.0
+	O	Q 6.1
+	O	Q 6.2
+	O	Q 6.3
+	O	Q 6.4
+	O	Q 6.5
+	L	KT 050.0
+	SD	T 7
+		
+	A	F 4.0
+	A	T 9
+	=	F 4.2
+		
+	A	F 4.1
+	A	T 10
+	=	F 4.3
+		
+	A	F 4.0
+	L	KT 010.0
+	SD	T 9
+		
+	A	F 4.1
+	L	KT 010.0
+	SD	T 10
+		
+	A	F 1.4
+	=	Q 7.6
+		
+	AN	F 5.4
+	A	F 1.4
+	A	F 4.2
+	=	Q 8.0
+		
+	AN	F 5.4
+	A	F 1.4
+	A	F 4.3
+	=	Q 8.1
+		
+	A(	
+	O	Q 8.0
+	O	Q 8.1
+	)	
+	A	F 4.5
+	=	Q 8.2
+		
+	A	F 1.3
+	=	Q 7.7
+		
+	AN	F 5.4
+	A	F 1.3
+	A	F 4.2
+	A	T 22
+	=	Q 8.4
+		
+	AN	F 5.4
+	A	F 1.3
+	A	F 4.3
+	A	T 22
+	=	Q 8.5
+		
+	A(	
+	O	Q 8.4
+	O	Q 8.5
+	)	
+	A	F 4.5
+	=	Q 8.3
+	***	]
+[10	
+	A	I 4.5	;;-IF +Speed pressed
+	AN	I 4.6	;;AND -Speed NOT pressed
+	=	F 3.5	;;Set Flag +Speed
+		
+	A	I 4.6	;;-If -Speed pressed
+	AN	I 4.5	;;AND +Speed NOT pressed
+	=	F 3.6	;;Set Flag -Speed
+		
+	A(	
+	O	F 3.5
+	O	F 3.6
+	)	
+	A(	
+	O	F 0.2
+	O	F 0.3
+	)	
+	A	I 2.7
+	=	F 2.0
+		
+	A(	
+	O	F 3.5
+	O	F 3.6
+	)	
+	A	F 0.4
+	=	F 2.1
+		
+	AN	F 2.0
+	AN	F 2.1
+	A(	
+	O	F 3.5
+	O	F 3.6
+	)	
+	=	F 2.2
+		
+	O	F 2.0
+	O	F 2.1
+	O	F 2.2
+	JC	FB 14
+NAME:	RICH.POT
+		
+	A	I 4.5	;;-IF +Speed pressed
+	=	F 2.3	;;Set Flag +Speed
+		
+	A	I 4.6	;;-IF -Speed pressed
+	=	F 2.4	;;Set Flag -Speed
+		
+	O	F 2.0
+	O	F 2.1
+	O	F 2.2
+	L	KT 030.1
+	SF	T 18
+		
+	A	T 18
+	BEC	
+		
+	L	DW 1
+	T	QW 66
+	BE	]
