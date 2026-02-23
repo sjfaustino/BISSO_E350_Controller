@@ -158,7 +158,7 @@ bool GCodeParser::validateGCodeSyntax(const char* line, char* error_msg, size_t 
                        cmd_num == 8 || cmd_num == 9 ||
                        cmd_num == 112 || cmd_num == 114 || cmd_num == 115 ||
                        cmd_num == 117 || cmd_num == 154 || cmd_num == 226 || cmd_num == 255 ||
-                       cmd_num == 999);
+                       cmd_num == 402 || cmd_num == 403 || cmd_num == 999);
         if (cmd_num == 117) {
             return true; // M117 is free-form text, skip parameter validation
         }
@@ -283,6 +283,7 @@ bool GCodeParser::processCommand(const char* line) {
             case 255: handleM255(line); break;
             case 112: motionEmergencyStop(); break;
             case 402: handleM402(line); break; // Coordinated Motion Mode toggle
+            case 403: handleM403(line); break; // VFD Frequency Control
             default: return false;
         }
         return true;
@@ -875,6 +876,31 @@ void GCodeParser::handleM402(const char* line) {
         bool enable = ((int)pVal != 0);
         motionSetCoordinatedMode(enable);
         logInfo("[GCODE] Coordinated Mode (C+T): %s", enable ? "ENABLED" : "DISABLED");
+    }
+}
+
+void GCodeParser::handleM403(const char* line) {
+    // M403 S<hz> [P<vfd_id>]
+    // S: Frequency in Hertz
+    // P: VFD ID (1 or 2, default 1)
+    float sVal = 0;
+    float pVal = 1;
+    
+    if (parseCode(line, 'S', sVal)) {
+        parseCode(line, 'P', pVal);
+        int vfd_id = (int)pVal;
+        
+        if (vfd_id == 1) {
+            AltivarX.writeFrequency(sVal);
+            logInfo("[GCODE] VFD1 (X) Frequency set to %.1f Hz", sVal);
+        } else if (vfd_id == 2) {
+            AltivarYZA.writeFrequency(sVal);
+            logInfo("[GCODE] VFD2 (Aux) Frequency set to %.1f Hz", sVal);
+        } else {
+            logWarning("[GCODE] Invalid VFD ID P%d (1-2 supported)", vfd_id);
+        }
+    } else {
+        logWarning("[GCODE] M403 requires S<hz> parameter");
     }
 }
 

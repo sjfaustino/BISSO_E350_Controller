@@ -93,6 +93,7 @@ private:
     // PHASE 5.1: M0/M1 Program Stop/Pause handler
     void handleM0_M1(const char* line);
     void handleM402(const char* line); // Coordinated Motion Mode toggle
+    void handleM403(const char* line); // VFD Frequency Control
 
     // PHASE 5.1: State for M0/M1 program pause
     bool programPaused;
