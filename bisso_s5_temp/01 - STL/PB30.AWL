@@ -11,13 +11,13 @@
 	A	I 72.2
 	AN	F 5.4
 	A	F 0.7
-	=	F 4.0
+	S       F 4.0
 	A	I 72.6
 	AN	I 5.5
 	A	I 72.2
 	AN	F 5.4
 		
-	=	F 4.1
+	S       F 4.1
 	L	DW 3
 	T	QW 64
 	A	T 7

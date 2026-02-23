@@ -6,11 +6,11 @@
 	A	I 2.4
 	AN	F 5.4
 	AN	I 5.0
-	=	F 4.0
+	S       F 4.0
 	A	I 2.5
 	AN	F 5.4
 	AN	I 5.1
-	=	F 4.1
+	S       F 4.1
 	L	DW 9
 	T	QW 64
 	A	T 7

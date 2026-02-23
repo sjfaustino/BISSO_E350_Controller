@@ -25,7 +25,7 @@
 	A	F 4.0
 	A	I 2.6
 	AN	F 5.4
-	=	F 4.0
+	S       F 4.0
 	A	I 2.7
 	AN	I 5.3
 	AN	F 5.4
@@ -35,7 +35,7 @@
 	A	I 5.3
 	A	T 16
 	A	I 2.7
-	=	F 4.1
+	S       F 4.1
 	L	DW 0
 	T	QW 64
 	A	T 7
