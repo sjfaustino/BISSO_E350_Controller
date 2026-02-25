@@ -128,7 +128,51 @@ window.DashboardModule = window.DashboardModule || {
             }
         }
 
-        const e = document.getElementById("vfd-status"), i = document.getElementById("spindle-rpm"), s = document.getElementById("spindle-speed"), n = document.getElementById("spindle-current"); if (t.vfd.connected) { const a = t.vfd.rpm > 0 ? window.i18n.t('dashboard.running') : window.i18n.t('dashboard.idle'); e && (e.textContent = a), i && (i.textContent = (t.vfd.rpm || 0).toFixed(0)), s && (s.textContent = (t.vfd.speed_m_s || 0).toFixed(1) + " m/s"), n && (n.textContent = (t.vfd.current_amps || 0).toFixed(2) + " A"); const o = document.getElementById("spindle-bar"); if (o) { const e = Math.min(100, (t.vfd.current_amps || 0) / 30 * 100); o.style.width = e + "%" } } else { e && (e.textContent = window.i18n.t('dashboard.disconnected')), this.setNA(i), this.setNA(s, " m/s"), this.setNA(n, " A"); const t = document.getElementById("spindle-bar"); t && (t.style.width = "0%") }
+        const e = document.getElementById("vfd-status"), i = document.getElementById("spindle-rpm"), s = document.getElementById("spindle-speed"), n = document.getElementById("spindle-current");
+        if (t.vfd.connected) {
+            const a = t.vfd.rpm > 0 ? window.i18n.t('dashboard.running') : window.i18n.t('dashboard.idle');
+            e && (e.textContent = a), i && (i.textContent = (t.vfd.rpm || 0).toFixed(0)), s && (s.textContent = (t.vfd.speed_m_s || 0).toFixed(1) + " m/s"), n && (n.textContent = (t.vfd.current_amps || 0).toFixed(2) + " A");
+            const o = document.getElementById("spindle-bar");
+            if (o) {
+                const e = Math.min(100, (t.vfd.current_amps || 0) / 30 * 100);
+                o.style.width = e + "%"
+            }
+        } else {
+            e && (e.textContent = window.i18n.t('dashboard.disconnected')), this.setNA(i), this.setNA(s, " m/s"), this.setNA(n, " A");
+            const t = document.getElementById("spindle-bar");
+            t && (t.style.width = "0%")
+        }
+
+        // VFD Fault Banners (Point 11)
+        const vfd1Warn = document.getElementById('warning-vfd1-fault');
+        const vfd1Text = document.getElementById('vfd1-fault-text');
+        if (vfd1Warn && vfd1Text && t.vfd.vfd1) {
+            if (t.vfd.vfd1.fault_code !== 0) {
+                vfd1Warn.classList.remove('hidden');
+                vfd1Text.textContent = `VFD 1 (X) Fault: ${t.vfd.vfd1.fault_str || t.vfd.vfd1.fault_code}`;
+            } else {
+                vfd1Warn.classList.add('hidden');
+            }
+        }
+
+        const vfd2Warn = document.getElementById('warning-vfd2-fault');
+        const vfd2Text = document.getElementById('vfd2-fault-text');
+        if (vfd2Warn && vfd2Text && t.vfd.vfd2) {
+            if (t.vfd.vfd2.fault_code !== 0) {
+                vfd2Warn.classList.remove('hidden');
+                vfd2Text.textContent = `VFD 2 (Aux) Fault: ${t.vfd.vfd2.fault_str || t.vfd.vfd2.fault_code}`;
+            } else {
+                vfd2Warn.classList.add('hidden');
+            }
+        }
+
+        // Update overall warning banner visibility
+        const warningBanner = document.getElementById('status-warnings');
+        if (warningBanner) {
+            const hasVfdFault = (t.vfd.vfd1 && t.vfd.vfd1.fault_code !== 0) || (t.vfd.vfd2 && t.vfd.vfd2.fault_code !== 0);
+            const hasRtcWarning = t.system && t.system.rtc_battery_low;
+            warningBanner.classList.toggle('hidden', !(hasVfdFault || hasRtcWarning));
+        }
     }
     , updateNetworkStatus(t) { if (!t.network) return; const e = document.getElementById("wifi-signal"); e && (e.textContent = t.network.signal_percent + "%"); const i = document.getElementById("wifi-bar"); i && (i.style.width = t.network.signal_percent + "%"); const s = document.getElementById("wifi-status"); s && (s.textContent = t.network.wifi_connected ? window.i18n.t('dashboard.connected_chk') : window.i18n.t('dashboard.disconnected_chk')) }, updateHistoryData(t) {
         this.history.cpu.push((t.system && t.system.cpu_percent) || 0);

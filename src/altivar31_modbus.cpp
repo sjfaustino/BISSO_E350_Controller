@@ -265,3 +265,29 @@ void Altivar31Driver::printDiagnostics() const {
 void altivar31PrintDiagnostics(void) {
     Altivar31.printDiagnostics();
 }
+
+const char* altivar31FaultCodeToString(uint16_t code) {
+    switch (code) {
+        case 0:  return "No Fault";
+        case 2:  return "OCF: Overcurrent";
+        case 3:  return "PHF: Input Phase Loss";
+        case 4:  return "OPF: Output Phase Loss";
+        case 5:  return "OSF: Overvoltage";
+        case 6:  return "OHF: Drive Overheat";
+        case 7:  return "OLF: Motor Overload";
+        case 8:  return "ObF: Braking Overload";
+        case 9:  return "OSF: Mains Overvoltage";
+        case 11: return "USF: Undervoltage";
+        case 12: return "SCF: Short Circuit";
+        case 13: return "ILF: Internal Link Fault";
+        case 14: return "InF: Internal Fault";
+        case 15: return "EPF: External Fault";
+        case 16: return "SPF: Speed Feedback Fault";
+        case 17: return "CnF: CANopen Fault";
+        case 18: return "COF: CANopen Fault";
+        case 19: return "tJF: IGBT Fault";
+        case 20: return "OLF: Motor Overload";
+        case 21: return "OHF: Drive Overheat";
+        default: return "Unknown Fault";
+    }
+}

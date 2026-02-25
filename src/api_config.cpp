@@ -14,6 +14,10 @@
 #include <string.h>
 #include <WiFi.h>
 #include "hardware_config.h"
+#include <time.h>
+#include "firmware_version.h"
+#include <SD.h>
+#include "sd_card_manager.h"
 
 static bool validateBool(JsonVariant value, char* error_msg, size_t len);
 
@@ -731,9 +735,18 @@ size_t apiConfigExportJSON(char *buffer, size_t buffer_size) {
 }
 
 void apiConfigPopulate(JsonDocument& doc) {
-  // Metadata (placeholder, updated by web_server)
-  doc["timestamp"] = ""; 
-  doc["firmware"] = ""; 
+  // Metadata
+  char timestamp[32];
+  time_t t = time(NULL);
+  if (t > 1000000) { // Check if time is set
+      struct tm timeinfo;
+      localtime_r(&t, &timeinfo);
+      strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  } else {
+      snprintf(timestamp, sizeof(timestamp), "Boot+%lu ms", (unsigned long)millis());
+  }
+  doc["timestamp"] = timestamp; 
+  doc["firmware"] = FW_VERSION; 
 
   apiConfigGet(CONFIG_CATEGORY_MOTION, doc["motion"]);
   apiConfigGet(CONFIG_CATEGORY_VFD, doc["vfd"]);
@@ -765,6 +778,56 @@ void apiConfigPrint(void) {
   logInfo("[API_CONFIG] Encoder: X=%u Y=%u Z=%u PPM", current_encoder.ppm[0],
           current_encoder.ppm[1], current_encoder.ppm[2]);
   logInfo("[API_CONFIG] ================================================");
+}
+
+bool apiConfigBackupSD(const char* filename) {
+    if (!sdCardIsMounted()) return false;
+    
+    // Ensure directory exists
+    char dir[64];
+    strncpy(dir, filename, sizeof(dir));
+    char* last_slash = strrchr(dir, '/');
+    if (last_slash) {
+        *last_slash = '\0';
+        if (strlen(dir) > 0) sdCardMkdirRecursive(dir);
+    }
+  
+    File f = SD.open(filename, FILE_WRITE);
+    if (!f) return false;
+  
+    JsonDocument doc;
+    apiConfigPopulate(doc);
+    
+    size_t bytes = serializeJson(doc, f);
+    f.close();
+    
+    if (bytes > 0) {
+        logInfo("[API_CONFIG] Backup saved to SD: %s (%zu bytes)", filename, bytes);
+        return true;
+    }
+    return false;
+}
+
+bool apiConfigRestoreSD(const char* filename) {
+    if (!sdCardIsMounted()) return false;
+    
+    File f = SD.open(filename, FILE_READ);
+    if (!f) return false;
+  
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, f);
+    f.close();
+  
+    if (err) {
+        logError("[API_CONFIG] Failed to parse SD backup: %s", err.c_str());
+        return false;
+    }
+  
+    if (apiConfigImportJSON(doc)) {
+        logInfo("[API_CONFIG] Restored from SD: %s", filename);
+        return true;
+    }
+    return false;
 }
 
 /**

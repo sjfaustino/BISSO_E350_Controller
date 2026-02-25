@@ -147,8 +147,9 @@ window.SettingsModule = window.SettingsModule || {
 
 
         // Configuration Management
-        document.getElementById('export-all-btn')?.addEventListener('click', () => { window.location.href = '/api/config/backup'; });
-        document.getElementById('import-config-btn')?.addEventListener('click', () => this.importConfiguration());
+        document.getElementById('export-all-btn')?.addEventListener('click', () => this.handleExport('all'));
+        document.getElementById('export-motion-btn')?.addEventListener('click', () => this.handleExport('motion'));
+        document.getElementById('import-config-btn')?.addEventListener('click', () => this.handleImport());
         document.getElementById('load-preset-btn')?.addEventListener('click', () => this.loadPreset());
 
         // CLI Options (includes OTA toggle now)
@@ -630,6 +631,44 @@ window.SettingsModule = window.SettingsModule || {
             }
         } catch (e) {
             filesList.innerHTML = '<div style="padding: 12px; color: var(--color-critical); text-align: center;">Failed to load files</div>';
+        }
+    },
+
+    async handleExport(type) {
+        const storage = document.getElementById('export-storage-select').value;
+        if (storage === 'download') {
+            window.location.href = `/api/config/backup${type === 'motion' ? '?type=motion' : ''}`;
+        } else if (storage === 'sd') {
+            const btn = type === 'all' ? 'export-all-btn' : 'export-motion-btn';
+            const filename = `config-${type}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+            try {
+                const data = await window.API.post('config/backup/sd', { filename }, btn);
+                if (data.success) {
+                    window.AlertManager.add(window.i18n.t('settings.backup_sd_success') || 'Backup saved to SD card', 'success');
+                    this.setEl('last-backup-text', new Date().toLocaleString());
+                }
+            } catch (e) { }
+        }
+    },
+
+    async handleImport() {
+        const storage = document.getElementById('import-storage-select').value;
+        if (storage === 'upload') {
+            this.importConfiguration();
+        } else if (storage === 'sd') {
+            if (!this.selectedBackupFile) {
+                window.AlertManager.add(window.i18n.t('settings.select_file_first') || 'Please select a file first', 'warning');
+                return;
+            }
+            if (await window.UI.showConfirm(window.i18n.t('settings.confirm_restore_sd') || `Restore from ${this.selectedBackupFile}? Device will reboot.`)) {
+                try {
+                    const data = await window.API.post('config/restore/sd', { filename: this.selectedBackupFile }, 'import-config-btn');
+                    if (data.success) {
+                        window.AlertManager.add(data.message || 'Restored successfully', 'success');
+                        setTimeout(() => location.reload(), 3000);
+                    }
+                } catch (e) { }
+            }
         }
     }
 };

@@ -48,6 +48,9 @@ void encoderMotionInit(int32_t default_threshold, uint32_t default_timeout) {
     position_errors[i].error_active = false;
     position_errors[i].error_count = 0;
     position_errors[i].error_time_ms = 0; 
+    position_errors[i].last_encoder_pos = 0;
+    position_errors[i].last_change_ms = millis();
+    position_errors[i].silence_alarm = false;
   }
 }
 
@@ -102,12 +105,36 @@ bool encoderMotionUpdate() {
         faultLogEntry(FAULT_WARNING, FAULT_ENCODER_SPIKE, i, error, "Axis Drift (Static)"); 
       }
     } else {
-      if (position_errors[i].error_active) {
-        position_errors[i].error_active = false;
-        position_errors[i].error_time_ms = 0; 
+        if (position_errors[i].error_active) {
+          position_errors[i].error_active = false;
+          position_errors[i].error_time_ms = 0; 
+        }
+      }
+
+      // --- Encoder Silence Watchdog (Point 9) ---
+      if (state != MOTION_IDLE) {
+          if (encoder_pos != position_errors[i].last_encoder_pos) {
+              position_errors[i].last_encoder_pos = encoder_pos;
+              position_errors[i].last_change_ms = now;
+              position_errors[i].silence_alarm = false;
+          } else {
+              uint32_t silence_duration = now - position_errors[i].last_change_ms;
+              if (silence_duration > max_error_duration_ms) {
+                  if (!position_errors[i].silence_alarm) {
+                      position_errors[i].silence_alarm = true;
+                      logError("[ENC_INT] Axis %d Silence Watchdog Triggered (%lu ms)", i, (unsigned long)silence_duration);
+                      // Trigger a managed stop via safety system
+                      safetyReportFault(FAULT_CRITICAL, FAULT_ENCODER_TIMEOUT, i, "Encoder Silence during motion", SAFETY_ENCODER_ERROR);
+                  }
+              }
+          }
+      } else {
+          // Reset watchdog tracker when idle
+          position_errors[i].last_encoder_pos = encoder_pos;
+          position_errors[i].last_change_ms = now;
+          position_errors[i].silence_alarm = false;
       }
     }
-  }
   return all_valid;
 }
 

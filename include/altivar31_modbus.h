@@ -264,6 +264,13 @@ bool altivar31DetectFrequencyLoss(float previous_freq_hz);
 void altivar31ResetErrorCounters(void);
 
 /**
+ * @brief Convert VFD fault code to human-readable string
+ * @param code Fault code from altivar31GetFaultCode()
+ * @return String description of the fault
+ */
+const char* altivar31FaultCodeToString(uint16_t code);
+
+/**
  * @brief Print VFD diagnostics to serial console
  */
 void altivar31PrintDiagnostics(void);

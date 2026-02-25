@@ -20,6 +20,11 @@ typedef struct {
   uint32_t max_error_time_ms;   // Max allowed error duration
   bool error_active;            // Currently in error state
   uint32_t error_count;         // Number of error events
+  
+  // Silence Watchdog Fields (Point 9)
+  int32_t last_encoder_pos;     // Previous captured position
+  uint32_t last_change_ms;      // Timestamp of last position change
+  bool silence_alarm;           // Is silence watchdog triggered
 } position_error_t;
 
 /**

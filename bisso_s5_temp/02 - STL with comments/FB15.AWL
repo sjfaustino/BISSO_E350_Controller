@@ -363,7 +363,7 @@ M001: A    F 7.4           // IF F7.4 IS ON
 BEC                      // BLOCK END CONDITIONAL
 
 //===============================================================
-// NETWORK 6 : Rot Disk Axis (I3.4/I3.5)
+// NETWORK 5 : Rot Disk Axis (I3.4/I3.5)
 //===============================================================
 A(                       
 O    I 3.4               // OR IF Mnp RotDskDown (Manipulo Rotacao Disco para baixo) IS ON

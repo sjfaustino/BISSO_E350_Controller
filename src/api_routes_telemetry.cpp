@@ -12,6 +12,7 @@
 #include "config_keys.h"
 #include "serial_logger.h"
 #include "mcu_info.h"
+#include "altivar31_modbus.h"
 #include "firmware_version.h"
 #include "hardware_config.h"
 #include "psram_alloc.h"
@@ -67,6 +68,10 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             "\"hw_has_psram\":%s,\"hw_has_rtc\":%s,\"hw_has_oled\":%s,\"hw_has_sd\":%s,"
             "\"hw_eth_chip\":\"%s\""
             "},"
+            "\"vfd\":{"
+            "\"vfd1\":{\"connected\":%s,\"freq\":%.1f,\"amps\":%.1f,\"fault_code\":%u,\"fault_str\":\"%s\"},"
+            "\"vfd2\":{\"connected\":%s,\"freq\":%.1f,\"amps\":%.1f,\"fault_code\":%u,\"fault_str\":\"%s\"}"
+            "},"
             "\"x_mm\":%.3f,\"y_mm\":%.3f,\"z_mm\":%.3f,\"a_mm\":%.3f,"
             "\"coordinated_mode\":%s,"
             "\"motion_enabled\":%s,\"motion_moving\":%s,\"estop\":%s,\"alarm\":%s}",
@@ -89,6 +94,16 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
             BOARD_HAS_OLED_SSD1306 ? "true" : "false",
             BOARD_HAS_SDCARD ? "true" : "false",
             BOARD_HAS_W5500 ? "W5500 (SPI)" : "LAN8720A (RMII)",
+            telemetry.vfd1_connected ? "true" : "false",
+            telemetry.vfd1_frequency_hz,
+            telemetry.vfd1_current_amps,
+            (unsigned int)telemetry.vfd1_fault_code,
+            altivar31FaultCodeToString(telemetry.vfd1_fault_code),
+            telemetry.vfd2_connected ? "true" : "false",
+            telemetry.vfd2_frequency_hz,
+            telemetry.vfd2_current_amps,
+            (unsigned int)telemetry.vfd2_fault_code,
+            altivar31FaultCodeToString(telemetry.vfd2_fault_code),
             telemetry.axis_x_mm,
             telemetry.axis_y_mm,
             telemetry.axis_z_mm,

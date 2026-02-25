@@ -261,6 +261,37 @@ void registerSystemRoutes(PsychicHttpServer& server) {
          }
     });
 
+    // POST /api/config/backup/sd
+    server.on("/api/config/backup/sd", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+         char filename[64] = "/backups/config.json";
+         if (request->hasParam("filename")) {
+             snprintf(filename, sizeof(filename), "/backups/%s", request->getParam("filename")->value().c_str());
+         }
+         
+         if (apiConfigBackupSD(filename)) {
+             return response->send(200, "application/json", "{\"success\":true}");
+         } else {
+             return response->send(500, "application/json", "{\"success\":false,\"error\":\"Failed to save to SD\"}");
+         }
+    });
+
+    // POST /api/config/restore/sd
+    server.on("/api/config/restore/sd", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+         if (!request->hasParam("filename")) {
+             return response->send(400, "application/json", "{\"error\":\"Missing filename\"}");
+         }
+         
+         char filename[64];
+         snprintf(filename, sizeof(filename), "/backups/%s", request->getParam("filename")->value().c_str());
+         
+         if (apiConfigRestoreSD(filename)) {
+             configUnifiedSave();
+             return response->send(200, "application/json", "{\"success\":true,\"message\":\"Restored from SD. Rebooting...\"}");
+         } else {
+             return response->send(400, "application/json", "{\"success\":false,\"error\":\"Restore from SD failed\"}");
+         }
+    });
+
     // POST /api/config/detect-rs485
     server.on("/api/config/detect-rs485", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
         int32_t baud = rs485AutodetectBaud();

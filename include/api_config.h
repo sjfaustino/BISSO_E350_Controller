@@ -152,6 +152,16 @@ size_t apiConfigExportJSON(char* buffer, size_t buffer_size);
  */
 bool apiConfigImportJSON(const JsonVariant& doc);
 
+/**
+ * @brief Backup configuration to SD card
+ */
+bool apiConfigBackupSD(const char* filename);
+
+/**
+ * @brief Restore configuration from SD card
+ */
+bool apiConfigRestoreSD(const char* filename);
+
 #ifdef __cplusplus
 /**
  * @brief Populate a JsonDocument with the full system configuration.
