@@ -7,7 +7,7 @@ NAME:	HELP.
 	AN	F 7.1
 	AN	F 7.2
 	AN	F 7.3
-	AN	F 7.4
+	AN	F 7.5
 	AN	F 7.5
 	R	F 6.3
 		
@@ -56,7 +56,7 @@ NAME:	HELP.
 	O	F 7.1
 	O	F 7.2
 	O	F 7.3
-	O	F 7.4
+	O	F 7.5
 	O	F 7.5
 	)	
 	S	F 8.0
@@ -91,7 +91,7 @@ NAME:	HELP.
 	O	F 7.1
 	O	F 7.2
 	O	F 7.3
-	O	F 7.4
+	O	F 7.5
 	O	F 7.5
 	)	
 	AN	F 1.2
@@ -280,71 +280,6 @@ NAME:	RIC(+/-)
 NAME:	SCALAR  
 		
 M005:	A	F 7.3
-	BEC	
-	***	]
-[5	
-	A(	
-	O	I 3.2
-	O	I 3.3
-	)	
-	AN	F 7.0
-	AN	F 7.1
-	AN	F 7.2
-	AN	F 7.3
-	AN	F 7.5
-	=	F 7.4
-		
-	AN	F 7.4
-	JC	=M001
-		
-	L	DW 41
-	T	FW 38
-	AN	F 8.0
-	JC	=M002
-		
-	L	DW 12
-	T	FW 34
-	JU	FB 17
-NAME:	RIC(+/-)
-		
-	L	FW 34
-	T	DW 12
-	JU	FB 16
-NAME:	SCALAR  
-		
-	A	F 8.0
-	BEC	
-		
-M002:	AN	F 8.1
-	JC	=M003
-		
-	L	DW 13
-	T	FW 34
-	JU	FB 17
-NAME:	RIC(+/-)
-		
-	L	FW 34
-	T	DW 13
-	JU	FB 16
-NAME:	SCALAR  
-		
-	A	F 8.1
-	BEC	
-		
-M003:	AN	F 8.2
-	JC	=M001
-		
-	L	DW 14
-	T	FW 34
-	JU	FB 17
-NAME:	RIC(+/-)
-		
-	L	FW 34
-	T	DW 14
-	JU	FB 16
-NAME:	SCALAR  
-		
-M001:	A	F 7.4
 	BEC	
 	***	]
 [6	

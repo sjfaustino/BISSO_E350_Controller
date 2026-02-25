@@ -469,35 +469,10 @@ NAME:	INCLBANC
 	O	Q 6.1
 	O	Q 6.2
 	O	Q 6.3
-	O	Q 6.4
 	O	Q 6.5
 	=	F 5.0
 	***	]
 [8	
-	A	I 73.3
-	S	Q 8.7
-		
-	A(	
-	O	F 0.1
-	O	F 0.2
-	)	
-	AN	F 0.4
-	AN	I 72.3
-	AN	Q 6.4
-	O	
-	AN	F 0.4
-	A	F 0.0
-	AN	I 73.3
-	AN	I 72.3
-	AN	I 3.2
-	AN	I 3.3
-	AN	Q 6.4
-	R	Q 8.7
-		
-	A	Q 8.7
-	L	KT 020.1
-	SD	T 8
-		
 	O	F 0.1
 	O	F 0.2
 	O	F 0.3
@@ -624,23 +599,14 @@ NAME:	INCLBANC
 	A	I 2.7
 	=	F 2.0
 		
-	A(	
-	O	F 3.5
-	O	F 3.6
-	)	
-	A	F 0.4
-	=	F 2.1
-		
 	AN	F 2.0
-	AN	F 2.1
-	A(	
+	A(
 	O	F 3.5
 	O	F 3.6
-	)	
+	)
 	=	F 2.2
 		
 	O	F 2.0
-	O	F 2.1
 	O	F 2.2
 	JC	FB 14
 NAME:	RICH.POT
@@ -652,7 +618,6 @@ NAME:	RICH.POT
 	=	F 2.4	;;Set Flag -Speed
 		
 	O	F 2.0
-	O	F 2.1
 	O	F 2.2
 	L	KT 030.1
 	SF	T 18

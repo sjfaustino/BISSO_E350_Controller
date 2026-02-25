@@ -23,6 +23,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "system_utils.h" // PHASE 8.1
+#include "altivar31_modbus.h"
 
 GCodeParser gcodeParser;
 

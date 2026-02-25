@@ -44,9 +44,6 @@ M002:	A	F 2.3
 	JC	FB 10
 NAME:	CALC1   
 		
-	A	F 0.4
-	JC	FB 11
-NAME:	CALC2   
 		
 	ON	F 2.3
 	O	C 2

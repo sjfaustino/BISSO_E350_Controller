@@ -578,7 +578,6 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         
         // Thermal State
         int16_t thermal = altivar31GetThermalState();
-        int32_t warn = configGetInt(KEY_VFD_TEMP_WARN, 85);
         int32_t crit = configGetInt(KEY_VFD_TEMP_CRIT, 90);
         snprintf(buf1, sizeof(buf1), "%d%%", thermal);
         snprintf(buf2, sizeof(buf2), "(Crit: %ld%%)", (long)(crit * 1.4));

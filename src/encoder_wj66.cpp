@@ -61,7 +61,15 @@ static rs485_device_t wj66_device = {
     .poll_count = 0,
     .error_count = 0,
     .consecutive_errors = 0,
-    .pending_response = false
+    .pending_response = false,
+    .last_tx_end_us = 0,
+    .first_rx_byte_us = 0,
+    .latency_hist = {0, 0, 0, 0, 0, 0},
+    .min_latency_us = 0,
+    .max_latency_us = 0,
+    .total_latency_us = 0,
+    .total_latency_sq_us = 0,
+    .latency_samples = 0
 };
 
 // PHASE 5.10: Mutex for thread-safe encoder position access

@@ -169,7 +169,6 @@ void motionUpdate() {
   // PHASE 5.7 Fix: Read consensus input OUTSIDE the mutex to prevent deadlock
   // if I2C bus hangs. This ensures motionUpdate doesn't hold the mutex for
   // 1000ms+.
-  bool consensus_active = false;
   uint8_t current_axis = 255;
 
   // PHASE 5.10: Use spinlock instead of mutex for consistent state protection
@@ -183,9 +182,6 @@ void motionUpdate() {
     // PHASE 17: I2C Optimization - Read full input byte once per loop
     // This reduces bus traffic from 2-3 reads to 1 read per 10ms
     elboI73Refresh();
-    
-    // Uses cached snapshot from elboI73Refresh()
-    consensus_active = elboI73GetInput(AXIS_TO_CONSENSO_BIT[current_axis]);
   }
 
   if (!taskLockMutex(taskGetMotionMutex(), timeout_ms)) {
@@ -704,7 +700,6 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
       axes[1].commanded_speed_mm_s = speed_mm_s;
       
       bool is_fwd_x = (axes[0].target_position > axes[0].position);
-      bool is_fwd_y = (axes[1].target_position > axes[1].position);
 
       plcBeginTransaction();
       // PHASE 8.6: Use precise Modbus velocities for coordinated motion
@@ -1035,7 +1030,6 @@ bool motionResume() {
   uint8_t axis = m_state.active_axis;
   portEXIT_CRITICAL(&motionSpinlock);
 
-  bool valid_resume = false;
   speed_profile_t prof = SPEED_PROFILE_1;
   bool is_fwd = false;
 
@@ -1061,8 +1055,6 @@ bool motionResume() {
     motionSetPLCSpeedProfile(prof); // Fallback
     motionSetPLCAxisDirection(axis, true, is_fwd);
     plcEndTransaction();
-    
-    valid_resume = true;
   }
 
   taskSignalMotionUpdate();

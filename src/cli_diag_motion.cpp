@@ -72,12 +72,19 @@ void cmd_encoder_status(int argc, char** argv) {
         char name[2] = {"XYZA"[i], '\0'};
         char pos_pulse_str[16];
         char pos_mm_str[16];
-        char status_str[20];
+        char status_str[24];
         char axis_idx_str[4];
         
         snprintf(axis_idx_str, sizeof(axis_idx_str), "%d", i);
         snprintf(pos_pulse_str, sizeof(pos_pulse_str), "%ld", (long)pos);
         snprintf(pos_mm_str, sizeof(pos_mm_str), "%.2f", pos_mm);
+        
+        if (stale) {
+            snprintf(status_str, sizeof(status_str), "STALE (%lu ms)", (unsigned long)age);
+        } else {
+            snprintf(status_str, sizeof(status_str), "OK (%lu ms)", (unsigned long)age);
+        }
+        
         cliPrintTableRow(axis_idx_str, name, pos_pulse_str, 5, 5, 12, pos_mm_str, 12, status_str, 14);
     }
     cliPrintTableFooter(5, 5, 12, 12, 14);

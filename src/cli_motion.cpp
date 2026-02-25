@@ -34,7 +34,7 @@ void cmd_predict_status(int argc, char** argv) {
   cliPrintTableRow("Metric", "Value", nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
   cliPrintTableDivider(18, 22, 0, 0, 0);
   
-  char buf1[32], buf2[32];
+  char buf1[32];
   snprintf(buf1, sizeof(buf1), "Axis %d (%c)", axis, axisIndexToChar(axis));
   cliPrintTableRow("Target Axis", buf1, nullptr, 18, 22, 0, nullptr, 0, nullptr, 0);
   
