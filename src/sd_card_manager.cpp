@@ -540,30 +540,24 @@ result_t sdCardFormat() {
         return RESULT_ERROR;
     }
     
-    // Collect all root-level items first (can't delete while iterating safely)
-    String items[64];  // Max 64 root items
-    int itemCount = 0;
+    // Delete each item
+    int deletedCount = 0;
     
     File entry;
-    while ((entry = root.openNextFile()) && itemCount < 64) {
-        items[itemCount] = String("/") + entry.name();
-        itemCount++;
+    while ((entry = root.openNextFile())) {
+        String entryPath = String("/") + entry.name();
         entry.close();
+        
+        logDebug("[SD] Deleting: %s", entryPath.c_str());
+        if (deleteRecursive(entryPath.c_str())) {
+            deletedCount++;
+        } else {
+            logError("[SD] Failed to delete: %s", entryPath.c_str());
+        }
     }
     root.close();
     
-    // Delete each item
-    int deletedCount = 0;
-    for (int i = 0; i < itemCount; i++) {
-        logDebug("[SD] Deleting: %s", items[i].c_str());
-        if (deleteRecursive(items[i].c_str())) {
-            deletedCount++;
-        } else {
-            logError("[SD] Failed to delete: %s", items[i].c_str());
-        }
-    }
-    
-    logInfo("[SD] Deleted %d/%d items", deletedCount, itemCount);
+    logInfo("[SD] Deleted %d root items", deletedCount);
     
     // Recreate default directories
     SD.mkdir("/gcode");

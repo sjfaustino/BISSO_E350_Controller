@@ -41,7 +41,7 @@ void memoryMonitorInit() {
 void memoryMonitorUpdate() {
   if (!mem_monitor_initialized) { memoryMonitorInit(); return; }
 
-  uint32_t current_free = ESP.getFreeHeap();
+  uint32_t current_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   
   // PHASE 14: Optimize expensive heap scanning
   // Only check largest block every 1s (Normal) or 5s (Load) to save CPU cycles
@@ -82,14 +82,14 @@ void memoryMonitorUpdate() {
 }
 
 memory_stats_t* memoryMonitorGetStats() { return &mem_stats; }
-uint32_t memoryMonitorGetFreeHeap() { return ESP.getFreeHeap(); }
+uint32_t memoryMonitorGetFreeHeap() { return heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); }
 uint32_t memoryMonitorGetMinFreeHeap() { return mem_stats.minimum_free; }
-bool memoryMonitorIsCriticallyLow(uint32_t threshold) { return (ESP.getFreeHeap() < threshold); }
+bool memoryMonitorIsCriticallyLow(uint32_t threshold) { return (memoryMonitorGetFreeHeap() < threshold); }
 
 void memoryMonitorPrintStats() {
   serialLoggerLock();
   logPrintln("\n=== MEMORY DIAGNOSTICS ===");
-  uint32_t free = ESP.getFreeHeap();
+  uint32_t free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   uint32_t used = total_heap_size - free;
   uint8_t percent = (used * 100) / total_heap_size;
   
@@ -115,12 +115,12 @@ void memoryMonitorPrintStats() {
 }
 
 void memoryMonitorResetMinimum() {
-  mem_stats.minimum_free = ESP.getFreeHeap();
+  mem_stats.minimum_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   logInfo("[MEM] [OK] Stats reset");
 }
 
 uint8_t memoryMonitorGetUsagePercent() {
-  uint32_t used = total_heap_size - ESP.getFreeHeap();
+  uint32_t used = total_heap_size - heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   return (uint8_t)((used * 100) / total_heap_size);
 }
 

@@ -468,37 +468,39 @@ void taskShowAllTasks() {
 extern volatile uint32_t accumulated_loop_count;
 
 uint8_t taskGetCpuUsage() {
-    static uint32_t last_count = 0;
     static uint32_t last_time = 0;
+    static uint32_t last_total_time[16] = {0}; // Track previous total_time_ms for each task
     static uint8_t cpu = 0;
-    static bool first_run = true;
     
-    // PHASE 5.3: Heartbeat from loop() task via accumulated_loop_count
     uint32_t now = millis();
-    if (now - last_time >= 1000) {
-        uint32_t current = accumulated_loop_count;
-        uint32_t delta = current - last_count;
-        last_count = current;
-        last_time = now;
+    uint32_t elapsed = now - last_time;
+    
+    if (elapsed >= 1000) {
+        uint32_t active_ms_this_period = 0;
         
-        // Loop runs with delay(10), so theoretical max is ~100.
-        // If system is healthy, loop runs frequently.
-        // If delta is low, CPU is busy with RTOS tasks.
-        if (delta > 100) delta = 100;
-        
-        uint8_t measured_cpu = (uint8_t)(100 - delta);
-        
-        // At boot, the loop might not have run yet. 
-        // If it's the first run and delta is 0, don't report 100%.
-        if (first_run && delta == 0) {
-            cpu = 0;
-            first_run = false;
-        } else {
-            // Simple smoothing: 50% previous, 50% current
-            cpu = (uint8_t)((cpu + measured_cpu) / 2);
-            first_run = false;
+        // Sum up the delta of total_time_ms for all tracked tasks
+        for (int i = 0; i < stats_count && i < 16; i++) {
+            uint32_t current_total = task_stats[i].total_time_ms;
+            uint32_t delta = current_total - last_total_time[i];
+            active_ms_this_period += delta;
+            last_total_time[i] = current_total;
         }
+        
+        // We have 2 cores, so total available time in 'elapsed' ms is elapsed * 2
+        uint32_t total_available_ms = elapsed * 2;
+        
+        if (total_available_ms > 0) {
+            uint32_t calculated_cpu = (active_ms_this_period * 100) / total_available_ms;
+            if (calculated_cpu > 100) calculated_cpu = 100;
+            
+            // Apply smoothing
+            if (last_time == 0) cpu = calculated_cpu; // Skip smoothing on first run
+            else cpu = (cpu + calculated_cpu) / 2;
+        }
+        
+        last_time = now;
     }
+    
     return cpu;
 }
 
