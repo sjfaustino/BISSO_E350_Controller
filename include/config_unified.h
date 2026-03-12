@@ -44,6 +44,12 @@ void configSetDefaults();
 
 int32_t configGetInt(const char* key, int32_t default_val);
 float configGetFloat(const char* key, float default_val);
+/**
+ * @brief Get a string config value.
+ * @warning The returned pointer comes from a 16-slot rotating buffer pool.
+ *          It is valid only until 16 more calls to configGetString() are made.
+ *          For long-lived strings, use configGetStringSafe() instead.
+ */
 const char* configGetString(const char* key, const char* default_val);
 uint64_t configGetUInt64(const char* key, uint64_t default_val);
 

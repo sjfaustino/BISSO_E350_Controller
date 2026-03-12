@@ -91,32 +91,16 @@ static bool isCriticalKey(const char *key) {
 }
 
 // ----------------------------------------------------------------------------
-// STRING BUFFER POOL (Safety Fix) - PHASE 5.7: Cursor AI Enhanced Documentation
+// STRING BUFFER POOL
 // ----------------------------------------------------------------------------
-// Increased to 8 to prevent overwrites during complex logging/formatting.
+// Uses a rotating pool of 16 buffers so that up to 16 pointers returned by
+// configGetString() can coexist safely. After 16 calls the oldest buffer is
+// reused. Prefer configGetStringSafe() for any pointer that must outlive the
+// current expression (e.g. stored in a struct, passed to a task, etc.).
 //
-// ⚠️ **CRITICAL POINTER LIFETIME WARNING** ⚠️
-//
-// Strings returned by configGetString() use a ROTATING BUFFER POOL.
-// Pointers become INVALID after 8 subsequent calls to configGetString().
-//
-// SAFE USAGE:
-//   const char* name = configGetString(KEY_WEB_USERNAME, "admin");
-//   printf("Username: %s\n", name);  // ✅ OK - immediate use
-//
-// UNSAFE USAGE (USE-AFTER-FREE):
-//   const char* name = configGetString(KEY_WEB_USERNAME, "admin");
-//   // ... 8 more configGetString() calls ...
-//   printf("Username: %s\n", name);  // ❌ DANGER - pointer now invalid!
-//
-// SAFE ALTERNATIVES:
-//   1. Use immediately after retrieval
-//   2. Copy to local buffer: char local[256]; safe_strcpy(local, sizeof(local),
-//   name);
-//   3. Use configGetStringSafe() which copies to your buffer
-//
-// BUFFER LIFETIME: Valid for 8 configGetString() calls or until function return
-#define CONFIG_STRING_BUFFER_COUNT 8
+// Pool enlarged from 8→16 to halve the chance of premature reuse in complex
+// logging sequences (e.g. a single log line that formats 4+ string keys).
+#define CONFIG_STRING_BUFFER_COUNT 16
 #define CONFIG_STRING_BUFFER_SIZE 256
 
 static struct {
@@ -125,15 +109,15 @@ static struct {
 } string_return_pool = {};
 
 /**
- * @brief Gets next buffer from rotating pool
- * @warning Returned pointer valid for only 8 more configGetString() calls!
- * @return Pointer to buffer (will be overwritten after pool rotates)
+ * @brief Gets next buffer from rotating pool.
+ * @note Prefer configGetStringSafe() for long-lived string pointers.
+ * @return Pointer to buffer — valid until 16 more configGetString() calls.
  */
 static char *configGetStringBuffer() {
   char *buffer = string_return_pool.buffers[string_return_pool.current_buffer];
   string_return_pool.current_buffer =
       (string_return_pool.current_buffer + 1) % CONFIG_STRING_BUFFER_COUNT;
-  return buffer; // ⚠️ WARNING: Pointer lifetime limited to 8 calls
+  return buffer;
 }
 
 // ============================================================================
@@ -159,17 +143,14 @@ static int findConfigEntry(const char *key) {
       }
       xSemaphoreGiveRecursive(config_cache_mutex);
     } else {
-      // Mutex timeout - log warning but still try unprotected for robustness
-      logWarning("Cache mutex timeout - accessing without lock");
-      for (int i = 0; i < config_count; i++) {
-        if (strcmp(config_table[i].key, key) == 0) {
-          result = i;
-          break;
-        }
-      }
+      // Mutex timeout — do NOT access config_table without the lock.
+      // Reading a shared array concurrently with a writer is a data race.
+      // Return -1 so the caller falls back to NVS or the default value.
+      logError("[CONFIG] Mutex timeout in findConfigEntry(%s) — key not found", key);
+      return -1;
     }
   } else {
-    // Mutex not initialized yet (early boot) - access directly
+    // Mutex not initialized yet (early boot) — access directly, single-threaded.
     for (int i = 0; i < config_count; i++) {
       if (strcmp(config_table[i].key, key) == 0) {
         result = i;
@@ -233,45 +214,47 @@ static result_t validateInt(const char *key, int32_t *value) {
   int32_t val = *value;
   result_t res = RESULT_OK;
 
-  // 1. Pulses Per MM/Degree (50-200)
-  if (strstr(key, "ppm_") != NULL) {
-    if (val < 50) { *value = 50; res = RESULT_INVALID_PARAM; }
+  // PPM — Pulses Per MM (50–500)
+  if (strcmp(key, KEY_PPM_X) == 0 || strcmp(key, KEY_PPM_Y) == 0 ||
+      strcmp(key, KEY_PPM_Z) == 0 || strcmp(key, KEY_PPM_A) == 0) {
+    if      (val < 50)  { *value = 50;  res = RESULT_INVALID_PARAM; }
     else if (val > 500) { *value = 500; res = RESULT_INVALID_PARAM; }
-  }
 
-  // 2. Soft Limits (-1,000,000 to 1,000,000)
-  else if (strstr(key, "_limit_") != NULL) {
-    if (val < -1000000) { *value = -1000000; res = RESULT_INVALID_PARAM; }
-    else if (val > 1000000) { *value = 1000000; res = RESULT_INVALID_PARAM; }
-  }
+  // Soft limits (-1,000,000 to 1,000,000)
+  } else if (strcmp(key, KEY_X_LIMIT_MIN) == 0 || strcmp(key, KEY_X_LIMIT_MAX) == 0 ||
+             strcmp(key, KEY_Y_LIMIT_MIN) == 0 || strcmp(key, KEY_Y_LIMIT_MAX) == 0 ||
+             strcmp(key, KEY_Z_LIMIT_MIN) == 0 || strcmp(key, KEY_Z_LIMIT_MAX) == 0 ||
+             strcmp(key, KEY_A_LIMIT_MIN) == 0 || strcmp(key, KEY_A_LIMIT_MAX) == 0) {
+    if      (val < -1000000) { *value = -1000000; res = RESULT_INVALID_PARAM; }
+    else if (val >  1000000) { *value =  1000000; res = RESULT_INVALID_PARAM; }
 
-  // 3. Timeout Safety (100ms to 60s)
-  else if (strcmp(key, KEY_STALL_TIMEOUT) == 0 || strcmp(key, KEY_STOP_TIMEOUT) == 0) {
-    if (val < 100) { *value = 100; res = RESULT_INVALID_PARAM; }
+  // Motion timeouts (100ms – 60s)
+  } else if (strcmp(key, KEY_STALL_TIMEOUT) == 0 || strcmp(key, KEY_STOP_TIMEOUT) == 0) {
+    if      (val < 100)   { *value = 100;   res = RESULT_INVALID_PARAM; }
     else if (val > 60000) { *value = 60000; res = RESULT_INVALID_PARAM; }
-  }
 
-  // 4. Encoder Deviation Alarm Timeout (100ms to 10s)
-  else if (strcmp(key, KEY_ENC_DEV_TIMEOUT) == 0) {
-    if (val < 100) { *value = 100; res = RESULT_INVALID_PARAM; }
+  // Encoder deviation alarm timeout (100ms – 10s)
+  } else if (strcmp(key, KEY_ENC_DEV_TIMEOUT) == 0) {
+    if      (val < 100)   { *value = 100;   res = RESULT_INVALID_PARAM; }
     else if (val > 10000) { *value = 10000; res = RESULT_INVALID_PARAM; }
-  }
 
-  // 5. Profiles (0-2)
-  else if (strstr(key, "home_prof_") != NULL) {
-    if (val < 0) { *value = 0; res = RESULT_INVALID_PARAM; }
+  // Homing profiles (0–2)
+  } else if (strcmp(key, KEY_HOME_PROFILE_FAST) == 0 || strcmp(key, KEY_HOME_PROFILE_SLOW) == 0) {
+    if      (val < 0) { *value = 0; res = RESULT_INVALID_PARAM; }
     else if (val > 2) { *value = 2; res = RESULT_INVALID_PARAM; }
-  }
 
-  // 6. Modbus Addresses (1-247)
-  else if (strstr(key, "_addr") != NULL) {
-    if (val < 1) { *value = 1; res = RESULT_INVALID_PARAM; }
+  // Modbus addresses (1–247)
+  } else if (strcmp(key, KEY_VFD_ADDR) == 0  || strcmp(key, KEY_VFD2_ADDR) == 0 ||
+             strcmp(key, KEY_JXK10_ADDR) == 0 || strcmp(key, KEY_YHTC05_ADDR) == 0 ||
+             strcmp(key, KEY_ENC_ADDR) == 0) {
+    if      (val < 1)   { *value = 1;   res = RESULT_INVALID_PARAM; }
     else if (val > 247) { *value = 247; res = RESULT_INVALID_PARAM; }
-  }
 
-  // 7. GPIO Pins (1-39, with caveats but this is a broad check)
-  else if (strstr(key, "_pin") != NULL) {
-    if (val < 1) { *value = 1; res = RESULT_INVALID_PARAM; }
+  // GPIO pins (1–39 on ESP32-S3, broad range check)
+  } else if (strcmp(key, KEY_ALARM_PIN) == 0   || strcmp(key, KEY_BUZZER_PIN) == 0  ||
+             strcmp(key, KEY_STATUS_LIGHT_GREEN) == 0 || strcmp(key, KEY_STATUS_LIGHT_YELLOW) == 0 ||
+             strcmp(key, KEY_STATUS_LIGHT_RED) == 0) {
+    if      (val < 1)  { *value = 1;  res = RESULT_INVALID_PARAM; }
     else if (val > 39) { *value = 39; res = RESULT_INVALID_PARAM; }
   }
 
@@ -282,15 +265,14 @@ static result_t validateFloat(const char *key, float *value) {
   float val = *value;
   result_t res = RESULT_OK;
 
-  // 1. Acceleration / Speed (Must be positive)
-  if (strstr(key, "default_") != NULL && (strstr(key, "accel") || strstr(key, "speed"))) {
+  // Acceleration and speed must be positive
+  if (strcmp(key, KEY_DEFAULT_ACCEL) == 0 || strcmp(key, KEY_DEFAULT_SPEED) == 0) {
     if (val < 0.1f) { *value = 0.1f; res = RESULT_INVALID_PARAM; }
-  }
-  
-  // 2. Target Margin (0.001 to 10.0mm)
-  else if (strcmp(key, KEY_TARGET_MARGIN) == 0) {
-    if (val < 0.001f) { *value = 0.001f; res = RESULT_INVALID_PARAM; }
-    else if (val > 10.0f) { *value = 10.0f; res = RESULT_INVALID_PARAM; }
+
+  // Target position margin (0.001mm – 10mm)
+  } else if (strcmp(key, KEY_TARGET_MARGIN) == 0) {
+    if      (val < 0.001f) { *value = 0.001f; res = RESULT_INVALID_PARAM; }
+    else if (val > 10.0f)  { *value = 10.0f;  res = RESULT_INVALID_PARAM; }
   }
 
   return res;

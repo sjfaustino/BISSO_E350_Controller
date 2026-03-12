@@ -14,6 +14,7 @@
 #include "psram_alloc.h"
 #include "api_config.h"
 #include "serial_logger.h"
+#include "auth_manager.h"   // PHASE 6.2: Universal SHA-256 and Rate Limiting
 #include "hardware_config.h"
 #include "plc_iface.h"
 #include "board_inputs.h"
@@ -517,13 +518,32 @@ bool webAuthenticate(PsychicRequest *request) {
         return true;
     }
 
-    // Get credentials from config
-    String username = configGetString(KEY_WEB_USERNAME, "admin");
-    String password = configGetString(KEY_WEB_PASSWORD, "bisso");
-    
-    // Use PsychicHttp's built-in digest authentication
-    // Note: authenticate() checks if the request has valid credentials
-    // If not, it sends the 401 challenge specific to Digest Auth
-    return request->authenticate(username.c_str(), password.c_str());
+    String client_ip = request->client()->remoteIP().toString();
+    const char* ip_address = client_ip.c_str();
+
+    // PHASE 6.2: Apply Rate Limiter
+    if (!authCheckRateLimit(ip_address)) {
+        // Technically returning false would trigger a 401 prompt.
+        // But for rate limits we should probably just fail the auth immediately.
+        // Because of the signature returning bool for standard auth middleware,
+        // we will log and return false, which re-prompts, but they stay blocked.
+        return false;
+    }
+
+    // Check for Authorization header
+    if (!request->hasHeader("Authorization")) {
+        // Triggers the 401 challenge
+        return false;
+    }
+
+    // Pass through auth_manager for SHA-256 verification
+    String auth_value = request->header("Authorization");
+    if (!authVerifyHTTPBasicAuth(auth_value.c_str())) {
+        authRecordFailedAttempt(ip_address);
+        return false; 
+    }
+
+    authClearRateLimit(ip_address);
+    return true;
 }
 // getWebSocketHandler is defined inline in web_server.h

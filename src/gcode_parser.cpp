@@ -217,9 +217,20 @@ bool GCodeParser::processCommand(const char* line) {
     if (!line || strlen(line) == 0) return false;
     if (line[0] == '(' || line[0] == ';') return true;
 
+    // Create a clean, comment-stripped version of the line for parsing
+    // This prevents parenthetical comments from poisoning parameter searches
+    char clean_line[128];
+    strncpy(clean_line, line, sizeof(clean_line) - 1);
+    clean_line[sizeof(clean_line) - 1] = '\0';
+    
+    char* comment_start = strpbrk(clean_line, "(;");
+    if (comment_start) {
+        *comment_start = '\0';
+    }
+
     // PHASE 5.10: Validate G-code syntax before processing
     char error_msg[128];
-    if (!validateGCodeSyntax(line, error_msg, sizeof(error_msg))) {
+    if (!validateGCodeSyntax(clean_line, error_msg, sizeof(error_msg))) {
         logError("[GCODE] Syntax error: %s (line: %s)", error_msg, line);
         return false;
     }
@@ -227,7 +238,7 @@ bool GCodeParser::processCommand(const char* line) {
     float val = -1.0f;
     
     // G Codes
-    if (parseCode(line, 'G', val)) {
+    if (parseCode(clean_line, 'G', val)) {
         int cmd = (int)val;
         // Optimization: Handle M117 free-form text separately to preserve case/formatting
         if (cmd == 117) {
@@ -281,10 +292,10 @@ bool GCodeParser::processCommand(const char* line) {
             // PHASE 4.0: M226 - Wait for pin state
             case 226: handleM226(line); break;
             // PHASE 4.0: M255 - LCD sleep/backlight timeout
-            case 255: handleM255(line); break;
+            case 255: handleM255(clean_line); break;
             case 112: motionEmergencyStop(); break;
-            case 402: handleM402(line); break; // Coordinated Motion Mode toggle
-            case 403: handleM403(line); break; // VFD Frequency Control
+            case 402: handleM402(clean_line); break; // Coordinated Motion Mode toggle
+            case 403: handleM403(clean_line); break; // VFD Frequency Control
             default: return false;
         }
         return true;
@@ -755,13 +766,19 @@ void GCodeParser::handleG53(const char* line) {
     machineCoordinatesMode = true;
     logInfo("[GCODE] G53 Machine Coordinates Mode Enabled");
 
-    // Check if there's a move command following
-    if (hasCode(line, 'G')) {
-        float g_val = -1.0f;
-        if (parseCode(line, 'G', g_val) && ((int)g_val == 0 || (int)g_val == 1)) {
-            // Process the G0/G1 move
-            handleG0_G1(line);
-        }
+    // Check if there's a G0 or G1 command following on the same line.
+    // parseCode('G') finds the first G (which is G53), so we explicitly seek G0 or G1
+    bool has_move = false;
+    
+    // Simple fast string check for "G0" or "G1" in the rest of the string
+    const char* g0_pos = strstr(line, "G0");
+    const char* g1_pos = strstr(line, "G1");
+    
+    if (g0_pos || g1_pos) {
+        has_move = true;
+        // Process the G0/G1 move using the standard handler
+        // The handleG0_G1 will respect the machineCoordinatesMode boolean
+        handleG0_G1(line);
     }
 
     machineCoordinatesMode = false;  // Reset for next command
@@ -977,7 +994,20 @@ bool GCodeParser::handleG2_G3(const char* line, bool clockwise) {
             seg_y = target_y;
         }
 
-        if (!pushMove(seg_x, seg_y, z, a)) {
+        // Wait with a timeout if the buffer is full, rather than instantly destroying the arc
+        int retries = 0;
+        bool segment_queued = false;
+        while (!segment_queued && retries < 500) { // Max 500ms wait per segment
+            if (pushMove(seg_x, seg_y, z, a)) {
+                segment_queued = true;
+            } else {
+                delay(1);
+                retries++;
+            }
+        }
+        
+        if (!segment_queued) {
+            logError("[GCODE] Arc motion failed: Buffer blocked for too long");
             success = false;
             break;
         }

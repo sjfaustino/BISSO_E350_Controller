@@ -561,25 +561,48 @@ void authRecordFailedAttempt(const char* ip_address) {
     rate_limit_table[rate_limit_entries].last_attempt_time = now;
     rate_limit_entries++;
   } else {
-    // Table full - evict oldest entry (LRU)
-    int oldest_idx = 0;
-    uint32_t oldest_time = rate_limit_table[0].last_attempt_time;
+    // Table full - do a sweep for any expired entries first to avoid evicting an active attacker
+    int oldest_idx = -1;
+    uint32_t oldest_time = now;
+    bool found_expired = false;
 
-    for (int i = 1; i < AUTH_RATE_LIMIT_MAX_IPS; i++) {
+    for (int i = 0; i < AUTH_RATE_LIMIT_MAX_IPS; i++) {
+      if (now - rate_limit_table[i].first_attempt_time > AUTH_RATE_LIMIT_WINDOW_MS) {
+        // Found an expired entry (no longer actively punished), this is safe to evict
+        oldest_idx = i;
+        found_expired = true;
+        break;
+      }
+      
+      // Track the oldest entry just in case
       if (rate_limit_table[i].last_attempt_time < oldest_time) {
         oldest_time = rate_limit_table[i].last_attempt_time;
         oldest_idx = i;
       }
     }
 
-    // Replace oldest entry
-    strncpy(rate_limit_table[oldest_idx].ip_address, ip_address, 15);
-    rate_limit_table[oldest_idx].ip_address[15] = '\0';
-    rate_limit_table[oldest_idx].attempt_count = 1;
-    rate_limit_table[oldest_idx].first_attempt_time = now;
-    rate_limit_table[oldest_idx].last_attempt_time = now;
+    // PHASE 6.2: Security - Only evict if the oldest entry is NOT actively rate limited (or expired)
+    // If the entire table is full of active attackers currently in timeout, DO NOT evict them
+    // to track a new 17th attacker. Doing so allows attackers to flush their bans with spoofed IPs.
+    if (!found_expired && oldest_idx >= 0 && rate_limit_table[oldest_idx].attempt_count >= AUTH_RATE_LIMIT_MAX_ATTEMPTS) {
+        logError("[AUTH] [SECURITY] Rate limit table completely saturated with active bans! Ignoring new IP tracking: %s", ip_address);
+        return;
+    }
 
-    logWarning("[AUTH] Rate limit table full - evicted entry for new IP: %s", ip_address);
+    if (oldest_idx >= 0) {
+        // Replace entry
+        strncpy(rate_limit_table[oldest_idx].ip_address, ip_address, 15);
+        rate_limit_table[oldest_idx].ip_address[15] = '\0';
+        rate_limit_table[oldest_idx].attempt_count = 1;
+        rate_limit_table[oldest_idx].first_attempt_time = now;
+        rate_limit_table[oldest_idx].last_attempt_time = now;
+        
+        if (found_expired) {
+             // Normal operation
+        } else {
+             logWarning("[AUTH] Rate limit table full - evicted non-banned entry for new IP: %s", ip_address);
+        }
+    }
   }
 }
 
@@ -603,11 +626,12 @@ void authClearRateLimit(const char* ip_address) {
 }
 
 // SECURITY: Unified Password Management Command
-// Usage: passwd [web|ota] <new_password>
+// Usage: passwd [web|ota] <old_password> <new_password>
 void cmd_passwd(int argc, char** argv) {
-  if (argc < 3) {
+  if (argc < 4 && !password_change_required) {
+    // If a password is already set, we need old+new
     logPrintln("\n[AUTH] === Password Management ===");
-    CLI_USAGE("passwd", "[web|ota] <new_password>");
+    CLI_USAGE("passwd", "[web|ota] <current_password> <new_password>");
     logPrintln("Options:");
     logPrintln("  web - Set Web UI password");
     logPrintln("  ota - Set OTA update password");
@@ -615,10 +639,16 @@ void cmd_passwd(int argc, char** argv) {
     logPrintln("  - Minimum 8 characters");
     logPrintln("  - Mixed case, numbers, symbols recommended");
     return;
+  } else if (argc < 3 && password_change_required) {
+    // First boot or forced reset requires no old password
+    logPrintln("\n[AUTH] === Password Management (First Setup) ===");
+    CLI_USAGE("passwd", "[web|ota] <new_password>");
+    return;
   }
 
   const char* type = argv[1];
-  const char* new_pass = argv[2];
+  const char* old_pass = password_change_required ? "" : argv[2];
+  const char* new_pass = password_change_required ? argv[2] : argv[3];
 
   // Common Length Check
   if (strlen(new_pass) < 8) {
@@ -628,6 +658,14 @@ void cmd_passwd(int argc, char** argv) {
 
   // Handle "web"
   if (strcasecmp(type, "web") == 0) {
+    // Verify old password before allowing change (unless it's a first boot/forced reset)
+    if (!password_change_required && !authVerifyCredentials("admin", old_pass)) {
+        logError("[AUTH] Incorrect current password for 'admin'");
+        // Log the failure to standard tracking
+        authRecordFailedAttempt("127.0.0.1"); // Fake IP for CLI
+        return;
+    }
+
     yield(); // Feed watchdog
     if (authSetPassword("admin", new_pass)) {
       yield();
@@ -641,6 +679,19 @@ void cmd_passwd(int argc, char** argv) {
 
   // Handle "ota"
   if (strcasecmp(type, "ota") == 0) {
+    // NOTE: we don't have an authVerifyOTA() readily available. 
+    // Usually OTA password is just read straight from config.
+    // Ensure the old password matches the config before changing it.
+    const char* current_ota_ptr = configGetString(KEY_OTA_PASSWORD, "");
+    char current_ota[64];
+    SAFE_STRCPY(current_ota, current_ota_ptr, sizeof(current_ota));
+    
+    if (!password_change_required && strlen(current_ota) > 0 && strcmp(current_ota, old_pass) != 0) {
+        logError("[AUTH] Incorrect current OTA password");
+        authRecordFailedAttempt("127.0.0.1"); // Fake IP for CLI
+        return;
+    }
+
     configSetString(KEY_OTA_PASSWORD, new_pass);
     configSetInt(KEY_OTA_PW_CHANGED, 1);
     configUnifiedSave();

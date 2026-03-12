@@ -362,7 +362,14 @@ void motionUpdate() {
           }
       }
       if (changed) {
-          configUnifiedSave();
+          // PHASE 8.7: Prevent Flash Death Trap. NEVER write to NVS while motion is active.
+          // Flash writes block the CPU and disable interrupts for up to 200ms
+          if (!motionIsMoving()) {
+              configUnifiedSave();
+          } else {
+              // Defer save to next idle cycle
+              should_save = false; 
+          }
       }
   }
 

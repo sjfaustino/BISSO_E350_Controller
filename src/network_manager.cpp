@@ -628,11 +628,23 @@ void NetworkManager::update() {
       break;
 
     case TELNET_AUTH_WAIT_PASSWORD: {
+      // PHASE 6.2: Check rate limit before verifying credentials
+      String client_ip = telnetClient.remoteIP().toString();
+      
+      if (!authCheckRateLimit(client_ip.c_str())) {
+        logWarning("[NET] Telnet Auth REJECTED: Rate limit exceeded for IP %s", client_ip.c_str());
+        telnetClient.println("\r\nToo many authentication attempts. Please try again later.");
+        telnetClient.stop();
+        resetTelnetAuthState();
+        break;
+      }
+
       // PHASE 5.10: Use auth_manager for credential verification (SHA-256)
       // Previously used plain config credentials, now synced with web auth
       telnetRestoreEcho(telnetClient);  // Restore echo after password entry
       if (authVerifyCredentials(telnet_username_attempt, input.c_str())) {
         // Authentication successful
+        authClearRateLimit(client_ip.c_str());
         telnet_auth_state = TELNET_AUTH_AUTHENTICATED;
         telnet_failed_attempts = 0;
         // Log to serial first (before telnet gets prompt)
@@ -642,6 +654,7 @@ void NetworkManager::update() {
         telnetClient.print("> ");
       } else {
         // Authentication failed
+        authRecordFailedAttempt(client_ip.c_str());
         telnet_failed_attempts++;
         logWarning("[NET] Telnet Auth FAILED (attempt %d/%d)",
                       telnet_failed_attempts, TELNET_MAX_FAILED_ATTEMPTS);

@@ -15,6 +15,8 @@
 #include <WiFi.h>
 #include "hardware_config.h"
 #include <time.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include "firmware_version.h"
 #include <SD.h>
 #include "sd_card_manager.h"
@@ -39,28 +41,25 @@ typedef struct {
 
 /**
  * @brief Import fields from JSON object using field descriptors
+ * @param category The config category for validation
  * @param obj Source JSON object
  * @param fields Array of field descriptors
  * @param count Number of field descriptors
  */
-static void importFields(JsonObject& obj, const config_field_t* fields, size_t count) {
+static void importFields(config_category_t category, JsonObject& obj, const config_field_t* fields, size_t count) {
+  char error_msg[64];
   for (size_t i = 0; i < count; i++) {
-    switch (fields[i].type) {
-      case CFG_INT:
-        if (obj[fields[i].json_key].is<int>()) {
-          configSetInt(fields[i].config_key, obj[fields[i].json_key].as<int>());
+    if (obj.containsKey(fields[i].json_key)) {
+      JsonVariant val = obj[fields[i].json_key];
+      if (apiConfigValidate(category, fields[i].json_key, val, error_msg, sizeof(error_msg))) {
+        switch (fields[i].type) {
+          case CFG_INT: configSetInt(fields[i].config_key, val.as<int>()); break;
+          case CFG_FLOAT: configSetFloat(fields[i].config_key, val.as<float>()); break;
+          case CFG_STRING: configSetString(fields[i].config_key, val.as<const char*>()); break;
         }
-        break;
-      case CFG_FLOAT:
-        if (obj[fields[i].json_key].is<float>()) {
-          configSetFloat(fields[i].config_key, obj[fields[i].json_key].as<float>());
-        }
-        break;
-      case CFG_STRING:
-        if (obj[fields[i].json_key].is<const char*>()) {
-          configSetString(fields[i].config_key, obj[fields[i].json_key].as<const char*>());
-        }
-        break;
+      } else {
+        logWarning("[API_CONFIG] JSON Import Validation Failed for %s: %s", fields[i].json_key, error_msg);
+      }
     }
   }
 }
@@ -185,11 +184,15 @@ static const encoder_config_t default_encoder = {.ppm = {100, 100, 100},
 // Current configuration in RAM
 static motion_config_t current_motion;
 static encoder_config_t current_encoder;
+static SemaphoreHandle_t config_mutex = NULL;
 
 /**
  * @brief Initialize API
  */
 void apiConfigInit(void) {
+  if (config_mutex == NULL) {
+      config_mutex = xSemaphoreCreateMutex();
+  }
   logInfo("[API_CONFIG] Initializing");
   apiConfigLoad();
   logInfo("[API_CONFIG] Ready");
@@ -199,6 +202,7 @@ void apiConfigInit(void) {
  * @brief Load configuration from NVS
  */
 bool apiConfigLoad(void) {
+  if (config_mutex) xSemaphoreTake(config_mutex, portMAX_DELAY);
   // Load motion config
   current_motion.soft_limit_low_mm[0] = configGetInt(KEY_X_LIMIT_MIN, 0);
   current_motion.soft_limit_high_mm[0] = configGetInt(KEY_X_LIMIT_MAX, 500);
@@ -221,6 +225,7 @@ bool apiConfigLoad(void) {
   current_encoder.calibrated[1] = 0;
   current_encoder.calibrated[2] = 0;
 
+  if (config_mutex) xSemaphoreGive(config_mutex);
   logInfo("[API_CONFIG] Configuration loaded from NVS");
   return true;
 }
@@ -229,6 +234,7 @@ bool apiConfigLoad(void) {
  * @brief Save configuration to NVS
  */
 bool apiConfigSave(void) {
+  if (config_mutex) xSemaphoreTake(config_mutex, portMAX_DELAY);
   // Save motion config
   configSetInt(KEY_X_LIMIT_MIN, current_motion.soft_limit_low_mm[0]);
   configSetInt(KEY_X_LIMIT_MAX, current_motion.soft_limit_high_mm[0]);
@@ -253,6 +259,7 @@ bool apiConfigSave(void) {
   // Flush all pending config changes (including network) to NVS
   configUnifiedSave();
 
+  if (config_mutex) xSemaphoreGive(config_mutex);
   logInfo("[API_CONFIG] Configuration saved to NVS");
   return true;
 }
@@ -261,8 +268,10 @@ bool apiConfigSave(void) {
  * @brief Reset configuration to defaults
  */
 bool apiConfigReset(void) {
+  if (config_mutex) xSemaphoreTake(config_mutex, portMAX_DELAY);
   current_motion = default_motion;
   current_encoder = default_encoder;
+  if (config_mutex) xSemaphoreGive(config_mutex);
 
   logWarning("[API_CONFIG] Configuration reset to defaults");
   return apiConfigSave();
@@ -293,12 +302,42 @@ static bool validateIntRange(JsonVariant value, int32_t min_val, int32_t max_val
 
 /**
  * @brief Validate soft limit configuration
- * PHASE 5.10: Changed from uint16_t to int32_t to support negative limits
+ * Changed from uint16_t to int32_t to support negative limits
  */
 static bool validateSoftLimit(const char *key, JsonVariant value,
                               char *error_msg, size_t error_msg_len) {
-  (void)key;
-  return validateIntRange(value, -10000, 10000, "Soft limit", "mm", error_msg, error_msg_len);
+  if (!validateIntRange(value, -10000, 10000, "Soft limit", "mm", error_msg, error_msg_len)) {
+      return false;
+  }
+  
+  // Cross-check bounds to ensure low < high
+  int32_t val = value.as<int32_t>();
+  if (strcmp(key, "soft_limit_x_low") == 0 && val >= current_motion.soft_limit_high_mm[0]) {
+      snprintf(error_msg, error_msg_len, "X Low Limit must be < X High Limit (%ld)", (long)current_motion.soft_limit_high_mm[0]);
+      return false;
+  }
+  if (strcmp(key, "soft_limit_x_high") == 0 && val <= current_motion.soft_limit_low_mm[0]) {
+      snprintf(error_msg, error_msg_len, "X High Limit must be > X Low Limit (%ld)", (long)current_motion.soft_limit_low_mm[0]);
+      return false;
+  }
+  if (strcmp(key, "soft_limit_y_low") == 0 && val >= current_motion.soft_limit_high_mm[1]) {
+      snprintf(error_msg, error_msg_len, "Y Low Limit must be < Y High Limit (%ld)", (long)current_motion.soft_limit_high_mm[1]);
+      return false;
+  }
+  if (strcmp(key, "soft_limit_y_high") == 0 && val <= current_motion.soft_limit_low_mm[1]) {
+      snprintf(error_msg, error_msg_len, "Y High Limit must be > Y Low Limit (%ld)", (long)current_motion.soft_limit_low_mm[1]);
+      return false;
+  }
+  if (strcmp(key, "soft_limit_z_low") == 0 && val >= current_motion.soft_limit_high_mm[2]) {
+      snprintf(error_msg, error_msg_len, "Z Low Limit must be < Z High Limit (%ld)", (long)current_motion.soft_limit_high_mm[2]);
+      return false;
+  }
+  if (strcmp(key, "soft_limit_z_high") == 0 && val <= current_motion.soft_limit_low_mm[2]) {
+      snprintf(error_msg, error_msg_len, "Z High Limit must be > Z Low Limit (%ld)", (long)current_motion.soft_limit_low_mm[2]);
+      return false;
+  }
+
+  return true;
 }
 
 /**
@@ -391,120 +430,103 @@ static bool validateBool(JsonVariant value, char* error_msg, size_t len) {
 }
 
 
-bool apiConfigSet(config_category_t category, const char *key,
-                  JsonVariant value) {
-  // Apply based on category
+static bool setFieldFromTable(const char* key, JsonVariant value, const config_field_t* fields, size_t count) {
+  for (size_t i = 0; i < count; i++) {
+    if (strcmp(key, fields[i].json_key) == 0) {
+      switch (fields[i].type) {
+        case CFG_INT: configSetInt(fields[i].config_key, value.as<int>()); break;
+        case CFG_FLOAT: configSetFloat(fields[i].config_key, value.as<float>()); break;
+        case CFG_STRING: configSetString(fields[i].config_key, value.as<const char*>()); break;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+bool apiConfigSet(config_category_t category, const char *key, JsonVariant value) {
+  bool found = false;
+
   switch (category) {
   case CONFIG_CATEGORY_MOTION:
-    // PHASE 5.10: Changed from uint16_t to int32_t to support negative limits
-    if (strcmp(key, "soft_limit_x_low") == 0) {
-      current_motion.soft_limit_low_mm[0] = value.as<int32_t>();
-    } else if (strcmp(key, "soft_limit_x_high") == 0) {
-      current_motion.soft_limit_high_mm[0] = value.as<int32_t>();
-    } else if (strcmp(key, "soft_limit_y_low") == 0) {
-      current_motion.soft_limit_low_mm[1] = value.as<int32_t>();
-    } else if (strcmp(key, "soft_limit_y_high") == 0) {
-      current_motion.soft_limit_high_mm[1] = value.as<int32_t>();
-    } else if (strcmp(key, "soft_limit_z_low") == 0) {
-      current_motion.soft_limit_low_mm[2] = value.as<int32_t>();
-    } else if (strcmp(key, "soft_limit_z_high") == 0) {
-      current_motion.soft_limit_high_mm[2] = value.as<int32_t>();
-    } else if (strcmp(key, "x_appr_slow") == 0) {
-      current_motion.x_approach_slow_mm = value.as<int32_t>();
-    } else if (strcmp(key, "x_appr_med") == 0) {
-      current_motion.x_approach_med_mm = value.as<int32_t>();
-    } else if (strcmp(key, "tgt_margin") == 0) {
-      current_motion.target_margin_mm = value.as<float>();
-    }
+    found = setFieldFromTable(key, value, motion_fields, ARRAY_SIZE(motion_fields));
     break;
 
   case CONFIG_CATEGORY_ENCODER:
-    if (strstr(key, "ppm_x")) {
-      current_encoder.ppm[0] = value.as<uint16_t>();
-    } else if (strstr(key, "ppm_y")) {
-      current_encoder.ppm[1] = value.as<uint16_t>();
-    } else if (strstr(key, "ppm_z")) {
-      current_encoder.ppm[2] = value.as<uint16_t>();
-    } else if (strcmp(key, "encoder_baud") == 0) {
-        // PHASE 6.3: Synchronization
-        uint32_t baud = value.as<uint32_t>();
-        configSetInt(KEY_ENC_BAUD, baud);
-        if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
-            logInfo("[API_CONFIG] Syncing rs485_baud -> %lu (RS485 shared)", (unsigned long)baud);
-            configSetInt(KEY_RS485_BAUD, baud);
-        }
+    found = setFieldFromTable(key, value, encoder_fields, ARRAY_SIZE(encoder_fields));
+    if (strcmp(key, "encoder_baud") == 0) {
+      uint32_t baud = value.as<uint32_t>();
+      configSetInt(KEY_ENC_BAUD, baud);
+      if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
+        logInfo("[API_CONFIG] Syncing rs485_baud -> %lu (RS485 shared)", (unsigned long)baud);
+        configSetInt(KEY_RS485_BAUD, baud);
+      }
+      found = true;
     }
     break;
 
   case CONFIG_CATEGORY_NETWORK:
-    // Direct NVS saves for network to ensure they persist immediately
-    // Note: network_manager reloads these on reboot or on specific commands
-    if (strcmp(key, "wifi_ssid") == 0) {
-        // Station SSID is special - managed by WiFi lib, but we can save to NVS buffer if needed
-        // For now, we assume ConfigSetString will be called by caller or we use configSetString here
-        // BUT apiConfigSet typically updates RAM state. 
-        // NetworkManager reads NVS directly. So we should write to NVS.
-        // However, apiConfigSet is usually followed by apiConfigSave for some categories.
-        // Let's write to NVS directly here since Network doesn't have a "current_network" struct in RAM in this file.
-        // Station creds are usually handled by WiFi.begin() persistence, but backing up in NVS keys is good practice if we unify.
-        // Actually, let's just use configSetString for these.
-        // But wait, apiConfigSet returns void/bool. Caller might call apiConfigSave later.
-        // Since we don't have RAM struct, let's write to NVS cache (which is what configSetString does).
-        // WARNING: apiConfigSave() (lines 83-101) only saves Motion/Encoder!
-        // So relying on apiConfigSave() to save Network is WRONG if we only update NVS cache here and don't flush.
-        // configSetString updates the cache. configUnifiedSave() flushes it.
-        // We should probably call configSetString here.
-        configSetString(KEY_WIFI_SSID, value.as<const char*>());
-    } else if (strcmp(key, "wifi_pass") == 0) {
-        configSetString(KEY_WIFI_PASS, value.as<const char*>());
-    } else if (strcmp(key, "wifi_ap_en") == 0) {
-        configSetInt(KEY_WIFI_AP_EN, value.as<int>());
-    } else if (strcmp(key, "wifi_ap_ssid") == 0) {
-        configSetString(KEY_WIFI_AP_SSID, value.as<const char*>());
-    } else if (strcmp(key, "wifi_ap_pass") == 0) {
-        configSetString(KEY_WIFI_AP_PASS, value.as<const char*>());
-    } else if (strcmp(key, "eth_en") == 0) {
-        configSetInt(KEY_ETH_ENABLED, value.as<int>());
-    }
-
+    if (setFieldFromTable(key, value, network_int_fields, ARRAY_SIZE(network_int_fields))) found = true;
+    else if (setFieldFromTable(key, value, network_str_fields, ARRAY_SIZE(network_str_fields))) found = true;
     break;
 
   case CONFIG_CATEGORY_SYSTEM:
-    if (strcmp(key, "cli_echo") == 0) {
-        configSetInt(KEY_CLI_ECHO, value.as<int>());
-    } else if (strcmp(key, "ota_chk_en") == 0) {
-        configSetInt(KEY_OTA_CHECK_EN, value.as<int>());
-    } else if (strcmp(key, "status_light_green") == 0) {
-        configSetInt(KEY_STATUS_LIGHT_GREEN, value.as<int>());
-    } else if (strcmp(key, "status_light_yellow") == 0) {
-        configSetInt(KEY_STATUS_LIGHT_YELLOW, value.as<int>());
-    } else if (strcmp(key, "status_light_red") == 0) {
-        configSetInt(KEY_STATUS_LIGHT_RED, value.as<int>());
-    } else if (strcmp(key, "buzzer_pin") == 0) {
-        configSetInt(KEY_BUZZER_PIN, value.as<int>());
-    } else if (strcmp(key, KEY_RS485_BAUD) == 0) {
-        // PHASE 6.3: If RS485 is shared with Encoder, sync them
-        uint32_t baud = value.as<uint32_t>();
-        configSetInt(KEY_RS485_BAUD, baud);
-        if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
-            logInfo("[API_CONFIG] Syncing encoder_baud -> %lu (RS485 shared)", (unsigned long)baud);
-            configSetInt(KEY_ENC_BAUD, baud);
-        }
+    found = setFieldFromTable(key, value, system_fields, ARRAY_SIZE(system_fields));
+    if (strcmp(key, "rs485_baud") == 0 || strcmp(key, KEY_RS485_BAUD) == 0) {
+      uint32_t baud = value.as<uint32_t>();
+      configSetInt(KEY_RS485_BAUD, baud);
+      if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
+        logInfo("[API_CONFIG] Syncing encoder_baud -> %lu (RS485 shared)", (unsigned long)baud);
+        configSetInt(KEY_ENC_BAUD, baud);
+      }
+      found = true;
     }
+    break;
+
+  case CONFIG_CATEGORY_VFD:
+    found = setFieldFromTable(key, value, vfd_fields, ARRAY_SIZE(vfd_fields));
+    break;
+
+  case CONFIG_CATEGORY_SPINDLE:
+    found = setFieldFromTable(key, value, spindle_fields, ARRAY_SIZE(spindle_fields));
+    break;
+
+  case CONFIG_CATEGORY_SERIAL:
+    found = setFieldFromTable(key, value, serial_fields, ARRAY_SIZE(serial_fields));
+    break;
+
+  case CONFIG_CATEGORY_BEHAVIOR:
+    if (setFieldFromTable(key, value, behavior_int_fields, ARRAY_SIZE(behavior_int_fields))) found = true;
+    else if (setFieldFromTable(key, value, behavior_float_fields, ARRAY_SIZE(behavior_float_fields))) found = true;
+    break;
+
+  case CONFIG_CATEGORY_CALIBRATION:
+    found = setFieldFromTable(key, value, calibration_fields, ARRAY_SIZE(calibration_fields));
+    break;
+
+  case CONFIG_CATEGORY_POSITIONS:
+    found = setFieldFromTable(key, value, positions_fields, ARRAY_SIZE(positions_fields));
     break;
 
   default:
     return false;
   }
 
-  logInfo("[API_CONFIG] Configuration updated: %s", key);
-  return true;
+  if (found) {
+    // Note: Caller (e.g., config batch API) is responsible for calling apiConfigLoad() 
+    // or we manually update the RAM struct if we want immediate reflection without NVS reload overhead.
+    // For single-key HTTP POSTs, the web server wrapper should invoke apiConfigLoad() or apiConfigSave().
+    logInfo("[API_CONFIG] Configuration updated: %s", key);
+    return true;
+  }
+  return false;
 }
 
 /**
  * @brief Get configuration as JSON
  */
 bool apiConfigGet(config_category_t category, JsonVariant doc) {
+  if (config_mutex) xSemaphoreTake(config_mutex, portMAX_DELAY);
   JsonObject obj = doc.is<JsonObject>() ? doc.as<JsonObject>() : doc.to<JsonObject>();
 
   switch (category) {
@@ -522,14 +544,9 @@ bool apiConfigGet(config_category_t category, JsonVariant doc) {
   }
 
   case CONFIG_CATEGORY_ENCODER: {
-    JsonArray ppm = obj["ppm"].to<JsonArray>();
-    ppm.add(current_encoder.ppm[0]);
-    ppm.add(current_encoder.ppm[1]);
-    ppm.add(current_encoder.ppm[2]);
-    JsonArray cal = obj["calibrated"].to<JsonArray>();
-    cal.add(current_encoder.calibrated[0]);
-    cal.add(current_encoder.calibrated[1]);
-    cal.add(current_encoder.calibrated[2]);
+    obj["ppm_x"] = current_encoder.ppm[0];
+    obj["ppm_y"] = current_encoder.ppm[1];
+    obj["ppm_z"] = current_encoder.ppm[2];
     break;
   }
 
@@ -649,9 +666,11 @@ bool apiConfigGet(config_category_t category, JsonVariant doc) {
   }
 
   default:
+    if (config_mutex) xSemaphoreGive(config_mutex);
     return false;
   }
 
+  if (config_mutex) xSemaphoreGive(config_mutex);
   return true;
 }
 
@@ -663,7 +682,6 @@ bool apiConfigGetSchema(config_category_t category, JsonVariant json_doc) {
 
   switch (category) {
   case CONFIG_CATEGORY_MOTION: {
-    // PHASE 5.10: Changed min from 0 to -10000 to support negative coordinates
     obj["soft_limit_x_low"]["type"] = "integer";
     obj["soft_limit_x_low"]["min"] = -10000;
     obj["soft_limit_x_low"]["max"] = 10000;
@@ -692,10 +710,15 @@ bool apiConfigGetSchema(config_category_t category, JsonVariant json_doc) {
   }
 
   case CONFIG_CATEGORY_ENCODER: {
-    obj["ppm"]["type"] = "array";
-    obj["ppm"]["element_type"] = "integer";
-    obj["ppm"]["min"] = 50;
-    obj["ppm"]["max"] = 200;
+    obj["ppm_x"]["type"] = "integer";
+    obj["ppm_x"]["min"] = 50;
+    obj["ppm_x"]["max"] = 200;
+    obj["ppm_y"]["type"] = "integer";
+    obj["ppm_y"]["min"] = 50;
+    obj["ppm_y"]["max"] = 200;
+    obj["ppm_z"]["type"] = "integer";
+    obj["ppm_z"]["min"] = 50;
+    obj["ppm_z"]["max"] = 200;
     break;
   }
 
@@ -746,7 +769,9 @@ void apiConfigPopulate(JsonDocument& doc) {
       snprintf(timestamp, sizeof(timestamp), "Boot+%lu ms", (unsigned long)millis());
   }
   doc["timestamp"] = timestamp; 
-  doc["firmware"] = FW_VERSION; 
+  char verStr[32];
+  firmwareGetVersionString(verStr, sizeof(verStr));
+  doc["firmware"] = verStr; 
 
   apiConfigGet(CONFIG_CATEGORY_MOTION, doc["motion"]);
   apiConfigGet(CONFIG_CATEGORY_VFD, doc["vfd"]);
@@ -784,8 +809,11 @@ bool apiConfigBackupSD(const char* filename) {
     if (!sdCardIsMounted()) return false;
     
     // Ensure directory exists
-    char dir[64];
-    strncpy(dir, filename, sizeof(dir));
+    // The previous implementation mangled the directory string during recursive mkdir, 
+    // crashing the subsequent SD.open() with deep folder hierarchies.
+    char dir[128];
+    strncpy(dir, filename, sizeof(dir) - 1);
+    dir[sizeof(dir) - 1] = '\0';
     char* last_slash = strrchr(dir, '/');
     if (last_slash) {
         *last_slash = '\0';
@@ -843,53 +871,59 @@ bool apiConfigImportJSON(const JsonVariant& doc) {
   // 1. Motion Config
   if (doc["motion"].is<JsonObject>()) {
     JsonObject m = doc["motion"];
-    importFields(m, motion_fields, ARRAY_SIZE(motion_fields));
+    importFields(CONFIG_CATEGORY_MOTION, m, motion_fields, ARRAY_SIZE(motion_fields));
   }
 
   // 2. VFD Config
   if (doc["vfd"].is<JsonObject>()) {
     JsonObject v = doc["vfd"];
-    importFields(v, vfd_fields, ARRAY_SIZE(vfd_fields));
+    importFields(CONFIG_CATEGORY_VFD, v, vfd_fields, ARRAY_SIZE(vfd_fields));
   }
 
   // 3. Encoder Config
   if (doc["encoder"].is<JsonObject>()) {
     JsonObject e = doc["encoder"];
-    importFields(e, encoder_fields, ARRAY_SIZE(encoder_fields));
+    importFields(CONFIG_CATEGORY_ENCODER, e, encoder_fields, ARRAY_SIZE(encoder_fields));
   }
 
   // 4. Network (has both int and string fields)
   if (doc["network"].is<JsonObject>()) {
     JsonObject n = doc["network"];
-    importFields(n, network_int_fields, ARRAY_SIZE(network_int_fields));
-    importFields(n, network_str_fields, ARRAY_SIZE(network_str_fields));
+    importFields(CONFIG_CATEGORY_NETWORK, n, network_int_fields, ARRAY_SIZE(network_int_fields));
+    importFields(CONFIG_CATEGORY_NETWORK, n, network_str_fields, ARRAY_SIZE(network_str_fields));
   }
 
   // 5. System
   if (doc["system"].is<JsonObject>()) {
     JsonObject s = doc["system"];
-    importFields(s, system_fields, ARRAY_SIZE(system_fields));
+    importFields(CONFIG_CATEGORY_SYSTEM, s, system_fields, ARRAY_SIZE(system_fields));
   }
 
   // 6. Spindle
   if (doc["spindle"].is<JsonObject>()) {
     JsonObject sp = doc["spindle"];
-    importFields(sp, spindle_fields, ARRAY_SIZE(spindle_fields));
+    importFields(CONFIG_CATEGORY_SPINDLE, sp, spindle_fields, ARRAY_SIZE(spindle_fields));
   }
 
   // 7. Serial
   if (doc["serial"].is<JsonObject>()) {
     JsonObject sr = doc["serial"];
-    importFields(sr, serial_fields, ARRAY_SIZE(serial_fields));
+    importFields(CONFIG_CATEGORY_SERIAL, sr, serial_fields, ARRAY_SIZE(serial_fields));
   }
 
   // 8. Hardware Pins (special handling - uses setPin instead of configSet)
   if (doc["hardware"].is<JsonObject>()) {
     JsonObject h = doc["hardware"];
+    char error_msg[64];
     for (size_t i = 0; i < SIGNAL_COUNT; i++) {
         const char* key = signalDefinitions[i].key;
-        if (h[key].is<int>()) {
-            setPin(key, h[key]); 
+        if (h.containsKey(key)) {
+            JsonVariant val = h[key];
+            if (apiConfigValidate(CONFIG_CATEGORY_HARDWARE, key, val, error_msg, sizeof(error_msg))) {
+                setPin(key, val.as<int>()); 
+            } else {
+                logWarning("[API_CONFIG] JSON Import Validation Failed for %s: %s", key, error_msg);
+            }
         }
     }
   }
@@ -897,21 +931,24 @@ bool apiConfigImportJSON(const JsonVariant& doc) {
   // 9. Behavior (has both int and float fields)
   if (doc["behavior"].is<JsonObject>()) {
     JsonObject b = doc["behavior"];
-    importFields(b, behavior_int_fields, ARRAY_SIZE(behavior_int_fields));
-    importFields(b, behavior_float_fields, ARRAY_SIZE(behavior_float_fields));
+    importFields(CONFIG_CATEGORY_BEHAVIOR, b, behavior_int_fields, ARRAY_SIZE(behavior_int_fields));
+    importFields(CONFIG_CATEGORY_BEHAVIOR, b, behavior_float_fields, ARRAY_SIZE(behavior_float_fields));
   }
 
   // 10. Calibration
   if (doc["calibration"].is<JsonObject>()) {
     JsonObject c = doc["calibration"];
-    importFields(c, calibration_fields, ARRAY_SIZE(calibration_fields));
+    importFields(CONFIG_CATEGORY_CALIBRATION, c, calibration_fields, ARRAY_SIZE(calibration_fields));
   }
 
   // 11. Positions
   if (doc["positions"].is<JsonObject>()) {
     JsonObject p = doc["positions"];
-    importFields(p, positions_fields, ARRAY_SIZE(positions_fields));
+    importFields(CONFIG_CATEGORY_POSITIONS, p, positions_fields, ARRAY_SIZE(positions_fields));
   }
 
+  // Flush to NVS and reload RAM state
+  configUnifiedSave();
+  apiConfigLoad();
   return true;
 }

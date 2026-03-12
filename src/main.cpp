@@ -41,6 +41,7 @@
 #include "memory_prealloc.h"  // PHASE 6.12: Memory pre-allocation
 #include "engineering_menu.h" // BOOT button menu
 #include "altivar31_modbus.h"
+#include "api_config.h"       // Moved from mid-file; was incorrectly placed after stack overflow hook
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -49,7 +50,6 @@
 static uint32_t boot_time_ms = 0;
 extern WebServerManager webServer;
 
-// OTA rollback validation timer callback
 static void otaValidationTimerCallback(TimerHandle_t xTimer) {
     (void)xTimer;
     otaValidateRunningFirmware();
@@ -65,43 +65,36 @@ extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskNa
   systemEmergencyReboot();  // Critical error - minimal cleanup
 }
 
-#include "api_config.h"
-
-// Wrappers
-bool init_fault_logging_wrapper() { faultLoggingInit(); return true; }
-bool init_watchdog_wrapper() { watchdogInit(); return true; }
-bool init_timeout_wrapper() { timeoutManagerInit(); return true; }
-bool init_config_wrapper() { 
-    configUnifiedInit(); 
-    apiConfigInit(); 
-    return true; 
+// Boot init wrapper functions.
+// Each calls the underlying module init and returns a success/failure bool.
+// Where the underlying init returns void, we return true and note it below.
+bool init_fault_logging_wrapper() { faultLoggingInit(); return true; }  // void init
+bool init_watchdog_wrapper()      { watchdogInit();     return true; }  // void init
+bool init_timeout_wrapper()       { timeoutManagerInit(); return true; } // void init
+bool init_config_wrapper() {
+    result_t r = configUnifiedInit();
+    apiConfigInit();  // void — no return value, always runs
+    return (r == RESULT_OK);
 }
-bool init_schema_wrapper() { configSchemaVersioningInit(); configSchemaInit(); return !configIsMigrationNeeded(); }
-bool init_auth_wrapper() { authInit(); return true; }  // PHASE 5.10: SHA-256 authentication
-bool init_prealloc_wrapper() { return memoryPreallocInit(); } // PHASE 6.12
+bool init_schema_wrapper()  { configSchemaVersioningInit(); configSchemaInit(); return !configIsMigrationNeeded(); }
+bool init_auth_wrapper()    { authInit(); return true; }  // void init
+bool init_prealloc_wrapper(){ return memoryPreallocInit(); }
 
-// PHASE 5.7: Cursor AI Fix - Proper error checking for calibration initialization
+// Calibration: underlying functions return void and log errors internally.
+// Cannot propagate success/failure — see loadAllCalibration() / encoderCalibrationInit().
 bool init_calib_wrapper() {
-    // Calibration is SAFETY CRITICAL - must succeed for safe operation
-    // Note: loadAllCalibration() and encoderCalibrationInit() return void
-    // They log errors internally if they fail
     loadAllCalibration();
     encoderCalibrationInit();
-    
-    // Since these functions don't return status, we assume success
-    // If they fail, they will log errors internally
     return true;
 }
 
-// UPDATED: Using correct init function
-bool init_plc_wrapper() { elboInit(); return true; }
-
-bool init_lcd_wrapper() { lcdInterfaceInit(); return true; }
-bool init_enc_wrapper() { wj66Init(); return true; }
-bool init_safety_wrapper() { safetyInit(); return true; }
-bool init_motion_wrapper() { motionInit(); return true; }
-bool init_cli_wrapper() { cliInit(); return true; }
-bool init_inputs_wrapper() { boardInputsInit(); return true; }
+bool init_plc_wrapper()    { elboInit();          return true; } // void init
+bool init_lcd_wrapper()    { lcdInterfaceInit();  return true; } // void init
+bool init_enc_wrapper()    { wj66Init();          return true; } // void init
+bool init_safety_wrapper() { safetyInit();        return true; } // void init
+bool init_motion_wrapper() { motionInit();        return true; } // void init
+bool init_cli_wrapper()    { cliInit();           return true; } // void init
+bool init_inputs_wrapper() { boardInputsInit();   return true; } // void init
 
 // PHASE 5.7: Cursor AI Fix - Proper error checking for network initialization
 bool init_network_wrapper() {

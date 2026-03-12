@@ -8,7 +8,6 @@
 #include "auth_manager.h"  // PHASE 5.10: SHA-256 authentication
 #include "serial_logger.h"
 #include <ArduinoJson.h>
-#include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <SD.h>
 #include "sd_card_manager.h"
@@ -17,7 +16,7 @@
 
 // PHASE 5.10: Local auth helper with rate limiting for PsychicHttp
 // Returns ESP_OK if authenticated, ESP_FAIL otherwise (caller should return early)
-static esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response) {
+esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response) {
   // Get client IP address for rate limiting
   String client_ip = request->client()->remoteIP().toString();
   const char* ip_address = client_ip.c_str();
@@ -49,17 +48,25 @@ static esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response)
 // --- Helper Functions ---
 
 /**
- * @brief Validates filename to prevent path traversal attacks
+ * @brief Strictly validates file paths to prevent traversal and protect system files
  */
-static bool isValidFilename(const char* filename) {
-  if (!filename || filename[0] == '\0') {
+static bool isSafePath(const String& path) {
+  if (path.length() == 0) return false;
+
+  // Block path traversal attempts
+  if (path.indexOf("..") >= 0) {
+    logWarning("[FILE_API] [SECURITY] Blocked path traversal: %s", path.c_str());
     return false;
   }
 
-  // Block path traversal attempts
-  if (strstr(filename, "..") != NULL) {
-    logWarning("[FILE_API] [SECURITY] Blocked path traversal: %s", filename);
-    return false;
+  // Explicitly block known system files from file manager access
+  if (path.indexOf("config.json") >= 0 ||
+      path.indexOf("wifi.json") >= 0 ||
+      path.indexOf("auth.json") >= 0 ||
+      path.indexOf("auth_users.json") >= 0 ||
+      path.indexOf("sys_") >= 0) {
+      logWarning("[FILE_API] [SECURITY] Blocked access to system file: %s", path.c_str());
+      return false;
   }
 
   return true;
@@ -129,6 +136,10 @@ static esp_err_t handleMakeDir(PsychicRequest *request, PsychicResponse *respons
     if (!request->hasParam("path")) return response->send(400, "text/plain", "Missing path");
     String path = request->getParam("path")->value();
 
+    if (!isSafePath(path)) {
+        return response->send(403, "text/plain", "Forbidden path");
+    }
+
     bool use_sd = path.startsWith("/sd");
     FS *fs;
     if (use_sd) {
@@ -159,7 +170,7 @@ static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *resp
   String path = request->getParam("name")->value();
 
   // PHASE 5.10: Security - Validate filename before deletion
-  if (!isValidFilename(path.c_str())) {
+  if (!isSafePath(path)) {
     logWarning("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s", path.c_str());
     return response->send(400, "text/plain", "Invalid filename");
   }
@@ -202,7 +213,7 @@ static esp_err_t handleFileBulkDelete(PsychicRequest *request, PsychicResponse *
 
     for (JsonVariant pathVar : paths) {
         String path = pathVar.as<String>();
-        if (!isValidFilename(path.c_str())) {
+        if (!isSafePath(path)) {
             failed++;
             continue;
         }
@@ -243,6 +254,10 @@ static esp_err_t handleFileRename(PsychicRequest *request, PsychicResponse *resp
     String src = request->getParam("src")->value();
     String dest = request->getParam("dest")->value();
 
+    if (!isSafePath(src) || !isSafePath(dest)) {
+        return response->send(403, "text/plain", "Forbidden path");
+    }
+
     bool use_sd = src.startsWith("/sd");
     FS *fs;
     if (use_sd) {
@@ -273,6 +288,10 @@ static esp_err_t handleFileUpload(PsychicRequest *request, const String& filenam
     }
     if (!dest.endsWith("/")) dest += "/";
     dest += filename;
+
+    if (!isSafePath(dest)) {
+        return ESP_FAIL;
+    }
 
     bool use_sd = dest.startsWith("/sd");
     FS *fs;
@@ -372,7 +391,7 @@ static esp_err_t handleTrashRestore(PsychicRequest *request, PsychicResponse *re
   }
 
   String fullPath = doc["path"].as<String>();
-  if (!isValidFilename(fullPath.c_str())) {
+  if (!isSafePath(fullPath)) {
       return response->send(400, "text/plain", "Invalid filename");
   }
 

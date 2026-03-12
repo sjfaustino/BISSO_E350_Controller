@@ -20,4 +20,7 @@ void registerSystemRoutes(PsychicHttpServer& server);
 // Helper function from web_server.cpp (shared)
 esp_err_t sendJsonResponse(PsychicResponse* response, JsonDocument& doc, int status = 200);
 
+// Helper function from api_file_manager.cpp (shared)
+esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response);
+
 #endif // API_ROUTES_H

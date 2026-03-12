@@ -26,6 +26,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
     
     // GET /api/config/get?category=N
     server.on("/api/config/get", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         int category = 0;
         if (request->hasParam("category")) {
             category = request->getParam("category")->value().toInt();
@@ -47,6 +48,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
     
     // POST /api/config/set
     server.on("/api/config/set", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         String body = request->body();
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, body);
@@ -75,6 +77,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // GET /api/config
     server.on("/api/config", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         response->setContentType("application/json");
         
         // STREAMING RESPONSE (Reduces Heap usage significantly)
@@ -125,6 +128,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // POST /api/config
     server.on("/api/config", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         deserializeJson(doc, request->body());
         
@@ -143,6 +147,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // POST /api/config/batch
     server.on("/api/config/batch", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         DeserializationError err = deserializeJson(doc, request->body());
         if (err) {
@@ -196,6 +201,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // GET /api/config/backup (OPTIMIZED: Streaming/Chunked)
     server.on("/api/config/backup", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         response->setContentType("application/json");
         
         time_t now;
@@ -247,6 +253,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // POST /api/config/restore
     server.on("/api/config/restore", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+         if (requireAuth(request, response) != ESP_OK) return ESP_OK;
          JsonDocument doc;
          DeserializationError error = deserializeJson(doc, request->body());
          if (error) {
@@ -263,6 +270,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // POST /api/config/backup/sd
     server.on("/api/config/backup/sd", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+         if (requireAuth(request, response) != ESP_OK) return ESP_OK;
          char filename[64] = "/backups/config.json";
          if (request->hasParam("filename")) {
              snprintf(filename, sizeof(filename), "/backups/%s", request->getParam("filename")->value().c_str());
@@ -277,6 +285,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // POST /api/config/restore/sd
     server.on("/api/config/restore/sd", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+         if (requireAuth(request, response) != ESP_OK) return ESP_OK;
          if (!request->hasParam("filename")) {
              return response->send(400, "application/json", "{\"error\":\"Missing filename\"}");
          }
@@ -294,6 +303,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // POST /api/config/detect-rs485
     server.on("/api/config/detect-rs485", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         int32_t baud = rs485AutodetectBaud();
         
         char json[128];
@@ -309,6 +319,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // GET /api/faults
     server.on("/api/faults", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         response->setContentType("application/json");
         
         const char* header = "{ \"success\": true, \"faults\": [";
@@ -338,18 +349,21 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // DELETE /api/faults
     server.on("/api/faults", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         faultClearHistory(); 
         return response->send(200, "application/json", "{\"success\":true, \"message\":\"Fault logs cleared\"}");
     });
 
     // POST /api/faults/clear
     server.on("/api/faults/clear", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         faultClearHistory();
         return response->send(200, "application/json", "{\"success\":true}");
     });
 
     // GET /api/ota/check (OPTIMIZED: snprintf)
     server.on("/api/ota/check", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         const UpdateCheckResult* res = otaGetCachedResult();
         
         char buffer[1024];
@@ -367,6 +381,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // GET /api/ota/latest (OPTIMIZED: snprintf)
     server.on("/api/ota/latest", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         const UpdateCheckResult* result = otaGetCachedResult();
         char buffer[1024];
         snprintf(buffer, sizeof(buffer),
@@ -382,6 +397,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
     
     // POST /api/ota/update
     server.on("/api/ota/update", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         deserializeJson(doc, request->body());
         
@@ -408,6 +424,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
     
     // GET /api/ota/status (OPTIMIZED: snprintf)
     server.on("/api/ota/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         char buffer[128];
         snprintf(buffer, sizeof(buffer),
             "{\"updating\":%s,\"progress\":%d}",
@@ -420,6 +437,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // POST /api/system/reboot
     server.on("/api/system/reboot", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         esp_err_t err = response->send(200, "application/json", "{\"success\":true,\"message\":\"Rebooting...\"}");
         delay(100);
         systemSafeReboot("Web API request");  // Safe: unmounts SD first
@@ -430,6 +448,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
     
     // GET /api/sd/status - Get SD card status for Web UI storage selection
     server.on("/api/sd/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         
         #if BOARD_HAS_SDCARD
@@ -457,6 +476,7 @@ void registerSystemRoutes(PsychicHttpServer& server) {
 
     // GET /api/sd/backups - List backup files on SD card
     server.on("/api/sd/backups", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         JsonArray files = doc["files"].to<JsonArray>();
         
