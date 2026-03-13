@@ -67,14 +67,24 @@ bool encoderMotionUpdate() {
   bool all_valid = true;
   
   for (int i = 0; i < 4; i++) {
+    motion_state_t state = motionGetState(i);
+    
+    // Calculate dynamic timeout based on active feedrate. Slower cuts = higher tolerance.
+    uint32_t dynamic_timeout = max_error_duration_ms;
+    float feedrate_mms = abs(motionGetVelocity(i));
+    if (feedrate_mms > 0.01f && feedrate_mms < 2.0f) {
+        dynamic_timeout = (uint32_t)((float)max_error_duration_ms * (2.0f / feedrate_mms));
+        if (dynamic_timeout > 15000) dynamic_timeout = 15000; // Cap at 15s max
+    }
+
     if (wj66IsStale(i)) {
       all_valid = false;
       
       // If the sensor goes completely stale while we are supposed to be moving, 
       // trigger the safety watchdog immediately instead of silently ignoring it.
-      if (motionGetState(i) != MOTION_IDLE) {
+      if (state != MOTION_IDLE) {
           uint32_t silence_duration = now - position_errors[i].last_change_ms;
-          if (silence_duration > max_error_duration_ms) {
+          if (silence_duration > dynamic_timeout) {
               if (!position_errors[i].silence_alarm) {
                   position_errors[i].silence_alarm = true;
                   logError("[ENC_INT] Axis %d STALE/DISCONNECTED Watchdog Triggered (%lu ms)", i, (unsigned long)silence_duration);
@@ -87,7 +97,6 @@ bool encoderMotionUpdate() {
     
     int32_t encoder_pos = wj66GetPosition(i);
     int32_t target_pos = motionGetTarget(i);
-    motion_state_t state = motionGetState(i);
 
     // Detect deviation during motion AND at idle
     // During motion: compare encoder to current position (detect lost steps)
@@ -137,7 +146,7 @@ bool encoderMotionUpdate() {
               position_errors[i].silence_alarm = false;
           } else {
               uint32_t silence_duration = now - position_errors[i].last_change_ms;
-              if (silence_duration > max_error_duration_ms) {
+              if (silence_duration > dynamic_timeout) {
                   if (!position_errors[i].silence_alarm) {
                       position_errors[i].silence_alarm = true;
                       logError("[ENC_INT] Axis %d Silence Watchdog Triggered (%lu ms)", i, (unsigned long)silence_duration);

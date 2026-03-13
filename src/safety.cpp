@@ -22,7 +22,6 @@
 #include "vfd_current_calibration.h" // PHASE 5.5: VFD current calibration
 #include "system_tuning.h"
 #include "rs485_device_registry.h" // PHASE 4.1: RS485 Watchdog integration
-#include "rs485_device_registry.h" // PHASE 4.1: RS485 Watchdog integration
 #include "system_utils.h" // PHASE 8.1
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
@@ -240,15 +239,15 @@ void safetyUpdate() {
 
       // Check each axis quality score (0-100)
       for (uint8_t axis = 0; axis < 3; axis++) {
-        const axis_metrics_t *metrics = axisSynchronizationGetAxisMetrics(axis);
-        if (metrics) {
+        axis_metrics_t m;
+        if (axisSynchronizationCopyAxisMetrics(axis, &m)) {
           // Trigger alarm if quality drops critically low (below 25%)
-          if (metrics->quality_score < 25 && metrics->is_moving &&
+          if (m.quality_score < 25 && m.is_moving &&
               !alarm_active) {
             char axis_char = 'X' + axis;
             char msg[64];
             snprintf(msg, sizeof(msg), "AXIS %c QUALITY CRITICAL: %lu%%",
-                     axis_char, (unsigned long)metrics->quality_score);
+                     axis_char, (unsigned long)m.quality_score);
             logError("[SAFETY] [FAIL] %s", msg);
             faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
                           "Axis motion quality critical");
@@ -257,11 +256,11 @@ void safetyUpdate() {
           }
 
           // Detect axis stall from quality metrics
-          if (metrics->stalled && metrics->is_moving && !alarm_active) {
+          if (m.stalled && m.is_moving && !alarm_active) {
             char axis_char = 'X' + axis;
             char msg[64];
             snprintf(msg, sizeof(msg), "AXIS %c STALL (Quality: %lu%%)",
-                     axis_char, (unsigned long)metrics->quality_score);
+                     axis_char, (unsigned long)m.quality_score);
             logError("[SAFETY] [FAIL] %s", msg);
             faultLogEntry(FAULT_ERROR, FAULT_MOTION_STALL, axis, 0,
                           "Axis motion stall detected via quality metrics");
@@ -270,7 +269,7 @@ void safetyUpdate() {
           }
 
           // Log warning if quality is degraded (below 50%)
-          if (metrics->quality_score < 50 && metrics->is_moving) {
+          if (m.quality_score < 50 && m.is_moving) {
             static uint32_t last_quality_warn[3] = {0, 0, 0};
             if ((uint32_t)(now - last_quality_warn[axis]) >
                 3000) { // Warn every 3s max
@@ -278,7 +277,7 @@ void safetyUpdate() {
               char axis_char = 'X' + axis;
               logWarning(
                   "[SAFETY] [WARN] AXIS %c motion quality degraded: %lu%%",
-                  axis_char, (unsigned long)metrics->quality_score);
+                  axis_char, (unsigned long)m.quality_score);
             }
           }
         }
@@ -442,9 +441,7 @@ void safetyResetAlarm() {
     return;
   }
 
-// VALIDATION 3: Wait minimum time after alarm trigger (prevent rapid reset)
-#define SAFETY_MIN_ALARM_DURATION_MS                                           \
-  1000 // Minimum 1 second before reset allowed
+  // VALIDATION 3: Wait minimum time after alarm trigger (prevent rapid reset)
   uint32_t alarm_duration = (uint32_t)(millis() - alarm_trigger_time);
   if (alarm_duration < SAFETY_MIN_ALARM_DURATION_MS) {
     xSemaphoreGive(safety_state_mutex);  // Mutex confirmed acquired

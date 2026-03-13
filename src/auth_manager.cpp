@@ -12,6 +12,7 @@
 #include "system_constants.h"
 #include <Preferences.h>
 #include <mbedtls/sha256.h>
+#include <MD5Builder.h>
 #include <esp_random.h>
 #include <string.h>
 #include "string_safety.h"
@@ -205,19 +206,28 @@ void authGenerateRandomPassword(char* output, size_t length) {
   uint8_t random_bytes[12];
   esp_fill_random(random_bytes, 12);
 
-  output[0] = lowercase[random_bytes[0] % 26];
-  output[1] = lowercase[random_bytes[1] % 26];
-  output[2] = lowercase[random_bytes[2] % 26];
-  output[3] = uppercase[random_bytes[3] % 26];
-  output[4] = uppercase[random_bytes[4] % 26];
-  output[5] = uppercase[random_bytes[5] % 26];
-  output[6] = digits[random_bytes[6] % 10];
-  output[7] = digits[random_bytes[7] % 10];
-  output[8] = digits[random_bytes[8] % 10];
-  output[9] = symbols[random_bytes[9] % 8];
+  output[0]  = lowercase[random_bytes[0] % 26];
+  output[1]  = lowercase[random_bytes[1] % 26];
+  output[2]  = lowercase[random_bytes[2] % 26];
+  output[3]  = uppercase[random_bytes[3] % 26];
+  output[4]  = uppercase[random_bytes[4] % 26];
+  output[5]  = uppercase[random_bytes[5] % 26];
+  output[6]  = digits[random_bytes[6] % 10];
+  output[7]  = digits[random_bytes[7] % 10];
+  output[8]  = digits[random_bytes[8] % 10];
+  output[9]  = symbols[random_bytes[9] % 8];
   output[10] = symbols[random_bytes[10] % 8];
   output[11] = symbols[random_bytes[11] % 8];
   output[12] = '\0';
+
+  // Fisher-Yates shuffle using 12 additional random bytes so the password
+  // is not always in the predictable lllUUUdddSSS pattern.
+  uint8_t shuffle_bytes[12];
+  esp_fill_random(shuffle_bytes, 12);
+  for (int i = 11; i > 0; i--) {
+    int j = shuffle_bytes[i] % (i + 1);
+    char tmp = output[i]; output[i] = output[j]; output[j] = tmp;
+  }
 }
 
 bool authValidatePasswordStrength(const char* password) {
@@ -342,12 +352,9 @@ bool authVerifyCredentials(const char* username, const char* password) {
     return false;
   }
 
-  // Verify username
+  // Verify username (safe to log — username is not secret)
   if (strcmp(username, current_username) != 0) {
-    // Log failed attempt with full details for security monitoring
-    logWarning("[AUTH] FAILED LOGIN - Invalid username");
-    logWarning("[AUTH]   Attempted user: '%s'", username);
-    logWarning("[AUTH]   Attempted pass: '%s' (len=%d)", password, strlen(password));
+    logWarning("[AUTH] FAILED LOGIN - Invalid username (len=%d)", (int)strlen(username));
     return false;
   }
 
@@ -355,11 +362,10 @@ bool authVerifyCredentials(const char* username, const char* password) {
   bool valid = verifyPassword(password, stored_password_hash);
 
   if (!valid) {
-    // Log failed attempt with full details for security monitoring / debugging
-    logWarning("[AUTH] FAILED LOGIN - Invalid password");
-    logWarning("[AUTH]   Username: '%s' (correct)", username);
-    logWarning("[AUTH]   Password: '%s' (len=%d)", password, strlen(password));
-    logWarning("[AUTH]   Expected hash prefix: %.20s...", stored_password_hash);
+    // Log failure at warning level but NEVER log the attempted password.
+    // Logging passwords (even wrong ones) leaks them to serial, SD card logs,
+    // and WebSocket telemetry — a significant security risk.
+    logWarning("[AUTH] FAILED LOGIN - Invalid password (len=%d)", (int)strlen(password));
     return false;
   }
 
@@ -679,24 +685,47 @@ void cmd_passwd(int argc, char** argv) {
 
   // Handle "ota"
   if (strcasecmp(type, "ota") == 0) {
-    // NOTE: we don't have an authVerifyOTA() readily available. 
-    // Usually OTA password is just read straight from config.
-    // Ensure the old password matches the config before changing it.
-    const char* current_ota_ptr = configGetString(KEY_OTA_PASSWORD, "");
-    char current_ota[64];
-    SAFE_STRCPY(current_ota, current_ota_ptr, sizeof(current_ota));
-    
-    if (!password_change_required && strlen(current_ota) > 0 && strcmp(current_ota, old_pass) != 0) {
-        logError("[AUTH] Incorrect current OTA password");
-        authRecordFailedAttempt("127.0.0.1"); // Fake IP for CLI
-        return;
+    // OTA password is now stored as a SHA-256 hash (same scheme as web password).
+    // Load the stored hash and verify the old password before allowing the change.
+    const char* stored_ota_ptr = configGetString(KEY_OTA_PASSWORD, "");
+    char stored_ota[AUTH_MAX_STORED_PW_LEN];
+    SAFE_STRCPY(stored_ota, stored_ota_ptr, sizeof(stored_ota));
+
+    if (!password_change_required && strlen(stored_ota) > 0) {
+      // If the stored value is an old plaintext entry, compare directly
+      // and upgrade to hashed on success.
+      if (strncmp(stored_ota, "$sha256$", 8) == 0) {
+        if (!verifyPassword(old_pass, stored_ota)) {
+          logError("[AUTH] Incorrect current OTA password");
+          authRecordFailedAttempt("127.0.0.1");
+          return;
+        }
+      } else {
+        // Legacy plaintext — compare directly, then upgrade
+        if (strcmp(stored_ota, old_pass) != 0) {
+          logError("[AUTH] Incorrect current OTA password");
+          authRecordFailedAttempt("127.0.0.1");
+          return;
+        }
+      }
     }
 
-    configSetString(KEY_OTA_PASSWORD, new_pass);
+    // Hash the new OTA password before storing
+    char new_ota_hash[AUTH_MAX_STORED_PW_LEN];
+    createPasswordHash(new_pass, new_ota_hash, sizeof(new_ota_hash));
+    configSetString(KEY_OTA_PASSWORD, new_ota_hash);
+
+    // Compute MD5 hash for ArduinoOTA protocol
+    MD5Builder md5;
+    md5.begin();
+    md5.add(new_pass);
+    md5.calculate();
+    configSetString(KEY_OTA_PW_MD5, md5.toString().c_str());
+
     configSetInt(KEY_OTA_PW_CHANGED, 1);
     configUnifiedSave();
-    
-    logInfo("[OTA] [OK] OTA password updated successfully");
+
+    logInfo("[OTA] [OK] OTA password updated (stored as SHA-256 and MD5 hash)");
     logWarning("[OTA] Reboot required for changes to take effect");
     return;
   }

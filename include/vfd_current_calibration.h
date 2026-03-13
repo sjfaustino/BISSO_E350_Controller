@@ -29,15 +29,15 @@ extern "C" {
 
 typedef struct {
     // Idle baseline (blade spinning, no cutting)
-    float idle_rms_amps;                // RMS current average
+    float idle_avg_amps;                // AVG current average
     float idle_peak_amps;               // Peak current spike
 
     // Standard cutting baseline (reference load)
-    float standard_cut_rms_amps;        // RMS current average
+    float standard_cut_avg_amps;        // AVG current average
     float standard_cut_peak_amps;       // Peak current spike
 
     // Heavy load (optional, high speed/load)
-    float heavy_cut_rms_amps;           // RMS current average
+    float heavy_cut_avg_amps;           // AVG current average
     float heavy_cut_peak_amps;          // Peak current spike
 
     // Calculated stall detection threshold
@@ -91,11 +91,11 @@ bool vfdCalibrationIsMeasureComplete(void);
 
 /**
  * @brief Get results from last measurement
- * @param out_rms_amps Measured RMS average current
+ * @param out_avg_amps Measured AVG average current
  * @param out_peak_amps Measured peak current
  * @return true if measurement was successful
  */
-bool vfdCalibrationGetMeasurement(float* out_rms_amps, float* out_peak_amps);
+bool vfdCalibrationGetMeasurement(float* out_avg_amps, float* out_peak_amps);
 
 /**
  * @brief Feed current sample to measurement system (called from telemetry task)
@@ -107,10 +107,10 @@ void vfdCalibrationSampleCurrent(float current_amps);
 /**
  * @brief Store measurement result for specific phase
  * @param phase 0=idle, 1=standard cut, 2=heavy load
- * @param rms_amps RMS average current
+ * @param avg_amps AVG average current
  * @param peak_amps Peak current
  */
-void vfdCalibrationStoreMeasurement(uint8_t phase, float rms_amps, float peak_amps);
+void vfdCalibrationStoreMeasurement(uint8_t phase, float avg_amps, float peak_amps);
 
 /**
  * @brief Calculate stall threshold from collected measurements

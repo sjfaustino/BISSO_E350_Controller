@@ -240,11 +240,6 @@ bool GCodeParser::processCommand(const char* line) {
     // G Codes
     if (parseCode(clean_line, 'G', val)) {
         int cmd = (int)val;
-        // Optimization: Handle M117 free-form text separately to preserve case/formatting
-        if (cmd == 117) {
-            handleM117(line);
-            return true;
-        }
 
         // Set current command string for UI tracking
         motionSetCurrentCommand(line);

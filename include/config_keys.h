@@ -225,6 +225,8 @@
   "ota_pass" // OTA update password (default: "bisso-ota")
 #define KEY_OTA_PW_CHANGED                                                     \
   "ota_pw_chg" // Flag: OTA password changed from default (1=changed, 0=default)
+#define KEY_OTA_PW_MD5                                                         \
+  "ota_pw_md5" // MD5 hash of OTA password for ArduinoOTA protocol
 #define KEY_OTA_CHECK_EN "ota_chk_en" // Enable GitHub OTA check (1=on, 0=off, default 0)
 
 

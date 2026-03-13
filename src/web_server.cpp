@@ -274,6 +274,18 @@ void WebServerManager::begin() {
 
 // --- Telemetry Setters - Update internal state ---
 
+#define UPDATE_STATUS_FIELD(field, value) \
+    portENTER_CRITICAL(&statusSpinlock); \
+    current_status.field = value; \
+    portEXIT_CRITICAL(&statusSpinlock)
+
+#define UPDATE_AXIS_METRIC(axis, field, value) \
+    if (axis < 3) { \
+        portENTER_CRITICAL(&statusSpinlock); \
+        current_status.axis_metrics[axis].field = value; \
+        portEXIT_CRITICAL(&statusSpinlock); \
+    }
+
 void WebServerManager::setSystemStatus(const char* status) {
     portENTER_CRITICAL(&statusSpinlock);
     SAFE_STRCPY(current_status.status, status, sizeof(current_status.status));
@@ -291,123 +303,25 @@ void WebServerManager::setAxisPosition(char axis, float position) {
     portEXIT_CRITICAL(&statusSpinlock);
 }
 
-void WebServerManager::setSystemUptime(uint32_t seconds) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.uptime_sec = seconds;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
+void WebServerManager::setSystemUptime(uint32_t seconds) { UPDATE_STATUS_FIELD(uptime_sec, seconds); }
+void WebServerManager::setVFDCurrent(float current_amps) { UPDATE_STATUS_FIELD(vfd_current_amps, current_amps); }
+void WebServerManager::setVFDFrequency(float frequency_hz) { UPDATE_STATUS_FIELD(vfd_frequency_hz, frequency_hz); }
+void WebServerManager::setVFDThermalState(int16_t thermal_percent) { UPDATE_STATUS_FIELD(vfd_thermal_percent, thermal_percent); }
+void WebServerManager::setVFDFaultCode(uint16_t fault_code) { UPDATE_STATUS_FIELD(vfd_fault_code, fault_code); }
+void WebServerManager::setVFDCalibrationThreshold(float threshold_amps) { UPDATE_STATUS_FIELD(vfd_threshold_amps, threshold_amps); }
+void WebServerManager::setVFDCalibrationValid(bool is_valid) { UPDATE_STATUS_FIELD(vfd_calibration_valid, is_valid); }
+void WebServerManager::setVFDConnected(bool is_connected) { UPDATE_STATUS_FIELD(vfd_connected, is_connected); }
+void WebServerManager::setDROConnected(bool is_connected) { UPDATE_STATUS_FIELD(dro_connected, is_connected); }
+void WebServerManager::setSpindleRPM(float rpm) { UPDATE_STATUS_FIELD(spindle_rpm, rpm); }
+void WebServerManager::setSpindleSpeed(float speed_m_s) { UPDATE_STATUS_FIELD(spindle_speed_m_s, speed_m_s); }
+void WebServerManager::setSpindleEfficiency(float load_ratio) { UPDATE_STATUS_FIELD(spindle_efficiency, load_ratio); }
+void WebServerManager::setSpindleLoadPercent(float load_pct) { UPDATE_STATUS_FIELD(spindle_load_pct, load_pct); }
 
-void WebServerManager::setVFDCurrent(float current_amps) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.vfd_current_amps = current_amps;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setVFDFrequency(float frequency_hz) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.vfd_frequency_hz = frequency_hz;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setVFDThermalState(int16_t thermal_percent) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.vfd_thermal_percent = thermal_percent;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setVFDFaultCode(uint16_t fault_code) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.vfd_fault_code = fault_code;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setVFDCalibrationThreshold(float threshold_amps) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.vfd_threshold_amps = threshold_amps;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setVFDCalibrationValid(bool is_valid) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.vfd_calibration_valid = is_valid;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setVFDConnected(bool is_connected) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.vfd_connected = is_connected;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setDROConnected(bool is_connected) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.dro_connected = is_connected;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setSpindleRPM(float rpm) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.spindle_rpm = rpm;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setSpindleSpeed(float speed_m_s) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.spindle_speed_m_s = speed_m_s;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setSpindleEfficiency(float load_ratio) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.spindle_efficiency = load_ratio;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setSpindleLoadPercent(float load_pct) {
-    portENTER_CRITICAL(&statusSpinlock);
-    current_status.spindle_load_pct = load_pct;
-    portEXIT_CRITICAL(&statusSpinlock);
-}
-
-void WebServerManager::setAxisQualityScore(uint8_t axis, uint32_t quality_score) {
-    if (axis < 3) {
-        portENTER_CRITICAL(&statusSpinlock);
-        current_status.axis_metrics[axis].quality_score = quality_score;
-        portEXIT_CRITICAL(&statusSpinlock);
-    }
-}
-
-void WebServerManager::setAxisJitterAmplitude(uint8_t axis, float jitter_mms) {
-    if (axis < 3) {
-        portENTER_CRITICAL(&statusSpinlock);
-        current_status.axis_metrics[axis].jitter_mms = jitter_mms;
-        portEXIT_CRITICAL(&statusSpinlock);
-    }
-}
-
-void WebServerManager::setAxisStalled(uint8_t axis, bool is_stalled) {
-    if (axis < 3) {
-        portENTER_CRITICAL(&statusSpinlock);
-        current_status.axis_metrics[axis].stalled = is_stalled;
-        portEXIT_CRITICAL(&statusSpinlock);
-    }
-}
-
-void WebServerManager::setAxisVFDError(uint8_t axis, float error_percent) {
-    if (axis < 3) {
-        portENTER_CRITICAL(&statusSpinlock);
-        current_status.axis_metrics[axis].vfd_error_percent = error_percent;
-        portEXIT_CRITICAL(&statusSpinlock);
-    }
-}
-
-void WebServerManager::setAxisMaintenanceWarning(uint8_t axis, bool warned) {
-    if (axis < 3) {
-        portENTER_CRITICAL(&statusSpinlock);
-        current_status.axis_metrics[axis].maintenance_warning = warned;
-        portEXIT_CRITICAL(&statusSpinlock);
-    }
-}
+void WebServerManager::setAxisQualityScore(uint8_t axis, uint32_t quality_score) { UPDATE_AXIS_METRIC(axis, quality_score, quality_score); }
+void WebServerManager::setAxisJitterAmplitude(uint8_t axis, float jitter_mms) { UPDATE_AXIS_METRIC(axis, jitter_mms, jitter_mms); }
+void WebServerManager::setAxisStalled(uint8_t axis, bool is_stalled) { UPDATE_AXIS_METRIC(axis, stalled, is_stalled); }
+void WebServerManager::setAxisVFDError(uint8_t axis, float error_percent) { UPDATE_AXIS_METRIC(axis, vfd_error_percent, error_percent); }
+void WebServerManager::setAxisMaintenanceWarning(uint8_t axis, bool warned) { UPDATE_AXIS_METRIC(axis, maintenance_warning, warned); }
 
 // --- JSON Builder Helper ---
 void WebServerManager::broadcastState() {
@@ -453,50 +367,14 @@ void WebServerManager::checkWsHealth() {
 
         uint32_t elapsed_client = (now >= last_seen) ? (now - last_seen) : (UINT32_MAX - last_seen + now + 1);
         if (elapsed_client > CLIENT_TIMEOUT) {
-            logWarning("[WS] Client %s timed out (30s). Closing.", client->remoteIP().toString().c_str());
+            logWarning("[WS] Client %s timed out (60s). Closing.", client->remoteIP().toString().c_str());
             
-            // Close the connection (triggers onClose which will erase from map... 
-            // BUT we are iterating the map right now! Be careful).
-            // Calling close() usually calls the onClose callback immediately or async.
-            // If it calls immediately, we get invalid iterator.
-            
-            // SAFER APPROACH: Mark for deletion or rely on close() triggering callback?
-            // If we erase here, we must update iterator.
-            // But if close() triggers onClose(), onClose() will try to erase the same key.
-            // Map erase is safe if key missing? Yes.
-            
-            // Let's close it. If onClose fires immediately, 'it' might be invalidated if implementation is naive?
-            // Actually, onClose callback uses "this->ws_clients.erase(client)".
-            // If we are holding an iterator to it, standard map rules say valid unless we erase 'it'.
-            // But if callback erases 'it', then 'it' becomes invalid.
-            
-            // Safe pattern: advance iterator, then close.
+            // Advance iterator before closing to prevent invalidation if onClose fires synchronously
             PsychicWebSocketClient* to_close = client;
             ++it; 
-            
-            // Now 'it' points to next. 'to_close' is valid pointer.
-            // Closing should be safe.
             to_close->close(); 
         } else {
-            // Client active - Send Ping to keep alive and solicit Pong
-            // OpCode 0x9 is PING. PsychicHttp 'sendFrame' needed?
-            // PsychicWebSocketClient has sendPing()?
-            // Looking at library headers (simulated), standard way is usually send(..., PING).
-            // PsychicHttp uses valid ESP-IDF ws_send_frame_async underneath.
-            
-            // Assuming client->sendPing() exists or sending raw frame.
-            // If API unknown, simplest is sending text "ping".
-            // But real WS Ping is OpCode 0x9.
-            // client->sendPing() is standard in many libs. 
-            // Let's try sending standard ping frame if method exists, else text.
-            // Since we can't see library source, safe bet for "Heartbeat" task logic is:
-            // "client->sendPing();"
-            // If that fails compilation, we will fix.
-            // PsychicWebSocketClient usually inherits from something or wraps httpd_ws_send_frame.
-            
-            // Let's assume sendPing() is available or use raw frame construction.
-            // For now, I'll use `client->sendPing()`.
-            // Use standard ESP-IDF opcode for PING (0x9)
+            // Client active - Send Ping to keep alive
             client->sendMessage(HTTPD_WS_TYPE_PING, nullptr, 0);
             ++it;
         }
@@ -504,12 +382,7 @@ void WebServerManager::checkWsHealth() {
 }
 
 // --- Credentials Stubs ---
-void WebServerManager::loadCredentials() {}
-void WebServerManager::setPassword(const char* new_password) {}
-bool WebServerManager::isPasswordChangeRequired() { return false; }
-
-// --- Legacy Support ---
-void WebServerManager::handleClient() {}
+// Old auth stubs removed: handled by auth_manager.cpp
 
 // --- Authentication Helper ---
 bool webAuthenticate(PsychicRequest *request) {

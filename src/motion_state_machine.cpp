@@ -283,7 +283,7 @@ void state_executing_handler(Axis* axis, int32_t pos, int32_t target, bool conse
         target_reached = true;
     } else {
         // Also check for overshoot (crossed target)
-        int32_t start_pos = motionGetActiveStartPosition();
+        int32_t start_pos = axis->active_start_position;
         if (start_pos < target && pos >= target) {
             target_reached = true;
         } else if (start_pos > target && pos <= target) {
@@ -503,7 +503,7 @@ void state_idle_entry(Axis* axis) {
 
 void state_executing_entry(Axis* axis) {
     // Record start position for target detection
-    motionSetActiveStartPosition(axis->position);
+    axis->active_start_position = axis->position;
 }
 
 void state_stopping_entry(Axis* axis) {

@@ -479,18 +479,27 @@ void NetworkManager::init() {
   // 2. OTA Setup
   ArduinoOTA.setHostname("bisso-e350");
 
-  // SECURITY FIX: Load OTA password from NVS instead of hardcoding
-  // Prevents password exposure in source code and allows runtime changes
-  const char *ota_password = configGetString(KEY_OTA_PASSWORD, "bisso-ota");
+  // SECURITY FIX: Use ArduinoOTA.setPasswordHash() with MD5 to avoid storing plaintext.
+  // When the user changes the OTA password via 'passwd ota', auth_manager stores:
+  //   KEY_OTA_PASSWORD  = SHA-256 hash (for verification)
+  //   KEY_OTA_PW_MD5    = MD5 hex (for ArduinoOTA.setPasswordHash)
+  // If neither is set, fall back to the built-in default.
   int ota_pw_changed = configGetInt(KEY_OTA_PW_CHANGED, 0);
-
-  ArduinoOTA.setPassword(ota_password);
-
-  if (ota_pw_changed == 0) {
-    logWarning("[OTA] Default password in use - change recommended!");
-    logWarning("[OTA] Use CLI command: passwd ota <new_password>");
+  if (ota_pw_changed) {
+    const char *ota_md5 = configGetString(KEY_OTA_PW_MD5, "");
+    if (strlen(ota_md5) == 32) {  // Valid MD5 hex is exactly 32 chars
+      ArduinoOTA.setPasswordHash(ota_md5);
+      logInfo("[OTA] [OK] Custom password hash loaded from NVS");
+    } else {
+      // Fallback: md5 key missing (firmware upgraded), warn and use default
+      logError("[OTA] Custom OTA password set but MD5 key missing - using default!");
+      logError("[OTA] Run: passwd ota <old_pass> <new_pass> to re-set.");
+      ArduinoOTA.setPassword("bisso-ota");
+    }
   } else {
-    logInfo("[OTA] [OK] Custom password loaded from NVS");
+    ArduinoOTA.setPassword("bisso-ota");
+    logWarning("[OTA] Default password in use - change recommended!");
+    logWarning("[OTA] Use CLI command: passwd ota <current> <new_password>");
   }
 
   ArduinoOTA.onStart([]() {

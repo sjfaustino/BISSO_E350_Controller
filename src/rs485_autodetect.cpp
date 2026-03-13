@@ -73,8 +73,8 @@ int32_t rs485AutodetectBaud(void) {
                 if (rs485Available() >= 5) { // Min Modbus response size
                     uint8_t rx_len = sizeof(rx_buffer);
                     if (rs485Receive(rx_buffer, &rx_len)) {
-                        // Check if it's a valid response for this address
-                        if (rx_buffer[0] == addr) {
+                        // Check if it's a valid response for this address and passes CRC
+                        if (rx_buffer[0] == addr && modbusVerifyCrc(rx_buffer, rx_len)) {
                             found_rate = rate;
                             got_reply = true;
                             logInfo("[RS485_DET] Found device at address %u @ %lu baud!", addr, (unsigned long)rate);

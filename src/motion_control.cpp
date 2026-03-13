@@ -52,7 +52,6 @@ static Axis axes[MOTION_AXES];
 
 static struct {
   uint8_t active_axis;
-  int32_t active_start_position;
   bool global_enabled;
   int strict_limits;
   // Execution Tracking
@@ -60,7 +59,7 @@ static struct {
   float progress_percent;
   float remaining_seconds;
   bool coordinated_mode; // Enable X/Y simultaneous motion
-} m_state = {255, 0, true, 1, "", 0.0f, 0.0f, false};
+} m_state = {255, true, 1, "", 0.0f, 0.0f, false};
 
 // PHASE 5.10: Non-static to allow external access from motion_state_machine.cpp
 portMUX_TYPE motionSpinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -289,8 +288,12 @@ void motionUpdate() {
     }
   }
 
-  motionPlanner.update(axes, m_state.active_axis,
-                       m_state.active_start_position);
+  if (m_state.active_axis < MOTION_AXES) {
+    motionPlanner.update(axes, m_state.active_axis, axes[m_state.active_axis].active_start_position);
+  } else {
+    int32_t dummy_pos = 0;
+    motionPlanner.update(axes, m_state.active_axis, dummy_pos);
+  }
 
   bool any_axis_active = false;
   for (int i = 0; i < MOTION_AXES; i++) {
@@ -508,21 +511,6 @@ uint8_t motionGetActiveAxis() {
   return axis;
 }
 
-// PHASE 5.10: Accessor for active_start_position (for state machine)
-int32_t motionGetActiveStartPosition() {
-  portENTER_CRITICAL(&motionSpinlock);
-  int32_t pos = m_state.active_start_position;
-  portEXIT_CRITICAL(&motionSpinlock);
-  return pos;
-}
-
-// PHASE 5.10: Setter for active_start_position (for state machine)
-void motionSetActiveStartPosition(int32_t position) {
-  portENTER_CRITICAL(&motionSpinlock);
-  m_state.active_start_position = position;
-  portEXIT_CRITICAL(&motionSpinlock);
-}
-
 // PHASE 5.10: Clear active axis (for state machine IDLE transition)
 void motionClearActiveAxis() {
   portENTER_CRITICAL(&motionSpinlock);
@@ -695,7 +683,7 @@ bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s) {
   // PHASE 5.10: Use spinlock for m_state writes (consistent lock domain)
   portENTER_CRITICAL(&motionSpinlock);
   m_state.active_axis = target_axis;
-  m_state.active_start_position = axes[target_axis].position;
+  axes[target_axis].active_start_position = axes[target_axis].position;
   portEXIT_CRITICAL(&motionSpinlock);
 
   if (is_coord_xy) {

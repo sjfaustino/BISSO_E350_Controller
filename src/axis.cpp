@@ -39,6 +39,7 @@ Axis::Axis() {
     last_actual_update_ms = 0;
     predicted_position = 0;
     velocity_counts_ms = 0.0f;
+    active_start_position = 0;
 }
 
 void Axis::init(uint8_t axis_id) {
@@ -115,7 +116,7 @@ void Axis::updateState(int32_t current_pos, int32_t global_target_pos, bool cons
 
     // Calculate Progress & ETA
     bool is_active = (this->id == motionGetActiveAxis());
-    int32_t start_pos = motionGetActiveStartPosition();
+    int32_t start_pos = this->active_start_position;
 
     if (is_active) {
         int32_t total_dist_counts = abs(global_target_pos - start_pos);

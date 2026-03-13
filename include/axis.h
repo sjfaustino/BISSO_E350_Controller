@@ -23,6 +23,7 @@ public:
     bool soft_limit_enabled;
     int32_t soft_limit_min;
     int32_t soft_limit_max;
+    int32_t active_start_position;
     
     // Timing & Status
     uint32_t dwell_end_ms;

@@ -653,8 +653,8 @@ bool apiConfigGet(config_category_t category, JsonVariant doc) {
 
   case CONFIG_CATEGORY_SECURITY: {
     obj["web_user"] = configGetString(KEY_WEB_USERNAME, "admin");
-    obj["web_pass"] = configGetString(KEY_WEB_PASSWORD, "bisso");
-    obj["ota_pass"] = configGetString(KEY_OTA_PASSWORD, "bisso-ota");
+    obj["web_pass"] = "********"; // Redacted
+    obj["ota_pass"] = "********"; // Redacted
     break;
   }
 

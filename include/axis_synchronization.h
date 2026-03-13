@@ -168,17 +168,19 @@ bool axisSynchronizationIsValid(void);
 uint32_t axisSynchronizationGetQualityScore(uint8_t axis);
 
 /**
- * @brief Get metrics for all axes
- * @return Pointer to all axes metrics structure
+ * @brief Get metrics for all axes (safely copied)
+ * @param out_metrics Pointer to struct to populate
+ * @return true if successful
  */
-const all_axes_metrics_t* axisSynchronizationGetAllMetrics(void);
+bool axisSynchronizationCopyAllMetrics(all_axes_metrics_t* out_metrics);
 
 /**
- * @brief Get metrics for specific axis
+ * @brief Get metrics for specific axis (safely copied)
  * @param axis 0=X, 1=Y, 2=Z
- * @return Pointer to axis metrics
+ * @param out_metrics Pointer to struct to populate
+ * @return true if successful
  */
-const axis_metrics_t* axisSynchronizationGetAxisMetrics(uint8_t axis);
+bool axisSynchronizationCopyAxisMetrics(uint8_t axis, axis_metrics_t* out_metrics);
 
 // ============================================================================
 // THREAD SAFETY (For multi-task access)

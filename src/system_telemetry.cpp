@@ -247,19 +247,16 @@ void telemetryUpdate() {
     bool a_stalled[3] = {false};
     float v_errs[3] = {0};
     bool m_warns[3] = {false};
-    
-    axisSynchronizationLock();
     for (int i = 0; i < 3; i++) {
-        const axis_metrics_t *metrics = axisSynchronizationGetAxisMetrics(i);
-        if (metrics) {
-            q_scores[i] = metrics->quality_score;
-            j_amps[i] = metrics->velocity_jitter_mms;
-            a_stalled[i] = metrics->stalled;
-            v_errs[i] = metrics->vfd_encoder_error_percent;
-            m_warns[i] = metrics->jitter_elevated;
+        axis_metrics_t metrics;
+        if (axisSynchronizationCopyAxisMetrics(i, &metrics)) {
+            q_scores[i] = metrics.quality_score;
+            j_amps[i] = metrics.velocity_jitter_mms;
+            a_stalled[i] = metrics.stalled;
+            v_errs[i] = metrics.vfd_encoder_error_percent;
+            m_warns[i] = metrics.jitter_elevated;
         }
     }
-    axisSynchronizationUnlock();
 
     bool dro_alive = !wj66IsStale(0);
 

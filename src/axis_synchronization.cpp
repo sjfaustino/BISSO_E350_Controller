@@ -374,16 +374,27 @@ uint32_t axisSynchronizationGetQualityScore(uint8_t axis) {
     return metrics->quality_score;
 }
 
-const all_axes_metrics_t* axisSynchronizationGetAllMetrics(void) {
-    // BUGFIX: Note - caller must be aware this returns pointer to shared state
-    // Caller should hold mutex if concurrent access is happening
-    return &all_axes;
+bool axisSynchronizationCopyAllMetrics(all_axes_metrics_t* out_metrics) {
+    if (out_metrics == NULL) return false;
+    axisSynchronizationLock();
+    memcpy(out_metrics, &all_axes, sizeof(all_axes_metrics_t));
+    axisSynchronizationUnlock();
+    return true;
 }
 
-const axis_metrics_t* axisSynchronizationGetAxisMetrics(uint8_t axis) {
+bool axisSynchronizationCopyAxisMetrics(uint8_t axis, axis_metrics_t* out_metrics) {
+    if (axis >= 3 || out_metrics == NULL) return false;
+    axisSynchronizationLock();
+    const axis_metrics_t* metrics = (axis == 0) ? &all_axes.x_axis :
+           (axis == 1) ? &all_axes.y_axis :
+           &all_axes.z_axis;
+    memcpy(out_metrics, metrics, sizeof(axis_metrics_t));
+    axisSynchronizationUnlock();
+    return true;
+}
+
+static const axis_metrics_t* _getAxisMetricsInternal(uint8_t axis) {
     if (axis >= 3) return NULL;
-    // BUGFIX: Note - returns pointer to shared state
-    // Caller should hold mutex if concurrent access is happening
     return (axis == 0) ? &all_axes.x_axis :
            (axis == 1) ? &all_axes.y_axis :
            &all_axes.z_axis;
@@ -407,7 +418,7 @@ void axisSynchronizationUnlock(void) {
 // ============================================================================
 
 static float axisSynchronizationGetVFDEncoderErrorForAxis(uint8_t axis) {
-    const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
+    const axis_metrics_t* metrics = _getAxisMetricsInternal(axis);
     if (!metrics) return 100.0f;
 
     // ========================================================================
@@ -466,14 +477,20 @@ bool axisSynchronizationCheckVFDEncoderCorrelation(void) {
 
 bool axisSynchronizationDetectJitter(void) {
     if (all_axes.active_axis >= 3) return false;
-    const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(all_axes.active_axis);
-    return metrics ? (metrics->velocity_jitter_mms > sync_config.jitter_threshold_mms) : false;
+    axis_metrics_t metrics;
+    if (axisSynchronizationCopyAxisMetrics(all_axes.active_axis, &metrics)) {
+        return metrics.velocity_jitter_mms > sync_config.jitter_threshold_mms;
+    }
+    return false;
 }
 
 bool axisSynchronizationDetectStall(void) {
     if (all_axes.active_axis >= 3) return false;
-    const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(all_axes.active_axis);
-    return metrics ? metrics->stalled : false;
+    axis_metrics_t metrics;
+    if (axisSynchronizationCopyAxisMetrics(all_axes.active_axis, &metrics)) {
+        return metrics.stalled;
+    }
+    return false;
 }
 
 float axisSynchronizationGetVFDEncoderError(void) {
@@ -494,6 +511,9 @@ const char* axisSynchronizationGetStatusString(uint8_t axis) {
 }
 
 void axisSynchronizationPrintSummary(void) {
+    all_axes_metrics_t a;
+    if (!axisSynchronizationCopyAllMetrics(&a)) return;
+
     serialLoggerLock();
     logPrintln("\n[AXIS_SYNC] === Per-Axis Motion Quality Summary ===");
     logPrintln("Active Axis: X                    Y                    Z");
@@ -506,27 +526,27 @@ void axisSynchronizationPrintSummary(void) {
 
     logPrintf("%s", "Quality:     ");
     logPrintf("%-20u %-20u %-20u\n",
-                  all_axes.x_axis.quality_score,
-                  all_axes.y_axis.quality_score,
-                  all_axes.z_axis.quality_score);
+                  a.x_axis.quality_score,
+                  a.y_axis.quality_score,
+                  a.z_axis.quality_score);
 
     logPrintf("%s", "Velocity:    ");
     logPrintf("%-20.2f %-20.2f %-20.2f mm/s\n",
-                  all_axes.x_axis.current_velocity_mms,
-                  all_axes.y_axis.current_velocity_mms,
-                  all_axes.z_axis.current_velocity_mms);
+                  a.x_axis.current_velocity_mms,
+                  a.y_axis.current_velocity_mms,
+                  a.z_axis.current_velocity_mms);
 
     logPrintf("%s", "Jitter:      ");
     logPrintf("%-20.3f %-20.3f %-20.3f mm/s\n",
-                  all_axes.x_axis.velocity_jitter_mms,
-                  all_axes.y_axis.velocity_jitter_mms,
-                  all_axes.z_axis.velocity_jitter_mms);
+                  a.x_axis.velocity_jitter_mms,
+                  a.y_axis.velocity_jitter_mms,
+                  a.z_axis.velocity_jitter_mms);
 
     logPrintf("%s", "Stalled:     ");
     logPrintf("%-20s %-20s %-20s\n",
-                  all_axes.x_axis.stalled ? "YES" : "NO",
-                  all_axes.y_axis.stalled ? "YES" : "NO",
-                  all_axes.z_axis.stalled ? "YES" : "NO");
+                  a.x_axis.stalled ? "YES" : "NO",
+                  a.y_axis.stalled ? "YES" : "NO",
+                  a.z_axis.stalled ? "YES" : "NO");
 
     logPrintln("");
     serialLoggerUnlock();
@@ -539,37 +559,38 @@ void axisSynchronizationPrintAxisDiagnostics(uint8_t axis) {
     }
 
     const char* axis_name = (axis == 0) ? "X" : (axis == 1) ? "Y" : "Z";
-    const axis_metrics_t* metrics = axisSynchronizationGetAxisMetrics(axis);
+    axis_metrics_t m;
+    if (!axisSynchronizationCopyAxisMetrics(axis, &m)) return;
 
     serialLoggerLock();
     logPrintf("\n[AXIS_SYNC] === Axis %s Diagnostics ===\n", axis_name);
     logPrintf("Status:                  %s (%u/100)\n",
                   axisSynchronizationGetStatusString(axis),
-                  metrics->quality_score);
-    logPrintf("Current Velocity:        %.2f mm/s\n", metrics->current_velocity_mms);
-    logPrintf("Commanded Feedrate:      %.2f mm/s\n", metrics->commanded_feedrate_mms);
-    logPrintf("Is Moving:               %s\n", metrics->is_moving ? "YES" : "NO");
+                  m.quality_score);
+    logPrintf("Current Velocity:        %.2f mm/s\n", m.current_velocity_mms);
+    logPrintf("Commanded Feedrate:      %.2f mm/s\n", m.commanded_feedrate_mms);
+    logPrintf("Is Moving:               %s\n", m.is_moving ? "YES" : "NO");
     logPrintf("Stalled:                 %s (count: %lu)\n",
-                  metrics->stalled ? "YES" : "NO", (unsigned long)metrics->stall_count);
+                  m.stalled ? "YES" : "NO", (unsigned long)m.stall_count);
 
     logPrintln("\n[VFD/Encoder Correlation]");
-    logPrintf("VFD Frequency:           %.1f Hz\n", metrics->vfd_frequency_hz);
+    logPrintf("VFD Frequency:           %.1f Hz\n", m.vfd_frequency_hz);
     logPrintf("Error:                   %.1f%% (tolerance: %.1f%%)\n",
-                  metrics->vfd_encoder_error_percent,
+                  m.vfd_encoder_error_percent,
                   sync_config.vfd_encoder_tolerance_percent);
 
     logPrintln("\n[Jitter & Wear]");
-    logPrintf("Current Jitter:          %.3f mm/s\n", metrics->velocity_jitter_mms);
+    logPrintf("Current Jitter:          %.3f mm/s\n", m.velocity_jitter_mms);
     logPrintf("Max Jitter Recorded:     %.3f mm/s\n",
-                  metrics->max_jitter_recorded_mms);
+                  m.max_jitter_recorded_mms);
     logPrintf("Jitter Elevated:         %s (threshold: %.2f mm/s)\n",
-                  metrics->jitter_elevated ? "YES" : "NO",
+                  m.jitter_elevated ? "YES" : "NO",
                   sync_config.jitter_threshold_mms);
 
     logPrintln("\n[Sampling History]");
-    logPrintf("Good Samples:            %lu\n", (unsigned long)metrics->good_motion_samples);
-    logPrintf("Bad Samples:             %lu\n", (unsigned long)metrics->bad_motion_samples);
-    logPrintf("Active Duration:         %lu ms\n", (unsigned long)metrics->active_duration_ms);
+    logPrintf("Good Samples:            %lu\n", (unsigned long)m.good_motion_samples);
+    logPrintf("Bad Samples:             %lu\n", (unsigned long)m.bad_motion_samples);
+    logPrintf("Active Duration:         %lu ms\n", (unsigned long)m.active_duration_ms);
 
     logPrintln("");
     serialLoggerUnlock();

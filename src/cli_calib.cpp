@@ -512,13 +512,13 @@ void cmd_vfd_diagnostics(int argc, char** argv) {
         if (vfdCalibrationIsValid()) {
             const vfd_calibration_data_t* calib = vfdCalibrationGetData();
             logPrintln("\r\nCalibrated Baselines:");
-            logPrintf("  Idle (no cut):       %.2f A (RMS) / %.2f A (peak)\r\n",
-                          calib->idle_rms_amps, calib->idle_peak_amps);
-            logPrintf("  Standard Cut:        %.2f A (RMS) / %.2f A (peak)\r\n",
-                          calib->standard_cut_rms_amps, calib->standard_cut_peak_amps);
-            if (calib->heavy_cut_rms_amps > 0.0f) {
-                logPrintf("  Heavy Load:          %.2f A (RMS) / %.2f A (peak)\r\n",
-                                calib->heavy_cut_rms_amps, calib->heavy_cut_peak_amps);
+            logPrintf("  Idle (no cut):       %.2f A (AVG) / %.2f A (peak)\r\n",
+                          calib->idle_avg_amps, calib->idle_peak_amps);
+            logPrintf("  Standard Cut:        %.2f A (AVG) / %.2f A (peak)\r\n",
+                          calib->standard_cut_avg_amps, calib->standard_cut_peak_amps);
+            if (calib->heavy_cut_avg_amps > 0.0f) {
+                logPrintf("  Heavy Load:          %.2f A (AVG) / %.2f A (peak)\r\n",
+                                calib->heavy_cut_avg_amps, calib->heavy_cut_peak_amps);
             }
             logPrintln("\r\nStall Detection:");
             logPrintf("  Threshold:           %.2f A\r\n", calib->stall_threshold_amps);

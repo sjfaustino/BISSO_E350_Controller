@@ -34,11 +34,11 @@ typedef struct {
 // ============================================================================
 
 static vfd_calibration_data_t calib_data = {
-    .idle_rms_amps = 0.0f,
+    .idle_avg_amps = 0.0f,
     .idle_peak_amps = 0.0f,
-    .standard_cut_rms_amps = 0.0f,
+    .standard_cut_avg_amps = 0.0f,
     .standard_cut_peak_amps = 0.0f,
-    .heavy_cut_rms_amps = 0.0f,
+    .heavy_cut_avg_amps = 0.0f,
     .heavy_cut_peak_amps = 0.0f,
     .stall_threshold_amps = 0.0f,
     .stall_margin_percent = 20.0f,
@@ -82,16 +82,16 @@ bool vfdCalibrationLoad(void) {
     }
 
     // Load confirmed data
-    calib_data.idle_rms_amps = idle_rms_i / 100.0f;
+    calib_data.idle_avg_amps = idle_rms_i / 100.0f;
     calib_data.idle_peak_amps = idle_pk_i / 100.0f;
-    calib_data.standard_cut_rms_amps = std_rms_i / 100.0f;
+    calib_data.standard_cut_avg_amps = std_rms_i / 100.0f;
     calib_data.standard_cut_peak_amps = std_pk_i / 100.0f;
 
     // Load optional heavy load data
     int32_t heavy_rms_i = configGetInt(KEY_VFD_HEAVY_RMS, -1);
     int32_t heavy_pk_i = configGetInt(KEY_VFD_HEAVY_PEAK, -1);
     if (heavy_rms_i >= 0 && heavy_pk_i >= 0) {
-        calib_data.heavy_cut_rms_amps = heavy_rms_i / 100.0f;
+        calib_data.heavy_cut_avg_amps = heavy_rms_i / 100.0f;
         calib_data.heavy_cut_peak_amps = heavy_pk_i / 100.0f;
     }
 
@@ -107,8 +107,8 @@ bool vfdCalibrationLoad(void) {
     calib_data.calibration_count = configGetInt("vfd_calib_cnt", 0);
 
     logInfo("[VFDCAL] Loaded: Idle=%.1f/%.1f A, Std=%.1f/%.1f A, Threshold=%.1f A",
-                  calib_data.idle_rms_amps, calib_data.idle_peak_amps,
-                  calib_data.standard_cut_rms_amps, calib_data.standard_cut_peak_amps,
+                  calib_data.idle_avg_amps, calib_data.idle_peak_amps,
+                  calib_data.standard_cut_avg_amps, calib_data.standard_cut_peak_amps,
                   calib_data.stall_threshold_amps);
 
     return true;
@@ -116,11 +116,11 @@ bool vfdCalibrationLoad(void) {
 
 bool vfdCalibrationSave(void) {
     // Save all calibration values to NVS config
-    configSetInt(KEY_VFD_IDLE_RMS, (int32_t)(calib_data.idle_rms_amps * 100.0f));
+    configSetInt(KEY_VFD_IDLE_RMS, (int32_t)(calib_data.idle_avg_amps * 100.0f));
     configSetInt(KEY_VFD_IDLE_PEAK, (int32_t)(calib_data.idle_peak_amps * 100.0f));
-    configSetInt(KEY_VFD_STD_CUT_RMS, (int32_t)(calib_data.standard_cut_rms_amps * 100.0f));
+    configSetInt(KEY_VFD_STD_CUT_RMS, (int32_t)(calib_data.standard_cut_avg_amps * 100.0f));
     configSetInt(KEY_VFD_STD_CUT_PEAK, (int32_t)(calib_data.standard_cut_peak_amps * 100.0f));
-    configSetInt(KEY_VFD_HEAVY_RMS, (int32_t)(calib_data.heavy_cut_rms_amps * 100.0f));
+    configSetInt(KEY_VFD_HEAVY_RMS, (int32_t)(calib_data.heavy_cut_avg_amps * 100.0f));
     configSetInt(KEY_VFD_HEAVY_PEAK, (int32_t)(calib_data.heavy_cut_peak_amps * 100.0f));
     configSetInt(KEY_VFD_STALL_THR, (int32_t)(calib_data.stall_threshold_amps * 100.0f));
     configSetInt(KEY_VFD_STALL_MARGIN, (int32_t)calib_data.stall_margin_percent);
@@ -170,8 +170,8 @@ bool vfdCalibrationIsMeasureComplete(void) {
     return false;
 }
 
-bool vfdCalibrationGetMeasurement(float* out_rms_amps, float* out_peak_amps) {
-    if (out_rms_amps == nullptr || out_peak_amps == nullptr) {
+bool vfdCalibrationGetMeasurement(float* out_avg_amps, float* out_peak_amps) {
+    if (out_avg_amps == nullptr || out_peak_amps == nullptr) {
         return false;
     }
 
@@ -179,38 +179,38 @@ bool vfdCalibrationGetMeasurement(float* out_rms_amps, float* out_peak_amps) {
         return false;  // No samples collected
     }
 
-    // Calculate RMS from sum of samples
-    float rms = measure_state.current_sum / measure_state.sample_count;
-    *out_rms_amps = rms;
+    // Calculate AVG from sum of samples
+    float avg = measure_state.current_sum / measure_state.sample_count;
+    *out_avg_amps = avg;
     *out_peak_amps = measure_state.current_max;
 
-    logInfo("[VFDCAL] Measurement result: RMS=%.2f A, Peak=%.2f A (samples: %lu)",
-                  rms, measure_state.current_max, (unsigned long)measure_state.sample_count);
+    logInfo("[VFDCAL] Measurement result: AVG=%.2f A, Peak=%.2f A (samples: %lu)",
+                  avg, measure_state.current_max, (unsigned long)measure_state.sample_count);
 
     return true;
 }
 
-void vfdCalibrationStoreMeasurement(uint8_t phase, float rms_amps, float peak_amps) {
+void vfdCalibrationStoreMeasurement(uint8_t phase, float avg_amps, float peak_amps) {
     switch (phase) {
         case 0:  // Idle baseline
-            calib_data.idle_rms_amps = rms_amps;
+            calib_data.idle_avg_amps = avg_amps;
             calib_data.idle_peak_amps = peak_amps;
-            logInfo("[VFDCAL] Stored idle baseline: %.2f A (RMS), %.2f A (peak)",
-                          rms_amps, peak_amps);
+            logInfo("[VFDCAL] Stored idle baseline: %.2f A (AVG), %.2f A (peak)",
+                          avg_amps, peak_amps);
             break;
 
         case 1:  // Standard cut baseline
-            calib_data.standard_cut_rms_amps = rms_amps;
+            calib_data.standard_cut_avg_amps = avg_amps;
             calib_data.standard_cut_peak_amps = peak_amps;
-            logInfo("[VFDCAL] Stored standard cut baseline: %.2f A (RMS), %.2f A (peak)",
-                          rms_amps, peak_amps);
+            logInfo("[VFDCAL] Stored standard cut baseline: %.2f A (AVG), %.2f A (peak)",
+                          avg_amps, peak_amps);
             break;
 
         case 2:  // Heavy load (optional)
-            calib_data.heavy_cut_rms_amps = rms_amps;
+            calib_data.heavy_cut_avg_amps = avg_amps;
             calib_data.heavy_cut_peak_amps = peak_amps;
-            logInfo("[VFDCAL] Stored heavy load baseline: %.2f A (RMS), %.2f A (peak)",
-                          rms_amps, peak_amps);
+            logInfo("[VFDCAL] Stored heavy load baseline: %.2f A (AVG), %.2f A (peak)",
+                          avg_amps, peak_amps);
             break;
 
         default:
@@ -271,8 +271,8 @@ float vfdCalibrationGetMargin(void) {
 
 bool vfdCalibrationIsValid(void) {
     return calib_data.is_calibrated &&
-           calib_data.idle_rms_amps > 0.0f &&
-           calib_data.standard_cut_rms_amps > 0.0f;
+           calib_data.idle_avg_amps > 0.0f &&
+           calib_data.standard_cut_avg_amps > 0.0f;
 }
 
 void vfdCalibrationReset(void) {
@@ -321,23 +321,23 @@ void vfdCalibrationPrintSummary(void) {
     logPrintf("Status:              %s\r\n", calib_data.is_calibrated ? "VALID" : "INVALID");
     logPrintf("Calibration Count:   %lu\r\n", (unsigned long)calib_data.calibration_count);
 
-    if (calib_data.idle_rms_amps > 0.0f || calib_data.idle_peak_amps > 0.0f) {
-        logPrintf("Idle Baseline:       %.2f A (RMS) / %.2f A (peak)\r\n",
-                      calib_data.idle_rms_amps, calib_data.idle_peak_amps);
+    if (calib_data.idle_avg_amps > 0.0f || calib_data.idle_peak_amps > 0.0f) {
+        logPrintf("Idle Baseline:       %.2f A (AVG) / %.2f A (peak)\r\n",
+                      calib_data.idle_avg_amps, calib_data.idle_peak_amps);
     } else {
         logPrintln("Idle Baseline:       Not measured");
     }
 
-    if (calib_data.standard_cut_rms_amps > 0.0f || calib_data.standard_cut_peak_amps > 0.0f) {
-        logPrintf("Standard Cut:        %.2f A (RMS) / %.2f A (peak)\r\n",
-                      calib_data.standard_cut_rms_amps, calib_data.standard_cut_peak_amps);
+    if (calib_data.standard_cut_avg_amps > 0.0f || calib_data.standard_cut_peak_amps > 0.0f) {
+        logPrintf("Standard Cut:        %.2f A (AVG) / %.2f A (peak)\r\n",
+                      calib_data.standard_cut_avg_amps, calib_data.standard_cut_peak_amps);
     } else {
         logPrintln("Standard Cut:        Not measured");
     }
 
-    if (calib_data.heavy_cut_rms_amps > 0.0f || calib_data.heavy_cut_peak_amps > 0.0f) {
-        logPrintf("Heavy Load:          %.2f A (RMS) / %.2f A (peak)\r\n",
-                      calib_data.heavy_cut_rms_amps, calib_data.heavy_cut_peak_amps);
+    if (calib_data.heavy_cut_avg_amps > 0.0f || calib_data.heavy_cut_peak_amps > 0.0f) {
+        logPrintf("Heavy Load:          %.2f A (AVG) / %.2f A (peak)\r\n",
+                      calib_data.heavy_cut_avg_amps, calib_data.heavy_cut_peak_amps);
     } else {
         logPrintln("Heavy Load:          Not measured");
     }
