@@ -12,6 +12,7 @@
 static int ota_progress = 0;
 static bool ota_active = false;
 static bool ota_check_complete = false;
+static bool ota_check_in_progress = false;
 static UpdateCheckResult cached_result = {false, "", "", ""};
 
 // The GitHub repository info
@@ -249,6 +250,7 @@ static void ota_check_task(void* pvParameters) {
 
     cached_result = otaCheckForUpdate();
     ota_check_complete = true;
+    ota_check_in_progress = false;
     
     if (cached_result.available) {
         logInfo("[OTA] Update available: %s", cached_result.latest_version);
@@ -260,12 +262,15 @@ static void ota_check_task(void* pvParameters) {
 }
 
 result_t otaStartBackgroundCheck(void) {
-    if (ota_check_complete) return RESULT_OK; // Already checked
+    if (ota_check_complete || ota_check_in_progress) return RESULT_OK; // Already checked or checking
+    
+    ota_check_in_progress = true;
     
     // Reduced stack from 8192 to 5120 to save heap
     BaseType_t res = xTaskCreate(ota_check_task, "ota_check", 5120, NULL, 3, NULL);
     if (res != pdPASS) {
         logError("[OTA] Failed to create ota_check task");
+        ota_check_in_progress = false;
         return RESULT_ERROR;
     }
     return RESULT_OK;

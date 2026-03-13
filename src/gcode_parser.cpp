@@ -246,29 +246,29 @@ bool GCodeParser::processCommand(const char* line) {
 
         switch (cmd) {
             case 0:
-            case 1:  return handleG0_G1(line);
-            case 2:  return handleG2_G3(line, true);  // CW Arc
-            case 3:  return handleG2_G3(line, false); // CCW Arc
-            case 4:  handleG4(line); break;  // G4 Dwell
-            case 10: handleG10(line); break; // G10 L20 P1...
-            case 28: handleG28(line); break; // PHASE 5.1: G28 Home
-            case 30: handleG30(line); break; // PHASE 5.1: G30 Predefined position
-            case 53: handleG53(line); break; // PHASE 5.1: G53 Machine coordinates
+            case 1:  return handleG0_G1(clean_line);
+            case 2:  return handleG2_G3(clean_line, true);  // CW Arc
+            case 3:  return handleG2_G3(clean_line, false); // CCW Arc
+            case 4:  handleG4(clean_line); break;  // G4 Dwell
+            case 10: handleG10(clean_line); break; // G10 L20 P1...
+            case 28: handleG28(clean_line); break; // PHASE 5.1: G28 Home
+            case 30: handleG30(clean_line); break; // PHASE 5.1: G30 Predefined position
+            case 53: handleG53(clean_line); break; // PHASE 5.1: G53 Machine coordinates
             case 54 ... 59: handleG5x(cmd - 54); break; // WCS Select
             case 90: handleG90(); break;
             case 91: handleG91(); break;
-            case 92: handleG92(line); break;
+            case 92: handleG92(clean_line); break;
             default: return false;
         }
         return true;
     }
 
     // M Codes
-    if (parseCode(line, 'M', val)) {
+    if (parseCode(clean_line, 'M', val)) {
         int cmd = (int)val;
         switch (cmd) {
             case 0:
-            case 1:  handleM0_M1(line); break; // PHASE 5.1: M0/M1 Program stop/pause
+            case 1:  handleM0_M1(clean_line); break; // PHASE 5.1: M0/M1 Program stop/pause
             case 2:  motionStop(); break;
             case 3:  plcSetSpeed(2); break; // Fast (Legacy Spindle ON)
             case 5:  plcSetSpeed(255); break; // All OFF (Legacy Spindle OFF)
@@ -283,9 +283,9 @@ bool GCodeParser::processCommand(const char* line) {
             // PHASE 4.0: M115 - Firmware info
             case 115: handleM115(); break;
             // PHASE 4.0: M154 - Position auto-report
-            case 154: handleM154(line); break;
+            case 154: handleM154(clean_line); break;
             // PHASE 4.0: M226 - Wait for pin state
-            case 226: handleM226(line); break;
+            case 226: handleM226(clean_line); break;
             // PHASE 4.0: M255 - LCD sleep/backlight timeout
             case 255: handleM255(clean_line); break;
             case 112: motionEmergencyStop(); break;

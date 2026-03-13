@@ -558,6 +558,10 @@ result_t configSetInt(const char *key, int32_t value) {
   }
 
   int idx = findConfigEntry(key);
+  if (idx >= 0 && config_table[idx].type != CONFIG_INT32) {
+    if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
+    return RESULT_INVALID_PARAM;
+  }
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
       if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
@@ -616,6 +620,10 @@ result_t configSetFloat(const char *key, float value) {
   }
 
   int idx = findConfigEntry(key);
+  if (idx >= 0 && config_table[idx].type != CONFIG_FLOAT) {
+    if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
+    return RESULT_INVALID_PARAM;
+  }
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
       if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
@@ -679,6 +687,10 @@ result_t configSetString(const char *key, const char *value) {
   }
 
   int idx = findConfigEntry(key);
+  if (idx >= 0 && config_table[idx].type != CONFIG_STRING) {
+    if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
+    return RESULT_INVALID_PARAM;
+  }
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
       if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
@@ -735,6 +747,10 @@ result_t configSetUInt64(const char *key, uint64_t value) {
   }
 
   int idx = findConfigEntry(key);
+  if (idx >= 0 && config_table[idx].type != CONFIG_UINT64) {
+    if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);
+    return RESULT_INVALID_PARAM;
+  }
   if (idx < 0) {
     if (config_count >= CONFIG_MAX_KEYS) {
       if (config_cache_mutex != NULL) xSemaphoreGiveRecursive(config_cache_mutex);

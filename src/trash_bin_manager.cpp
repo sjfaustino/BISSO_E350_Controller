@@ -159,8 +159,8 @@ static void trashBinTask(void* pvParameters) {
     
     while (1) {
         trashBinAutoPurge();
-        // Run purge every 24 hours
-        vTaskDelay(pdMS_TO_TICKS(24 * 60 * 60 * 1000));
+        // Run purge every 24 hours safely avoiding 32-bit multiplication overflow inside pdMS_TO_TICKS
+        vTaskDelay(pdMS_TO_TICKS(60000) * 60 * 24);
     }
 }
 
