@@ -19,6 +19,7 @@ void registerNetworkRoutes(PsychicHttpServer& server) {
     
     // GET /api/network/status (OPTIMIZED: snprintf, no heap)
     server.on("/api/network/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         // WiFi Status
         bool wifi_connected = WiFi.isConnected();
         int rssi = WiFi.RSSI();
@@ -56,6 +57,7 @@ void registerNetworkRoutes(PsychicHttpServer& server) {
 
     // POST /api/network/reconnect (OPTIMIZED: static string)
     server.on("/api/network/reconnect", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         WiFi.disconnect();
         WiFi.begin();
         
@@ -64,6 +66,7 @@ void registerNetworkRoutes(PsychicHttpServer& server) {
 
     // GET /api/time (OPTIMIZED: snprintf, no heap)
     server.on("/api/time", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         time_t now;
         struct tm timeinfo;
         time(&now);
@@ -85,6 +88,7 @@ void registerNetworkRoutes(PsychicHttpServer& server) {
 
     // POST /api/time/sync
     server.on("/api/time/sync", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, request->body());
         

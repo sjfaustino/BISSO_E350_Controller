@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 // ============================================================================
-// PHASE 2.5: LOG RATE LIMITING
+// LOG RATE LIMITING
 // ============================================================================
 
 // Maximum number of fault types to track

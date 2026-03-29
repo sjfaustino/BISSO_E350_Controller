@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 // ============================================================================
-// PHASE 2.5: CONFIG MIGRATION FRAMEWORK
+// CONFIG MIGRATION FRAMEWORK
 // ============================================================================
 
 // Configuration default values for automatic initialization

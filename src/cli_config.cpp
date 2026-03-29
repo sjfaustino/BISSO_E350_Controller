@@ -26,8 +26,8 @@ void cmd_config_validate(int argc, char **argv);
 void cmd_config_export(int argc, char **argv);
 void cmd_config_import(int argc, char **argv);
 
-// PHASE 5.1: Config backup/restore declarations
-// PHASE 5.1: Config backup/restore implementation
+// Config backup/restore declarations
+// Config backup/restore implementation
 void cmd_config_backup(int argc, char **argv) {
     (void)argc; (void)argv;
     extern bool configMigrationBackup(uint8_t version);
@@ -248,7 +248,7 @@ void cmd_config_validate(int argc, char **argv) {
 }
 
 // ============================================================================
-// PHASE 2: CONFIG IMPORT/EXPORT (JSON)
+// CONFIG IMPORT/EXPORT (JSON)
 // ============================================================================
 
 void cmd_config_export(int argc, char **argv) {

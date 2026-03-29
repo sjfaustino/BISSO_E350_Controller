@@ -1,6 +1,6 @@
 /**
  * @file lcd_formatter.h
- * @brief LCD String Formatter - Background Task (PHASE 5.4)
+ * @brief LCD String Formatter - Background Task
  * @details Formats LCD strings on Core 0 to reduce Core 1 snprintf overhead
  */
 
@@ -12,11 +12,11 @@
 
 // Pre-formatted LCD line buffers (20 chars each for typical 20x4 LCD)
 typedef struct {
-    char line0[21];  // Axis positions line
-    char line1[21];  // Status line
-    char line2[21];  // Motion/Alarm/Message line
-    char line3[21];  // Detail line
-    uint32_t last_update_ms;
+ char line0[21]; // Axis positions line
+ char line1[21]; // Status line
+ char line2[21]; // Motion/Alarm/Message line
+ char line3[21]; // Detail line
+ uint32_t last_update_ms;
 } lcd_format_buffer_t;
 
 /**

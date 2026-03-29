@@ -1,7 +1,7 @@
 /**
  * @file auth_manager.h
  * @brief Secure authentication manager with SHA-256 password hashing
- * @details PHASE 5.10: Security hardening - replaces plain text passwords
+ * @details Security hardening - replaces plain text passwords
  */
 
 #ifndef AUTH_MANAGER_H
@@ -9,13 +9,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stddef.h>  // For size_t
+#include <stddef.h> // For size_t
 
 // Password hash format: $sha256$<salt_hex>$<hash_hex>
 // Example: $sha256$a1b2c3d4e5f67890$1234567890abcdef...
 #define AUTH_SALT_BYTES 16
 #define AUTH_HASH_BYTES 32
-#define AUTH_MAX_STORED_PW_LEN 128  // $sha256$ + 32 hex salt + $ + 64 hex hash
+#define AUTH_MAX_STORED_PW_LEN 128 // $sha256$ + 32 hex salt + $ + 64 hex hash
 
 /**
  * @brief Initialize authentication manager

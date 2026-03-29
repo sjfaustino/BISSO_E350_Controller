@@ -10,79 +10,79 @@
 #include "config_unified.h"
 #include "config_keys.h"
 #include "serial_logger.h"
-#include "lcd_message.h"  // PHASE 3.2: M117 LCD message support
-#include "auto_report.h"  // PHASE 4.0: M154 auto-report support
-#include "lcd_sleep.h"    // PHASE 4.0: M255 LCD sleep support
-#include "plc_iface.h"    // PHASE 4.0: M226 pin state reading
-#include "board_inputs.h"  // PHASE 4.0: M226 board input reading
-#include "hardware_config.h"  // For MachineCalibration in handleM114()
+#include "lcd_message.h" // M117 LCD message support
+#include "auto_report.h" // M154 auto-report support
+#include "lcd_sleep.h" // M255 LCD sleep support
+#include "plc_iface.h" // M226 pin state reading
+#include "board_inputs.h" // M226 board input reading
+#include "hardware_config.h" // For MachineCalibration in handleM114()
 #include "firmware_version.h" // For M115 version reporting
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
-#include "system_utils.h" // PHASE 8.1
+#include "system_utils.h"
 #include "altivar31_modbus.h"
 
 GCodeParser gcodeParser;
 
 GCodeParser::GCodeParser() : distanceMode(G_MODE_ABSOLUTE), currentFeedRate(50.0f), currentWCS(WCS_G54), machineCoordinatesMode(false), programPaused(false), pauseStartTime(0), dryRunMode(false) {
-    memset(wcs_offsets, 0, sizeof(wcs_offsets));
-    memset(&dryRunResult, 0, sizeof(dryRunResult));
-    memset(dryRunLastPos, 0, sizeof(dryRunLastPos));
+ memset(wcs_offsets, 0, sizeof(wcs_offsets));
+ memset(&dryRunResult, 0, sizeof(dryRunResult));
+ memset(dryRunLastPos, 0, sizeof(dryRunLastPos));
 }
 
 void GCodeParser::init() {
-    logModuleInit("GCODE");
-    distanceMode = G_MODE_ABSOLUTE;
-    currentFeedRate = 50.0f; 
-    currentWCS = WCS_G54;
-    loadWCS(); 
-    logInfo("[GCODE] Ready. WCS: G54");
+ logModuleInit("GCODE");
+ distanceMode = G_MODE_ABSOLUTE;
+ currentFeedRate = 50.0f; 
+ currentWCS = WCS_G54;
+ loadWCS(); 
+ logInfo("[GCODE] Ready. WCS: G54");
 }
 
 void GCodeParser::loadWCS() {
-    char key[16];
-    for(int s=0; s<6; s++) {
-        for(int a=0; a<4; a++) {
-            snprintf(key, sizeof(key), "g%d_%c", 54+s, "xyza"[a]);
-            wcs_offsets[s][a] = configGetFloat(key, 0.0f);
-        }
-    }
+ char key[16];
+ for(int s=0; s<6; s++) {
+ for(int a=0; a<4; a++) {
+ snprintf(key, sizeof(key), "g%d_%c", 54+s, "xyza"[a]);
+ wcs_offsets[s][a] = configGetFloat(key, 0.0f);
+ }
+ }
 }
 
 void GCodeParser::saveWCS(uint8_t system) {
-    if(system > 5) return;
-    char key[16];
-    for(int a=0; a<4; a++) {
-        snprintf(key, sizeof(key), "g%d_%c", 54+system, "xyza"[a]);
-        configSetFloat(key, wcs_offsets[system][a]);
-    }
-    configUnifiedFlush(); 
+ if(system > 5) return;
+ char key[16];
+ for(int a=0; a<4; a++) {
+ snprintf(key, sizeof(key), "g%d_%c", 54+system, "xyza"[a]);
+ configSetFloat(key, wcs_offsets[system][a]);
+ }
+ configUnifiedFlush(); 
 }
 
 float GCodeParser::getWorkPosition(uint8_t axis, float mpos) {
-    if(axis >= 4) return 0.0f;
-    return mpos - wcs_offsets[currentWCS][axis];
+ if(axis >= 4) return 0.0f;
+ return mpos - wcs_offsets[currentWCS][axis];
 }
 
 void GCodeParser::getWCO(float* wco_array) {
-    if(!wco_array) return;
-    for(int i=0; i<4; i++) wco_array[i] = wcs_offsets[currentWCS][i];
+ if(!wco_array) return;
+ for(int i=0; i<4; i++) wco_array[i] = wcs_offsets[currentWCS][i];
 }
 
 float GCodeParser::getCurrentFeedRate() {
-    return currentFeedRate;
+ return currentFeedRate;
 }
 
 void GCodeParser::getParserState(char* buffer, size_t len) {
-    // Standard Grbl response string
-    snprintf(buffer, len, "[GC:G%d G%d %s G94 M5]",
-        (motionIsMoving() ? 1 : 0),
-        (54 + currentWCS),
-        (distanceMode == G_MODE_ABSOLUTE ? "G90" : "G91")
-    );
+ // Standard Grbl response string
+ snprintf(buffer, len, "[GC:G%d G%d %s G94 M5]",
+ (motionIsMoving() ? 1 : 0),
+ (54 + currentWCS),
+ (distanceMode == G_MODE_ABSOLUTE ? "G90" : "G91")
+ );
 }
 
 /**
@@ -93,920 +93,920 @@ void GCodeParser::getParserState(char* buffer, size_t len) {
  * @return true if syntax is valid, false otherwise
  */
 bool GCodeParser::validateGCodeSyntax(const char* line, char* error_msg, size_t error_msg_len) {
-    if (!line) {
-        snprintf(error_msg, error_msg_len, "Null command");
-        return false;
-    }
+ if (!line) {
+ snprintf(error_msg, error_msg_len, "Null command");
+ return false;
+ }
 
-    size_t len = strlen(line);
+ size_t len = strlen(line);
 
-    // Check length (prevent buffer overflow)
-    if (len == 0) {
-        snprintf(error_msg, error_msg_len, "Empty command");
-        return false;
-    }
-    if (len > 128) {
-        snprintf(error_msg, error_msg_len, "Command too long (max 128 chars)");
-        return false;
-    }
+ // Check length (prevent buffer overflow)
+ if (len == 0) {
+ snprintf(error_msg, error_msg_len, "Empty command");
+ return false;
+ }
+ if (len > 128) {
+ snprintf(error_msg, error_msg_len, "Command too long (max 128 chars)");
+ return false;
+ }
 
-    // Skip comments and whitespace
-    if (line[0] == '(' || line[0] == ';' || line[0] == ' ' || line[0] == '\t') {
-        return true; // Comments are valid
-    }
+ // Skip comments and whitespace
+ if (line[0] == '(' || line[0] == ';' || line[0] == ' ' || line[0] == '\t') {
+ return true; // Comments are valid
+ }
 
-    // Check for valid command letter (G or M)
-    if (line[0] != 'G' && line[0] != 'g' && line[0] != 'M' && line[0] != 'm') {
-        snprintf(error_msg, error_msg_len, "Invalid command (must start with G or M)");
-        return false;
-    }
+ // Check for valid command letter (G or M)
+ if (line[0] != 'G' && line[0] != 'g' && line[0] != 'M' && line[0] != 'm') {
+ snprintf(error_msg, error_msg_len, "Invalid command (must start with G or M)");
+ return false;
+ }
 
-    // Extract command number
-    char cmd_letter = toupper(line[0]);
-    const char* num_start = line + 1;
-    char* end_ptr;
-    long cmd_num = strtol(num_start, &end_ptr, 10);
+ // Extract command number
+ char cmd_letter = toupper(line[0]);
+ const char* num_start = line + 1;
+ char* end_ptr;
+ long cmd_num = strtol(num_start, &end_ptr, 10);
 
-    // Check if number was found
-    if (end_ptr == num_start) {
-        snprintf(error_msg, error_msg_len, "Missing command number after %c", cmd_letter);
-        return false;
-    }
+ // Check if number was found
+ if (end_ptr == num_start) {
+ snprintf(error_msg, error_msg_len, "Missing command number after %c", cmd_letter);
+ return false;
+ }
 
-    // Validate command ranges
-    if (cmd_letter == 'G') {
-        if (cmd_num < 0 || cmd_num > 99) {
-            snprintf(error_msg, error_msg_len, "Invalid G-code number G%ld (range: G0-G99)", cmd_num);
-            return false;
-        }
-        // Check for supported G-codes
-        bool valid_g = (cmd_num == 0 || cmd_num == 1 || cmd_num == 2 || cmd_num == 3 ||
-                       cmd_num == 4 || cmd_num == 10 ||
-                       cmd_num == 28 || cmd_num == 30 || cmd_num == 53 ||
-                       (cmd_num >= 54 && cmd_num <= 59) ||
-                       cmd_num == 90 || cmd_num == 91 || cmd_num == 92);
-        if (!valid_g) {
-            snprintf(error_msg, error_msg_len, "Unsupported G-code G%ld", cmd_num);
-            return false;
-        }
-    } else if (cmd_letter == 'M') {
-        if (cmd_num < 0 || cmd_num > 999) {
-            snprintf(error_msg, error_msg_len, "Invalid M-code number M%ld (range: M0-M999)", cmd_num);
-            return false;
-        }
-        // Check for supported M-codes
-        bool valid_m = (cmd_num == 0 || cmd_num == 1 || cmd_num == 2 || cmd_num == 3 || cmd_num == 5 ||
-                       cmd_num == 8 || cmd_num == 9 ||
-                       cmd_num == 112 || cmd_num == 114 || cmd_num == 115 ||
-                       cmd_num == 117 || cmd_num == 154 || cmd_num == 226 || cmd_num == 255 ||
-                       cmd_num == 402 || cmd_num == 403 || cmd_num == 999);
-        if (cmd_num == 117) {
-            return true; // M117 is free-form text, skip parameter validation
-        }
+ // Validate command ranges
+ if (cmd_letter == 'G') {
+ if (cmd_num < 0 || cmd_num > 99) {
+ snprintf(error_msg, error_msg_len, "Invalid G-code number G%ld (range: G0-G99)", cmd_num);
+ return false;
+ }
+ // Check for supported G-codes
+ bool valid_g = (cmd_num == 0 || cmd_num == 1 || cmd_num == 2 || cmd_num == 3 ||
+ cmd_num == 4 || cmd_num == 10 ||
+ cmd_num == 28 || cmd_num == 30 || cmd_num == 53 ||
+ (cmd_num >= 54 && cmd_num <= 59) ||
+ cmd_num == 90 || cmd_num == 91 || cmd_num == 92);
+ if (!valid_g) {
+ snprintf(error_msg, error_msg_len, "Unsupported G-code G%ld", cmd_num);
+ return false;
+ }
+ } else if (cmd_letter == 'M') {
+ if (cmd_num < 0 || cmd_num > 999) {
+ snprintf(error_msg, error_msg_len, "Invalid M-code number M%ld (range: M0-M999)", cmd_num);
+ return false;
+ }
+ // Check for supported M-codes
+ bool valid_m = (cmd_num == 0 || cmd_num == 1 || cmd_num == 2 || cmd_num == 3 || cmd_num == 5 ||
+ cmd_num == 8 || cmd_num == 9 ||
+ cmd_num == 112 || cmd_num == 114 || cmd_num == 115 ||
+ cmd_num == 117 || cmd_num == 154 || cmd_num == 226 || cmd_num == 255 ||
+ cmd_num == 402 || cmd_num == 403 || cmd_num == 999);
+ if (cmd_num == 117) {
+ return true; // M117 is free-form text, skip parameter validation
+ }
 
-        if (!valid_m) {
-            snprintf(error_msg, error_msg_len, "Unsupported M-code M%ld", cmd_num);
-            return false;
-        }
-    }
+ if (!valid_m) {
+ snprintf(error_msg, error_msg_len, "Unsupported M-code M%ld", cmd_num);
+ return false;
+ }
+ }
 
-    // Validate parameters (if any)
-    const char* param_start = end_ptr;
-    while (*param_start) {
-        // Skip whitespace
-        while (*param_start && (*param_start == ' ' || *param_start == '\t')) {
-            param_start++;
-        }
-        if (*param_start == '\0') break;
+ // Validate parameters (if any)
+ const char* param_start = end_ptr;
+ while (*param_start) {
+ // Skip whitespace
+ while (*param_start && (*param_start == ' ' || *param_start == '\t')) {
+ param_start++;
+ }
+ if (*param_start == '\0') break;
 
-        // Check for valid parameter letter
-        char param_letter = toupper(*param_start);
-        bool valid_param = (param_letter == 'X' || param_letter == 'Y' || param_letter == 'Z' ||
-                           param_letter == 'A' || param_letter == 'F' || param_letter == 'S' ||
-                           param_letter == 'P' || param_letter == 'L' || param_letter == 'R' ||
-                           param_letter == 'I' || param_letter == 'J' || param_letter == 'K');
+ // Check for valid parameter letter
+ char param_letter = toupper(*param_start);
+ bool valid_param = (param_letter == 'X' || param_letter == 'Y' || param_letter == 'Z' ||
+ param_letter == 'A' || param_letter == 'F' || param_letter == 'S' ||
+ param_letter == 'P' || param_letter == 'L' || param_letter == 'R' ||
+ param_letter == 'I' || param_letter == 'J' || param_letter == 'K');
 
-        if (!valid_param) {
-            snprintf(error_msg, error_msg_len, "Invalid parameter '%c'", param_letter);
-            return false;
-        }
+ if (!valid_param) {
+ snprintf(error_msg, error_msg_len, "Invalid parameter '%c'", param_letter);
+ return false;
+ }
 
-        // Check parameter value
-        param_start++;
-        char* param_end;
-        float param_val = strtof(param_start, &param_end);
+ // Check parameter value
+ param_start++;
+ char* param_end;
+ float param_val = strtof(param_start, &param_end);
 
-        if (param_end == param_start) {
-            snprintf(error_msg, error_msg_len, "Missing value for parameter %c", param_letter);
-            return false;
-        }
+ if (param_end == param_start) {
+ snprintf(error_msg, error_msg_len, "Missing value for parameter %c", param_letter);
+ return false;
+ }
 
-        // Validate numeric range (prevent overflow)
-        if (!isfinite(param_val)) {
-            snprintf(error_msg, error_msg_len, "Invalid numeric value for %c", param_letter);
-            return false;
-        }
+ // Validate numeric range (prevent overflow)
+ if (!isfinite(param_val)) {
+ snprintf(error_msg, error_msg_len, "Invalid numeric value for %c", param_letter);
+ return false;
+ }
 
-        param_start = param_end;
-    }
+ param_start = param_end;
+ }
 
-    return true;
+ return true;
 }
 
 bool GCodeParser::processCommand(const char* line) {
-    if (!line || strlen(line) == 0) return false;
-    if (line[0] == '(' || line[0] == ';') return true;
+ if (!line || strlen(line) == 0) return false;
+ if (line[0] == '(' || line[0] == ';') return true;
 
-    // Create a clean, comment-stripped version of the line for parsing
-    // This prevents parenthetical comments from poisoning parameter searches
-    char clean_line[128];
-    strncpy(clean_line, line, sizeof(clean_line) - 1);
-    clean_line[sizeof(clean_line) - 1] = '\0';
-    
-    char* comment_start = strpbrk(clean_line, "(;");
-    if (comment_start) {
-        *comment_start = '\0';
-    }
+ // Create a clean, comment-stripped version of the line for parsing
+ // This prevents parenthetical comments from poisoning parameter searches
+ char clean_line[128];
+ strncpy(clean_line, line, sizeof(clean_line) - 1);
+ clean_line[sizeof(clean_line) - 1] = '\0';
+ 
+ char* comment_start = strpbrk(clean_line, "(;");
+ if (comment_start) {
+ *comment_start = '\0';
+ }
 
-    // PHASE 5.10: Validate G-code syntax before processing
-    char error_msg[128];
-    if (!validateGCodeSyntax(clean_line, error_msg, sizeof(error_msg))) {
-        logError("[GCODE] Syntax error: %s (line: %s)", error_msg, line);
-        return false;
-    }
+ // Validate G-code syntax before processing
+ char error_msg[128];
+ if (!validateGCodeSyntax(clean_line, error_msg, sizeof(error_msg))) {
+ logError("[GCODE] Syntax error: %s (line: %s)", error_msg, line);
+ return false;
+ }
 
-    float val = -1.0f;
-    
-    // G Codes
-    if (parseCode(clean_line, 'G', val)) {
-        int cmd = (int)val;
+ float val = -1.0f;
+ 
+ // G Codes
+ if (parseCode(clean_line, 'G', val)) {
+ int cmd = (int)val;
 
-        // Set current command string for UI tracking
-        motionSetCurrentCommand(line);
+ // Set current command string for UI tracking
+ motionSetCurrentCommand(line);
 
-        switch (cmd) {
-            case 0:
-            case 1:  return handleG0_G1(clean_line);
-            case 2:  return handleG2_G3(clean_line, true);  // CW Arc
-            case 3:  return handleG2_G3(clean_line, false); // CCW Arc
-            case 4:  handleG4(clean_line); break;  // G4 Dwell
-            case 10: handleG10(clean_line); break; // G10 L20 P1...
-            case 28: handleG28(clean_line); break; // PHASE 5.1: G28 Home
-            case 30: handleG30(clean_line); break; // PHASE 5.1: G30 Predefined position
-            case 53: handleG53(clean_line); break; // PHASE 5.1: G53 Machine coordinates
-            case 54 ... 59: handleG5x(cmd - 54); break; // WCS Select
-            case 90: handleG90(); break;
-            case 91: handleG91(); break;
-            case 92: handleG92(clean_line); break;
-            default: return false;
-        }
-        return true;
-    }
+ switch (cmd) {
+ case 0:
+ case 1: return handleG0_G1(clean_line);
+ case 2: return handleG2_G3(clean_line, true); // CW Arc
+ case 3: return handleG2_G3(clean_line, false); // CCW Arc
+ case 4: handleG4(clean_line); break; // G4 Dwell
+ case 10: handleG10(clean_line); break; // G10 L20 P1...
+ case 28: handleG28(clean_line); break; // G28 Home
+ case 30: handleG30(clean_line); break; // G30 Predefined position
+ case 53: handleG53(clean_line); break; // G53 Machine coordinates
+ case 54 ... 59: handleG5x(cmd - 54); break; // WCS Select
+ case 90: handleG90(); break;
+ case 91: handleG91(); break;
+ case 92: handleG92(clean_line); break;
+ default: return false;
+ }
+ return true;
+ }
 
-    // M Codes
-    if (parseCode(clean_line, 'M', val)) {
-        int cmd = (int)val;
-        switch (cmd) {
-            case 0:
-            case 1:  handleM0_M1(clean_line); break; // PHASE 5.1: M0/M1 Program stop/pause
-            case 2:  motionStop(); break;
-            case 3:  plcSetSpeed(2); break; // Fast (Legacy Spindle ON)
-            case 5:  plcSetSpeed(255); break; // All OFF (Legacy Spindle OFF)
-            case 8:  plcSetOutput(getPin("output_coolant"), true); logInfo("[GCODE] Coolant ON (M8)"); break;   // Y13
-            case 9:  
-                plcSetOutput(getPin("output_coolant"), false); 
-                logInfo("[GCODE] All Coolant/Aux OFF (M9)"); break;
-            // PHASE 3.2: M117 - Display message on LCD (standard gcode command)
-            case 117: handleM117(line); break;
-            // PHASE 4.0: M114 - Get current position
-            case 114: handleM114(); break;
-            // PHASE 4.0: M115 - Firmware info
-            case 115: handleM115(); break;
-            // PHASE 4.0: M154 - Position auto-report
-            case 154: handleM154(clean_line); break;
-            // PHASE 4.0: M226 - Wait for pin state
-            case 226: handleM226(clean_line); break;
-            // PHASE 4.0: M255 - LCD sleep/backlight timeout
-            case 255: handleM255(clean_line); break;
-            case 112: motionEmergencyStop(); break;
-            case 402: handleM402(clean_line); break; // Coordinated Motion Mode toggle
-            case 403: handleM403(clean_line); break; // VFD Frequency Control
-            default: return false;
-        }
-        return true;
-    }
+ // M Codes
+ if (parseCode(clean_line, 'M', val)) {
+ int cmd = (int)val;
+ switch (cmd) {
+ case 0:
+ case 1: handleM0_M1(clean_line); break; // M0/M1 Program stop/pause
+ case 2: motionStop(); break;
+ case 3: plcSetSpeed(2); break; // Fast (Legacy Spindle ON)
+ case 5: plcSetSpeed(255); break; // All OFF (Legacy Spindle OFF)
+ case 8: plcSetOutput(getPin("output_coolant"), true); logInfo("[GCODE] Coolant ON (M8)"); break; // Y13
+ case 9: 
+ plcSetOutput(getPin("output_coolant"), false); 
+ logInfo("[GCODE] All Coolant/Aux OFF (M9)"); break;
+ // M117 - Display message on LCD (standard gcode command)
+ case 117: handleM117(line); break;
+ // M114 - Get current position
+ case 114: handleM114(); break;
+ // M115 - Firmware info
+ case 115: handleM115(); break;
+ // M154 - Position auto-report
+ case 154: handleM154(clean_line); break;
+ // M226 - Wait for pin state
+ case 226: handleM226(clean_line); break;
+ // M255 - LCD sleep/backlight timeout
+ case 255: handleM255(clean_line); break;
+ case 112: motionEmergencyStop(); break;
+ case 402: handleM402(clean_line); break; // Coordinated Motion Mode toggle
+ case 403: handleM403(clean_line); break; // VFD Frequency Control
+ default: return false;
+ }
+ return true;
+ }
 
-    return false;
+ return false;
 }
 
 void GCodeParser::handleG10(const char* line) {
-    // G10 L20 P1 X0 Y0 (Set WCS G54 offset so current pos = 0)
-    float pVal = 0, lVal = 0;
-    if(!parseCode(line, 'L', lVal) || lVal != 20) return; 
-    if(!parseCode(line, 'P', pVal)) pVal = 1; 
-    
-    int sys_idx = (int)pVal - 1;
-    if(sys_idx < 0 || sys_idx > 5) return;
+ // G10 L20 P1 X0 Y0 (Set WCS G54 offset so current pos = 0)
+ float pVal = 0, lVal = 0;
+ if(!parseCode(line, 'L', lVal) || lVal != 20) return; 
+ if(!parseCode(line, 'P', pVal)) pVal = 1; 
+ 
+ int sys_idx = (int)pVal - 1;
+ if(sys_idx < 0 || sys_idx > 5) return;
 
-    float mPos[4] = {
-        motionGetPositionMM(0), motionGetPositionMM(1), 
-        motionGetPositionMM(2), motionGetPositionMM(3)
-    };
+ float mPos[4] = {
+ motionGetPositionMM(0), motionGetPositionMM(1), 
+ motionGetPositionMM(2), motionGetPositionMM(3)
+ };
 
-    float val;
-    const char axis_chars[] = "XYZA";
-    for (int a = 0; a < 4; a++) {
-        if (parseCode(line, axis_chars[a], val)) {
-            wcs_offsets[sys_idx][a] = mPos[a] - val;
-        }
-    }
+ float val;
+ const char axis_chars[] = "XYZA";
+ for (int a = 0; a < 4; a++) {
+ if (parseCode(line, axis_chars[a], val)) {
+ wcs_offsets[sys_idx][a] = mPos[a] - val;
+ }
+ }
 
-    saveWCS(sys_idx);
-    logInfo("[GCODE] Updated G%d Offsets", 54 + sys_idx);
+ saveWCS(sys_idx);
+ logInfo("[GCODE] Updated G%d Offsets", 54 + sys_idx);
 }
 
 void GCodeParser::handleG5x(int system_idx) {
-    currentWCS = (wcs_system_t)system_idx;
-    logInfo("[GCODE] Switched to G%d", 54 + system_idx);
+ currentWCS = (wcs_system_t)system_idx;
+ logInfo("[GCODE] Switched to G%d", 54 + system_idx);
 }
 
 bool GCodeParser::handleG0_G1(const char* line) {
-    float fVal = 0.0f;
-    if (parseCode(line, 'F', fVal) && fVal > 0) currentFeedRate = fVal;
+ float fVal = 0.0f;
+ if (parseCode(line, 'F', fVal) && fVal > 0) currentFeedRate = fVal;
 
-    float req[4] = {0};
-    bool has[4] = { false };
-    const char axes_char[] = "XYZA";
+ float req[4] = {0};
+ bool has[4] = { false };
+ const char axes_char[] = "XYZA";
 
-    for(int i=0; i<4; i++) {
-        if(parseCode(line, axes_char[i], req[i])) has[i] = true;
-    }
+ for(int i=0; i<4; i++) {
+ if(parseCode(line, axes_char[i], req[i])) has[i] = true;
+ }
 
-    if (!has[0] && !has[1] && !has[2] && !has[3]) return true; // No axes specified
+ if (!has[0] && !has[1] && !has[2] && !has[3]) return true; // No axes specified
 
-    float curM[4] = {
-        motionGetPositionMM(0), motionGetPositionMM(1),
-        motionGetPositionMM(2), motionGetPositionMM(3)
-    };
+ float curM[4] = {
+ motionGetPositionMM(0), motionGetPositionMM(1),
+ motionGetPositionMM(2), motionGetPositionMM(3)
+ };
 
-    float targetM[4];
+ float targetM[4];
 
-    for(int i=0; i<4; i++) {
-        if (has[i]) {
-            if (distanceMode == G_MODE_ABSOLUTE) {
-                // PHASE 5.1: G53 machine coordinates mode (ignore WCS offset)
-                if (machineCoordinatesMode) {
-                    targetM[i] = req[i];
-                } else {
-                    targetM[i] = req[i] + wcs_offsets[currentWCS][i];
-                }
-            } else {
-                targetM[i] = curM[i] + req[i];
-            }
-        } else {
-            targetM[i] = curM[i];
-        }
-    }
+ for(int i=0; i<4; i++) {
+ if (has[i]) {
+ if (distanceMode == G_MODE_ABSOLUTE) {
+ // G53 machine coordinates mode (ignore WCS offset)
+ if (machineCoordinatesMode) {
+ targetM[i] = req[i];
+ } else {
+ targetM[i] = req[i] + wcs_offsets[currentWCS][i];
+ }
+ } else {
+ targetM[i] = curM[i] + req[i];
+ }
+ } else {
+ targetM[i] = curM[i];
+ }
+ }
 
-    // Check if any axis actually needs to move
-    bool move = false;
-    for(int i=0; i<4; i++) if(fabs(targetM[i] - curM[i]) > 0.01) move = true;
+ // Check if any axis actually needs to move
+ bool move = false;
+ for(int i=0; i<4; i++) if(fabs(targetM[i] - curM[i]) > 0.01) move = true;
 
-    if(move) return pushMove(targetM[0], targetM[1], targetM[2], targetM[3]);
-    return true; // No move needed is considered success (idempotent)
+ if(move) return pushMove(targetM[0], targetM[1], targetM[2], targetM[3]);
+ return true; // No move needed is considered success (idempotent)
 }
 
 void GCodeParser::handleG4(const char* line) {
-    // G4 Dwell command - non-blocking pause
-    // G4 P<ms>  - Dwell for P milliseconds
-    // G4 S<sec> - Dwell for S seconds
-    // Example: G4 P500  (dwell 500ms)
-    // Example: G4 S2    (dwell 2 seconds)
+ // G4 Dwell command - non-blocking pause
+ // G4 P<ms> - Dwell for P milliseconds
+ // G4 S<sec> - Dwell for S seconds
+ // Example: G4 P500 (dwell 500ms)
+ // Example: G4 S2 (dwell 2 seconds)
 
-    float p_val = 0.0f;
-    float s_val = 0.0f;
-    uint32_t dwell_ms = 0;
+ float p_val = 0.0f;
+ float s_val = 0.0f;
+ uint32_t dwell_ms = 0;
 
-    // Check for P parameter (milliseconds)
-    if (parseCode(line, 'P', p_val) && p_val > 0) {
-        dwell_ms = (uint32_t)p_val;
-    }
-    // Check for S parameter (seconds) - takes precedence if both specified
-    else if (parseCode(line, 'S', s_val) && s_val > 0) {
-        dwell_ms = (uint32_t)(s_val * 1000.0f);
-    }
+ // Check for P parameter (milliseconds)
+ if (parseCode(line, 'P', p_val) && p_val > 0) {
+ dwell_ms = (uint32_t)p_val;
+ }
+ // Check for S parameter (seconds) - takes precedence if both specified
+ else if (parseCode(line, 'S', s_val) && s_val > 0) {
+ dwell_ms = (uint32_t)(s_val * 1000.0f);
+ }
 
-    if (dwell_ms > 0) {
-        if (motionDwell(dwell_ms)) {
-            logInfo("[GCODE] G4 Dwell: %lu ms", (unsigned long)dwell_ms);
-        } else {
-            logWarning("[GCODE] G4 Dwell failed - motion may be active");
-        }
-    } else {
-        logWarning("[GCODE] G4 requires P<ms> or S<sec> parameter");
-    }
+ if (dwell_ms > 0) {
+ if (motionDwell(dwell_ms)) {
+ logInfo("[GCODE] G4 Dwell: %lu ms", (unsigned long)dwell_ms);
+ } else {
+ logWarning("[GCODE] G4 Dwell failed - motion may be active");
+ }
+ } else {
+ logWarning("[GCODE] G4 requires P<ms> or S<sec> parameter");
+ }
 }
 
 bool GCodeParser::pushMove(float x, float y, float z, float a) {
-    // --- DRY-RUN MODE: validate and track stats without actual motion ---
-    if (dryRunMode) {
-        dryRunResult.move_count++;
+ // --- DRY-RUN MODE: validate and track stats without actual motion ---
+ if (dryRunMode) {
+ dryRunResult.move_count++;
 
-        // Update bounding box
-        if (dryRunResult.move_count == 1) {
-            dryRunResult.min_x = dryRunResult.max_x = x;
-            dryRunResult.min_y = dryRunResult.max_y = y;
-            dryRunResult.min_z = dryRunResult.max_z = z;
-        } else {
-            if (x < dryRunResult.min_x) dryRunResult.min_x = x;
-            if (x > dryRunResult.max_x) dryRunResult.max_x = x;
-            if (y < dryRunResult.min_y) dryRunResult.min_y = y;
-            if (y > dryRunResult.max_y) dryRunResult.max_y = y;
-            if (z < dryRunResult.min_z) dryRunResult.min_z = z;
-            if (z > dryRunResult.max_z) dryRunResult.max_z = z;
-        }
+ // Update bounding box
+ if (dryRunResult.move_count == 1) {
+ dryRunResult.min_x = dryRunResult.max_x = x;
+ dryRunResult.min_y = dryRunResult.max_y = y;
+ dryRunResult.min_z = dryRunResult.max_z = z;
+ } else {
+ if (x < dryRunResult.min_x) dryRunResult.min_x = x;
+ if (x > dryRunResult.max_x) dryRunResult.max_x = x;
+ if (y < dryRunResult.min_y) dryRunResult.min_y = y;
+ if (y > dryRunResult.max_y) dryRunResult.max_y = y;
+ if (z < dryRunResult.min_z) dryRunResult.min_z = z;
+ if (z > dryRunResult.max_z) dryRunResult.max_z = z;
+ }
 
-        // Accumulate distance
-        float dx = x - dryRunLastPos[0];
-        float dy = y - dryRunLastPos[1];
-        float dz = z - dryRunLastPos[2];
-        dryRunResult.total_distance_mm += sqrtf(dx*dx + dy*dy + dz*dz);
+ // Accumulate distance
+ float dx = x - dryRunLastPos[0];
+ float dy = y - dryRunLastPos[1];
+ float dz = z - dryRunLastPos[2];
+ dryRunResult.total_distance_mm += sqrtf(dx*dx + dy*dy + dz*dz);
 
-        dryRunLastPos[0] = x;
-        dryRunLastPos[1] = y;
-        dryRunLastPos[2] = z;
-        dryRunLastPos[3] = a;
-        return true;
-    }
+ dryRunLastPos[0] = x;
+ dryRunLastPos[1] = y;
+ dryRunLastPos[2] = z;
+ dryRunLastPos[3] = a;
+ return true;
+ }
 
-    // --- NORMAL MODE ---
-    if (configGetInt(KEY_MOTION_BUFFER_ENABLE, 0)) {
-        if (!motionBuffer.isFull()) {
-            motionBuffer.push(x, y, z, a, currentFeedRate);
-            return true;
-        } else {
-            logError("[GCODE] Motion buffer full");
-            return false;
-        }
-    } else {
-        if (!motionMoveAbsolute(x, y, z, a, currentFeedRate)) {
-            logError("[GCODE] Move failed (Busy, Limit, or Multi-Axis not supported)");
-            return false; 
-        }
-        return true;
-    }
+ // --- NORMAL MODE ---
+ if (configGetInt(KEY_MOTION_BUFFER_ENABLE, 0)) {
+ if (!motionBuffer.isFull()) {
+ motionBuffer.push(x, y, z, a, currentFeedRate);
+ return true;
+ } else {
+ logError("[GCODE] Motion buffer full");
+ return false;
+ }
+ } else {
+ if (!motionMoveAbsolute(x, y, z, a, currentFeedRate)) {
+ logError("[GCODE] Move failed (Busy, Limit, or Multi-Axis not supported)");
+ return false; 
+ }
+ return true;
+ }
 }
 
 void GCodeParser::setDryRun(bool enable) {
-    dryRunMode = enable;
-    if (enable) {
-        memset(&dryRunResult, 0, sizeof(dryRunResult));
-        // Initialize last pos to current machine position
-        for (int i = 0; i < 4; i++) {
-            dryRunLastPos[i] = motionGetPositionMM(i);
-        }
-    }
+ dryRunMode = enable;
+ if (enable) {
+ memset(&dryRunResult, 0, sizeof(dryRunResult));
+ // Initialize last pos to current machine position
+ for (int i = 0; i < 4; i++) {
+ dryRunLastPos[i] = motionGetPositionMM(i);
+ }
+ }
 }
 
 void GCodeParser::handleG90() { distanceMode = G_MODE_ABSOLUTE; }
 void GCodeParser::handleG91() { distanceMode = G_MODE_RELATIVE; }
 
-// PHASE 3.2: M117 - Display message on LCD
+// M117 - Display message on LCD
 void GCodeParser::handleM117(const char* line) {
-    // M117 Display Message (standard gcode format)
-    // Syntax: M117 <message text>
-    // Example: M117 Cutting edge...
+ // M117 Display Message (standard gcode format)
+ // Syntax: M117 <message text>
+ // Example: M117 Cutting edge...
 
-    if (!line || strlen(line) < 4) return;
+ if (!line || strlen(line) < 4) return;
 
-    // Find the start of the message (skip "M117" and whitespace)
-    const char* msg_start = line + 4;  // Skip "M117"
-    while (*msg_start && (*msg_start == ' ' || *msg_start == '\t')) msg_start++;
+ // Find the start of the message (skip "M117" and whitespace)
+ const char* msg_start = line + 4; // Skip "M117"
+ while (*msg_start && (*msg_start == ' ' || *msg_start == '\t')) msg_start++;
 
-    if (*msg_start == '\0') return;  // No message text
+ if (*msg_start == '\0') return; // No message text
 
-    // Display message for 10 seconds (10000ms)
-    lcdMessageSet(msg_start, 10000);
-    logInfo("[GCODE] M117: Display message: '%s'", msg_start);
+ // Display message for 10 seconds (10000ms)
+ lcdMessageSet(msg_start, 10000);
+ logInfo("[GCODE] M117: Display message: '%s'", msg_start);
 }
 
-// PHASE 4.0: M114 - Get current position (standard gcode command)
+// M114 - Get current position (standard gcode command)
 void GCodeParser::handleM114() {
-    // M114 Get Position (standard gcode format)
-    // Reports: X:<value> Y:<value> Z:<value> A:<value>
-    
-    char response[128];
-    float pos[4];
-    for (int i = 0; i < 4; i++) {
-        pos[i] = motionGetPositionMM(i);
-    }
+ // M114 Get Position (standard gcode format)
+ // Reports: X:<value> Y:<value> Z:<value> A:<value>
+ 
+ char response[128];
+ float pos[4];
+ for (int i = 0; i < 4; i++) {
+ pos[i] = motionGetPositionMM(i);
+ }
 
-    snprintf(response, sizeof(response),
-             "[POS:X:%.3f Y:%.3f Z:%.3f A:%.3f]",
-             pos[0], pos[1], pos[2], pos[3]);
+ snprintf(response, sizeof(response),
+ "[POS:X:%.3f Y:%.3f Z:%.3f A:%.3f]",
+ pos[0], pos[1], pos[2], pos[3]);
 
-    logPrintln(response);
-    logInfo("[GCODE] M114 %s", response);
+ logPrintln(response);
+ logInfo("[GCODE] M114 %s", response);
 }
 
-// PHASE 4.0: M115 - Firmware info (standard gcode command)
+// M115 - Firmware info (standard gcode command)
 void GCodeParser::handleM115() {
-    // M115 Report Firmware Version & Capabilities
-    // Standard Grbl response format
+ // M115 Report Firmware Version & Capabilities
+ // Standard Grbl response format
 
-    // Build firmware info response
-    char ver_buf[32];
-    firmwareGetVersionString(ver_buf, sizeof(ver_buf));
-    
-    serialLoggerLock();
-    logPrintf("[VER:%s BISSO-E350]\n", ver_buf);
-    logPrintln("[OPT:B#,M,T#]");  // Options: Block #, Messages, Real-time status
+ // Build firmware info response
+ char ver_buf[32];
+ firmwareGetVersionString(ver_buf, sizeof(ver_buf));
+ 
+ serialLoggerLock();
+ logPrintf("[VER:%s BISSO-E350]\n", ver_buf);
+ logPrintln("[OPT:B#,M,T#]"); // Options: Block #, Messages, Real-time status
 
-    // Report capabilities
-    logPrintln("[CAPABILITY:4-axis]");        // 4 axes: X, Y, Z, A
-    logPrintln("[CAPABILITY:adaptive-feed]");  // Feed override support
-    logPrintln("[CAPABILITY:G4-dwell]");       // G4 dwell support
-    logPrintln("[CAPABILITY:M114-position]");  // M114 position reporting
-    logPrintln("[CAPABILITY:M154-auto-report]"); // M154 auto-report support
-    logPrintln("[CAPABILITY:M117-lcd-msg]");  // M117 LCD message support
-    logPrintln("[CAPABILITY:WCS-6-system]");  // 6 work coordinate systems
-    logPrintln("[CAPABILITY:soft-limits]");   // Soft limits enabled
-    serialLoggerUnlock();
+ // Report capabilities
+ logPrintln("[CAPABILITY:4-axis]"); // 4 axes: X, Y, Z, A
+ logPrintln("[CAPABILITY:adaptive-feed]"); // Feed override support
+ logPrintln("[CAPABILITY:G4-dwell]"); // G4 dwell support
+ logPrintln("[CAPABILITY:M114-position]"); // M114 position reporting
+ logPrintln("[CAPABILITY:M154-auto-report]"); // M154 auto-report support
+ logPrintln("[CAPABILITY:M117-lcd-msg]"); // M117 LCD message support
+ logPrintln("[CAPABILITY:WCS-6-system]"); // 6 work coordinate systems
+ logPrintln("[CAPABILITY:soft-limits]"); // Soft limits enabled
+ serialLoggerUnlock();
 
-    logInfo("[GCODE] M115 Firmware Info Reported");
+ logInfo("[GCODE] M115 Firmware Info Reported");
 }
 
-// PHASE 4.0: M154 - Position auto-report (non-blocking)
+// M154 - Position auto-report (non-blocking)
 void GCodeParser::handleM154(const char* line) {
-    // M154 Position Auto-Report
-    // M154 S<interval>  - Set auto-report interval (0 = disable)
-    // Interval in seconds, 0.1 to 60.0 supported
-    // Example: M154 S1   (report every 1 second)
-    // Example: M154 S0   (disable auto-report)
+ // M154 Position Auto-Report
+ // M154 S<interval> - Set auto-report interval (0 = disable)
+ // Interval in seconds, 0.1 to 60.0 supported
+ // Example: M154 S1 (report every 1 second)
+ // Example: M154 S0 (disable auto-report)
 
-    float s_val = 0.0f;
+ float s_val = 0.0f;
 
-    // Check for S parameter (interval in seconds)
-    if (parseCode(line, 'S', s_val) && s_val >= 0) {
-        uint32_t interval_sec = (uint32_t)s_val;
+ // Check for S parameter (interval in seconds)
+ if (parseCode(line, 'S', s_val) && s_val >= 0) {
+ uint32_t interval_sec = (uint32_t)s_val;
 
-        if (autoReportSetInterval(interval_sec)) {
-            if (interval_sec == 0) {
-                logInfo("[GCODE] M154 Auto-Report Disabled");
-            } else {
-                logInfo("[GCODE] M154 Auto-Report Enabled - %lu sec", (unsigned long)interval_sec);
-            }
-        } else {
-            logWarning("[GCODE] M154 Failed to set interval");
-        }
-    } else {
-        logWarning("[GCODE] M154 requires S<interval> parameter (in seconds)");
-    }
+ if (autoReportSetInterval(interval_sec)) {
+ if (interval_sec == 0) {
+ logInfo("[GCODE] M154 Auto-Report Disabled");
+ } else {
+ logInfo("[GCODE] M154 Auto-Report Enabled - %lu sec", (unsigned long)interval_sec);
+ }
+ } else {
+ logWarning("[GCODE] M154 Failed to set interval");
+ }
+ } else {
+ logWarning("[GCODE] M154 requires S<interval> parameter (in seconds)");
+ }
 }
 
-// PHASE 4.0: M226 - Wait for pin state (non-blocking)
+// M226 - Wait for pin state (non-blocking)
 void GCodeParser::handleM226(const char* line) {
-    // M226 Wait for Pin State (non-blocking with timeout)
-    // M226 P<pin> S<state> [A<type>] [T<timeout>]
-    // P: Pin ID (0-7 for I2C)
-    // S: State to wait for (0 or 1)
-    // A: Pin type (0=I73, 1=Board, 2=GPIO) - default 0
-    // T: Timeout in seconds (0 = no timeout, default = 5)
-    // Example: M226 P3 S1     (wait for I73 pin 3 to go HIGH)
-    // Example: M226 P0 S0 A1 T10  (wait for Board pin 0 to go LOW, timeout 10sec)
+ // M226 Wait for Pin State (non-blocking with timeout)
+ // M226 P<pin> S<state> [A<type>] [T<timeout>]
+ // P: Pin ID (0-7 for I2C)
+ // S: State to wait for (0 or 1)
+ // A: Pin type (0=I73, 1=Board, 2=GPIO) - default 0
+ // T: Timeout in seconds (0 = no timeout, default = 5)
+ // Example: M226 P3 S1 (wait for I73 pin 3 to go HIGH)
+ // Example: M226 P0 S0 A1 T10 (wait for Board pin 0 to go LOW, timeout 10sec)
 
-    float p_val = -1.0f;
-    float s_val = -1.0f;
-    float a_val = 0.0f;  // Default to I73
-    float t_val = 5.0f;  // Default 5 second timeout
+ float p_val = -1.0f;
+ float s_val = -1.0f;
+ float a_val = 0.0f; // Default to I73
+ float t_val = 5.0f; // Default 5 second timeout
 
-    // Parse parameters
-    if (!parseCode(line, 'P', p_val) || p_val < 0) {
-        logWarning("[GCODE] M226 requires P<pin> parameter");
-        return;
-    }
+ // Parse parameters
+ if (!parseCode(line, 'P', p_val) || p_val < 0) {
+ logWarning("[GCODE] M226 requires P<pin> parameter");
+ return;
+ }
 
-    if (!parseCode(line, 'S', s_val) || (s_val != 0 && s_val != 1)) {
-        logWarning("[GCODE] M226 requires S<state> parameter (0 or 1)");
-        return;
-    }
+ if (!parseCode(line, 'S', s_val) || (s_val != 0 && s_val != 1)) {
+ logWarning("[GCODE] M226 requires S<state> parameter (0 or 1)");
+ return;
+ }
 
-    parseCode(line, 'A', a_val);  // Optional, defaults to 0
-    parseCode(line, 'T', t_val);  // Optional, defaults to 5
+ parseCode(line, 'A', a_val); // Optional, defaults to 0
+ parseCode(line, 'T', t_val); // Optional, defaults to 5
 
-    uint8_t pin_id = (uint8_t)p_val;
-    uint8_t pin_type = (uint8_t)a_val;
-    uint8_t pin_state = (uint8_t)s_val;
-    uint32_t timeout_sec = (uint32_t)t_val;
+ uint8_t pin_id = (uint8_t)p_val;
+ uint8_t pin_type = (uint8_t)a_val;
+ uint8_t pin_state = (uint8_t)s_val;
+ uint32_t timeout_sec = (uint32_t)t_val;
 
-    // Validate pin type
-    if (pin_type > 2) {
-        logWarning("[GCODE] M226 invalid A<type> (0=I73, 1=Board, 2=GPIO)");
-        return;
-    }
+ // Validate pin type
+ if (pin_type > 2) {
+ logWarning("[GCODE] M226 invalid A<type> (0=I73, 1=Board, 2=GPIO)");
+ return;
+ }
 
-    // Validate pin ranges
-    if ((pin_type == 0 || pin_type == 1) && pin_id > 7) {
-        logWarning("[GCODE] M226 invalid P<pin> for I2C (0-7)");
-        return;
-    }
-    if (pin_type == 2 && pin_id > 39) {
-        logWarning("[GCODE] M226 invalid P<pin> for GPIO (0-39)");
-        return;
-    }
+ // Validate pin ranges
+ if ((pin_type == 0 || pin_type == 1) && pin_id > 7) {
+ logWarning("[GCODE] M226 invalid P<pin> for I2C (0-7)");
+ return;
+ }
+ if (pin_type == 2 && pin_id > 39) {
+ logWarning("[GCODE] M226 invalid P<pin> for GPIO (0-39)");
+ return;
+ }
 
-    // Start waiting for pin
-    if (motionWaitPin(pin_id, pin_type, pin_state, timeout_sec)) {
-        logInfo("[GCODE] M226 Wait for pin %d type %d state %d timeout %lu sec",
-                pin_id, pin_type, pin_state, (unsigned long)timeout_sec);
-    } else {
-        logWarning("[GCODE] M226 failed - motion may be active");
-    }
+ // Start waiting for pin
+ if (motionWaitPin(pin_id, pin_type, pin_state, timeout_sec)) {
+ logInfo("[GCODE] M226 Wait for pin %d type %d state %d timeout %lu sec",
+ pin_id, pin_type, pin_state, (unsigned long)timeout_sec);
+ } else {
+ logWarning("[GCODE] M226 failed - motion may be active");
+ }
 }
 
-// PHASE 4.0: M255 - LCD sleep/backlight timeout
+// M255 - LCD sleep/backlight timeout
 void GCodeParser::handleM255(const char* line) {
-    // M255 LCD Sleep/Backlight Timeout Control
-    // M255 S<seconds>   - Set backlight timeout (0 = never sleep)
-    // Example: M255 S0   (disable sleep, always on)
-    // Example: M255 S300 (sleep after 300 seconds of inactivity)
-    // Example: M255 S60  (sleep after 1 minute of inactivity)
+ // M255 LCD Sleep/Backlight Timeout Control
+ // M255 S<seconds> - Set backlight timeout (0 = never sleep)
+ // Example: M255 S0 (disable sleep, always on)
+ // Example: M255 S300 (sleep after 300 seconds of inactivity)
+ // Example: M255 S60 (sleep after 1 minute of inactivity)
 
-    float s_val = 0.0f;
+ float s_val = 0.0f;
 
-    // Check for S parameter (timeout in seconds)
-    if (parseCode(line, 'S', s_val) && s_val >= 0) {
-        uint32_t timeout_sec = (uint32_t)s_val;
+ // Check for S parameter (timeout in seconds)
+ if (parseCode(line, 'S', s_val) && s_val >= 0) {
+ uint32_t timeout_sec = (uint32_t)s_val;
 
-        if (lcdSleepSetTimeout(timeout_sec)) {
-            if (timeout_sec == 0) {
-                logInfo("[GCODE] M255 LCD sleep disabled - always on");
-            } else {
-                logInfo("[GCODE] M255 LCD sleep enabled - timeout %lu seconds", (unsigned long)timeout_sec);
-            }
-        } else {
-            logWarning("[GCODE] M255 failed to set timeout");
-        }
-    } else {
-        logWarning("[GCODE] M255 requires S<timeout> parameter (in seconds)");
-    }
+ if (lcdSleepSetTimeout(timeout_sec)) {
+ if (timeout_sec == 0) {
+ logInfo("[GCODE] M255 LCD sleep disabled - always on");
+ } else {
+ logInfo("[GCODE] M255 LCD sleep enabled - timeout %lu seconds", (unsigned long)timeout_sec);
+ }
+ } else {
+ logWarning("[GCODE] M255 failed to set timeout");
+ }
+ } else {
+ logWarning("[GCODE] M255 requires S<timeout> parameter (in seconds)");
+ }
 }
 
-// PHASE 5.1: G28 - Go to Machine Home
+// G28 - Go to Machine Home
 void GCodeParser::handleG28(const char* line) {
-    // G28 Go to Machine Home
-    // Homing sequence for specified axes or all if none specified
-    // G28     - Home all axes
-    // G28 X   - Home X axis only
-    // G28 Y   - Home Y axis only
-    // G28 Z   - Home Z axis only
-    // G28 A   - Home A axis only
-    // G28 X Y - Home X and Y axes
+ // G28 Go to Machine Home
+ // Homing sequence for specified axes or all if none specified
+ // G28 - Home all axes
+ // G28 X - Home X axis only
+ // G28 Y - Home Y axis only
+ // G28 Z - Home Z axis only
+ // G28 A - Home A axis only
+ // G28 X Y - Home X and Y axes
 
-    // Check if homing is enabled
-    if (!configGetInt(KEY_HOME_ENABLE, 0)) {
-        logWarning("[GCODE] G28 homing disabled - not configured");
-        return;
-    }
+ // Check if homing is enabled
+ if (!configGetInt(KEY_HOME_ENABLE, 0)) {
+ logWarning("[GCODE] G28 homing disabled - not configured");
+ return;
+ }
 
-    bool home_x = hasCode(line, 'X');
-    bool home_y = hasCode(line, 'Y');
-    bool home_z = hasCode(line, 'Z');
-    bool home_a = hasCode(line, 'A');
+ bool home_x = hasCode(line, 'X');
+ bool home_y = hasCode(line, 'Y');
+ bool home_z = hasCode(line, 'Z');
+ bool home_a = hasCode(line, 'A');
 
-    // If no axes specified, home all
-    if (!home_x && !home_y && !home_z && !home_a) {
-        home_x = home_y = home_z = home_a = true;
-    }
+ // If no axes specified, home all
+ if (!home_x && !home_y && !home_z && !home_a) {
+ home_x = home_y = home_z = home_a = true;
+ }
 
-    // IMPORTANT: A axis has no motor - only manual positioning with encoder feedback
-    if (home_a) {
-        logWarning("[GCODE] G28 A homing skipped - A axis is manual (no motor)");
-        logWarning("[GCODE] Operator: Manually position A axis to zero and confirm");
-        home_a = false;  // Cannot auto-home A axis
-    }
+ // IMPORTANT: A axis has no motor - only manual positioning with encoder feedback
+ if (home_a) {
+ logWarning("[GCODE] G28 A homing skipped - A axis is manual (no motor)");
+ logWarning("[GCODE] Operator: Manually position A axis to zero and confirm");
+ home_a = false; // Cannot auto-home A axis
+ }
 
-    logInfo("[GCODE] G28 Homing: X=%d Y=%d Z=%d A=%d(manual)",
-            home_x, home_y, home_z, home_a);
+ logInfo("[GCODE] G28 Homing: X=%d Y=%d Z=%d A=%d(manual)",
+ home_x, home_y, home_z, home_a);
 
-    // Execute homing sequence in SAFE ORDER: Z → Y → X
-    // CRITICAL SAFETY: Always home Z first to lift tool/blade before moving X/Y
-    // This prevents crashes into workpiece or fixture
-    // Only one axis can home at a time due to single VFD motor constraint
+ // Execute homing sequence in SAFE ORDER: Z → Y → X
+ // CRITICAL SAFETY: Always home Z first to lift tool/blade before moving X/Y
+ // This prevents crashes into workpiece or fixture
+ // Only one axis can home at a time due to single VFD motor constraint
 
-    // 1. Home Z first (lift to safe height)
-    if (home_z && !motionHome(2)) {
-        logError("[GCODE] G28 Z homing failed - axis busy or error");
-        return;
-    }
+ // 1. Home Z first (lift to safe height)
+ if (home_z && !motionHome(2)) {
+ logError("[GCODE] G28 Z homing failed - axis busy or error");
+ return;
+ }
 
-    // 2. Home Y second (after Z is safe)
-    if (home_y && !motionHome(1)) {
-        logError("[GCODE] G28 Y homing failed - axis busy or error");
-        return;
-    }
+ // 2. Home Y second (after Z is safe)
+ if (home_y && !motionHome(1)) {
+ logError("[GCODE] G28 Y homing failed - axis busy or error");
+ return;
+ }
 
-    // 3. Home X last
-    if (home_x && !motionHome(0)) {
-        logError("[GCODE] G28 X homing failed - axis busy or error");
-        return;
-    }
+ // 3. Home X last
+ if (home_x && !motionHome(0)) {
+ logError("[GCODE] G28 X homing failed - axis busy or error");
+ return;
+ }
 
-    logInfo("[GCODE] G28 Homing sequence completed successfully");
+ logInfo("[GCODE] G28 Homing sequence completed successfully");
 }
 
-// PHASE 5.1: G30 - Go to Predefined Position
+// G30 - Go to Predefined Position
 void GCodeParser::handleG30(const char* line) {
-    // G30 Go to Predefined Position
-    // G30     - Go to safe position (default)
-    // G30 P1  - Go to predefined position 1
-    // G30 P2  - Go to predefined position 2
+ // G30 Go to Predefined Position
+ // G30 - Go to safe position (default)
+ // G30 P1 - Go to predefined position 1
+ // G30 P2 - Go to predefined position 2
 
-    float p_val = 0.0f;
-    parseCode(line, 'P', p_val);
-    int pos_id = (int)p_val;  // 0 = safe, 1 = pos1, etc.
+ float p_val = 0.0f;
+ parseCode(line, 'P', p_val);
+ int pos_id = (int)p_val; // 0 = safe, 1 = pos1, etc.
 
-    // Load predefined position from configuration
-    float target[4];
-    if (pos_id == 0) {  // Safe position
-        target[0] = configGetFloat(KEY_POS_SAFE_X, 0.0f);
-        target[1] = configGetFloat(KEY_POS_SAFE_Y, 0.0f);
-        target[2] = configGetFloat(KEY_POS_SAFE_Z, 0.0f);
-        target[3] = configGetFloat(KEY_POS_SAFE_A, 0.0f);
-        logInfo("[GCODE] G30 Go to Safe Position: X:%.1f Y:%.1f Z:%.1f A:%.1f",
-                target[0], target[1], target[2], target[3]);
-    } else if (pos_id == 1) {  // Predefined position 1
-        target[0] = configGetFloat(KEY_POS_1_X, 0.0f);
-        target[1] = configGetFloat(KEY_POS_1_Y, 0.0f);
-        target[2] = configGetFloat(KEY_POS_1_Z, 0.0f);
-        target[3] = configGetFloat(KEY_POS_1_A, 0.0f);
-        logInfo("[GCODE] G30 Go to Position 1: X:%.1f Y:%.1f Z:%.1f A:%.1f",
-                target[0], target[1], target[2], target[3]);
-    } else {
-        logWarning("[GCODE] G30 Invalid position P%d (0-1 supported)", pos_id);
-        return;
-    }
+ // Load predefined position from configuration
+ float target[4];
+ if (pos_id == 0) { // Safe position
+ target[0] = configGetFloat(KEY_POS_SAFE_X, 0.0f);
+ target[1] = configGetFloat(KEY_POS_SAFE_Y, 0.0f);
+ target[2] = configGetFloat(KEY_POS_SAFE_Z, 0.0f);
+ target[3] = configGetFloat(KEY_POS_SAFE_A, 0.0f);
+ logInfo("[GCODE] G30 Go to Safe Position: X:%.1f Y:%.1f Z:%.1f A:%.1f",
+ target[0], target[1], target[2], target[3]);
+ } else if (pos_id == 1) { // Predefined position 1
+ target[0] = configGetFloat(KEY_POS_1_X, 0.0f);
+ target[1] = configGetFloat(KEY_POS_1_Y, 0.0f);
+ target[2] = configGetFloat(KEY_POS_1_Z, 0.0f);
+ target[3] = configGetFloat(KEY_POS_1_A, 0.0f);
+ logInfo("[GCODE] G30 Go to Position 1: X:%.1f Y:%.1f Z:%.1f A:%.1f",
+ target[0], target[1], target[2], target[3]);
+ } else {
+ logWarning("[GCODE] G30 Invalid position P%d (0-1 supported)", pos_id);
+ return;
+ }
 
-    // Move to the predefined position
-    pushMove(target[0], target[1], target[2], target[3]);
+ // Move to the predefined position
+ pushMove(target[0], target[1], target[2], target[3]);
 }
 
-// PHASE 5.1: G53 - Machine Coordinates (Ignore WCS Offsets)
+// G53 - Machine Coordinates (Ignore WCS Offsets)
 void GCodeParser::handleG53(const char* line) {
-    // G53 Machine Coordinates
-    // Next G0/G1 move will be in machine coordinates (ignoring WCS offset)
-    // G53 G0 X100 Y200 Z50 A0  - Rapid to machine coordinates
-    // G53 G1 X100 Y200 Z50 F100 - Linear move in machine coordinates
+ // G53 Machine Coordinates
+ // Next G0/G1 move will be in machine coordinates (ignoring WCS offset)
+ // G53 G0 X100 Y200 Z50 A0 - Rapid to machine coordinates
+ // G53 G1 X100 Y200 Z50 F100 - Linear move in machine coordinates
 
-    machineCoordinatesMode = true;
-    logInfo("[GCODE] G53 Machine Coordinates Mode Enabled");
+ machineCoordinatesMode = true;
+ logInfo("[GCODE] G53 Machine Coordinates Mode Enabled");
 
-    // Check if there's a G0 or G1 command following on the same line.
-    // parseCode('G') finds the first G (which is G53), so we explicitly seek G0 or G1
-    bool has_move = false;
-    
-    // Simple fast string check for "G0" or "G1" in the rest of the string
-    const char* g0_pos = strstr(line, "G0");
-    const char* g1_pos = strstr(line, "G1");
-    
-    if (g0_pos || g1_pos) {
-        has_move = true;
-        // Process the G0/G1 move using the standard handler
-        // The handleG0_G1 will respect the machineCoordinatesMode boolean
-        handleG0_G1(line);
-    }
+ // Check if there's a G0 or G1 command following on the same line.
+ // parseCode('G') finds the first G (which is G53), so we explicitly seek G0 or G1
+ bool has_move = false;
+ 
+ // Simple fast string check for "G0" or "G1" in the rest of the string
+ const char* g0_pos = strstr(line, "G0");
+ const char* g1_pos = strstr(line, "G1");
+ 
+ if (g0_pos || g1_pos) {
+ has_move = true;
+ // Process the G0/G1 move using the standard handler
+ // The handleG0_G1 will respect the machineCoordinatesMode boolean
+ handleG0_G1(line);
+ }
 
-    machineCoordinatesMode = false;  // Reset for next command
+ machineCoordinatesMode = false; // Reset for next command
 }
 
-// PHASE 5.1: G92 - Set Position / Calibration
+// G92 - Set Position / Calibration
 void GCodeParser::handleG92(const char* line) {
-    // PHASE 5.4: G92 Set Work Offset (Temporary Shift)
-    // Instead of overwriting machine position (which absolute scales will undo)
-    // we set a temporary shift in the G-code parser's G92 offset system.
-    
-    // We use wcs_offsets[5] (G59) or similar for G92? 
-    // Actually, Grbl/LinuxCNC use a separate G92 offset.
-    // For now, let's keep it simple: G92 sets the offset for G54-G59 
-    // so current machine position results in the requested value.
-    
-    float mPos[4] = {
-        motionGetPositionMM(0), motionGetPositionMM(1),
-        motionGetPositionMM(2), motionGetPositionMM(3)
-    };
+ // G92 Set Work Offset (Temporary Shift)
+ // Instead of overwriting machine position (which absolute scales will undo)
+ // we set a temporary shift in the G-code parser's G92 offset system.
+ 
+ // We use wcs_offsets[5] (G59) or similar for G92? 
+ // Actually, Grbl/LinuxCNC use a separate G92 offset.
+ // For now, let's keep it simple: G92 sets the offset for G54-G59 
+ // so current machine position results in the requested value.
+ 
+ float mPos[4] = {
+ motionGetPositionMM(0), motionGetPositionMM(1),
+ motionGetPositionMM(2), motionGetPositionMM(3)
+ };
 
-    // Parse any axis values provided
-    float val;
-    const char axis_chars[] = "XYZA";
+ // Parse any axis values provided
+ float val;
+ const char axis_chars[] = "XYZA";
 
-    for (int i = 0; i < 4; i++) {
-        if (parseCode(line, axis_chars[i], val)) {
-            // We want (mPos - offset) = val  =>  offset = mPos - val
-            wcs_offsets[currentWCS][i] = mPos[i] - val;
-        }
-    }
+ for (int i = 0; i < 4; i++) {
+ if (parseCode(line, axis_chars[i], val)) {
+ // We want (mPos - offset) = val => offset = mPos - val
+ wcs_offsets[currentWCS][i] = mPos[i] - val;
+ }
+ }
 
-    saveWCS(currentWCS);
-    logInfo("[GCODE] G92 Work Offset set for G%d", 54 + currentWCS);
+ saveWCS(currentWCS);
+ logInfo("[GCODE] G92 Work Offset set for G%d", 54 + currentWCS);
 }
 
-// PHASE 5.1: M0/M1 - Program Stop / Pause
+// M0/M1 - Program Stop / Pause
 void GCodeParser::handleM0_M1(const char* line) {
-    // M0 Mandatory Program Stop
-    // M1 Optional Program Stop (skip if ignore-optional-stops is enabled)
-    // Program execution pauses - operator must press resume/continue
-    // Useful for: blade changes, material inspection, manual adjustments
+ // M0 Mandatory Program Stop
+ // M1 Optional Program Stop (skip if ignore-optional-stops is enabled)
+ // Program execution pauses - operator must press resume/continue
+ // Useful for: blade changes, material inspection, manual adjustments
 
-    bool is_optional = (strchr(line, 'M') && *(strchr(line, 'M') + 1) == '1');
+ bool is_optional = (strchr(line, 'M') && *(strchr(line, 'M') + 1) == '1');
 
-    if (is_optional) {
-        // M1 - Optional stop
-        // Could check for a configuration flag to skip optional stops
-        bool ignore_optional = configGetInt("opt_stop_skip", 0);
-        if (ignore_optional) {
-            logInfo("[GCODE] M1 Optional stop skipped (ignore optional stops enabled)");
-            return;
-        }
-        logInfo("[GCODE] M1 Optional Program Stop - waiting for resume");
-    } else {
-        // M0 - Mandatory stop
-        logInfo("[GCODE] M0 Mandatory Program Stop - waiting for resume");
-    }
+ if (is_optional) {
+ // M1 - Optional stop
+ // Could check for a configuration flag to skip optional stops
+ bool ignore_optional = configGetInt("opt_stop_skip", 0);
+ if (ignore_optional) {
+ logInfo("[GCODE] M1 Optional stop skipped (ignore optional stops enabled)");
+ return;
+ }
+ logInfo("[GCODE] M1 Optional Program Stop - waiting for resume");
+ } else {
+ // M0 - Mandatory stop
+ logInfo("[GCODE] M0 Mandatory Program Stop - waiting for resume");
+ }
 
-    // Set pause state
-    programPaused = true;
-    pauseStartTime = millis();
+ // Set pause state
+ programPaused = true;
+ pauseStartTime = millis();
 
-    // Display message on LCD
-    logPrintln("[PAUSE] Program paused - press resume to continue");
-    lcdMessageSet("PAUSED: Resume?", 0);  // Stay until operator resumes
+ // Display message on LCD
+ logPrintln("[PAUSE] Program paused - press resume to continue");
+ lcdMessageSet("PAUSED: Resume?", 0); // Stay until operator resumes
 
-    // Pause motion control
-    if (!motionPause()) {
-        logError("[GCODE] Failed to pause motion");
-        return;
-    }
+ // Pause motion control
+ if (!motionPause()) {
+ logError("[GCODE] Failed to pause motion");
+ return;
+ }
 
-    logInfo("[GCODE] Motion paused - waiting for operator to resume");
+ logInfo("[GCODE] Motion paused - waiting for operator to resume");
 
-    // Note: Resume is handled by operator pressing physical resume button
-    // or sending resume command via CLI/web interface which calls motionResume()
+ // Note: Resume is handled by operator pressing physical resume button
+ // or sending resume command via CLI/web interface which calls motionResume()
 }
 
 bool GCodeParser::parseCode(const char* line, char code, float& value) {
-    char* ptr = strchr((char*)line, code);
-    if (ptr) {
-        // SAFETY FIX: Use strtod instead of atof to detect parsing errors
-        // atof returns 0.0 on error (e.g., "G1 X-NaN" → moves to 0, dangerous!)
-        // strtod sets endptr to original string if no conversion occurred
-        char* endptr = NULL;
-        double parsed_value = strtod(ptr + 1, &endptr);
+ char* ptr = strchr((char*)line, code);
+ if (ptr) {
+ // SAFETY FIX: Use strtod instead of atof to detect parsing errors
+ // atof returns 0.0 on error (e.g., "G1 X-NaN" → moves to 0, dangerous!)
+ // strtod sets endptr to original string if no conversion occurred
+ char* endptr = NULL;
+ double parsed_value = strtod(ptr + 1, &endptr);
 
-        // Validation checks:
-        // 1. endptr must have advanced (successful parse)
-        // 2. Value must not be NaN
-        // 3. Value must not be infinity
-        if (endptr != (ptr + 1) && !isnan(parsed_value) && !isinf(parsed_value)) {
-            value = (float)parsed_value;
-            return true;
-        } else {
-            // Parsing failed - corrupt G-code
-            logError("[GCODE] Parse error: Invalid numeric value after '%c' in: %s", code, line);
-            return false;
-        }
-    }
-    return false;
+ // Validation checks:
+ // 1. endptr must have advanced (successful parse)
+ // 2. Value must not be NaN
+ // 3. Value must not be infinity
+ if (endptr != (ptr + 1) && !isnan(parsed_value) && !isinf(parsed_value)) {
+ value = (float)parsed_value;
+ return true;
+ } else {
+ // Parsing failed - corrupt G-code
+ logError("[GCODE] Parse error: Invalid numeric value after '%c' in: %s", code, line);
+ return false;
+ }
+ }
+ return false;
 }
 
 bool GCodeParser::hasCode(const char* line, char code) {
-    return strchr((char*)line, code) != NULL;
+ return strchr((char*)line, code) != NULL;
 }
 
 gcode_distance_mode_t GCodeParser::getDistanceMode() { return distanceMode; }
 void GCodeParser::handleM402(const char* line) {
-    float pVal = 0;
-    if (parseCode(line, 'P', pVal)) {
-        bool enable = ((int)pVal != 0);
-        motionSetCoordinatedMode(enable);
-        logInfo("[GCODE] Coordinated Mode (C+T): %s", enable ? "ENABLED" : "DISABLED");
-    }
+ float pVal = 0;
+ if (parseCode(line, 'P', pVal)) {
+ bool enable = ((int)pVal != 0);
+ motionSetCoordinatedMode(enable);
+ logInfo("[GCODE] Coordinated Mode (C+T): %s", enable ? "ENABLED" : "DISABLED");
+ }
 }
 
 void GCodeParser::handleM403(const char* line) {
-    // M403 S<hz> [P<vfd_id>]
-    // S: Frequency in Hertz
-    // P: VFD ID (1 or 2, default 1)
-    float sVal = 0;
-    float pVal = 1;
-    
-    if (parseCode(line, 'S', sVal)) {
-        parseCode(line, 'P', pVal);
-        int vfd_id = (int)pVal;
-        
-        if (vfd_id == 1) {
-            AltivarX.writeFrequency(sVal);
-            logInfo("[GCODE] VFD1 (X) Frequency set to %.1f Hz", sVal);
-        } else if (vfd_id == 2) {
-            AltivarYZA.writeFrequency(sVal);
-            logInfo("[GCODE] VFD2 (Aux) Frequency set to %.1f Hz", sVal);
-        } else {
-            logWarning("[GCODE] Invalid VFD ID P%d (1-2 supported)", vfd_id);
-        }
-    } else {
-        logWarning("[GCODE] M403 requires S<hz> parameter");
-    }
+ // M403 S<hz> [P<vfd_id>]
+ // S: Frequency in Hertz
+ // P: VFD ID (1 or 2, default 1)
+ float sVal = 0;
+ float pVal = 1;
+ 
+ if (parseCode(line, 'S', sVal)) {
+ parseCode(line, 'P', pVal);
+ int vfd_id = (int)pVal;
+ 
+ if (vfd_id == 1) {
+ AltivarX.writeFrequency(sVal);
+ logInfo("[GCODE] VFD1 (X) Frequency set to %.1f Hz", sVal);
+ } else if (vfd_id == 2) {
+ AltivarYZA.writeFrequency(sVal);
+ logInfo("[GCODE] VFD2 (Aux) Frequency set to %.1f Hz", sVal);
+ } else {
+ logWarning("[GCODE] Invalid VFD ID P%d (1-2 supported)", vfd_id);
+ }
+ } else {
+ logWarning("[GCODE] M403 requires S<hz> parameter");
+ }
 }
 
 bool GCodeParser::handleG2_G3(const char* line, bool clockwise) {
-    // Current position in MM
-    float x = motionGetPositionMM(0);
-    float y = motionGetPositionMM(1);
-    float z = motionGetPositionMM(2);
-    float a = motionGetPositionMM(3);
+ // Current position in MM
+ float x = motionGetPositionMM(0);
+ float y = motionGetPositionMM(1);
+ float z = motionGetPositionMM(2);
+ float a = motionGetPositionMM(3);
 
-    // Targets
-    float target_x = x, target_y = y;
-    float val_x = 0, val_y = 0;
-    if (parseCode(line, 'X', val_x)) {
-        if (distanceMode == G_MODE_ABSOLUTE) {
-            target_x = val_x + wcs_offsets[currentWCS][0];
-        } else {
-            target_x = x + val_x;
-        }
-    }
-    if (parseCode(line, 'Y', val_y)) {
-        if (distanceMode == G_MODE_ABSOLUTE) {
-            target_y = val_y + wcs_offsets[currentWCS][1];
-        } else {
-            target_y = y + val_y;
-        }
-    }
+ // Targets
+ float target_x = x, target_y = y;
+ float val_x = 0, val_y = 0;
+ if (parseCode(line, 'X', val_x)) {
+ if (distanceMode == G_MODE_ABSOLUTE) {
+ target_x = val_x + wcs_offsets[currentWCS][0];
+ } else {
+ target_x = x + val_x;
+ }
+ }
+ if (parseCode(line, 'Y', val_y)) {
+ if (distanceMode == G_MODE_ABSOLUTE) {
+ target_y = val_y + wcs_offsets[currentWCS][1];
+ } else {
+ target_y = y + val_y;
+ }
+ }
 
-    // Center offsets (I and J are always relative to start point in standard G-code)
-    float i_off = 0, j_off = 0;
-    bool has_i = parseCode(line, 'I', i_off);
-    bool has_j = parseCode(line, 'J', j_off);
+ // Center offsets (I and J are always relative to start point in standard G-code)
+ float i_off = 0, j_off = 0;
+ bool has_i = parseCode(line, 'I', i_off);
+ bool has_j = parseCode(line, 'J', j_off);
 
-    if (!has_i && !has_j) {
-        logError("[GCODE] Arcs require I or J offsets");
-        return false;
-    }
+ if (!has_i && !has_j) {
+ logError("[GCODE] Arcs require I or J offsets");
+ return false;
+ }
 
-    // Geometry calculations
-    float center_x = x + i_off;
-    float center_y = y + j_off;
-    float radius = sqrt(i_off * i_off + j_off * j_off);
+ // Geometry calculations
+ float center_x = x + i_off;
+ float center_y = y + j_off;
+ float radius = sqrt(i_off * i_off + j_off * j_off);
 
-    float start_angle = atan2(y - center_y, x - center_x);
-    float end_angle = atan2(target_y - center_y, target_x - center_x);
+ float start_angle = atan2(y - center_y, x - center_x);
+ float end_angle = atan2(target_y - center_y, target_x - center_x);
 
-    // Calculate angular sweep based on direction
-    float sweep = end_angle - start_angle;
-    if (clockwise) {
-        if (sweep >= 0) sweep -= 2.0f * M_PI;
-    } else {
-        if (sweep <= 0) sweep += 2.0f * M_PI;
-    }
+ // Calculate angular sweep based on direction
+ float sweep = end_angle - start_angle;
+ if (clockwise) {
+ if (sweep >= 0) sweep -= 2.0f * M_PI;
+ } else {
+ if (sweep <= 0) sweep += 2.0f * M_PI;
+ }
 
-    // Arc segmentation (PHASE 22: Target 0.5mm chordal error or segments)
-    // For simplicity, let's use 1mm linear segments
-    float arc_length = abs(sweep) * radius;
-    int segments = (int)ceil(arc_length / 1.0f); // 1.0mm per segment
-    if (segments < 1) segments = 1;
-    if (segments > 100) segments = 100; // Cap to avoid blocking
+ // Arc segmentation
+ // For simplicity, let's use 1mm linear segments
+ float arc_length = abs(sweep) * radius;
+ int segments = (int)ceil(arc_length / 1.0f); // 1.0mm per segment
+ if (segments < 1) segments = 1;
+ if (segments > 100) segments = 100; // Cap to avoid blocking
 
-    bool success = true;
-    for (int s = 1; s <= segments; s++) {
-        float frac = (float)s / segments;
-        float angle = start_angle + sweep * frac;
-        
-        float seg_x = center_x + radius * cos(angle);
-        float seg_y = center_y + radius * sin(angle);
-        
-        // Final segment should land exactly on target to avoid accumulation
-        if (s == segments) {
-            seg_x = target_x;
-            seg_y = target_y;
-        }
+ bool success = true;
+ for (int s = 1; s <= segments; s++) {
+ float frac = (float)s / segments;
+ float angle = start_angle + sweep * frac;
+ 
+ float seg_x = center_x + radius * cos(angle);
+ float seg_y = center_y + radius * sin(angle);
+ 
+ // Final segment should land exactly on target to avoid accumulation
+ if (s == segments) {
+ seg_x = target_x;
+ seg_y = target_y;
+ }
 
-        // Wait with a timeout if the buffer is full, rather than instantly destroying the arc
-        int retries = 0;
-        bool segment_queued = false;
-        while (!segment_queued && retries < 500) { // Max 500ms wait per segment
-            if (pushMove(seg_x, seg_y, z, a)) {
-                segment_queued = true;
-            } else {
-                delay(1);
-                retries++;
-            }
-        }
-        
-        if (!segment_queued) {
-            logError("[GCODE] Arc motion failed: Buffer blocked for too long");
-            success = false;
-            break;
-        }
-    }
+ // Wait with a timeout if the buffer is full, rather than instantly destroying the arc
+ int retries = 0;
+ bool segment_queued = false;
+ while (!segment_queued && retries < 500) { // Max 500ms wait per segment
+ if (pushMove(seg_x, seg_y, z, a)) {
+ segment_queued = true;
+ } else {
+ delay(1);
+ retries++;
+ }
+ }
+ 
+ if (!segment_queued) {
+ logError("[GCODE] Arc motion failed: Buffer blocked for too long");
+ success = false;
+ break;
+ }
+ }
 
-    return success;
+ return success;
 }

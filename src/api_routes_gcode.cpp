@@ -16,6 +16,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
     
     // POST /api/gcode - Execute G-code command
     server.on("/api/gcode", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         String body = request->body();
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, body);
@@ -29,7 +30,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
         uint16_t job_id = gcodeQueueAdd(cmd);
         gcodeQueueMarkRunning();
         
-        // PHASE 5.11: Wait-and-Retry logic if motion buffer is full
+        // Wait-and-Retry logic if motion buffer is full
         // Prevents "Command rejected" errors during high-cadence small moves.
         bool result = false;
         for (int retry = 0; retry < 10; retry++) {
@@ -91,6 +92,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
 
     // GET /api/gcode/state (OPTIMIZED: snprintf, no heap)
     server.on("/api/gcode/state", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         char state_str[64];
         gcodeParser.getParserState(state_str, sizeof(state_str));
         
@@ -107,6 +109,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
     
     // GET /api/gcode/queue
     server.on("/api/gcode/queue", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         gcode_queue_state_t state = gcodeQueueGetState();
         gcode_job_t jobs[10];
         uint16_t count = gcodeQueueGetAll(jobs, 10);
@@ -143,6 +146,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
     
     // POST /api/gcode/queue/retry
     server.on("/api/gcode/queue/retry", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         if (gcodeQueueRetry()) {
             return response->send(200, "application/json", "{\"success\":true,\"action\":\"retry\"}");
         }
@@ -151,6 +155,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
     
     // POST /api/gcode/queue/skip
     server.on("/api/gcode/queue/skip", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         if (gcodeQueueSkip()) {
             return response->send(200, "application/json", "{\"success\":true,\"action\":\"skip\"}");
         }
@@ -159,6 +164,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
     
     // POST /api/gcode/queue/resume
     server.on("/api/gcode/queue/resume", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         if (gcodeQueueResume()) {
             return response->send(200, "application/json", "{\"success\":true,\"action\":\"resume\"}");
         }
@@ -167,6 +173,7 @@ void registerGcodeRoutes(PsychicHttpServer& server) {
     
     // DELETE /api/gcode/queue - Clear queue
     server.on("/api/gcode/queue", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         gcodeQueueClear();
         return response->send(200, "application/json", "{\"success\":true}");
     });

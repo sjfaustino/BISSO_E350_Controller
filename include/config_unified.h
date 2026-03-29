@@ -39,7 +39,7 @@ typedef struct {
 } config_entry_t;
 
 result_t configUnifiedInit();
-void configUnifiedCleanup();  // PHASE 5.10: Resource cleanup
+void configUnifiedCleanup();  // Resource cleanup
 void configSetDefaults();
 
 int32_t configGetInt(const char* key, int32_t default_val);
@@ -68,7 +68,7 @@ void configUnifiedDiagnostics();
 void configUnifiedPrintAll();
 void* configGetMutex();
 
-// PHASE 5.1: Validated configuration getters with bounds checking
+// Validated configuration getters with bounds checking
 /**
  * Get integer with validation and bounds checking
  * @param key Configuration key

@@ -17,13 +17,13 @@
 #include "config_unified.h"
 #include "config_keys.h"
 #include "modbus_rtu.h"
-#include "system_utils.h" // PHASE 8.1
+#include "system_utils.h"
 
 // Safety Constants
 // BUFFER SIZE VERIFICATION (Code Audit):
 // Max frame: !<11 digits>,<11 digits>,<11 digits>,<11 digits>\r = 49 bytes
-// Example:   !-2147483648,-2147483648,-2147483648,-2147483648\r
-// Buffer:    64 bytes (15 byte safety margin)
+// Example: !-2147483648,-2147483648,-2147483648,-2147483648\r
+// Buffer: 64 bytes (15 byte safety margin)
 // Conclusion: Adequate for full encoder frame ✓
 #define MAX_BYTES_PER_CYCLE 64
 #define WJ66_TIMEOUT_MS 500
@@ -31,16 +31,16 @@
 
 // Internal State
 struct {
-  int32_t position[WJ66_AXES];
-  int32_t zero_offset[WJ66_AXES];
-  uint32_t last_read[WJ66_AXES];
-  uint32_t read_count[WJ66_AXES];
-  encoder_status_t status;
-  uint32_t error_count;
-  uint32_t last_command_time;
-  bool waiting_for_response; // Added for flow control
-  uint32_t last_latency_ms;  // Latency of last successful read
-  uint32_t noise_rejections; // Count of frames rejected due to delta > MAX_DELTA
+ int32_t position[WJ66_AXES];
+ int32_t zero_offset[WJ66_AXES];
+ uint32_t last_read[WJ66_AXES];
+ uint32_t read_count[WJ66_AXES];
+ encoder_status_t status;
+ uint32_t error_count;
+ uint32_t last_command_time;
+ bool waiting_for_response; // Added for flow control
+ uint32_t last_latency_ms; // Latency of last successful read
+ uint32_t noise_rejections; // Count of frames rejected due to delta > MAX_DELTA
 } wj66_state = {{0}, {0}, {0}, {0}, ENCODER_OK, 0, 0, false, 0, 0};
 
 // RS-485 Registry Device Descriptor
@@ -48,136 +48,133 @@ static bool wj66Poll(void* ctx);
 static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len);
 
 static rs485_device_t wj66_device = {
-    .name = "WJ66",
-    .type = RS485_DEVICE_TYPE_ENCODER,
-    .slave_address = 0,
-    .poll_interval_ms = 50,
-    .priority = 200,
-    .enabled = true,
-    .poll = wj66Poll,
-    .on_response = wj66OnResponse,
-    .user_data = nullptr,
-    .last_poll_time_ms = 0,
-    .poll_count = 0,
-    .error_count = 0,
-    .consecutive_errors = 0,
-    .pending_response = false,
-    .last_tx_end_us = 0,
-    .first_rx_byte_us = 0,
-    .latency_hist = {0, 0, 0, 0, 0, 0},
-    .min_latency_us = 0,
-    .max_latency_us = 0,
-    .total_latency_us = 0,
-    .total_latency_sq_us = 0,
-    .latency_samples = 0
+ .name = "WJ66",
+ .type = RS485_DEVICE_TYPE_ENCODER,
+ .slave_address = 0,
+ .poll_interval_ms = 50,
+ .priority = 200,
+ .enabled = true,
+ .poll = wj66Poll,
+ .on_response = wj66OnResponse,
+ .user_data = nullptr,
+ .last_poll_time_ms = 0,
+ .poll_count = 0,
+ .error_count = 0,
+ .consecutive_errors = 0,
+ .pending_response = false,
+ .last_tx_end_us = 0,
+ .first_rx_byte_us = 0,
+ .latency_hist = {0, 0, 0, 0, 0, 0},
+ .min_latency_us = 0,
+ .max_latency_us = 0,
+ .total_latency_us = 0,
+ .total_latency_sq_us = 0,
+ .latency_samples = 0
 };
 
-// PHASE 5.10: Mutex for thread-safe encoder position access
+// Mutex for thread-safe encoder position access
 // Protects wj66_state from torn reads between Encoder task and Motion task
 static SemaphoreHandle_t wj66_mutex = NULL;
 
 
-
-
-
 void wj66Init() {
-  logModuleInit("WJ66");
+ logModuleInit("WJ66");
 
-  // PHASE 5.10: Create mutex for thread-safe position access
-  if (wj66_mutex == NULL) {
-    wj66_mutex = xSemaphoreCreateMutex();
-    if (wj66_mutex == NULL) {
-      logError("[WJ66] Failed to create position mutex!");
-    }
-  }
+ // Create mutex for thread-safe position access
+ if (wj66_mutex == NULL) {
+ wj66_mutex = xSemaphoreCreateMutex();
+ if (wj66_mutex == NULL) {
+ logError("[WJ66] Failed to create position mutex!");
+ }
+ }
 
-  // 1. Load configuration
-  uint32_t config_baud = configGetInt(KEY_ENC_BAUD, WJ66_BAUD);
-  uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS485_RXD2);
-  
-  // PHASE 6.3: Harmonize baud rates if sharing RS485 bus
-  // If we are on Interface 1 (RS485), we MUST use the global rs485_baud
-  // to prevent port re-init conflicts and watchdog triggers.
-  if (config_iface == 1) {
-    uint32_t bus_baud = configGetInt(KEY_RS485_BAUD, 0);
-    if (bus_baud != 0 && bus_baud != config_baud) {
-        logInfo("[WJ66] Syncing encoder baud %lu -> bus baud %lu (RS485 mode)", 
-                (unsigned long)config_baud, (unsigned long)bus_baud);
-        config_baud = bus_baud;
-        // Optionally save back to keep UI in sync, but for now we just use it
-    }
-  }
+ // 1. Load configuration
+ uint32_t config_baud = configGetInt(KEY_ENC_BAUD, WJ66_BAUD);
+ uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS485_RXD2);
+ 
+ // Harmonize baud rates if sharing RS485 bus
+ // If we are on Interface 1 (RS485), we MUST use the global rs485_baud
+ // to prevent port re-init conflicts and watchdog triggers.
+ if (config_iface == 1) {
+ uint32_t bus_baud = configGetInt(KEY_RS485_BAUD, 0);
+ if (bus_baud != 0 && bus_baud != config_baud) {
+ logInfo("[WJ66] Syncing encoder baud %lu -> bus baud %lu (RS485 mode)", 
+ (unsigned long)config_baud, (unsigned long)bus_baud);
+ config_baud = bus_baud;
+ // Optionally save back to keep UI in sync, but for now we just use it
+ }
+ }
 
-  // Sanity check
-  if (config_baud < 1200 || config_baud > 115200) config_baud = 9600;
+ // Sanity check
+ if (config_baud < 1200 || config_baud > 115200) config_baud = 9600;
 
-  logInfo("[WJ66] Configuring @ %lu baud, Interface: %d", (unsigned long)config_baud, config_iface);
-  
-  // Initialize via HAL to ensure internal state (serial_port pointer) is set
-  // This prevents crash when encoderHalSendString is called
-  if (!encoderHalInit((encoder_interface_t)config_iface, config_baud)) {
-      logError("[WJ66] HAL Init Failed!");
-      // Fallback
-      if (config_iface == ENCODER_INTERFACE_RS232_HT) {
-          Serial1.begin(config_baud, SERIAL_8N1, 14, 33);
-      } else {
+ logInfo("[WJ66] Configuring @ %lu baud, Interface: %d", (unsigned long)config_baud, config_iface);
+ 
+ // Initialize via HAL to ensure internal state (serial_port pointer) is set
+ // This prevents crash when encoderHalSendString is called
+ if (!encoderHalInit((encoder_interface_t)config_iface, config_baud)) {
+ logError("[WJ66] HAL Init Failed!");
+ // Fallback
+ if (config_iface == ENCODER_INTERFACE_RS232_HT) {
+ Serial1.begin(config_baud, SERIAL_8N1, 14, 33);
+ } else {
 #if !defined(CONFIG_IDF_TARGET_ESP32S2)
-          Serial2.begin(config_baud, SERIAL_8N1, 16, 13);
+ Serial2.begin(config_baud, SERIAL_8N1, 16, 13);
 #else
-          // ESP32-S2 fallback: use Serial1 for second interface
-          Serial1.begin(config_baud, SERIAL_8N1, 16, 13);
+ // ESP32-S2 fallback: use Serial1 for second interface
+ Serial1.begin(config_baud, SERIAL_8N1, 16, 13);
 #endif
-      }
-  }
+ }
+ }
 
-  // Init State
-  uint8_t addr = (uint8_t)configGetInt(KEY_ENC_ADDR, 0);
-  wj66_device.slave_address = addr;
+ // Init State
+ uint8_t addr = (uint8_t)configGetInt(KEY_ENC_ADDR, 0);
+ wj66_device.slave_address = addr;
 
-  for (int i = 0; i < WJ66_AXES; i++) {
-    wj66_state.position[i] = 0;
-    wj66_state.zero_offset[i] = 0;
-    wj66_state.last_read[i] = 0;
-    wj66_state.read_count[i] = 0;
-  }
-  wj66_state.status = ENCODER_OK;
-  wj66_state.waiting_for_response = false;
-  
-  // Register with RS-485 registry ONLY if in RS485 mode
-  // Interface 1 = RS485 (GPIO 16/13)
-  if (config_iface == 1) {
-    rs485RegisterDevice(&wj66_device);
-    logInfo("[WJ66] Ready (Registered with RS485 bus @ %lu baud)", (unsigned long)config_baud);
-  } else {
-    logInfo("[WJ66] Ready (Using Serial interface on HT pins @ %lu baud)", (unsigned long)config_baud);
-  }
+ for (int i = 0; i < WJ66_AXES; i++) {
+ wj66_state.position[i] = 0;
+ wj66_state.zero_offset[i] = 0;
+ wj66_state.last_read[i] = 0;
+ wj66_state.read_count[i] = 0;
+ }
+ wj66_state.status = ENCODER_OK;
+ wj66_state.waiting_for_response = false;
+ 
+ // Register with RS-485 registry ONLY if in RS485 mode
+ // Interface 1 = RS485 (GPIO 16/13)
+ if (config_iface == 1) {
+ rs485RegisterDevice(&wj66_device);
+ logInfo("[WJ66] Ready (Registered with RS485 bus @ %lu baud)", (unsigned long)config_baud);
+ } else {
+ logInfo("[WJ66] Ready (Using Serial interface on HT pins @ %lu baud)", (unsigned long)config_baud);
+ }
 }
 
 // Flag to prevent race conditions check (Legacy)
 static volatile bool wj66_maintenance_mode = false;
 
 bool wj66SetBaud(uint32_t baud) {
-    if (baud < 1200 || baud > 115200) return false;
-    
-    logInfo("[WJ66] Setting baud rate to %lu...", (unsigned long)baud);
-    
-    // Critical Section: Shutdown HAL to prevent EncoderTask from accessing Serial1
-    encoderHalEnd();
-    delay(50); // Ensure any pending ISRs/Tasks clear
+ if (baud < 1200 || baud > 115200) return false;
+ 
+ logInfo("[WJ66] Setting baud rate to %lu...", (unsigned long)baud);
+ 
+ // Critical Section: Shutdown HAL to prevent EncoderTask from accessing Serial1
+ encoderHalEnd();
+ delay(50); // Ensure any pending ISRs/Tasks clear
 
-    // Re-initialize with new baud
-    // This atomically sets up Serial1 AND enables HAL flags
-    bool ok = encoderHalInit(ENCODER_INTERFACE_RS232_HT, baud);
-    
-    if (ok) {
-        // Save to NVS only if init successful
-        configSetInt(KEY_ENC_BAUD, baud);
-        configUnifiedSave();
-    } else {
-        logError("[WJ66] Failed to set baud via HAL!");
-    }
-    
-    return ok;
+ // Re-initialize with new baud
+ // This atomically sets up Serial1 AND enables HAL flags
+ bool ok = encoderHalInit(ENCODER_INTERFACE_RS232_HT, baud);
+ 
+ if (ok) {
+ // Save to NVS only if init successful
+ configSetInt(KEY_ENC_BAUD, baud);
+ configUnifiedSave();
+ } else {
+ logError("[WJ66] Failed to set baud via HAL!");
+ }
+ 
+ return ok;
 }
 
 // --- Autodetect Probe Helpers ---
@@ -187,14 +184,14 @@ bool wj66SetBaud(uint32_t baud) {
  * @return true if a valid Modbus response is received
  */
 static bool wj66ProbeModbus(HardwareSerial* s, uint8_t addr) {
-    uint8_t frame[8];
-    modbusReadRegistersRequest(addr, 0x0010, 8, frame);
-    s->write(frame, 8);
-    s->flush();
-    s->setTimeout(150);
-    uint8_t resp[64];
-    int len = s->readBytes(resp, sizeof(resp));
-    return (len >= 5 && resp[0] == addr && resp[1] == 0x03 && modbusVerifyCrc(resp, len));
+ uint8_t frame[8];
+ modbusReadRegistersRequest(addr, 0x0010, 8, frame);
+ s->write(frame, 8);
+ s->flush();
+ s->setTimeout(150);
+ uint8_t resp[64];
+ int len = s->readBytes(resp, sizeof(resp));
+ return (len >= 5 && resp[0] == addr && resp[1] == 0x03 && modbusVerifyCrc(resp, len));
 }
 
 /**
@@ -202,33 +199,33 @@ static bool wj66ProbeModbus(HardwareSerial* s, uint8_t addr) {
  * @return true if a WJ66-compatible ASCII response is received
  */
 static bool wj66ProbeAscii(HardwareSerial* s, int addr) {
-    const char* probes[] = {"#%02d\r", "#%02d2\r"};
-    for (int p_idx = 0; p_idx < 2; p_idx++) {
-        char cmd[16];
-        snprintf(cmd, sizeof(cmd), probes[p_idx], addr);
-        s->print(cmd);
-        s->flush();
-        s->setTimeout(150);
-        uint8_t resp[64];
-        int len = s->readBytes(resp, sizeof(resp));
-        if (len > 0) {
-            resp[len] = '\0';
-            // WJ66 signature characters
-            if (strchr((char*)resp, '!') || strchr((char*)resp, '>')) {
-                return true;
-            }
-            // Fallback: digits + commas pattern = CSV position data
-            int digits = 0, commas = 0;
-            for (int i = 0; i < len; i++) {
-                if (isdigit(resp[i])) digits++;
-                if (resp[i] == ',') commas++;
-            }
-            if (digits >= 4 && commas >= 1) {
-                return true;
-            }
-        }
-    }
-    return false;
+ const char* probes[] = {"#%02d\r", "#%02d2\r"};
+ for (int p_idx = 0; p_idx < 2; p_idx++) {
+ char cmd[16];
+ snprintf(cmd, sizeof(cmd), probes[p_idx], addr);
+ s->print(cmd);
+ s->flush();
+ s->setTimeout(150);
+ uint8_t resp[64];
+ int len = s->readBytes(resp, sizeof(resp));
+ if (len > 0) {
+ resp[len] = '\0';
+ // WJ66 signature characters
+ if (strchr((char*)resp, '!') || strchr((char*)resp, '>')) {
+ return true;
+ }
+ // Fallback: digits + commas pattern = CSV position data
+ int digits = 0, commas = 0;
+ for (int i = 0; i < len; i++) {
+ if (isdigit(resp[i])) digits++;
+ if (resp[i] == ',') commas++;
+ }
+ if (digits >= 4 && commas >= 1) {
+ return true;
+ }
+ }
+ }
+ return false;
 }
 
 /**
@@ -236,629 +233,629 @@ static bool wj66ProbeAscii(HardwareSerial* s, int addr) {
  * @return Detected address (0-254) or -1 if no response
  */
 static int wj66BroadcastProbe(HardwareSerial* s) {
-    logDebug("[WJ66] Probing ASCII Broadcast (#AA)...");
-    s->print("#AA\r");
-    s->flush();
-    s->setTimeout(150);
-    uint8_t buf[32];
-    int len = s->readBytes(buf, sizeof(buf) - 1);
-    if (len > 0) {
-        buf[len] = '\0';
-        logInfo("[WJ66] Received response to Broadcast: %s", (char*)buf);
-        char* excl = strchr((char*)buf, '!');
-        if (excl && isdigit(excl[1])) {
-            int addr = atoi(excl + 1);
-            logInfo("[WJ66] Detected Address: %d", addr);
-            return addr;
-        }
-    }
-    return -1;
+ logDebug("[WJ66] Probing ASCII Broadcast (#AA)...");
+ s->print("#AA\r");
+ s->flush();
+ s->setTimeout(150);
+ uint8_t buf[32];
+ int len = s->readBytes(buf, sizeof(buf) - 1);
+ if (len > 0) {
+ buf[len] = '\0';
+ logInfo("[WJ66] Received response to Broadcast: %s", (char*)buf);
+ char* excl = strchr((char*)buf, '!');
+ if (excl && isdigit(excl[1])) {
+ int addr = atoi(excl + 1);
+ logInfo("[WJ66] Detected Address: %d", addr);
+ return addr;
+ }
+ }
+ return -1;
 }
 
 uint32_t wj66Autodetect() {
-    if (!serialLoggerLock()) return 0;
-    logInfo("[WJ66] Starting robust Auto-detect...");
-    
-    // Suspend RS485 bus activity during scan
-    rs485SetBusPaused(true);
-    
-    // Acquire bus mutex (critical for preventing background task interference)
-    if (!rs485TakeBus(1000)) {
-        logError("[WJ66] Failed to acquire bus mutex for scan");
-        rs485SetBusPaused(false);
-        serialLoggerUnlock();
-        return 0;
-    }
+ if (!serialLoggerLock()) return 0;
+ logInfo("[WJ66] Starting robust Auto-detect...");
+ 
+ // Suspend RS485 bus activity during scan
+ rs485SetBusPaused(true);
+ 
+ // Acquire bus mutex (critical for preventing background task interference)
+ if (!rs485TakeBus(1000)) {
+ logError("[WJ66] Failed to acquire bus mutex for scan");
+ rs485SetBusPaused(false);
+ serialLoggerUnlock();
+ return 0;
+ }
 
-    vTaskDelay(200 / portTICK_PERIOD_MS); 
-    
-    const uint32_t rates[] = {9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200};
-    uint32_t found_rate = 0;
-    int found_addr = -1;
-    int found_proto = -1;
+ vTaskDelay(200 / portTICK_PERIOD_MS); 
+ 
+ const uint32_t rates[] = {9600, 19200, 38400, 57600, 115200, 4800, 2400, 1200};
+ uint32_t found_rate = 0;
+ int found_addr = -1;
+ int found_proto = -1;
 
-    // Select serial channel based on current config
+ // Select serial channel based on current config
 #if !defined(CONFIG_IDF_TARGET_ESP32S2)
-    uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS485_RXD2);
-    HardwareSerial* s = (config_iface == 1) ? &Serial2 : &Serial1;
+ uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, ENCODER_INTERFACE_RS485_RXD2);
+ HardwareSerial* s = (config_iface == 1) ? &Serial2 : &Serial1;
 #else
-    HardwareSerial* s = &Serial1;
+ HardwareSerial* s = &Serial1;
 #endif
 
-    logInfo("[WJ66] Scanning on %s...", (config_iface == 1) ? "Serial2 (RS485)" : "Serial1 (HT)");
+ logInfo("[WJ66] Scanning on %s...", (config_iface == 1) ? "Serial2 (RS485)" : "Serial1 (HT)");
 
-    for (uint32_t rate : rates) {
-        logInfo("[WJ66] Trying %lu baud...", (unsigned long)rate);
-        s->updateBaudRate(rate);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        while (s->available()) s->read(); // Flush noise
-        
-        // Try ASCII broadcast first to detect address
-        int broadcast_addr = wj66BroadcastProbe(s);
-        int start_addr = (broadcast_addr >= 0) ? broadcast_addr : 0;
+ for (uint32_t rate : rates) {
+ logInfo("[WJ66] Trying %lu baud...", (unsigned long)rate);
+ s->updateBaudRate(rate);
+ vTaskDelay(100 / portTICK_PERIOD_MS);
+ while (s->available()) s->read(); // Flush noise
+ 
+ // Try ASCII broadcast first to detect address
+ int broadcast_addr = wj66BroadcastProbe(s);
+ int start_addr = (broadcast_addr >= 0) ? broadcast_addr : 0;
 
-        // Try BOTH protocols at each baud rate
-        for (int proto = 0; proto <= 1; proto++) {
-            for (int addr = start_addr; addr <= 10; addr++) {
-                bool got_response = false;
-                if (proto == 1) {
-                    if (addr == 0) continue; // Modbus addr 0 is broadcast-only
-                    got_response = wj66ProbeModbus(s, (uint8_t)addr);
-                } else {
-                    got_response = wj66ProbeAscii(s, addr);
-                }
+ // Try BOTH protocols at each baud rate
+ for (int proto = 0; proto <= 1; proto++) {
+ for (int addr = start_addr; addr <= 10; addr++) {
+ bool got_response = false;
+ if (proto == 1) {
+ if (addr == 0) continue; // Modbus addr 0 is broadcast-only
+ got_response = wj66ProbeModbus(s, (uint8_t)addr);
+ } else {
+ got_response = wj66ProbeAscii(s, addr);
+ }
 
-                if (got_response) {
-                    found_rate = rate;
-                    found_addr = addr;
-                    found_proto = proto;
-                    logInfo("[WJ66] FOUND: %s @ %lu baud, Addr %d!", 
-                             (found_proto == 1) ? "Modbus" : "ASCII", 
-                             (unsigned long)found_rate, found_addr);
-                    break;
-                }
-                vTaskDelay(5 / portTICK_PERIOD_MS); // Yield
-            }
-            if (found_rate) break;
-        }
-        if (found_rate) break;
-    }
-    
-    if (found_rate) {
-        configSetInt(KEY_ENC_BAUD, (int)found_rate);
-        configSetInt(KEY_ENC_ADDR, found_addr);
-        configSetInt(KEY_ENC_PROTO, found_proto);
-        
-        uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, 1);
-        if (config_iface == 1) {
-            logInfo("[WJ66] Syncing global RS485 baud -> %lu", (unsigned long)found_rate);
-            configSetInt(KEY_RS485_BAUD, (int)found_rate);
-        }
-        configUnifiedSave();
-    } else {
-        logError("[WJ66] Auto-detect failed to find any responding device.");
-        // Restore previous baud rate to serial port
-        s->updateBaudRate(configGetInt(KEY_ENC_BAUD, WJ66_BAUD));
-    }
-    
-    rs485ReleaseBus();
-    rs485SetBusPaused(false);
-    serialLoggerUnlock();
-    return found_rate;
+ if (got_response) {
+ found_rate = rate;
+ found_addr = addr;
+ found_proto = proto;
+ logInfo("[WJ66] FOUND: %s @ %lu baud, Addr %d!", 
+ (found_proto == 1) ? "Modbus" : "ASCII", 
+ (unsigned long)found_rate, found_addr);
+ break;
+ }
+ vTaskDelay(5 / portTICK_PERIOD_MS); // Yield
+ }
+ if (found_rate) break;
+ }
+ if (found_rate) break;
+ }
+ 
+ if (found_rate) {
+ configSetInt(KEY_ENC_BAUD, (int)found_rate);
+ configSetInt(KEY_ENC_ADDR, found_addr);
+ configSetInt(KEY_ENC_PROTO, found_proto);
+ 
+ uint8_t config_iface = (uint8_t)configGetInt(KEY_ENC_INTERFACE, 1);
+ if (config_iface == 1) {
+ logInfo("[WJ66] Syncing global RS485 baud -> %lu", (unsigned long)found_rate);
+ configSetInt(KEY_RS485_BAUD, (int)found_rate);
+ }
+ configUnifiedSave();
+ } else {
+ logError("[WJ66] Auto-detect failed to find any responding device.");
+ // Restore previous baud rate to serial port
+ s->updateBaudRate(configGetInt(KEY_ENC_BAUD, WJ66_BAUD));
+ }
+ 
+ rs485ReleaseBus();
+ rs485SetBusPaused(false);
+ serialLoggerUnlock();
+ return found_rate;
 }
 
 static bool wj66Poll(void* ctx) { (void)ctx;
-    if (rs485IsBusPaused()) return false;
-    
-    int addr = configGetInt(KEY_ENC_ADDR, 0);
-    int proto = configGetInt(KEY_ENC_PROTO, 0); // 0=ASCII, 1=Modbus
+ if (rs485IsBusPaused()) return false;
+ 
+ int addr = configGetInt(KEY_ENC_ADDR, 0);
+ int proto = configGetInt(KEY_ENC_PROTO, 0); // 0=ASCII, 1=Modbus
 
-    if (proto == 1) {
-        uint8_t frame[8];
-        modbusReadRegistersRequest((uint8_t)addr, 0x0010, 8, frame);
-        wj66_state.last_command_time = millis();
-        return rs485Send(frame, 8);
-    }
-    
-    // ASCII Mode
-    char cmd[8];
-    snprintf(cmd, sizeof(cmd), "#%02d2\r", addr); // Use #AA2\r per manual
-    
-    wj66_state.last_command_time = millis();
-    if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
-        logDebug("[WJ66] Sending Poll: %s (Addr %d)", cmd, addr);
-        return rs485Send((const uint8_t*)cmd, (uint8_t)strlen(cmd));
-    }
-    
-    return encoderHalSendString(cmd);
+ if (proto == 1) {
+ uint8_t frame[8];
+ modbusReadRegistersRequest((uint8_t)addr, 0x0010, 8, frame);
+ wj66_state.last_command_time = millis();
+ return rs485Send(frame, 8);
+ }
+ 
+ // ASCII Mode
+ char cmd[8];
+ snprintf(cmd, sizeof(cmd), "#%02d2\r", addr); // Use #AA2\r per manual
+ 
+ wj66_state.last_command_time = millis();
+ if (configGetInt(KEY_ENC_INTERFACE, 0) == 1) {
+ logDebug("[WJ66] Sending Poll: %s (Addr %d)", cmd, addr);
+ return rs485Send((const uint8_t*)cmd, (uint8_t)strlen(cmd));
+ }
+ 
+ return encoderHalSendString(cmd);
 }
 
 static bool wj66OnResponse(void* ctx, const uint8_t* data, uint16_t len) { (void)ctx;
-    logDebug("[WJ66] Received %d bytes", len);
-    if (len == 0) return false;
+ logDebug("[WJ66] Received %d bytes", len);
+ if (len == 0) return false;
 
-    // --- MODBUS RTU PARSING ---
-    if (configGetInt(KEY_ENC_PROTO, 0) == 1) {
-        // Minimum Modbus response is 5 bytes (Addr, FC, Len, CRC, CRC)
-        if (len < 5) return false;
-        
-        // Verify address and FC (0x03)
-        if (data[0] != configGetInt(KEY_ENC_ADDR, 0) || data[1] != 0x03) return false;
-        
-        // Verify CRC
-        if (!modbusVerifyCrc(data, len)) {
-            logWarning("[WJ66] Modbus CRC mismatch");
-            return false;
-        }
+ // --- MODBUS RTU PARSING ---
+ if (configGetInt(KEY_ENC_PROTO, 0) == 1) {
+ // Minimum Modbus response is 5 bytes (Addr, FC, Len, CRC, CRC)
+ if (len < 5) return false;
+ 
+ // Verify address and FC (0x03)
+ if (data[0] != configGetInt(KEY_ENC_ADDR, 0) || data[1] != 0x03) return false;
+ 
+ // Verify CRC
+ if (!modbusVerifyCrc(data, len)) {
+ logWarning("[WJ66] Modbus CRC mismatch");
+ return false;
+ }
 
-        uint8_t byte_count = data[2];
-        if (len < byte_count + 5) return false;
+ uint8_t byte_count = data[2];
+ if (len < byte_count + 5) return false;
 
-        // Parse 32-bit values (Big Endian, 2 registers per axis)
-        int32_t values[4] = {0};
-        int axes_found = byte_count / 4;
-        if (axes_found > 4) axes_found = 4;
+ // Parse 32-bit values (Big Endian, 2 registers per axis)
+ int32_t values[4] = {0};
+ int axes_found = byte_count / 4;
+ if (axes_found > 4) axes_found = 4;
 
-        for (int i = 0; i < axes_found; i++) {
-            int base = 3 + (i * 4);
-            values[i] = ((uint32_t)data[base] << 24) | 
-                        ((uint32_t)data[base+1] << 16) | 
-                        ((uint32_t)data[base+2] << 8) | 
-                        ((uint32_t)data[base+3]);
-        }
-        
-        // Update state
-        if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            uint32_t now = millis();
-            wj66_state.last_latency_ms = (now >= wj66_state.last_command_time)
-                ? (now - wj66_state.last_command_time)
-                : (UINT32_MAX - wj66_state.last_command_time + now + 1);
-            if (wj66_state.last_latency_ms > 5000) wj66_state.last_latency_ms = 5000; // Cap
-            for (int i = 0; i < axes_found; i++) {
-                wj66_state.position[i] = values[i];
-                wj66_state.last_read[i] = now;
-                wj66_state.read_count[i]++;
-            }
-            wj66_state.status = ENCODER_OK;
-            xSemaphoreGive(wj66_mutex);
-        }
-        return true;
-    }
+ for (int i = 0; i < axes_found; i++) {
+ int base = 3 + (i * 4);
+ values[i] = ((uint32_t)data[base] << 24) | 
+ ((uint32_t)data[base+1] << 16) | 
+ ((uint32_t)data[base+2] << 8) | 
+ ((uint32_t)data[base+3]);
+ }
+ 
+ // Update state
+ if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+ uint32_t now = millis();
+ wj66_state.last_latency_ms = (now >= wj66_state.last_command_time)
+ ? (now - wj66_state.last_command_time)
+ : (UINT32_MAX - wj66_state.last_command_time + now + 1);
+ if (wj66_state.last_latency_ms > 5000) wj66_state.last_latency_ms = 5000; // Cap
+ for (int i = 0; i < axes_found; i++) {
+ wj66_state.position[i] = values[i];
+ wj66_state.last_read[i] = now;
+ wj66_state.read_count[i]++;
+ }
+ wj66_state.status = ENCODER_OK;
+ xSemaphoreGive(wj66_mutex);
+ }
+ return true;
+ }
 
-    // --- ASCII/CSV PARSING WITH LOCAL BUFFERING ---
-    static char asm_buf[128];
-    static uint8_t asm_idx = 0;
-    static uint32_t last_frag_time = 0;
+ // --- ASCII/CSV PARSING WITH LOCAL BUFFERING ---
+ static char asm_buf[128];
+ static uint8_t asm_idx = 0;
+ static uint32_t last_frag_time = 0;
 
-    // Clear stale buffer (over 1s)
-    uint32_t now = millis();
-    uint32_t elapsed_frag = (now >= last_frag_time) ? (now - last_frag_time) : (UINT32_MAX - last_frag_time + now + 1);
-    if (asm_idx > 0 && elapsed_frag > 1000) {
-        asm_idx = 0;
-    }
-    last_frag_time = now;
+ // Clear stale buffer (over 1s)
+ uint32_t now = millis();
+ uint32_t elapsed_frag = (now >= last_frag_time) ? (now - last_frag_time) : (UINT32_MAX - last_frag_time + now + 1);
+ if (asm_idx > 0 && elapsed_frag > 1000) {
+ asm_idx = 0;
+ }
+ last_frag_time = now;
 
-    // Look for signatures (!) within the incoming data
-    int sig_idx = -1;
-    for (int i = 0; i < len; i++) {
-        if (data[i] == '!' || data[i] == '>') {
-            sig_idx = i;
-            break;
-        }
-    }
+ // Look for signatures (!) within the incoming data
+ int sig_idx = -1;
+ for (int i = 0; i < len; i++) {
+ if (data[i] == '!' || data[i] == '>') {
+ sig_idx = i;
+ break;
+ }
+ }
 
-    // If we find a signature, we start a fresh frame
-    if (sig_idx != -1) {
-        asm_idx = 0;
-        for (int i = sig_idx; i < len; i++) {
-            if (asm_idx < sizeof(asm_buf) - 1) asm_buf[asm_idx++] = (char)data[i];
-        }
-    } else {
-        // Otherwise, append to existing buffer if we've started a frame
-        if (asm_idx > 0) {
-            for (int i = 0; i < len; i++) {
-                if (asm_idx < sizeof(asm_buf) - 1) asm_buf[asm_idx++] = (char)data[i];
-            }
-        }
-    }
-    asm_buf[asm_idx] = '\0';
+ // If we find a signature, we start a fresh frame
+ if (sig_idx != -1) {
+ asm_idx = 0;
+ for (int i = sig_idx; i < len; i++) {
+ if (asm_idx < sizeof(asm_buf) - 1) asm_buf[asm_idx++] = (char)data[i];
+ }
+ } else {
+ // Otherwise, append to existing buffer if we've started a frame
+ if (asm_idx > 0) {
+ for (int i = 0; i < len; i++) {
+ if (asm_idx < sizeof(asm_buf) - 1) asm_buf[asm_idx++] = (char)data[i];
+ }
+ }
+ }
+ asm_buf[asm_idx] = '\0';
 
-    // Wait for terminator (\r or \n)
-    if (strchr(asm_buf, '\r') == NULL && strchr(asm_buf, '\n') == NULL) {
-        return true; 
-    }
+ // Wait for terminator (\r or \n)
+ if (strchr(asm_buf, '\r') == NULL && strchr(asm_buf, '\n') == NULL) {
+ return true; 
+ }
 
-    // Found terminator - we have a full line!
-    char full_line[128];
-    strncpy(full_line, asm_buf, sizeof(full_line));
-    full_line[sizeof(full_line)-1] = '\0';
-    uint16_t full_len = asm_idx;
-    asm_idx = 0; // Prepare for next frame
+ // Found terminator - we have a full line!
+ char full_line[128];
+ strncpy(full_line, asm_buf, sizeof(full_line));
+ full_line[sizeof(full_line)-1] = '\0';
+ uint16_t full_len = asm_idx;
+ asm_idx = 0; // Prepare for next frame
 
-    // Start parsing from full_line
-    int start_idx = -1;
-    for (int i = 0; i < full_len; i++) {
-        if (full_line[i] == '!' || full_line[i] == '>' || isdigit(full_line[i]) || full_line[i] == '-' || full_line[i] == '+') {
-            start_idx = i;
-            break;
-        }
-    }
-    if (start_idx == -1) return false;
+ // Start parsing from full_line
+ int start_idx = -1;
+ for (int i = 0; i < full_len; i++) {
+ if (full_line[i] == '!' || full_line[i] == '>' || isdigit(full_line[i]) || full_line[i] == '-' || full_line[i] == '+') {
+ start_idx = i;
+ break;
+ }
+ }
+ if (start_idx == -1) return false;
 
-    int commas = 0;
-    int32_t current_values[4] = {0};
-    int32_t current_num = 0;
-    bool is_negative = false;
-    
-    // CSV Parsing Logic
-    for (uint16_t i = start_idx; i < full_len; i++) {
-        char ch = full_line[i];
-        if (ch == '!' || ch == '>') continue; // Skip signature if present
-        if (ch == ',') {
-            current_values[commas] = is_negative ? -current_num : current_num;
-            current_num = 0; is_negative = false;
-            commas++;
-            if (commas >= 4) break;
-        } else if (ch == '-') is_negative = true;
-        else if (ch >= '0' && ch <= '9') current_num = current_num * 10 + (ch - '0');
-        else if (ch == '\r' || ch == '\n') break; // End of frame
-    }
-    
-    // Final Value & Validation (Permissive: capture last value and support variable axes)
-    if (commas < 4) {
-        current_values[commas] = is_negative ? -current_num : current_num;
-    }
-    
-    if (commas >= 0) {
-        if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            int axes_limit = (commas + 1 > WJ66_AXES) ? WJ66_AXES : commas + 1;
-            for (int i = 0; i < axes_limit; i++) {
-                // ROBUSTNESS: Sanity check for huge jumps (serial noise filter)
-                // If the jump is >100k counts and it's not the first reading, ignore it.
-                int32_t delta = abs(current_values[i] - wj66_state.position[i]);
-                if (wj66_state.read_count[i] > 0 && delta > WJ66_MAX_DELTA_COUNTS) {
-                    wj66_state.noise_rejections++;
-                    logWarning("[WJ66] Noise detected on Axis %d! Jumped %ld counts (Current: %ld, New: %ld). Discarding frame.",
-                               i, (long)delta, (long)wj66_state.position[i], (long)current_values[i]);
-                    continue;
-                }
+ int commas = 0;
+ int32_t current_values[4] = {0};
+ int32_t current_num = 0;
+ bool is_negative = false;
+ 
+ // CSV Parsing Logic
+ for (uint16_t i = start_idx; i < full_len; i++) {
+ char ch = full_line[i];
+ if (ch == '!' || ch == '>') continue; // Skip signature if present
+ if (ch == ',') {
+ current_values[commas] = is_negative ? -current_num : current_num;
+ current_num = 0; is_negative = false;
+ commas++;
+ if (commas >= 4) break;
+ } else if (ch == '-') is_negative = true;
+ else if (ch >= '0' && ch <= '9') current_num = current_num * 10 + (ch - '0');
+ else if (ch == '\r' || ch == '\n') break; // End of frame
+ }
+ 
+ // Final Value & Validation (Permissive: capture last value and support variable axes)
+ if (commas < 4) {
+ current_values[commas] = is_negative ? -current_num : current_num;
+ }
+ 
+ if (commas >= 0) {
+ if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+ int axes_limit = (commas + 1 > WJ66_AXES) ? WJ66_AXES : commas + 1;
+ for (int i = 0; i < axes_limit; i++) {
+ // ROBUSTNESS: Sanity check for huge jumps (serial noise filter)
+ // If the jump is >100k counts and it's not the first reading, ignore it.
+ int32_t delta = abs(current_values[i] - wj66_state.position[i]);
+ if (wj66_state.read_count[i] > 0 && delta > WJ66_MAX_DELTA_COUNTS) {
+ wj66_state.noise_rejections++;
+ logWarning("[WJ66] Noise detected on Axis %d! Jumped %ld counts (Current: %ld, New: %ld). Discarding frame.",
+ i, (long)delta, (long)wj66_state.position[i], (long)current_values[i]);
+ continue;
+ }
 
-                wj66_state.position[i] = current_values[i];
-                wj66_state.last_read[i] = millis();
-                wj66_state.read_count[i]++;
-            }
-            uint32_t now = millis();
-            wj66_state.last_latency_ms = (now >= wj66_state.last_command_time)
-                ? (now - wj66_state.last_command_time)
-                : (UINT32_MAX - wj66_state.last_command_time + now + 1);
-            if (wj66_state.last_latency_ms > 5000) wj66_state.last_latency_ms = 5000;
-            wj66_state.status = ENCODER_OK;
-            xSemaphoreGive(wj66_mutex);
-            // Diagnostic trace enabled for debugging the background issue
-            logDebug("[WJ66] Background Update: %ld", (long)current_values[0]);
-        }
-        return true;
-    } else {
-        if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            wj66_state.status = ENCODER_CRC_ERROR;
-            wj66_state.error_count++;
-            xSemaphoreGive(wj66_mutex);
-        }
-        return false;
-    }
+ wj66_state.position[i] = current_values[i];
+ wj66_state.last_read[i] = millis();
+ wj66_state.read_count[i]++;
+ }
+ uint32_t now = millis();
+ wj66_state.last_latency_ms = (now >= wj66_state.last_command_time)
+ ? (now - wj66_state.last_command_time)
+ : (UINT32_MAX - wj66_state.last_command_time + now + 1);
+ if (wj66_state.last_latency_ms > 5000) wj66_state.last_latency_ms = 5000;
+ wj66_state.status = ENCODER_OK;
+ xSemaphoreGive(wj66_mutex);
+ // Diagnostic trace enabled for debugging the background issue
+ logDebug("[WJ66] Background Update: %ld", (long)current_values[0]);
+ }
+ return true;
+ } else {
+ if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+ wj66_state.status = ENCODER_CRC_ERROR;
+ wj66_state.error_count++;
+ xSemaphoreGive(wj66_mutex);
+ }
+ return false;
+ }
 }
 
 void wj66ProcessSerial() {
-    // CRITICAL: Only process if we are NOT on RS485 (Interface 1)
-    // Background RS485 registry handles the polling if encoder_iface == 1
-    const encoder_hal_config_t* hal_cfg = encoderHalGetConfig();
-    if (hal_cfg && hal_cfg->interface == ENCODER_INTERFACE_RS485_RXD2) {
-        return; 
-    }
-    
-    if (wj66_maintenance_mode) return;
+ // CRITICAL: Only process if we are NOT on RS485 (Interface 1)
+ // Background RS485 registry handles the polling if encoder_iface == 1
+ const encoder_hal_config_t* hal_cfg = encoderHalGetConfig();
+ if (hal_cfg && hal_cfg->interface == ENCODER_INTERFACE_RS485_RXD2) {
+ return; 
+ }
+ 
+ if (wj66_maintenance_mode) return;
 
-    static uint32_t last_poll = 0;
-    uint32_t now = millis();
+ static uint32_t last_poll = 0;
+ uint32_t now = millis();
 
-    // 1. Handlers for Incoming Data
-    if (encoderHalAvailable() > 0) {
-        uint8_t buffer[64];
-        uint8_t len = sizeof(buffer);
-        if (encoderHalReceive(buffer, &len)) {
-            // Process the response
-            wj66OnResponse(nullptr, buffer, len);
-        }
-    }
+ // 1. Handlers for Incoming Data
+ if (encoderHalAvailable() > 0) {
+ uint8_t buffer[64];
+ uint8_t len = sizeof(buffer);
+ if (encoderHalReceive(buffer, &len)) {
+ // Process the response
+ wj66OnResponse(nullptr, buffer, len);
+ }
+ }
 
-    // 2. Transmit Polling (every 50ms)
-    if (now - last_poll >= WJ66_READ_INTERVAL_MS) {
-        last_poll = now;
-        
-        int addr = configGetInt(KEY_ENC_ADDR, 0);
-        int proto = configGetInt(KEY_ENC_PROTO, 0);
+ // 2. Transmit Polling (every 50ms)
+ if (now - last_poll >= WJ66_READ_INTERVAL_MS) {
+ last_poll = now;
+ 
+ int addr = configGetInt(KEY_ENC_ADDR, 0);
+ int proto = configGetInt(KEY_ENC_PROTO, 0);
 
-        if (proto == 1) {
-            uint8_t frame[8];
-            modbusReadRegistersRequest((uint8_t)addr, 0x0010, 8, frame);
-            encoderHalSend(frame, 8);
-        } else {
-            char cmd[8];
-            snprintf(cmd, sizeof(cmd), "#%02d2\r", addr);
-            encoderHalSendString(cmd);
-        }
-    }
+ if (proto == 1) {
+ uint8_t frame[8];
+ modbusReadRegistersRequest((uint8_t)addr, 0x0010, 8, frame);
+ encoderHalSend(frame, 8);
+ } else {
+ char cmd[8];
+ snprintf(cmd, sizeof(cmd), "#%02d2\r", addr);
+ encoderHalSendString(cmd);
+ }
+ }
 }
 
 
 int32_t wj66GetPosition(uint8_t axis) {
-    if (axis >= WJ66_AXES) return 0;
+ if (axis >= WJ66_AXES) return 0;
 
-    // PHASE 5.10: Thread-safe position read to prevent torn reads
-    int32_t position = 0;
-    if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-      position = wj66_state.position[axis] - wj66_state.zero_offset[axis];
-      xSemaphoreGive(wj66_mutex);
-    } else {
-      logWarning("[WJ66] Mutex timeout reading axis %d position", axis);
-      // Return cached value without protection (better than blocking)
-      position = wj66_state.position[axis] - wj66_state.zero_offset[axis];
-    }
+ // Thread-safe position read to prevent torn reads
+ int32_t position = 0;
+ if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+ position = wj66_state.position[axis] - wj66_state.zero_offset[axis];
+ xSemaphoreGive(wj66_mutex);
+ } else {
+ logWarning("[WJ66] Mutex timeout reading axis %d position", axis);
+ // Return cached value without protection (better than blocking)
+ position = wj66_state.position[axis] - wj66_state.zero_offset[axis];
+ }
 
-    return position;
+ return position;
 }
 
 uint32_t wj66GetAxisAge(uint8_t axis) { 
-    if (axis >= WJ66_AXES) return 0xFFFFFFFF;
-    uint32_t last = wj66_state.last_read[axis];
-    if (last == 0) return 999999;
-    uint32_t now = millis();
-    if (now < last) return 0;
-    return now - last;
+ if (axis >= WJ66_AXES) return 0xFFFFFFFF;
+ uint32_t last = wj66_state.last_read[axis];
+ if (last == 0) return 999999;
+ uint32_t now = millis();
+ if (now < last) return 0;
+ return now - last;
 }
 
 uint32_t wj66GetReadCount(uint8_t axis) {
-    if (axis >= WJ66_AXES) return 0;
-    return wj66_state.read_count[axis];
+ if (axis >= WJ66_AXES) return 0;
+ return wj66_state.read_count[axis];
 }
 
 uint32_t wj66GetPollCount() {
-    return wj66_device.poll_count;
+ return wj66_device.poll_count;
 }
 
 bool wj66IsStale(uint8_t axis) { 
-    return wj66GetAxisAge(axis) > WJ66_TIMEOUT_MS; 
+ return wj66GetAxisAge(axis) > WJ66_TIMEOUT_MS; 
 }
 
-// PHASE 5.10: Protect status read with mutex
+// Protect status read with mutex
 encoder_status_t wj66GetStatus() {
-  encoder_status_t status = ENCODER_OK;
-  if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-    status = wj66_state.status;
-    xSemaphoreGive(wj66_mutex);
-  }
-  return status;
+ encoder_status_t status = ENCODER_OK;
+ if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+ status = wj66_state.status;
+ xSemaphoreGive(wj66_mutex);
+ }
+ return status;
 }
 
 void wj66Reset() {
-  for (int i = 0; i < WJ66_AXES; i++) {
-    wj66_state.position[i] = 0;
-    wj66_state.zero_offset[i] = 0;
-    // Set last_read to past timestamp to ensure IsStale() returns true (disconnected) until first response
-    wj66_state.last_read[i] = (millis() > 60000) ? (millis() - 60000) : 0;
-  }
-  wj66_state.error_count = 0;
-  wj66_state.waiting_for_response = false;
-  logInfo("[WJ66] Stats reset.");
+ for (int i = 0; i < WJ66_AXES; i++) {
+ wj66_state.position[i] = 0;
+ wj66_state.zero_offset[i] = 0;
+ // Set last_read to past timestamp to ensure IsStale() returns true (disconnected) until first response
+ wj66_state.last_read[i] = (millis() > 60000) ? (millis() - 60000) : 0;
+ }
+ wj66_state.error_count = 0;
+ wj66_state.waiting_for_response = false;
+ logInfo("[WJ66] Stats reset.");
 }
 
 void wj66SetZero(uint8_t axis) {
-    if (axis < WJ66_AXES) {
-        // PHASE 5.10: Thread-safe zero offset update
-        if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-          wj66_state.zero_offset[axis] = wj66_state.position[axis];
-          xSemaphoreGive(wj66_mutex);
-          logInfo("[WJ66] Axis %d Zeroed. Offset: %ld", axis, (long)wj66_state.zero_offset[axis]);
-        } else {
-          logWarning("[WJ66] Mutex timeout setting zero for axis %d", axis);
-        }
-    }
+ if (axis < WJ66_AXES) {
+ // Thread-safe zero offset update
+ if (wj66_mutex && xSemaphoreTake(wj66_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+ wj66_state.zero_offset[axis] = wj66_state.position[axis];
+ xSemaphoreGive(wj66_mutex);
+ logInfo("[WJ66] Axis %d Zeroed. Offset: %ld", axis, (long)wj66_state.zero_offset[axis]);
+ } else {
+ logWarning("[WJ66] Mutex timeout setting zero for axis %d", axis);
+ }
+ }
 }
 
 void wj66Diagnostics() {
-  if (!serialLoggerLock()) return;
-  const encoder_hal_config_t* hal = encoderHalGetConfig();
-  logPrintln("\n=== ENCODER STATUS ===");
-  logPrintf("Interface: %d (%s)\n", hal->interface, encoderHalGetInterfaceName(hal->interface));
-  logPrintf("Baud Rate: %lu\n", (unsigned long)hal->baud_rate);
-  logPrintf("Protocol:  %s\n", configGetInt(KEY_ENC_PROTO, 0) == 1 ? "Modbus RTU" : "ASCII/CSV");
-  logPrintf("Latency:   %lu ms (Response time)\n", (unsigned long)wj66_state.last_latency_ms);
-  logPrintf("Status:    %d\nErrors:   %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
-  logPrintf("Waiting: %s\n", wj66_state.waiting_for_response ? "YES" : "NO");
-  
-  for (int i = 0; i < WJ66_AXES; i++) {
-    uint32_t age = wj66GetAxisAge(i);
-    logPrintf("  Axis %d: Raw=%ld | Offset=%ld | NET=%ld | Age=%lu ms\n", 
-        i, 
-        (long)wj66_state.position[i], 
-        (long)wj66_state.zero_offset[i],
-        (long)(wj66_state.position[i] - wj66_state.zero_offset[i]),
-        (unsigned long)age
-    );
-  }
-  serialLoggerUnlock();
+ if (!serialLoggerLock()) return;
+ const encoder_hal_config_t* hal = encoderHalGetConfig();
+ logPrintln("\n=== ENCODER STATUS ===");
+ logPrintf("Interface: %d (%s)\n", hal->interface, encoderHalGetInterfaceName(hal->interface));
+ logPrintf("Baud Rate: %lu\n", (unsigned long)hal->baud_rate);
+ logPrintf("Protocol: %s\n", configGetInt(KEY_ENC_PROTO, 0) == 1 ? "Modbus RTU" : "ASCII/CSV");
+ logPrintf("Latency: %lu ms (Response time)\n", (unsigned long)wj66_state.last_latency_ms);
+ logPrintf("Status: %d\nErrors: %lu\n", wj66_state.status, (unsigned long)wj66_state.error_count);
+ logPrintf("Waiting: %s\n", wj66_state.waiting_for_response ? "YES" : "NO");
+ 
+ for (int i = 0; i < WJ66_AXES; i++) {
+ uint32_t age = wj66GetAxisAge(i);
+ logPrintf(" Axis %d: Raw=%ld | Offset=%ld | NET=%ld | Age=%lu ms\n", 
+ i, 
+ (long)wj66_state.position[i], 
+ (long)wj66_state.zero_offset[i],
+ (long)(wj66_state.position[i] - wj66_state.zero_offset[i]),
+ (unsigned long)age
+ );
+ }
+ serialLoggerUnlock();
 }
 
 void wj66IdentifyCapability() {
-    if (!serialLoggerLock()) return;
-    
-    // Use logPrintf for all messages to ensure synchronicity and avoid async queue race
-    logPrintf("[WJ66] Starting Protocol Capability Identification...\r\n");
-    
-    // Suspend RS485 bus activity during scan
-    rs485SetBusPaused(true);
-    
-    // Acquire bus mutex
-    if (!rs485TakeBus(2000)) {
-        logPrintf("[WJ66] ERROR: Failed to acquire bus mutex for identification\r\n");
-        rs485SetBusPaused(false);
-        serialLoggerUnlock();
-        return;
-    }
+ if (!serialLoggerLock()) return;
+ 
+ // Use logPrintf for all messages to ensure synchronicity and avoid async queue race
+ logPrintf("[WJ66] Starting Protocol Capability Identification...\r\n");
+ 
+ // Suspend RS485 bus activity during scan
+ rs485SetBusPaused(true);
+ 
+ // Acquire bus mutex
+ if (!rs485TakeBus(2000)) {
+ logPrintf("[WJ66] ERROR: Failed to acquire bus mutex for identification\r\n");
+ rs485SetBusPaused(false);
+ serialLoggerUnlock();
+ return;
+ }
 
-    // Small delay to allow any pending transaction to clear the UART hardware buffers
-    vTaskDelay(pdMS_TO_TICKS(50));
+ // Small delay to allow any pending transaction to clear the UART hardware buffers
+ vTaskDelay(pdMS_TO_TICKS(50));
 
-    int addr = configGetInt(KEY_ENC_ADDR, 1);
-    const encoder_hal_config_t* hal = encoderHalGetConfig();
-    
-    // Determine which serial object to use
+ int addr = configGetInt(KEY_ENC_ADDR, 1);
+ const encoder_hal_config_t* hal = encoderHalGetConfig();
+ 
+ // Determine which serial object to use
 #if !defined(CONFIG_IDF_TARGET_ESP32S2)
-    HardwareSerial* s = (hal->interface == ENCODER_INTERFACE_RS485_RXD2) ? &Serial2 : &Serial1;
+ HardwareSerial* s = (hal->interface == ENCODER_INTERFACE_RS485_RXD2) ? &Serial2 : &Serial1;
 #else
-    HardwareSerial* s = &Serial1;
+ HardwareSerial* s = &Serial1;
 #endif
 
-    bool ascii_ok = false;
-    bool rtu_ok = false;
-    bool switch_recognized = false;
-    uint8_t resp[128];
-    int len;
+ bool ascii_ok = false;
+ bool rtu_ok = false;
+ bool switch_recognized = false;
+ uint8_t resp[128];
+ int len;
 
-    // 1. Probe current baud with ASCII
-    logPrintf("[WJ66] Probing ASCII (Addr %02d @ %lu baud)...\r\n", addr, (unsigned long)hal->baud_rate);
-    while(s->available()) s->read();
-    char cmd[16];
-    snprintf(cmd, sizeof(cmd), "#%02d\r", addr);
-    s->print(cmd);
-    s->flush();
-    
-    // Synchronous wait for response
-    uint32_t start = millis();
-    len = 0;
-    while(true) {
-        uint32_t now = millis();
-        uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
-        if (elapsed >= 400 || len >= (int)sizeof(resp)-1) break;
-        
-        if(s->available()) resp[len++] = s->read();
-        else vTaskDelay(1);
-    }
-    if (len > 0) {
-        resp[len] = '\0';
-        // WJ66 ASCII response starts with '!' or '>' or '*'
-        if (strchr((char*)resp, '!') || strchr((char*)resp, '>') || strchr((char*)resp, '*')) {
-            ascii_ok = true;
-            logPrintf("[WJ66] ASCII Response Received: %s\r\n", (char*)resp);
-        }
-    }
+ // 1. Probe current baud with ASCII
+ logPrintf("[WJ66] Probing ASCII (Addr %02d @ %lu baud)...\r\n", addr, (unsigned long)hal->baud_rate);
+ while(s->available()) s->read();
+ char cmd[16];
+ snprintf(cmd, sizeof(cmd), "#%02d\r", addr);
+ s->print(cmd);
+ s->flush();
+ 
+ // Synchronous wait for response
+ uint32_t start = millis();
+ len = 0;
+ while(true) {
+ uint32_t now = millis();
+ uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
+ if (elapsed >= 400 || len >= (int)sizeof(resp)-1) break;
+ 
+ if(s->available()) resp[len++] = s->read();
+ else vTaskDelay(1);
+ }
+ if (len > 0) {
+ resp[len] = '\0';
+ // WJ66 ASCII response starts with '!' or '>' or '*'
+ if (strchr((char*)resp, '!') || strchr((char*)resp, '>') || strchr((char*)resp, '*')) {
+ ascii_ok = true;
+ logPrintf("[WJ66] ASCII Response Received: %s\r\n", (char*)resp);
+ }
+ }
 
-    // 2. Probe current baud with Modbus RTU
-    logPrintf("[WJ66] Probing Modbus RTU (Addr %02d @ %lu baud)...\r\n", addr, (unsigned long)hal->baud_rate);
-    while(s->available()) s->read();
-    uint8_t frame[8];
-    modbusReadRegistersRequest((uint8_t)addr, 0x0000, 1, frame);
-    s->write(frame, 8);
-    s->flush();
-    
-    start = millis();
-    len = 0;
-    while(true) {
-        uint32_t now = millis();
-        uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
-        if (elapsed >= 400 || len >= (int)sizeof(resp)) break;
-        
-        if(s->available()) resp[len++] = s->read();
-        else vTaskDelay(1);
-    }
-    if (len >= 5 && resp[0] == addr && (resp[1] == 0x03 || resp[1] == 0x83) && modbusVerifyCrc(resp, len)) {
-        if (resp[1] == 0x03) {
-            rtu_ok = true;
-            logPrintf("[WJ66] Modbus RTU Response Received (Verified CRC)\r\n");
-        } else {
-            logPrintf("[WJ66] Modbus EXCEPTION Received (Error code: %d)\r\n", resp[2]);
-            rtu_ok = true; // Still counts as speaking Modbus
-        }
-    }
+ // 2. Probe current baud with Modbus RTU
+ logPrintf("[WJ66] Probing Modbus RTU (Addr %02d @ %lu baud)...\r\n", addr, (unsigned long)hal->baud_rate);
+ while(s->available()) s->read();
+ uint8_t frame[8];
+ modbusReadRegistersRequest((uint8_t)addr, 0x0000, 1, frame);
+ s->write(frame, 8);
+ s->flush();
+ 
+ start = millis();
+ len = 0;
+ while(true) {
+ uint32_t now = millis();
+ uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
+ if (elapsed >= 400 || len >= (int)sizeof(resp)) break;
+ 
+ if(s->available()) resp[len++] = s->read();
+ else vTaskDelay(1);
+ }
+ if (len >= 5 && resp[0] == addr && (resp[1] == 0x03 || resp[1] == 0x83) && modbusVerifyCrc(resp, len)) {
+ if (resp[1] == 0x03) {
+ rtu_ok = true;
+ logPrintf("[WJ66] Modbus RTU Response Received (Verified CRC)\r\n");
+ } else {
+ logPrintf("[WJ66] Modbus EXCEPTION Received (Error code: %d)\r\n", resp[2]);
+ rtu_ok = true; // Still counts as speaking Modbus
+ }
+ }
 
-    // 3. If ASCII works but RTU doesn't, check if it understands the protocol switch command
-    if (ascii_ok && !rtu_ok) {
-        logPrintf("[WJ66] Checking if ASCII device recognizes RTU switch command ($%02dP1)...\r\n", addr);
-        while(s->available()) s->read();
-        snprintf(cmd, sizeof(cmd), "$%02dP1\r", addr);
-        s->print(cmd);
-        s->flush();
-        
-        start = millis();
-        len = 0;
-        while(true) {
-            uint32_t now = millis();
-            uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
-            if (elapsed >= 500 || len >= (int)sizeof(resp)-1) break;
-            
-            if(s->available()) resp[len++] = s->read();
-            else vTaskDelay(1);
-        }
-        if (len > 0) {
-            resp[len] = '\0';
-            if (strchr((char*)resp, '!')) {
-                switch_recognized = true;
-                logPrintf("[WJ66] Success: Device responded '!' to switch command.\r\n");
-            } else {
-                logPrintf("[WJ66] Device responded with unknown sequence: %s\r\n", (char*)resp);
-            }
-        }
-    }
+ // 3. If ASCII works but RTU doesn't, check if it understands the protocol switch command
+ if (ascii_ok && !rtu_ok) {
+ logPrintf("[WJ66] Checking if ASCII device recognizes RTU switch command ($%02dP1)...\r\n", addr);
+ while(s->available()) s->read();
+ snprintf(cmd, sizeof(cmd), "$%02dP1\r", addr);
+ s->print(cmd);
+ s->flush();
+ 
+ start = millis();
+ len = 0;
+ while(true) {
+ uint32_t now = millis();
+ uint32_t elapsed = (now >= start) ? (now - start) : (UINT32_MAX - start + now + 1);
+ if (elapsed >= 500 || len >= (int)sizeof(resp)-1) break;
+ 
+ if(s->available()) resp[len++] = s->read();
+ else vTaskDelay(1);
+ }
+ if (len > 0) {
+ resp[len] = '\0';
+ if (strchr((char*)resp, '!')) {
+ switch_recognized = true;
+ logPrintf("[WJ66] Success: Device responded '!' to switch command.\r\n");
+ } else {
+ logPrintf("[WJ66] Device responded with unknown sequence: %s\r\n", (char*)resp);
+ }
+ }
+ }
 
-    logPrintf("\r\n=== WJ66 CAPABILITY REPORT ===\r\n");
-    logPrintf("Device Address:  %02d\r\n", addr);
-    logPrintf("ASCII Protocol:  %s\r\n", ascii_ok ? "DETECTED" : "NO RESPONSE");
-    logPrintf("Modbus RTU:      %s\r\n", rtu_ok ? "DETECTED" : "NO RESPONSE");
-    
-    if (ascii_ok && !rtu_ok) {
-        logPrintf("RTU Capability:  %s\r\n", switch_recognized ? "CONFIRMED (Responded to $xxP1)" : "NOT DETECTED");
-        if (switch_recognized) {
-            logPrintf("\r\n[RESULT] Your module supports RTU but is currently in ASCII mode.\r\n");
-            logPrintf("         You can permanently switch it using: rs485 raw $%02dP1\\r\n", addr);
-        } else {
-            logPrintf("\r\n[RESULT] Module is in ASCII mode but ignores the RTU switch command.\r\n");
-            logPrintf("         You MUST connect the INIT pin to GND to enable config changes.\r\n");
-        }
-    } else if (rtu_ok) {
-        logPrintf("\r\n[RESULT] Device is already in Modbus RTU mode.\r\n");
-    } else if (!ascii_ok && !rtu_ok) {
-        logPrintf("\r\n[RESULT] No response from Address %02d. Things to check:\r\n", addr);
-        logPrintf("         - Is the module powered?\r\n");
-        logPrintf("         - Is the RS-485 / RS-232 wiring correct?\r\n");
-        logPrintf("         - Try 'encoder scan' to verify the baud rate.\r\n");
-    }
-    logPrintf("==============================\r\n");
+ logPrintf("\r\n=== WJ66 CAPABILITY REPORT ===\r\n");
+ logPrintf("Device Address: %02d\r\n", addr);
+ logPrintf("ASCII Protocol: %s\r\n", ascii_ok ? "DETECTED" : "NO RESPONSE");
+ logPrintf("Modbus RTU: %s\r\n", rtu_ok ? "DETECTED" : "NO RESPONSE");
+ 
+ if (ascii_ok && !rtu_ok) {
+ logPrintf("RTU Capability: %s\r\n", switch_recognized ? "CONFIRMED (Responded to $xxP1)" : "NOT DETECTED");
+ if (switch_recognized) {
+ logPrintf("\r\n[RESULT] Your module supports RTU but is currently in ASCII mode.\r\n");
+ logPrintf(" You can permanently switch it using: rs485 raw $%02dP1\\r\n", addr);
+ } else {
+ logPrintf("\r\n[RESULT] Module is in ASCII mode but ignores the RTU switch command.\r\n");
+ logPrintf(" You MUST connect the INIT pin to GND to enable config changes.\r\n");
+ }
+ } else if (rtu_ok) {
+ logPrintf("\r\n[RESULT] Device is already in Modbus RTU mode.\r\n");
+ } else if (!ascii_ok && !rtu_ok) {
+ logPrintf("\r\n[RESULT] No response from Address %02d. Things to check:\r\n", addr);
+ logPrintf(" - Is the module powered?\r\n");
+ logPrintf(" - Is the RS-485 / RS-232 wiring correct?\r\n");
+ logPrintf(" - Try 'encoder scan' to verify the baud rate.\r\n");
+ }
+ logPrintf("==============================\r\n");
 
-    rs485ReleaseBus();
-    rs485SetBusPaused(false);
-    serialLoggerUnlock();
+ rs485ReleaseBus();
+ rs485SetBusPaused(false);
+ serialLoggerUnlock();
 }
 
 // --- ENCODER HEALTH ACCESSORS ---
 
 uint32_t wj66GetErrorCount() {
-    return wj66_state.error_count;
+ return wj66_state.error_count;
 }
 
 uint32_t wj66GetLatencyMs() {
-    return wj66_state.last_latency_ms;
+ return wj66_state.last_latency_ms;
 }
 
 float wj66GetErrorRate() {
-    uint32_t total_reads = 0;
-    for (int i = 0; i < WJ66_AXES; i++) {
-        total_reads += wj66_state.read_count[i];
-    }
-    uint32_t total_ops = wj66_state.error_count + total_reads;
-    if (total_ops == 0) return 0.0f;
-    return (wj66_state.error_count * 100.0f) / (float)total_ops;
+ uint32_t total_reads = 0;
+ for (int i = 0; i < WJ66_AXES; i++) {
+ total_reads += wj66_state.read_count[i];
+ }
+ uint32_t total_ops = wj66_state.error_count + total_reads;
+ if (total_ops == 0) return 0.0f;
+ return (wj66_state.error_count * 100.0f) / (float)total_ops;
 }
 
 uint32_t wj66GetNoiseRejections() {
-    return wj66_state.noise_rejections;
+ return wj66_state.noise_rejections;
 }

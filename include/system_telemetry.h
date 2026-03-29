@@ -1,6 +1,6 @@
 /**
  * @file system_telemetry.h
- * @brief Comprehensive System Telemetry and Health Metrics (PHASE 5.1)
+ * @brief Comprehensive System Telemetry and Health Metrics
  * @details Aggregates all system metrics into unified telemetry dashboard
  * @project BISSO E350 Controller
  */
@@ -20,139 +20,139 @@ extern "C" {
  * System health status
  */
 typedef enum {
-    HEALTH_UNKNOWN = 0,
-    HEALTH_CRITICAL = 1,    // System is in fault state
-    HEALTH_WARNING = 2,     // High resource usage or slow tasks
-    HEALTH_NORMAL = 3,      // All systems operating normally
-    HEALTH_OPTIMAL = 4      // All systems within optimal ranges
+ HEALTH_UNKNOWN = 0,
+ HEALTH_CRITICAL = 1, // System is in fault state
+ HEALTH_WARNING = 2, // High resource usage or slow tasks
+ HEALTH_NORMAL = 3, // All systems operating normally
+ HEALTH_OPTIMAL = 4 // All systems within optimal ranges
 } system_health_t;
 
 /**
  * Comprehensive telemetry snapshot
  */
 typedef struct {
-    // System Status
-    system_health_t health_status;
-    uint32_t uptime_seconds;
-    uint32_t boot_failures;  // Number of boot attempts before success
-    bool plc_hardware_present; // PHASE 5.11: Detected at boot
-    bool rtc_battery_low;      // NEW: RTC Battery failure detection
+ // System Status
+ system_health_t health_status;
+ uint32_t uptime_seconds;
+ uint32_t boot_failures; // Number of boot attempts before success
+ bool plc_hardware_present; // Detected at boot
+ bool rtc_battery_low; // NEW: RTC Battery failure detection
 
-    // Identification
-    char mcu_revision[16];
-    char mcu_serial[32];
-    char mcu_model[32];
+ // Identification
+ char mcu_revision[16];
+ char mcu_serial[32];
+ char mcu_model[32];
 
-    // CPU & Memory
-    uint8_t cpu_usage_percent;
-    uint32_t free_heap_bytes;
-    uint32_t heap_fragmentation_percent;
-    uint32_t stack_used_bytes;
+ // CPU & Memory
+ uint8_t cpu_usage_percent;
+ uint32_t free_heap_bytes;
+ uint32_t heap_fragmentation_percent;
+ uint32_t stack_used_bytes;
 
-    // Motion System
-    bool motion_enabled;
-    bool motion_moving;
-    float axis_x_mm;
-    float axis_y_mm;
-    float axis_z_mm;
-    float axis_a_mm;
-    bool coordinated_mode;     // PHASE 22: Simultaneous X/Y enabled
-    float wcs_offset_mm[4];    // PHASE 5.1: X, Y, Z, A offsets
-    uint8_t active_wcs;        // PHASE 5.1: 0=G54, 1=G55, etc.
-    uint32_t steps_executed;
-    uint32_t motion_errors;
-    uint16_t motion_buffer_count;
-    uint16_t motion_buffer_capacity;
+ // Motion System
+ bool motion_enabled;
+ bool motion_moving;
+ float axis_x_mm;
+ float axis_y_mm;
+ float axis_z_mm;
+ float axis_a_mm;
+ bool coordinated_mode; // Simultaneous X/Y enabled
+ float wcs_offset_mm[4]; // X, Y, Z, A offsets
+ uint8_t active_wcs; // 0=G54, 1=G55, etc.
+ uint32_t steps_executed;
+ uint32_t motion_errors;
+ uint16_t motion_buffer_count;
+ uint16_t motion_buffer_capacity;
 
-    // Spindle
-    bool spindle_enabled;       // Spindle monitoring enabled
-    bool spindle_running;       // Motor actually running (from VFD Modbus status)
-    float spindle_current_amps;
-    float spindle_current_peak_amps;
-    uint32_t spindle_errors;
-    bool spindle_overcurrent;
-    bool spindle_fault;
+ // Spindle
+ bool spindle_enabled; // Spindle monitoring enabled
+ bool spindle_running; // Motor actually running (from VFD Modbus status)
+ float spindle_current_amps;
+ float spindle_current_peak_amps;
+ uint32_t spindle_errors;
+ bool spindle_overcurrent;
+ bool spindle_fault;
 
-    // RPM Sensor (YH-TC05)
-    bool rpm_sensor_enabled;
-    uint16_t spindle_rpm;
-    bool rpm_stall_detected;
+ // RPM Sensor (YH-TC05)
+ bool rpm_sensor_enabled;
+ uint16_t spindle_rpm;
+ bool rpm_stall_detected;
 
-    // VFD & Spindle Detail (PHASE 8 DRY)
-    bool vfd_connected;             // Primary/Consolidated
-    float vfd_frequency_hz;
-    int16_t vfd_thermal_state;
-    uint32_t vfd_fault_code;
+ // VFD & Spindle Detail 
+ bool vfd_connected; // Primary/Consolidated
+ float vfd_frequency_hz;
+ int16_t vfd_thermal_state;
+ uint32_t vfd_fault_code;
 
-    // VFD 1 (X-Axis)
-    bool vfd1_connected;
-    float vfd1_frequency_hz;
-    float vfd1_current_amps;
-    uint32_t vfd1_fault_code;
+ // VFD 1 (X-Axis)
+ bool vfd1_connected;
+ float vfd1_frequency_hz;
+ float vfd1_current_amps;
+ uint32_t vfd1_fault_code;
 
-    // VFD 2 (Aux Axes: Y, Z, A)
-    bool vfd2_connected;
-    float vfd2_frequency_hz;
-    float vfd2_current_amps;
-    uint32_t vfd2_fault_code;
-    float vfd_threshold_amps;
-    bool vfd_calibration_valid;
-    float spindle_load_percent;
-    float spindle_efficiency;
-    
-    // Axis Quality & Synchronization (PHASE 8 DRY)
-    float axis_quality_score[3];
-    float axis_jitter_mms[3];
-    bool axis_stalled[3];
-    float axis_vfd_error_percent[3];
-    bool axis_maintenance_warning[3];
+ // VFD 2 (Aux Axes: Y, Z, A)
+ bool vfd2_connected;
+ float vfd2_frequency_hz;
+ float vfd2_current_amps;
+ uint32_t vfd2_fault_code;
+ float vfd_threshold_amps;
+ bool vfd_calibration_valid;
+ float spindle_load_percent;
+ float spindle_efficiency;
+ 
+ // Axis Quality & Synchronization 
+ float axis_quality_score[3];
+ float axis_jitter_mms[3];
+ bool axis_stalled[3];
+ float axis_vfd_error_percent[3];
+ bool axis_maintenance_warning[3];
 
-    // Connectivity
-    bool dro_connected;
+ // Connectivity
+ bool dro_connected;
 
-    // Safety System
-    bool estop_active;
-    bool alarm_active;
-    uint32_t safety_events;
-    uint32_t faults_logged;
-    uint32_t critical_faults;
+ // Safety System
+ bool estop_active;
+ bool alarm_active;
+ uint32_t safety_events;
+ uint32_t faults_logged;
+ uint32_t critical_faults;
 
-    // Task Metrics
-    uint8_t slowest_task_id;      // Task with longest execution time
-    uint32_t slowest_task_time_us;
-    uint32_t total_task_underruns; // Times tasks missed deadline
+ // Task Metrics
+ uint8_t slowest_task_id; // Task with longest execution time
+ uint32_t slowest_task_time_us;
+ uint32_t total_task_underruns; // Times tasks missed deadline
 
-    // Network
-    bool wifi_connected;
-    uint8_t wifi_signal_strength;  // 0-100 RSSI percentage
-    uint32_t http_requests_served;
-    uint32_t http_errors;
+ // Network
+ bool wifi_connected;
+ uint8_t wifi_signal_strength; // 0-100 RSSI percentage
+ uint32_t http_requests_served;
+ uint32_t http_errors;
 
-    // Configuration
-    uint32_t config_version;
-    bool config_is_default;
-    uint32_t config_changes_count;
+ // Configuration
+ uint32_t config_version;
+ bool config_is_default;
+ uint32_t config_changes_count;
 
-    // Diagnostics
-    const char* primary_fault_message;
-    uint32_t loop_cycle_count;
-    uint32_t watchdog_resets;
-    float temperature;
-    char system_status_string[32];
+ // Diagnostics
+ const char* primary_fault_message;
+ uint32_t loop_cycle_count;
+ uint32_t watchdog_resets;
+ float temperature;
+ char system_status_string[32];
 
-    // SD Card Metrics (PHASE 6.6)
-    bool sd_mounted;
-    uint8_t sd_health;         // Maps to SDCardHealth enum
-    uint64_t sd_total_bytes;
-    uint64_t sd_used_bytes;
+ // SD Card Metrics
+ bool sd_mounted;
+ uint8_t sd_health; // Maps to SDCardHealth enum
+ uint64_t sd_total_bytes;
+ uint64_t sd_used_bytes;
 
-    // Parser State
-    bool parser_absolute_mode;
-    float parser_req_feedrate;
-    float parser_actual_feedrate;
+ // Parser State
+ bool parser_absolute_mode;
+ float parser_req_feedrate;
+ float parser_actual_feedrate;
 
-    // LCD Mirror
-    char lcd_lines[4][21];
+ // LCD Mirror
+ char lcd_lines[4][21];
 } system_telemetry_t;
 
 /**
@@ -160,33 +160,33 @@ typedef struct {
  */
 #pragma pack(push, 1)
 typedef struct {
-    uint16_t magic;           // 0xB155 (BISSO)
-    uint8_t version;          // Protocol version: 1
-    uint8_t health;           // system_health_t
+ uint16_t magic; // 0xB155 (BISSO)
+ uint8_t version; // Protocol version: 1
+ uint8_t health; // system_health_t
 
-    uint32_t uptime;          // seconds
-    uint8_t cpu_usage;        // percentage
-    uint32_t free_heap;       // bytes
-    
-    uint8_t flags;            // [0]:motion_en, [1]:moving, [2]:spindle_en, [3]:overcurrent, [4]:fault, [5]:wifi_conn, [6]:estop, [7]:alarm
-    uint8_t flags2;           // [0]:plc_present
+ uint32_t uptime; // seconds
+ uint8_t cpu_usage; // percentage
+ uint32_t free_heap; // bytes
+ 
+ uint8_t flags; // [0]:motion_en, [1]:moving, [2]:spindle_en, [3]:overcurrent, [4]:fault, [5]:wifi_conn, [6]:estop, [7]:alarm
+ uint8_t flags2; // [0]:plc_present
 
-    float axis_x;             // mm
-    float axis_y;             // mm
-    float axis_z;             // mm
-    float axis_a;             // mm
+ float axis_x; // mm
+ float axis_y; // mm
+ float axis_z; // mm
+ float axis_a; // mm
 
-    float spindle_amps;       // Current
-    float spindle_peak;       // Peak Current
+ float spindle_amps; // Current
+ float spindle_peak; // Peak Current
 
-    uint32_t faults_logged;
-    uint32_t critical_faults;
-    
-    uint8_t slowest_id;
-    uint32_t slowest_us;
-    
-    uint8_t wifi_signal;      // percentage
-    uint8_t temperature;      // scale 0-100C
+ uint32_t faults_logged;
+ uint32_t critical_faults;
+ 
+ uint8_t slowest_id;
+ uint32_t slowest_us;
+ 
+ uint8_t wifi_signal; // percentage
+ uint8_t temperature; // scale 0-100C
 } telemetry_packet_t;
 #pragma pack(pop)
 

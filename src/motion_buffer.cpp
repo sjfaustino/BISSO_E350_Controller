@@ -10,7 +10,7 @@
 #include "motion.h"
 #include "serial_logger.h"
 #include "system_constants.h" // For MOTION_POSITION_SCALE_FACTOR
-#include "system_events.h"    // PHASE 5.10: Event-driven architecture
+#include "system_events.h"    // Event-driven architecture
 #include "task_manager.h"     // For taskGetMotionMutex()
 #include "psram_alloc.h"     // PSRAM allocations
 #include <string.h>
@@ -67,7 +67,7 @@ bool MotionBuffer::push_unsafe(float x, float y, float z, float a,
   if (count >= MOTION_BUFFER_SIZE)
     return false;
 
-  // PHASE 5.27: Position overflow protection
+  // Position overflow protection
   float sx = x * motionGetAxisScale(0);
   float sy = y * motionGetAxisScale(1);
   float sz = z * motionGetAxisScale(2);
@@ -191,7 +191,7 @@ bool MotionBuffer::pop(motion_cmd_t *cmd) {
   bool was_full = isFull_unsafe();
   bool result = pop_unsafe(cmd);
 
-  // PHASE 5.10: Signal event if buffer has space now
+  // Signal event if buffer has space now
   if (was_full && result) {
     systemEventsMotionSet(EVENT_MOTION_BUFFER_READY);
   }
@@ -276,7 +276,7 @@ void MotionBuffer::clear() {
     return;
   }
 
-  // PHASE 5.1: Must acquire mutex before clearing to prevent race conditions
+  // Must acquire mutex before clearing to prevent race conditions
   if (!xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(100))) {
     logError("[BUFFER] CRITICAL: Clear timeout - cannot clear buffer safely");
     return; // Do NOT clear without mutex - risk of data corruption
@@ -290,7 +290,7 @@ void MotionBuffer::clear() {
   xSemaphoreGive(buffer_mutex);
 }
 
-// PHASE 5.7: Clarification - Naming Convention
+// Clarification - Naming Convention
 // NOTE: available() returns COUNT USED (not count free!)
 // Arduino convention: available() = "data ready to read" (e.g.,
 // Serial.available()) This buffer: available() = "items in buffer" (0 = empty,

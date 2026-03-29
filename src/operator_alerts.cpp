@@ -62,7 +62,7 @@ static void updateStatusLightOutputs(bool green, bool yellow, bool red) {
 void statusLightInit(void) {
     status_light_enabled = configGetInt(KEY_STATUS_LIGHT_EN, 0) != 0;  // Default: disabled
     
-    // PHASE 16: Auto-migrate legacy pin indices (1-16) to virtual pin IDs (116-131)
+    // Auto-migrate legacy pin indices (1-16) to virtual pin IDs (116-131)
     auto migratePin = [](const char* key, uint16_t def) -> uint16_t {
         uint16_t p = configGetInt(key, def);
         if (p >= 1 && p <= 16) {
@@ -204,7 +204,7 @@ system_display_state_t statusLightGetState(void) {
 void buzzerInit(void) {
     buzzer_enabled = configGetInt(KEY_BUZZER_EN, 1) != 0;  // Default: enabled
     
-    // PHASE 16: Auto-migration for buzzer
+    // Auto-migration for buzzer
     uint16_t p = configGetInt(KEY_BUZZER_PIN, 127);
     if (p >= 1 && p <= 16) {
         buzzer_pin = p + 115;

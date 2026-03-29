@@ -6,7 +6,7 @@
 #define LCD_COLS 20
 #define LCD_ROWS 4
 #define LCD_I2C_ADDR 0x27
-// PHASE 3.1: Reduced from 100ms to 20ms to match task period and encoder update frequency
+// Reduced from 100ms to 20ms to match task period and encoder update frequency
 // Synchronizes LCD updates with position data from encoder task
 #define LCD_UPDATE_INTERVAL_MS 20 
 

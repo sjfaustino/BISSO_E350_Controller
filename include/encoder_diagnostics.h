@@ -1,6 +1,6 @@
 /**
  * @file encoder_diagnostics.h
- * @brief Advanced Encoder Diagnostics and Health Monitoring (PHASE 5.3)
+ * @brief Advanced Encoder Diagnostics and Health Monitoring
  * @details Position variance tracking, drift detection, signal quality
  * @project BISSO E350 Controller
  */
@@ -20,43 +20,43 @@ extern "C" {
  * Encoder health status
  */
 typedef enum {
-    ENCODER_HEALTH_OPTIMAL = 0,     // No issues detected
-    ENCODER_HEALTH_NORMAL = 1,      // Minor variance, acceptable
-    ENCODER_HEALTH_DEGRADED = 2,    // Noticeable drift, recalibration recommended
-    ENCODER_HEALTH_CRITICAL = 3     // Severe drift, calibration required
+ ENCODER_HEALTH_OPTIMAL = 0, // No issues detected
+ ENCODER_HEALTH_NORMAL = 1, // Minor variance, acceptable
+ ENCODER_HEALTH_DEGRADED = 2, // Noticeable drift, recalibration recommended
+ ENCODER_HEALTH_CRITICAL = 3 // Severe drift, calibration required
 } encoder_health_t;
 
 /**
  * Encoder diagnostic data for single axis
  */
 typedef struct {
-    uint8_t axis_id;                // Axis (0=X, 1=Y, 2=Z, 3=A)
-    encoder_health_t health;        // Overall health status
+ uint8_t axis_id; // Axis (0=X, 1=Y, 2=Z, 3=A)
+ encoder_health_t health; // Overall health status
 
-    // Position tracking
-    float position_mm;              // Current position
-    float position_variance_mm;     // Variance from expected (accumulated error)
-    float max_variance_mm;          // Peak variance since boot
+ // Position tracking
+ float position_mm; // Current position
+ float position_variance_mm; // Variance from expected (accumulated error)
+ float max_variance_mm; // Peak variance since boot
 
-    // Drift analysis
-    float drift_per_hour_mm;        // Estimated drift rate
-    float drift_direction;          // +1 for positive drift, -1 for negative
-    uint32_t drift_samples;         // Number of drift measurements
+ // Drift analysis
+ float drift_per_hour_mm; // Estimated drift rate
+ float drift_direction; // +1 for positive drift, -1 for negative
+ uint32_t drift_samples; // Number of drift measurements
 
-    // Signal quality (0-100%)
-    uint8_t signal_quality;         // 0-100 signal quality indicator
-    uint32_t signal_errors;         // Number of signal errors detected
-    uint32_t last_error_ms;         // Time of last error (0 if none)
+ // Signal quality (0-100%)
+ uint8_t signal_quality; // 0-100 signal quality indicator
+ uint32_t signal_errors; // Number of signal errors detected
+ uint32_t last_error_ms; // Time of last error (0 if none)
 
-    // Calibration state
-    bool needs_recalibration;       // True if calibration check recommended
-    uint32_t last_calibration_age_hours;  // Hours since last calibration
+ // Calibration state
+ bool needs_recalibration; // True if calibration check recommended
+ uint32_t last_calibration_age_hours; // Hours since last calibration
 
-    // Statistics
-    uint32_t read_count;            // Number of successful reads
-    uint32_t error_count;           // Number of read errors
-    float error_rate;               // Percentage of failed reads
-    uint32_t last_update_ms;        // Timestamp of last update
+ // Statistics
+ uint32_t read_count; // Number of successful reads
+ uint32_t error_count; // Number of read errors
+ float error_rate; // Percentage of failed reads
+ uint32_t last_update_ms; // Timestamp of last update
 } encoder_diagnostic_t;
 
 /**

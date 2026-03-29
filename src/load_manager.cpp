@@ -1,308 +1,308 @@
 /**
  * @file load_manager.cpp
- * @brief Load Manager Implementation (PHASE 5.3)
+ * @brief Load Manager Implementation
  */
 
 #include "load_manager.h"
 #include "task_manager.h"
 #include "serial_logger.h"
 #include "safety.h"
-#include "motion.h"  // PHASE 5.10: For motionEmergencyStop()
+#include "motion.h" // For motionEmergencyStop()
 #include <Arduino.h>
 #include <string.h>
 #include <stdio.h>
 
 // Load thresholds (CPU percentage)
-#define LOAD_THRESHOLD_NORMAL       75
-#define LOAD_THRESHOLD_ELEVATED     85
-#define LOAD_THRESHOLD_HIGH         95
-#define LOAD_THRESHOLD_CRITICAL     98
+#define LOAD_THRESHOLD_NORMAL 75
+#define LOAD_THRESHOLD_ELEVATED 85
+#define LOAD_THRESHOLD_HIGH 95
+#define LOAD_THRESHOLD_CRITICAL 98
 
 // State persistence
-#define CRITICAL_LOAD_TIMEOUT_MS    30000  // E-STOP after 30 seconds at critical load
+#define CRITICAL_LOAD_TIMEOUT_MS 30000 // E-STOP after 30 seconds at critical load
 
 // Load state tracking
 static struct {
-    load_state_t current_state;
-    load_state_t previous_state;
-    uint8_t current_cpu_percent;
-    uint32_t state_entry_time_ms;
-    bool state_changed;
-    bool emergency_triggered;
-    uint32_t critical_load_start_ms;
+ load_state_t current_state;
+ load_state_t previous_state;
+ uint8_t current_cpu_percent;
+ uint32_t state_entry_time_ms;
+ bool state_changed;
+ bool emergency_triggered;
+ uint32_t critical_load_start_ms;
 } load_state = {
-    .current_state = LOAD_STATE_NORMAL,
-    .previous_state = LOAD_STATE_NORMAL,
-    .current_cpu_percent = 0,
-    .state_entry_time_ms = 0,
-    .state_changed = false,
-    .emergency_triggered = false,
-    .critical_load_start_ms = 0
+ .current_state = LOAD_STATE_NORMAL,
+ .previous_state = LOAD_STATE_NORMAL,
+ .current_cpu_percent = 0,
+ .state_entry_time_ms = 0,
+ .state_changed = false,
+ .emergency_triggered = false,
+ .critical_load_start_ms = 0
 };
 
 const char* loadManagerGetStateString(load_state_t state) {
-    switch (state) {
-        case LOAD_STATE_NORMAL: return "NORMAL";
-        case LOAD_STATE_ELEVATED: return "ELEVATED";
-        case LOAD_STATE_HIGH: return "HIGH";
-        case LOAD_STATE_CRITICAL: return "CRITICAL";
-        default: return "UNKNOWN";
-    }
+ switch (state) {
+ case LOAD_STATE_NORMAL: return "NORMAL";
+ case LOAD_STATE_ELEVATED: return "ELEVATED";
+ case LOAD_STATE_HIGH: return "HIGH";
+ case LOAD_STATE_CRITICAL: return "CRITICAL";
+ default: return "UNKNOWN";
+ }
 }
 
 void loadManagerInit() {
-    load_state.current_state = LOAD_STATE_NORMAL;
-    load_state.previous_state = LOAD_STATE_NORMAL;
-    load_state.state_entry_time_ms = millis();
-    load_state.state_changed = false;
-    load_state.emergency_triggered = false;
-    load_state.critical_load_start_ms = 0;
+ load_state.current_state = LOAD_STATE_NORMAL;
+ load_state.previous_state = LOAD_STATE_NORMAL;
+ load_state.state_entry_time_ms = millis();
+ load_state.state_changed = false;
+ load_state.emergency_triggered = false;
+ load_state.critical_load_start_ms = 0;
 
-    logInfo("[LOAD_MGR] Initialized with thresholds: %u%%/%u%%/%u%%",
-           LOAD_THRESHOLD_ELEVATED, LOAD_THRESHOLD_HIGH, LOAD_THRESHOLD_CRITICAL);
+ logInfo("[LOAD_MGR] Initialized with thresholds: %u%%/%u%%/%u%%",
+ LOAD_THRESHOLD_ELEVATED, LOAD_THRESHOLD_HIGH, LOAD_THRESHOLD_CRITICAL);
 }
 
 static void transitionToState(load_state_t new_state) {
-    if (new_state == load_state.current_state) {
-        return;  // No transition needed
-    }
+ if (new_state == load_state.current_state) {
+ return; // No transition needed
+ }
 
-    load_state.previous_state = load_state.current_state;
-    load_state.current_state = new_state;
-    load_state.state_entry_time_ms = millis();
-    load_state.state_changed = true;
+ load_state.previous_state = load_state.current_state;
+ load_state.current_state = new_state;
+ load_state.state_entry_time_ms = millis();
+ load_state.state_changed = true;
 
-    logWarning("[LOAD_MGR] State transition: %s → %s (CPU: %u%%)",
-              loadManagerGetStateString(load_state.previous_state),
-              loadManagerGetStateString(new_state),
-              load_state.current_cpu_percent);
+ logWarning("[LOAD_MGR] State transition: %s → %s (CPU: %u%%)",
+ loadManagerGetStateString(load_state.previous_state),
+ loadManagerGetStateString(new_state),
+ load_state.current_cpu_percent);
 
-    // Handle state-specific actions
-    switch (new_state) {
-        case LOAD_STATE_NORMAL:
-            load_state.emergency_triggered = false;
-            load_state.critical_load_start_ms = 0;
-            logInfo("[LOAD_MGR] System recovered to NORMAL state");
-            break;
+ // Handle state-specific actions
+ switch (new_state) {
+ case LOAD_STATE_NORMAL:
+ load_state.emergency_triggered = false;
+ load_state.critical_load_start_ms = 0;
+ logInfo("[LOAD_MGR] System recovered to NORMAL state");
+ break;
 
-        case LOAD_STATE_ELEVATED:
-            logWarning("[LOAD_MGR] System entering ELEVATED load state");
-            logWarning("  - Reducing refresh rates");
-            logWarning("  - Increasing telemetry intervals");
-            break;
+ case LOAD_STATE_ELEVATED:
+ logWarning("[LOAD_MGR] System entering ELEVATED load state");
+ logWarning(" - Reducing refresh rates");
+ logWarning(" - Increasing telemetry intervals");
+ break;
 
-        case LOAD_STATE_HIGH:
-            logWarning("[LOAD_MGR] System entering HIGH load state");
-            logWarning("  - Suspending non-critical tasks");
-            logWarning("  - Reducing motion poll rate");
-            logWarning("[LOAD_MGR] HIGH load detected - suspending telemetry");
-            break;
+ case LOAD_STATE_HIGH:
+ logWarning("[LOAD_MGR] System entering HIGH load state");
+ logWarning(" - Suspending non-critical tasks");
+ logWarning(" - Reducing motion poll rate");
+ logWarning("[LOAD_MGR] HIGH load detected - suspending telemetry");
+ break;
 
-        case LOAD_STATE_CRITICAL:
-            logError("[LOAD_MGR] System CRITICAL load state");
-            logError("  - All non-essential services suspended");
-            logError("  - E-STOP will trigger if condition persists 30 seconds");
-            logWarning("[LOAD_MGR] CRITICAL load - emergency shutdown in 30 seconds if not resolved");
-            load_state.critical_load_start_ms = millis();
-            break;
-    }
+ case LOAD_STATE_CRITICAL:
+ logError("[LOAD_MGR] System CRITICAL load state");
+ logError(" - All non-essential services suspended");
+ logError(" - E-STOP will trigger if condition persists 30 seconds");
+ logWarning("[LOAD_MGR] CRITICAL load - emergency shutdown in 30 seconds if not resolved");
+ load_state.critical_load_start_ms = millis();
+ break;
+ }
 }
 
 void loadManagerUpdate() {
-    uint8_t cpu_usage = taskGetCpuUsage();
-    load_state.current_cpu_percent = cpu_usage;
-    load_state.state_changed = false;
+ uint8_t cpu_usage = taskGetCpuUsage();
+ load_state.current_cpu_percent = cpu_usage;
+ load_state.state_changed = false;
 
-    // Fragmentation check (PHASE 6.1)
-    uint32_t free_heap = ESP.getFreeHeap();
-    uint32_t max_alloc = ESP.getMaxAllocHeap();
-    float frag_percent = 0.0f;
-    if (free_heap > 0) {
-        frag_percent = (1.0f - ((float)max_alloc / (float)free_heap)) * 100.0f;
-    }
+ // Fragmentation check
+ uint32_t free_heap = ESP.getFreeHeap();
+ uint32_t max_alloc = ESP.getMaxAllocHeap();
+ float frag_percent = 0.0f;
+ if (free_heap > 0) {
+ frag_percent = (1.0f - ((float)max_alloc / (float)free_heap)) * 100.0f;
+ }
 
-    // State machine: determine new state based on CPU usage
-    load_state_t new_state = load_state.current_state;
+ // State machine: determine new state based on CPU usage
+ load_state_t new_state = load_state.current_state;
 
-    // PHASE 14: Boot-up grace period (15 seconds)
-    // Prevents system alerts during initial network/FS/startup spikes
-    if (millis() < 15000) {
-        new_state = LOAD_STATE_NORMAL;
-    } else if (cpu_usage < LOAD_THRESHOLD_NORMAL) {
-        // Normal operation
-        new_state = LOAD_STATE_NORMAL;
-    } else if (cpu_usage < LOAD_THRESHOLD_ELEVATED) {
-        // Elevated load
-        new_state = LOAD_STATE_ELEVATED;
-    } else if (cpu_usage < LOAD_THRESHOLD_HIGH) {
-        // High load
-        new_state = LOAD_STATE_HIGH;
-    } else {
-        // Critical load
-        new_state = LOAD_STATE_CRITICAL;
-    }
+ // Boot-up grace period (15 seconds)
+ // Prevents system alerts during initial network/FS/startup spikes
+ if (millis() < 15000) {
+ new_state = LOAD_STATE_NORMAL;
+ } else if (cpu_usage < LOAD_THRESHOLD_NORMAL) {
+ // Normal operation
+ new_state = LOAD_STATE_NORMAL;
+ } else if (cpu_usage < LOAD_THRESHOLD_ELEVATED) {
+ // Elevated load
+ new_state = LOAD_STATE_ELEVATED;
+ } else if (cpu_usage < LOAD_THRESHOLD_HIGH) {
+ // High load
+ new_state = LOAD_STATE_HIGH;
+ } else {
+ // Critical load
+ new_state = LOAD_STATE_CRITICAL;
+ }
 
-    // PHASE 14: State Damping (Hysteresis)
-    // Only upgrade state if condition persists, or downgrade if it drops significantly
-    static uint32_t last_state_change_request = 0;
-    static load_state_t pending_state = LOAD_STATE_NORMAL;
-    
-    if (new_state != load_state.current_state) {
-        if (new_state != pending_state) {
-            pending_state = new_state;
-            last_state_change_request = millis();
-        }
-        
-        // Require 3 seconds of consistent load to change state (unless it's CRITICAL upgrade)
-        uint32_t damping_time = (new_state == LOAD_STATE_CRITICAL) ? 1000 : 3000;
-        if (millis() - last_state_change_request < damping_time) {
-            new_state = load_state.current_state; // Keep current state for now
-        }
-    } else {
-        pending_state = new_state;
-    }
+ // State Damping (Hysteresis)
+ // Only upgrade state if condition persists, or downgrade if it drops significantly
+ static uint32_t last_state_change_request = 0;
+ static load_state_t pending_state = LOAD_STATE_NORMAL;
+ 
+ if (new_state != load_state.current_state) {
+ if (new_state != pending_state) {
+ pending_state = new_state;
+ last_state_change_request = millis();
+ }
+ 
+ // Require 3 seconds of consistent load to change state (unless it's CRITICAL upgrade)
+ uint32_t damping_time = (new_state == LOAD_STATE_CRITICAL) ? 1000 : 3000;
+ if (millis() - last_state_change_request < damping_time) {
+ new_state = load_state.current_state; // Keep current state for now
+ }
+ } else {
+ pending_state = new_state;
+ }
 
-    // PHASE 6.1: Force load state based on memory fragmentation (Tuned for stability)
-    // If fragmentation is severe (>80%), force at least ELEVATED state to slow down tasks
-    if (frag_percent > 80.0f && new_state == LOAD_STATE_NORMAL) {
-        new_state = LOAD_STATE_ELEVATED;
-    }
-    
-    // If fragmentation is critical (>90%) or largest block is tiny (< 8KB), force HIGH state 
-    // to suspend non-critical services (like Web UI telemetry)
-    if ((frag_percent > 90.0f || max_alloc < 8192) && new_state < LOAD_STATE_HIGH) {
-        new_state = LOAD_STATE_HIGH;
-    }
+ // Force load state based on memory fragmentation (Tuned for stability)
+ // If fragmentation is severe (>80%), force at least ELEVATED state to slow down tasks
+ if (frag_percent > 80.0f && new_state == LOAD_STATE_NORMAL) {
+ new_state = LOAD_STATE_ELEVATED;
+ }
+ 
+ // If fragmentation is critical (>90%) or largest block is tiny (< 8KB), force HIGH state 
+ // to suspend non-critical services (like Web UI telemetry)
+ if ((frag_percent > 90.0f || max_alloc < 8192) && new_state < LOAD_STATE_HIGH) {
+ new_state = LOAD_STATE_HIGH;
+ }
 
-    // Transition if state changed
-    if (new_state != load_state.current_state) {
-        transitionToState(new_state);
-    }
+ // Transition if state changed
+ if (new_state != load_state.current_state) {
+ transitionToState(new_state);
+ }
 
-    // Handle critical load timeout - E-STOP after 30 seconds
-    if (load_state.current_state == LOAD_STATE_CRITICAL) {
-        uint32_t time_in_critical = millis() - load_state.critical_load_start_ms;
+ // Handle critical load timeout - E-STOP after 30 seconds
+ if (load_state.current_state == LOAD_STATE_CRITICAL) {
+ uint32_t time_in_critical = millis() - load_state.critical_load_start_ms;
 
-        if (time_in_critical > CRITICAL_LOAD_TIMEOUT_MS && !load_state.emergency_triggered) {
-            load_state.emergency_triggered = true;
-            logError("[LOAD_MGR] CRITICAL: Emergency E-STOP triggered after 30 seconds at max load");
-            logError("[LOAD_MGR] INITIATING EMERGENCY E-STOP DUE TO SYSTEM OVERLOAD");
+ if (time_in_critical > CRITICAL_LOAD_TIMEOUT_MS && !load_state.emergency_triggered) {
+ load_state.emergency_triggered = true;
+ logError("[LOAD_MGR] CRITICAL: Emergency E-STOP triggered after 30 seconds at max load");
+ logError("[LOAD_MGR] INITIATING EMERGENCY E-STOP DUE TO SYSTEM OVERLOAD");
 
-            // PHASE 5.10: CRITICAL FIX - Actually trigger E-STOP instead of just logging
-            motionEmergencyStop();
+ // CRITICAL FIX - Actually trigger E-STOP instead of just logging
+ motionEmergencyStop();
 
-            logError("[LOAD_MGR] System overload detected - manual intervention required");
-        }
-    }
+ logError("[LOAD_MGR] System overload detected - manual intervention required");
+ }
+ }
 
-    // Hysteresis: require significant load drop to leave critical state
-    if (load_state.current_state == LOAD_STATE_CRITICAL && cpu_usage < LOAD_THRESHOLD_HIGH - 10) {
-        // Only leave critical state if CPU drops significantly
-        transitionToState(LOAD_STATE_HIGH);
-    }
+ // Hysteresis: require significant load drop to leave critical state
+ if (load_state.current_state == LOAD_STATE_CRITICAL && cpu_usage < LOAD_THRESHOLD_HIGH - 10) {
+ // Only leave critical state if CPU drops significantly
+ transitionToState(LOAD_STATE_HIGH);
+ }
 }
 
 load_status_t loadManagerGetStatus() {
-    load_status_t status;
-    status.current_state = load_state.current_state;
-    status.previous_state = load_state.previous_state;
-    status.current_cpu_percent = load_state.current_cpu_percent;
-    status.state_entry_time_ms = load_state.state_entry_time_ms;
-    status.time_in_state_ms = millis() - load_state.state_entry_time_ms;
-    status.state_changed = load_state.state_changed;
-    status.emergency_estop_initiated = load_state.emergency_triggered;
-    return status;
+ load_status_t status;
+ status.current_state = load_state.current_state;
+ status.previous_state = load_state.previous_state;
+ status.current_cpu_percent = load_state.current_cpu_percent;
+ status.state_entry_time_ms = load_state.state_entry_time_ms;
+ status.time_in_state_ms = millis() - load_state.state_entry_time_ms;
+ status.state_changed = load_state.state_changed;
+ status.emergency_estop_initiated = load_state.emergency_triggered;
+ return status;
 }
 
 bool loadManagerIsSubsystemActive(uint8_t subsystem_id) {
-    // Determine which subsystems to disable at each load level
-    switch (load_state.current_state) {
-        case LOAD_STATE_NORMAL:
-            return true;  // All active
+ // Determine which subsystems to disable at each load level
+ switch (load_state.current_state) {
+ case LOAD_STATE_NORMAL:
+ return true; // All active
 
-        case LOAD_STATE_ELEVATED:
-            // Keep critical systems, reduce others
-            return true;  // All still active, just rate-limited
+ case LOAD_STATE_ELEVATED:
+ // Keep critical systems, reduce others
+ return true; // All still active, just rate-limited
 
-        case LOAD_STATE_HIGH:
-            // Disable non-critical systems
-            if (subsystem_id & (LOAD_SUBSYS_LCD | LOAD_SUBSYS_TELEMETRY | LOAD_SUBSYS_MONITOR)) {
-                return false;
-            }
-            return true;
+ case LOAD_STATE_HIGH:
+ // Disable non-critical systems
+ if (subsystem_id & (LOAD_SUBSYS_LCD | LOAD_SUBSYS_TELEMETRY | LOAD_SUBSYS_MONITOR)) {
+ return false;
+ }
+ return true;
 
-        case LOAD_STATE_CRITICAL:
-            // Only keep safety-critical systems
-            // Disable everything except motion/safety
-            if (subsystem_id & (LOAD_SUBSYS_LCD | LOAD_SUBSYS_TELEMETRY |
-                               LOAD_SUBSYS_MONITOR | LOAD_SUBSYS_API | LOAD_SUBSYS_LOGGING)) {
-                return false;
-            }
-            return true;
+ case LOAD_STATE_CRITICAL:
+ // Only keep safety-critical systems
+ // Disable everything except motion/safety
+ if (subsystem_id & (LOAD_SUBSYS_LCD | LOAD_SUBSYS_TELEMETRY |
+ LOAD_SUBSYS_MONITOR | LOAD_SUBSYS_API | LOAD_SUBSYS_LOGGING)) {
+ return false;
+ }
+ return true;
 
-        default:
-            return false;
-    }
+ default:
+ return false;
+ }
 }
 
 uint32_t loadManagerGetAdjustedRefreshRate(uint32_t base_refresh_ms, uint8_t subsystem_id) {
-    switch (load_state.current_state) {
-        case LOAD_STATE_NORMAL:
-            return base_refresh_ms;  // No adjustment
+ switch (load_state.current_state) {
+ case LOAD_STATE_NORMAL:
+ return base_refresh_ms; // No adjustment
 
-        case LOAD_STATE_ELEVATED:
-            // Increase refresh rates by 50%
-            return base_refresh_ms * 150 / 100;
+ case LOAD_STATE_ELEVATED:
+ // Increase refresh rates by 50%
+ return base_refresh_ms * 150 / 100;
 
-        case LOAD_STATE_HIGH:
-            // Double the refresh rates
-            return base_refresh_ms * 200 / 100;
+ case LOAD_STATE_HIGH:
+ // Double the refresh rates
+ return base_refresh_ms * 200 / 100;
 
-        case LOAD_STATE_CRITICAL:
-            // Subsystems disabled in critical state
-            return base_refresh_ms * 500 / 100;
+ case LOAD_STATE_CRITICAL:
+ // Subsystems disabled in critical state
+ return base_refresh_ms * 500 / 100;
 
-        default:
-            return base_refresh_ms;
-    }
+ default:
+ return base_refresh_ms;
+ }
 }
 
 bool loadManagerIsUnderLoad() {
-    return load_state.current_state != LOAD_STATE_NORMAL;
+ return load_state.current_state != LOAD_STATE_NORMAL;
 }
 
 void loadManagerForceState(load_state_t state) {
-    logInfo("[LOAD_MGR] Forcing state to %s (testing)", loadManagerGetStateString(state));
-    transitionToState(state);
+ logInfo("[LOAD_MGR] Forcing state to %s (testing)", loadManagerGetStateString(state));
+ transitionToState(state);
 }
 
 void loadManagerPrintStatus() {
-    load_status_t status = loadManagerGetStatus();
+ load_status_t status = loadManagerGetStatus();
 
-    serialLoggerLock();
-    logPrintln("\r\n[LOAD_MGR] === System Load Status ===");
-    logPrintf("Current State: %s\r\n", loadManagerGetStateString(status.current_state));
-    logPrintf("CPU Usage: %u%%\r\n", status.current_cpu_percent);
-    logPrintf("Time in State: %lu ms\r\n", (unsigned long)status.time_in_state_ms);
+ serialLoggerLock();
+ logPrintln("\r\n[LOAD_MGR] === System Load Status ===");
+ logPrintf("Current State: %s\r\n", loadManagerGetStateString(status.current_state));
+ logPrintf("CPU Usage: %u%%\r\n", status.current_cpu_percent);
+ logPrintf("Time in State: %lu ms\r\n", (unsigned long)status.time_in_state_ms);
 
-    logPrintln("\r\nThresholds:");
-    logPrintf("  Normal    < %u%% CPU\r\n", LOAD_THRESHOLD_NORMAL);
-    logPrintf("  Elevated  %u-%u%% CPU (reduce refresh rates 50%%)\r\n",
-                 LOAD_THRESHOLD_NORMAL, LOAD_THRESHOLD_ELEVATED);
-    logPrintf("  High      %u-%u%% CPU (suspend non-essential tasks)\r\n",
-                 LOAD_THRESHOLD_ELEVATED, LOAD_THRESHOLD_HIGH);
-    logPrintf("  Critical  > %u%% CPU (emergency shutdown in 30s)\r\n", LOAD_THRESHOLD_HIGH);
+ logPrintln("\r\nThresholds:");
+ logPrintf(" Normal < %u%% CPU\r\n", LOAD_THRESHOLD_NORMAL);
+ logPrintf(" Elevated %u-%u%% CPU (reduce refresh rates 50%%)\r\n",
+ LOAD_THRESHOLD_NORMAL, LOAD_THRESHOLD_ELEVATED);
+ logPrintf(" High %u-%u%% CPU (suspend non-essential tasks)\r\n",
+ LOAD_THRESHOLD_ELEVATED, LOAD_THRESHOLD_HIGH);
+ logPrintf(" Critical > %u%% CPU (emergency shutdown in 30s)\r\n", LOAD_THRESHOLD_HIGH);
 
-    logPrintln("\nActions by State:");
-    logPrintln("  NORMAL:    All subsystems active");
-    logPrintln("  ELEVATED:  Reduce LCD refresh, increase telemetry interval");
-    logPrintln("  HIGH:      Suspend LCD/Monitor/Telemetry");
-    logPrintln("  CRITICAL:  Safety-only, E-STOP after 30s");
+ logPrintln("\nActions by State:");
+ logPrintln(" NORMAL: All subsystems active");
+ logPrintln(" ELEVATED: Reduce LCD refresh, increase telemetry interval");
+ logPrintln(" HIGH: Suspend LCD/Monitor/Telemetry");
+ logPrintln(" CRITICAL: Safety-only, E-STOP after 30s");
 
-    if (status.emergency_estop_initiated) {
-        logPrintln("\n[!] EMERGENCY E-STOP HAS BEEN TRIGGERED");
-    }
+ if (status.emergency_estop_initiated) {
+ logPrintln("\n[!] EMERGENCY E-STOP HAS BEEN TRIGGERED");
+ }
 
-    logPrintln("");
-    serialLoggerUnlock();
+ logPrintln("");
+ serialLoggerUnlock();
 }

@@ -1,6 +1,6 @@
 /**
  * @file vfd_current_calibration.h
- * @brief VFD Motor Current Calibration System (PHASE 5.5)
+ * @brief VFD Motor Current Calibration System
  * @project BISSO E350 Controller
  * @details Operator-guided current baseline measurement and stall detection threshold
  *
@@ -28,26 +28,26 @@ extern "C" {
 // ============================================================================
 
 typedef struct {
-    // Idle baseline (blade spinning, no cutting)
-    float idle_avg_amps;                // AVG current average
-    float idle_peak_amps;               // Peak current spike
+ // Idle baseline (blade spinning, no cutting)
+ float idle_avg_amps; // AVG current average
+ float idle_peak_amps; // Peak current spike
 
-    // Standard cutting baseline (reference load)
-    float standard_cut_avg_amps;        // AVG current average
-    float standard_cut_peak_amps;       // Peak current spike
+ // Standard cutting baseline (reference load)
+ float standard_cut_avg_amps; // AVG current average
+ float standard_cut_peak_amps; // Peak current spike
 
-    // Heavy load (optional, high speed/load)
-    float heavy_cut_avg_amps;           // AVG current average
-    float heavy_cut_peak_amps;          // Peak current spike
+ // Heavy load (optional, high speed/load)
+ float heavy_cut_avg_amps; // AVG current average
+ float heavy_cut_peak_amps; // Peak current spike
 
-    // Calculated stall detection threshold
-    float stall_threshold_amps;         // Stall detected if current > this
-    float stall_margin_percent;         // Margin above max measured (default 20%)
+ // Calculated stall detection threshold
+ float stall_threshold_amps; // Stall detected if current > this
+ float stall_margin_percent; // Margin above max measured (default 20%)
 
-    // Calibration metadata
-    uint32_t last_calibration_ms;       // Timestamp of last calibration
-    bool is_calibrated;                 // True if valid calibration exists
-    uint32_t calibration_count;         // How many times calibrated
+ // Calibration metadata
+ uint32_t last_calibration_ms; // Timestamp of last calibration
+ bool is_calibrated; // True if valid calibration exists
+ uint32_t calibration_count; // How many times calibrated
 
 } vfd_calibration_data_t;
 

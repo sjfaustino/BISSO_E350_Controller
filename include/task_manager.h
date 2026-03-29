@@ -19,10 +19,10 @@
 #define TASK_PRIORITY_CLI 15
 #define TASK_PRIORITY_FAULT_LOG 14
 #define TASK_PRIORITY_MONITOR 12
-#define TASK_PRIORITY_TELEMETRY 11 // PHASE 5.4: Background telemetry on Core 0
+#define TASK_PRIORITY_TELEMETRY 11 // Background telemetry on Core 0
 #define TASK_PRIORITY_LCD_FORMAT                                               \
-  10                        // PHASE 5.4: LCD string formatting on Core 0
-#define TASK_PRIORITY_LCD 9 // PHASE 5.4: Display only, reduced priority
+  10                        // LCD string formatting on Core 0
+#define TASK_PRIORITY_LCD 9 // Display only, reduced priority
 #define TASK_PRIORITY_IDLE 1
 
 // ============================================================================
@@ -71,10 +71,10 @@
 #define TASK_PERIOD_FAULT_LOG 500
 #define TASK_PERIOD_MONITOR 1000
 #define TASK_PERIOD_TELEMETRY                                                  \
-  50 // PHASE 5.4: High-frequency base (20Hz) to ensure stable 10Hz DRO updates
+  50 // High-frequency base (20Hz) to ensure stable 10Hz DRO updates
 #define TASK_PERIOD_LCD_FORMAT                                                 \
-  200 // PHASE 5.4: Format strings same rate as display
-// PHASE 3.1: Increased from 100ms to 20ms (50Hz) to match encoder update
+  200 // Format strings same rate as display
+// Increased from 100ms to 20ms (50Hz) to match encoder update
 // frequency Reduces position display staleness from ±100ms to ±20ms
 // AUDIT: Reduced to 200ms (5Hz) to prevent I2C bus contention with Motion task
 #define TASK_PERIOD_LCD 200
@@ -83,7 +83,7 @@
 // ADAPTIVE I2C TIMEOUT CONFIGURATION
 // ============================================================================
 
-// PHASE 5.4: Optimized I2C timeout for dual-core performance
+// Optimized I2C timeout for dual-core performance
 // At low CPU: 50ms (system idle, I2C operations should complete quickly)
 // At high CPU: 100ms (reduced from 500ms to prevent Safety task blocking)
 // Formula: timeout_ms = base_ms + (cpu_usage_percent * scale_factor)
@@ -99,13 +99,13 @@
 // MESSAGE QUEUE DEFINITIONS
 // ============================================================================
 
-// PHASE 5.10: Renamed to QUEUE_DATA_SIZE to clarify it's the payload size, not full message
+// Renamed to QUEUE_DATA_SIZE to clarify it's the payload size, not full message
 #define QUEUE_DATA_SIZE 96
 #define QUEUE_LEN_MOTION 10
 #define QUEUE_LEN_SAFETY 20
 #define QUEUE_LEN_ENCODER 10
 #define QUEUE_LEN_PLC 10
-// PHASE 2 FIX: Increased from 50 to 150 to prevent loss of critical logs
+// FIX: Increased from 50 to 150 to prevent loss of critical logs
 // Rationale: Under fault conditions, system can generate 20+ faults/sec.
 // With 50 items, queue fills in 2.5s and critical logs are dropped.
 // With 150 items, provides 7.5s buffer for fault processing.
@@ -169,9 +169,9 @@ void taskCliFunction(void *parameter);
 void taskFaultLogFunction(void *parameter);
 void taskMonitorFunction(void *parameter);
 void taskTelemetryFunction(
-    void *parameter); // PHASE 5.4: Background telemetry collection
+    void *parameter); // Background telemetry collection
 void taskLcdFormatterFunction(
-    void *parameter); // PHASE 5.4: LCD string formatting
+    void *parameter); // LCD string formatting
 void taskLcdFunction(void *parameter);
 
 void taskSafetyCreate();
@@ -182,8 +182,8 @@ void taskI2cManagerCreate();
 void taskCliCreate();
 void taskFaultLogCreate();
 void taskMonitorCreate();
-void taskTelemetryCreate();    // PHASE 5.4: Background telemetry collection
-void taskLcdFormatterCreate(); // PHASE 5.4: LCD string formatting
+void taskTelemetryCreate();    // Background telemetry collection
+void taskLcdFormatterCreate(); // LCD string formatting
 void taskLcdCreate();
 
 QueueHandle_t taskGetMotionQueue();
@@ -203,9 +203,9 @@ void taskSignalMotionUpdate();
 SemaphoreHandle_t
 taskGetI2cMutex(); // DEPRECATED: Use separate board/PLC mutexes
 SemaphoreHandle_t
-taskGetI2cBoardMutex(); // PHASE 5.4: Board inputs (buttons, etc.)
+taskGetI2cBoardMutex(); // Board inputs (buttons, etc.)
 SemaphoreHandle_t
-taskGetI2cPlcMutex(); // PHASE 5.4: PLC interface (speed, CONSENSO)
+taskGetI2cPlcMutex(); // PLC interface (speed, CONSENSO)
 SemaphoreHandle_t taskGetLcdMutex(); // LCD display (0x27)
 SemaphoreHandle_t taskGetMotionMutex();
 SemaphoreHandle_t taskGetBufferMutex(); // NEW: Separate buffer mutex
@@ -217,7 +217,7 @@ void taskShowAllTasks();
 uint8_t taskGetCpuUsage();
 uint32_t taskGetUptime();
 
-// PHASE 2.5: Adaptive I2C timeout based on CPU load
+// Adaptive I2C timeout based on CPU load
 // Returns timeout in milliseconds, scaled from base to max based on current CPU
 // usage
 uint32_t taskGetAdaptiveI2cTimeout();

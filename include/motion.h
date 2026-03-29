@@ -24,7 +24,7 @@ class Axis;
 const Axis *motionGetAxis(uint8_t axis);
 
 // --- CORE CONTROL API ---
-void motionInit();
+result_t motionInit();
 void motionUpdate();
 
 bool motionMoveAbsolute(float x, float y, float z, float a, float speed_mm_s);
@@ -89,6 +89,12 @@ void motionResetSpinlockStats();  // Reset spinlock timing statistics
 uint32_t motionGetMaxJitterUS();   // Get maximum loop jitter recorded in microseconds
 void motionResetMaxJitter();     // Reset jitter tracking
 void motionTrackJitterUS(uint32_t jitter_us); // Internal use: track loop jitter in microseconds
+
+// --- MAINTENANCE TASK ---
+// Distance persistence and maintenance checks run in a separate low-priority task
+// to keep NVS writes out of the real-time motion loop.
+double motionGetAccumulatedDistance(uint8_t axis);  // Returns accumulated distance in mm
+void motionStartMaintenanceTask();
 
 extern const uint8_t AXIS_TO_I73_BIT[];
 extern const uint8_t AXIS_TO_CONSENSO_BIT[];

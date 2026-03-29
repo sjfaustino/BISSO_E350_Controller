@@ -21,22 +21,22 @@ extern "C" {
  * @brief Configuration categories
  */
 typedef enum {
-    CONFIG_CATEGORY_MOTION = 0,         // Motion control (soft limits)
-    CONFIG_CATEGORY_VFD = 1,            // VFD parameters (speed, ramps)
-    CONFIG_CATEGORY_ENCODER = 2,        // Encoder calibration (PPM)
-    CONFIG_CATEGORY_SAFETY = 3,         // Safety thresholds
-    CONFIG_CATEGORY_THERMAL = 4,        // Thermal protection
-    CONFIG_CATEGORY_NETWORK = 5,        // WiFi/Ethernet settings
-    CONFIG_CATEGORY_SYSTEM = 6,         // System settings (CLI, OTA, etc.)
-    CONFIG_CATEGORY_SPINDLE = 7,        // JXK10, Tach, Pause
-    CONFIG_CATEGORY_SERIAL = 8,         // Baud rates, I2C speed
-    CONFIG_CATEGORY_HARDWARE = 9,       // Pin mapping
-    CONFIG_CATEGORY_BEHAVIOR = 10,      // Jog speed, Accel, Margins
-    CONFIG_CATEGORY_CALIBRATION = 11,   // Speed calibration
-    CONFIG_CATEGORY_POSITIONS = 12,     // Safe/User positions
-    CONFIG_CATEGORY_WCS = 13,           // Work Coordinate Systems
-    CONFIG_CATEGORY_SECURITY = 14,      // Credentials
-    CONFIG_CATEGORY_STATS = 15          // Runtime, Cycle count
+ CONFIG_CATEGORY_MOTION = 0, // Motion control (soft limits)
+ CONFIG_CATEGORY_VFD = 1, // VFD parameters (speed, ramps)
+ CONFIG_CATEGORY_ENCODER = 2, // Encoder calibration (PPM)
+ CONFIG_CATEGORY_SAFETY = 3, // Safety thresholds
+ CONFIG_CATEGORY_THERMAL = 4, // Thermal protection
+ CONFIG_CATEGORY_NETWORK = 5, // WiFi/Ethernet settings
+ CONFIG_CATEGORY_SYSTEM = 6, // System settings (CLI, OTA, etc.)
+ CONFIG_CATEGORY_SPINDLE = 7, // JXK10, Tach, Pause
+ CONFIG_CATEGORY_SERIAL = 8, // Baud rates, I2C speed
+ CONFIG_CATEGORY_HARDWARE = 9, // Pin mapping
+ CONFIG_CATEGORY_BEHAVIOR = 10, // Jog speed, Accel, Margins
+ CONFIG_CATEGORY_CALIBRATION = 11, // Speed calibration
+ CONFIG_CATEGORY_POSITIONS = 12, // Safe/User positions
+ CONFIG_CATEGORY_WCS = 13, // Work Coordinate Systems
+ CONFIG_CATEGORY_SECURITY = 14, // Credentials
+ CONFIG_CATEGORY_STATS = 15 // Runtime, Cycle count
 } config_category_t;
 
 /**
@@ -44,29 +44,29 @@ typedef enum {
  * @note PHASE 5.10: Changed from uint16_t to int32_t to support negative coordinates
  */
 typedef struct {
-    int32_t soft_limit_low_mm[3];       // Lower limit for X, Y, Z (mm) - supports negative
-    int32_t soft_limit_high_mm[3];      // Upper limit for X, Y, Z (mm)
-    int32_t x_approach_slow_mm;         // X Slow approach threshold (mm)
-    int32_t x_approach_med_mm;          // X Medium approach threshold (mm)
-    float target_margin_mm;             // Target position margin (mm)
+ int32_t soft_limit_low_mm[3]; // Lower limit for X, Y, Z (mm) - supports negative
+ int32_t soft_limit_high_mm[3]; // Upper limit for X, Y, Z (mm)
+ int32_t x_approach_slow_mm; // X Slow approach threshold (mm)
+ int32_t x_approach_med_mm; // X Medium approach threshold (mm)
+ float target_margin_mm; // Target position margin (mm)
 } motion_config_t;
 
 /**
  * @brief VFD configuration structure
  */
 typedef struct {
-    uint16_t min_speed_hz;              // Minimum speed (LSP)
-    uint16_t max_speed_hz;              // Maximum speed (HSP)
-    uint16_t acc_time_ms;               // Acceleration time
-    uint16_t dec_time_ms;               // Deceleration time
+ uint16_t min_speed_hz; // Minimum speed (LSP)
+ uint16_t max_speed_hz; // Maximum speed (HSP)
+ uint16_t acc_time_ms; // Acceleration time
+ uint16_t dec_time_ms; // Deceleration time
 } vfd_config_t;
 
 /**
  * @brief Encoder configuration structure
  */
 typedef struct {
-    uint16_t ppm[3];                    // Pulses per mm for X, Y, Z
-    uint8_t calibrated[3];              // Calibration status per axis
+ uint16_t ppm[3]; // Pulses per mm for X, Y, Z
+ uint8_t calibrated[3]; // Calibration status per axis
 } encoder_config_t;
 
 /**
@@ -101,7 +101,7 @@ bool apiConfigSet(config_category_t category, const char* key, JsonVariant value
  * @return true if validation passed
  */
 bool apiConfigValidate(config_category_t category, const char* key, JsonVariant value,
-                       char* error_msg, size_t error_msg_len);
+ char* error_msg, size_t error_msg_len);
 
 /**
  * @brief Get configuration schema (for client-side validation hints)

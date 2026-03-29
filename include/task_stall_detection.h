@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 // ============================================================================
-// PHASE 2.5: TASK STALL DETECTION
+// TASK STALL DETECTION
 // ============================================================================
 
 // Threshold for detecting task stall (milliseconds)

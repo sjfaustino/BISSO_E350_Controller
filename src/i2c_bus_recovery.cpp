@@ -2,7 +2,7 @@
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "system_constants.h"
-#include "system_events.h" // PHASE 5.10: Event-driven architecture
+#include "system_events.h" // Event-driven architecture
 #include <Wire.h>
 
 // FIX: Fully initialized struct to suppress -Wmissing-field-initializers
@@ -89,7 +89,7 @@ i2c_bus_status_t i2cCheckBusStatus() {
 void i2cRecoverBus() {
   logInfo("[I2C] Executing recovery...");
 
-  // PHASE 5.10: Signal I2C error event before recovery
+  // Signal I2C error event before recovery
   systemEventsSystemSet(EVENT_SYSTEM_I2C_ERROR);
 
   pinMode(PIN_I2C_SDA, INPUT_PULLUP);
@@ -123,7 +123,7 @@ void i2cRecoverBus() {
   stats.bus_recoveries++;
   i2cSoftReset();
 
-  // PHASE 5.10: Clear I2C error event after successful recovery
+  // Clear I2C error event after successful recovery
   systemEventsSystemClear(EVENT_SYSTEM_I2C_ERROR);
 }
 
@@ -210,7 +210,7 @@ i2c_result_t i2cTransactionWithRetry(uint8_t address, uint8_t *data,
 
 i2c_result_t i2cWriteWithRetry(uint8_t address, const uint8_t *data,
                                uint8_t len) {
-  // PHASE 5.26: Stack safety - Replace VLA with fixed buffer
+  // Stack safety - Replace VLA with fixed buffer
   // Most I2C transactions in this system are < 8 bytes (PLC, LCD, RTC)
   const uint8_t I2C_MAX_WRITE_LEN = 32;
   if (len > I2C_MAX_WRITE_LEN) {

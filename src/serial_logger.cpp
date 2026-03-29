@@ -110,7 +110,7 @@ void serialLoggerInit(log_level_t log_level) {
   
   current_log_level = log_level;
   
-  // PHASE 8.5: Load serial destination from NVS
+  // Load serial destination from NVS
   int dest = configGetInt(KEY_SERIAL_DEST, 0); // 0=USB, 1=Alt UART
   if (dest == 1) {
 #if defined(PIN_ALT_UART_RX) && defined(PIN_ALT_UART_TX)

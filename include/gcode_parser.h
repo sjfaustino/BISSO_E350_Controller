@@ -60,7 +60,7 @@ private:
     gcode_distance_mode_t distanceMode;
     float currentFeedRate;
     wcs_system_t currentWCS;
-    bool machineCoordinatesMode;  // PHASE 5.1: G53 machine coordinates
+    bool machineCoordinatesMode;  // G53 machine coordinates
 
     float wcs_offsets[6][4]; 
 
@@ -72,30 +72,30 @@ private:
     void handleG4(const char* line);   // G4 Dwell command
     void handleG10(const char* line);
     void handleG5x(int system_idx);
-    void handleG28(const char* line);  // PHASE 5.1: G28 Go to Machine Home
-    void handleG30(const char* line);  // PHASE 5.1: G30 Go to Predefined Position
-    void handleG53(const char* line);  // PHASE 5.1: G53 Machine Coordinates
+    void handleG28(const char* line);  // G28 Go to Machine Home
+    void handleG30(const char* line);  // G30 Go to Predefined Position
+    void handleG53(const char* line);  // G53 Machine Coordinates
     void handleG90();
     void handleG91();
-    void handleG92(const char* line);  // PHASE 5.1: G92 Set Position/Calibration
-    // PHASE 3.2: M117 LCD message handler
+    void handleG92(const char* line);  // G92 Set Position/Calibration
+    // M117 LCD message handler
     void handleM117(const char* line);
-    // PHASE 4.0: M114 Get current position handler
+    // M114 Get current position handler
     void handleM114();
-    // PHASE 4.0: M115 Firmware info handler
+    // M115 Firmware info handler
     void handleM115();
-    // PHASE 4.0: M154 Position auto-report handler
+    // M154 Position auto-report handler
     void handleM154(const char* line);
-    // PHASE 4.0: M226 Wait for pin state handler
+    // M226 Wait for pin state handler
     void handleM226(const char* line);
-    // PHASE 4.0: M255 LCD sleep/backlight timeout handler
+    // M255 LCD sleep/backlight timeout handler
     void handleM255(const char* line);
-    // PHASE 5.1: M0/M1 Program Stop/Pause handler
+    // M0/M1 Program Stop/Pause handler
     void handleM0_M1(const char* line);
     void handleM402(const char* line); // Coordinated Motion Mode toggle
     void handleM403(const char* line); // VFD Frequency Control
 
-    // PHASE 5.1: State for M0/M1 program pause
+    // State for M0/M1 program pause
     bool programPaused;
     uint32_t pauseStartTime;
 

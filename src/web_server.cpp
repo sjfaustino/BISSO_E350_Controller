@@ -14,12 +14,11 @@
 #include "psram_alloc.h"
 #include "api_config.h"
 #include "serial_logger.h"
-#include "auth_manager.h"   // PHASE 6.2: Universal SHA-256 and Rate Limiting
+#include "auth_manager.h"   // Universal SHA-256 and Rate Limiting
 #include "hardware_config.h"
 #include "plc_iface.h"
 #include "board_inputs.h"
 #include <ETH.h>
-#include "gcode_parser.h"
 #include "system_telemetry.h"
 #include "fault_logging.h"
 #include "spindle_current_monitor.h"
@@ -53,9 +52,7 @@ int history_head = 0;
 int history_count = 0;
 static uint32_t last_history_sample_ms = 0;
 
-// Forward Declaration
-bool webAuthenticate(PsychicRequest *request);
-
+// (Removed global webAuthenticate declaration, requireAuth is used directly from api_routes)
 void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
     uint32_t now = millis();
     uint32_t elapsed = (now >= last_history_sample_ms) ? (now - last_history_sample_ms) : (UINT32_MAX - last_history_sample_ms + now + 1);
@@ -70,7 +67,7 @@ void updateHistory(uint8_t cpu, uint32_t heap, float spindle) {
 // Instantiate the global webServer object declared extern in web_server.h
 WebServerManager webServer;
 
-// PHASE 6.4: Transmit buffer in PSRAM
+// Transmit buffer in PSRAM
 static char* broadcast_buffer = nullptr;
 
 // Constructor
@@ -88,7 +85,7 @@ void WebServerManager::init() {
     otaInit();
     
     // TUNE: Increase parallel sockets to 6 for Dashboard stability (many assets + WS)
-    // server.config.stack_size = 6144; // PHASE 6.9: Reduced to 6KB to save heap (was 8KB)
+    // server.config.stack_size = 6144; // Reduced to 6KB to save heap (was 8KB)
     // RATIONALE: Reducing PsychicHttp task stack to 6KB frees ~12KB of internal DRAM 
     // across 6 sockets, which is critical for supporting large WebSocket broadcasts.
     // MONITOR: High-water marks should be checked if new API handlers use large stack arrays.
@@ -115,7 +112,7 @@ void WebServerManager::init() {
     // Initialize PSRAM Web Cache (loads assets into RAM for ultra-fast serving)
     PsramWebCache::getInstance().init();
     
-    // PHASE 6.4: Allocate broadcast buffer in PSRAM
+    // Allocate broadcast buffer in PSRAM
     if (broadcast_buffer == nullptr) {
         broadcast_buffer = (char*)psramMalloc(2048);
     }
@@ -127,10 +124,6 @@ void WebServerManager::init() {
     memset(&current_status, 0, sizeof(current_status));
     SAFE_STRCPY(current_status.status, "IDLE", sizeof(current_status.status));
 }
-
-// ============================================================================
-// JSON RESPONSE HELPER (P2 DRY Improvement)
-// ============================================================================
 
 /**
  * @brief Send JSON response with proper content type
@@ -179,10 +172,10 @@ void WebServerManager::setupRoutes() {
     wsHandler.onOpen([this](PsychicWebSocketClient *client) {
         // logPrintf("[WS] Client connected: %s\n", client->remoteIP().toString().c_str());
         
-        // PHASE 6.8: Track client for heartbeat
+        // Track client for heartbeat
         ws_clients[client] = millis();
 
-        // PHASE 6.3: Memory Optimization
+        // Memory Optimization
         // DO NOT send initial state here. It causes heap churn during page navigation.
         // The client will pick up the next periodic broadcast (within 500ms).
         // This elimiantes a ~2KB allocation per page load.
@@ -191,14 +184,14 @@ void WebServerManager::setupRoutes() {
     wsHandler.onClose([this](PsychicWebSocketClient *client) {
         // logPrintf("[WS] Client disconnected: %s\n", client->remoteIP().toString().c_str());
         
-        // PHASE 6.8: Stop tracking client
+        // Stop tracking client
         ws_clients.erase(client);
     });
     
     wsHandler.onFrame([this](PsychicWebSocketRequest *request, httpd_ws_frame *frame) {
         // Handle incoming messages (commands from web UI)
         if (frame->type == HTTPD_WS_TYPE_TEXT) {
-            // PHASE 6.8: Update activity timestamp
+            // Update activity timestamp
             ws_clients[request->client()] = millis();
 
             String msg = String((char*)frame->payload, frame->len);
@@ -224,7 +217,7 @@ void WebServerManager::setupRoutes() {
             }
         } 
         else if (frame->type == HTTPD_WS_TYPE_PONG) {
-            // PHASE 6.8: Heartbeat response received
+            // Heartbeat response received
             ws_clients[request->client()] = millis();
             // logVerbose("[WS] Pong received from %s", request->client()->remoteIP().toString().c_str());
         }
@@ -235,7 +228,7 @@ void WebServerManager::setupRoutes() {
     logPrintln("[WEB] WebSocket handler registered at /ws");
     
     // Serve static files from root (MUST be after API routes)
-    // PHASE 6: Enable browser caching to reduce load on LittleFS
+    // Enable browser caching to reduce load on LittleFS
     // --- Static File Routing ---
     
     // Noise suppressor: Intercept /bootlog.txt requests to prevent VFS "[E] open() failed" logs
@@ -264,7 +257,7 @@ void WebServerManager::setupRoutes() {
 void WebServerManager::begin() {
     logPrintln("[WEB] Starting Server");
     
-    // PHASE 6.2: Memory-safe configuration (Optimized for standard browser parallelism)
+    // Memory-safe configuration (Optimized for standard browser parallelism)
     // 6 sockets provide a good balance between concurrency and heap usage on S3.
     server.config.max_open_sockets = 6; 
     server.config.max_uri_handlers = 40;
@@ -345,7 +338,7 @@ void WebServerManager::broadcastState() {
     system_telemetry_t t = telemetryGetSnapshot();
     updateHistory(t.cpu_usage_percent, t.free_heap_bytes, current_status.vfd_current_amps);
 
-    // PHASE 6.8: Check WebSocket health (prune stale clients)
+    // Check WebSocket health (prune stale clients)
     checkWsHealth();
 }
 
@@ -394,7 +387,7 @@ bool webAuthenticate(PsychicRequest *request) {
     String client_ip = request->client()->remoteIP().toString();
     const char* ip_address = client_ip.c_str();
 
-    // PHASE 6.2: Apply Rate Limiter
+    // Apply Rate Limiter
     if (!authCheckRateLimit(ip_address)) {
         // Technically returning false would trigger a 401 prompt.
         // But for rate limits we should probably just fail the auth immediately.

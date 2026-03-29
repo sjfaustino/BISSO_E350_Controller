@@ -5,7 +5,7 @@
  */
 
 #include "api_file_manager.h"
-#include "auth_manager.h"  // PHASE 5.10: SHA-256 authentication
+#include "auth_manager.h"  // SHA-256 authentication
 #include "serial_logger.h"
 #include <ArduinoJson.h>
 #include <LittleFS.h>
@@ -14,7 +14,7 @@
 #include "trash_bin_manager.h"
 #include <functional>  // For std::function in recursive listing
 
-// PHASE 5.10: Local auth helper with rate limiting for PsychicHttp
+// Local auth helper with rate limiting for PsychicHttp
 // Returns ESP_OK if authenticated, ESP_FAIL otherwise (caller should return early)
 esp_err_t requireAuth(PsychicRequest *request, PsychicResponse *response) {
   // Get client IP address for rate limiting
@@ -83,6 +83,9 @@ static esp_err_t handleFileList(PsychicRequest *request, PsychicResponse *respon
   String path = "/";
   if (request->hasParam("path")) {
     path = request->getParam("path")->value();
+    if (!isSafePath(path)) {
+      return response->send(400, "text/plain", "Forbidden path");
+    }
   }
 
   bool use_sd = path.startsWith("/sd");
@@ -169,7 +172,7 @@ static esp_err_t handleFileDelete(PsychicRequest *request, PsychicResponse *resp
   // Get param value
   String path = request->getParam("name")->value();
 
-  // PHASE 5.10: Security - Validate filename before deletion
+  // Security - Validate filename before deletion
   if (!isSafePath(path)) {
     logWarning("[FILE_API] [SECURITY] Blocked delete attempt with unsafe filename: %s", path.c_str());
     return response->send(400, "text/plain", "Invalid filename");
@@ -328,6 +331,9 @@ static esp_err_t handleFileRead(PsychicRequest *request, PsychicResponse *respon
     if (requireAuth(request, response) != ESP_OK) return ESP_OK;
     if (!request->hasParam("path")) return response->send(400, "text/plain", "Missing path");
     String path = request->getParam("path")->value();
+    if (!isSafePath(path)) {
+        return response->send(403, "text/plain", "Forbidden path");
+    }
 
     bool use_sd = path.startsWith("/sd");
     FS *fs;
@@ -357,6 +363,9 @@ static esp_err_t handleFileSave(PsychicRequest *request, PsychicResponse *respon
     if (requireAuth(request, response) != ESP_OK) return ESP_OK;
     if (!request->hasParam("path")) return response->send(400, "text/plain", "Missing path");
     String path = request->getParam("path")->value();
+    if (!isSafePath(path)) {
+        return response->send(403, "text/plain", "Forbidden path");
+    }
     String content = request->body();
 
     bool use_sd = path.startsWith("/sd");

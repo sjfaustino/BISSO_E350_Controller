@@ -62,7 +62,7 @@ bool encoderCalibrationFinalize(uint8_t axis) {
     return false;
   }
   
-  // PHASE 5.25: Overflow-safe distance calculation
+  // Overflow-safe distance calculation
   int64_t distance_counts = (int64_t)calib_data[axis].end_position - (int64_t)calib_data[axis].start_position;
   if (distance_counts == 0) {
     logError("[CALIB] No motion detected");

@@ -1,6 +1,6 @@
 /**
  * @file api_ota_updater.h
- * @brief OTA Firmware Update Handler (PHASE 5.1: Maintenance & Updates)
+ * @brief OTA Firmware Update Handler
  * @details Manages secure firmware updates via HTTP/REST API
  * @project BISSO E350 Controller
  */
@@ -20,27 +20,27 @@ extern "C" {
  * OTA Update Status Codes
  */
 typedef enum {
-    OTA_STATUS_IDLE = 0,
-    OTA_STATUS_IN_PROGRESS = 1,
-    OTA_STATUS_VALIDATING = 2,
-    OTA_STATUS_SUCCESS = 3,
-    OTA_STATUS_ERROR = 4,
-    OTA_STATUS_CRC_FAILED = 5,
-    OTA_STATUS_SIZE_ERROR = 6,
-    OTA_STATUS_PARTITION_ERROR = 7
+ OTA_STATUS_IDLE = 0,
+ OTA_STATUS_IN_PROGRESS = 1,
+ OTA_STATUS_VALIDATING = 2,
+ OTA_STATUS_SUCCESS = 3,
+ OTA_STATUS_ERROR = 4,
+ OTA_STATUS_CRC_FAILED = 5,
+ OTA_STATUS_SIZE_ERROR = 6,
+ OTA_STATUS_PARTITION_ERROR = 7
 } ota_status_t;
 
 /**
  * OTA Update Statistics
  */
 typedef struct {
-    ota_status_t status;              // Current OTA status
-    uint32_t bytes_received;          // Total bytes received
-    uint32_t total_size;              // Expected total size
-    uint32_t crc32;                   // CRC32 of received data
-    uint32_t last_error;              // Error code from last operation
-    const char* last_error_msg;       // Human-readable error message
-    uint64_t update_timestamp;        // Timestamp of last update attempt
+ ota_status_t status; // Current OTA status
+ uint32_t bytes_received; // Total bytes received
+ uint32_t total_size; // Expected total size
+ uint32_t crc32; // CRC32 of received data
+ uint32_t last_error; // Error code from last operation
+ const char* last_error_msg; // Human-readable error message
+ uint64_t update_timestamp; // Timestamp of last update attempt
 } ota_status_info_t;
 
 /**

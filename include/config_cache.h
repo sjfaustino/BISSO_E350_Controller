@@ -1,6 +1,6 @@
 /**
  * @file config_cache.h
- * @brief High-performance Typed Configuration Cache (PHASE 6.7)
+ * @brief High-performance Typed Configuration Cache
  * @details Provides O(1) access to commonly used configuration parameters.
  */
 
@@ -15,34 +15,34 @@
  * @details All fields are O(1) access and type-safe.
  */
 typedef struct {
-    // RS485 Bus
-    uint32_t rs485_baud;
-    
-    // Spindle / Current Monitor
-    bool jxk10_enabled;
-    uint32_t jxk10_addr;
-    uint32_t spindle_threshold;
-    uint32_t spindle_pause_threshold;
-    bool spindle_pause_enabled;
-    float spindle_rated_amps;
-    
-    // Motion Safety
-    bool strict_limits;
-    uint32_t stall_timeout_ms;
-    float target_margin_mm;
-    float stall_threshold_mm;
-    float deviation_warning_mm;
-    float deviation_critical_mm;
-    
-    // Network
-    bool wifi_ap_enabled;
-    uint32_t web_port;
-    
-    // Hardware Features
-    bool lcd_enabled;
-    bool buzzer_enabled;
-    
-    bool cache_valid;
+ // RS485 Bus
+ uint32_t rs485_baud;
+ 
+ // Spindle / Current Monitor
+ bool jxk10_enabled;
+ uint32_t jxk10_addr;
+ uint32_t spindle_threshold;
+ uint32_t spindle_pause_threshold;
+ bool spindle_pause_enabled;
+ float spindle_rated_amps;
+ 
+ // Motion Safety
+ bool strict_limits;
+ uint32_t stall_timeout_ms;
+ float target_margin_mm;
+ float stall_threshold_mm;
+ float deviation_warning_mm;
+ float deviation_critical_mm;
+ 
+ // Network
+ bool wifi_ap_enabled;
+ uint32_t web_port;
+ 
+ // Hardware Features
+ bool lcd_enabled;
+ bool buzzer_enabled;
+ 
+ bool cache_valid;
 } config_cache_t;
 
 /**

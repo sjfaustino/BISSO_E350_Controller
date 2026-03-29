@@ -175,7 +175,7 @@ static void appendMethodDetail(char* buffer, size_t* offset, size_t buffer_size,
     const char* content_type = ep->response_type ? ep->response_type : "application/json";
     const char* schema_type = "{\"type\":\"object\"}";
     
-    // PHASE 5.10: Handle binary response schema
+    // Handle binary response schema
     if (strstr(content_type, "octet-stream")) {
         schema_type = "{\"type\":\"string\",\"format\":\"binary\"}";
     }
@@ -204,7 +204,7 @@ size_t openAPIGenerateJSON(char* buffer, size_t buffer_size) {
 
     size_t offset = 0;
 
-    // PHASE 5.10: Add truncation checks after each snprintf
+    // Add truncation checks after each snprintf
     // Header
     offset += snprintf(buffer + offset, buffer_size - offset,
         "{\"openapi\":\"%s\",\"info\":%s,",

@@ -8,7 +8,7 @@
 #include "serial_logger.h"
 #include "fault_logging.h"
 #include "system_constants.h"
-#include "system_events.h" // PHASE 5.10: Event-driven architecture
+#include "system_events.h" // Event-driven architecture
 #include "motion.h"
 #include "config_unified.h"
 #include "config_keys.h"
@@ -101,7 +101,7 @@ void encoderDeviationUpdate(uint8_t axis, int32_t expected_pos, int32_t actual_p
                     "Sustained encoder deviation: %ld counts", (long)dev->deviation_counts);
                 logError("[ENCODER_DEV] Axis %d: SUSTAINED DEVIATION ALARM", axis);
 
-                // PHASE 5.10: Signal encoder deviation event
+                // Signal encoder deviation event
                 systemEventsSafetySet(EVENT_SAFETY_ENCODER_DEVIATION);
             }
             else if (!is_moving) {
@@ -116,7 +116,7 @@ void encoderDeviationUpdate(uint8_t axis, int32_t expected_pos, int32_t actual_p
                 dev->status = AXIS_OK;
                 logInfo("[ENCODER_DEV] Axis %d deviation cleared", axis);
 
-                // PHASE 5.10: Clear encoder deviation event
+                // Clear encoder deviation event
                 systemEventsSafetyClear(EVENT_SAFETY_ENCODER_DEVIATION);
             }
             break;

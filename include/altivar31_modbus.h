@@ -1,10 +1,10 @@
 /**
  * @file altivar31_modbus.h
- * @brief Altivar 31 VFD Modbus RTU Driver (PHASE 5.5)
+ * @brief Altivar 31 VFD Modbus RTU Driver
  * @project BISSO E350 Controller
  * @details Modbus RTU interface for Schneider Altivar 31 VFD
- *          Provides asynchronous and synchronous queries for motor current,
- *          frequency, status, faults, and thermal state.
+ * Provides asynchronous and synchronous queries for motor current,
+ * frequency, status, faults, and thermal state.
  *
  * Register Addresses (Verified from ATV312 Programming Manual BBV51701):
  * - 3202: Output frequency (rFr, 0.1 Hz units)
@@ -25,27 +25,27 @@
 // ============================================================================
 
 typedef struct {
-    bool enabled;                       // Device enabled/connected flag
-    uint8_t slave_address;              // Modbus slave ID (1-247, typically 1)
-    uint32_t baud_rate;                 // Baud rate in bps (19200 typical)
+ bool enabled; // Device enabled/connected flag
+ uint8_t slave_address; // Modbus slave ID (1-247, typically 1)
+ uint32_t baud_rate; // Baud rate in bps (19200 typical)
 
-    // Real-time measurements
-    int16_t frequency_raw;              // Raw register value (0.1 Hz units)
-    float frequency_hz;                 // Output frequency in Hz
+ // Real-time measurements
+ int16_t frequency_raw; // Raw register value (0.1 Hz units)
+ float frequency_hz; // Output frequency in Hz
 
-    int16_t current_raw;                // Raw register value (0.1 A units)
-    float current_amps;                 // Motor current in amperes
+ int16_t current_raw; // Raw register value (0.1 A units)
+ float current_amps; // Motor current in amperes
 
-    uint16_t status_word;               // Operating status (bit flags)
-    uint16_t fault_code;                // Fault code (0 = no fault)
-    int16_t thermal_state;              // Thermal state (1% units, 100% = nominal)
+ uint16_t status_word; // Operating status (bit flags)
+ uint16_t fault_code; // Fault code (0 = no fault)
+ int16_t thermal_state; // Thermal state (1% units, 100% = nominal)
 
-    // Statistics (Now managed by base class, synced for C-API compatibility if needed)
-    uint32_t last_read_time_ms;         
-    uint32_t last_error_time_ms;        
-    uint32_t read_count;                
-    uint32_t error_count;               
-    uint32_t consecutive_errors;        
+ // Statistics (Now managed by base class, synced for C-API compatibility if needed)
+ uint32_t last_read_time_ms; 
+ uint32_t last_error_time_ms; 
+ uint32_t read_count; 
+ uint32_t error_count; 
+ uint32_t consecutive_errors; 
 } altivar31_state_t;
 
 #ifdef __cplusplus
@@ -53,46 +53,46 @@ typedef struct {
 
 class Altivar31Driver : public ModbusDriver {
 public:
-    Altivar31Driver(const char* name = "Altivar31");
-    
-    // Accessors
-    float getCurrentAmps() const;
-    int16_t getCurrentRaw() const;
-    float getFrequencyHz() const;
-    int16_t getFrequencyRaw() const;
-    uint16_t getStatusWord() const;
-    uint16_t getFaultCode() const;
-    int16_t getThermalState() const;
-    
-    bool isFaulted() const;
-    bool isRunning() const;
-    
-    bool writeFrequency(float hz); // Write frequency setpoint (LFRD)
-    bool setModbusPriority(bool active); // Take/Release priority over analog terminal
-    
-    const altivar31_state_t* getState() const;
+ Altivar31Driver(const char* name = "Altivar31");
+ 
+ // Accessors
+ float getCurrentAmps() const;
+ int16_t getCurrentRaw() const;
+ float getFrequencyHz() const;
+ int16_t getFrequencyRaw() const;
+ uint16_t getStatusWord() const;
+ uint16_t getFaultCode() const;
+ int16_t getThermalState() const;
+ 
+ bool isFaulted() const;
+ bool isRunning() const;
+ 
+ bool writeFrequency(float hz); // Write frequency setpoint (LFRD)
+ bool setModbusPriority(bool active); // Take/Release priority over analog terminal
+ 
+ const altivar31_state_t* getState() const;
 
-    // Diagnostics
-    void printDiagnostics() const override;
+ // Diagnostics
+ void printDiagnostics() const override;
 
-    // Commands (Queueing for next poll)
-    void queueRequest(uint16_t register_addr);
-    
+ // Commands (Queueing for next poll)
+ void queueRequest(uint16_t register_addr);
+ 
 protected:
-    bool poll() override;
-    bool onResponse(const uint8_t* data, uint16_t len) override;
+ bool poll() override;
+ bool onResponse(const uint8_t* data, uint16_t len) override;
 
 private:
-    mutable altivar31_state_t _state;
-    uint8_t _tx_buffer[16];
-    
-    // Polling state
-    uint16_t _pending_register;
-    uint8_t _poll_step;
+ mutable altivar31_state_t _state;
+ uint8_t _tx_buffer[16];
+ 
+ // Polling state
+ uint16_t _pending_register;
+ uint8_t _poll_step;
 };
 
-extern Altivar31Driver AltivarX;    // VFD1 (X-Axis)
-extern Altivar31Driver AltivarYZA;  // VFD2 (Y, Z, A Axes)
+extern Altivar31Driver AltivarX; // VFD1 (X-Axis)
+extern Altivar31Driver AltivarYZA; // VFD2 (Y, Z, A Axes)
 
 // Legacy alias for single-VFD backward compatibility
 #define Altivar31 AltivarX
@@ -107,20 +107,19 @@ extern "C" {
 // ============================================================================
 // Verified against Altivar 31/312 Programming Manual BBV51701
 
-#define ALTIVAR31_REG_OUTPUT_FREQ       3202    // rFr: Output frequency (0.1 Hz units)
-#define ALTIVAR31_REG_DRIVE_CURRENT     3204    // LCr: Motor current (0.1 A units)
-#define ALTIVAR31_REG_DRIVE_STATUS      3201    // ETA: Status word (bit flags)
-#define ALTIVAR31_REG_FAULT_CODE        8606    // ERRD: Fault code
-#define ALTIVAR31_REG_THERMAL_STATE     3209    // tHd: Drive heatsink thermal state (1% units)
-#define ALTIVAR31_REG_FREQ_SETPOINT     8502    // LFRD: Frequency setpoint (0.1 Hz units)
-#define ALTIVAR31_REG_COMMAND_WORD      8501    // CMD: Command word
+#define ALTIVAR31_REG_OUTPUT_FREQ 3202 // rFr: Output frequency (0.1 Hz units)
+#define ALTIVAR31_REG_DRIVE_CURRENT 3204 // LCr: Motor current (0.1 A units)
+#define ALTIVAR31_REG_DRIVE_STATUS 3201 // ETA: Status word (bit flags)
+#define ALTIVAR31_REG_FAULT_CODE 8606 // ERRD: Fault code
+#define ALTIVAR31_REG_THERMAL_STATE 3209 // tHd: Drive heatsink thermal state (1% units)
+#define ALTIVAR31_REG_FREQ_SETPOINT 8502 // LFRD: Frequency setpoint (0.1 Hz units)
+#define ALTIVAR31_REG_COMMAND_WORD 8501 // CMD: Command word
 
 // Drive status values
-#define ALTIVAR31_STATUS_IDLE           0
-#define ALTIVAR31_STATUS_RUNNING        1
-#define ALTIVAR31_STATUS_FAULT          2
-#define ALTIVAR31_STATUS_OVERHEAT       3
-
+#define ALTIVAR31_STATUS_IDLE 0
+#define ALTIVAR31_STATUS_RUNNING 1
+#define ALTIVAR31_STATUS_FAULT 2
+#define ALTIVAR31_STATUS_OVERHEAT 3
 
 
 // ============================================================================
@@ -169,7 +168,6 @@ bool altivar31ModbusReadFaultCode(void);
  * @return true if request sent, false on error
  */
 bool altivar31ModbusReadThermalState(void);
-
 
 
 // ============================================================================
@@ -237,7 +235,7 @@ bool altivar31IsRunning(void);
 const altivar31_state_t* altivar31GetState(void);
 
 // ============================================================================
-// MOTION VALIDATION (PHASE 5.5)
+// MOTION VALIDATION
 // ============================================================================
 
 /**

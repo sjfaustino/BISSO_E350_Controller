@@ -1,6 +1,6 @@
 /**
  * @file api_endpoints.h
- * @brief API Endpoint Registry and Discovery (PHASE 5.2)
+ * @brief API Endpoint Registry and Discovery
  * @details Centralized registry of all available API endpoints for auto-discovery
  * @project BISSO E350 Controller
  */
@@ -30,13 +30,13 @@ typedef uint16_t http_method_t;
  * API endpoint descriptor
  */
 typedef struct {
-    const char* path;              // REST endpoint path (e.g., "/api/status")
-    http_method_t methods;         // Bitmask of supported HTTP methods
-    const char* description;       // Human-readable description
-    bool requires_auth;            // True if HTTP Basic Auth required
-    bool rate_limited;             // True if rate limiting applied
-    const char* rate_limit_info;   // e.g., "50 requests/min"
-    const char* response_type;     // e.g., "application/json"
+ const char* path; // REST endpoint path (e.g., "/api/status")
+ http_method_t methods; // Bitmask of supported HTTP methods
+ const char* description; // Human-readable description
+ bool requires_auth; // True if HTTP Basic Auth required
+ bool rate_limited; // True if rate limiting applied
+ const char* rate_limit_info; // e.g., "50 requests/min"
+ const char* response_type; // e.g., "application/json"
 } api_endpoint_t;
 
 /**

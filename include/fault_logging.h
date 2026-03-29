@@ -34,11 +34,11 @@ typedef enum {
   FAULT_ENCODER_SPIKE = 0x11,
   FAULT_I2C_ERROR = 0x12,
   FAULT_TASK_HUNG = 0x13,
-  FAULT_MOTION_TIMEOUT = 0x14,  // PHASE 5.1: Motion mutex timeout
-  FAULT_SPINDLE_OVERCURRENT = 0x15,  // PHASE 5.1: Spindle overcurrent detection
+  FAULT_MOTION_TIMEOUT = 0x14,  // Motion mutex timeout
+  FAULT_SPINDLE_OVERCURRENT = 0x15,  // Spindle overcurrent detection
   FAULT_SPINDLE_STALL = 0x16,  // Spindle stall (prolonged overload)
   FAULT_SPINDLE_TOOLBREAK = 0x17,  // Tool breakage (sudden current drop)
-  FAULT_RS485_TIMEOUT = 0x18,   // PHASE 4.1: RS-485 Bus communication failure
+  FAULT_RS485_TIMEOUT = 0x18,   // RS-485 Bus communication failure
   FAULT_CODE_MAX = 0x19  // Maximum fault code value (for array sizing)
 } fault_code_t;
 
@@ -92,12 +92,12 @@ bool emergencyStopIsActive();
 bool emergencyStopRequestRecovery();
 void emergencyStopClearRecovery();
 
-// PHASE 5.1: Ring buffer fallback diagnostics
+// Ring buffer fallback diagnostics
 uint32_t faultGetRingBufferDropCount();
 uint8_t faultGetRingBufferEntryCount();
 const fault_entry_t* faultGetRingBufferEntry(uint8_t index);
 
-// PHASE 5.2: Persistent NVS History Access
+// Persistent NVS History Access
 uint8_t faultGetHistoryCount();
 bool faultGetHistoryEntry(uint8_t logical_index, fault_entry_t* out_entry);
 

@@ -1,6 +1,6 @@
 /**
  * @file vfd_current_calibration.cpp
- * @brief VFD Motor Current Calibration System Implementation (PHASE 5.5)
+ * @brief VFD Motor Current Calibration System Implementation
  * @project BISSO E350 Controller
  * @details Operator-guided baseline current measurement for stall detection
  */
@@ -18,15 +18,15 @@
 // ============================================================================
 
 typedef struct {
-    bool active;                        // Measurement in progress
-    uint32_t start_time_ms;             // Timestamp when measurement started
-    uint32_t duration_ms;               // Target measurement duration
-    char phase_name[32];                // Current measurement phase name
+ bool active; // Measurement in progress
+ uint32_t start_time_ms; // Timestamp when measurement started
+ uint32_t duration_ms; // Target measurement duration
+ char phase_name[32]; // Current measurement phase name
 
-    // Current samples during measurement
-    float current_sum;                  // Sum of sampled currents (for RMS)
-    float current_max;                  // Maximum current spike
-    uint32_t sample_count;              // Number of samples collected
+ // Current samples during measurement
+ float current_sum; // Sum of sampled currents (for RMS)
+ float current_max; // Maximum current spike
+ uint32_t sample_count; // Number of samples collected
 } measure_state_t;
 
 // ============================================================================
@@ -34,105 +34,105 @@ typedef struct {
 // ============================================================================
 
 static vfd_calibration_data_t calib_data = {
-    .idle_avg_amps = 0.0f,
-    .idle_peak_amps = 0.0f,
-    .standard_cut_avg_amps = 0.0f,
-    .standard_cut_peak_amps = 0.0f,
-    .heavy_cut_avg_amps = 0.0f,
-    .heavy_cut_peak_amps = 0.0f,
-    .stall_threshold_amps = 0.0f,
-    .stall_margin_percent = 20.0f,
-    .last_calibration_ms = 0,
-    .is_calibrated = false,
-    .calibration_count = 0
+ .idle_avg_amps = 0.0f,
+ .idle_peak_amps = 0.0f,
+ .standard_cut_avg_amps = 0.0f,
+ .standard_cut_peak_amps = 0.0f,
+ .heavy_cut_avg_amps = 0.0f,
+ .heavy_cut_peak_amps = 0.0f,
+ .stall_threshold_amps = 0.0f,
+ .stall_margin_percent = 20.0f,
+ .last_calibration_ms = 0,
+ .is_calibrated = false,
+ .calibration_count = 0
 };
 
-static measure_state_t measure_state = {};  // Initialize to zero/default values
+static measure_state_t measure_state = {}; // Initialize to zero/default values
 
 // ============================================================================
 // INITIALIZATION & PERSISTENCE
 // ============================================================================
 
 void vfdCalibrationInit(void) {
-    logInfo("[VFDCAL] Initializing calibration system");
-    memset(&calib_data, 0, sizeof(calib_data));
-    memset(&measure_state, 0, sizeof(measure_state));
-    calib_data.stall_margin_percent = 20.0f;
+ logInfo("[VFDCAL] Initializing calibration system");
+ memset(&calib_data, 0, sizeof(calib_data));
+ memset(&measure_state, 0, sizeof(measure_state));
+ calib_data.stall_margin_percent = 20.0f;
 
-    // Attempt to load existing calibration from NVS
-    if (!vfdCalibrationLoad()) {
-        logInfo("[VFDCAL] No valid calibration found, starting fresh");
-        calib_data.is_calibrated = false;
-    } else {
-        logInfo("[VFDCAL] Loaded existing calibration from NVS");
-    }
+ // Attempt to load existing calibration from NVS
+ if (!vfdCalibrationLoad()) {
+ logInfo("[VFDCAL] No valid calibration found, starting fresh");
+ calib_data.is_calibrated = false;
+ } else {
+ logInfo("[VFDCAL] Loaded existing calibration from NVS");
+ }
 }
 
 bool vfdCalibrationLoad(void) {
-    // Try to load each field from NVS config
-    int32_t idle_rms_i = configGetInt(KEY_VFD_IDLE_RMS, -1);
-    int32_t idle_pk_i = configGetInt(KEY_VFD_IDLE_PEAK, -1);
-    int32_t std_rms_i = configGetInt(KEY_VFD_STD_CUT_RMS, -1);
-    int32_t std_pk_i = configGetInt(KEY_VFD_STD_CUT_PEAK, -1);
-    int32_t valid_i = configGetInt(KEY_VFD_CALIB_VALID, 0);
+ // Try to load each field from NVS config
+ int32_t idle_rms_i = configGetInt(KEY_VFD_IDLE_RMS, -1);
+ int32_t idle_pk_i = configGetInt(KEY_VFD_IDLE_PEAK, -1);
+ int32_t std_rms_i = configGetInt(KEY_VFD_STD_CUT_RMS, -1);
+ int32_t std_pk_i = configGetInt(KEY_VFD_STD_CUT_PEAK, -1);
+ int32_t valid_i = configGetInt(KEY_VFD_CALIB_VALID, 0);
 
-    // Check if we have minimum calibration (idle + standard cut)
-    if (idle_rms_i < 0 || idle_pk_i < 0 || std_rms_i < 0 || std_pk_i < 0) {
-        return false;  // Not enough data
-    }
+ // Check if we have minimum calibration (idle + standard cut)
+ if (idle_rms_i < 0 || idle_pk_i < 0 || std_rms_i < 0 || std_pk_i < 0) {
+ return false; // Not enough data
+ }
 
-    // Load confirmed data
-    calib_data.idle_avg_amps = idle_rms_i / 100.0f;
-    calib_data.idle_peak_amps = idle_pk_i / 100.0f;
-    calib_data.standard_cut_avg_amps = std_rms_i / 100.0f;
-    calib_data.standard_cut_peak_amps = std_pk_i / 100.0f;
+ // Load confirmed data
+ calib_data.idle_avg_amps = idle_rms_i / 100.0f;
+ calib_data.idle_peak_amps = idle_pk_i / 100.0f;
+ calib_data.standard_cut_avg_amps = std_rms_i / 100.0f;
+ calib_data.standard_cut_peak_amps = std_pk_i / 100.0f;
 
-    // Load optional heavy load data
-    int32_t heavy_rms_i = configGetInt(KEY_VFD_HEAVY_RMS, -1);
-    int32_t heavy_pk_i = configGetInt(KEY_VFD_HEAVY_PEAK, -1);
-    if (heavy_rms_i >= 0 && heavy_pk_i >= 0) {
-        calib_data.heavy_cut_avg_amps = heavy_rms_i / 100.0f;
-        calib_data.heavy_cut_peak_amps = heavy_pk_i / 100.0f;
-    }
+ // Load optional heavy load data
+ int32_t heavy_rms_i = configGetInt(KEY_VFD_HEAVY_RMS, -1);
+ int32_t heavy_pk_i = configGetInt(KEY_VFD_HEAVY_PEAK, -1);
+ if (heavy_rms_i >= 0 && heavy_pk_i >= 0) {
+ calib_data.heavy_cut_avg_amps = heavy_rms_i / 100.0f;
+ calib_data.heavy_cut_peak_amps = heavy_pk_i / 100.0f;
+ }
 
-    // Load threshold and margin
-    int32_t thr_i = configGetInt(KEY_VFD_STALL_THR, -1);
-    int32_t marg_i = configGetInt(KEY_VFD_STALL_MARGIN, 20);
-    if (thr_i >= 0) {
-        calib_data.stall_threshold_amps = thr_i / 100.0f;
-    }
-    calib_data.stall_margin_percent = marg_i;
+ // Load threshold and margin
+ int32_t thr_i = configGetInt(KEY_VFD_STALL_THR, -1);
+ int32_t marg_i = configGetInt(KEY_VFD_STALL_MARGIN, 20);
+ if (thr_i >= 0) {
+ calib_data.stall_threshold_amps = thr_i / 100.0f;
+ }
+ calib_data.stall_margin_percent = marg_i;
 
-    calib_data.is_calibrated = (valid_i == 1);
-    calib_data.calibration_count = configGetInt("vfd_calib_cnt", 0);
+ calib_data.is_calibrated = (valid_i == 1);
+ calib_data.calibration_count = configGetInt("vfd_calib_cnt", 0);
 
-    logInfo("[VFDCAL] Loaded: Idle=%.1f/%.1f A, Std=%.1f/%.1f A, Threshold=%.1f A",
-                  calib_data.idle_avg_amps, calib_data.idle_peak_amps,
-                  calib_data.standard_cut_avg_amps, calib_data.standard_cut_peak_amps,
-                  calib_data.stall_threshold_amps);
+ logInfo("[VFDCAL] Loaded: Idle=%.1f/%.1f A, Std=%.1f/%.1f A, Threshold=%.1f A",
+ calib_data.idle_avg_amps, calib_data.idle_peak_amps,
+ calib_data.standard_cut_avg_amps, calib_data.standard_cut_peak_amps,
+ calib_data.stall_threshold_amps);
 
-    return true;
+ return true;
 }
 
 bool vfdCalibrationSave(void) {
-    // Save all calibration values to NVS config
-    configSetInt(KEY_VFD_IDLE_RMS, (int32_t)(calib_data.idle_avg_amps * 100.0f));
-    configSetInt(KEY_VFD_IDLE_PEAK, (int32_t)(calib_data.idle_peak_amps * 100.0f));
-    configSetInt(KEY_VFD_STD_CUT_RMS, (int32_t)(calib_data.standard_cut_avg_amps * 100.0f));
-    configSetInt(KEY_VFD_STD_CUT_PEAK, (int32_t)(calib_data.standard_cut_peak_amps * 100.0f));
-    configSetInt(KEY_VFD_HEAVY_RMS, (int32_t)(calib_data.heavy_cut_avg_amps * 100.0f));
-    configSetInt(KEY_VFD_HEAVY_PEAK, (int32_t)(calib_data.heavy_cut_peak_amps * 100.0f));
-    configSetInt(KEY_VFD_STALL_THR, (int32_t)(calib_data.stall_threshold_amps * 100.0f));
-    configSetInt(KEY_VFD_STALL_MARGIN, (int32_t)calib_data.stall_margin_percent);
-    configSetInt(KEY_VFD_CALIB_VALID, calib_data.is_calibrated ? 1 : 0);
-    configSetInt("vfd_calib_cnt", calib_data.calibration_count);
+ // Save all calibration values to NVS config
+ configSetInt(KEY_VFD_IDLE_RMS, (int32_t)(calib_data.idle_avg_amps * 100.0f));
+ configSetInt(KEY_VFD_IDLE_PEAK, (int32_t)(calib_data.idle_peak_amps * 100.0f));
+ configSetInt(KEY_VFD_STD_CUT_RMS, (int32_t)(calib_data.standard_cut_avg_amps * 100.0f));
+ configSetInt(KEY_VFD_STD_CUT_PEAK, (int32_t)(calib_data.standard_cut_peak_amps * 100.0f));
+ configSetInt(KEY_VFD_HEAVY_RMS, (int32_t)(calib_data.heavy_cut_avg_amps * 100.0f));
+ configSetInt(KEY_VFD_HEAVY_PEAK, (int32_t)(calib_data.heavy_cut_peak_amps * 100.0f));
+ configSetInt(KEY_VFD_STALL_THR, (int32_t)(calib_data.stall_threshold_amps * 100.0f));
+ configSetInt(KEY_VFD_STALL_MARGIN, (int32_t)calib_data.stall_margin_percent);
+ configSetInt(KEY_VFD_CALIB_VALID, calib_data.is_calibrated ? 1 : 0);
+ configSetInt("vfd_calib_cnt", calib_data.calibration_count);
 
-    // Persist to NVS
-    configUnifiedFlush();
-    configUnifiedSave();
+ // Persist to NVS
+ configUnifiedFlush();
+ configUnifiedSave();
 
-    logInfo("[VFDCAL] Saved calibration data (%u times)", calib_data.calibration_count);
-    return true;
+ logInfo("[VFDCAL] Saved calibration data (%u times)", calib_data.calibration_count);
+ return true;
 }
 
 // ============================================================================
@@ -140,82 +140,82 @@ bool vfdCalibrationSave(void) {
 // ============================================================================
 
 void vfdCalibrationStartMeasure(uint32_t duration_ms, const char* phase_name) {
-    measure_state.active = true;
-    measure_state.start_time_ms = millis();
-    measure_state.duration_ms = duration_ms;
-    measure_state.current_sum = 0.0f;
-    measure_state.current_max = 0.0f;
-    measure_state.sample_count = 0;
+ measure_state.active = true;
+ measure_state.start_time_ms = millis();
+ measure_state.duration_ms = duration_ms;
+ measure_state.current_sum = 0.0f;
+ measure_state.current_max = 0.0f;
+ measure_state.sample_count = 0;
 
-    strncpy(measure_state.phase_name, phase_name, sizeof(measure_state.phase_name) - 1);
-    measure_state.phase_name[sizeof(measure_state.phase_name) - 1] = '\0';
+ strncpy(measure_state.phase_name, phase_name, sizeof(measure_state.phase_name) - 1);
+ measure_state.phase_name[sizeof(measure_state.phase_name) - 1] = '\0';
 
-    logInfo("[VFDCAL] Starting measurement: %s (duration: %lu ms)",
-                  measure_state.phase_name, (unsigned long)duration_ms);
+ logInfo("[VFDCAL] Starting measurement: %s (duration: %lu ms)",
+ measure_state.phase_name, (unsigned long)duration_ms);
 }
 
 bool vfdCalibrationIsMeasureComplete(void) {
-    if (!measure_state.active) {
-        return false;
-    }
+ if (!measure_state.active) {
+ return false;
+ }
 
-    uint32_t elapsed = millis() - measure_state.start_time_ms;
-    if (elapsed >= measure_state.duration_ms) {
-        measure_state.active = false;
-        logInfo("[VFDCAL] Measurement complete: %lu samples collected",
-                      (unsigned long)measure_state.sample_count);
-        return true;
-    }
+ uint32_t elapsed = millis() - measure_state.start_time_ms;
+ if (elapsed >= measure_state.duration_ms) {
+ measure_state.active = false;
+ logInfo("[VFDCAL] Measurement complete: %lu samples collected",
+ (unsigned long)measure_state.sample_count);
+ return true;
+ }
 
-    return false;
+ return false;
 }
 
 bool vfdCalibrationGetMeasurement(float* out_avg_amps, float* out_peak_amps) {
-    if (out_avg_amps == nullptr || out_peak_amps == nullptr) {
-        return false;
-    }
+ if (out_avg_amps == nullptr || out_peak_amps == nullptr) {
+ return false;
+ }
 
-    if (measure_state.sample_count == 0) {
-        return false;  // No samples collected
-    }
+ if (measure_state.sample_count == 0) {
+ return false; // No samples collected
+ }
 
-    // Calculate AVG from sum of samples
-    float avg = measure_state.current_sum / measure_state.sample_count;
-    *out_avg_amps = avg;
-    *out_peak_amps = measure_state.current_max;
+ // Calculate AVG from sum of samples
+ float avg = measure_state.current_sum / measure_state.sample_count;
+ *out_avg_amps = avg;
+ *out_peak_amps = measure_state.current_max;
 
-    logInfo("[VFDCAL] Measurement result: AVG=%.2f A, Peak=%.2f A (samples: %lu)",
-                  avg, measure_state.current_max, (unsigned long)measure_state.sample_count);
+ logInfo("[VFDCAL] Measurement result: AVG=%.2f A, Peak=%.2f A (samples: %lu)",
+ avg, measure_state.current_max, (unsigned long)measure_state.sample_count);
 
-    return true;
+ return true;
 }
 
 void vfdCalibrationStoreMeasurement(uint8_t phase, float avg_amps, float peak_amps) {
-    switch (phase) {
-        case 0:  // Idle baseline
-            calib_data.idle_avg_amps = avg_amps;
-            calib_data.idle_peak_amps = peak_amps;
-            logInfo("[VFDCAL] Stored idle baseline: %.2f A (AVG), %.2f A (peak)",
-                          avg_amps, peak_amps);
-            break;
+ switch (phase) {
+ case 0: // Idle baseline
+ calib_data.idle_avg_amps = avg_amps;
+ calib_data.idle_peak_amps = peak_amps;
+ logInfo("[VFDCAL] Stored idle baseline: %.2f A (AVG), %.2f A (peak)",
+ avg_amps, peak_amps);
+ break;
 
-        case 1:  // Standard cut baseline
-            calib_data.standard_cut_avg_amps = avg_amps;
-            calib_data.standard_cut_peak_amps = peak_amps;
-            logInfo("[VFDCAL] Stored standard cut baseline: %.2f A (AVG), %.2f A (peak)",
-                          avg_amps, peak_amps);
-            break;
+ case 1: // Standard cut baseline
+ calib_data.standard_cut_avg_amps = avg_amps;
+ calib_data.standard_cut_peak_amps = peak_amps;
+ logInfo("[VFDCAL] Stored standard cut baseline: %.2f A (AVG), %.2f A (peak)",
+ avg_amps, peak_amps);
+ break;
 
-        case 2:  // Heavy load (optional)
-            calib_data.heavy_cut_avg_amps = avg_amps;
-            calib_data.heavy_cut_peak_amps = peak_amps;
-            logInfo("[VFDCAL] Stored heavy load baseline: %.2f A (AVG), %.2f A (peak)",
-                          avg_amps, peak_amps);
-            break;
+ case 2: // Heavy load (optional)
+ calib_data.heavy_cut_avg_amps = avg_amps;
+ calib_data.heavy_cut_peak_amps = peak_amps;
+ logInfo("[VFDCAL] Stored heavy load baseline: %.2f A (AVG), %.2f A (peak)",
+ avg_amps, peak_amps);
+ break;
 
-        default:
-            return;
-    }
+ default:
+ return;
+ }
 }
 
 // ============================================================================
@@ -223,30 +223,30 @@ void vfdCalibrationStoreMeasurement(uint8_t phase, float avg_amps, float peak_am
 // ============================================================================
 
 bool vfdCalibrationCalculateThreshold(float margin_percent) {
-    // Use the highest measurement (prefer heavy load if available, otherwise standard cut)
-    float max_peak = calib_data.standard_cut_peak_amps;
+ // Use the highest measurement (prefer heavy load if available, otherwise standard cut)
+ float max_peak = calib_data.standard_cut_peak_amps;
 
-    if (calib_data.heavy_cut_peak_amps > 0.0f) {
-        max_peak = calib_data.heavy_cut_peak_amps;
-    }
+ if (calib_data.heavy_cut_peak_amps > 0.0f) {
+ max_peak = calib_data.heavy_cut_peak_amps;
+ }
 
-    if (max_peak <= 0.0f) {
-        logError("[VFDCAL] No valid baseline measurements for threshold calculation");
-        return false;
-    }
+ if (max_peak <= 0.0f) {
+ logError("[VFDCAL] No valid baseline measurements for threshold calculation");
+ return false;
+ }
 
-    // Calculate stall threshold: max_peak + margin
-    float margin_factor = 1.0f + (margin_percent / 100.0f);
-    calib_data.stall_threshold_amps = max_peak * margin_factor;
-    calib_data.stall_margin_percent = margin_percent;
-    calib_data.last_calibration_ms = millis();
-    calib_data.is_calibrated = true;
-    calib_data.calibration_count++;
+ // Calculate stall threshold: max_peak + margin
+ float margin_factor = 1.0f + (margin_percent / 100.0f);
+ calib_data.stall_threshold_amps = max_peak * margin_factor;
+ calib_data.stall_margin_percent = margin_percent;
+ calib_data.last_calibration_ms = millis();
+ calib_data.is_calibrated = true;
+ calib_data.calibration_count++;
 
-    logInfo("[VFDCAL] Calculated stall threshold: %.2f A (max peak: %.2f A, margin: %.0f%%)",
-                  calib_data.stall_threshold_amps, max_peak, margin_percent);
+ logInfo("[VFDCAL] Calculated stall threshold: %.2f A (max peak: %.2f A, margin: %.0f%%)",
+ calib_data.stall_threshold_amps, max_peak, margin_percent);
 
-    return vfdCalibrationSave();
+ return vfdCalibrationSave();
 }
 
 // ============================================================================
@@ -254,37 +254,37 @@ bool vfdCalibrationCalculateThreshold(float margin_percent) {
 // ============================================================================
 
 bool vfdCalibrationIsStall(float current_amps) {
-    if (!calib_data.is_calibrated) {
-        return false;  // Can't detect stall without calibration
-    }
+ if (!calib_data.is_calibrated) {
+ return false; // Can't detect stall without calibration
+ }
 
-    return current_amps > calib_data.stall_threshold_amps;
+ return current_amps > calib_data.stall_threshold_amps;
 }
 
 float vfdCalibrationGetThreshold(void) {
-    return calib_data.stall_threshold_amps;
+ return calib_data.stall_threshold_amps;
 }
 
 float vfdCalibrationGetMargin(void) {
-    return calib_data.stall_margin_percent;
+ return calib_data.stall_margin_percent;
 }
 
 bool vfdCalibrationIsValid(void) {
-    return calib_data.is_calibrated &&
-           calib_data.idle_avg_amps > 0.0f &&
-           calib_data.standard_cut_avg_amps > 0.0f;
+ return calib_data.is_calibrated &&
+ calib_data.idle_avg_amps > 0.0f &&
+ calib_data.standard_cut_avg_amps > 0.0f;
 }
 
 void vfdCalibrationReset(void) {
-    logInfo("[VFDCAL] Resetting all calibration data");
-    memset(&calib_data, 0, sizeof(calib_data));
-    calib_data.stall_margin_percent = 20.0f;
-    calib_data.is_calibrated = false;
+ logInfo("[VFDCAL] Resetting all calibration data");
+ memset(&calib_data, 0, sizeof(calib_data));
+ calib_data.stall_margin_percent = 20.0f;
+ calib_data.is_calibrated = false;
 
-    // Clear from NVS
-    configSetInt(KEY_VFD_CALIB_VALID, 0);
-    configUnifiedFlush();
-    configUnifiedSave();
+ // Clear from NVS
+ configSetInt(KEY_VFD_CALIB_VALID, 0);
+ configUnifiedFlush();
+ configUnifiedSave();
 }
 
 // ============================================================================
@@ -296,15 +296,15 @@ void vfdCalibrationReset(void) {
  * @param current_amps Current motor current in amperes
  */
 void vfdCalibrationSampleCurrent(float current_amps) {
-    if (!measure_state.active) {
-        return;  // Not currently measuring
-    }
+ if (!measure_state.active) {
+ return; // Not currently measuring
+ }
 
-    measure_state.current_sum += current_amps;
-    if (current_amps > measure_state.current_max) {
-        measure_state.current_max = current_amps;
-    }
-    measure_state.sample_count++;
+ measure_state.current_sum += current_amps;
+ if (current_amps > measure_state.current_max) {
+ measure_state.current_max = current_amps;
+ }
+ measure_state.sample_count++;
 }
 
 // ============================================================================
@@ -312,43 +312,43 @@ void vfdCalibrationSampleCurrent(float current_amps) {
 // ============================================================================
 
 const vfd_calibration_data_t* vfdCalibrationGetData(void) {
-    return &calib_data;
+ return &calib_data;
 }
 
 void vfdCalibrationPrintSummary(void) {
-    serialLoggerLock();
-    logPrintln("\n[VFDCAL] === Current Calibration Summary ===");
-    logPrintf("Status:              %s\r\n", calib_data.is_calibrated ? "VALID" : "INVALID");
-    logPrintf("Calibration Count:   %lu\r\n", (unsigned long)calib_data.calibration_count);
+ serialLoggerLock();
+ logPrintln("\n[VFDCAL] === Current Calibration Summary ===");
+ logPrintf("Status: %s\r\n", calib_data.is_calibrated ? "VALID" : "INVALID");
+ logPrintf("Calibration Count: %lu\r\n", (unsigned long)calib_data.calibration_count);
 
-    if (calib_data.idle_avg_amps > 0.0f || calib_data.idle_peak_amps > 0.0f) {
-        logPrintf("Idle Baseline:       %.2f A (AVG) / %.2f A (peak)\r\n",
-                      calib_data.idle_avg_amps, calib_data.idle_peak_amps);
-    } else {
-        logPrintln("Idle Baseline:       Not measured");
-    }
+ if (calib_data.idle_avg_amps > 0.0f || calib_data.idle_peak_amps > 0.0f) {
+ logPrintf("Idle Baseline: %.2f A (AVG) / %.2f A (peak)\r\n",
+ calib_data.idle_avg_amps, calib_data.idle_peak_amps);
+ } else {
+ logPrintln("Idle Baseline: Not measured");
+ }
 
-    if (calib_data.standard_cut_avg_amps > 0.0f || calib_data.standard_cut_peak_amps > 0.0f) {
-        logPrintf("Standard Cut:        %.2f A (AVG) / %.2f A (peak)\r\n",
-                      calib_data.standard_cut_avg_amps, calib_data.standard_cut_peak_amps);
-    } else {
-        logPrintln("Standard Cut:        Not measured");
-    }
+ if (calib_data.standard_cut_avg_amps > 0.0f || calib_data.standard_cut_peak_amps > 0.0f) {
+ logPrintf("Standard Cut: %.2f A (AVG) / %.2f A (peak)\r\n",
+ calib_data.standard_cut_avg_amps, calib_data.standard_cut_peak_amps);
+ } else {
+ logPrintln("Standard Cut: Not measured");
+ }
 
-    if (calib_data.heavy_cut_avg_amps > 0.0f || calib_data.heavy_cut_peak_amps > 0.0f) {
-        logPrintf("Heavy Load:          %.2f A (AVG) / %.2f A (peak)\r\n",
-                      calib_data.heavy_cut_avg_amps, calib_data.heavy_cut_peak_amps);
-    } else {
-        logPrintln("Heavy Load:          Not measured");
-    }
+ if (calib_data.heavy_cut_avg_amps > 0.0f || calib_data.heavy_cut_peak_amps > 0.0f) {
+ logPrintf("Heavy Load: %.2f A (AVG) / %.2f A (peak)\r\n",
+ calib_data.heavy_cut_avg_amps, calib_data.heavy_cut_peak_amps);
+ } else {
+ logPrintln("Heavy Load: Not measured");
+ }
 
-    logPrintf("Stall Threshold:     %.2f A (Margin: %.0f%%)\r\n",
-                  calib_data.stall_threshold_amps, calib_data.stall_margin_percent);
+ logPrintf("Stall Threshold: %.2f A (Margin: %.0f%%)\r\n",
+ calib_data.stall_threshold_amps, calib_data.stall_margin_percent);
 
-    if (calib_data.last_calibration_ms > 0) {
-        logPrintf("Last Calibration:    %lu ms ago\r\n",
-                      (unsigned long)(millis() - calib_data.last_calibration_ms));
-    }
-    logPrintln("");
-    serialLoggerUnlock();
+ if (calib_data.last_calibration_ms > 0) {
+ logPrintf("Last Calibration: %lu ms ago\r\n",
+ (unsigned long)(millis() - calib_data.last_calibration_ms));
+ }
+ logPrintln("");
+ serialLoggerUnlock();
 }

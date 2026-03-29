@@ -1,6 +1,6 @@
 /**
  * @file firmware_selftest.h
- * @brief Comprehensive Firmware Self-Test Suite (PHASE 5.2)
+ * @brief Comprehensive Firmware Self-Test Suite
  * @details Automated hardware validation and diagnostics
  * @project BISSO E350 Controller
  */
@@ -20,36 +20,36 @@ extern "C" {
  * Individual test result
  */
 typedef struct {
-    const char* test_name;
-    bool passed;
-    const char* error_message;
-    uint32_t duration_ms;
+ const char* test_name;
+ bool passed;
+ const char* error_message;
+ uint32_t duration_ms;
 } selftest_result_t;
 
 /**
  * Overall test suite results
  */
 typedef struct {
-    uint32_t total_tests;
-    uint32_t passed_tests;
-    uint32_t failed_tests;
-    uint32_t total_duration_ms;
-    selftest_result_t* results;
+ uint32_t total_tests;
+ uint32_t passed_tests;
+ uint32_t failed_tests;
+ uint32_t total_duration_ms;
+ selftest_result_t* results;
 } selftest_suite_t;
 
 /**
  * Test categories
  */
 typedef enum {
-    SELFTEST_CAT_MEMORY = 0x01,
-    SELFTEST_CAT_I2C = 0x02,
-    SELFTEST_CAT_STORAGE = 0x04,
-    SELFTEST_CAT_MOTION = 0x08,
-    SELFTEST_CAT_SPINDLE = 0x10,
-    SELFTEST_CAT_SAFETY = 0x20,
-    SELFTEST_CAT_NETWORK = 0x40,
-    SELFTEST_CAT_WATCHDOG = 0x80,
-    SELFTEST_CAT_ALL = 0xFF
+ SELFTEST_CAT_MEMORY = 0x01,
+ SELFTEST_CAT_I2C = 0x02,
+ SELFTEST_CAT_STORAGE = 0x04,
+ SELFTEST_CAT_MOTION = 0x08,
+ SELFTEST_CAT_SPINDLE = 0x10,
+ SELFTEST_CAT_SAFETY = 0x20,
+ SELFTEST_CAT_NETWORK = 0x40,
+ SELFTEST_CAT_WATCHDOG = 0x80,
+ SELFTEST_CAT_ALL = 0xFF
 } selftest_category_t;
 
 /**

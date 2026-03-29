@@ -3,7 +3,7 @@
 #include "board_variant.h"
 #include <SPI.h>
 #include <SD.h>
-#include "system_utils.h" // PHASE 8.1: Standardized Logging
+#include "system_utils.h" // Standardized Logging
 #include "config_keys.h"
 #include "config_unified.h"
 
@@ -18,127 +18,127 @@ static uint64_t g_total_bytes_written = 0;
 static uint64_t g_last_synced_bytes = 0;
 #define SD_WRITE_SYNC_THRESHOLD (1024 * 1024) // Sync to NVS every 1MB
 
-// Latency Tracking (PHASE 2.0)
+// Latency Tracking
 typedef struct {
-    uint32_t min_us;
-    uint32_t max_us;
-    uint64_t total_us;
-    uint64_t total_sq_us;
-    uint32_t samples;
+ uint32_t min_us;
+ uint32_t max_us;
+ uint64_t total_us;
+ uint64_t total_sq_us;
+ uint32_t samples;
 } sd_internal_latency_stats_t;
 
 static sd_internal_latency_stats_t read_latency = {UINT32_MAX, 0, 0, 0, 0};
 static sd_internal_latency_stats_t write_latency = {UINT32_MAX, 0, 0, 0, 0};
 
 static void updateLatency(sd_internal_latency_stats_t* stats, uint32_t us) {
-    if (us < stats->min_us) stats->min_us = us;
-    if (us > stats->max_us) stats->max_us = us;
-    stats->total_us += us;
-    stats->total_sq_us += (uint64_t)us * us;
-    stats->samples++;
+ if (us < stats->min_us) stats->min_us = us;
+ if (us > stats->max_us) stats->max_us = us;
+ stats->total_us += us;
+ stats->total_sq_us += (uint64_t)us * us;
+ stats->samples++;
 }
 
 /**
  * @brief Initialize SD card with custom SPI pins
  */
 result_t sdCardInit() {
-    // Only initialize if board has SD card support
-    #if !BOARD_HAS_SDCARD
-        logWarning("[SD] SD card not supported on this board variant");
-        return RESULT_ERROR_HARDWARE;
-    #else
-    
-    if (sd_initialized) {
-        logDebug("[SD] Already initialized");
-        return sd_mounted ? RESULT_OK : RESULT_ERROR;
-    }
-    
-    // Load endurance data from NVS
-    g_total_bytes_written = configGetUInt64(KEY_SD_BYTES_WRITTEN, 0);
-    g_last_synced_bytes = g_total_bytes_written;
-    
-    logModuleInit("SD");
-    
-    // Check card detect pin first
-    pinMode(PIN_SD_CD, INPUT_PULLUP);
-    delay(10);
-    
-    if (!sdCardIsPresent()) {
-        logInfo("[SD] No card detected (card detect pin is HIGH)");
-        sd_initialized = true;
-        sd_mounted = false;
-        return RESULT_ERROR;
-    }
-    
-    logInfo("[SD] Card detected, initializing SPI...");
-    
-    // Initialize custom SPI for SD card
-    sd_spi.begin(PIN_SD_SCK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
-    
-    // Try to mount SD card
-    if (!SD.begin(PIN_SD_CS, sd_spi, 4000000)) {  // 4MHz SPI speed
-        logModuleInitFail("SD", "Mount failed");
-        sd_initialized = true;
-        sd_mounted = false;
-        return RESULT_ERROR_HARDWARE;
-    }
-    
-    // Get card type
-    uint8_t cardType = SD.cardType();
-    const char* typeStr = "UNKNOWN";
-    
-    switch (cardType) {
-        case CARD_NONE:
-            typeStr = "NONE";
-            logError("[SD] No SD card attached");
-            sd_mounted = false;
-            break;
-        case CARD_MMC:
-            typeStr = "MMC";
-            sd_mounted = true;
-            break;
-        case CARD_SD:
-            typeStr = "SDSC";
-            sd_mounted = true;
-            break;
-        case CARD_SDHC:
-            typeStr = "SDHC/SDXC";
-            sd_mounted = true;
-            break;
-        default:
-            typeStr = "UNKNOWN";
-            sd_mounted = false;
-            break;
-    }
-    
-    if (sd_mounted) {
-        uint64_t cardSize = SD.cardSize() / (1024 * 1024);  // MB
-        uint64_t totalBytes = SD.totalBytes() / (1024 * 1024);  // MB
-        uint64_t usedBytes = SD.usedBytes() / (1024 * 1024);  // MB
-        
-        logInfo("[SD] Card Type: %s", typeStr);
-        logInfo("[SD] Card Size: %llu MB", cardSize);
-        logInfo("[SD] Total Space: %llu MB", totalBytes);
-        logInfo("[SD] Used Space: %llu MB", usedBytes);
-        logModuleInitOK("SD");
-        
-        // Create default directories if they don't exist
-        SD.mkdir("/gcode");
-        SD.mkdir("/logs");
-        SD.mkdir("/backups");
-        SD.mkdir("/jobs");
-        
-        // Perform health check to detect card issues early
-        last_health = sdCardHealthCheck();
-        if (last_health != SD_HEALTH_OK) {
-            logWarning("[SD] Health check FAILED: %s", sdCardHealthString(last_health));
-            // Continue anyway - card may still be usable for reads
-        }
-    }
-    
-    sd_initialized = true;
-    return sd_mounted ? RESULT_OK : RESULT_ERROR;
-    #endif
+ // Only initialize if board has SD card support
+ #if !BOARD_HAS_SDCARD
+ logWarning("[SD] SD card not supported on this board variant");
+ return RESULT_ERROR_HARDWARE;
+ #else
+ 
+ if (sd_initialized) {
+ logDebug("[SD] Already initialized");
+ return sd_mounted ? RESULT_OK : RESULT_ERROR;
+ }
+ 
+ // Load endurance data from NVS
+ g_total_bytes_written = configGetUInt64(KEY_SD_BYTES_WRITTEN, 0);
+ g_last_synced_bytes = g_total_bytes_written;
+ 
+ logModuleInit("SD");
+ 
+ // Check card detect pin first
+ pinMode(PIN_SD_CD, INPUT_PULLUP);
+ delay(10);
+ 
+ if (!sdCardIsPresent()) {
+ logInfo("[SD] No card detected (card detect pin is HIGH)");
+ sd_initialized = true;
+ sd_mounted = false;
+ return RESULT_ERROR;
+ }
+ 
+ logInfo("[SD] Card detected, initializing SPI...");
+ 
+ // Initialize custom SPI for SD card
+ sd_spi.begin(PIN_SD_SCK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
+ 
+ // Try to mount SD card
+ if (!SD.begin(PIN_SD_CS, sd_spi, 4000000)) { // 4MHz SPI speed
+ logModuleInitFail("SD", "Mount failed");
+ sd_initialized = true;
+ sd_mounted = false;
+ return RESULT_ERROR_HARDWARE;
+ }
+ 
+ // Get card type
+ uint8_t cardType = SD.cardType();
+ const char* typeStr = "UNKNOWN";
+ 
+ switch (cardType) {
+ case CARD_NONE:
+ typeStr = "NONE";
+ logError("[SD] No SD card attached");
+ sd_mounted = false;
+ break;
+ case CARD_MMC:
+ typeStr = "MMC";
+ sd_mounted = true;
+ break;
+ case CARD_SD:
+ typeStr = "SDSC";
+ sd_mounted = true;
+ break;
+ case CARD_SDHC:
+ typeStr = "SDHC/SDXC";
+ sd_mounted = true;
+ break;
+ default:
+ typeStr = "UNKNOWN";
+ sd_mounted = false;
+ break;
+ }
+ 
+ if (sd_mounted) {
+ uint64_t cardSize = SD.cardSize() / (1024 * 1024); // MB
+ uint64_t totalBytes = SD.totalBytes() / (1024 * 1024); // MB
+ uint64_t usedBytes = SD.usedBytes() / (1024 * 1024); // MB
+ 
+ logInfo("[SD] Card Type: %s", typeStr);
+ logInfo("[SD] Card Size: %llu MB", cardSize);
+ logInfo("[SD] Total Space: %llu MB", totalBytes);
+ logInfo("[SD] Used Space: %llu MB", usedBytes);
+ logModuleInitOK("SD");
+ 
+ // Create default directories if they don't exist
+ SD.mkdir("/gcode");
+ SD.mkdir("/logs");
+ SD.mkdir("/backups");
+ SD.mkdir("/jobs");
+ 
+ // Perform health check to detect card issues early
+ last_health = sdCardHealthCheck();
+ if (last_health != SD_HEALTH_OK) {
+ logWarning("[SD] Health check FAILED: %s", sdCardHealthString(last_health));
+ // Continue anyway - card may still be usable for reads
+ }
+ }
+ 
+ sd_initialized = true;
+ return sd_mounted ? RESULT_OK : RESULT_ERROR;
+ #endif
 }
 
 
@@ -146,220 +146,220 @@ result_t sdCardInit() {
  * @brief Check if SD card is physically present (using card detect pin)
  */
 bool sdCardIsPresent() {
-    #if !BOARD_HAS_SDCARD
-        return false;
-    #else
-    // Card detect pin is LOW when card is inserted
-    return digitalRead(PIN_SD_CD) == LOW;
-    #endif
+ #if !BOARD_HAS_SDCARD
+ return false;
+ #else
+ // Card detect pin is LOW when card is inserted
+ return digitalRead(PIN_SD_CD) == LOW;
+ #endif
 }
 
 /**
  * @brief Check if SD card is mounted and ready
  */
 bool sdCardIsMounted() {
-    return sd_mounted;
+ return sd_mounted;
 }
 
 /**
  * @brief Safely unmount SD card
  */
 void sdCardUnmount() {
-    if (sd_mounted) {
-        SD.end();
-        sd_mounted = false;
-        logInfo("[SD] SD card unmounted");
-    }
+ if (sd_mounted) {
+ SD.end();
+ sd_mounted = false;
+ logInfo("[SD] SD card unmounted");
+ }
 }
 
 /**
  * @brief Get SD card information
  */
 result_t sdCardGetInfo(SDCardInfo* info) {
-    if (!info) return RESULT_INVALID_PARAM;
-    if (!sd_mounted) return RESULT_NOT_READY;
-    
-    info->totalBytes = SD.totalBytes();
-    info->usedBytes = SD.usedBytes();
-    info->freeBytes = info->totalBytes - info->usedBytes;
-    info->cardType = SD.cardType();
-    
-    switch (info->cardType) {
-        case CARD_NONE: info->cardTypeName = "NONE"; break;
-        case CARD_MMC: info->cardTypeName = "MMC"; break;
-        case CARD_SD: info->cardTypeName = "SDSC"; break;
-        case CARD_SDHC: info->cardTypeName = "SDHC/SDXC"; break;
-        default: info->cardTypeName = "UNKNOWN"; break;
-    }
-    
-    return RESULT_OK;
+ if (!info) return RESULT_INVALID_PARAM;
+ if (!sd_mounted) return RESULT_NOT_READY;
+ 
+ info->totalBytes = SD.totalBytes();
+ info->usedBytes = SD.usedBytes();
+ info->freeBytes = info->totalBytes - info->usedBytes;
+ info->cardType = SD.cardType();
+ 
+ switch (info->cardType) {
+ case CARD_NONE: info->cardTypeName = "NONE"; break;
+ case CARD_MMC: info->cardTypeName = "MMC"; break;
+ case CARD_SD: info->cardTypeName = "SDSC"; break;
+ case CARD_SDHC: info->cardTypeName = "SDHC/SDXC"; break;
+ default: info->cardTypeName = "UNKNOWN"; break;
+ }
+ 
+ return RESULT_OK;
 }
 
 /**
  * @brief Check if file exists on SD card
  */
 bool sdCardFileExists(const char* path) {
-    if (!sd_mounted) return false;
-    return SD.exists(path);
+ if (!sd_mounted) return false;
+ return SD.exists(path);
 }
 
 /**
  * @brief Get file size
  */
 size_t sdCardGetFileSize(const char* path) {
-    if (!sd_mounted || !path) return 0;
-    
-    File file = SD.open(path, FILE_READ);
-    if (!file) return 0;
-    
-    size_t size = file.size();
-    file.close();
-    return size;
+ if (!sd_mounted || !path) return 0;
+ 
+ File file = SD.open(path, FILE_READ);
+ if (!file) return 0;
+ 
+ size_t size = file.size();
+ file.close();
+ return size;
 }
 
 /**
  * @brief Delete file
  */
 result_t sdCardDeleteFile(const char* path) {
-    if (!path) return RESULT_INVALID_PARAM;
-    if (!sd_mounted) return RESULT_NOT_READY;
-    
-    if (!SD.exists(path)) {
-        logError("[SD] File not found: %s", path);
-        return RESULT_ERROR;
-    }
-    
-    if (SD.remove(path)) {
-        logInfo("[SD] Deleted: %s", path);
-        return RESULT_OK;
-    }
-    
-    logError("[SD] Failed to delete: %s", path);
-    return RESULT_ERROR;
+ if (!path) return RESULT_INVALID_PARAM;
+ if (!sd_mounted) return RESULT_NOT_READY;
+ 
+ if (!SD.exists(path)) {
+ logError("[SD] File not found: %s", path);
+ return RESULT_ERROR;
+ }
+ 
+ if (SD.remove(path)) {
+ logInfo("[SD] Deleted: %s", path);
+ return RESULT_OK;
+ }
+ 
+ logError("[SD] Failed to delete: %s", path);
+ return RESULT_ERROR;
 }
 
 /**
  * @brief Create directory
  */
 result_t sdCardCreateDir(const char* path) {
-    if (!path) return RESULT_INVALID_PARAM;
-    if (!sd_mounted) return RESULT_NOT_READY;
-    
-    if (SD.exists(path)) {
-        logDebug("[SD] Directory already exists: %s", path);
-        return RESULT_OK;
-    }
-    
-    if (SD.mkdir(path)) {
-        logInfo("[SD] Created directory: %s", path);
-        return RESULT_OK;
-    }
-    
-    logError("[SD] Failed to create directory: %s", path);
-    return RESULT_ERROR;
+ if (!path) return RESULT_INVALID_PARAM;
+ if (!sd_mounted) return RESULT_NOT_READY;
+ 
+ if (SD.exists(path)) {
+ logDebug("[SD] Directory already exists: %s", path);
+ return RESULT_OK;
+ }
+ 
+ if (SD.mkdir(path)) {
+ logInfo("[SD] Created directory: %s", path);
+ return RESULT_OK;
+ }
+ 
+ logError("[SD] Failed to create directory: %s", path);
+ return RESULT_ERROR;
 }
 
 /**
  * @brief Create directory recursively (e.g., /var/log/boot.log -> creates /var and /var/log)
  */
 result_t sdCardMkdirRecursive(const char* path) {
-    if (!path || !sd_mounted) return RESULT_ERROR;
+ if (!path || !sd_mounted) return RESULT_ERROR;
 
-    String fullPath = String(path);
-    if (fullPath.length() == 0) return RESULT_OK;
+ String fullPath = String(path);
+ if (fullPath.length() == 0) return RESULT_OK;
 
-    // Split path and create directories one by one
-    String currentPath = "";
-    int start = 0;
-    
-    // Skip leading slash
-    if (fullPath.startsWith("/")) {
-        start = 1;
-        currentPath = "/";
-    }
+ // Split path and create directories one by one
+ String currentPath = "";
+ int start = 0;
+ 
+ // Skip leading slash
+ if (fullPath.startsWith("/")) {
+ start = 1;
+ currentPath = "/";
+ }
 
-    while (start < (int)fullPath.length()) {
-        int nextSlash = fullPath.indexOf('/', start);
-        String folder;
-        
-        if (nextSlash == -1) {
-            folder = fullPath.substring(start);
-            start = fullPath.length();
-        } else {
-            folder = fullPath.substring(start, nextSlash);
-            start = nextSlash + 1;
-        }
+ while (start < (int)fullPath.length()) {
+ int nextSlash = fullPath.indexOf('/', start);
+ String folder;
+ 
+ if (nextSlash == -1) {
+ folder = fullPath.substring(start);
+ start = fullPath.length();
+ } else {
+ folder = fullPath.substring(start, nextSlash);
+ start = nextSlash + 1;
+ }
 
-        if (folder.length() > 0) {
-            currentPath += folder;
-            if (!SD.exists(currentPath.c_str())) {
-                if (!SD.mkdir(currentPath.c_str())) {
-                    logError("[SD] Failed to create intermediate dir: %s", currentPath.c_str());
-                    return RESULT_ERROR;
-                }
-            }
-            currentPath += "/";
-        }
-    }
+ if (folder.length() > 0) {
+ currentPath += folder;
+ if (!SD.exists(currentPath.c_str())) {
+ if (!SD.mkdir(currentPath.c_str())) {
+ logError("[SD] Failed to create intermediate dir: %s", currentPath.c_str());
+ return RESULT_ERROR;
+ }
+ }
+ currentPath += "/";
+ }
+ }
 
-    return RESULT_OK;
+ return RESULT_OK;
 }
 
 /**
  * @brief List directory contents
  */
 bool sdCardListDir(const char* path) {
-    if (!sd_mounted || !path) return false;
-    
-    File root = SD.open(path);
-    if (!root) {
-        logError("[SD] Failed to open directory: %s", path);
-        return false;
-    }
-    
-    if (!root.isDirectory()) {
-        logError("[SD] Not a directory: %s", path);
-        root.close();
-        return false;
-    }
-    
-    logPrintln("");
-    logPrintf("Listing [SD]: %s\n", path);
-    logPrintln("-------------------------------------------------------------");
-    logPrintln("Type       Size        Name");
-    logPrintln("-------------------------------------------------------------");
-    
-    File file = root.openNextFile();
-    int count = 0;
-    
-    while (file) {
-        
-        if (file.isDirectory()) {
-            logPrintf("%-10s %-11s %s\n", "[DIR]", "-", file.name());
-        } else {
-            logPrintf("%-10s %-11lu %s\n", "[FILE]", (unsigned long)file.size(), file.name());
-        }
-        
-        count++;
-        file = root.openNextFile();
-    }
-    
-    logPrintln("-------------------------------------------------------------");
-    logPrintf("Total: %d items\n", count);
-    logPrintln("");
-    
-    root.close();
-    return true;
+ if (!sd_mounted || !path) return false;
+ 
+ File root = SD.open(path);
+ if (!root) {
+ logError("[SD] Failed to open directory: %s", path);
+ return false;
+ }
+ 
+ if (!root.isDirectory()) {
+ logError("[SD] Not a directory: %s", path);
+ root.close();
+ return false;
+ }
+ 
+ logPrintln("");
+ logPrintf("Listing [SD]: %s\n", path);
+ logPrintln("-------------------------------------------------------------");
+ logPrintln("Type Size Name");
+ logPrintln("-------------------------------------------------------------");
+ 
+ File file = root.openNextFile();
+ int count = 0;
+ 
+ while (file) {
+ 
+ if (file.isDirectory()) {
+ logPrintf("%-10s %-11s %s\n", "[DIR]", "-", file.name());
+ } else {
+ logPrintf("%-10s %-11lu %s\n", "[FILE]", (unsigned long)file.size(), file.name());
+ }
+ 
+ count++;
+ file = root.openNextFile();
+ }
+ 
+ logPrintln("-------------------------------------------------------------");
+ logPrintf("Total: %d items\n", count);
+ logPrintln("");
+ 
+ root.close();
+ return true;
 }
 
 /**
  * @brief Get status string for CLI
  */
 const char* sdCardGetStatusString() {
-    if (!sd_initialized) return "Not initialized";
-    if (!sdCardIsPresent()) return "No card detected";
-    if (!sd_mounted) return "Card present but not mounted";
-    return "Mounted and ready";
+ if (!sd_initialized) return "Not initialized";
+ if (!sdCardIsPresent()) return "No card detected";
+ if (!sd_mounted) return "Card present but not mounted";
+ return "Mounted and ready";
 }
 
 /**
@@ -374,149 +374,149 @@ const char* sdCardGetStatusString() {
  * Takes approximately 50-150ms depending on card speed.
  */
 SDCardHealth sdCardHealthCheck() {
-    if (!sd_mounted) {
-        last_health = SD_HEALTH_NOT_MOUNTED;
-        return last_health;
-    }
-    
-    const char* testPath = "/.sd_health_check";
-    
-    // Test pattern with varying bytes to catch stuck bits
-    const uint8_t testPattern[] = {
-        0x55, 0xAA, 0x00, 0xFF,  // Alternating bit patterns
-        0x12, 0x34, 0x56, 0x78,  // Sequential values
-        0xDE, 0xAD, 0xBE, 0xEF,  // Magic pattern
-        0x42, 0x49, 0x53, 0x53   // "BISS"
-    };
-    const size_t patternSize = sizeof(testPattern);
-    
-    // Step 1: Try to write test file
-    uint32_t writeStart = micros();
-    File writeFile = SD.open(testPath, FILE_WRITE);
-    if (!writeFile) {
-        logDebug("[SD] Health: Failed to create test file");
-        return SD_HEALTH_WRITE_FAILED;
-    }
-    
-    size_t written = writeFile.write(testPattern, patternSize);
-    writeFile.close();
-    sdCardRecordWrite(written);
-    updateLatency(&write_latency, micros() - writeStart);
-    
-    if (written != patternSize) {
-        logDebug("[SD] Health: Write size mismatch (%u != %u)", written, patternSize);
-        SD.remove(testPath);  // Clean up
-        return SD_HEALTH_WRITE_FAILED;
-    }
-    
-    // Step 2: Read back and verify
-    uint32_t readStart = micros();
-    File readFile = SD.open(testPath, FILE_READ);
-    if (!readFile) {
-        logDebug("[SD] Health: Failed to open test file for read");
-        SD.remove(testPath);  // Clean up
-        return SD_HEALTH_READ_FAILED;
-    }
-    
-    uint8_t readBuffer[sizeof(testPattern)];
-    size_t bytesRead = readFile.read(readBuffer, patternSize);
-    readFile.close();
-    updateLatency(&read_latency, micros() - readStart);
-    
-    if (bytesRead != patternSize) {
-        logDebug("[SD] Health: Read size mismatch (%u != %u)", bytesRead, patternSize);
-        SD.remove(testPath);  // Clean up
-        return SD_HEALTH_READ_FAILED;
-    }
-    
-    // Step 3: Verify data integrity
-    if (memcmp(testPattern, readBuffer, patternSize) != 0) {
-        logDebug("[SD] Health: Data verification failed");
-        SD.remove(testPath);  // Clean up
-        return SD_HEALTH_VERIFY_FAILED;
-    }
-    
-    // Step 4: Delete test file
-    if (!SD.remove(testPath)) {
-        logDebug("[SD] Health: Failed to delete test file");
-        return SD_HEALTH_DELETE_FAILED;
-    }
-    
-    logDebug("[SD] Health check passed");
-    last_health = SD_HEALTH_OK;
-    return last_health;
+ if (!sd_mounted) {
+ last_health = SD_HEALTH_NOT_MOUNTED;
+ return last_health;
+ }
+ 
+ const char* testPath = "/.sd_health_check";
+ 
+ // Test pattern with varying bytes to catch stuck bits
+ const uint8_t testPattern[] = {
+ 0x55, 0xAA, 0x00, 0xFF, // Alternating bit patterns
+ 0x12, 0x34, 0x56, 0x78, // Sequential values
+ 0xDE, 0xAD, 0xBE, 0xEF, // Magic pattern
+ 0x42, 0x49, 0x53, 0x53 // "BISS"
+ };
+ const size_t patternSize = sizeof(testPattern);
+ 
+ // Step 1: Try to write test file
+ uint32_t writeStart = micros();
+ File writeFile = SD.open(testPath, FILE_WRITE);
+ if (!writeFile) {
+ logDebug("[SD] Health: Failed to create test file");
+ return SD_HEALTH_WRITE_FAILED;
+ }
+ 
+ size_t written = writeFile.write(testPattern, patternSize);
+ writeFile.close();
+ sdCardRecordWrite(written);
+ updateLatency(&write_latency, micros() - writeStart);
+ 
+ if (written != patternSize) {
+ logDebug("[SD] Health: Write size mismatch (%u != %u)", written, patternSize);
+ SD.remove(testPath); // Clean up
+ return SD_HEALTH_WRITE_FAILED;
+ }
+ 
+ // Step 2: Read back and verify
+ uint32_t readStart = micros();
+ File readFile = SD.open(testPath, FILE_READ);
+ if (!readFile) {
+ logDebug("[SD] Health: Failed to open test file for read");
+ SD.remove(testPath); // Clean up
+ return SD_HEALTH_READ_FAILED;
+ }
+ 
+ uint8_t readBuffer[sizeof(testPattern)];
+ size_t bytesRead = readFile.read(readBuffer, patternSize);
+ readFile.close();
+ updateLatency(&read_latency, micros() - readStart);
+ 
+ if (bytesRead != patternSize) {
+ logDebug("[SD] Health: Read size mismatch (%u != %u)", bytesRead, patternSize);
+ SD.remove(testPath); // Clean up
+ return SD_HEALTH_READ_FAILED;
+ }
+ 
+ // Step 3: Verify data integrity
+ if (memcmp(testPattern, readBuffer, patternSize) != 0) {
+ logDebug("[SD] Health: Data verification failed");
+ SD.remove(testPath); // Clean up
+ return SD_HEALTH_VERIFY_FAILED;
+ }
+ 
+ // Step 4: Delete test file
+ if (!SD.remove(testPath)) {
+ logDebug("[SD] Health: Failed to delete test file");
+ return SD_HEALTH_DELETE_FAILED;
+ }
+ 
+ logDebug("[SD] Health check passed");
+ last_health = SD_HEALTH_OK;
+ return last_health;
 }
 
 /**
  * @brief Get the last health check result
  */
 SDCardHealth sdCardGetLastHealth() {
-    return last_health;
+ return last_health;
 }
 
 /**
  * @brief Get human-readable health check result string
  */
 const char* sdCardHealthString(SDCardHealth result) {
-    switch (result) {
-        case SD_HEALTH_OK:            return "OK";
-        case SD_HEALTH_READ_ONLY:     return "Write-protected";
-        case SD_HEALTH_WRITE_FAILED:  return "Write failed";
-        case SD_HEALTH_READ_FAILED:   return "Read failed";
-        case SD_HEALTH_VERIFY_FAILED: return "Data verification failed (corruption)";
-        case SD_HEALTH_DELETE_FAILED: return "Delete failed";
-        case SD_HEALTH_NOT_MOUNTED:   return "Card not mounted";
-        default:                      return "Unknown error";
-    }
+ switch (result) {
+ case SD_HEALTH_OK: return "OK";
+ case SD_HEALTH_READ_ONLY: return "Write-protected";
+ case SD_HEALTH_WRITE_FAILED: return "Write failed";
+ case SD_HEALTH_READ_FAILED: return "Read failed";
+ case SD_HEALTH_VERIFY_FAILED: return "Data verification failed (corruption)";
+ case SD_HEALTH_DELETE_FAILED: return "Delete failed";
+ case SD_HEALTH_NOT_MOUNTED: return "Card not mounted";
+ default: return "Unknown error";
+ }
 }
 
 /**
  * @brief Recursively delete all files and subdirectories in a directory
  */
 static bool deleteRecursive(const char* path) {
-    File dir = SD.open(path);
-    if (!dir) {
-        return false;
-    }
-    
-    if (!dir.isDirectory()) {
-        dir.close();
-        return SD.remove(path);
-    }
-    
-    // Iterate through all entries
-    File entry;
-    while ((entry = dir.openNextFile())) {
-        String entryPath = String(path);
-        if (!entryPath.endsWith("/")) entryPath += "/";
-        entryPath += entry.name();
-        
-        if (entry.isDirectory()) {
-            entry.close();
-            // Recursively delete subdirectory
-            if (!deleteRecursive(entryPath.c_str())) {
-                dir.close();
-                return false;
-            }
-        } else {
-            entry.close();
-            // Delete file
-            if (!SD.remove(entryPath.c_str())) {
-                logError("[SD] Failed to delete: %s", entryPath.c_str());
-                dir.close();
-                return false;
-            }
-        }
-    }
-    
-    dir.close();
-    
-    // Now remove the empty directory (unless it's root)
-    if (strcmp(path, "/") != 0) {
-        return SD.rmdir(path);
-    }
-    
-    return true;
+ File dir = SD.open(path);
+ if (!dir) {
+ return false;
+ }
+ 
+ if (!dir.isDirectory()) {
+ dir.close();
+ return SD.remove(path);
+ }
+ 
+ // Iterate through all entries
+ File entry;
+ while ((entry = dir.openNextFile())) {
+ String entryPath = String(path);
+ if (!entryPath.endsWith("/")) entryPath += "/";
+ entryPath += entry.name();
+ 
+ if (entry.isDirectory()) {
+ entry.close();
+ // Recursively delete subdirectory
+ if (!deleteRecursive(entryPath.c_str())) {
+ dir.close();
+ return false;
+ }
+ } else {
+ entry.close();
+ // Delete file
+ if (!SD.remove(entryPath.c_str())) {
+ logError("[SD] Failed to delete: %s", entryPath.c_str());
+ dir.close();
+ return false;
+ }
+ }
+ }
+ 
+ dir.close();
+ 
+ // Now remove the empty directory (unless it's root)
+ if (strcmp(path, "/") != 0) {
+ return SD.rmdir(path);
+ }
+ 
+ return true;
 }
 
 /**
@@ -526,100 +526,100 @@ static bool deleteRecursive(const char* path) {
  * then recreates the default directory structure.
  */
 result_t sdCardFormat() {
-    if (!sd_mounted) {
-        logError("[SD] SD card not mounted");
-        return RESULT_NOT_READY;
-    }
-    
-    logWarning("[SD] Formatting SD card (deleting all data)...");
-    
-    // Delete all contents of root directory
-    File root = SD.open("/");
-    if (!root) {
-        logError("[SD] Failed to open root directory");
-        return RESULT_ERROR;
-    }
-    
-    // Delete each item
-    int deletedCount = 0;
-    
-    File entry;
-    while ((entry = root.openNextFile())) {
-        String entryPath = String("/") + entry.name();
-        entry.close();
-        
-        logDebug("[SD] Deleting: %s", entryPath.c_str());
-        if (deleteRecursive(entryPath.c_str())) {
-            deletedCount++;
-        } else {
-            logError("[SD] Failed to delete: %s", entryPath.c_str());
-        }
-    }
-    root.close();
-    
-    logInfo("[SD] Deleted %d root items", deletedCount);
-    
-    // Recreate default directories
-    SD.mkdir("/gcode");
-    SD.mkdir("/logs");
-    SD.mkdir("/backups");
-    SD.mkdir("/jobs");
-    
-    logInfo("[SD] [OK] SD card formatted successfully");
-    logInfo("[SD] Default directories recreated: /gcode, /logs, /backups, /jobs");
-    
-    return RESULT_OK;
+ if (!sd_mounted) {
+ logError("[SD] SD card not mounted");
+ return RESULT_NOT_READY;
+ }
+ 
+ logWarning("[SD] Formatting SD card (deleting all data)...");
+ 
+ // Delete all contents of root directory
+ File root = SD.open("/");
+ if (!root) {
+ logError("[SD] Failed to open root directory");
+ return RESULT_ERROR;
+ }
+ 
+ // Delete each item
+ int deletedCount = 0;
+ 
+ File entry;
+ while ((entry = root.openNextFile())) {
+ String entryPath = String("/") + entry.name();
+ entry.close();
+ 
+ logDebug("[SD] Deleting: %s", entryPath.c_str());
+ if (deleteRecursive(entryPath.c_str())) {
+ deletedCount++;
+ } else {
+ logError("[SD] Failed to delete: %s", entryPath.c_str());
+ }
+ }
+ root.close();
+ 
+ logInfo("[SD] Deleted %d root items", deletedCount);
+ 
+ // Recreate default directories
+ SD.mkdir("/gcode");
+ SD.mkdir("/logs");
+ SD.mkdir("/backups");
+ SD.mkdir("/jobs");
+ 
+ logInfo("[SD] [OK] SD card formatted successfully");
+ logInfo("[SD] Default directories recreated: /gcode, /logs, /backups, /jobs");
+ 
+ return RESULT_OK;
 }
 
 static void sdPopulateStats(sd_internal_latency_stats_t* src, bus_latency_stats_t* dest) {
-    if (src->samples == 0) {
-        dest->min_us = 0;
-        dest->max_us = 0;
-        dest->avg_us = 0;
-        dest->std_dev_us = 0;
-        dest->samples = 0;
-        return;
-    }
-    dest->min_us = src->min_us;
-    dest->max_us = src->max_us;
-    dest->avg_us = src->total_us / src->samples;
-    dest->samples = src->samples;
-    
-    uint64_t mean_sq = src->total_sq_us / src->samples;
-    uint64_t avg_sq = (uint64_t)dest->avg_us * dest->avg_us;
-    if (mean_sq > avg_sq) {
-        dest->std_dev_us = (uint32_t)sqrt(mean_sq - avg_sq);
-    } else {
-        dest->std_dev_us = 0;
-    }
+ if (src->samples == 0) {
+ dest->min_us = 0;
+ dest->max_us = 0;
+ dest->avg_us = 0;
+ dest->std_dev_us = 0;
+ dest->samples = 0;
+ return;
+ }
+ dest->min_us = src->min_us;
+ dest->max_us = src->max_us;
+ dest->avg_us = src->total_us / src->samples;
+ dest->samples = src->samples;
+ 
+ uint64_t mean_sq = src->total_sq_us / src->samples;
+ uint64_t avg_sq = (uint64_t)dest->avg_us * dest->avg_us;
+ if (mean_sq > avg_sq) {
+ dest->std_dev_us = (uint32_t)sqrt(mean_sq - avg_sq);
+ } else {
+ dest->std_dev_us = 0;
+ }
 }
 
 void sdCardGetReadLatency(bus_latency_stats_t* stats) {
-    sdPopulateStats(&read_latency, stats);
+ sdPopulateStats(&read_latency, stats);
 }
 
 void sdCardGetWriteLatency(bus_latency_stats_t* stats) {
-    sdPopulateStats(&write_latency, stats);
+ sdPopulateStats(&write_latency, stats);
 }
 
 void sdCardResetLatencyStats() {
-    read_latency = {UINT32_MAX, 0, 0, 0, 0};
-    write_latency = {UINT32_MAX, 0, 0, 0, 0};
+ read_latency = {UINT32_MAX, 0, 0, 0, 0};
+ write_latency = {UINT32_MAX, 0, 0, 0, 0};
 }
 
 void sdCardRecordWrite(size_t bytes) {
-    g_total_bytes_written += bytes;
-    
-    // Periodic NVS sync to prevent excessive writes while maintaining endurance data
-    if (g_total_bytes_written - g_last_synced_bytes >= SD_WRITE_SYNC_THRESHOLD) {
-        g_last_synced_bytes = g_total_bytes_written;
-        // Store as string or large int? config_unified supports int64?
-        // Let's use configSetInt64 if available, or just configSetInt (32-bit is only 4GB, too small)
-        // Checking config_unified... it has configGetUInt64/configSetUInt64 usually.
-        configSetUInt64(KEY_SD_BYTES_WRITTEN, g_total_bytes_written);
-    }
+ g_total_bytes_written += bytes;
+ 
+ // Periodic NVS sync to prevent excessive writes while maintaining endurance data
+ if (g_total_bytes_written - g_last_synced_bytes >= SD_WRITE_SYNC_THRESHOLD) {
+ g_last_synced_bytes = g_total_bytes_written;
+ // Store as string or large int? config_unified supports int64?
+ // Let's use configSetInt64 if available, or just configSetInt (32-bit is only 4GB, too small)
+ // Checking config_unified... it has configGetUInt64/configSetUInt64 usually.
+ configSetUInt64(KEY_SD_BYTES_WRITTEN, g_total_bytes_written);
+ }
 }
 
 uint64_t sdCardGetTotalWritten() {
-    return g_total_bytes_written;
+ return g_total_bytes_written;
 }

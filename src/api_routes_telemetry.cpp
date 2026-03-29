@@ -39,6 +39,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
     
     // Handler for status/telemetry endpoints (OPTIMIZED: snprintf, no heap)
     auto statusHandler = [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         system_telemetry_t telemetry = telemetryGetSnapshot();
         
         char rev_str[16];
@@ -131,6 +132,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
     
     // GET /api/spindle - Spindle monitor state (OPTIMIZED: snprintf, no heap)
     server.on("/api/spindle", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         const spindle_monitor_state_t* state = spindleMonitorGetState();
         
         char buffer[256];
@@ -150,6 +152,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
     
     // GET /api/spindle/alarm - Spindle alarm thresholds (OPTIMIZED: snprintf, no heap)
     server.on("/api/spindle/alarm", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         const spindle_monitor_state_t* state = spindleMonitorGetState();
         float toolbreak = configGetFloat(KEY_SPINDL_TOOLBREAK_THR, 5.0f);
         int stall_thr = configGetInt(KEY_SPINDL_PAUSE_THR, 25);
@@ -169,6 +172,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
     
     // POST /api/spindle/alarm - Set spindle alarm thresholds
     server.on("/api/spindle/alarm", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         String body = request->body();
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, body);
@@ -193,12 +197,14 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
     
     // POST /api/spindle/alarm/clear - Clear spindle alarms
     server.on("/api/spindle/alarm/clear", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         spindleMonitorClearAlarms();
         return response->send(200, "application/json", "{\"success\":true}");
     });
     
     // GET /api/history/telemetry (legacy 5-min history)
     server.on("/api/history/telemetry", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         // ... (existing logic remains same for backwards compatibility)
         response->setContentType("application/json");
         response->sendHeaders(); 
@@ -259,6 +265,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
 
     // NEW: GET /api/telemetry/history - 1-Hour High-Res History (JSON)
     server.on("/api/telemetry/history", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         size_t count = telemetryHistoryGetCount();
         if (count == 0) {
             return response->send(200, "application/json", "{\"success\":true,\"samples\":[]}");
@@ -323,6 +330,7 @@ void registerTelemetryRoutes(PsychicHttpServer& server) {
 
     // NEW: GET /api/telemetry/history/raw - Binary export for offline analysis
     server.on("/api/telemetry/history/raw", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         size_t count = telemetryHistoryGetCount();
         size_t total_size = count * sizeof(telemetry_packet_t);
         

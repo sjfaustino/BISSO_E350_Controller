@@ -170,9 +170,12 @@ void gcodeQueueMarkRunning() {
 }
 
 void gcodeQueueMarkCompleted() {
-    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return;
-    
     xSemaphoreTake(queueMutex, portMAX_DELAY);
+    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) {
+        xSemaphoreGive(queueMutex);
+        return;
+    }
+    
     jobs[current_job_idx].status = QJOB_COMPLETED;
     jobs[current_job_idx].end_time_ms = millis();
     uint16_t id = jobs[current_job_idx].id;
@@ -183,9 +186,12 @@ void gcodeQueueMarkCompleted() {
 }
 
 void gcodeQueueMarkFailed(const char* error) {
-    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return;
-    
     xSemaphoreTake(queueMutex, portMAX_DELAY);
+    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) {
+        xSemaphoreGive(queueMutex);
+        return;
+    }
+    
     jobs[current_job_idx].status = QJOB_FAILED;
     jobs[current_job_idx].end_time_ms = millis();
     if (error) {
@@ -200,17 +206,29 @@ void gcodeQueueMarkFailed(const char* error) {
 }
 
 bool gcodeQueueRetry() {
-    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return false;
+    xSemaphoreTake(queueMutex, portMAX_DELAY);
+    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) {
+        xSemaphoreGive(queueMutex);
+        return false;
+    }
     
     gcode_job_t* job = &jobs[current_job_idx];
-    if (job->status != QJOB_FAILED) return false;
+    if (job->status != QJOB_FAILED) {
+        xSemaphoreGive(queueMutex);
+        return false;
+    }
     
+    // Capture job data before unlocking for motion call
+    float start_coords[4] = {job->start_pos[0], job->start_pos[1], job->start_pos[2], job->start_pos[3]};
+    uint16_t id = job->id;
+    xSemaphoreGive(queueMutex);
+
     // Move back to starting position
-    logInfo("[QUEUE] Retrying job #%d - moving to start position", job->id);
+    logInfo("[QUEUE] Retrying job #%d - moving to start position", id);
     
     // Execute move to start position
-    if (!motionMoveAbsolute(job->start_pos[0], job->start_pos[1], 
-                            job->start_pos[2], job->start_pos[3], 
+    if (!motionMoveAbsolute(start_coords[0], start_coords[1], 
+                            start_coords[2], start_coords[3], 
                             300.0f)) {  // Slow speed for recovery
         logError("[QUEUE] Failed to move to start position");
         return false;
@@ -218,24 +236,33 @@ bool gcodeQueueRetry() {
     
     // Reset job status and retry
     xSemaphoreTake(queueMutex, portMAX_DELAY);
-    job->status = QJOB_PENDING;
-    job->error[0] = '\0';
-    queue_paused = false;
+    // Double check it hasn't changed
+    if (current_job_idx < GCODE_QUEUE_MAX_JOBS) {
+        jobs[current_job_idx].status = QJOB_PENDING;
+        jobs[current_job_idx].error[0] = '\0';
+        queue_paused = false;
+    }
     xSemaphoreGive(queueMutex);
     
     return true;
 }
 
 bool gcodeQueueResume() {
-    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return false;
+    xSemaphoreTake(queueMutex, portMAX_DELAY);
+    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) {
+        xSemaphoreGive(queueMutex);
+        return false;
+    }
     
     gcode_job_t* job = &jobs[current_job_idx];
-    if (job->status != QJOB_FAILED) return false;
+    if (job->status != QJOB_FAILED) {
+        xSemaphoreGive(queueMutex);
+        return false;
+    }
     
-    logInfo("[QUEUE] Resuming queue from current position");
+    logInfo("[QUEUE] Resuming queue from current position for job #%d", job->id);
     
     // Mark current job as completed (operator says it's fine)
-    xSemaphoreTake(queueMutex, portMAX_DELAY);
     job->status = QJOB_COMPLETED;
     job->end_time_ms = millis();
     queue_paused = false;
@@ -246,14 +273,20 @@ bool gcodeQueueResume() {
 }
 
 bool gcodeQueueSkip() {
-    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) return false;
+    xSemaphoreTake(queueMutex, portMAX_DELAY);
+    if (current_job_idx >= GCODE_QUEUE_MAX_JOBS) {
+        xSemaphoreGive(queueMutex);
+        return false;
+    }
     
     gcode_job_t* job = &jobs[current_job_idx];
-    if (job->status != QJOB_FAILED) return false;
+    if (job->status != QJOB_FAILED) {
+        xSemaphoreGive(queueMutex);
+        return false;
+    }
     
     logInfo("[QUEUE] Skipping job #%d", job->id);
     
-    xSemaphoreTake(queueMutex, portMAX_DELAY);
     job->status = QJOB_SKIPPED;
     job->end_time_ms = millis();
     queue_paused = false;

@@ -1,10 +1,10 @@
 /**
  * @file axis_synchronization.h
- * @brief Per-Axis Motion Validation System (PHASE 5.6)
+ * @brief Per-Axis Motion Validation System
  * @project BISSO E350 Controller
  * @details Validates individual axis motion quality using VFD frequency feedback and encoder velocities
- *          Single VFD multiplexed across X/Y/Z axes via contactors - validates active axis only
- *          Detects mechanical degradation, bearing wear, and drive system faults
+ * Single VFD multiplexed across X/Y/Z axes via contactors - validates active axis only
+ * Detects mechanical degradation, bearing wear, and drive system faults
  *
  * Key Features:
  * - VFD/encoder correlation for active axis
@@ -29,28 +29,28 @@ extern "C" {
 // ============================================================================
 
 typedef struct {
-    // Current motion state
-    float current_velocity_mms;     // Current axis velocity (mm/s)
-    float vfd_frequency_hz;         // VFD frequency when this axis is active (Hz)
-    float commanded_feedrate_mms;   // Target feedrate for this axis (mm/s)
+ // Current motion state
+ float current_velocity_mms; // Current axis velocity (mm/s)
+ float vfd_frequency_hz; // VFD frequency when this axis is active (Hz)
+ float commanded_feedrate_mms; // Target feedrate for this axis (mm/s)
 
-    // Motion quality indicators
-    float velocity_jitter_mms;      // Peak-to-peak velocity variation
-    float vfd_encoder_error_percent; // VFD vs encoder mismatch (0-100%)
-    bool is_moving;                 // True if axis currently moving
-    bool stalled;                   // True if commanded but not moving
-    bool jitter_elevated;           // True if jitter above threshold
+ // Motion quality indicators
+ float velocity_jitter_mms; // Peak-to-peak velocity variation
+ float vfd_encoder_error_percent; // VFD vs encoder mismatch (0-100%)
+ bool is_moving; // True if axis currently moving
+ bool stalled; // True if commanded but not moving
+ bool jitter_elevated; // True if jitter above threshold
 
-    // Historical quality metrics
-    uint32_t quality_score;         // 0-100 (100 = perfect motion)
-    uint32_t good_motion_samples;   // Consecutive good samples
-    uint32_t bad_motion_samples;    // Consecutive bad samples
-    uint32_t stall_count;           // Total stall events recorded
+ // Historical quality metrics
+ uint32_t quality_score; // 0-100 (100 = perfect motion)
+ uint32_t good_motion_samples; // Consecutive good samples
+ uint32_t bad_motion_samples; // Consecutive bad samples
+ uint32_t stall_count; // Total stall events recorded
 
-    // Timing
-    uint32_t last_update_ms;        // Timestamp of last validation
-    uint32_t active_duration_ms;    // How long this axis has been active
-    float max_jitter_recorded_mms;  // Peak jitter amplitude (wear trend)
+ // Timing
+ uint32_t last_update_ms; // Timestamp of last validation
+ uint32_t active_duration_ms; // How long this axis has been active
+ float max_jitter_recorded_mms; // Peak jitter amplitude (wear trend)
 
 } axis_metrics_t;
 
@@ -59,10 +59,10 @@ typedef struct {
 // ============================================================================
 
 typedef struct {
-    axis_metrics_t x_axis;          // X-axis metrics
-    axis_metrics_t y_axis;          // Y-axis metrics
-    axis_metrics_t z_axis;          // Z-axis metrics
-    uint8_t active_axis;            // Currently active axis (0=X, 1=Y, 2=Z, 255=none)
+ axis_metrics_t x_axis; // X-axis metrics
+ axis_metrics_t y_axis; // Y-axis metrics
+ axis_metrics_t z_axis; // Z-axis metrics
+ uint8_t active_axis; // Currently active axis (0=X, 1=Y, 2=Z, 255=none)
 } all_axes_metrics_t;
 
 // ============================================================================
@@ -70,17 +70,17 @@ typedef struct {
 // ============================================================================
 
 typedef struct {
-    // VFD/encoder correlation tolerance (single VFD multiplexed to axes)
-    float vfd_encoder_tolerance_percent;    // Max allowed mismatch (default 15%)
-    float encoder_stall_threshold_mms;      // Min velocity below threshold = stalled (default 0.1 mm/s)
+ // VFD/encoder correlation tolerance (single VFD multiplexed to axes)
+ float vfd_encoder_tolerance_percent; // Max allowed mismatch (default 15%)
+ float encoder_stall_threshold_mms; // Min velocity below threshold = stalled (default 0.1 mm/s)
 
-    // Jitter detection (bearing wear indicator)
-    float jitter_threshold_mms;     // Velocity jitter above this triggers alert (default 0.5 mm/s)
-    uint32_t jitter_window_ms;      // Rolling window for jitter detection (default 500ms)
+ // Jitter detection (bearing wear indicator)
+ float jitter_threshold_mms; // Velocity jitter above this triggers alert (default 0.5 mm/s)
+ uint32_t jitter_window_ms; // Rolling window for jitter detection (default 500ms)
 
-    // Quality scoring
-    uint32_t good_samples_for_quality;      // Samples needed for "good" rating (default 10)
-    uint32_t bad_samples_for_alert;         // Bad samples before alert (default 3)
+ // Quality scoring
+ uint32_t good_samples_for_quality; // Samples needed for "good" rating (default 10)
+ uint32_t bad_samples_for_alert; // Bad samples before alert (default 3)
 
 } axis_sync_config_t;
 
@@ -151,8 +151,8 @@ void axisSynchronizationSetJitterThreshold(float threshold_mms);
  * @param commanded_feedrate_mms Target feedrate for active axis (mm/s)
  */
 void axisSynchronizationUpdate(uint8_t active_axis,
-                               float x_velocity_mms, float y_velocity_mms, float z_velocity_mms,
-                               float vfd_frequency_hz, float commanded_feedrate_mms);
+ float x_velocity_mms, float y_velocity_mms, float z_velocity_mms,
+ float vfd_frequency_hz, float commanded_feedrate_mms);
 
 /**
  * @brief Check if currently active axis motion is valid

@@ -14,6 +14,7 @@ void registerMotionRoutes(PsychicHttpServer& server) {
     
     // POST /api/encoder/calibrate
     server.on("/api/encoder/calibrate", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         String body = request->body();
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, body);
@@ -33,6 +34,7 @@ void registerMotionRoutes(PsychicHttpServer& server) {
 
     // POST /api/hardware/wj66/baud
     server.on("/api/hardware/wj66/baud", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         String body = request->body();
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, body);
@@ -48,6 +50,7 @@ void registerMotionRoutes(PsychicHttpServer& server) {
 
     // POST /api/hardware/wj66/detect
     server.on("/api/hardware/wj66/detect", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         // Don't block the web server - spawn a background task
         xTaskCreate([](void* param) {
             logInfo("[WJ66] Autodetect task starting...");

@@ -25,7 +25,7 @@ void taskI2cManagerFunction(void *parameter) {
   while (1) {
     // Skip I2C operations if hardware was not detected at boot
     if (hardware_present) {
-      // PHASE 2.5: Monitor bus health with adaptive timeout
+      // Monitor bus health with adaptive timeout
       // Scaling prevents spurious timeouts under high system load
       uint32_t bus_timeout = taskGetAdaptiveI2cTimeout();
       if (taskLockMutex(taskGetI2cMutex(), bus_timeout)) {

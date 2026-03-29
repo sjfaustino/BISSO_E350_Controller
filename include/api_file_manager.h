@@ -9,7 +9,7 @@
 
 #include <PsychicHttp.h>
 
-// PHASE 5.10: Removed username/password parameters - auth handled via auth_manager
+// Removed username/password parameters - auth handled via auth_manager
 void apiRegisterFileRoutes(PsychicHttpServer& server);
 
 #endif // API_FILE_MANAGER_H

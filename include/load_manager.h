@@ -1,6 +1,6 @@
 /**
  * @file load_manager.h
- * @brief Graceful Degradation Under Load (PHASE 5.3)
+ * @brief Graceful Degradation Under Load
  * @details Multi-level response to system overload conditions
  * @project BISSO E350 Controller
  */
@@ -19,23 +19,23 @@ extern "C" {
  * Load state machine levels
  */
 typedef enum {
-    LOAD_STATE_NORMAL = 0,      // CPU < 75%, normal operation
-    LOAD_STATE_ELEVATED = 1,    // CPU 75-85%, reduce refresh rates
-    LOAD_STATE_HIGH = 2,        // CPU 85-95%, suspend non-essential tasks
-    LOAD_STATE_CRITICAL = 3     // CPU > 95%, emergency mode
+ LOAD_STATE_NORMAL = 0, // CPU < 75%, normal operation
+ LOAD_STATE_ELEVATED = 1, // CPU 75-85%, reduce refresh rates
+ LOAD_STATE_HIGH = 2, // CPU 85-95%, suspend non-essential tasks
+ LOAD_STATE_CRITICAL = 3 // CPU > 95%, emergency mode
 } load_state_t;
 
 /**
  * Load state information
  */
 typedef struct {
-    load_state_t current_state;
-    load_state_t previous_state;
-    uint8_t current_cpu_percent;
-    uint32_t state_entry_time_ms;
-    uint32_t time_in_state_ms;
-    bool state_changed;
-    bool emergency_estop_initiated;
+ load_state_t current_state;
+ load_state_t previous_state;
+ uint8_t current_cpu_percent;
+ uint32_t state_entry_time_ms;
+ uint32_t time_in_state_ms;
+ bool state_changed;
+ bool emergency_estop_initiated;
 } load_status_t;
 
 /**
@@ -97,12 +97,12 @@ void loadManagerPrintStatus();
 /**
  * Subsystem IDs
  */
-#define LOAD_SUBSYS_MONITOR      0x01
-#define LOAD_SUBSYS_LCD          0x02
-#define LOAD_SUBSYS_TELEMETRY    0x04
-#define LOAD_SUBSYS_LOGGING      0x08
-#define LOAD_SUBSYS_ENCODER      0x10
-#define LOAD_SUBSYS_API          0x20
+#define LOAD_SUBSYS_MONITOR 0x01
+#define LOAD_SUBSYS_LCD 0x02
+#define LOAD_SUBSYS_TELEMETRY 0x04
+#define LOAD_SUBSYS_LOGGING 0x08
+#define LOAD_SUBSYS_ENCODER 0x10
+#define LOAD_SUBSYS_API 0x20
 
 #ifdef __cplusplus
 }

@@ -3,7 +3,7 @@
  * @brief RS-485 Device Registration and Scheduling System
  * @project BISSO E350 Controller
  * @details Manages multiple Modbus RTU devices on shared RS-485 bus.
- *          Supports priority-based scheduling and per-device statistics.
+ * Supports priority-based scheduling and per-device statistics.
  */
 
 #ifndef RS485_DEVICE_REGISTRY_H
@@ -20,20 +20,20 @@ extern "C" {
 // CONFIGURATION
 // ============================================================================
 
-#define RS485_MAX_DEVICES           8       // Maximum registered devices
-#define RS485_DEFAULT_BAUD_RATE     9600    // Default baud rate
-#define RS485_INTER_FRAME_DELAY_MS  5       // Delay between device switches
+#define RS485_MAX_DEVICES 8 // Maximum registered devices
+#define RS485_DEFAULT_BAUD_RATE 9600 // Default baud rate
+#define RS485_INTER_FRAME_DELAY_MS 5 // Delay between device switches
 
 // ============================================================================
 // DEVICE TYPES (for identification)
 // ============================================================================
 
 typedef enum {
-    RS485_DEVICE_TYPE_ENCODER = 0,      // WJ66 encoder
-    RS485_DEVICE_TYPE_CURRENT_SENSOR,   // JXK-10 current sensor
-    RS485_DEVICE_TYPE_VFD,              // Altivar 31 VFD
-    RS485_DEVICE_TYPE_RPM_SENSOR,       // YH-TC05 RPM sensor
-    RS485_DEVICE_TYPE_GENERIC           // Unknown/custom device
+ RS485_DEVICE_TYPE_ENCODER = 0, // WJ66 encoder
+ RS485_DEVICE_TYPE_CURRENT_SENSOR, // JXK-10 current sensor
+ RS485_DEVICE_TYPE_VFD, // Altivar 31 VFD
+ RS485_DEVICE_TYPE_RPM_SENSOR, // YH-TC05 RPM sensor
+ RS485_DEVICE_TYPE_GENERIC // Unknown/custom device
 } rs485_device_type_t;
 
 // ============================================================================
@@ -61,12 +61,12 @@ typedef bool (*rs485_response_fn)(void* ctx, const uint8_t* data, uint16_t len);
 // ============================================================================
 
 typedef struct {
-    uint32_t bucket_lt10ms;     // < 10ms
-    uint32_t bucket_10to25ms;   // 10-25ms
-    uint32_t bucket_25to50ms;   // 25-50ms
-    uint32_t bucket_50to100ms;  // 50-100ms
-    uint32_t bucket_100to250ms; // 100-250ms
-    uint32_t bucket_gt250ms;    // > 250ms (usually a timeout)
+ uint32_t bucket_lt10ms; // < 10ms
+ uint32_t bucket_10to25ms; // 10-25ms
+ uint32_t bucket_25to50ms; // 25-50ms
+ uint32_t bucket_50to100ms; // 50-100ms
+ uint32_t bucket_100to250ms; // 100-250ms
+ uint32_t bucket_gt250ms; // > 250ms (usually a timeout)
 } rs485_latency_histogram_t;
 
 // ============================================================================
@@ -74,36 +74,36 @@ typedef struct {
 // ============================================================================
 
 typedef struct {
-    const char* name;               // Device name ("JXK-10", "Altivar31", etc.)
-    rs485_device_type_t type;       // Device type enum
-    uint8_t slave_address;          // Modbus slave address (1-247)
-    uint16_t poll_interval_ms;      // How often to poll (50-5000ms)
-    uint8_t priority;               // 0=lowest, 255=highest
-    bool enabled;                   // Device enabled flag
-    
-    // Callbacks
-    rs485_poll_fn poll;             // Initiate transaction
-    rs485_response_fn on_response;  // Process response
-    void* user_data;                // User context (passed to callbacks)
-    
-    // Runtime statistics (managed by registry)
-    uint32_t last_poll_time_ms;     // Timestamp of last poll
-    uint32_t poll_count;            // Successful polls
-    uint32_t error_count;           // Failed polls
-    uint32_t consecutive_errors;    // Consecutive failures
-    bool pending_response;          // Waiting for response
+ const char* name; // Device name ("JXK-10", "Altivar31", etc.)
+ rs485_device_type_t type; // Device type enum
+ uint8_t slave_address; // Modbus slave address (1-247)
+ uint16_t poll_interval_ms; // How often to poll (50-5000ms)
+ uint8_t priority; // 0=lowest, 255=highest
+ bool enabled; // Device enabled flag
+ 
+ // Callbacks
+ rs485_poll_fn poll; // Initiate transaction
+ rs485_response_fn on_response; // Process response
+ void* user_data; // User context (passed to callbacks)
+ 
+ // Runtime statistics (managed by registry)
+ uint32_t last_poll_time_ms; // Timestamp of last poll
+ uint32_t poll_count; // Successful polls
+ uint32_t error_count; // Failed polls
+ uint32_t consecutive_errors; // Consecutive failures
+ bool pending_response; // Waiting for response
 
-    // Latency Tracking (NEW)
-    uint32_t last_tx_end_us;        // micros() end of last transmission
-    uint32_t first_rx_byte_us;      // micros() start of reception
-    rs485_latency_histogram_t latency_hist;
-    
-    // Jitter Analysis
-    uint32_t min_latency_us;
-    uint32_t max_latency_us;
-    uint64_t total_latency_us;
-    uint64_t total_latency_sq_us;
-    uint32_t latency_samples;
+ // Latency Tracking (NEW)
+ uint32_t last_tx_end_us; // micros() end of last transmission
+ uint32_t first_rx_byte_us; // micros() start of reception
+ rs485_latency_histogram_t latency_hist;
+ 
+ // Jitter Analysis
+ uint32_t min_latency_us;
+ uint32_t max_latency_us;
+ uint64_t total_latency_us;
+ uint64_t total_latency_sq_us;
+ uint32_t latency_samples;
 } rs485_device_t;
 
 // ============================================================================
@@ -111,33 +111,33 @@ typedef struct {
 // ============================================================================
 
 typedef struct {
-    rs485_device_t* devices[RS485_MAX_DEVICES]; // Registered devices
-    uint8_t device_count;                       // Number of registered devices
-    uint8_t current_device_index;               // Currently active device
-    uint32_t last_switch_time_ms;               // Last device switch timestamp
-    uint32_t baud_rate;                         // Current baud rate
-    bool bus_busy;                              // Transaction in progress
-    uint32_t total_transactions;                // Total transactions
-    uint32_t total_errors;                      // Total errors
-    
-    // Watchdog state
-    uint32_t last_successful_response_ms;       // Last successful response timestamp
-    bool watchdog_alert_active;                 // True if alert has been raised
-    bool bus_paused;                            // True to suspend all registry activity
-    void* bus_mutex;                            // Mutex for bus access
-    
-    // Sniffer support
-    void (*sniffer_cb)(bool is_tx, const uint8_t* data, uint16_t len);
+ rs485_device_t* devices[RS485_MAX_DEVICES]; // Registered devices
+ uint8_t device_count; // Number of registered devices
+ uint8_t current_device_index; // Currently active device
+ uint32_t last_switch_time_ms; // Last device switch timestamp
+ uint32_t baud_rate; // Current baud rate
+ bool bus_busy; // Transaction in progress
+ uint32_t total_transactions; // Total transactions
+ uint32_t total_errors; // Total errors
+ 
+ // Watchdog state
+ uint32_t last_successful_response_ms; // Last successful response timestamp
+ bool watchdog_alert_active; // True if alert has been raised
+ bool bus_paused; // True to suspend all registry activity
+ void* bus_mutex; // Mutex for bus access
+ 
+ // Sniffer support
+ void (*sniffer_cb)(bool is_tx, const uint8_t* data, uint16_t len);
 } rs485_registry_state_t;
 
-// Sniffer Entry (PHASE 2.0)
+// Sniffer Entry
 typedef struct {
-    uint32_t timestamp;
-    uint8_t address;
-    uint8_t function;
-    uint16_t length;
-    bool is_tx;
-    uint8_t data[8]; // Snapshot of first 8 bytes
+ uint32_t timestamp;
+ uint8_t address;
+ uint8_t function;
+ uint16_t length;
+ bool is_tx;
+ uint8_t data[8]; // Snapshot of first 8 bytes
 } rs485_sniff_entry_t;
 
 #define RS485_SNIFF_BUFFER_SIZE 50

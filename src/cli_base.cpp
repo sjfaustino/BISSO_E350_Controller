@@ -63,7 +63,7 @@ void handle_jog_command(char* cmd) {
     if (strstr(cmd, "G91")) use_relative = true;
     else if (strstr(cmd, "G90")) use_relative = false;
 
-    // PHASE 5.10: Use strtof with error checking instead of atof
+    // Use strtof with error checking instead of atof
     float feed_mm_min = 0.0f;
     char* f_ptr = strchr(cmd, 'F');
     if (f_ptr) {
@@ -89,7 +89,7 @@ void handle_jog_command(char* cmd) {
         motionGetPositionMM(2), motionGetPositionMM(3)
     };
 
-    // PHASE 5.10: Use strtof with error checking for axis values
+    // Use strtof with error checking for axis values
     for(int i=0; i<4; i++) {
         char* ax_ptr = strchr(cmd, axes_char[i]);
         if (ax_ptr) {
@@ -103,7 +103,7 @@ void handle_jog_command(char* cmd) {
                 return;
             }
         } else {
-            // PHASE 5.10: For non-specified axes, store work position (not machine)
+            // For non-specified axes, store work position (not machine)
             // This ensures target[] array uses consistent coordinate system
             target[i] = use_relative ? 0.0f : gcodeParser.getWorkPosition(i, current_mpos[i]);
         }
@@ -180,7 +180,7 @@ void cliUpdate() {
         else if (motionGetState(0) == MOTION_HOMING_APPROACH_FAST) state_str = "Home";
         else if (motionGetState(0) == MOTION_PAUSED) state_str = "Hold:0";
 
-        // PHASE 5.10: Use MOTION_BUFFER_SIZE instead of hardcoded 31
+        // Use MOTION_BUFFER_SIZE instead of hardcoded 31
         // Grbl convention: report available planning buffer slots (capacity - 1 - used)
         int plan_slots = (MOTION_BUFFER_SIZE - 1) - motionBuffer.available();
         if (plan_slots < 0) plan_slots = 0;
@@ -463,7 +463,7 @@ void cliProcessCommand(const char* cmd) {
   }
 
   // Settings ($100=val)
-  // PHASE 5.10: Use strtol/strtof with error checking
+  // Use strtol/strtof with error checking
   if (cmd[0] == '$' && isdigit(cmd[1])) {
       char* endptr = NULL;
       long id_long = strtol(cmd + 1, &endptr, 10);
@@ -696,7 +696,7 @@ bool cliDispatchSubcommand(const char* prefix, int argc, char** argv,
 // ============================================================================
 
 void cliPrintTableDivider(int w1, int w2, int w3, int w4, int w5) {
-    // PHASE 16 FIX: Build entire line in buffer, then output atomically
+    // FIX: Build entire line in buffer, then output atomically
     char line[256];
     int pos = 0;
     
@@ -728,7 +728,7 @@ void cliPrintTableRow(const char* c1, const char* c2, const char* c3,
                       int w1, int w2, int w3,
                       const char* c4, int w4,
                       const char* c5, int w5) {
-    // PHASE 16 FIX: Build entire row in buffer, then output atomically
+    // FIX: Build entire row in buffer, then output atomically
     char line[256];
     int pos = 0;
     

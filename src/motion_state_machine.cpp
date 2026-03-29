@@ -17,7 +17,7 @@
 #include "fault_logging.h"
 #include "serial_logger.h"
 #include "board_inputs.h"
-#include "system_events.h" // PHASE 5.10: Event-driven architecture
+#include "system_events.h" // Event-driven architecture
 #include <Arduino.h>
 
 // External spinlock for thread-safe state access
@@ -168,7 +168,7 @@ bool MotionStateMachine::transitionTo(Axis* axis, motion_state_t new_state) {
              motionStateToString(old_state),
              motionStateToString(new_state));
 
-    // PHASE 5.10: Signal event group for state changes
+    // Signal event group for state changes
     // This allows tasks to wake up immediately instead of polling
     systemEventsMotionSet(EVENT_MOTION_STATE_CHANGE);
 
@@ -313,7 +313,7 @@ void state_stopping_handler(Axis* axis, int32_t pos, int32_t target, bool consen
         return;
     }
 
-    // PHASE 5.20: Position Hunting Logic
+    // Position Hunting Logic
     // If we've settled for at least 600ms (typical mechanical bounce time)
     // and we are still outside margin, we check if we should "hunt" back.
     // SAFETY: Restrict hunting to X (0) and Z (2) axes. 
@@ -429,7 +429,7 @@ void state_homing_settle_handler(Axis* axis, int32_t pos, int32_t target, bool c
 
         logInfo("[HOME] Axis %d zeroed", axis->id);
 
-        // PHASE 5.10: Signal homing completion event before transitioning
+        // Signal homing completion event before transitioning
         systemEventsMotionSet(EVENT_MOTION_HOMING_COMPLETE);
 
         MotionStateMachine::transitionTo(axis, MOTION_IDLE);

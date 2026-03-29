@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 // ============================================================================
-// PHASE 3.2: LCD MESSAGE SYSTEM (G-CODE M117 SUPPORT)
+// LCD MESSAGE SYSTEM (G-CODE M117 SUPPORT)
 // ============================================================================
 
 // Maximum length for custom LCD messages (fits on 20-char line)

@@ -1,6 +1,6 @@
 /**
  * @file dashboard_metrics.h
- * @brief Dashboard Metrics Aggregator (PHASE 5.3)
+ * @brief Dashboard Metrics Aggregator
  * @details Real-time data streaming for web UI dashboard
  * @project BISSO E350 Controller
  */
@@ -20,41 +20,41 @@ extern "C" {
  * Real-time dashboard metrics snapshot
  */
 typedef struct {
-    // System status
-    uint32_t uptime_ms;
-    uint8_t cpu_percent;
-    uint32_t free_heap_bytes;
+ // System status
+ uint32_t uptime_ms;
+ uint8_t cpu_percent;
+ uint32_t free_heap_bytes;
 
-    // Motion
-    float x_pos, y_pos, z_pos, a_pos;
-    bool motion_moving;
-    bool motion_enabled;
+ // Motion
+ float x_pos, y_pos, z_pos, a_pos;
+ bool motion_moving;
+ bool motion_enabled;
 
-    // Safety
-    bool estop_active;
-    bool alarm_active;
-    uint32_t fault_count;
+ // Safety
+ bool estop_active;
+ bool alarm_active;
+ uint32_t fault_count;
 
-    // Spindle
-    float spindle_current_amps;
-    bool spindle_overcurrent;
+ // Spindle
+ float spindle_current_amps;
+ bool spindle_overcurrent;
 
-    // Network
-    bool wifi_connected;
-    uint8_t wifi_signal;
+ // Network
+ bool wifi_connected;
+ uint8_t wifi_signal;
 
-    // Performance
-    uint8_t slowest_task_id;
-    uint32_t slowest_task_us;
+ // Performance
+ uint8_t slowest_task_id;
+ uint32_t slowest_task_us;
 
-    // Encoder health (simple status)
-    uint8_t encoder_health[4];  // 0=optimal, 1=normal, 2=degraded, 3=critical
+ // Encoder health (simple status)
+ uint8_t encoder_health[4]; // 0=optimal, 1=normal, 2=degraded, 3=critical
 
-    // Load state
-    uint8_t load_state;  // 0=normal, 1=elevated, 2=high, 3=critical
+ // Load state
+ uint8_t load_state; // 0=normal, 1=elevated, 2=high, 3=critical
 
-    // Timestamp
-    uint64_t timestamp_ms;
+ // Timestamp
+ uint64_t timestamp_ms;
 } dashboard_metrics_t;
 
 /**

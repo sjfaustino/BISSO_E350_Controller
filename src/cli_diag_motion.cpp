@@ -49,7 +49,7 @@ void cmd_encoder_status(int argc, char** argv) {
     snprintf(buf, sizeof(buf), "%d", configGetInt(KEY_ENC_ADDR, 0));
     cliPrintTableRow("Slave ID", buf, nullptr, 16, 38, 0, nullptr, 0, nullptr, 0);
     
-    // PHASE 7: Added Latency & Errors to summary
+    // Added Latency & Errors to summary
     // Use axis age instead of wall clock for summary
     snprintf(buf, sizeof(buf), "%d ms", (int)wj66GetPollCount() > 0 ? 50 : 0); // Polling interval
     cliPrintTableRow("Poll Interval", buf, nullptr, 16, 38, 0, nullptr, 0, nullptr, 0);

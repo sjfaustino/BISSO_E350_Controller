@@ -171,7 +171,7 @@ static void ota_task(void* pvParameters) {
                 logInfo("[OTA] File size: %d bytes", contentLength);
                 
                 if (Update.begin(contentLength)) {
-                    // PHASE 7: Register progress callback so UI isn't blind during 30s flash
+                    // Register progress callback so UI isn't blind during 30s flash
                     Update.onProgress([](size_t progress, size_t size) {
                         if (size > 0) ota_progress = (progress * 100) / size;
                     });

@@ -1,6 +1,6 @@
 /**
  * @file tasks_lcd_formatter.cpp
- * @brief LCD String Formatter Task (PHASE 5.4)
+ * @brief LCD String Formatter Task
  * @details Background formatting task on Core 0 to prepare LCD strings
  * @author Sergio Faustino
  */
@@ -13,25 +13,25 @@
 #include <freertos/task.h>
 
 void taskLcdFormatterFunction(void* parameter) {
-  TickType_t last_wake = xTaskGetTickCount();
+ TickType_t last_wake = xTaskGetTickCount();
 
-  logInfo("[LCD_FORMATTER_TASK] [OK] Started on core 0 - Background formatting");
-  watchdogTaskAdd("LCD_Formatter");
-  watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "LCD_Formatter");
+ logInfo("[LCD_FORMATTER_TASK] [OK] Started on core 0 - Background formatting");
+ watchdogTaskAdd("LCD_Formatter");
+ watchdogSubscribeTask(xTaskGetCurrentTaskHandle(), "LCD_Formatter");
 
-  // Initialize the formatter
-  lcdFormatterInit();
+ // Initialize the formatter
+ lcdFormatterInit();
 
-  while (1) {
-    // CRITICAL FIX: Feed watchdog EARLY to prevent timeout if operations block
-    watchdogFeed("LCD_Formatter");
+ while (1) {
+ // CRITICAL FIX: Feed watchdog EARLY to prevent timeout if operations block
+ watchdogFeed("LCD_Formatter");
 
-    // Format all LCD strings with current motion state
-    // This heavy snprintf work happens on Core 0, freeing Core 1 for motion control
-    lcdFormatterUpdate();
+ // Format all LCD strings with current motion state
+ // This heavy snprintf work happens on Core 0, freeing Core 1 for motion control
+ lcdFormatterUpdate();
 
-    // Feed watchdog again at end of loop (defense in depth)
-    watchdogFeed("LCD_Formatter");
-    vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_LCD_FORMAT));
-  }
+ // Feed watchdog again at end of loop (defense in depth)
+ watchdogFeed("LCD_Formatter");
+ vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TASK_PERIOD_LCD_FORMAT));
+ }
 }

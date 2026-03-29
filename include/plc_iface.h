@@ -9,6 +9,7 @@
 
 #include <Arduino.h>
 #include <stdint.h>
+#include "system_constants.h"
 
 
 // ============================================================================
@@ -76,7 +77,7 @@ typedef struct {
 // PUBLIC API
 // ============================================================================
 
-void elboInit();
+result_t elboInit();
 
 /**
  * @brief Reads a specific bit from the I73 input board.

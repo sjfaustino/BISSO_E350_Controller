@@ -2,6 +2,7 @@
 #define SAFETY_H
 
 #include <Arduino.h>
+#include "system_constants.h"
 #include "safety_state_machine.h" // Includes the safety_fsm_state_t enum definition
 #include "fault_logging.h"        // Includes fault_severity_t and fault_code_t
 
@@ -35,10 +36,10 @@ typedef struct safety_system_data {
   uint8_t history_index;
 } safety_system_data_t; // FIX: New name for the struct type
 
-void safetyInit();
+result_t safetyInit();
 void safetyUpdate();
 bool safetyCheckMotionAllowed(uint8_t axis);
-// PHASE 5.10: Added fault_type parameter for thread-safe fault assignment
+// Added fault_type parameter for thread-safe fault assignment
 void safetyTriggerAlarm(const char* reason, safety_fault_t fault_type);
 void safetyResetAlarm();
 /**

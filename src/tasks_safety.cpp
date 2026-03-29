@@ -11,7 +11,7 @@
 #include "safety.h"
 #include "serial_logger.h"
 #include "system_constants.h"
-#include "system_events.h" // PHASE 5.10: Event-driven architecture
+#include "system_events.h" // Event-driven architecture
 #include "task_performance_monitor.h"
 #include "task_manager.h"
 #include "watchdog_manager.h"
@@ -40,7 +40,7 @@ void taskSafetyFunction(void *parameter) {
     safetyUpdate();
 
     // 2. Poll Physical Buttons
-    // PHASE 5.4: Use dedicated board input mutex instead of generic I2C mutex
+    // Use dedicated board input mutex instead of generic I2C mutex
     // Prevents button polling from blocking PLC communication
     // NOTE: boardInputsUpdate() manages its own mutex internally
 
@@ -65,7 +65,7 @@ void taskSafetyFunction(void *parameter) {
           if (motionIsMoving()) {
             logInfo("[SAFETY] Physical PAUSE button pressed");
 
-            // PHASE 5.10: Signal event before action
+            // Signal event before action
             systemEventsSafetySet(EVENT_SAFETY_PAUSE_PRESSED);
 
             motionPause();
@@ -80,7 +80,7 @@ void taskSafetyFunction(void *parameter) {
           if (!safetyIsAlarmed()) {
             logInfo("[SAFETY] Physical RESUME button pressed");
 
-            // PHASE 5.10: Signal event before action
+            // Signal event before action
             systemEventsSafetySet(EVENT_SAFETY_RESUME_PRESSED);
 
             motionResume();
@@ -89,7 +89,7 @@ void taskSafetyFunction(void *parameter) {
         }
       }
     } else if (bootIsSubsystemHealthy("Inputs")) { 
-      // PHASE 16: Only log periodic errors if the device was actually detected at boot.
+      // Only log periodic errors if the device was actually detected at boot.
       // If the board is known-missing (bare DevKit), stay silent to avoid CLI spam.
       static uint32_t last_io_err = 0;
       if (now - last_io_err > 5000) {

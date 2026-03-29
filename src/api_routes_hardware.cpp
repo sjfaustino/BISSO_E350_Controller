@@ -23,6 +23,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
     
     // GET /api/io/status (OPTIMIZED: snprintf, no heap)
     server.on("/api/io/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         uint8_t in_bits = elboI73GetRawState();
         uint8_t board_in = boardInputsGetRawState();
         uint8_t out_bits = elboQ73GetRawState();
@@ -53,6 +54,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
     
     // GET /api/hardware/io (STABLE: Chunked streaming, no large buffer)
     server.on("/api/hardware/io", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         uint8_t in_bits = elboI73GetRawState();
         uint8_t out_bits = elboQ73GetRawState();
         uint8_t board_in = boardInputsGetRawState();
@@ -102,6 +104,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
 
     // GET /api/hardware/pins (FIXED: Overflow-safe efficient chunked streaming)
     server.on("/api/hardware/pins", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         response->setContentType("application/json");
         response->sendHeaders(); // CRITICAL: Must send headers before first chunk
 
@@ -152,6 +155,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
 
     // POST /api/hardware/pins
     server.on("/api/hardware/pins", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, request->body());
         if (error) {
@@ -186,6 +190,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
 
     // POST /api/hardware/pins/reset
     server.on("/api/hardware/pins/reset", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         for (size_t i = 0; i < SIGNAL_COUNT; i++) {
             // Use setPin to ensure consistent NVS key usage and logging
             setPin(signalDefinitions[i].key, -1, true);
@@ -196,6 +201,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
 
     // GET /api/hardware/tachometer
     server.on("/api/hardware/tachometer", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+         if (requireAuth(request, response) != ESP_OK) return ESP_OK;
          const yhtc05_state_t* state = yhtc05GetState();
          JsonDocument doc;
          doc["enabled"] = state->enabled;
@@ -211,6 +217,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
 
     // GET /api/logs/boot - Stream boot log directly from filesystem
     server.on("/api/logs/boot", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         if (!LittleFS.exists("/bootlog.txt") || bootLogGetSize() == 0) {
             return response->send(200, "text/plain", "(No boot log available)");
         }
@@ -222,6 +229,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
     
     // DELETE /api/logs/boot
     server.on("/api/logs/boot", HTTP_DELETE, [](PsychicRequest *request, PsychicResponse *response) {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         if (LittleFS.exists("/bootlog.txt")) {
             if (LittleFS.remove("/bootlog.txt")) {
                 logInfo("[WEB] Boot log deleted");
@@ -235,6 +243,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
     
     // POST /api/hardware/i2c/test - Comprehensive I2C bus scan
     server.on("/api/hardware/i2c/test", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         
         // Define all known I2C devices to scan
@@ -282,6 +291,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
     
     // GET /api/hardware/rs485/status - Get RS485 bus health
     server.on("/api/hardware/rs485/status", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         
         const rs485_registry_state_t* state = rs485GetState();
@@ -368,12 +378,14 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
 
     // POST /api/hardware/rs485/reset - Reset bus statistics
     server.on("/api/hardware/rs485/reset", HTTP_POST, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         rs485ResetErrorCounters();
         return response->send(200, "application/json", "{\"success\":true}");
     });
 
     // GET /api/hardware/rs485/sniff - Live frame sniffer
     server.on("/api/hardware/rs485/sniff", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         JsonArray frames = doc.to<JsonArray>();
         
@@ -401,6 +413,7 @@ void registerHardwareRoutes(PsychicHttpServer& server) {
 
     // GET /api/system/health/buses - Unified health dashboard
     server.on("/api/system/health/buses", HTTP_GET, [](PsychicRequest *request, PsychicResponse *response) -> esp_err_t {
+        if (requireAuth(request, response) != ESP_OK) return ESP_OK;
         JsonDocument doc;
         JsonObject buses = doc.to<JsonObject>();
         
